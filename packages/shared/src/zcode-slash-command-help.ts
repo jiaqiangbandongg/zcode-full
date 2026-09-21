@@ -187,4 +187,15 @@ export const BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlas
       summary: "Show or set the current session goal.",
       usage: "/goal [pause|resume|clear|replace <objective>|<objective>]",
     },
+    {
+      details: [
+        "Shows current Git auto-backup status and configuration.",
+        "Use configure to set up Alibaba Cloud OSS credentials interactively.",
+        "Use enable or disable to toggle automatic backups.",
+        "Use run to trigger an immediate backup of the current workspace.",
+      ],
+      name: "backup",
+      summary: "Manage Git auto-backup to Alibaba Cloud OSS.",
+      usage: "/backup [status|configure|enable|disable|run]",
+    },
   ] as const;

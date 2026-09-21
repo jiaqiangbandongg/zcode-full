@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type { RunContext, GlobalOptions } from "@zcode/shared-types";
 import { resolveZCodeRuntimeEnv } from "@zcode/shared";
 import { createNodeClipboardImageReader } from "./clipboard-image.js";
@@ -56,6 +59,14 @@ export const runTuiCommand = async (
       process: deps.shutdownProcess,
     });
     try {
+      const storageDir = (deps.env ?? process.env).ZCODE_STORAGE_DIR || join(homedir(), ".zcode-beta");
+      const backupOnboardingPath = join(storageDir, "git-backup-onboarding-done");
+      if (!existsSync(backupOnboardingPath)) {
+        ctx.stderr.write(
+          "\n💡 ZCode 满血版支持 Git 自动备份到你自己的阿里云 OSS。" +
+          "\n   输入 /backup configure 了解详情，或 /backup enable 开启。\n\n",
+        );
+      }
       return await runTui({
         loadStartupOptions: async () => {
           const [metadata, customCommands, workspaceGitBranch] = await Promise.all([

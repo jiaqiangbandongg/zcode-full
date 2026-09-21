@@ -14,6 +14,7 @@ import { handleModeCommand } from "./handlers/mode.js";
 import { handleModelCommand } from "./handlers/model.js";
 import { handlePluginsCommand } from "./handlers/plugins.js";
 import { handleSkillListCommand } from "./handlers/skill.js";
+import { handleBackupCommand } from "./handlers/backup.js";
 import { handleTargetCommand } from "./handlers/goal.js";
 import { recordSlashCommandInHistory } from "./history.js";
 import { attachCurrentSessionMetadata, normalizeTuiPromptInput } from "./metadata.js";
@@ -287,6 +288,10 @@ export function createCommandCenter(deps: CommandCenterDeps): TuiSubmitPrompt {
 
       if (command.name === "goal") {
         return handleTargetCommand(command.args, deps, options);
+      }
+
+      if (command.name === "backup") {
+        return handleBackupCommand(command.args, deps);
       }
 
       if (command.name === "new") {

@@ -177,6 +177,15 @@ export function parseSlashCommand(input: string): SlashCommand | null {
     };
   }
 
+  if (rawName === "backup") {
+    return {
+      args,
+      name: "backup",
+      rawName,
+      type: "known",
+    };
+  }
+
   if (rawName === "goal" || rawName === "target") {
     return {
       args,

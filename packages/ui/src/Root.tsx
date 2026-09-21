@@ -44,6 +44,7 @@ import { RootWorkspaceContent } from "@/root/RootWorkspaceContent.js";
 import { resolveRootWorkspaceShellTarget } from "@/root/rootWorkspaceShellTarget.js";
 import { OccupationOnboarding } from "@/onboarding/OccupationOnboarding.js";
 import { OnboardingDialog } from "@/onboarding/OnboardingDialog.js";
+import { GitBackupWelcomeDialog } from "@/GitBackupWelcomeDialog.js";
 import { useRemoteWorkspaceHistory } from "@/root/useRemoteWorkspaceHistory.js";
 import { useRemoteWorkspaceTabLifecycle } from "@/root/useRemoteWorkspaceTabLifecycle.js";
 import { useRootProviderStateRefresh } from "@/root/useRootProviderStateRefresh.js";
@@ -226,6 +227,25 @@ function RootInner({
   const readRootModelSelectionView = useCallback(
     () => services.modelSelectionService.getView(),
     [services.modelSelectionService],
+  );
+  const [gitBackupWelcomeOpen, setGitBackupWelcomeOpen] = useState(() => {
+    try {
+      return !localStorage.getItem("git-backup-onboarding-done");
+    } catch {
+      return false;
+    }
+  });
+  const handleGitBackupWelcomeComplete = useCallback(
+    (config: { enabled: boolean; oss?: { accessKeyId: string; accessKeySecret: string; bucket: string; region: string; pathPrefix?: string } }) => {
+      try {
+        localStorage.setItem("git-backup-onboarding-done", "1");
+        if (config.enabled && config.oss) {
+          localStorage.setItem("git-backup-config", JSON.stringify({ enabled: true, oss: config.oss }));
+        }
+      } catch { /* noop */ }
+      setGitBackupWelcomeOpen(false);
+    },
+    [],
   );
   const [remoteConnectionDialogOpen, setRemoteConnectionDialogOpen] = useState(false);
   const [remoteConnectionOpenPreference, setRemoteConnectionOpenPreference] =
@@ -1062,6 +1082,10 @@ function RootInner({
             isDesktop={isDesktop}
           />
         </ScopedErrorBoundary>
+        <GitBackupWelcomeDialog
+          open={gitBackupWelcomeOpen}
+          onComplete={handleGitBackupWelcomeComplete}
+        />
       </OccupationOnboarding>
     </RootShell>
   );

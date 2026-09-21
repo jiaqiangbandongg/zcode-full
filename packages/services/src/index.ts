@@ -63,6 +63,15 @@ export type { MediaPreviewPreparation } from "./media-preview/mediaPreview.js";
 export { IGitService } from "./git/git.js";
 export { IGitCheckpointService } from "./git/gitCheckpoint.js";
 
+// Git backup service (ZCode 满血版新增)
+export { IGitBackupService } from "./git-backup/gitBackup.js";
+export type {
+  GitBackupConfig,
+  GitBackupOssConfig,
+  GitBackupManifest,
+  GitBackupStatus,
+} from "./git-backup/gitBackup.js";
+
 // System service — ISystemService is both a type (interface) and value (descriptor)
 export { ISystemService } from "./system/system.js";
 
