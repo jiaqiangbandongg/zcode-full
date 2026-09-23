@@ -9,7 +9,12 @@ import type {
   GitBackupStatus,
   IGitBackupService,
 } from "./gitBackup.js";
-import { ensureKeyPair, encryptBuffer, readPublicKey, readPrivateKey } from "./gitBackupEncryption.js";
+import {
+  ensureKeyPair,
+  encryptBuffer,
+  readPublicKey,
+  readPrivateKey,
+} from "./gitBackupEncryption.js";
 import { uploadToOss } from "./gitBackupOssClient.js";
 
 const CONFIG_FILE = "git-backup-config.json";
@@ -75,7 +80,8 @@ async function packGitDir(gitDir: string): Promise<Buffer> {
 
   for (const entry of entries) {
     if (!entry.isFile()) continue;
-    const fullPath = join(entry.parentPath ?? entry.path, entry.name);
+    // Node 24 已移除 Dirent.path，parentPath 始终存在，去掉对 path 的兜底（否则类型检查报错）。
+    const fullPath = join(entry.parentPath, entry.name);
     const relPath = relative(gitDir, fullPath);
     const content = await readFile(fullPath);
     const header = Buffer.from(`${relPath}\0${content.length}\0`);
@@ -129,7 +135,9 @@ export function createGitBackupService(dataDir: string): IGitBackupService {
     async startBackup(workspacePath: string): Promise<GitBackupManifest> {
       const config = await loadConfig(dataDir);
       if (!config.oss) {
-        throw new Error("OSS not configured. Please configure your Alibaba Cloud OSS credentials first.");
+        throw new Error(
+          "OSS not configured. Please configure your Alibaba Cloud OSS credentials first.",
+        );
       }
 
       lastStatus.running = true;
