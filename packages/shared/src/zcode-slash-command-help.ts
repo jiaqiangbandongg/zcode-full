@@ -1,3 +1,5 @@
+import { FORK_SLASH_COMMAND_HELP_ENTRIES } from "./fork-slash-command-help.js";
+
 export type BuiltinZCodeSlashCommandHelpEntry = {
   aliases?: readonly string[];
   details: readonly string[];
@@ -6,7 +8,7 @@ export type BuiltinZCodeSlashCommandHelpEntry = {
   usage: string;
 };
 
-export const BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlashCommandHelpEntry[] =
+const UPSTREAM_BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlashCommandHelpEntry[] =
   [
     {
       details: [
@@ -197,15 +199,8 @@ export const BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlas
       summary: "Design and launch a dynamic workflow for a task.",
       usage: "/workflow [what the workflow should accomplish]",
     },
-    {
-      details: [
-        "Shows current Git auto-backup status and configuration.",
-        "Use configure to set up Alibaba Cloud OSS credentials interactively.",
-        "Use enable or disable to toggle automatic backups.",
-        "Use run to trigger an immediate backup of the current workspace.",
-      ],
-      name: "backup",
-      summary: "Manage Git auto-backup to Alibaba Cloud OSS.",
-      usage: "/backup [status|configure|enable|disable|run]",
-    },
   ] as const;
+
+// 满血版：上游数组保持原样，满血版命令在数组外拼接，避免上游在数组末尾新增命令时同步冲突。
+export const BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES: readonly BuiltinZCodeSlashCommandHelpEntry[] =
+  [...UPSTREAM_BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES, ...FORK_SLASH_COMMAND_HELP_ENTRIES];
