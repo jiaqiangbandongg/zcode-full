@@ -1,0 +1,127 @@
+name: Sync upstream
+
+on:
+  schedule:
+    # 每天北京时间 09:17 检查上游更新
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+
+env:
+  UPSTREAM_REPO: https://github.com/zai-org/ZCode.git
+  UPSTREAM_BRANCH: main
+  SYNC_BRANCH: sync/upstream
+  # 显式指定仓库，避免 gh 在多个 remote 时把 PR 开到上游
+  GH_REPO: ${{ github.repository }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # .gitattributes 中标记 merge=ours 的文件（如 README.md）合并时保留本仓库版本
+          git config merge.ours.driver true
+
+          git fetch --no-tags "$UPSTREAM_REPO" "$UPSTREAM_BRANCH"
+          upstream_sha=$(git rev-parse FETCH_HEAD)
+          echo "upstream_sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+
+          if git merge-base --is-ancestor "$upstream_sha" HEAD; then
+            echo "上游没有新提交"
+            echo "result=up-to-date" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          subject=$(git log -1 --format=%s "$upstream_sha")
+          if git merge --no-edit -m "chore: 同步上游 ZCode（${subject}）" "$upstream_sha"; then
+            echo "result=merged" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+            git merge --abort
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.merge.outputs.result == 'merged'
+        with:
+          node-version: "24.14.0"
+
+      # 不指定 version，按 package.json 的 packageManager 安装，上游升级 pnpm 时自动跟随
+      - uses: pnpm/action-setup@v4
+        if: steps.merge.outputs.result == 'merged'
+
+      - name: Build
+        id: build
+        if: steps.merge.outputs.result == 'merged'
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # GITHUB_TOKEN 的推送不会再触发 CI，所以上面先在这里 build 过才推送
+      - name: Push to main
+        if: steps.merge.outputs.result == 'merged'
+        run: git push origin HEAD:main
+
+      - name: Open PR for manual sync
+        if: ${{ !cancelled() && (steps.merge.outputs.result == 'conflict' || steps.build.outcome == 'failure') }}
+        env:
+          RESULT: ${{ steps.merge.outputs.result }}
+          UPSTREAM_SHA: ${{ steps.merge.outputs.upstream_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # 同步分支只放上游提交；不强推，避免覆盖在该分支上手动解决冲突的提交
+          git push origin "$UPSTREAM_SHA:refs/heads/$SYNC_BRANCH" \
+            || echo "::warning::$SYNC_BRANCH 分支上已有手动提交，保持不变"
+
+          {
+            echo "上游 [zai-org/ZCode](https://github.com/zai-org/ZCode) 有新提交，无法自动同步到 main，需要手动处理。"
+            echo
+            if [ "$RESULT" = conflict ]; then
+              echo "**原因**：合并时以下文件有冲突"
+              echo
+              sed 's/.*/- `&`/' "$RUNNER_TEMP/conflicts.txt"
+            else
+              echo "**原因**：合并没有冲突，但合并后 build 失败，详见[运行日志]($RUN_URL)。"
+            fi
+            echo
+            echo "**处理方法**（在本地仓库执行）："
+            echo
+            echo '```bash'
+            echo 'git config merge.ours.driver true  # 仅首次需要'
+            echo 'git switch main && git pull'
+            echo 'git fetch upstream'
+            echo 'git merge upstream/main'
+            echo '# 解决冲突或修复 build 后提交，然后推送'
+            echo 'git push origin main'
+            echo '```'
+            echo
+            echo "推送后 main 已包含上游提交，这个 PR 会自动变为已合并。"
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          existing=$(gh pr list --head "$SYNC_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --body-file "$RUNNER_TEMP/pr-body.md"
+          else
+            gh pr create --base main --head "$SYNC_BRANCH" \
+              --title "同步上游 ZCode（需要手动处理）" \
+              --body-file "$RUNNER_TEMP/pr-body.md"
+          fi
+
+          echo "::error::上游有更新但无法自动同步，请按 PR 说明手动处理"
+          exit 1
