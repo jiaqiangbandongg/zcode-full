@@ -66,14 +66,15 @@ jobs:
       - uses: pnpm/action-setup@v4
         if: steps.merge.outputs.result == 'merged'
 
-      - name: Build
+      - name: Build and typecheck
         id: build
         if: steps.merge.outputs.result == 'merged'
         run: |
           pnpm install --frozen-lockfile
           pnpm build
+          pnpm typecheck
 
-      # GITHUB_TOKEN 的推送不会再触发 CI，所以上面先在这里 build 过才推送
+      # GITHUB_TOKEN 的推送不会再触发 CI，所以上面先在这里 build 并做类型检查，通过才推送
       - name: Push to main
         if: steps.merge.outputs.result == 'merged'
         run: git push origin HEAD:main
@@ -97,7 +98,7 @@ jobs:
               echo
               sed 's/.*/- `&`/' "$RUNNER_TEMP/conflicts.txt"
             else
-              echo "**原因**：合并没有冲突，但合并后 build 失败，详见[运行日志]($RUN_URL)。"
+              echo "**原因**：合并没有冲突，但合并后 build 或类型检查失败，详见[运行日志]($RUN_URL)。"
             fi
             echo
             echo "**处理方法**（在本地仓库执行）："
@@ -107,7 +108,7 @@ jobs:
             echo 'git switch main && git pull'
             echo 'git fetch upstream'
             echo 'git merge upstream/main'
-            echo '# 解决冲突或修复 build 后提交，然后推送'
+            echo '# 解决冲突或修复 build/类型错误后提交，然后推送'
             echo 'git push origin main'
             echo '```'
             echo

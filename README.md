@@ -66,7 +66,7 @@ ZCode 满血版补齐了这个缺失的功能。你的 `.git` 仓库会被安全
 
 本仓库 fork 自 [zai-org/ZCode](https://github.com/zai-org/ZCode)，保持与上游同步。所有新增功能以独立模块形式添加，不修改原有核心逻辑。
 
-[Sync upstream](.github/workflows/sync-upstream.yml) 每天自动检查上游更新：能自动合并且 build 通过就直接推送到 main；有冲突或 build 失败时开一个 PR，按 PR 里的说明手动处理。
+[Sync upstream](.github/workflows/sync-upstream.yml) 每天自动检查上游更新：能自动合并且 build、类型检查都通过就直接推送到 main；有冲突或检查失败时开一个 PR，按 PR 里的说明手动处理。
 
 手动同步：
 
