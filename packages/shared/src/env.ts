@@ -49,19 +49,19 @@ export const RUNTIME_ZCODE_DEBUG =
   typeof process !== "undefined" ? process.env.ZCODE_DEBUG : undefined;
 
 // 满血版：遥测开关改为用户可控。设置 ZCODE_TELEMETRY_ENABLED=false 即可关闭。
-// 官方原版此值硬编码为 true，用户无法关闭。
 export const ZCODE_TELEMETRY_ENABLED: boolean =
-  typeof process !== "undefined"
-    ? process.env.ZCODE_TELEMETRY_ENABLED !== "false"
-    : true;
+  typeof process !== "undefined" ? process.env.ZCODE_TELEMETRY_ENABLED !== "false" : true;
 
 // ── 构建期可选能力（见 docs/desktop/build-time-optional-capabilities.md），未注入时一律关闭 ──
 /** ARMS RUM 上报地址；为空时 SDK 以 enable=false 初始化，不产生上报。 */
 export const ZCODE_ARMS_RUM_ENDPOINT: string =
-  typeof __ZCODE_ARMS_RUM_ENDPOINT__ !== "undefined" ? __ZCODE_ARMS_RUM_ENDPOINT__ : "";
+  // 同步后消费者改读端点，必须在唯一解析入口应用开关，否则只保留旧常量无法关闭上报。
+  ZCODE_TELEMETRY_ENABLED && typeof __ZCODE_ARMS_RUM_ENDPOINT__ !== "undefined"
+    ? __ZCODE_ARMS_RUM_ENDPOINT__
+    : "";
 /** 事件上报（数仓）地址；为空时不上报。 */
 export const ZCODE_TELEMETRY_REPORT_ENDPOINT: string =
-  typeof __ZCODE_TELEMETRY_REPORT_ENDPOINT__ !== "undefined"
+  ZCODE_TELEMETRY_ENABLED && typeof __ZCODE_TELEMETRY_REPORT_ENDPOINT__ !== "undefined"
     ? __ZCODE_TELEMETRY_REPORT_ENDPOINT__
     : "";
 /** 桌面自动更新是否启用。 */

@@ -35,7 +35,17 @@ desktop tsup（main、host、preload）与 desktop vite（renderer）的 define
 - 自动更新在 Desktop Main 启动时判定：`ZCODE_PRODUCT_FLAVOR === "production" && ZCODE_AUTO_UPDATE_ENABLED`。
 - Agent 的 OTLP 遥测沿用既有机制，由打包环境的 `ZCODE_PACKAGED_AGENT_OTEL_*` 注入，不在本文件范围内。
 
-## 验收
+## Fork 同步兼容约束
+
+满血版保留启动时 `ZCODE_TELEMETRY_ENABLED=false` 的关闭能力。在可读取
+`process.env` 的运行环境中，该值优先于构建期注入的两个上报端点：
+`packages/shared/src/env.ts` 作为唯一解析入口，将有效 ARMS 和事件上报端点置空，
+消费者继续使用已有的空端点关闭路径。未设置开关时沿用上游构建期配置；
+没有 `process` 的浏览器环境沿用构建值。该开关不改变自动更新和 Agent OTLP 配置。
+
+验收需要覆盖已注入端点时显式关闭、默认启用及未注入端点时默认关闭。
+
+## 上游能力验收
 
 1. 内部仓库存在私有默认配置时，构建结果与改造前一致：ARMS、事件上报、自动更新均启用，地址不变。
 2. 没有私有默认配置、也没有环境变量时，三项均关闭。

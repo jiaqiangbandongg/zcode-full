@@ -8,6 +8,29 @@ async function importFreshEnvModule() {
 describe("shared runtime env", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("满血版显式关闭遥测时，已注入的两个上报端点也关闭", async () => {
+    vi.stubEnv("ZCODE_TELEMETRY_ENABLED", "false");
+    vi.stubGlobal("__ZCODE_ARMS_RUM_ENDPOINT__", "https://rum.example.com/report");
+    vi.stubGlobal("__ZCODE_AUTO_UPDATE_ENABLED__", true);
+
+    const env = await importFreshEnvModule();
+
+    expect(env.ZCODE_ARMS_RUM_ENDPOINT).toBe("");
+    expect(env.ZCODE_TELEMETRY_REPORT_ENDPOINT).toBe("");
+    expect(env.ZCODE_AUTO_UPDATE_ENABLED).toBe(true);
+  });
+
+  it("未设置满血版开关时保留上游注入的上报端点", async () => {
+    vi.stubEnv("ZCODE_TELEMETRY_ENABLED", undefined);
+    vi.stubGlobal("__ZCODE_ARMS_RUM_ENDPOINT__", "https://rum.example.com/report");
+
+    const env = await importFreshEnvModule();
+
+    expect(env.ZCODE_ARMS_RUM_ENDPOINT).toBe("https://rum.example.com/report");
+    expect(env.ZCODE_TELEMETRY_REPORT_ENDPOINT).not.toBe("");
   });
 
   it("构建期可选能力未注入时关闭，事件上报端点取测试注入值", async () => {
