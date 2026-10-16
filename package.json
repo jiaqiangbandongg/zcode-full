@@ -36,7 +36,7 @@
     "test:unit:affected": "node scripts/run-affected-unit-tests.mjs",
     "test:docker:web-app-gateway": "node scripts/test-web-app-gateway-reset.mjs",
     "verify:pre-push": "pnpm run lint && pnpm run architecture:check -- --changed && pnpm run test:unit:affected",
-    "build": "pnpm -r build",
+    "build": "pnpm -r --filter '!@zcode/web-share' build",
     "build:desktop-agent:bytecode": "node scripts/build-desktop-agent-bytecode.mjs",
     "build:docs": "pnpm --filter @zcode/dev-docs build",
     "build:web-remote-control": "pnpm --filter @zcode/web exec vite build --base=/remote/",
