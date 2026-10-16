@@ -42,7 +42,8 @@ describe("settingsPageConfig", () => {
       },
       {
         id: "dataAndStats",
-        sections: ["usage"],
+        // 同步上游测试时保留满血版的 Git 备份入口，避免误将既有功能当作多余分区。
+        sections: ["gitBackup", "usage"],
       },
     ]);
 
@@ -59,6 +60,7 @@ describe("settingsPageConfig", () => {
       "hooks",
       "browser",
       "shortcuts",
+      "gitBackup",
       "usage",
     ]);
   });
@@ -80,6 +82,7 @@ describe("settingsPageConfig", () => {
       "hooks",
       "browser",
       "shortcuts",
+      "gitBackup",
       "usage",
     ]);
   });
