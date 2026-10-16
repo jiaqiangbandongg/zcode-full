@@ -1,0 +1,77 @@
+flowchart TD
+  entry(["entry"])
+  subgraph phase_1["preflight"]
+    phase_1_1{{"preflight<br/>phase#1@1"}}
+    world_read_2_1["world-read#2@1"]
+    world_read_3_1["world-read#3@1"]
+    world_read_1_1["world-read#1@1"]
+  end
+  subgraph phase_2["attempt"]
+    phase_2_1{{"attempt<br/>phase#2@1"}}
+    ask_1_1["ask#1@1"]
+  end
+  subgraph phase_3["gate"]
+    phase_3_1{{"gate<br/>phase#3@1"}}
+    world_read_4_1["world-read#4@1"]
+    world_read_1_2["world-read#1@2"]
+  end
+  subgraph phase_4["checkpoint"]
+    phase_4_1{{"checkpoint<br/>phase#4@1"}}
+    world_read_5_1["world-read#5@1"]
+  end
+  subgraph phase_5["recover"]
+    phase_5_1{{"recover<br/>phase#5@1"}}
+    world_read_6_1["world-read#6@1"]
+    ask_2_1["ask#2@1"]
+  end
+  subgraph phase_6["wrap-up"]
+    phase_6_1{{"wrap-up<br/>phase#6@1"}}
+    world_read_7_1["world-read#7@1"]
+  end
+  sink(["sink"])
+  abort(["abort"])
+  entry --> phase_1_1
+  phase_1_1 --> world_read_2_1
+  world_read_2_1 -->|"branch"| world_read_3_1
+  world_read_2_1 -->|"throw"| abort
+  world_read_3_1 -->|"branch"| world_read_1_1
+  world_read_3_1 -->|"branch"| phase_2_1
+  world_read_3_1 -->|"exit"| phase_5_1
+  world_read_3_1 -->|"exit"| phase_6_1
+  world_read_3_1 -->|"throw"| abort
+  world_read_1_1 -->|"join (return)"| phase_2_1
+  world_read_1_1 -->|"join (return)"| phase_5_1
+  world_read_1_1 -->|"join (return)"| phase_6_1
+  phase_2_1 --> ask_1_1
+  ask_1_1 --> phase_3_1
+  phase_3_1 --> world_read_4_1
+  world_read_4_1 -->|"loop"| phase_2_1
+  world_read_4_1 -->|"loop (continue)"| phase_2_1
+  world_read_4_1 -->|"branch"| world_read_1_2
+  world_read_4_1 -->|"branch"| phase_4_1
+  world_read_4_1 -->|"exit"| phase_5_1
+  world_read_4_1 -->|"loop"| phase_5_1
+  world_read_4_1 -->|"exit"| phase_6_1
+  world_read_1_2 -->|"loop"| phase_2_1
+  world_read_1_2 -->|"join (return)"| phase_4_1
+  world_read_1_2 -->|"join (return)"| phase_5_1
+  world_read_1_2 -->|"loop"| phase_5_1
+  world_read_1_2 -->|"join (return)"| phase_6_1
+  phase_4_1 --> world_read_5_1
+  world_read_5_1 -->|"loop"| phase_2_1
+  world_read_5_1 -->|"exit"| phase_5_1
+  world_read_5_1 -->|"loop"| phase_5_1
+  world_read_5_1 -->|"exit"| phase_6_1
+  world_read_5_1 -->|"throw"| abort
+  phase_5_1 --> world_read_6_1
+  world_read_6_1 -->|"branch"| ask_2_1
+  world_read_6_1 -->|"throw"| abort
+  ask_2_1 -->|"loop"| phase_2_1
+  ask_2_1 -->|"loop"| phase_5_1
+  ask_2_1 -->|"exit"| phase_6_1
+  phase_6_1 --> world_read_7_1
+  world_read_7_1 -->|"jump (return)"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class entry,sink,abort endpoint;
+  classDef mark fill:#fff2cc,stroke:#d6b656;
+  class phase_1_1,phase_2_1,phase_3_1,phase_4_1,phase_5_1,phase_6_1 mark;

@@ -1,0 +1,77 @@
+phase phase#1 "总设计" @42:1
+phase phase#2 "并行构建" @47:1
+phase phase#3 "集成与门禁" @56:1
+phase phase#4 "视觉评审" @77:1
+phase phase#5 "终验与交付" @109:1
+lane workspace
+lane actor#1 "architect" @43:19
+lane actor#2 "harness" @48:17
+lane actor#3 name-head="builder-" @52:23 families=fanout#1
+lane actor#4 "fixer" @57:15
+lane actor#5 "jury-a" @79:15
+lane actor#6 "jury-b" @80:15
+lane actor#7 "jury-c" @81:15
+lane actor#8 "polisher" @82:18
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @52:6 label="map"
+region loop#1 loop parent=seq#1 @59:1
+region branch#1 branch parent=loop#1 @61:27
+region branch#2 branch parent=loop#1 @68:20
+region loop#2 loop parent=seq#1 @86:1
+region branch#3 branch parent=loop#2 @88:29
+region fanout#2 fanout parent=loop#2 @92:38 label="map"
+region branch#4 branch parent=seq#1 @100:18
+region branch#5 branch parent=branch#4 @102:29
+step ask#1 ask "architect" @44:34 lane=actor#1 phase=phase#1 region=seq#1 always
+step ask#2 ask "harness" @51:11 lane=actor#2 phase=phase#2 region=seq#1 always
+step ask#3 ask "ask" label-head="builder-" @52:45 lane=actor#3 phase=phase#2 region=fanout#1 maybe stack
+step world-read#1 world-read "run node" @60:27 lane=workspace phase=phase#3 region=loop#1 maybe serial
+step ask#4 ask "fixer" @62:29 lane=actor#4 phase=phase#3 region=branch#1 maybe serial
+step world-read#2 world-read "run node" @66:27 lane=workspace phase=phase#3 region=loop#1 maybe serial
+step ask#5 ask "fixer" @69:17 lane=actor#4 phase=phase#3 region=branch#2 maybe serial
+step world-read#3 world-read "run node" @87:29 lane=workspace phase=phase#4 region=loop#2 maybe serial
+step ask#6 ask "fixer" @89:17 lane=actor#4 phase=phase#4 region=branch#3 maybe serial
+step ask#7~actor#5 ask "j" @92:73 lane=actor#5 lanes=actor#5,actor#6,actor#7 source=ask#7 phase=phase#4 region=fanout#2 maybe serial
+step ask#7~actor#6 ask "j" @92:73 lane=actor#6 lanes=actor#5,actor#6,actor#7 source=ask#7 phase=phase#4 region=fanout#2 maybe serial
+step ask#7~actor#7 ask "j" @92:73 lane=actor#7 lanes=actor#5,actor#6,actor#7 source=ask#7 phase=phase#4 region=fanout#2 maybe serial
+step ask#8 ask "polisher" @97:18 lane=actor#8 phase=phase#4 region=loop#2 maybe serial
+step world-read#4 world-read "run node" @101:29 lane=workspace phase=phase#4 region=branch#4 maybe
+step ask#9 ask "juryA" @103:33 lane=actor#5 phase=phase#4 region=branch#5 maybe
+step world-read#5 world-read "run node" @110:30 lane=workspace phase=phase#5 region=seq#1 always
+step world-read#6 world-read "run node" @111:30 lane=workspace phase=phase#5 region=seq#1 always
+edge ask#1 -> ask#2 seq always
+edge ask#1 -> ask#3 seq maybe
+edge ask#2 -> world-read#1 seq maybe
+edge ask#3 -> world-read#1 seq maybe
+edge world-read#1 -> ask#4 control maybe
+edge world-read#1 -> world-read#2 seq maybe
+edge ask#4 -> ask#5 fifo maybe
+edge world-read#2 -> world-read#1 carry maybe
+edge world-read#2 -> ask#5 control maybe
+edge ask#5 -> world-read#1 carry maybe
+edge ask#5 -> world-read#3 seq maybe
+edge ask#5 -> ask#6 fifo maybe
+edge world-read#3 -> ask#6 control maybe
+edge world-read#3 -> ask#7~actor#5 seq maybe
+edge world-read#3 -> ask#7~actor#6 seq maybe
+edge world-read#3 -> ask#7~actor#7 seq maybe
+edge ask#6 -> ask#7~actor#5 carry maybe
+edge ask#6 -> ask#7~actor#6 carry maybe
+edge ask#6 -> ask#7~actor#7 carry maybe
+edge ask#6 -> world-read#4 seq maybe
+edge ask#7~actor#5 -> ask#8 data maybe exact
+edge ask#7~actor#6 -> ask#8 data maybe exact
+edge ask#7~actor#7 -> ask#8 data maybe exact
+edge ask#7~actor#5 -> ask#9 fifo maybe
+edge ask#8 -> world-read#3 carry maybe
+edge ask#8 -> world-read#4 seq maybe
+edge world-read#4 -> ask#9 control maybe
+edge ask#9 -> world-read#5 seq maybe
+edge world-read#5 -> world-read#6 seq always
+phase-edge phase#1 -> phase#2 seq maybe
+phase-edge phase#2 -> phase#3 seq maybe
+phase-edge phase#3 -> phase#3 carry maybe
+phase-edge phase#3 -> phase#4 fifo maybe
+phase-edge phase#4 -> phase#4 carry maybe
+phase-edge phase#4 -> phase#5 seq maybe
+sink ask#1,ask#7~actor#5,ask#7~actor#6,ask#7~actor#7,ask#9,world-read#5,world-read#6

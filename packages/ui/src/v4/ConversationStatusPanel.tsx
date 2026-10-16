@@ -6,10 +6,8 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ComponentPropsWithoutRef,
-  type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -56,10 +54,9 @@ import type {
 } from "@zcode/shared/zcode-protocol-v4";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
-import {
-  RUN_STATUS_DOT,
-  RUN_STATUS_TEXT,
-} from "@/components/workflow-graph/run-status-presentation.js";
+import { RUN_STATUS_DOT } from "@/components/workflow-graph/run-status-presentation.js";
+import { WorkflowRunRail } from "@/components/workflow-run-line/WorkflowRunRail.js";
+import { foldWorkflowRunRail } from "@/lib/workflowRunLine.js";
 import { useNowTicker } from "@/components/workflow-graph/use-now-ticker.js";
 import {
   Collapsible,
@@ -95,13 +92,17 @@ import {
   type ConversationStatusPanelWorkflowRun,
 } from "@/v4/conversationStatusPanelModel.js";
 import type { ConversationStatusPanelWorkflowRunTarget } from "@/v4/conversationStatusPanelModel.js";
-import { workflowRunOpenTarget } from "@/v4/conversationStatusPanelModel.js";
+import {
+  workflowRunOpenTarget,
+  workflowRunWords,
+  type ConversationStatusPanelWorkflowRunWords,
+} from "@/v4/conversationStatusPanelModel.js";
 import {
   buildConversationGoalIterationSummaries,
   getConversationGoalElapsedSeconds,
 } from "@/v4/conversationGoalSummaryModel.js";
 
-interface ConversationStatusPanelProps {
+export interface ConversationStatusPanelProps {
   workspacePath: string;
   workspaceIdentity?: string;
   gitSummary?: GitRepositorySummary | null;
@@ -126,6 +127,7 @@ interface ConversationStatusPanelProps {
   rootSessionId?: string;
   parentSessionId?: string;
   /** 当前 pane 是否由手机 Web 远控壳承载。 */
+  isWebRemoteControl?: boolean;
   /** 当前是否为粗指针手机视口。 */
   isMobileViewport?: boolean;
   layoutMode?: "none" | "auto" | "inline";
@@ -241,8 +243,8 @@ const STATUS_SECTION_SCROLL_POLICY = {
   // 六个双行 Todo（6 × 52px）需要约 20rem；超过后只滚动进程区块。
   plan: "max-h-80",
   terminal: "max-h-48",
-  // workflow 行与 terminal / agent 行同高（两行 + 控制），限高沿用同一档。
-  workflow: "max-h-48",
+  // workflow 行定高 56px，列表滚到三行半（196px）：露出的半行告诉人下面还有。
+  workflow: "max-h-[12.25rem]",
   agent: "max-h-48",
 } as const satisfies Record<StatusSectionKind, string | null>;
 
@@ -288,6 +290,7 @@ function StatusSectionHeader({
 function StatusSection({
   children,
   defaultOpen = true,
+  footer,
   onOpenChange,
   open,
   separated = false,
@@ -297,6 +300,8 @@ function StatusSection({
 }: {
   children: ReactNode;
   defaultOpen?: boolean;
+  /** 固定在滚动视口之外的页脚（如已结束目录入口）：列表再长也滚不走它。 */
+  footer?: ReactNode;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
   separated?: boolean;
@@ -348,6 +353,7 @@ function StatusSection({
           ) : (
             children
           )}
+          {footer}
         </CollapsibleContent>
       </section>
     </Collapsible>
@@ -404,7 +410,7 @@ function GitStatusSection({
       }
     >
       <div className="space-y-0">
-        {/* V4 状态面板迁移时只保留了 Changes 的静态展示，
+        {/* Bug 原因：V4 状态面板迁移时只保留了 Changes 的静态展示，
             没有继续透传旧版 Git review 回调，导致规范中的审阅入口不可点击。 */}
         <button
           type="button"
@@ -609,14 +615,16 @@ function PlanStatusIcon({ status }: { status: PlanState["items"][number]["status
 const COMPACT_TODO_THRESHOLD = 6;
 const TODO_FOCUS_WINDOW_SIZE = 3;
 
-interface StatusPanelTodoFocusWindow {
+export interface StatusPanelTodoFocusWindow {
   compact: boolean;
   precedingItems: PlanState["items"];
   focusItems: PlanState["items"];
   followingItems: PlanState["items"];
 }
 
-function getStatusPanelTodoFocusWindow(items: PlanState["items"]): StatusPanelTodoFocusWindow {
+export function getStatusPanelTodoFocusWindow(
+  items: PlanState["items"],
+): StatusPanelTodoFocusWindow {
   if (items.length <= COMPACT_TODO_THRESHOLD) {
     return {
       compact: false,
@@ -856,7 +864,7 @@ function SessionPlansStatusSection({
   );
 }
 
-function buildSessionPlanOpenRequest(
+export function buildSessionPlanOpenRequest(
   parentSessionId: string,
   item: ConversationStatusPanelSessionPlanItem,
 ): OpenPlanDetailSideTabRequest {
@@ -945,7 +953,7 @@ function RunningWorkCancelButton({
   );
 }
 
-function buildRunningSubagentOpenRequest({
+export function buildRunningSubagentOpenRequest({
   parentSessionId,
   rootSessionId,
   subagent,
@@ -1104,14 +1112,227 @@ function BackgroundWorkStatusSection({
 }
 
 /**
+ * run 行的时长：沿用分区头部的时长单位（formatDurationUnits），但不带「已运行」前缀，且超过
+ * 一小时去掉秒——一条跑了一小时的 run 上逐秒跳动的数字只是噪音（`1小时 2分` / `1h 2m`）。
+ */
+function formatWorkflowRunElapsed(
+  elapsedMs: number,
+  formatMessage: ReturnType<typeof useZCodeIntl>["intl"]["formatMessage"],
+) {
+  const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  return formatDurationUnits(seconds >= 3600 ? seconds - (seconds % 60) : seconds, formatMessage);
+}
+
+/** run 「此刻在做什么」的词，按 i18n 拼成一句（规则在模型层的 `workflowRunWords`）。 */
+function formatWorkflowRunWords(
+  words: ConversationStatusPanelWorkflowRunWords,
+  formatMessage: ReturnType<typeof useZCodeIntl>["intl"]["formatMessage"],
+) {
+  switch (words.kind) {
+    case "status":
+      return formatMessage({ id: `chat.toolCall.workflow.run.status.${words.status}` });
+    case "steps":
+      return formatMessage(
+        { id: "chat.toolCall.workflow.card.steps" },
+        { done: String(words.done), total: String(words.total) },
+      );
+    case "phases":
+      return words.text;
+  }
+}
+
+/** 未命名的判定：`title ≡ runId`（见 `ConversationStatusPanelWorkflowRun.title`）。 */
+function workflowRunDisplayName(run: ConversationStatusPanelWorkflowRun): string | null {
+  return run.title && run.title !== run.runId ? run.title : null;
+}
+
+/** 单盏状态灯（pending 空心、running 脉冲），与卡片、侧栏同一套 `STATUS_DOT`。 */
+function WorkflowRunLamp({ status }: { status: "pending" | "running" }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-workflow-run-lamp={status}
+      className={cn("size-1.5 shrink-0 rounded-full", RUN_STATUS_DOT[status])}
+    />
+  );
+}
+
+/**
+ * run 行的 Stop（docs/dynamic-workflow/presentation.md「Other places a run appears」）：沿用今天的
+ * 幽灵按钮（方块 + 「停止」），但**叠在时长上**——悬停或键盘焦点落进这一行时出现、时长淡出；
+ * 平时不占位，整列行因此只剩名字和时长。没有悬停的触屏（`hover: none`）上常驻，换成第三列的 32px
+ * 图标按钮。隐藏时同时关掉指针事件：一个看不见却点得中的 Stop 会在用户点时长时停掉 run。
+ * 背景用不透明的 menu-hover：它与悬停中的行同色，盖住时长下面可能被截断的名字尾巴。
+ */
+function WorkflowRunStopButton({
+  workId,
+  onCancel,
+}: {
+  workId: string;
+  onCancel: (workId: string) => void;
+}) {
+  const { intl } = useZCodeIntl();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      data-testid={testId(TID_V4_BACKGROUND_WORK_CANCEL, workId)}
+      aria-label={intl.formatMessage({ id: "chat.toolCall.workflow.run.cancel" })}
+      onClick={(event) => {
+        event.stopPropagation();
+        onCancel(workId);
+      }}
+      className={cn(
+        "pointer-events-none absolute right-1.5 top-1.5 z-[2] h-6 gap-1 bg-menu-hover px-1.5 text-ui-sm text-foreground opacity-0 transition-opacity",
+        "hover:bg-[image:linear-gradient(var(--color-hover),var(--color-hover))]",
+        "group-hover/wf-run:pointer-events-auto group-hover/wf-run:opacity-100 group-focus-within/wf-run:pointer-events-auto group-focus-within/wf-run:opacity-100",
+        "[@media(hover:none)]:pointer-events-auto [@media(hover:none)]:static [@media(hover:none)]:size-8 [@media(hover:none)]:bg-transparent [@media(hover:none)]:p-0 [@media(hover:none)]:text-foreground-subtle [@media(hover:none)]:opacity-100",
+      )}
+    >
+      <SquareIcon aria-hidden className="size-2.5 fill-current [@media(hover:none)]:size-3" />
+      <span className="[@media(hover:none)]:sr-only">
+        {intl.formatMessage({ id: "chat.statusPanel.runningStop" })}
+      </span>
+    </Button>
+  );
+}
+
+/**
+ * 一条 run 两行定高（56px）：第一行 名字 + 时长，第二行 侧栏同款轨道 + 「在做什么」的词。
+ * 字段三簇逐簇独立缺席（见 `ConversationStatusPanelWorkflowRun`）：
+ * - 无 `status`：偏斜降级行（旧 CLI），只剩第一行——不知道状态就不画灯、不说词；
+ * - 无 `startedAt`：没有配对的后台任务，没有时长；pending 也不报时长；
+ * - 无 `workId` / 不可取消：没有 Stop，时长常驻。
+ * 可见的状态词没了（灯和 phase 已经说了），所以它进打开按钮的无障碍名：名字 · 状态 · 词。
+ */
+function WorkflowRunRow({
+  now,
+  onCancelBackgroundWork,
+  onOpenWorkflowRun,
+  run,
+}: {
+  now: number;
+  onCancelBackgroundWork?: (workId: string) => void;
+  onOpenWorkflowRun?: (target: ConversationStatusPanelWorkflowRunTarget) => void;
+  run: ConversationStatusPanelWorkflowRun;
+}) {
+  const { intl } = useZCodeIntl();
+  // 行 → 打开意图的换算与 composer 徽标直达共用（模型层 workflowRunOpenTarget）。
+  const openTarget = onOpenWorkflowRun ? workflowRunOpenTarget(run) : null;
+  const name = workflowRunDisplayName(run);
+  const displayName = name ?? intl.formatMessage({ id: "chat.toolCall.workflow.fallbackName" });
+  const words = workflowRunWords(run);
+  const wordsText = words ? formatWorkflowRunWords(words, intl.formatMessage) : null;
+  const elapsed =
+    run.startedAt === undefined || run.status === "pending"
+      ? null
+      : formatWorkflowRunElapsed(now - run.startedAt, intl.formatMessage);
+  const canStop = Boolean(run.workId && run.cancellable !== false && onCancelBackgroundWork);
+  const statusWord = run.status
+    ? intl.formatMessage({ id: `chat.toolCall.workflow.run.status.${run.status}` })
+    : null;
+  const openLabel = [
+    intl.formatMessage({ id: "chat.toolCall.workflow.openRunDetails" }),
+    displayName,
+    statusWord,
+    wordsText === statusWord ? null : wordsText,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const phases = run.phases ?? [];
+
+  return (
+    <li
+      data-testid={run.workId ? testId(TID_V4_BACKGROUND_WORK_ITEM, run.workId) : undefined}
+      data-background-task-kind="workflow"
+      data-workflow-run-id={run.runId}
+      data-work-id={run.workId}
+      data-work-status={run.status}
+      className={cn(
+        "group/wf-run relative grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-2 rounded-lg p-2 hover:bg-[var(--color-hover)]",
+        canStop && "[@media(hover:none)]:grid-cols-[1rem_minmax(0,1fr)_2rem]",
+        openTarget && "cursor-pointer",
+      )}
+    >
+      {openTarget ? (
+        // 行里还有 Stop 这个嵌套交互，整行 button 会套出嵌套按钮：透明同级按钮承接「打开详情页」，
+        // Stop 保持独立交互层并阻止冒泡（与 Agent 行同款）。
+        <button
+          type="button"
+          data-workflow-run-details-trigger="true"
+          data-workflow-run-id={run.runId}
+          aria-label={openLabel}
+          title={displayName}
+          onClick={() => onOpenWorkflowRun?.(openTarget)}
+          className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-input-border-focused)]"
+        />
+      ) : null}
+      <Workflow className="pointer-events-none relative z-[1] mt-0.5 size-4 shrink-0 self-start text-[var(--color-foreground-subtle)]" />
+      <div className="pointer-events-none relative z-[1] flex min-w-0 flex-col gap-0.5">
+        <div
+          data-workflow-island-line="name"
+          className="flex h-5 min-w-0 items-baseline gap-2 leading-5"
+        >
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-ui-base",
+              name ? "text-[var(--color-foreground)]" : "text-[var(--color-foreground-subtle)]",
+            )}
+          >
+            {displayName}
+          </span>
+          {elapsed ? (
+            <span
+              data-workflow-run-elapsed="true"
+              className={cn(
+                "shrink-0 text-ui-sm tabular-nums text-[var(--color-foreground-subtle)] transition-opacity",
+                canStop &&
+                  "group-hover/wf-run:opacity-0 [@media(hover:hover)]:group-focus-within/wf-run:opacity-0",
+                // 触屏：Stop 占了第三列，时长挪到第二行末尾（没有第二行时留在这里）。
+                canStop && wordsText && "[@media(hover:none)]:hidden",
+              )}
+            >
+              {elapsed}
+            </span>
+          ) : null}
+        </div>
+        {words && wordsText ? (
+          <div
+            data-workflow-island-line="phase"
+            className="flex h-4.5 min-w-0 items-center gap-1.5 text-ui-sm text-[var(--color-foreground-subtle)]"
+          >
+            {words.kind === "phases" ? (
+              <WorkflowRunRail rail={foldWorkflowRunRail(phases)} intl={intl} />
+            ) : (
+              <WorkflowRunLamp status={run.status === "pending" ? "pending" : "running"} />
+            )}
+            <span className="min-w-0 flex-1 truncate">{wordsText}</span>
+            {elapsed && canStop ? (
+              <span
+                aria-hidden="true"
+                className="hidden shrink-0 tabular-nums [@media(hover:none)]:inline"
+              >
+                {elapsed}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {canStop && run.workId && onCancelBackgroundWork ? (
+        <WorkflowRunStopButton workId={run.workId} onCancel={onCancelBackgroundWork} />
+      ) : null}
+    </li>
+  );
+}
+
+/**
  * Workflows 分区：与 Terminals / Agents 并列的第三类实时活动，**外加**一条通往 run 目录的
  * 页脚行——已结束的 run 折进这条页脚行，不占活动列表的位置。
  *
- * 行的字段分三簇（见 `ConversationStatusPanelWorkflowRun`），渲染逐簇独立缺席：
- * - 无 `status`：偏斜降级行（旧 CLI 没有 workflowRuns 投影键），没有状态词与步数；
- * - 无 `startedAt`：run 还没有配对的后台任务，没有时长；
- * - 无 `workId`：停不了，不出 Stop。
- * 把它们并成一个「有没有 work」的布尔就会漏掉偏斜形态——这三簇正是偏斜的全部表现。
+ * 头部右侧开合一个样：一盏运行灯 + 「{n} 个运行中」。折叠时不再换成「所有 run 里最长的时长」
+ * ——那不是任何一条 run 的时间。只有 run 列表滚动（三行半，露出的半行告诉人下面还有）；
+ * 已结束入口放在滚动区之外，run 再多也滚不走它。
  *
  * **不排序**：顺序 = 投影 runs 序 = 启动序（模型层已经保证）。Terminals / Agents 按
  * startedAt 排是因为它们的投影无序；这里重排反而会让行在每次投影更新时跳位。
@@ -1153,162 +1374,58 @@ function WorkflowStatusSection({
   // 都不在跑，于是入口连带目录页一起消失——而重启后回看被打断的 run 正是它的主要用途。
   if (runs.length === 0 && endedRunCount <= 0) return null;
 
-  const longestElapsedMs = runs.reduce(
-    (longest, run) =>
-      run.startedAt === undefined ? longest : Math.max(longest, Math.max(0, now - run.startedAt)),
-    0,
-  );
-  const openLabel = intl.formatMessage({ id: "chat.toolCall.workflow.openRunDetails" });
-
   return (
     <StatusSection
       section="workflow"
-      defaultOpen={false}
+      // 宿主不接管开合时同一条规则：有活 run 就默认打开（受控时由宿主按同一规则驱动）。
+      defaultOpen={runs.length > 0}
       open={open}
       onOpenChange={onOpenChange}
       separated={separated}
       title={title}
-      trailing={(isOpen) =>
-        isOpen ? (
-          <span>
-            {intl.formatMessage(
-              {
-                // 复用 Terminals 的计数文案而不是 Agents 的：workflow run 确实是一条后台任务
-                // （它有自己的 BackgroundWorkSummary），而 subagent 可能是前台的，那条文案
-                // 才需要把语义放宽成「运行」。
-                id:
-                  runs.length === 1
-                    ? "chat.statusPanel.runningStatusValue"
-                    : "chat.statusPanel.runningStatusValuePlural",
-              },
-              { count: String(runs.length) },
-            )}
-          </span>
-        ) : (
+      trailing={() =>
+        runs.length > 0 ? (
           <>
-            {/* 一行都没有 startedAt 时收起态只剩计数：宁可少一段，也不显示一个 0 秒的假时长。 */}
-            {longestElapsedMs > 0 ? (
-              <>
-                <span className="min-w-0 truncate">
-                  {formatDurationUnits(
-                    Math.max(1, Math.floor(longestElapsedMs / 1000)),
-                    intl.formatMessage,
-                  )}
-                </span>
-                <span className="shrink-0">·</span>
-              </>
-            ) : null}
-            <span className="shrink-0">{formatRunningCount(intl.formatMessage, runs.length)}</span>
+            <WorkflowRunLamp status="running" />
+            <span>
+              {intl.formatMessage(
+                { id: "chat.statusPanel.workflowsLive" },
+                { count: String(runs.length) },
+              )}
+            </span>
           </>
-        )
+        ) : null
+      }
+      // 已结束的 run 折进这条页脚行（与 Agents 分区共用同一个 affordance）：终态 run 不占
+      // 活动列表的位置，但入口必须留着——被打断的那些正是最需要点进去的。
+      footer={
+        <EndedDirectoryRow
+          count={endedRunCount}
+          icon={
+            <CheckCircle2Icon className="size-4 shrink-0 text-[var(--color-foreground-subtle)]" />
+          }
+          label={intl.formatMessage({ id: "chat.statusPanel.endedWorkflows" })}
+          separated={runs.length > 0}
+          testId="workflow-run-directory-trigger"
+          onOpen={
+            parentSessionId && onOpenDirectory
+              ? () => onOpenDirectory({ parentSessionId })
+              : undefined
+          }
+        />
       }
     >
       <ul className="space-y-0">
-        {runs.map((run) => {
-          // 行 → 打开意图的换算与 composer 徽标直达共用（模型层 workflowRunOpenTarget）。
-          const openTarget = onOpenWorkflowRun ? workflowRunOpenTarget(run) : null;
-          const canOpen = openTarget !== null;
-          // 未命名的判定：`title ≡ workId`（≡ runId）就是 core 的 workflowTaskSubject 兜底到
-          // taskId 的样子，投影会把非空 description 原样抄进 title。降级行的 runId 也 ≡ workId，
-          // 所以一次比较覆盖两簇。
-          const displayName =
-            run.title && run.title !== run.runId
-              ? run.title
-              : intl.formatMessage({ id: "chat.toolCall.workflow.fallbackName" });
-          return (
-            <li
-              key={run.runId}
-              data-testid={run.workId ? testId(TID_V4_BACKGROUND_WORK_ITEM, run.workId) : undefined}
-              data-background-task-kind="workflow"
-              data-workflow-run-id={run.runId}
-              data-work-id={run.workId}
-              data-work-status={run.status}
-              className={cn(
-                "group relative flex min-w-0 items-start gap-2 rounded-lg px-2 py-2 hover:bg-[var(--color-hover)]",
-                canOpen && "cursor-pointer",
-              )}
-            >
-              {openTarget ? (
-                // 与 Agent 行同款：行里已经有 Stop 这个嵌套交互，整行 button 会套出嵌套按钮。
-                // 透明同级按钮承接「打开详情页」，Stop 保持独立交互层并阻止冒泡。
-                <button
-                  type="button"
-                  data-workflow-run-details-trigger="true"
-                  data-workflow-run-id={run.runId}
-                  aria-label={openLabel}
-                  onClick={() => onOpenWorkflowRun?.(openTarget)}
-                  className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-input-border-focused)]"
-                />
-              ) : null}
-              <Workflow className="pointer-events-none relative z-[1] mt-0.5 size-4 shrink-0 text-[var(--color-foreground-subtle)]" />
-              <div className="pointer-events-none relative z-[1] flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="line-clamp-2 text-ui-base leading-5 text-[var(--color-foreground)]">
-                  {displayName}
-                </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui-base">
-                  {run.status ? (
-                    <>
-                      {/* 状态永远有词，绝不只靠颜色或动画表达（a11y）。 */}
-                      <span
-                        aria-hidden="true"
-                        data-workflow-run-status-dot={run.status}
-                        className={cn("size-1.5 shrink-0 rounded-full", RUN_STATUS_DOT[run.status])}
-                      />
-                      <span className={cn("shrink-0", RUN_STATUS_TEXT[run.status])}>
-                        {intl.formatMessage({
-                          id: `chat.toolCall.workflow.run.status.${run.status}`,
-                        })}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-[var(--color-foreground-subtle)]">
-                        {intl.formatMessage(
-                          { id: "chat.toolCall.workflow.card.steps" },
-                          {
-                            // 步数与 status 在模型层同簇出现（present iff status present），
-                            // 但类型上是各自独立的可选字段；`?? 0` 只是补这道类型形式，
-                            // 真跑到它意味着模型违反了自己的不变量。
-                            done: String(run.nodesSettled ?? 0),
-                            total: String(run.nodesTotal ?? 0),
-                          },
-                        )}
-                      </span>
-                    </>
-                  ) : null}
-                  {run.startedAt === undefined ? null : (
-                    <span className="shrink-0 tabular-nums text-[var(--color-foreground-subtle)]">
-                      {formatBackgroundTaskElapsedLabel(
-                        Math.max(0, now - run.startedAt),
-                        intl.formatMessage,
-                      )}
-                    </span>
-                  )}
-                  {run.workId && run.cancellable !== false ? (
-                    <RunningWorkCancelButton
-                      workId={run.workId}
-                      onCancel={onCancelBackgroundWork}
-                    />
-                  ) : null}
-                </span>
-              </div>
-            </li>
-          );
-        })}
+        {runs.map((run) => (
+          <WorkflowRunRow
+            key={run.runId}
+            run={run}
+            now={now}
+            onCancelBackgroundWork={onCancelBackgroundWork}
+            onOpenWorkflowRun={onOpenWorkflowRun}
+          />
+        ))}
       </ul>
-      {/* 已结束的 run 折进这条页脚行（与 Agents 分区共用同一个 affordance）：终态 run 不占
-          活动列表的位置，但入口必须留着——被打断的那些正是最需要点进去的。 */}
-      <EndedDirectoryRow
-        count={endedRunCount}
-        icon={
-          <CheckCircle2Icon className="size-4 shrink-0 text-[var(--color-foreground-subtle)]" />
-        }
-        label={intl.formatMessage({ id: "chat.statusPanel.endedWorkflows" })}
-        separated={runs.length > 0}
-        testId="workflow-run-directory-trigger"
-        onOpen={
-          parentSessionId && onOpenDirectory
-            ? () => onOpenDirectory({ parentSessionId })
-            : undefined
-        }
-      />
     </StatusSection>
   );
 }
@@ -1533,7 +1650,7 @@ function EndedSubagentDirectoryRow({
 
 function StatusSummaryMetric({ children, icon }: { children: ReactNode; icon: ReactNode }) {
   return (
-    <div className="flex h-8 w-max max-w-80 min-w-0 items-center gap-1.5 pl-2 pr-3 text-ui-base text-[var(--color-foreground)]">
+    <div className="flex h-8 w-max max-w-full min-w-0 items-center gap-1.5 pl-2 pr-3 text-ui-base text-[var(--color-foreground)]">
       <span className="relative size-4 shrink-0">
         <span className="absolute inset-0 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0">
           {icon}
@@ -1542,6 +1659,51 @@ function StatusSummaryMetric({ children, icon }: { children: ReactNode; icon: Re
       </span>
       {children}
     </div>
+  );
+}
+
+/**
+ * 胶囊里的工作流摘要：Workflow 图标 · 名字 · 灯 · phase 词 · `+n`（其余在跑的 run）。
+ * phase 词整段保留（至多占 45%），先截的是名字：名字看开头就认得出，截断的 phase 什么也说不了。降级行（旧 CLI，无状态）只有名字，不画灯——不知道状态就不猜。
+ */
+function WorkflowSummaryMetric({
+  others,
+  run,
+}: {
+  others: number;
+  run: ConversationStatusPanelWorkflowRun;
+}) {
+  const { intl } = useZCodeIntl();
+  const name = workflowRunDisplayName(run);
+  const words = workflowRunWords(run);
+  const wordsText = words ? formatWorkflowRunWords(words, intl.formatMessage) : null;
+  return (
+    <StatusSummaryMetric icon={<Workflow className="size-4 text-[var(--color-foreground)]" />}>
+      <span
+        data-workflow-pill={run.runId}
+        className={cn(
+          // 挤不下时只有名字让位：phase 不收缩，但封顶 45%，所以名字总还剩一半多。不给名字设
+          // 最小宽度——定宽下限会把短名字撑出一段空白，还会和 phase 一起把胶囊撑破。
+          "min-w-0 truncate",
+          !name && "text-[var(--color-foreground-subtle)]",
+        )}
+      >
+        {name ?? intl.formatMessage({ id: "chat.toolCall.workflow.fallbackName" })}
+      </span>
+      {run.status && wordsText ? (
+        <>
+          <WorkflowRunLamp status={run.status} />
+          <span className="max-w-[45%] shrink-0 truncate text-[var(--color-foreground-subtle)]">
+            {wordsText}
+          </span>
+        </>
+      ) : null}
+      {others > 0 ? (
+        <span className="shrink-0 tabular-nums text-[var(--color-foreground-subtlest)]">
+          +{others}
+        </span>
+      ) : null}
+    </StatusSummaryMetric>
   );
 }
 
@@ -1561,12 +1723,15 @@ function StatusSummaryRow({
   endedWorkflowRunCount,
   gitWorktreeChangeSummary,
   model,
+  onOpenWorkflowSection,
   onVariantChange,
 }: {
   /** 已结束 run 的目录计数；宿主给 0 表示目录入口不可渲染（缺会话或缺回调）。 */
   endedWorkflowRunCount: number;
   gitWorktreeChangeSummary?: { added: number; removed: number } | null;
   model: ConversationStatusPanelModel;
+  /** 胶囊显示着工作流时，点击展开要同时打开的「工作流」分区。 */
+  onOpenWorkflowSection?: () => void;
   onVariantChange?: (variant: ChatViewSummaryPanelVariant | null) => void;
 }) {
   const { intl } = useZCodeIntl();
@@ -1590,27 +1755,24 @@ function StatusSummaryRow({
   const hasGitMiniSummary = Boolean(model.git && added + removed > 0);
 
   // 胶囊摘要过去把所有后台任务都写死成 Activity，纯 Subagent 因而没有复用
-  // Running 明细的 Bot 语义。规则现在是三类的：**恰好一类**沿用该类图标，混合才是 Activity
-  // （两类矩阵在 workflow 加入后就不够用了，硬写下去会漏掉 workflow+agent 这种组合）。
+  // Running 明细的 Bot 语义。**恰好一类**沿用该类图标，混合才是 Activity。在跑的工作流不进这条
+  // 兜底：它排在胶囊最前，自己一个分支（名字 · 灯 · phase），不再是一个计数。
   const hasRunningBash = model.runningBashWorks.length > 0;
   const hasRunningSubagent = model.runningSubagentWorks.length > 0;
-  const hasRunningWorkflow = model.runningWorkflowRuns.length > 0;
-  const runningCount =
-    model.runningBashWorks.length +
-    model.runningSubagentWorks.length +
-    model.runningWorkflowRuns.length;
-  const runningKindCount = [hasRunningWorkflow, hasRunningBash, hasRunningSubagent].filter(
-    Boolean,
-  ).length;
+  const runningCount = model.runningBashWorks.length + model.runningSubagentWorks.length;
   const RunningSummaryIcon =
-    runningKindCount > 1
+    hasRunningBash && hasRunningSubagent
       ? ActivityIcon
-      : hasRunningWorkflow
-        ? Workflow
-        : hasRunningBash
-          ? SquareTerminalIcon
-          : BotIcon;
-  const summaryMetric = currentPlanItem ? (
+      : hasRunningBash
+        ? SquareTerminalIcon
+        : BotIcon;
+  const firstLiveRun = model.runningWorkflowRuns[0];
+  // 在跑的工作流排在胶囊最前（docs/dynamic-workflow/presentation.md「Other places a run appears」）：
+  // 它在跑时就是会话在做的事，而主代理那一轮多半早已结束、todo 只是上一轮的余迹。过去它排在
+  // 最后，理由是「与输入框的后台计数重复」——名字加 phase 并不重复什么。
+  const summaryMetric = firstLiveRun ? (
+    <WorkflowSummaryMetric run={firstLiveRun} others={model.runningWorkflowRuns.length - 1} />
+  ) : currentPlanItem ? (
     <StatusSummaryMetric
       icon={<ArrowRightIcon className="size-4 text-[var(--color-foreground)]" />}
     >
@@ -1659,7 +1821,7 @@ function StatusSummaryRow({
     <StatusSummaryMetric
       icon={<RunningSummaryIcon className="size-4 text-[var(--color-foreground)]" />}
     >
-      {/* 产品规则：实时活动只能在没有 Goal/Todo/Git 等主状态时兜底，
+      {/* 产品规则：终端 / 智能体的实时计数只能在没有 Goal/Todo/Git 等主状态时兜底，
           避免胶囊把主状态和输入框已展示的实时计数重复拼接。 */}
       <span className="shrink-0">
         {hasRunningSubagent
@@ -1694,8 +1856,13 @@ function StatusSummaryRow({
       <button
         type="button"
         aria-label={expandLabel}
-        className="group inline-flex w-max max-w-80 cursor-pointer flex-col items-stretch text-left text-[var(--color-foreground)] transition-colors hover:bg-[var(--color-menu-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-input-border-focused)]"
-        onClick={() => onVariantChange?.("panel")}
+        className="group inline-flex w-max max-w-full cursor-pointer flex-col items-stretch text-left text-[var(--color-foreground)] transition-colors hover:bg-[var(--color-menu-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-input-border-focused)]"
+        onClick={() => {
+          // 展开后看到的不能比胶囊还少：胶囊显示着工作流，就连同「工作流」分区一起打开——
+          // 哪怕读者先前手动折过它（点胶囊就是「给我看这个」）。
+          if (firstLiveRun) onOpenWorkflowSection?.();
+          onVariantChange?.("panel");
+        }}
       >
         {summaryMetric}
       </button>
@@ -1721,6 +1888,7 @@ function ConversationStatusPanelImpl({
   endedSubagentCount = 0,
   rootSessionId,
   parentSessionId,
+  isWebRemoteControl = false,
   isMobileViewport = false,
   layoutMode = "none",
   summaryPanelVariantOverride,
@@ -1745,8 +1913,6 @@ function ConversationStatusPanelImpl({
   className,
 }: ConversationStatusPanelProps) {
   const isOfficeMode = useIsOfficeMode();
-  const miniMeasureRef = useRef<HTMLDivElement | null>(null);
-  const [miniWidth, setMiniWidth] = useState(320);
   const model = useMemo(
     () =>
       buildConversationStatusPanelModel({
@@ -1780,19 +1946,15 @@ function ConversationStatusPanelImpl({
     variantOverride: summaryPanelVariantOverride ?? null,
   });
   const isVariantAutomatic = summaryPanelVariantOverride == null;
-  const useVerticalFloatingPanels = false;
+  // Bug 根因：状态面板在手机远控中仍把分支/Todo 浮层固定到左侧，
+  // 而面板本身已占据大部分视口，左右均无法容纳固定宽度。手机远控改用纵向定位，
+  // 让 Radix 在上/下之间翻转；桌面和宽屏 Web 保持原左侧交互。
+  const useVerticalFloatingPanels = isWebRemoteControl && isMobileViewport;
   const panelModeValue = isVariantAutomatic ? "auto" : variant;
   const { intl } = useZCodeIntl();
   const panelMenuLabel = intl.formatMessage({
     id: "chat.summaryPanel.displayMode",
   });
-  const shellStyle = useMemo(
-    () =>
-      ({
-        "--chat-summary-panel-mini-width": `${miniWidth}px`,
-      }) as CSSProperties,
-    [miniWidth],
-  );
   const canRenderGit = Boolean(model.git && gitSummary && onRefreshGit);
   const canRenderGoal = Boolean(model.goal);
   const canRenderSessionPlans = Boolean(model.sessionPlans);
@@ -1822,34 +1984,12 @@ function ConversationStatusPanelImpl({
     },
     [onVariantChange],
   );
+  const handleOpenWorkflowSection = useCallback(() => {
+    onWorkflowSectionOpenChange?.(true);
+  }, [onWorkflowSectionOpenChange]);
   const handleCollapseToMini = useCallback(() => {
     onVariantChange?.("mini");
   }, [onVariantChange]);
-
-  useEffect(() => {
-    const element = miniMeasureRef.current;
-    if (!element) {
-      return;
-    }
-    const updateMiniWidth = () => {
-      const nextWidth = Math.ceil(element.getBoundingClientRect().width);
-      if (nextWidth > 0) {
-        const nextMiniWidth = Math.min(nextWidth, 320);
-        setMiniWidth((currentMiniWidth) =>
-          currentMiniWidth === nextMiniWidth ? currentMiniWidth : nextMiniWidth,
-        );
-      }
-    };
-
-    updateMiniWidth();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const observer = new ResizeObserver(updateMiniWidth);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [model]);
 
   // `model.hasContent` 只认**活的**内容（模型手上的投影都是活状态），所以「只剩历史」的
   // 会话会连整个胶囊一起消失——而那正是重启后打开一条旧对话的样子，run 目录的入口于是又没了。
@@ -1873,7 +2013,7 @@ function ConversationStatusPanelImpl({
         className,
       )}
     >
-      {/* 状态面板恢复旧 ChatView 的同 shell 收起/展开模型。
+      {/* Bugfix: 状态面板恢复旧 ChatView 的同 shell 收起/展开模型。
           之前 v4 用固定展开卡片替代 summary panel，窄屏会遮挡聊天正文，也丢失用户 override。 */}
       <aside
         aria-label={intl.formatMessage({ id: "chat.summaryPanel.title" })}
@@ -1891,14 +2031,17 @@ function ConversationStatusPanelImpl({
         data-running-agent-count={model.runningSubagentWorks.length}
         data-running-workflow-count={model.runningWorkflowRuns.length}
         data-ended-workflow-count={endedWorkflowRunCount}
-        style={shellStyle}
         className={cn(
           "pointer-events-auto relative overflow-hidden rounded-2xl border border-[var(--color-popover-border)] bg-[var(--color-popover)] text-[var(--color-foreground)] shadow-md transition-[border-radius,padding,background-color,box-shadow] duration-300 ease-in-out",
+          // 胶囊宽度只由 CSS 决定：w-max 跟随摘要内容，上限以 conversation 容器（100cqw）为基准。
+          // Bug 原因：过去由 ResizeObserver 量出摘要宽度写进 CSS 变量（为了给宽度做插值动画，
+          // 而 shell 早已不过渡宽度），测量值会比内容晚一次渲染、上限又按窗口宽度（100vw）算——
+          // 两者都能让文字落到胶囊外面。
           variant === "mini"
-            ? "inline-flex max-h-8.5 w-[var(--chat-summary-panel-mini-width)] max-w-[calc(100vw-1.5rem)] flex-col"
+            ? "inline-flex max-h-8.5 w-max max-w-[min(20rem,calc(100cqw-2rem))] flex-col"
             : variant === "panel"
-              ? "flex max-h-[min(64dvh,32rem)] w-80 max-w-[calc(100vw-1.5rem)] flex-col"
-              : "inline-flex max-h-8.5 w-[var(--chat-summary-panel-mini-width)] max-w-[calc(100vw-1.5rem)] flex-col @min-[1280px]/conversation:max-h-[min(64dvh,32rem)] @min-[1280px]/conversation:w-80",
+              ? "flex max-h-[min(64dvh,32rem)] w-80 max-w-[calc(100cqw-2rem)] flex-col"
+              : "inline-flex max-h-8.5 w-max max-w-[min(20rem,calc(100cqw-2rem))] flex-col @min-[1280px]/conversation:max-h-[min(64dvh,32rem)] @min-[1280px]/conversation:w-80",
         )}
       >
         {variant !== "mini" ? (
@@ -2057,10 +2200,9 @@ function ConversationStatusPanelImpl({
           </div>
         ) : null}
         <div
-          ref={miniMeasureRef}
           aria-hidden={variant === "panel"}
           className={cn(
-            "w-max max-w-80 transition-opacity duration-150",
+            "w-max max-w-full transition-opacity duration-150",
             variant === "mini"
               ? "pointer-events-auto relative visible opacity-100"
               : variant === "panel"
@@ -2074,6 +2216,7 @@ function ConversationStatusPanelImpl({
             // 胶囊也就不该报一个点了没反应的数。
             endedWorkflowRunCount={canRenderEndedWorkflows ? endedWorkflowRunCount : 0}
             gitWorktreeChangeSummary={gitWorktreeChangeSummary}
+            onOpenWorkflowSection={handleOpenWorkflowSection}
             onVariantChange={onVariantChange}
           />
         </div>

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-thought-level-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-thought-level-cold-resume.test.ts",
+  "fixtures": [
+    {
+      "id": "thought-cold-resume-seed-main",
+      "description": "I63 冷重启前创建 completed GLM-5.2 max session 的稳定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 completed task 的 task-local thought 冷恢复；响应只需稳定结束首轮。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_COLD_RESUME_SEED"],
+        "bodyIncludes": ["E2E_THOUGHT_COLD_RESUME_SEED", "GLM-5.2", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "extra_body"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-thought-cold-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thought-cold-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thought-cold-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "thought-cold-resume-follow-main",
+      "description": "I63 冷重启后同一 task 续发时验证 GLM-5.2 max 请求的稳定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应正文不是产品变量；续发 request body 的 max 配置才是核心证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_COLD_RESUME_FOLLOW"],
+        "bodyIncludes": ["E2E_THOUGHT_COLD_RESUME_FOLLOW", "GLM-5.2", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "extra_body"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-thought-cold-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thought-cold-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thought-cold-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":144,\"completion_tokens\":12,\"total_tokens\":156}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

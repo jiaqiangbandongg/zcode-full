@@ -22,15 +22,22 @@ const VALID_COLORS = new Set<AgentColor>([
   "cyan",
 ]);
 
-const VALID_PERMISSION_MODES = new Set<AgentPermissionMode>(["auto", "plan"]);
+const VALID_PERMISSION_MODES = new Set<AgentPermissionMode>([
+  "acceptEdits",
+  "auto",
+  "bypassPermissions",
+  "default",
+  "dontAsk",
+  "plan",
+]);
 
-interface ParseSubagentMarkdownInput {
+export interface ParseSubagentMarkdownInput {
   content: string;
   path: string;
   scope: AgentScope;
 }
 
-interface ParseSubagentMarkdownResult {
+export interface ParseSubagentMarkdownResult {
   agent?: AgentSummary;
   diagnostic?: AgentDiagnostic;
 }

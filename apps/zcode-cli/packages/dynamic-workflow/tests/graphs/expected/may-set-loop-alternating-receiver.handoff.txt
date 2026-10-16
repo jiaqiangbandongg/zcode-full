@@ -1,0 +1,5 @@
+phase unphased
+participant unphased:actor#1 "black" steps=ask#1~actor#1
+participant unphased:actor#2 "white" steps=ask#1~actor#2
+handoff unphased:actor#1 -> unphased:actor#2 back types="string"
+handoff unphased:actor#2 -> unphased:actor#1 back types="string"

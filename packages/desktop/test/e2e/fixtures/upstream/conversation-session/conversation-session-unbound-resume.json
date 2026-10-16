@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-unbound-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-unbound-resume.test.ts",
+  "fixtures": [
+    {
+      "id": "unbound-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"{\\\"title\\\":\\\"Unbound resume\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "unbound-history",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UNBOUND_RESUME_HISTORY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"unbound-history-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "unbound-continue_0",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UNBOUND_RESUME_CONTINUE_0"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"unbound-continue-0-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "unbound-continue_1",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UNBOUND_RESUME_CONTINUE_1"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"unbound-continue-1-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "unbound-continue_2",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UNBOUND_RESUME_CONTINUE_2"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"unbound-continue-2-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "unbound-continue_3",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UNBOUND_RESUME_CONTINUE_3"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"unbound-continue-3-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"unbound\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

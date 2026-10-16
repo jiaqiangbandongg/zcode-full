@@ -18,7 +18,7 @@ export interface ProcessResourceReportContext {
 }
 
 /** ARMS 的 `platform` 维度只有这三个取值，看板按它分组。 */
-type ProcessResourceOsCategory = "macos" | "windows" | "linux";
+export type ProcessResourceOsCategory = "macos" | "windows" | "linux";
 
 export function normalizeOsCategory(platform: NodeJS.Platform): ProcessResourceOsCategory {
   switch (platform) {

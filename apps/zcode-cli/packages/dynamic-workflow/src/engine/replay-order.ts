@@ -1,11 +1,12 @@
 /**
- * Replay 的**结算次序闸**。
+ * Replay 的**结算次序闸**（docs/execution-engine.md「Replaying the settle order」）。
  *
  * 站点序号是调用到达时的计数器，所以一条分支在 await **之后**做的每一次 journal 调用，
  * 编号依的是扇出完成的顺序，而不是脚本发起的顺序。那个顺序是墙钟的，节点行里没有任何东西
  * 能复现它：按准入顺序释放缓存结算，重放的 `Promise.all` 会按数组顺序跑续体，join 之后的第一条
  * `report` 于是拿到 journal 给「最先跑完的那条分支」的序号，run 死在自己的防御性校验里
- * （`InputHashMismatch`），即使脚本本身是确定性的，也可能因重放完成顺序不同而失败。
+ * （`InputHashMismatch`），被指认为不确定的却是一个纯脚本。2026-09-17 实盘：五路并行调研，
+ * 完成顺序 1、4、2、5、3，resume 在 report#2@2 上炸。
  *
  * 所以 resume 重放的是**调度**，不只是答案：本闸持有首生的结算次序，命中缓存的结算在释放点
  * 挂起，直到它前面的每一条都已释放。次序表之外的实例直接放行——闸门只约束它有证据的那些，
@@ -13,8 +14,39 @@
  */
 
 import { isArtifactPresetOp } from "../facade/registry.js";
-import type { InstanceRef, JournalStorePort, NodeRecord, RunEvent } from "./types.js";
+import { NODE_KINDS, type RunEventType } from "./journal-read-types.js";
+import type { InstanceRef, JournalStorePort, NodeKind, NodeRecord, RunEvent } from "./types.js";
 import { refToString } from "./types.js";
+
+/**
+ * 重放时一定会兑现一个 promise 的节点 kind：除 `report`（void）与 `artifact`（要看成员族，
+ * 见 {@link claimsOnReplay}）之外的全部。从 {@link NODE_KINDS} 派生：新增的 kind 默认算进来。
+ */
+export const REPLAY_WORK_KINDS: readonly NodeKind[] = NODE_KINDS.filter(
+  (kind) => kind !== "report" && kind !== "artifact",
+);
+
+/** 结算次序只看这三种事件（{@link settledInstanceKey}），其余事件不必读出来。 */
+const SETTLE_EVENT_TYPES: readonly RunEventType[] = [
+  "node-settled",
+  "artifact-published",
+  "artifact-failed",
+];
+
+/**
+ * 结算次序要的节点行：工作行**不带结果**（只看 kind / status / 坐标），产物行带结果（成员族在
+ * `result.kind` 上，而产物行有界：32 个 id × 每 id 16 版）。报告行一条都不读——它们从不认领
+ * 闸门，而一个 run 可以有 65,536 条（docs/execution-engine.md「Reading the journal」）。
+ */
+export function readReplayRows(
+  journal: JournalStorePort,
+  runId: string,
+): { workRows: NodeRecord[]; artifactRows: NodeRecord[] } {
+  return {
+    workRows: journal.listNodes(runId, { kinds: REPLAY_WORK_KINDS, withResult: false }),
+    artifactRows: journal.listNodes(runId, { kinds: ["artifact"], withResult: true }),
+  };
+}
 
 export class ReplaySettleOrder {
   /** 实例键 → 它在首生结算次序里的位置。 */
@@ -39,7 +71,7 @@ export class ReplaySettleOrder {
     return new ReplaySettleOrder([]);
   }
 
-  /** 首生的结算次序（用于诊断）。 */
+  /** 首生的结算次序（诊断与测试用）。 */
   recorded(): readonly string[] {
     return this.order;
   }
@@ -86,7 +118,7 @@ export class ReplaySettleOrder {
    * run 结算：闸门永久打开，挂起的按记录次序放完。
    *
    * 不放的后果是脚本那侧的 promise 永远不兑现——在 harness 里沙箱马上就被关掉，但在同进程
-   * 跑脚本的装配（如 `EvalWorkflowSnippet`）里那就是一次挂死。结算之后释放是安全的：
+   * 跑脚本的装配（引擎测试、`EvalWorkflowSnippet`）里那就是一次挂死。结算之后释放是安全的：
    * 引擎已 markSettled，每条 host 路径都以 `isRunSettled()` 开头。
    */
   open(): void {
@@ -141,8 +173,8 @@ export class ReplaySettleOrder {
 export function recoverSettleOrder(
   journal: JournalStorePort,
   runId: string,
-  /** 已读好的节点行（引擎的 resume 分支本来就要读一次，传进来省掉第二次全表读）。 */
-  nodes: readonly NodeRecord[] = journal.listNodes(runId),
+  /** 已读好的节点行（引擎的 resume 分支本来就要读一次，传进来省掉第二次读）。 */
+  nodes: readonly NodeRecord[] = Object.values(readReplayRows(journal, runId)).flat(),
 ): ReplaySettleOrder {
   const claimable = new Set<string>();
   for (const node of nodes) {
@@ -154,7 +186,10 @@ export function recoverSettleOrder(
 
   const order: string[] = [];
   const seen = new Set<string>();
-  for (const { event } of journal.listEvents(runId)) {
+  for (const { event } of journal.listEvents(runId, {
+    types: SETTLE_EVENT_TYPES,
+    reportItems: { limit: 0 },
+  })) {
     const key = settledInstanceKey(event);
     if (key === undefined || seen.has(key) || !claimable.has(key)) continue;
     seen.add(key);

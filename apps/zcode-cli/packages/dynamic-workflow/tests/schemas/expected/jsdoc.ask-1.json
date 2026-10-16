@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "A validated registration form.",
+  "properties": {
+    "age": {
+      "description": "Age in years.",
+      "exclusiveMaximum": 130,
+      "minimum": 13,
+      "type": "number"
+    },
+    "email": {
+      "description": "Contact email.",
+      "format": "email",
+      "type": "string"
+    },
+    "interests": {
+      "description": "Interests.",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "type": "array"
+    },
+    "subscribe": {
+      "default": false,
+      "description": "Whether to subscribe to the newsletter.",
+      "type": "boolean"
+    },
+    "username": {
+      "description": "Chosen username.",
+      "maxLength": 20,
+      "minLength": 3,
+      "pattern": "^[a-z0-9_]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "username",
+    "age",
+    "email",
+    "interests",
+    "subscribe"
+  ],
+  "type": "object"
+}

@@ -1,7 +1,7 @@
 export const ZCODE_E2E_FS_FAULTS_ENV = "ZCODE_E2E_FS_FAULTS";
 export const ZCODE_E2E_FS_FAULTS_ALLOW_ENV = "ZCODE_E2E_FS_FAULTS_ALLOW";
 
-type StorageFsFaultOperation =
+export type StorageFsFaultOperation =
   | "appendFile"
   | "any"
   | "mkdir"
@@ -11,7 +11,7 @@ type StorageFsFaultOperation =
   | "sqliteRun"
   | "writeFile";
 
-interface StorageFsFaultRule {
+export interface StorageFsFaultRule {
   id: string;
   code: string;
   operations?: readonly StorageFsFaultOperation[];
@@ -22,7 +22,7 @@ interface StorageFsFaultRule {
   message?: string;
 }
 
-interface StorageFsFaultInput {
+export interface StorageFsFaultInput {
   operation: StorageFsFaultOperation;
   path: string;
 }
@@ -39,7 +39,7 @@ interface NormalizedStorageFsFaultRule {
   matchedCount: number;
 }
 
-interface InjectedStorageFsFaultError extends NodeJS.ErrnoException {
+export interface InjectedStorageFsFaultError extends NodeJS.ErrnoException {
   zcodeFsFaultId: string;
 }
 
@@ -76,15 +76,10 @@ function optionalString(value: unknown, field: string, index: number): string | 
 function normalizeOperations(value: unknown, index: number): readonly StorageFsFaultOperation[] {
   if (value === undefined) return ["any"];
   if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(
-      `Invalid fs fault rule at index ${index}: operations must be a non-empty array`,
-    );
+    throw new Error(`Invalid fs fault rule at index ${index}: operations must be a non-empty array`);
   }
   return value.map((operation) => {
-    if (
-      typeof operation !== "string" ||
-      !SUPPORTED_OPERATIONS.has(operation as StorageFsFaultOperation)
-    ) {
+    if (typeof operation !== "string" || !SUPPORTED_OPERATIONS.has(operation as StorageFsFaultOperation)) {
       throw new Error(
         `Invalid fs fault rule at index ${index}: unsupported operation ${String(operation)}`,
       );
@@ -97,9 +92,7 @@ function normalizeRule(rule: StorageFsFaultRule, index: number): NormalizedStora
   const record = rule as unknown as Record<string, unknown>;
   const maxMatches = record.maxMatches === undefined ? 1 : record.maxMatches;
   if (typeof maxMatches !== "number" || !Number.isInteger(maxMatches) || maxMatches < 0) {
-    throw new Error(
-      `Invalid fs fault rule at index ${index}: maxMatches must be a non-negative integer`,
-    );
+    throw new Error(`Invalid fs fault rule at index ${index}: maxMatches must be a non-negative integer`);
   }
   const pathRegexRaw = optionalString(record.pathRegex, "pathRegex", index);
 
@@ -138,19 +131,14 @@ function parseRules(rawValue: string): StorageFsFaultRule[] {
   });
 }
 
-function operationMatches(
-  rule: NormalizedStorageFsFaultRule,
-  operation: StorageFsFaultOperation,
-): boolean {
+function operationMatches(rule: NormalizedStorageFsFaultRule, operation: StorageFsFaultOperation): boolean {
   return rule.operations.has("any") || rule.operations.has(operation);
 }
 
 function pathMatches(rule: NormalizedStorageFsFaultRule, path: string): boolean {
   const normalizedPath = normalizePath(path);
-  const includes =
-    rule.pathIncludes === undefined || normalizedPath.includes(normalizePath(rule.pathIncludes));
-  const endsWith =
-    rule.pathEndsWith === undefined || normalizedPath.endsWith(normalizePath(rule.pathEndsWith));
+  const includes = rule.pathIncludes === undefined || normalizedPath.includes(normalizePath(rule.pathIncludes));
+  const endsWith = rule.pathEndsWith === undefined || normalizedPath.endsWith(normalizePath(rule.pathEndsWith));
   const regex = rule.pathRegex === undefined || rule.pathRegex.test(normalizedPath);
   return includes && endsWith && regex;
 }
@@ -172,12 +160,12 @@ function createInjectedError(input: {
   return error;
 }
 
-interface StorageFsFaultInjector {
+export interface StorageFsFaultInjector {
   maybeThrow(input: StorageFsFaultInput): void;
   reset(): void;
 }
 
-function createStorageFsFaultInjector(
+export function createStorageFsFaultInjector(
   rules: readonly StorageFsFaultRule[] = [],
 ): StorageFsFaultInjector {
   const normalizedRules = rules.map((rule, index) => normalizeRule(rule, index));
@@ -230,4 +218,13 @@ function getStorageFsFaultInjector(): StorageFsFaultInjector {
 
 export function maybeThrowStorageFsFault(input: StorageFsFaultInput): void {
   getStorageFsFaultInjector().maybeThrow(input);
+}
+
+export function setStorageFsFaultInjectorForTests(injector: StorageFsFaultInjector | null): void {
+  injectedForTests = injector;
+}
+
+export function resetStorageFsFaultInjectorForTests(): void {
+  envInjector = null;
+  injectedForTests = null;
 }

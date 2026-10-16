@@ -15,12 +15,14 @@ The browser registry is driven from the Node REPL MCP `js` tool. In this environ
 
 ## Bootstrap every JavaScript call
 
-The `browser-client` module is the browser entry point and is available at `scripts/browser-client.mjs` under this plugin's root. Resolve that root only from `process.env.ZCODE_PLUGIN_ROOT`, then convert the joined path with `pathToFileURL`. Never derive the plugin root from this skill's base directory or leave a synthetic root placeholder for the model to resolve. If the host root is unavailable or the resolved module cannot be imported, stop and report the exact setup error.
+The `browser-client` module is the browser entry point and is available at `scripts/browser-client.mjs` under this plugin's root. Resolve that root only from `process.env.ZCODE_PLUGIN_ROOT` (with `CLAUDE_PLUGIN_ROOT` as a compatibility fallback), then convert the joined path with `pathToFileURL`. Never derive the plugin root from this skill's base directory or leave a synthetic root placeholder for the model to resolve. If the host root is unavailable or the resolved module cannot be imported, stop and report the exact setup error.
 
 Initialize at the start of every `mcp__node_repl__js` call that uses the browser. The bootstrap deliberately does not select a backend; apply the user's existing backend choice or the selection rules below after setup.
 
 ```js
-const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT;
+// 修复原因：Skill base directory 指向 skills/control-browser，不能据此拼接插件运行时资产。
+const browserPluginRoot =
+  process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;
 if (!browserPluginRoot) {
   throw new Error("Browser plugin root is unavailable in the node_repl host");
 }
@@ -76,7 +78,7 @@ const browser = await agent.browsers.getDefault();
 nodeRepl.write(await browser.documentation());
 ```
 
-Do not slice, truncate, or summarize it. Only if the tool output itself reports truncation may you read it in smaller chunks. It documents every default method, the Playwright DOM snapshot→locator workflow, the snapshot-ref, `cua`, and `dom_cua` escape-hatch paths, and safety rules. Screenshot instructions are intentionally lookup-only and must not be loaded unless the visual branch below applies.
+Do not slice, truncate, or summarize it. Only if the tool output itself reports truncation may you read it in smaller chunks. It documents every default method, the Playwright DOM snapshot→locator workflow, the ref/cua/dom_cua compatibility paths, and safety rules. Screenshot instructions are intentionally lookup-only and must not be loaded unless the visual branch below applies.
 
 ## Core workflow
 
@@ -94,7 +96,7 @@ Do not slice, truncate, or summarize it. Only if the tool output itself reports 
 4. If the task names a new URL, prefer the reuse-aware entry: `await agent.browsers.open(url)` reuses an existing
    same-site controlled tab (same hostname), activates it so the user sees it, and navigates in place, instead of
    stacking a new tab on every navigation. Only when the task genuinely needs a parallel independent tab, create one
-   explicitly and follow this navigation sequence:
+   explicitly and use this navigation sequence:
 
    ```js
    const tab = await browser.tabs.new();
@@ -149,9 +151,10 @@ string id, recover the same verified tab before every status/cancel batch, and p
 - `tab.dom_cua.*` — node path (`node_id` comes from `get_visible_dom()`): `click({node_id})`, `double_click({node_id})`, `scroll({node_id?,x,y})`, `keypress({keys})`, and `type({text})` after focusing the target.
 - `tab.playwright.waitForTimeout(timeoutMs)` — fixed wait for the rare case where no concrete
   page state can be observed yet. `timeoutMs` must be a non-negative integer. Do not call
-  `tab.waitForTimeout(...)`; that root-level API does not exist in this runtime. Prefer a targeted wait or fresh `domSnapshot()`
+  `tab.waitForTimeout(...)`; that root-level API does not exist. Prefer a targeted wait or fresh `domSnapshot()`
   over routine sleeps.
-- `tab.playwright.getByRole/getByText/getByLabel/getByPlaceholder/getByTestId/locator` — lazy locator builders. Prefer these when a targeted state wait or a strict DOM action is clearer than a
+- `tab.playwright.getByRole/getByText/getByLabel/getByPlaceholder/getByTestId/locator` — lazy
+  locator builders. Prefer these when a targeted state wait or a strict DOM action is clearer than a
   snapshot ref. Common terminal methods include `click`, `dblclick`, `fill`, `type`, `press`, `check`,
   `uncheck`, `selectOption`, `waitFor`, `count`, `allTextContents`, `textContent`, `innerText`,
   `getAttribute`, `isVisible`, `isEnabled`, `evaluate`, and `downloadMedia`.
@@ -161,7 +164,7 @@ string id, recover the same verified tab before every status/cancel batch, and p
 - `goto()` accepts `http:`, `https:`, and exact `about:blank`. `file:`, other `about:*`, `data:`, and
   `javascript:` targets are not navigable. A `file:` URL may still be used only as a `getForUrl()` backend-selection
   hint when multiple backends exist.
-- `networkidle` is present in the shared type but is rejected by every ZCode browser backend. For
+- `networkidle` is present in the shared type but is rejected by the IAB backend. For
   `expectNavigation(...)`, pass an expected `url` when the action must prove a new navigation; without `url`, an
   already-loaded old page can satisfy the load-state waiter.
 

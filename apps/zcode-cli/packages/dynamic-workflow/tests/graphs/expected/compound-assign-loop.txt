@@ -1,0 +1,11 @@
+node source
+node fan-out#1 "fan-out" @5:1
+node ask#1 "worker" @6:35 actors=actor#1 within=fan-out#1 type="string"
+node ask#2 "summarizer" @9:43 actors=actor#2 type="string"
+node sink
+actor actor#1 "worker" @6:19 within=fan-out#1
+actor actor#2 "summarizer" @9:23
+edge source -> fan-out#1 data exact
+edge fan-out#1 -> ask#1 data exact
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

@@ -1,0 +1,5 @@
+phase unphased
+participant unphased:workspace steps=world-read#1,world-read#2
+participant unphased:actor#1 "optimizer" steps=ask#1
+handoff unphased:workspace -> unphased:actor#1 types="WorldRunResult"
+handoff unphased:actor#1 -> unphased:workspace types="string"

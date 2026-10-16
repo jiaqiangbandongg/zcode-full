@@ -2,6 +2,11 @@
 
 Portable design system for AI-assisted UI work in this repository.
 
+This document is the single source of truth for design rules and token intent.
+Theme values are defined in [styles.css](packages/ui/src/styles.css), including the
+fallback themes and active Zai Light / Zai Dark overrides; do not maintain a separate
+copy of their numeric color values in documentation.
+
 This file is meant for coding agents. When generating or editing UI in this repo, follow this file before inventing new visual rules.
 
 ## Highest-priority UI constraint
@@ -41,6 +46,17 @@ Avoid:
 
 ## Theme Modes
 
+### Full-page desktop overlays
+
+Login, Coding Plan upgrade, and Rewards surfaces must keep minimize, maximize/restore,
+and close-window controls reachable at the top right on Windows and Linux. Reuse
+`DesktopWindowControls` and the existing platform CSS variants. Keep the controls
+outside scrolling content and above page decoration, with a non-draggable hit area.
+The embedded website's close-page action remains separate from close-window.
+macOS keeps native traffic lights; ordinary Web and mobile Web hide desktop controls.
+Verify all three surfaces in both themes, including narrow windows, maximize/restore,
+minimize, and close-page versus close-window behavior.
+
 User-facing theme choices are:
 
 - System
@@ -57,6 +73,10 @@ Default light and dark CSS variables still exist as fallback foundations, but ne
   Use for key emphasis, important links, active indicators, and brand-accented actions. Never use as a full-page background.
 - **Icon Blue**: `--color-icon-blue`
   Use for browser-style links and blue icon emphasis that follows the Figma `icon/blue` role. Keep file-type icons on their own descriptor colors.
+- **Icon Purple**: `--color-icon-purple`
+  Use for Highspeed duration emphasis and other UI explicitly mapped to the Figma `icon/purple` role. Do not reuse idle-task or terminal colors directly.
+- **Highspeed Composer Material**: `--color-highspeed-composer-border-idle` with `--color-highspeed-glow-*`
+  Use only for an active Highspeed composer shell. Its stable surface and particle layer are defined by the dedicated Highspeed activation stylesheet and must not leak into ordinary inputs.
 - **Accent Surface**: `--color-accent`
   Use for weak emphasis blocks, selected highlights, and low-intensity branded surfaces.
 - **Background**: `--color-background`
@@ -123,7 +143,7 @@ Use semantic colors only for actual semantic states. Do not borrow success, warn
 ### Blocking interaction colors
 
 - **Ask Interaction**: `--color-interaction-ask-surface`, `--color-interaction-ask-foreground`, `--color-interaction-ask-fill`
-  Legacy compatibility tokens for `AskUserQuestion`; waiting badges no longer use a separate blue treatment.
+  Legacy compatibility surface/foreground tokens for `AskUserQuestion`; waiting badges no longer use a separate blue treatment. The ask fill is reserved for countdown progress.
 - **Confirmation Interaction**: `--color-interaction-confirmation-surface`, `--color-interaction-confirmation-foreground`
   Use for all waiting badges, including `AskUserQuestion`, permission, and `ExitPlanMode`.
 
@@ -131,7 +151,8 @@ Waiting badges use one green confirmation treatment so identical waiting copy do
 
 ### Workflow timeline colors
 
-The dynamic-workflow timeline draws with a feature-scoped token family:
+The dynamic-workflow timeline (spec: `docs/dynamic-workflow/presentation.md`) draws with a
+feature-scoped token family:
 
 - **Rule**: `--color-workflow-rule`
   Sub-hairline for repeated furniture. Weaker than `--color-border`; do not use it as a
@@ -139,16 +160,22 @@ The dynamic-workflow timeline draws with a feature-scoped token family:
 - **Trace / Trace Strong**: `--color-workflow-trace`, `--color-workflow-trace-strong`
   Rail and arc stroke ramp: not yet taken vs control has passed. The marching segment
   overlays `--color-warning` dashes; there is no third stroke colour.
+- **Fill frame**: a filled hole's frame is drawn in `--color-workflow-trace` (1px), and in
+  `--color-warning` (1.5px) only for the two seconds after the fill joins; never a tinted
+  surface (spec: `docs/dynamic-workflow/presentation.md`, "Holes on the timeline").
 - Station lamps and agent pills use the semantic status colours (`--color-success`,
-  `--color-warning` for running, `--color-destructive`); agent avatars use the fixed nine-color HEX palette,
+  `--color-warning` for running, `--color-destructive`); agent avatars use the fixed nine-color HEX palette defined in the workflow spec,
   assigned by instance index (name hash fallback), and never encode status.
 - A compile-feedback row (a script that did not compile, so nothing ran) uses a hollow lamp:
   `--color-warning` while it is the latest draft, `--color-foreground-subtlest` once a newer
-  draft exists. Never `--color-destructive`, which on this feature belongs to a run that errored.
+  draft exists. Never `--color-destructive`, which on this feature belongs to a run that errored
+  (spec: `docs/dynamic-workflow/presentation.md`, "Compiler feedback").
 
 ### Overlay and utility colors
 
 - **Toast**: `--color-toast`
+  The shared toast uses `bg-toast/60` with background blur and a `rounded-2xl` shell.
+  Keep stack positioning in the shared toast component; do not add per-call offsets.
 - **Tooltip**: `--color-tooltip`
 - **Tooltip Text**: `--color-tooltip-foreground`
 - **Tooltip Tag**: `--color-tooltip-tag`
@@ -161,6 +188,39 @@ The dynamic-workflow timeline draws with a feature-scoped token family:
 - **Primary**: `--color-primary`
 - **Primary Foreground**: `--color-primary-foreground`
 - **Secondary**: `--color-secondary`
+
+### Specialized color tokens
+
+| Token | Purpose |
+| --- | --- |
+| `--color-markdown-inline-code` | Markdown 行内代码背景，沿用 tag / label 胶囊层级 |
+| `--color-popover-header` | Popover header |
+| `--color-tab` | Tab 默认背景 |
+| `--color-tab-active` | 当前激活 tab |
+| `--color-tab-border` | Tab 分隔线 |
+| `--color-feedback-privacy-hint` | 反馈截图隐私提醒文字及叹号图标；独立一行，使用辅助说明字号 |
+| `--color-git-none` | Git 无变更状态，沿用普通文件名颜色 |
+| `--color-git-modified` | Git modified，表示已跟踪文件有未提交修改 |
+| `--color-git-added` | Git added，表示新增文件已进入工作树 / 暂存区 |
+| `--color-git-deleted` | Git deleted，表示已跟踪文件被删除 |
+| `--color-git-renamed` | Git renamed，表示已跟踪文件移动或重命名 |
+| `--color-git-untracked` | Git untracked，表示 Git 尚未跟踪的新文件 |
+| `--color-git-ignored` | Git ignored，继承弱化文本层级 |
+| `--color-git-descendant` | Git descendant，表示目录后代包含变更 |
+| `--color-file-node` | 文件 mention node 背景 |
+| `--color-file-node-hover` | 文件 mention node hover 背景 |
+| `--color-file-node-foreground` | 文件 mention node 文字 / 图标 |
+| `--color-skill-node` | Skill mention node 背景 |
+| `--color-skill-node-hover` | Skill mention node hover 背景 |
+| `--color-skill-node-foreground` | Skill mention node 文字 / 图标 |
+| `--color-command-node` | Command mention node 背景 |
+| `--color-command-node-hover` | Command mention node hover 背景 |
+| `--color-command-node-foreground` | Command mention node 文字 / 图标 |
+
+Git file statuses must use `text-git-*` / `bg-git-*`, rather than borrowing diff or warning tokens.
+Mention tokens belong to prompt-editor and UserPrompt mention nodes; their background, hover,
+and foreground roles must stay together. Markdown inline code uses its own background token,
+currently mapped to `--color-tag`.
 
 ## Color Usage Rules
 
@@ -178,6 +238,15 @@ The dynamic-workflow timeline draws with a feature-scoped token family:
 - `DesktopWindowFrame` uses `bg-background-alt` on macOS desktop. Windows, Linux, and Web keep `bg-background-win-alt`; child surface colors remain independent.
 - Linux desktop uses a `16px` outer window-shell radius around the `12px` workspace panels and their `4px` outer inset. Keep the shell radius and compositor clip path equal; maximized windows use `0px`.
 
+### Lucide 前景透明度
+
+- Lucide 的次级、三级前景使用不透明描边绘制完整图标，再整体与背景混合，避免多条路径交点加深。次级为 60%，三级浅色为 40%、深色为 30%。
+- 保留现有 `text-foreground-subtle` / `text-foreground-subtlest` 调用；同时支持颜色类直接位于图标和从父元素继承。文字继续使用原有半透明颜色。
+- 颜色 utility 的 hover、group-hover、focus、disabled 和 data 状态应同步图标层级；子元素显式使用其他颜色时清除继承的弱化层级。已有 `opacity-*` 继续独立叠加，`opacity-0` 仍隐藏图标。
+- 本次适配范围为 Tailwind 颜色 utility；自定义 CSS / inline 的颜色与滤镜不作为层级入口，不全局改写非 Lucide SVG。标准 Lucide 的 `stroke="currentColor"` 是适配入口。
+- 支持普通百分比颜色修饰符（如 `/50`）以及 `fill-current` 的实心图标。不支持相对颜色语法的浏览器保留原始绘制方式。
+- 验收：390px / 1200px、Zai Light / Zai Dark，分别检查页面、面板和彩色背景上的直接/继承颜色、交点与非交点像素一致、文字颜色不变、交互颜色覆盖和额外透明度。
+
 ## Typography
 
 ### Font families
@@ -187,17 +256,19 @@ The dynamic-workflow timeline draws with a feature-scoped token family:
 
 ### UI font tokens
 
+Each `text-ui-*` utility maps to the corresponding `--text-ui-*` CSS token.
+
 All interface typography must use the dedicated `text-ui-*` scale. The Appearance setting controls `--ui-font-size`, whose default is `14px`:
 
-| Token             | Formula                | Default |
-| ----------------- | ---------------------- | ------: |
-| `text-ui-xl`      | `--ui-font-size + 4px` |    18px |
-| `text-ui-lg`      | `--ui-font-size + 2px` |    16px |
-| `text-ui-base`    | `--ui-font-size`       |    14px |
-| `text-ui-caption` | `--ui-font-size - 1px` |    13px |
-| `text-ui-sm`      | `--ui-font-size - 2px` |    12px |
-| `text-ui-xs`      | `--ui-font-size - 4px` |    10px |
-| `text-ui-2xs`     | `--ui-font-size - 5px` |     9px |
+| Token | Formula | Default |
+| --- | --- | ---: |
+| `text-ui-xl` | `--ui-font-size + 4px` | 18px |
+| `text-ui-lg` | `--ui-font-size + 2px` | 16px |
+| `text-ui-base` | `--ui-font-size` | 14px |
+| `text-ui-caption` | `--ui-font-size - 1px` | 13px |
+| `text-ui-sm` | `--ui-font-size - 2px` | 12px |
+| `text-ui-xs` | `--ui-font-size - 4px` | 10px |
+| `text-ui-2xs` | `--ui-font-size - 5px` | 9px |
 
 `text-ui-2xs` is a restricted exception below the `text-ui-xs` floor: it is permitted
 only for graph **axis furniture** — timebase tick labels, channel codes, and unit
@@ -217,14 +288,14 @@ be prevented, and therefore does not scale with `--ui-font-size`.
 
 The `text-ui-*` scale expresses stable semantic roles. Choose a token by content role rather than by isolated visual preference:
 
-| Token             | Primary roles                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| `text-ui-xl`      | Markdown `h1` and equivalent first-level reading headings                                                    |
-| `text-ui-lg`      | Markdown `h2` and equivalent second-level reading headings                                                   |
-| `text-ui-base`    | Markdown `h3`-`h6`, body copy, common buttons, workspace and section titles, and other primary UI text       |
+| Token | Primary roles |
+| --- | --- |
+| `text-ui-xl` | Markdown `h1` and equivalent first-level reading headings |
+| `text-ui-lg` | Markdown `h2` and equivalent second-level reading headings |
+| `text-ui-base` | Markdown `h3`-`h6`, body copy, common buttons, workspace and section titles, and other primary UI text |
 | `text-ui-caption` | Compact supporting copy that must remain one step below body text, such as the New Task feature announcement |
-| `text-ui-sm`      | Secondary copy, supporting information, helper text, Tooltip copy, and Markdown inline code                  |
-| `text-ui-xs`      | Tooltip keyboard shortcuts, badges, compact labels, counters, and very weak metadata                         |
+| `text-ui-sm` | Secondary copy, supporting information, helper text, Tooltip copy, and Markdown inline code |
+| `text-ui-xs` | Tooltip keyboard shortcuts, badges, compact labels, counters, and very weak metadata |
 
 - Markdown `h3`-`h6` share `text-ui-base`; distinguish their hierarchy through weight: `h3`-`h4` use `font-semibold`, `h5` uses `font-medium`, and `h6` uses `font-normal`.
 - Body copy and common controls normally use `text-ui-base font-normal`; titles and labels may strengthen weight without changing their semantic size role.
@@ -309,11 +380,11 @@ These exceptions do not automatically grant `2xl` to nested controls or content 
 
 Buttons, menu trigger buttons, ordinary Input, Textarea, and Select triggers default to `rounded-lg`. Adjust them according to the nearest rounded parent container:
 
-| Nearest rounded parent          | Control radius |
-| ------------------------------- | -------------- |
-| None, or `rounded-xl` and above | `rounded-lg`   |
-| `rounded-lg`                    | `rounded-md`   |
-| `rounded-md` / `rounded-sm`     | `rounded-sm`   |
+| Nearest rounded parent | Control radius |
+| --- | --- |
+| None, or `rounded-xl` and above | `rounded-lg` |
+| `rounded-lg` | `rounded-md` |
+| `rounded-md` / `rounded-sm` | `rounded-sm` |
 
 Control size and primary/secondary action emphasis do not independently change radius.
 
@@ -356,6 +427,11 @@ Control size and primary/secondary action emphasis do not independently change r
 - Prefer fluid widths for content containers.
 - Fixed widths are acceptable for menus, popovers, dialogs, and stable side panels.
 - Avoid arbitrary `w-[...]` and `h-[...]` for ordinary business UI.
+- Prefer the shared Button `size` variants, including `icon*`, over separate width/height overrides. The current variants are `default(h-7)`, `xs(h-5)`, `sm(h-6)`, and `lg(h-8)`; generic control baselines do not replace those component contracts.
+- Regular inputs prefer `h-9`; compact filters and inline inputs may use `h-7` or `h-8`.
+- Use `w-full`, `w-fit`, `max-w-full`, and `min-w-0` for content widths. Fixed overlays may use `w-52`, `w-64`, `w-80`, or `max-w-sm/md/lg/xl` when a stable width is required.
+- Page roots use `h-full` or `min-h-screen`. Nested scroll and preview containers need `min-h-0` and `min-w-0` as appropriate; `overflow-auto` alone does not establish a shrinkable flex region.
+- Prefer `max-h-*` to a fixed height for scrollable content. Do not combine `size-*` with conflicting `w-*` / `h-*` unless a non-square shape is deliberate.
 
 ## Components
 
@@ -484,7 +560,7 @@ Depth rules:
 
 ## Workspace layout
 
-Desktop and wide Web workspace content uses independent conversation, bottom terminal, and Side Pane frames. The conversation frame contains WorkspaceHeader and conversation; the optional terminal has its own frame below it, and Side Pane owns its tab bar. Frames use their own background and border, with 4px resizable gaps matching the macOS outer inset. Resize handles keep a transparent 4px hit area and show a 2px tertiary foreground (`foreground-subtlest/50`) line on hover, focus or drag. The indicator extends along the panel edge, inset by the panel radius at both ends, with rounded ends and no mask. Layout frames do not count toward content radius levels. Mobile remote control retains its single-column and drawer presentation.
+Desktop and wide Web workspace content uses independent conversation, bottom terminal, and Side Pane frames. The conversation frame contains WorkspaceHeader and conversation; the optional terminal has its own frame below it, and Side Pane owns its tab bar. Frames use their own background and border, with 4px resizable gaps matching the macOS outer inset. Resize handles keep a transparent 4px hit area and show a 2px tertiary foreground (`foreground-subtlest/50`) line on hover, focus or drag. The indicator extends along the panel edge, inset by the panel radius at both ends, with rounded ends and no mask. Layout frames do not count toward content radius levels. Mobile remote control retains its single-column and drawer presentation. See [workspace independent panels](docs/design/workspace-independent-panels.md) for platform chrome and persistence boundaries.
 
 ## Responsive Behavior
 
@@ -497,6 +573,23 @@ Rules:
 - Do not change the semantic meaning of components across breakpoints.
 - Prefer changing `max-width`, `grid`, `flex`, and visibility over changing component identity.
 - Preserve primary actions at all breakpoints; do not hide core workflows behind desktop-only affordances.
+
+### Breakpoint roles
+
+| Breakpoint | Preferred use |
+| --- | --- |
+| `sm:` | Dialog width, button arrangement, small-screen layout corrections |
+| `md:` | Grid columns and form layout expansion |
+| `lg:` | Desktop toolbar visibility and secondary information density |
+| `xl:` | Chat and complex content arrangements |
+| `2xl:` | Wide-screen reading-width caps, not ordinary page behavior |
+
+Start with the unprefixed layout, then add the fewest breakpoints needed. Prefer changing
+layout, `max-width`, and visibility to repeatedly switching fixed dimensions or semantic
+colors, borders, and radii. Keep essential actions available below desktop breakpoints.
+Dialogs should reuse patterns such as `sm:max-w-*`; grids grow from one column rather
+than starting desktop-wide and being repeatedly reduced. Fix unstable base layout before
+adding breakpoint overrides.
 
 ## Accessibility and Internationalization
 

@@ -1,0 +1,24 @@
+actor-node source
+actor-node workspace
+actor-node actor#1 "architect" @43:19
+actor-node actor#2 "harness" @48:17
+actor-node actor#3 @52:23 family=fan-out#1
+actor-node actor#4 "fixer" @57:15
+actor-node actor#5 "jury-a" @79:15
+actor-node actor#6 "jury-b" @80:15
+actor-node actor#7 "jury-c" @81:15
+actor-node actor#8 "polisher" @82:18
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#2 exact count=1
+actor-edge source -> actor#5 exact count=2
+actor-edge source -> actor#6 inexact count=1
+actor-edge source -> actor#7 inexact count=1
+actor-edge workspace -> actor#4 exact count=3 types="WorldRunResult"
+actor-edge actor#1 -> sink exact count=1 types="Contract"
+actor-edge actor#5 -> actor#8 exact count=2 types="JuryVerdict"
+actor-edge actor#5 -> sink exact count=2 types="JuryVerdict"
+actor-edge actor#6 -> actor#8 inexact count=1 types="JuryVerdict"
+actor-edge actor#6 -> sink inexact count=1 types="JuryVerdict"
+actor-edge actor#7 -> actor#8 inexact count=1 types="JuryVerdict"
+actor-edge actor#7 -> sink inexact count=1 types="JuryVerdict"

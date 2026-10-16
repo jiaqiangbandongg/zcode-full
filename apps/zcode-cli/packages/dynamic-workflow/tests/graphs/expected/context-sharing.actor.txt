@@ -1,0 +1,11 @@
+actor-node source
+actor-node actor#1 "shared" @11:16
+actor-node actor#2 "loner" @15:15
+actor-node actor#3 "ephemeral" @18:23
+actor-node sink
+actor-edge source -> actor#1 exact count=3
+actor-edge source -> actor#2 exact count=1
+actor-edge source -> actor#3 exact count=1
+actor-edge actor#1 -> sink exact count=3 types="string"
+actor-edge actor#2 -> sink exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

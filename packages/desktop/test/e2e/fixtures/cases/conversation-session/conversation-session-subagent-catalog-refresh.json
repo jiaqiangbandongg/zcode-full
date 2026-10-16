@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-catalog-refresh",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-catalog-refresh.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-catalog-refresh.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "~/.zcode/agents/e2e-refresh-{a,b}-{user,mcs}.md",
+      "source": "created-by-spec",
+      "description": "Settings 在同一已运行父 session 下创建、更名、编辑、启停和删除；不重启当前 session。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "scr-user-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-add-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-add-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-add-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-renamed-old-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-renamed-old-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-renamed-new-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-renamed-new-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-renamed-new-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-update-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-update-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-update-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-disabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-disabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-reenabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-reenabled-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-reenabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-deleted-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-user-deleted-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-add-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-add-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-add-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-renamed-old-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-renamed-old-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-renamed-new-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-renamed-new-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-renamed-new-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-update-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-update-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-update-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-disabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-disabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-reenabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-reenabled-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-reenabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-deleted-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    },
+    {
+      "id": "scr-mcs-deleted-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+    }
+  ]
+}

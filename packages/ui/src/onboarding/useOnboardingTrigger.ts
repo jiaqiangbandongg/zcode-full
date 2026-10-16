@@ -19,7 +19,7 @@ export function useOnboardingTrigger(options: {
   update: (patch: Partial<AppSettings>) => Promise<void>;
 }): [boolean | null, () => void] {
   const { onboardingRecord, userId, hasStoredOccupation, loadDeviceMid, update } = options;
-  // null 表示异步判定中（按本地使用记录判断是否触发）。
+  // null 表示异步判定中（触发判定改为按本地记录，docs/onboarding-record-spec.md）。
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   // 记录上一次判定时的 userId，回填只在身份实际变化后发生（见下方回填条件）。
   const lastSyncedUserIdRef = useRef<string | null | undefined>(undefined);

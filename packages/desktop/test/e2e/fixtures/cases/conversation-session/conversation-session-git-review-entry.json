@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-git-review-entry",
+  "spec": "./test/e2e/conversation-session/conversation-session-git-review-entry.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-git-review-entry.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-git-review-entry/status-panel-review.txt",
+      "source": "created-by-spec",
+      "description": "beforeSession case setup 创建未跟踪文件，驱动 status panel Git Changes 入口和 unstaged review 数据。"
+    }
+  ],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "复用隔离 HOME 中预置的只读历史 session；创建未暂存文件、点击 status panel 和打开 Git pane 都是本地 UI/Git service 行为，不发送 prompt 或 provider 请求。",
+  "requests": []
+}

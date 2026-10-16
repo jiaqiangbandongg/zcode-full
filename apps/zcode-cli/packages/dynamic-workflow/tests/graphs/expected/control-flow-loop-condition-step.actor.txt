@@ -1,0 +1,5 @@
+actor-node source
+actor-node actor#1 "gate" @6:15
+actor-node actor#2 "worker" @7:9
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#2 exact count=1

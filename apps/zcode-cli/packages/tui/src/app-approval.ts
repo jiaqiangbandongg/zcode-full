@@ -11,6 +11,10 @@ import { asRecord, stringField } from "./state.js";
 const COMMAND_INPUT_FIELD = "command";
 const DESCRIPTION_INPUT_FIELD = "description";
 
+export function decisionsForApproval(request: PermissionBrokerRequest): ApprovalDecision[] {
+  return request.approvalMode === "user-once" ? ["allow_once", "deny"] : approvalDecisions;
+}
+
 export function handleApprovalKey(
   key: KeyEvent,
   approval: ApprovalPrompt,
@@ -23,17 +27,17 @@ export function handleApprovalKey(
   }
 
   if (key.name === "up" || key.name === "down") {
+    const decisions = decisionsForApproval(approval.request);
     const delta = key.name === "up" ? -1 : 1;
     setApprovalQueue((current) => {
       const [first, ...rest] = current;
       if (!first) return current;
-      const selectedIndex = approvalDecisions.indexOf(first.selectedDecision);
+      const selectedIndex = decisions.indexOf(first.selectedDecision);
       return [
         {
           ...first,
           selectedDecision:
-            approvalDecisions[clampIndex(selectedIndex + delta, approvalDecisions.length)] ??
-            "deny",
+            decisions[clampIndex(selectedIndex + delta, decisions.length)] ?? "deny",
         },
         ...rest,
       ];
@@ -120,11 +124,14 @@ function resolveApproval(
   setStatus(`Permission ${approvalStatusLabel(decision)} for ${approval.request.toolName}.`);
 }
 
-function createApprovalResult(
+export function createApprovalResult(
   request: PermissionBrokerRequest,
   decision: ApprovalDecision,
 ): PermissionBrokerResult {
-  if (decision === "deny") {
+  if (
+    decision === "deny" ||
+    (decision === "allow_project" && request.approvalMode === "user-once")
+  ) {
     return {
       decision: "deny",
       reason: "Denied in TUI",

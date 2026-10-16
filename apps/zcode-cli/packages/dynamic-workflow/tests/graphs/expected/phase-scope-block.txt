@@ -1,0 +1,16 @@
+node source
+node world-read#1 "glob src/**/*.ts" @6:27 type="string[]"
+node world-read#2 "read" @12:28 type="string"
+node ask#1 "auditor" @13:33 actors=actor#1 type="string"
+node world-read#3 "read README.md" @22:28 type="string"
+node ask#2 "scribe" @25:30 actors=actor#2 type="string"
+node sink
+actor actor#1 "auditor" @7:17
+actor actor#2 "scribe" @8:16
+edge source -> world-read#1 data exact
+edge source -> world-read#3 data exact
+edge world-read#1 -> world-read#2 data exact type="string[]"
+edge world-read#1 -> ask#2 data exact type="string[]"
+edge world-read#2 -> ask#1 data exact type="string"
+edge world-read#3 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

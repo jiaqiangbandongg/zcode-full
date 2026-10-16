@@ -15,11 +15,11 @@ type Logger = {
   warn: (...args: unknown[]) => void;
 };
 
-interface WindowsOpenFolderRegistryOperation {
+export interface WindowsOpenFolderRegistryOperation {
   args: string[];
 }
 
-function getWindowsOpenFolderMenuName(locale: Locale): string {
+export function getWindowsOpenFolderMenuName(locale: Locale): string {
   return MENU_LABELS[locale] ?? MENU_LABELS["en-US"];
 }
 
@@ -27,7 +27,7 @@ function quoteWindowsCommandArg(value: string): string {
   return `"${value.replace(/"/g, '\\"')}"`;
 }
 
-function buildWindowsOpenFolderCommand(
+export function buildWindowsOpenFolderCommand(
   executablePath: string,
   appArgs: readonly string[] = [],
 ): string {
@@ -39,7 +39,7 @@ function buildWindowsOpenFolderCommand(
   ].join(" ");
 }
 
-function buildWindowsOpenFolderRegistryOperations(options: {
+export function buildWindowsOpenFolderRegistryOperations(options: {
   executablePath: string;
   appArgs?: readonly string[];
   locale: Locale;

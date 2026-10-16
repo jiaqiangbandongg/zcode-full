@@ -6,7 +6,7 @@ import type {
 import { useWorkspaceServicesResolution } from "@/hooks/useWorkspaceServices.js";
 import { logger } from "@/logger.js";
 
-interface PluginReferenceCatalogState {
+export interface PluginReferenceCatalogState {
   entries: ZCodePluginReferenceCatalogEntry[];
   authority: "session" | "workspace" | null;
   loading: boolean;
@@ -30,7 +30,7 @@ const EMPTY_SCOPED_STATE: ScopedPluginReferenceCatalogState = {
   value: EMPTY_STATE,
 };
 
-interface PluginReferenceCatalogOptions {
+export interface PluginReferenceCatalogOptions {
   preferredRemoteSessionId?: string;
   /** 显式重试代次；菜单重开时重新查询，关闭菜单不清空已加载的目录。 */
   refreshRevision?: number;
@@ -43,6 +43,10 @@ let sessionCatalogRequests = new WeakMap<
   object,
   Map<string, Promise<ZCodePluginsReferenceCatalogResult>>
 >();
+
+export function clearPluginReferenceCatalogCacheForTest(): void {
+  sessionCatalogRequests = new WeakMap();
+}
 
 function releaseSessionCatalogRequest(
   services: object,

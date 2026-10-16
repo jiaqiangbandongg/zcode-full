@@ -21,6 +21,7 @@ import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import { WorkspaceSidePaneToggleButton } from "@/WorkspaceSidePaneToggleButton.js";
 import { DesktopWindowControls } from "@/DesktopWindowControls.js";
 import { BrowserUseSidePaneContent } from "@/browser-use/BrowserUseSidePaneContent.js";
+import { BrowserSitePermissionsPage } from "@/browser-use/BrowserSitePermissionsPage.js";
 import { findScreenshotSurfaceTabForRender } from "@/browser-use/useBrowserScreenshotSurfaceRequest.js";
 import { HumanBrowserView } from "@/browser-use/HumanBrowserView.js";
 import { ScopedErrorBoundary } from "@/ErrorBoundary.js";
@@ -45,6 +46,7 @@ import { SubagentDirectorySidePane } from "@/app-shell/SubagentDirectorySidePane
 import { SelectionSideChatPane } from "@/app-shell/SelectionSideChatPane.js";
 import { BackgroundBashOutputSidePane } from "@/app-shell/BackgroundBashOutputSidePane.js";
 import { PlanDetailSidePane } from "@/app-shell/PlanDetailSidePane.js";
+import { PluginUiLauncherItems, PluginUiSidePane, useOpenPluginUi } from "@/plugin-ui/index.js";
 import { WorkflowRunSidePane } from "@/app-shell/WorkflowRunSidePane.js";
 import { WorkflowRunDirectorySidePane } from "@/app-shell/WorkflowRunDirectorySidePane.js";
 import { WorkflowActorSessionSidePane } from "@/app-shell/WorkflowActorSessionSidePane.js";
@@ -69,6 +71,7 @@ import {
 import type { BrowserNavigationRequest, RecentClosedSidePaneTab } from "@/hooks/useAppPanels.js";
 import { useDeveloperToolsVisibility } from "@/hooks/useDeveloperToolsVisibility.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
+import { useIsMobileTextInputViewport } from "@/lib/mobileTextInput.js";
 import { logger } from "@/logger.js";
 import { formatTaskRelativeTime } from "@/lib/taskListItemPresentation.js";
 import {
@@ -105,6 +108,9 @@ type TabsScrollMaskEdges = {
   left: boolean;
   right: boolean;
 };
+const OPEN_TAB_LAUNCHER_BUTTON_CLASS =
+  "side-pane-open-tab-button flex h-12 min-w-0 items-center gap-3 rounded-xl bg-surface px-3 text-ui-base font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 type OpenTabLauncherItem = {
   id: OpenTabLauncherItemId;
   label: string;
@@ -311,6 +317,7 @@ export function AnimatedSidePanePanel({
   onCloseAllTabs,
   onReopenClosedTab,
   onOpenBrowserTab,
+  onOpenBrowserPermissionSettings,
   onOpenWhiteboard: _onOpenWhiteboard,
   onOpenDeveloperTools,
   onOpenTerminalTab,
@@ -336,6 +343,8 @@ export function AnimatedSidePanePanel({
   showWindowControls,
   onCloseSidePane,
   toggleSidePaneShortcutLabel,
+  mobileOverlay = false,
+  mobileStacked = false,
 }: {
   services: IServiceAccessor;
   frameClassName?: string;
@@ -370,12 +379,14 @@ export function AnimatedSidePanePanel({
   onCloseCodeViewer: () => void;
   onCloseGit: () => void;
   onActivateTab: (tabId: string) => void;
+  /** "插件"分组打开面板 tab；缺省不渲染分组（web / 无宿主）。 */
   onReorderTab: (activeTabId: string, overTabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
   onCloseAllTabs: () => void;
   onReopenClosedTab: (tabId: string) => void;
   onOpenBrowserTab: () => void;
+  onOpenBrowserPermissionSettings?: (origin: string) => void;
   onOpenWhiteboard: () => void;
   onOpenDeveloperTools: () => void;
   onOpenTerminalTab: () => void;
@@ -400,10 +411,14 @@ export function AnimatedSidePanePanel({
   onBrowserUrlChange: (tabId: string, url: string) => void;
   onBrowserPageMetadataChange: (tabId: string, metadata: BrowserSidePaneMetadata) => void;
   onSelectGitSource: (value: GitChangeSourceId) => void;
+  mobileOverlay?: boolean;
+  mobileStacked?: boolean;
 }) {
+  const onOpenPluginUi = useOpenPluginUi();
   const { intl } = useZCodeIntl();
   const isOfficeMode = useIsOfficeMode();
   const developerToolsEnabled = useDeveloperToolsVisibility();
+  const isMobileTextInputViewport = useIsMobileTextInputViewport();
   const isDragCollapsible = !isVisible;
   const isResizeDisabled = !isVisible;
   const workspaceKey = workspaceIdentity?.trim() || workspaceAbsPath;
@@ -446,10 +461,12 @@ export function AnimatedSidePanePanel({
   const isWindowResizeSettling = useWindowResizeSettling(hasRenderedSidePane);
   const widthUnlockTimerRef = useRef<number | null>(null);
   const previousIsVisibleRef = useRef(isVisible);
-  const panelLayout = resolveAnimatedSidePanePanelLayout();
+  const panelLayout = resolveAnimatedSidePanePanelLayout({ mobileOverlay });
   const hasReviewTab = visibleTabs.some((tab) => tab.type === "git");
   const canOpenSelectionSideConversation = shouldOfferSelectionSideConversation({
     activeTaskId,
+    isMobileTextInputViewport,
+    mobileOverlay,
   });
   const tabDragSensors = useSensors(
     useSensor(PointerSensor, {
@@ -715,7 +732,7 @@ export function AnimatedSidePanePanel({
             <span>{intl.formatMessage({ id: "sidePane.review" })}</span>
           </DropdownMenuItem>
         ) : null}
-        {/* 画板入口未启用 */}
+        {/* 暂时隐藏画板入口，后续可能重新开放 */}
         {/* <DropdownMenuItem
           onSelect={() => {
             onOpenWhiteboard();
@@ -756,6 +773,17 @@ export function AnimatedSidePanePanel({
             <BugIcon className="size-4" />
             <span>{intl.formatMessage({ id: "developerTools.title" })}</span>
           </DropdownMenuItem>
+        ) : null}
+        {/* 插件此前只接入空白页；已有 tab 后必须在加号菜单复用相同候选与打开动作。 */}
+        {onOpenPluginUi ? (
+          <PluginUiLauncherItems
+            variant="menu"
+            workspacePath={workspaceAbsPath}
+            workspaceIdentity={workspaceIdentity}
+            remoteSessionId={workspaceRemoteSessionId}
+            sessionId={activeTaskId}
+            onOpenPluginUi={onOpenPluginUi}
+          />
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -801,7 +829,7 @@ export function AnimatedSidePanePanel({
     .filter((itemId) => !isOfficeMode || (itemId !== "terminal" && itemId !== "review"))
     .map((itemId) => openTabLauncherItemById[itemId]);
   const closeSidePaneButton =
-    isVisible && onCloseSidePane ? (
+    isVisible && !mobileOverlay && onCloseSidePane ? (
       <div className="flex shrink-0 items-center gap-0.5 [app-region:no-drag]">
         <WorkspaceSidePaneToggleButton
           isSidePaneOpen
@@ -813,7 +841,7 @@ export function AnimatedSidePanePanel({
     ) : null;
   const openTabLauncher = (
     <div className="side-pane-open-tab-shell flex h-full min-h-0 flex-col bg-background">
-      {
+      {!mobileOverlay ? (
         <div
           className={cn(
             "flex h-12 shrink-0 items-center justify-end px-2",
@@ -823,7 +851,7 @@ export function AnimatedSidePanePanel({
         >
           {closeSidePaneButton}
         </div>
-      }
+      ) : null}
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 py-10">
         <div className="side-pane-open-tab-content flex w-full max-w-[20rem] flex-col gap-5">
           <div className="flex flex-col gap-2 text-center">
@@ -842,7 +870,7 @@ export function AnimatedSidePanePanel({
                   key={item.id}
                   type="button"
                   data-side-pane-open-tab-item={item.id}
-                  className="side-pane-open-tab-button flex h-12 min-w-0 items-center gap-3 rounded-xl bg-surface px-3 text-ui-base font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={OPEN_TAB_LAUNCHER_BUTTON_CLASS}
                   onClick={item.onOpen}
                 >
                   <Icon className="size-4 text-foreground-subtle" />
@@ -852,6 +880,16 @@ export function AnimatedSidePanePanel({
                 </button>
               );
             })}
+            {onOpenPluginUi ? (
+              <PluginUiLauncherItems
+                workspacePath={workspaceAbsPath}
+                workspaceIdentity={workspaceIdentity}
+                remoteSessionId={workspaceRemoteSessionId}
+                sessionId={activeTaskId}
+                onOpenPluginUi={onOpenPluginUi}
+                itemClassName={OPEN_TAB_LAUNCHER_BUTTON_CLASS}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -885,6 +923,9 @@ export function AnimatedSidePanePanel({
         developerToolsTitle: intl.formatMessage({
           id: "developerTools.title",
         }),
+        browserPermissionsTitle: intl.formatMessage({
+          id: "browser.permission.settings",
+        }),
         terminalTitle: intl.formatMessage({ id: "terminal.title" }),
         subagentTypeLabel: intl.formatMessage({ id: "sidePane.subagent" }),
         subagentDirectoryTitle: intl.formatMessage({
@@ -912,13 +953,16 @@ export function AnimatedSidePanePanel({
   const panelContent = (
     <div
       aria-hidden={!isVisible}
-      data-workspace-side-frame="true"
+      data-workspace-side-frame={mobileOverlay ? undefined : "true"}
       className={cn(
         // 独立外框放在内容层：关闭仍保留 Browser Guest 和 tab 实例，不改变面板持久化边界。
         "h-full overflow-hidden bg-background",
-        frameClassName,
+        !mobileOverlay && frameClassName,
+        mobileStacked && "max-md:rounded-none max-md:border-0",
+        mobileOverlay && "min-w-0",
+        mobileStacked && "max-md:!w-full",
       )}
-      style={lockedContentStyle}
+      style={mobileOverlay ? undefined : lockedContentStyle}
     >
       <ScopedErrorBoundary
         scope="workspace-side-pane"
@@ -929,9 +973,9 @@ export function AnimatedSidePanePanel({
         {hasRenderedSidePane && sidePaneState ? (
           <>
             {visibleTabs.length === 0 ? openTabLauncher : null}
-            {/* sidePaneState 是 workspace 级 registry，fork/切换任务后可能只剩其他
-                任务的 session-scoped tab。此时 registry 非空但 visibleTabs 为空，渲染
-                value="" 的空 Tabs 会白屏。这里隐藏但保留 TabsContent 挂载，切回父任务时
+            {/* Bugfix：sidePaneState 是 workspace 级 registry，fork/切换任务后可能只剩其他
+                任务的 session-scoped tab。此时 registry 非空但 visibleTabs 为空，旧逻辑会渲染
+                value="" 的空 Tabs 而白屏。这里隐藏但保留 TabsContent 挂载，切回父任务时
                 辅助对话草稿和引用不会丢失。 */}
             <div
               className={cn(
@@ -945,11 +989,12 @@ export function AnimatedSidePanePanel({
                 className="relative h-full gap-0"
               >
                 <TabsList
-                  style={captionControlsStyle}
+                  style={mobileOverlay ? undefined : captionControlsStyle}
                   className={cn(
                     "flex justify-start w-full rounded-none p-0 border-0 border-b border-border/50 bg-transparent shadow-none !h-12 overflow-hidden",
                     // 独立面板将标签栏移至窗口顶部，需补充窗口拖拽区域；标签和按钮仍处理自身交互。
                     isDesktop &&
+                      !mobileOverlay &&
                       "[app-region:drag] [&_button]:[app-region:no-drag] [&_[data-side-pane-tab-id]]:[app-region:no-drag]",
                   )}
                 >
@@ -1057,7 +1102,7 @@ export function AnimatedSidePanePanel({
                 */}
                 </TabsList>
 
-                <div className="relative min-h-0 flex-1 isolate">
+                <div className={cn("relative min-h-0 flex-1 isolate", mobileOverlay && "min-w-0")}>
                   {tabs.map((tab) => {
                     if (
                       (tab.type === "browser" || tab.type === "browser-use") &&
@@ -1070,6 +1115,7 @@ export function AnimatedSidePanePanel({
                         <BrowserUseSidePaneContent
                           key={tab.id}
                           tab={tab}
+                          onOpenPermissionSettings={onOpenBrowserPermissionSettings}
                           isPanelVisible={isVisible}
                           isSelected={tab.id === visibleActiveTabId}
                           isCurrentTask={tab.sessionId === sidePaneOwnerId}
@@ -1096,7 +1142,10 @@ export function AnimatedSidePanePanel({
                         key={tab.id}
                         value={tab.id}
                         forceMount
-                        className="relative z-10 h-full min-h-0 bg-background data-[state=inactive]:hidden"
+                        className={cn(
+                          "relative z-10 h-full min-h-0 bg-background data-[state=inactive]:hidden",
+                          mobileOverlay && "min-w-0",
+                        )}
                       >
                         {tab.type === "bash-output" ? (
                           <BackgroundBashOutputSidePane
@@ -1108,6 +1157,7 @@ export function AnimatedSidePanePanel({
                           <SubagentSessionSidePane
                             tab={tab}
                             focused={isVisible && tab.id === visibleActiveTabId}
+                            compactForRemoteControl={mobileOverlay}
                             onOpenBrowserUrl={onOpenBrowserUrl}
                             onOpenCodeViewer={onOpenCodeViewer}
                             onOpenFileLink={onOpenFileLink}
@@ -1127,6 +1177,12 @@ export function AnimatedSidePanePanel({
                             onOpenCodeViewer={onOpenCodeViewer}
                             onOpenFileLink={onOpenFileLink}
                             onUnavailable={onCloseTab}
+                          />
+                        ) : tab.type === "plugin-ui" ? (
+                          <PluginUiSidePane
+                            tab={tab}
+                            onOpenBrowserUrl={onOpenBrowserUrl}
+                            onCloseTab={onCloseTab}
                           />
                         ) : tab.type === "plan-detail" ? (
                           <PlanDetailSidePane
@@ -1201,6 +1257,7 @@ export function AnimatedSidePanePanel({
                                 tab.source.type === "media" ||
                                 (tab.source.type === "file" &&
                                   inferMediaPreview(tab.source.path) !== null),
+                              isMobileOverlay: mobileOverlay,
                               isResizeSettling: isWindowResizeSettling,
                               isSidePaneVisible: isVisible,
                               visibleInlineSizePx: sidePaneVisibleInlineSizePx,
@@ -1263,9 +1320,15 @@ export function AnimatedSidePanePanel({
                             isWindowsDesktop={isWindowsDesktop}
                             onOpenBrowserUrl={onOpenBrowserUrl}
                           />
+                        ) : tab.type === "browser-permissions" ? (
+                          <BrowserSitePermissionsPage
+                            origin={tab.origin}
+                            isVisible={isVisible && tab.id === visibleActiveTabId}
+                          />
                         ) : (
                           <HumanBrowserView
                             browserKey={tab.id}
+                            onOpenPermissionSettings={onOpenBrowserPermissionSettings}
                             agentOpened={tab.agentOpened}
                             deferEmptyGuest
                             isResidencyRestore={tab.residency === "restoring"}
@@ -1317,8 +1380,8 @@ export function AnimatedSidePanePanel({
   if (!panelLayout.useResizablePanel) {
     return (
       <>
-        {/* 兜底路径：面板不在 ResizablePanelGroup 的布局上下文里时，
-            继续渲染 ResizablePanel 会让外层 auto 宽度把子级 100% 宽度链路解析成 0px，
+        {/* Bugfix: 手机远控侧栏是覆盖聊天区的抽屉，不在 ResizablePanelGroup 的布局上下文里。
+            如果继续渲染 ResizablePanel，外层 auto 宽度会把子级 100% 宽度链路解析成 0px，
             diff / preview 内容就会挂载但不可见；这里改用普通满宽容器承接内容。 */}
         <div
           ref={panelElementRef}
@@ -1348,6 +1411,7 @@ export function AnimatedSidePanePanel({
             "aria-[orientation=vertical]:[mask-image:none] aria-[orientation=vertical]:[-webkit-mask-image:none]",
             "after:pointer-events-none after:absolute after:rounded-full after:bg-foreground-subtlest/50 after:opacity-0 after:transition-opacity after:content-[''] after:inset-y-[var(--workspace-panel-radius,var(--radius-xl))] after:w-0.5",
             "hover:after:opacity-100 data-[separator=hover]:after:opacity-100 data-[separator=active]:after:opacity-100 focus-visible:after:opacity-100",
+            mobileStacked && "max-md:hidden",
           )}
         />
       ) : null}
@@ -1367,6 +1431,11 @@ export function AnimatedSidePanePanel({
         disabled={isResizeDisabled}
         className={cn(
           "!overflow-hidden transition-opacity duration-200 ease-out",
+          mobileOverlay &&
+            "max-md:!h-full max-md:!w-full max-md:!min-w-0 max-md:!max-w-none max-md:!flex-1 max-md:!basis-auto max-md:border-l",
+          mobileStacked &&
+            !mobileOverlay &&
+            "max-md:!h-[min(45dvh,24rem)] max-md:!w-full max-md:!min-w-0 max-md:!max-w-none max-md:!flex-none max-md:!basis-auto max-md:border-l-0 max-md:border-t",
           // 截图期间 panel 仍保持 opacity=1，避免 opacity=0 让 Chromium 丢弃 guest
           // compositor surface；实际 browser surface 已 fixed 到窗口内的低透明合成层，不会露出 tab 栏。
           isVisible || isScreenshotSurfaceActive ? "opacity-100" : "pointer-events-none opacity-0",

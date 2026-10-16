@@ -188,6 +188,7 @@ const NOOP_ATTEMPT: ModelAttemptSpanWriter = {
   markFirstProviderEvent() {},
   markFirstText() {},
   markStreamStalled() {},
+  recordRequestObservation() {},
   setCacheReadTokens() {},
   setCacheWriteTokens() {},
   setEffectiveReasoningBudgetTokens() {},

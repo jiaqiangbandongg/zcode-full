@@ -15,9 +15,9 @@ export { serializeWorkflowArtifact };
 /**
  * 完成通知里 `<reports>` 那一节的预算：整节最多这么多字符。
  *
- * 通知端本来就有 120k 的总截断，但那是**最后一道**闸：它先斩到的是排在后面的字段。渐进产物
- * 可以有 256 条，任由它铺开会把 `<result>` 与 `<error>` 挤出通知——而那两个才是模型首先要看的。
- * 所以这一节自己带预算。
+ * 通知端本来就有 120k 的总截断，但那是**最后一道**闸：它先斩到的是排在后面的字段。快照带来的
+ * 渐进产物可以有 256 条（`DYNAMIC_WORKFLOW_SNAPSHOT_MAX_REPORTS`），任由它铺开会把 `<result>` 与
+ * `<error>` 挤出通知——而那两个才是模型首先要看的。所以这一节自己带预算。
  */
 const WORKFLOW_REPORTS_PREVIEW_MAX_CHARS = 8_000;
 /** 单条的界。一条 32KB 的产物不该吃掉整节预算，让后面十条一条也进不来。 */
@@ -37,10 +37,14 @@ interface WorkflowReportsNotificationSection {
  * 截断与计数**两者都重要**：计数才是让主 agent 知道「预览是局部的、全量可经 run id 取回」的
  * 那个信号。只给预览会让模型以为它看到了全部；只给计数则等于什么产物都没回。
  *
+ * `total` 是 run 的真实总条数（快照的 `reportCount`）；`items` 只是它的前若干条（快照截在
+ * 256 条处）。缺席时退回 `items.length`——老快照没有这个字段，而那时 `items` 就是全部。
+ *
  * 零条时返回 `undefined`，调用方据此让整节缺席——不发一节空的 `<reports>`。
  */
 export function buildWorkflowReportsNotificationSection(
   items: readonly unknown[] | undefined,
+  total?: number,
 ): WorkflowReportsNotificationSection | undefined {
   if (items === undefined || items.length === 0) return undefined;
 
@@ -55,7 +59,11 @@ export function buildWorkflowReportsNotificationSection(
     used += line.length + 1;
   }
 
-  return { count: items.length, shown: lines.length, preview: lines.join("\n") };
+  return {
+    count: Math.max(total ?? 0, items.length),
+    shown: lines.length,
+    preview: lines.join("\n"),
+  };
 }
 
 /**
@@ -66,10 +74,13 @@ export function buildWorkflowReportsNotificationSection(
  * 界与通知文本那一节刻意不同：这里逐条 ≤500、最多 8 条（同步于 shared 的 `workflowNotificationMetaSchema`——超界会让 turnHeader row 落库时 zod 拒收）。
  * `count` 恒是**真实总条数**：`count ≠ shown` 就是「预览是局部的、全量经 run id 可取」的信号。
  *
+ * `total` 与通知那一节同义（快照的 `reportCount`，缺席退回 `items.length`）。
+ *
  * 零条时返回 `undefined`，调用方据此让整字段缺席。
  */
 export function buildWorkflowReportsManifestSection(
   items: readonly unknown[] | undefined,
+  total?: number,
 ): { count: number; shown: number; preview: string[] } | undefined {
   if (items === undefined || items.length === 0) return undefined;
 
@@ -78,7 +89,7 @@ export function buildWorkflowReportsManifestSection(
     if (preview.length >= WORKFLOW_NOTIFICATION_REPORTS_MAX_ITEMS) break;
     preview.push(clip(serializeWorkflowArtifact(item) ?? "", WORKFLOW_NOTIFICATION_REPORT_ITEM_MAX_CHARS));
   }
-  return { count: items.length, shown: preview.length, preview };
+  return { count: Math.max(total ?? 0, items.length), shown: preview.length, preview };
 }
 
 /** manifest 载荷里逐条产物预览的界（shared schema：≤500 字符）。 */

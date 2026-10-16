@@ -21,16 +21,23 @@
 import { ImportedWorldQueue, matchImportedActor } from "./imported-cache.js";
 import type { ArtifactContentOp, ArtifactPresetOp } from "../facade/registry.js";
 import { AskScheduler, type SchedulerHost } from "./scheduler.js";
-import type { ArtifactIdState, EngineState, RunSettlement } from "./engine-state.js";
-import {
-  declarePresetArtifact,
-  publishContentArtifact,
-  rememberArtifactRow,
-} from "./engine-artifacts.js";
+import type { ArtifactIdState, EngineState, ReportTally, RunSettlement } from "./engine-state.js";
+import { declarePresetArtifact, publishContentArtifact } from "./engine-artifacts.js";
 import { publishReport } from "./engine-report.js";
 import { closeImportCache, readWorld, recoverImportClosure } from "./engine-world.js";
-import { recoverSettleOrder, ReplaySettleOrder } from "./replay-order.js";
+import { ReplaySettleOrder } from "./replay-order.js";
+import { restoreFromJournal } from "./engine-resume.js";
 import { settleCompleted, settleFailed, settleStopped } from "./engine-settlement.js";
+import type { EngineConfig } from "./engine-config.js";
+import {
+  HoleRegistry,
+  fillHole as fillHoleBody,
+  reachHole,
+  type FilledHole,
+  type FillHoleResult,
+  type HoleFill,
+  type OpenHole,
+} from "./engine-holes.js";
 import type {
   ActorId,
   ArtifactRef,
@@ -55,79 +62,12 @@ import type {
   WorldReadOp,
 } from "./types.js";
 import { refToString, WorkflowError } from "./types.js";
-import { runLaunchedEvent, type RunLaunchConfig } from "./engine-launch.js";
+import { runLaunchedEvent } from "./engine-launch.js";
+import { normalizePersona } from "./persona.js";
 import { enrichProviderStopPhase, stampBirthPhase } from "./engine-phase-stamp.js";
 
-/** 引擎构造配置。 */
-export interface EngineConfig {
-  runId: string;
-  driver: WorkflowDriver;
-  caps: Caps;
-  /**
-   * 每 ask 站点的静态规格（typed + schema）。**必须覆盖脚本里的每一个 ask 站点**——
-   * 站点表与 schema 合成来自同一次编译，因此缺席只可能是接线错误，引擎按硬错误处理
-   * （MissingAskSpec）。untyped 站点要显式记为 `{ typed: false }`。
-   */
-  askSpecs: ReadonlyMap<string, AskSpec>;
-  /** 注入的 schema 校验器（核心不 import schema 实现）。 */
-  validate: ValidateFn;
-  /** run 元数据（落 dwf_run，仅在本次 createRun 时写入；resume 时不覆写记录）。 */
-  scriptText?: string;
-  /**
-   * run 的展示名（`CreateWorkflow` 的可选 `input.name`）。引擎不读它，只在建 run 时随
-   * `scriptText` 一起落库——宿主的枚举面据它给 run 起标签。见 {@link RunRecord.name}。
-   */
-  name?: string;
-  /**
-   * 脚本文本的哈希。resume 时与 journal 记录里的值比对：两侧都有且不同即拒绝本次 resume
-   * （V1 的 resume 只对逐字节相同的脚本有效）。
-   */
-  scriptHash?: string;
-  /**
-   * 本次 run 的实参（已校验回填）。引擎不读它，只在建 run 时随 `scriptText` 一起落库；
-   * 沙箱侧的注入走 harness 的 spawn payload，不经引擎。见 {@link RunRecord.args}。
-   */
-  args?: Record<string, unknown>;
-  parentSessionId?: string;
-  cwd?: string;
-  /**
-   * 发起 run 的 CreateWorkflow 工具调用 id（见 {@link RunRecord.toolCallId}）。
-   * 引擎不读它，只随其余元数据在 createRun 时落库。
-   */
-  toolCallId?: string;
-  /**
-   * 本次 run 修订自哪个前驱 run（见 {@link RunRecord.resumedFrom}）。引擎不读它，
-   * 只随其余元数据在 createRun 时落库——导入缓存的构建在 run service，不在核心。
-   */
-  resumedFrom?: string;
-  /**
-   * 发起 run 那一轮的锚点。引擎不读它，只在建 run 那一世
-   * 紧跟首条 `run-started` 记一条 `run-launched`；resume 命中既有行时不再记（锚点跨生命周期唯一）。
-   * `phaseNames` 随锚点同车：脚本声明的阶段表，引擎同样不读，只落 journal。`phaseAlongside`
-   * 与它按位置对齐（下标指向同一张表），同车同规。
-   * `subagentModel` 也同车：本 run 子代理的选型（规范 picker 串），引擎同样不读——模型面整个
-   * 在宿主侧（bootstrap 的 workflow-actor-model.ts），宿主从这条事件读回它，零 SQL。
-   * `scriptPath` 同车同规：本 run 的脚本来自哪个文件（绝对路径），引擎不读，宿主从这条事件
-   * 读回它交给模型面。
-   */
-  launch?: RunLaunchConfig;
-  /**
-   * 建 run 时的用量起点：前驱 run 的 `spentTokens`。amend 路径给出，全新 submit 缺席（= 从零起账），
-   * resume 路径给了也无用——命中既有行时用量从行里恢复。
-   *
-   * 语义是「本 run 报的是整条 lineage 的花费」：每个前驱的数字本身已是累计值，所以链式修订
-   * 按构造求和，没人需要走 `resumed_from` 链。命中缓存不再加钱（那笔账就在这个继承值里），
-   * 只有本次现跑的 live turn 往上加。
-   */
-  inheritedTokens?: number;
-  /**
-   * amend-resume 的导入缓存（{@link ImportedRunCache}）。**纯数据注入**——核心因此仍是
-   * 零 I/O 的确定性状态机：读前驱 journal、走 `resumed_from` 链、解析转录源，全部发生在
-   * run service，引擎只拿到一张构建好的表并按运行期身份（actor 名 + persona、
-   * `{op,args}` 内容 + 出现序）比对。缺席即本次不是修订续跑。
-   */
-  importedCache?: ImportedRunCache;
-}
+/** 引擎构造配置（定义迁到 engine-config.ts，这里原地再导出）。 */
+export type { EngineConfig } from "./engine-config.js";
 
 /** run 的最终结算（定义随结算模块的接缝迁到 engine-state.ts，这里原地再导出）。 */
 export type { RunSettlement } from "./engine-state.js";
@@ -147,7 +87,11 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
    * caps 必须保持它们被记下时的样子（调用方递进来的那个对象同理不被回写）。
    */
   private caps: Caps;
-  private readonly askSpecs: ReadonlyMap<string, AskSpec>;
+  /**
+   * 每 ask 站点的静态规格。**可变**（见 {@link fillHole}）：一次补全把它整份换成有效脚本的表
+   * （原表的超集）。整份替换而不是原地改，与 caps 同一条纪律。
+   */
+  private askSpecs: ReadonlyMap<string, AskSpec>;
   private readonly validate: ValidateFn;
   private readonly scheduler: AskScheduler;
 
@@ -164,6 +108,10 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
    * 读取——见 {@link nextOrdinal}。
    */
   private currentPhase: string | undefined;
+  /** 站点 → 词法出生阶段（见 {@link EngineConfig.sitePhases}）。可变，与 `askSpecs` 同一条路换表。 */
+  private sitePhases: ReadonlyMap<string, string>;
+  /** 留白的停驻表与本世的补全记忆（engine-holes.ts）。 */
+  private readonly holes: HoleRegistry;
   /**
    * 实例（`siteId@ordinal`）→ 它**出生时**的阶段名。写在铸造点、读在 {@link record} 的打戳漏斗：静态因果图按阶段拷贝
    * 站点，运行时实例必须带同一个坐标，否则一条车道上的实例会被那个站点的每一份阶段拷贝
@@ -189,7 +137,7 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
    */
   private importClosed = false;
   /**
-   * replay 的结算次序闸：命中缓存的
+   * replay 的结算次序闸（docs/execution-engine.md「Replaying the settle order」）：命中缓存的
    * 结算按 journal 记下的**首生结算次序**释放，而不是按准入次序——join 之后的每一个站点序号
    * 都由那个次序决定。非 resume 恒为空闸（人人放行）。
    */
@@ -200,13 +148,13 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
   private queuedBeforeImportClose: ReadonlySet<string> = new Set();
 
   /**
-   * 本 run 已发布的报告条数（REPORT_CAPS.maxItemsPerRun 的计数器）。resume 时按 journal 里
-   * kind:"report" 的行数恢复——上限是 run 级的，跨 resume 必须连续计数，否则一个反复
+   * 本 run 已发布的报告条数与 item 字节数（REPORT_CAPS 两个 run 级上限的计数器）。resume 时从
+   * journal 的 kind:"report" 行恢复——上限是 run 级的，跨 resume 必须连续计数，否则一个反复
    * resume 的 run 可以无限报告。
    */
-  private reportCount = 0;
+  private reportTally: ReportTally = { count: 0, bytes: 0 };
   /**
-   * 本 run 每个**用户面产物** id 的状态。与 `reportCount`
+   * 本 run 每个**用户面产物** id 的状态。与 `reportTally`
    * 同一条恢复法：resume 时从 journal 的 `kind: "artifact"` 行重建，此后在内存里维护——
    * 上限（32 个 id / 每 id 16 版）与版本号都是 run 级的事实，跨 resume 必须连续，否则一个
    * 反复 resume 的 run 可以无限发布。
@@ -231,6 +179,8 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
     this.caps = { maxConcurrency: config.caps.maxConcurrency };
     this.askSpecs = config.askSpecs;
     this.validate = config.validate;
+    this.sitePhases = config.sitePhases ?? new Map();
+    this.holes = new HoleRegistry(config.now ?? Date.now);
     this.importedCache = config.importedCache;
     this.importedWorld = new ImportedWorldQueue(config.importedCache?.world ?? new Map());
 
@@ -255,9 +205,12 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
       holdForReplay: (instance, release) => {
         this.replaySettleOrder.hold(instance, release);
       },
-      reportCount: () => this.reportCount,
-      countReport: () => {
-        this.reportCount++;
+      reportTally: () => this.reportTally,
+      countReport: (bytes) => {
+        this.reportTally = {
+          count: this.reportTally.count + 1,
+          bytes: this.reportTally.bytes + bytes,
+        };
       },
       importClosed: () => this.importClosed,
       closeImport: () => {
@@ -270,7 +223,11 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
         // 永不兑现（沙箱会被关掉，但同进程跑脚本的装配就此挂死）。
         this.replaySettleOrder.open();
       },
-      abortInFlight: (error, emitCancelled) => this.scheduler.abortInFlight(error, emitCancelled),
+      abortInFlight: (error, emitCancelled) => {
+        this.scheduler.abortInFlight(error, emitCancelled);
+        // 停在留白上的分支与在飞 ask 同一笔拒绝：结算之后没有什么可以再补全它。
+        this.holes.rejectAll(error);
+      },
       resolveSettled: (settlement) => this.settledDeferred.resolve(settlement),
     };
 
@@ -346,19 +303,10 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
           { mismatch: { expected: existing.scriptHash, got: config.scriptHash } },
         );
       }
-      // resume：结算次序按本 run 自己的事件恢复（本闸是 replay 正确性的一部分，不是观察面：
-      // 站点序号依调用到达顺序，而扇出的到达顺序只有首生的结算次序能复现）。节点行只读一次，
-      // 下面的报告计数与产物恢复共用它。
-      const nodes = this.journal.listNodes(this.runId);
-      this.replaySettleOrder = recoverSettleOrder(this.journal, this.runId, nodes);
-      // 报告计数按 journal 里 kind:"report" 的行数恢复；用量从记录恢复（跨生命周期连续）。
-      this.reportCount = nodes.filter((n) => n.kind === "report").length;
-      // 产物状态与 reportCount 同席恢复：id 归属（种类、预置 spec）与已成功版本数全部由
-      // journal 行派生，所以崩溃恢复后第 3 版仍然是第 3 版，而不是从 1 重新数起。
-      for (const node of nodes) {
-        if (node.kind !== "artifact" || node.status !== "completed") continue;
-        rememberArtifactRow(this.state, node.artifactId, node.result);
-      }
+      // resume：次序闸、actor 的已记录 ask 数、报告计数与产物状态从 journal 恢复（engine-resume.ts）。
+      ({ replaySettleOrder: this.replaySettleOrder, reportTally: this.reportTally } =
+        restoreFromJournal(this.state, this.scheduler));
+      // 用量从记录恢复（跨生命周期连续）。
       this.spentTokens = existing.spentTokens;
       // 修订 run 的崩溃恢复：导入表被整表重建，而「门是否已关」不落库——从事件精确恢复。
       if (this.importedCache !== undefined) {
@@ -508,6 +456,33 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
     this.record({ type: "phase-entered", name: trimmed, ordinal });
   }
 
+  /** 脚本到达一处未补全的留白（Boundary A 的 `hole`）：方法体在 engine-holes.ts 的 reachHole。 */
+  hole(siteId: string, name: string, prompt?: string): Promise<{ code: string }> {
+    return reachHole(this.state, this.holes, siteId, name, prompt);
+  }
+
+  /**
+   * 主代理补全一处留白（docs/execution-engine.md「The engine's part」）：一个同步步骤里换掉规格表
+   * 与阶段表、写回有效脚本、记 `hole-filled`、记住代码、放行停驻的每一个分支。方法体在
+   * engine-holes.ts 的 fillHole；两条 no-op（`not_waiting` / `settled`）不写不发。
+   */
+  fillHole(fill: HoleFill): FillHoleResult {
+    return fillHoleBody(this.state, this.holes, fill, (askSpecs, sitePhases) => {
+      this.askSpecs = askSpecs;
+      this.sitePhases = sitePhases;
+    });
+  }
+
+  /** 仍在等的留白（快照投影：事件之外还要问引擎，进程死过之后没有 promise 在等）。 */
+  openHoles(): OpenHole[] {
+    return this.holes.open();
+  }
+
+  /** 本世已补全的留白。 */
+  filledHoles(): FilledHole[] {
+    return this.holes.filledList();
+  }
+
   /** 发布一条中间结果（Boundary A 的 `report`）：方法体在 engine-report.ts 的 publishReport。 */
   report(siteId: string, item: unknown, artifactId?: string): void {
     publishReport(this.state, siteId, item, artifactId);
@@ -559,7 +534,7 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
   }
 
   /**
-   * 就地改本 run **自己**的并发上界。
+   * 就地改本 run **自己**的并发上界（docs/dynamic-workflow/concurrency.md「Two bounds on a run」）。
    * 一次只带 `max_concurrency` 的修订作用在活着的 run 上：同一个 runId、不铸后继、不 supersede、
    * 在飞 ask 一个不丢——这正是它与 AmendWorkflow 的全部差别，也是它存在的唯一理由。
    *
@@ -685,8 +660,10 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
   private nextOrdinal(siteId: string): number {
     const next = (this.ordinals.get(siteId) ?? 0) + 1;
     this.ordinals.set(siteId, next);
-    if (this.currentPhase !== undefined)
-      this.instancePhases.set(refToString({ siteId, ordinal: next }), this.currentPhase);
+    // 词法优先、动态兜底：并发的两个 future 各带自己的标记时，「最近经过的标记」是谁家的全凭
+    // 时序；编译期表里的阶段才是确认图上用户看到的那个（docs/execution-engine.md）。
+    const phase = this.sitePhases.get(siteId) ?? this.currentPhase;
+    if (phase !== undefined) this.instancePhases.set(refToString({ siteId, ordinal: next }), phase);
     return next;
   }
 
@@ -713,14 +690,4 @@ export class WorkflowEngine implements WorkflowHostApi, WorkflowReportSink {
     this.journal.appendEvent(this.runId, stamped);
     this.driver.emit(stamped);
   }
-}
-
-/** persona 规范化：字符串视为 system prompt；display name 落到 persona.name。 */ function normalizePersona(
-  name: string | undefined,
-  persona: string | PersonaSpec | undefined,
-): PersonaSpec {
-  const base: PersonaSpec =
-    typeof persona === "string" ? { system: persona } : persona ? { ...persona } : {};
-  if (base.name === undefined && name !== undefined) base.name = name;
-  return base;
 }

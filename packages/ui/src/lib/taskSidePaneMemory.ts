@@ -4,11 +4,13 @@ import {
   type WorkspaceSidePaneState,
 } from "@/lib/workspaceSidePane.js";
 
-interface TaskSidePaneMemoryState {
+export interface TaskSidePaneMemoryState {
   sidePaneState: WorkspaceSidePaneState | null;
   isSidePaneCollapsed: boolean;
   /** 对话级展开/收起偏好；tabs 本身仍按 workspace 复用。 */
   sidePaneCollapsedByOwner: Record<string, boolean>;
+  /** 工具调用的自动打开已消费记录；不随消息行卸载清空。 */
+  pluginUiAutoOpenKeys: ReadonlySet<string>;
   activeGitSourceId: GitChangeSourceId;
   browserUrls: Record<string, string>;
   /** @deprecated 旧版单浏览器 tab 的 URL，保留用于读取历史内存状态。 */
@@ -19,12 +21,13 @@ const DEFAULT_TASK_SIDE_PANE_MEMORY_STATE: TaskSidePaneMemoryState = {
   sidePaneState: null,
   isSidePaneCollapsed: true,
   sidePaneCollapsedByOwner: {},
+  pluginUiAutoOpenKeys: new Set(),
   activeGitSourceId: "unstaged",
   browserUrls: {},
   browserUrl: null,
 };
 
-const TASK_SIDE_PANE_MEMORY_MAX_ENTRIES = 50;
+export const TASK_SIDE_PANE_MEMORY_MAX_ENTRIES = 50;
 
 const DRAFT_SIDE_PANE_OWNER_KEY = "__draft__";
 
@@ -140,4 +143,23 @@ export function saveTaskSidePaneCollapsedPreference(
       [ownerKey]: isSidePaneCollapsed,
     },
   });
+}
+
+export function clearTaskSidePaneMemoryStateForTest(): void {
+  taskSidePaneMemory.clear();
+}
+
+export function claimPluginUiSidePaneAutoOpen(
+  workspaceKey: string | null,
+  requestKey: string,
+): boolean {
+  if (!workspaceKey) return false;
+  const state = readTaskSidePaneMemoryState(workspaceKey);
+  if (state.pluginUiAutoOpenKeys.has(requestKey)) return false;
+  // 根因：行内 useRef 在会话切换/虚拟卸载后丢失，旧 fullscreen 结果会覆盖已保存的收起状态。
+  // 与侧栏偏好共用同一内存 owner；同步消费也保证同一调用的多个锚点只触发一次。
+  saveTaskSidePaneMemoryState(workspaceKey, {
+    pluginUiAutoOpenKeys: new Set([...state.pluginUiAutoOpenKeys, requestKey]),
+  });
+  return true;
 }

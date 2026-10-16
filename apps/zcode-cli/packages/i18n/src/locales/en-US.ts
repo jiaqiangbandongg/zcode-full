@@ -29,7 +29,6 @@ Options:
   -h, --help       Show help
   -v, --version    Show version
   -p, --prompt <text>  Run a single prompt without opening the TUI
-  --enable-workflow  Enable dynamic workflows for --prompt or --target (default: off)
   --memory-bench   With --prompt, enable automatic Memory extraction and wait before exiting (requires Memory enabled)
   --browser-use <mode> Enable Browser Use backend (supported: headless)
   --surface <surface>  Presentation surface for headless prompts/app-server: terminal or desktop
@@ -42,10 +41,11 @@ Options:
     "Bash(git *)" removes all of Bash; command patterns are not matched.
   --force-mcs      Force mid-conversation system projection for Anthropic providers
   --locale <locale>  UI locale: en-US, zh-CN, or auto
-  --mode <mode>    Permission mode for prompts: build, edit, plan, or yolo (default: yolo for --prompt)
+  --mode <mode>    Permission mode for prompts: build, edit, plan, yolo, or guarded (default: yolo for --prompt)
   --resume <sessionId>  Resume a persisted session by sessionId (sess_...)
   --target <text>  Run or set the session goal in headless mode
   --target-replace Replace any existing session goal set by --target
+  --workflow-mode <mode>  Dynamic workflows for prompts/TUI: disabled, onDemand, or alwaysOn (default: disabled)
   -c, --continue        Resume the latest session for the current directory
   --json           Print machine-readable JSON where supported
   --no-browser     Print the OAuth URL without opening a browser
@@ -61,7 +61,7 @@ Slash Commands:
   /dwf [list|cancel|resume]  List, cancel, or resume dynamic workflow runs
   /fork [latest|checkpointId]  Fork a new session from a workspace checkpoint
   /mcp [list|status|connect|disconnect]  Show or manage MCP servers
-  /mode [mode]          Show or switch permission mode: build, edit, plan, or yolo
+  /mode [mode]          Show or switch permission mode: build, edit, plan, yolo, or guarded
   /model [id]           Show or switch the current session model
   /new                  Start a fresh session in the TUI
   /resume [sessionId]   Resume a session by sessionId; omit it for latest in cwd

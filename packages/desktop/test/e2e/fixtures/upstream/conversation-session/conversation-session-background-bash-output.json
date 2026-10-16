@@ -1,0 +1,562 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-bash-output",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-bash-output.test.ts",
+  "fixtures": [
+    {
+      "id": "bgv-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BGV_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "bgv-title",
+          "text": "{\"title\":\"Background output\"}",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "EXPLICIT-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_EXPLICIT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_EXPLICIT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_EXPLICIT",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" EXPLICIT",
+              "description": "EXPLICIT background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "EXPLICIT-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_EXPLICIT", "E2E_BGV_EXPLICIT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "EXPLICIT-done",
+          "text": "E2E_BGV_EXPLICIT_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "AUTO-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_AUTO"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_AUTO"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_AUTO",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" AUTO",
+              "description": "AUTO background output",
+              "timeout": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "AUTO-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_AUTO", "E2E_BGV_AUTO"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "AUTO-done",
+          "text": "E2E_BGV_AUTO_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "PAUSE-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_PAUSE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_PAUSE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_PAUSE",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" PAUSE",
+              "description": "PAUSE background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PAUSE-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_PAUSE", "E2E_BGV_PAUSE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "PAUSE-done",
+          "text": "E2E_BGV_PAUSE_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "SCOPE_A-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_SCOPE_A"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_SCOPE_A"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_SCOPE_A",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" SCOPE_A",
+              "description": "SCOPE_A background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SCOPE_A-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_SCOPE_A", "E2E_BGV_SCOPE_A"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "SCOPE_A-done",
+          "text": "E2E_BGV_SCOPE_A_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "SCOPE_B-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_SCOPE_B"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_SCOPE_B"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_SCOPE_B",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" SCOPE_B",
+              "description": "SCOPE_B background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SCOPE_B-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_SCOPE_B", "E2E_BGV_SCOPE_B"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "SCOPE_B-done",
+          "text": "E2E_BGV_SCOPE_B_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "ERROR-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_ERROR"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_ERROR"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_ERROR",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" ERROR",
+              "description": "ERROR background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ERROR-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_ERROR", "E2E_BGV_ERROR"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ERROR-done",
+          "text": "E2E_BGV_ERROR_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "STOP-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_STOP"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_STOP"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_STOP",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" STOP",
+              "description": "STOP background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "STOP-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_bgv_STOP", "E2E_BGV_STOP"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "STOP-done",
+          "text": "E2E_BGV_STOP_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "PARENT-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_PARENT:"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_parent"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_parent",
+            "name": "Agent",
+            "input": {
+              "description": "background child output",
+              "prompt": "E2E_BGV_CHILD_WORK: Start the exact background Bash writer fixture and return.",
+              "subagent_type": "general-purpose",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PARENT-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BGV_PARENT:", "toolu_bgv_parent"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "parent-done",
+          "text": "E2E_BGV_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "CHILD-call",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BGV_CHILD_WORK:"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_CHILD",
+          "toolu_bgv_parent"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bgv_CHILD",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/background-bash-output/中文 空格/writer.cjs\" CHILD",
+              "description": "child background output",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "CHILD-done",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "delayed-text",
+        "syntheticReason": "child Bash 在真实后台运行时保持 child 模型请求在途，以验证现有子会话条目及 Stop。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BGV_CHILD_WORK:", "toolu_bgv_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bgv_parent"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "child-done",
+          "text": "CHILD_READY"
+        },
+        "delayMs": 60000
+      }
+    }
+  ]
+}

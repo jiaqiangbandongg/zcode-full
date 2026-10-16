@@ -1,10 +1,13 @@
 import { nativeTheme, type BrowserWindow, type Point } from "electron";
 import { PlatformChannels } from "@zcode/shared";
-import { resolveDesktopZoomFactorForLevel } from "./desktopZoom.js";
+import {
+  resolveDesktopZoomFactorForLevel,
+  resolveDesktopZoomLevelFromFactor,
+} from "./desktopZoom.js";
 
 export const MACOS_TRAFFIC_LIGHT_BASE_POSITION = { x: 22, y: 23 } as const;
-const MACOS_TRAFFIC_LIGHT_BASE_LEFT_PADDING_PX = 96;
-const MACOS_TRAFFIC_LIGHT_POSITION_MOVEMENT_GAIN = 1.5;
+export const MACOS_TRAFFIC_LIGHT_BASE_LEFT_PADDING_PX = 96;
+export const MACOS_TRAFFIC_LIGHT_POSITION_MOVEMENT_GAIN = 1.5;
 export const WINDOWS_WINDOW_CONTROLS_BASE_RIGHT_PADDING_PX = 136;
 export const WINDOWS_TITLE_BAR_HEIGHT_PX = 48;
 const MACOS_TRAFFIC_LIGHT_MIN_POSITION_PX = 4;
@@ -18,7 +21,7 @@ export function hasCustomWindowsControls(window: BrowserWindow) {
   return customWindowsControls.has(window);
 }
 
-function resolveMacOSWindowButtonPositionForZoomLevel(zoomLevel: number): Point {
+export function resolveMacOSWindowButtonPositionForZoomLevel(zoomLevel: number): Point {
   const zoomFactor = resolveDesktopZoomFactorForLevel(zoomLevel);
   const resolveVerticalPosition = (base: number) =>
     Math.max(
@@ -31,7 +34,7 @@ function resolveMacOSWindowButtonPositionForZoomLevel(zoomLevel: number): Point 
   };
 }
 
-function resolveMacOSWindowControlsOverlayMetricsForZoomLevel(zoomLevel: number) {
+export function resolveMacOSWindowControlsOverlayMetricsForZoomLevel(zoomLevel: number) {
   const zoomFactor = resolveDesktopZoomFactorForLevel(zoomLevel);
   const buttonPosition = resolveMacOSWindowButtonPositionForZoomLevel(zoomLevel);
   return {
@@ -42,11 +45,11 @@ function resolveMacOSWindowControlsOverlayMetricsForZoomLevel(zoomLevel: number)
   };
 }
 
-function resolveWindowsTitleBarOverlayHeightForZoomLevel(zoomLevel: number) {
+export function resolveWindowsTitleBarOverlayHeightForZoomLevel(zoomLevel: number) {
   return Math.round(WINDOWS_TITLE_BAR_HEIGHT_PX * resolveDesktopZoomFactorForLevel(zoomLevel));
 }
 
-function resolveWindowsWindowControlsOverlayMetricsForZoomLevel(zoomLevel: number) {
+export function resolveWindowsWindowControlsOverlayMetricsForZoomLevel(zoomLevel: number) {
   return {
     // 原生按钮宽度不随页面缩放；固定 CSS 边距只适用于下面的自绘窗控分支。
     rightPaddingPx: Math.round(
@@ -109,4 +112,22 @@ export function syncWindowControlsOverlayForZoomLevel(
       resolveWindowsWindowControlsOverlayMetricsForZoomLevel(zoomLevel),
     );
   }
+}
+
+export function syncMacOSWindowButtonPositionForZoomLevel(
+  targetWindow: BrowserWindow | null | undefined,
+  zoomLevel: number,
+) {
+  syncWindowControlsOverlayForZoomLevel(targetWindow, zoomLevel);
+}
+
+export function syncMacOSWindowButtonPositionForCurrentZoomFactor(
+  targetWindow: BrowserWindow | null | undefined,
+) {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return;
+  }
+
+  const zoomLevel = resolveDesktopZoomLevelFromFactor(targetWindow.webContents.getZoomFactor());
+  syncWindowControlsOverlayForZoomLevel(targetWindow, zoomLevel);
 }

@@ -1,6 +1,6 @@
 # AI implementation guidance
 
-Architecture governance is a pre-code decision protocol. A coding agent should be able to answer these questions before producing a patch:
+Architecture governance is a pre-code decision protocol. Apply the rows relevant to the change: state/ordering questions apply to stateful behavior, and contract questions apply to boundary changes. A local fix with an established contract does not need a new design record. Use the root AGENTS.md for spec requirements and when user input is necessary.
 
 | Decision | Required answer                                                                                               |
 | -------- | ------------------------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@ The agent should reject these shapes during design:
 - a remote stream change that mixes desktop `continuous` and mobile `replayable` semantics;
 - a broad refactor that changes unrelated modules without an explicit migration boundary.
 
-The patch description should include a small decision record:
+For stateful or cross-boundary changes, capture the relevant decisions in the existing spec/contract or patch description; omit fields that do not apply:
 
 ```text
 owner: <single state owner>
@@ -34,4 +34,4 @@ delivery: <desktop-continuous | web-remote-replayable | both>
 contracts/spec/tests: <bounded reading and validation set>
 ```
 
-This guidance complements executable rules. The policy checker can prove import and size constraints; the decision record makes ownership, reuse, and time semantics explicit before an agent writes code.
+This guidance complements executable rules. The policy checker verifies configured import and size constraints within its managed coverage; the decision record explains ownership, reuse, and time semantics that the checker cannot prove.

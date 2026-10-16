@@ -8,7 +8,7 @@
 import type { PermissionBrokerResult } from "@zcode/contracts";
 import { linkAbortSignal } from "./timeout.js";
 
-interface PermissionResponderRaceInput {
+export interface PermissionResponderRaceInput {
   /**
    * hook 链应答方。resolve `undefined` 表示无决定（退赛，只剩 broker 单边等待）；
    * 抛错同样按退赛处理并回调 {@link PermissionResponderRaceInput.onHookFailure}——
@@ -30,7 +30,7 @@ interface PermissionResponderRaceInput {
   onHookFailure?: (error: unknown) => void;
 }
 
-interface PermissionResponderRaceOutcome {
+export interface PermissionResponderRaceOutcome {
   result: PermissionBrokerResult;
   source: "hook" | "broker";
 }

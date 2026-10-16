@@ -1,10 +1,18 @@
+import { conversationQuotesSchema } from "../conversationSelection.js";
+import { botGroupInputSourceSchema } from "../bots.js";
 // ConversationRow：行类型自包含。
 // 三条结构性规则：row 自包含（渲染任一行不需看别的行）；
 // 结构变化换整行（row.upserted），文本增长用 append（row.delta）；turn 是 row 上的标签不是容器。
 import { z } from "zod";
+import { highspeedMessageMetaSchema } from "../highspeed.js";
 import { executionOutputPreviewSchema } from "../execution-output-preview.js";
 import { timestampSchema } from "./core.js";
-import { backgroundResultOriginMetaSchema, workflowLaunchMetaSchema } from "./workflow-row-meta.js";
+import { conversationInputSourceSchema } from "./input-intent.js";
+import {
+  backgroundResultOriginMetaSchema,
+  workflowLaunchMetaSchema,
+} from "./workflow-row-meta.js";
+import { attachmentRefSchema } from "./attachment-ref.js";
 
 // RowBase。rowId：session 内单调、永不复用、事件日志的确定性纯函数。
 const rowBaseFields = {
@@ -79,6 +87,12 @@ export const turnHeaderRowSchema = z.object({
   endedAt: timestampSchema.optional(),
   // 权威工时：排除权限等待/用户输入等待/verifier 等待。
   activeMs: z.number().optional(),
+  // 当前 product turn 内主链路 ModelComplete 的 output usage 累计；optional 兼容旧快照。
+  outputTokens: z.number().int().nonnegative().optional(),
+  // CLI 从运行时事件聚合的真实耗时；optional 兼容旧快照及普通 turn。
+  modelDurationMs: z.number().nonnegative().optional(),
+  toolDurationMs: z.number().nonnegative().optional(),
+  otherDurationMs: z.number().nonnegative().optional(),
   // guide 不切 product turn，但每条 accepted guide 都开启独立视觉工作段。
   // 普通 turn 缺省以保持旧 snapshot 兼容；一旦出现 guide，CLI 负责完整投影首段与后续段。
   workSegments: z.array(turnWorkSegmentSchema).optional(),
@@ -100,6 +114,9 @@ export type TurnHeaderRow = z.infer<typeof turnHeaderRowSchema>;
 export const userInputRowSchema = z.object({
   ...rowBaseFields,
   kind: z.literal("userInput"),
+  inputOrigin: z.enum(["desktop", "mobile"]).optional(),
+  botGroupSource: botGroupInputSourceSchema.optional(),
+  conversationQuotes: conversationQuotesSchema.optional(),
   text: z.string(),
   // text 从此下标起是引擎附加文本（dwf ask 尾注 /
   // nudge），GUI 把它折进默认收起的披露；0 = 整条都是；缺席 = 无（老转录、非工作流会话）。
@@ -135,17 +152,12 @@ export const userInputRowSchema = z.object({
   rootSourceCommandId: z.string().optional(),
   // 提交端身份由 CLI admission 写入；旧 transcript 可缺省。
   clientId: z.string().optional(),
-  attachments: z
-    .array(
-      z.object({
-        ref: z.string(),
-        fileName: z.string(),
-        mime: z.string(),
-        bytes: z.number(),
-        previewRef: z.string().optional(),
-      }),
-    )
-    .optional(),
+  // accelerated 历史展示的持久事实；缺省兼容普通消息和旧 snapshot。
+  highspeed: highspeedMessageMetaSchema.optional(),
+  // 重复定义曾在出队后的 row 校验中剥掉来源，导致历史附件丢失预览入口；与入站引用共用 schema。
+  attachments: z.array(attachmentRefSchema).optional(),
+  // 插件 UI 代发的消息带来源；卡片显示"来自插件 X"。旧 transcript 可缺省。
+  source: conversationInputSourceSchema.optional(),
 });
 export type UserInputRow = z.infer<typeof userInputRowSchema>;
 
@@ -203,9 +215,10 @@ export const toolCallRowSchema = z.object({
   // display 解析失败只丢这张卡的载荷，不拒整条 row（理由见 toolDisplay.ts 的 toolOutputSchema
   // 注释：装饰载荷不得决定 row/帧/订阅的生死）。
   display: toolCallDisplaySchema.optional().catch(undefined),
+  // （2026-09-12）：原 widgetState / widgetStateVisibility 已删除，插件 UI 界面状态不再进 row。
   // status=error 时必带。
   error: z.object({ code: z.string(), message: z.string() }).optional(),
-  // 仅 replayable 档运行中出现，终态清除。
+  // 运行中出现（ToolCallProgress 事件），终态清除。
   progress: toolProgressSchema.optional(),
   // continuous/replayable 共用的有界 Bash 内容，终态或后台移交时清除。
   outputPreview: executionOutputPreviewSchema.optional(),

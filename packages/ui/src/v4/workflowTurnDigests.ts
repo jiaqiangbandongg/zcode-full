@@ -6,6 +6,7 @@ import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/typ
 import type { WorkflowRunCardSummary } from "@/ToolCallBlocks/fileSummaryTypes.js";
 import { readWorkflowName } from "@/ToolCallBlocks/renderers/createWorkflowInput.js";
 import type { AssistantWorkRow } from "@/v4/conversationTurnFlowItems.js";
+import type { WorkflowFillGraph } from "@/v4/workflowRunCardJoin.js";
 
 /**
  * 轮尾 run 卡的解析：这一轮里哪些**来源**点名了
@@ -34,6 +35,8 @@ export interface WorkflowTurnDigest {
   /** 脚本 `name`；缺席时由渲染方本地化兜底名。 */
   name: string | undefined;
   graph: WorkflowCausalityGraphData | undefined;
+  /** 补全过的留白的名字与类型（补全行入参带来的）；只有补全过的 run 才有。 */
+  holeLabels?: WorkflowFillGraph["holeLabels"];
   /** 活投影的联接摘要；缺席 = run 不在投影里，卡退成中性单行（「已结束」）。 */
   summary: WorkflowRunCardSummary | undefined;
   /**
@@ -42,7 +45,8 @@ export interface WorkflowTurnDigest {
    */
   settings?: { amend: WorkflowSettingsAmendMeta; at?: number };
   /**
-   * **只出那一行、不出卡**：就地生效的设置轮（只改并发上限、run 仍在运行，`amend` 不带 `predecessorRunId`）。它点名的 run 没有被替代、身份没变，
+   * **只出那一行、不出卡**：就地生效的设置轮（只改并发上限、run 又在飞，`amend` 不带
+   * `predecessorRunId`；docs/dynamic-workflow/concurrency.md）。它点名的 run 没有被替代、身份没变，
    * 卡已经在它启动的那一轮里——这里再画一张会读成第二次运行。恒与 `settings` 同在。
    */
   rowOnly?: true;
@@ -59,6 +63,8 @@ interface WorkflowTurnDigestJoin {
   byToolCallId?: ReadonlyMap<string, WorkflowRunCardSummary>;
   byRunId?: ReadonlyMap<string, WorkflowRunCardSummary>;
   graphByToolCallId?: ReadonlyMap<string, WorkflowCausalityGraphData>;
+  /** runId → 最新补全的有效脚本图（`buildWorkflowFillGraphByRunId`）：补全之后卡取它，不取发起行的。 */
+  fillGraphByRunId?: ReadonlyMap<string, WorkflowFillGraph>;
 }
 
 export function resolveWorkflowTurnDigests(
@@ -67,8 +73,11 @@ export function resolveWorkflowTurnDigests(
 ): WorkflowTurnDigest[] {
   const digests: WorkflowTurnDigest[] = [];
   const seen = new Set<string>();
-  const graphOf = (originToolCallId: string | undefined) =>
-    originToolCallId === undefined ? undefined : join.graphByToolCallId?.get(originToolCallId);
+  // 图是 run 的属性（docs/dynamic-workflow/presentation.md「Holes on the timeline」的「The model」）：
+  // 补全过的 run 取最新补全行的图，否则按发起 toolCallId。
+  const graphOf = (originToolCallId: string | undefined, runId: string) =>
+    join.fillGraphByRunId?.get(runId)?.graph ??
+    (originToolCallId === undefined ? undefined : join.graphByToolCallId?.get(originToolCallId));
 
   const launch = unit.workflowLaunch;
   if (launch !== undefined) {
@@ -78,7 +87,10 @@ export function resolveWorkflowTurnDigests(
     const rowOnly = launch.amend !== undefined && launch.amend.predecessorRunId === undefined;
     if (!rowOnly) seen.add(launch.runId);
     digests.push({
-      graph: graphOf(launch.toolCallId),
+      graph: graphOf(launch.toolCallId, launch.runId),
+      ...(join.fillGraphByRunId?.get(launch.runId) === undefined
+        ? {}
+        : { holeLabels: join.fillGraphByRunId.get(launch.runId)!.holeLabels }),
       key: `launch:${launch.toolCallId}`,
       name: launch.name,
       runId: launch.runId,
@@ -103,7 +115,10 @@ export function resolveWorkflowTurnDigests(
       if (seen.has(created.runId)) continue;
       seen.add(created.runId);
       digests.push({
-        graph: graphOf(row.toolCallId),
+        graph: graphOf(row.toolCallId, created.runId),
+        ...(join.fillGraphByRunId?.get(created.runId) === undefined
+          ? {}
+          : { holeLabels: join.fillGraphByRunId.get(created.runId)!.holeLabels }),
         key: `${row.rowId}:${row.toolCallId}`,
         name: readWorkflowName(row.input),
         runId: created.runId,
@@ -119,7 +134,10 @@ export function resolveWorkflowTurnDigests(
     const resumed = join.byRunId?.get(runId);
     digests.push({
       // 发起行 id 只有联接到投影才知道；不在投影里的 resume 卡没有图可找。
-      graph: graphOf(resumed?.toolCallId),
+      graph: graphOf(resumed?.toolCallId, runId),
+      ...(join.fillGraphByRunId?.get(runId) === undefined
+        ? {}
+        : { holeLabels: join.fillGraphByRunId.get(runId)!.holeLabels }),
       key: `${row.rowId}:${row.toolCallId}`,
       name: undefined,
       runId,

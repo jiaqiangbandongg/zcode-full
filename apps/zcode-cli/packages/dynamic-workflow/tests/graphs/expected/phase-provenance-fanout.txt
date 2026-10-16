@@ -1,0 +1,12 @@
+node source
+node world-read#1 "run git" @33:27 type="WorldRunResult"
+node ask#1 "scout" @41:23 actors=actor#1 type="string"
+node ask#2 "auditor" @46:28 actors=actor#2 type="string"
+node sink
+actor actor#1 "scout" @38:15
+actor actor#2 "auditor" @39:17
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge world-read#1 -> sink data exact type="WorldRunResult"
+edge ask#1 -> world-read#1 data exact type="string"
+edge ask#2 -> sink data exact type="string"

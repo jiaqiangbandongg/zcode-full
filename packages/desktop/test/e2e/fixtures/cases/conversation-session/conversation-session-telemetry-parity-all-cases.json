@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-telemetry-parity-all-cases",
+  "spec": "./test/e2e/conversation-session/conversation-session-telemetry-parity-all-cases.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-telemetry-parity-all-cases.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "requests": []
+}

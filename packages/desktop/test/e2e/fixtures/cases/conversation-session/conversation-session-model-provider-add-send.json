@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-add-send",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-add-send.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-add-send.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-provider-add-send-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中首发业务 fixture。"
+    },
+    {
+      "id": "model-provider-add-send-first-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在设置页模型高级配置、provider 落盘、模型 currentValue provider 身份、显式选择 high 后的请求 body/model/thought/max_tokens 和 UI 回复；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

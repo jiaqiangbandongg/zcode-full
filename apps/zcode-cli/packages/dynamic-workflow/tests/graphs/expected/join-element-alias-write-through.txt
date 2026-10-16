@@ -1,0 +1,20 @@
+node source
+node join#1 "join" @9:27 type="[R, R]"
+node ask#1 "a" @9:34 actors=actor#1 type="R"
+node ask#2 "b" @9:49 actors=actor#2 type="R"
+node ask#3 "wc" @11:34 actors=actor#3 type="string"
+node ask#4 "reader" @13:35 actors=actor#4 type="string"
+node sink
+actor actor#1 "wa" @7:11
+actor actor#2 "wb" @8:11
+actor actor#3 "wc" @11:22
+actor actor#4 "reader" @13:19
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> ask#3 data exact
+edge join#1 -> ask#4 data exact port=0 type="R"
+edge ask#1 -> join#1 data exact port=0 type="R"
+edge ask#1 -> ask#4 data exact type="R"
+edge ask#2 -> join#1 data exact port=1 type="R"
+edge ask#3 -> ask#4 data exact type="string"
+edge ask#4 -> sink data exact type="string"

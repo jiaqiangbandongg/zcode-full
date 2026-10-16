@@ -1,0 +1,10 @@
+node source
+node world-read#1 "run ./bench" @9:30 type="WorldRunResult"
+node ask#1 "optimizer" @15:32 actors=actor#1 type="string"
+node world-read#2 "run cargo" @16:15 type="WorldRunResult"
+node sink
+actor actor#1 "optimizer" @12:19
+edge source -> world-read#1 data exact
+edge world-read#1 -> ask#1 data exact type="WorldRunResult"
+edge world-read#1 -> sink data exact type="WorldRunResult"
+edge ask#1 -> world-read#2 data exact type="string"

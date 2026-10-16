@@ -1,0 +1,7 @@
+actor-node actor#1 @18:19 family=fan-out#1
+actor-node actor#2 @25:19 family=fan-out#2
+actor-node actor#3 @33:21 family=fan-out#3
+actor-node sink
+actor-edge actor#1 -> actor#3 exact count=1 types="string"
+actor-edge actor#2 -> actor#3 exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

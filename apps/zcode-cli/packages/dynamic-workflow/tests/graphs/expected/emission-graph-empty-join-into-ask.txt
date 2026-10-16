@@ -1,0 +1,7 @@
+node source
+node join#1 "join" @6:31 type="[]"
+node ask#1 "solo" @7:22 actors=actor#1 type="string"
+node sink
+actor actor#1 "solo" @7:8
+edge join#1 -> ask#1 data exact type="[]"
+edge ask#1 -> sink data exact type="string"

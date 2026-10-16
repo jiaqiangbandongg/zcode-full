@@ -1,0 +1,6 @@
+.astro/
+.DS_Store
+.env
+dist/
+node_modules/
+src/content/docs/reference/plugins/

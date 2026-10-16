@@ -1,0 +1,28 @@
+ask ask#1 "ask" head="审阅-" @7:47 order=0 type="string"
+actor actor#1 head="审阅-" @7:26 order=1
+hole hole#cd7e8315 "评判" @8:16 order=2 type="Verdict"
+fact ask-actor ask#1 <- actor#1 exact
+fact hole-data hole#cd7e8315 <- ask#1 exact
+fact return <- hole#cd7e8315 exact
+region seq#1 seq entered
+region call#1 call parent=seq#1 @10:21 entered label="judge" strand
+region call#2 call parent=seq#1 @11:20 entered label="judge" strand
+region choice#1 choice parent=seq#1 @12:8 entered
+region branch#1 branch parent=choice#1 @12:22
+spawn actor#1 in=seq#1>call#1
+issue ask#1 in=seq#1>call#1 phase=unphased
+settle ask#1 in=seq#1>call#1
+issue hole#cd7e8315 in=seq#1>call#1 phase=unphased
+mark hole#cd7e8315 in=seq#1>call#1
+settle hole#cd7e8315 in=seq#1>call#1
+jump return call#1 in=seq#1>call#1 phase=unphased
+settle ask#1,hole#cd7e8315 in=seq#1 joins=call#1
+spawn actor#1 in=seq#1>call#2
+issue ask#1 in=seq#1>call#2 phase=unphased
+issue hole#cd7e8315 in=seq#1>call#2 phase=unphased
+mark hole#cd7e8315 in=seq#1>call#2
+jump return call#2 in=seq#1>call#2 phase=unphased
+settle in=seq#1 joins=call#2
+jump return seq#1 in=seq#1 phase=unphased
+control branch#1 by=ask#1,hole#cd7e8315
+phase hole#cd7e8315 "评判" @8:16

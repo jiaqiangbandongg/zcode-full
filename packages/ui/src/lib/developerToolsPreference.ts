@@ -5,7 +5,7 @@ export const DEVELOPER_TOOLS_STORAGE_KEYS = [
 
 const DISABLED_VALUES = new Set(["0", "false", "off", "no"]);
 
-function isDeveloperToolsStorageValueEnabled(value: string | null): boolean {
+export function isDeveloperToolsStorageValueEnabled(value: string | null): boolean {
   if (value === null) {
     return false;
   }

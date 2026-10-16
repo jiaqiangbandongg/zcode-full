@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-changes-group-unresolved-path",
+  "spec": "./test/e2e/conversation-session/conversation-session-changes-group-unresolved-path.test.ts",
+  "fixtures": [
+    {
+      "id": "tge07-title",
+      "description": "TGE07 title sidecar response.",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "标题不参与 Changes 流式路径语义；case-local 固定响应保证 strict replay 不依赖 legacy fixture 池。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_CHANGES_GROUP_UNRESOLVED_PATH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "tge07-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Changes Unresolved Path E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "tge07-write-controlled-stream",
+      "description": "TGE07 streams Write content before file_path.",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "稳定保留 file_path 尚未到达的观察窗口，验证 Changes 不显示 0 files 且展开保留 Writing。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CHANGES_GROUP_UNRESOLVED_PATH"],
+        "bodyExcludes": ["Generate a concise title", "toolu_tge07_write"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_tge07_write\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":100,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_tge07_write\",\"name\":\"Write\",\"input\":{}}}\n\n"
+          },
+          {
+            "offsetMs": 300,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"content\\\":\\\"export const app = true;\\\\n\\\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 10000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\",\\\"file_path\\\":\\\"{{e2eRuntimeRoot}}/conversation-session-changes-group-unresolved-path/App.tsx\\\"}\"}}\n\n"
+          },
+          {
+            "offsetMs": 10400,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 10500,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":100,\"output_tokens\":24,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 10600,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "tge07-final",
+      "description": "TGE07 closes the single-file Changes stage.",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定终态文本，验证单文件完成折叠摘要省略 1 file。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CHANGES_GROUP_UNRESOLVED_PATH",
+          "toolu_tge07_write"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    },
+    {
+      "id": "tge07-compact-after-write",
+      "description": "TGE07 compact sidecar after Write.",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "E2E 极小 context window 在 Write 后触发自动 compact；摘要保留 marker 与 tool id，使终态 matcher 可继续命中。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_CHANGES_GROUP_UNRESOLVED_PATH", "toolu_tge07_write", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "tge07-compact-after-write",
+          "inputTokens": 128,
+          "outputTokens": 24,
+          "text": "<summary>E2E_CHANGES_GROUP_UNRESOLVED_PATH completed Write toolu_tge07_write. Return upstream-e2e-ok.</summary>"
+        }
+      }
+    }
+  ]
+}

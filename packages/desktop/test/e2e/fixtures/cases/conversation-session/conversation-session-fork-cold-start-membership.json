@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-cold-start-membership",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-cold-start-membership.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-fork-cold-start-membership.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "fork-cold-start-project-row-title",
+      "description": "TSL19 parent 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是本 case 产品语义；固定响应只为冷启动列表提供稳定可读标题。"
+    },
+    {
+      "id": "fork-cold-start-project-row-parent",
+      "description": "TSL19 parent completed assistant，提供稳定 fork target。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 parented fork 的冷启动 membership；provider 只需稳定形成 completed assistant。"
+    }
+  ]
+}

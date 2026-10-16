@@ -7,13 +7,13 @@ import type { ShortcutBindingEvent } from "./bindings.js";
 import { matchesShortcutBinding } from "./bindings.js";
 
 /** composer 作用域命令在生效表中的切片（只关心这两条，避免拉全量表的类型依赖）。 */
-interface ComposerEffectiveBindings {
+export interface ComposerEffectiveBindings {
   readonly composerSend: readonly string[];
   readonly composerInsertNewline: readonly string[];
 }
 
 /** Enter 族事件在 composer 内的最终动作。 */
-type ComposerKeyAction = "send" | "newline";
+export type ComposerKeyAction = "send" | "newline";
 
 /**
  * 按生效表解析 composer 动作（改绑层，统一开放策略）。

@@ -38,6 +38,8 @@ import {
 } from "./hook-flow.js";
 import { resolveToolCallCapabilityFlags } from "./permission-capability.js";
 import { resolveToolPermission } from "./permission-flow.js";
+import { snapshotPermissionInput } from "./permission-input.js";
+import { buildToolInputResolutionContext } from "./permission-input-adjustments.js";
 import { createMcpToolDisplay, createToolResultDisplay } from "./result-display.js";
 import { appendHookAdditionalContexts, serializeOutput } from "./result-serialization.js";
 import {
@@ -152,489 +154,521 @@ async function executeToolCallImpl(
     return result;
   }
 
-  const mode = deps.getMode();
-
-  if (options?.signal?.aborted) {
+  let lifetime: ReturnType<NonNullable<ToolEntry["retainExecution"]>> | undefined;
+  try {
+    lifetime = entry.retainExecution?.(canonicalToolCall.id);
+  } catch (error) {
     const result = createErrorResult(
       canonicalToolCall,
-      createCoreError(CoreErrorType.ToolCancelled, "Tool execution cancelled"),
-    );
-    telemetry?.finishCancelled("abort_signal");
-    return result;
-  }
-
-  const preparedInitialInput = prepareInitialToolExecutionInput({
-    entry,
-    input: canonicalToolCall.input,
-    logger: deps.logger,
-  });
-  let executionInput = preparedInitialInput.input;
-  const initialInputValidation = validateInitialModelToolInput(
-    executionInput,
-    entry,
-    preparedInitialInput.runtimeValidationIssues,
-  );
-  if (initialInputValidation) {
-    const result = createErrorResult(canonicalToolCall, initialInputValidation);
-    // schema 失败与 registry miss 同属 handler/ToolCallStarted 之前的早退；旧代码
-    // 只把失败回灌模型，没有发布 ToolCallError，V4 tool row 因而在整个 turn 里停在
-    // inputStreaming（CreateWorkflow 卡持续显示「正在编写工作流」），模型重试后又叠一张。
-    await emitToolCallError(deps, canonicalToolCall.id, traceContext, turnId, result.error);
-    telemetry?.finishFailed("validation", "parse", result.error);
-    return result;
-  }
-
-  const toolInputValidation = entry.validateInput?.(executionInput, {
-    runtimeTaskRegistry: deps.runtimeTaskRegistry,
-  });
-  if (toolInputValidation && isToolHandlerFailure(toolInputValidation)) {
-    // tool-specific 语义校验原先只能放在 handler，导致无效调用仍先执行
-    // PreToolUse、权限和 failure hook；语义校验必须在 hook 前结束。
-    const result = createErrorResult(
-      canonicalToolCall,
-      createToolHandlerFailureError(canonicalToolCall, toolInputValidation),
+      createCoreError(
+        CoreErrorType.ToolCancelled,
+        error instanceof Error ? error.message : "Tool instance is unavailable",
+      ),
     );
     await emitToolCallError(deps, canonicalToolCall.id, traceContext, turnId, result.error);
-    // 工具专属校验以普通失败结果返回，不走 handler 执行的 try/catch 失败收口。
-    // 先发出 ToolCallError 更新工具行，再显式标记遥测失败，避免被记录为 abandoned。
-    telemetry?.finishFailed("validation", "parse", result.error);
     return result;
   }
+  if (lifetime)
+    options = {
+      ...options,
+      signal: options?.signal
+        ? AbortSignal.any([options.signal, lifetime.signal])
+        : lifetime.signal,
+    };
+  try {
+    const mode = deps.getMode();
 
-  // 归一化：把模型发出的入参换成「将要发生的执行事实」。位置刻意在 hook **之前**——此后
-  // hook、权限规则、确认窗载荷、prepareApproval 与 handler 读的都是同一份输入，于是
-  // 「策略看得到真正的脚本」「跨版本可见」「确认与执行同字节」三件事一次到位。
-  if (entry.resolveInput) {
-    const workingDirectory = deps.getWorkingDirectory?.();
-    const resolution = await entry.resolveInput(executionInput, {
-      ...(workingDirectory === undefined ? {} : { workingDirectory }),
-      runtimeTaskRegistry: deps.runtimeTaskRegistry,
-      ...(deps.dynamicWorkflowRunPort === undefined
-        ? {}
-        : { dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort }),
-      ...(deps.modelCatalogPort === undefined ? {} : { modelCatalogPort: deps.modelCatalogPort }),
-      sessionId: deps.sessionId,
-      ...(deps.hasLoadedSkill === undefined ? {} : { hasLoadedSkill: deps.hasLoadedSkill }),
-    });
-    if (isToolHandlerFailure(resolution)) {
-      // 与 validateInput 同一条生命周期出口：解析不出来是模型该立刻拿回去修的东西，
-      // 不该先弹一次注定失败的确认窗。
+    if (options?.signal?.aborted) {
       const result = createErrorResult(
         canonicalToolCall,
-        createToolHandlerFailureError(canonicalToolCall, resolution),
+        createCoreError(CoreErrorType.ToolCancelled, "Tool execution cancelled"),
       );
+      telemetry?.finishCancelled("abort_signal");
+      return result;
+    }
+
+    const preparedInitialInput = prepareInitialToolExecutionInput({
+      entry,
+      input: canonicalToolCall.input,
+      logger: deps.logger,
+    });
+    let executionInput = preparedInitialInput.input;
+    const initialInputValidation = validateInitialModelToolInput(
+      executionInput,
+      entry,
+      preparedInitialInput.runtimeValidationIssues,
+    );
+    if (initialInputValidation) {
+      const result = createErrorResult(canonicalToolCall, initialInputValidation);
+      // schema 失败与 registry miss 同属 handler/ToolCallStarted 之前的早退；旧代码
+      // 只把失败回灌模型，没有发布 ToolCallError，V4 tool row 因而在整个 turn 里停在
+      // inputStreaming（CreateWorkflow 卡持续显示「正在编写工作流」），模型重试后又叠一张。
       await emitToolCallError(deps, canonicalToolCall.id, traceContext, turnId, result.error);
       telemetry?.finishFailed("validation", "parse", result.error);
       return result;
     }
-    executionInput = resolution.input;
-  }
 
-  const preToolHookResult = await runPreToolUseHooks(
-    deps,
-    canonicalToolCall,
-    executionInput,
-    entry,
-    mode,
-    traceContext,
-    options?.signal,
-  );
-  if (preToolHookResult.permissionBehavior === "deny" || preToolHookResult.preventContinuation) {
-    const result = appendPreToolAdditionalContextsToErrorResult(
-      withPlanExitDeniedTurnStop(
-        createPermissionErrorResult(
-          canonicalToolCall,
-          preToolHookResult.hookPermissionDecisionReason ??
-            preToolHookResult.stopReason ??
-            "Blocked by PreToolUse hook",
-          {
-            decision: "deny",
-            mode,
-            reason: preToolHookResult.hookPermissionDecisionReason ?? preToolHookResult.stopReason,
-            source: "hook.PreToolUse",
-          },
-        ),
-        {
-          mode,
-          planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
-          toolName: canonicalToolCall.name,
-        },
-      ),
-      preToolHookResult.additionalContexts,
-    );
-    telemetry?.setPermissionDecision("denied");
-    telemetry?.finishDenied("policy_denied");
-    return result;
-  }
-  if (preToolHookResult.updatedInput !== undefined) {
-    executionInput = normalizeToolExecutionInput({
-      entry,
-      input: preToolHookResult.updatedInput,
-      logger: deps.logger,
-      source: "hook",
+    const toolInputValidation = entry.validateInput?.(executionInput, {
+      runtimeTaskRegistry: deps.runtimeTaskRegistry,
     });
-    const hookInputValidation = validateInput(executionInput, entry);
-    if (hookInputValidation) {
-      // Hook 修改后的输入校验失败会在 handler 前直接返回，旧分支没有走
-      // PreToolUse context 的统一追加逻辑，导致模型只看到 schema error，看不到 Hook
-      // 已产生的诊断上下文；与 deny、permission-deny 的提前失败契约不一致。
-      const result = appendPreToolAdditionalContextsToErrorResult(
-        createErrorResult(canonicalToolCall, hookInputValidation),
-        preToolHookResult.additionalContexts,
+    if (toolInputValidation && isToolHandlerFailure(toolInputValidation)) {
+      // tool-specific 语义校验原先只能放在 handler，导致无效调用仍先执行
+      // PreToolUse、权限和 failure hook；语义校验必须在 hook 前结束。
+      const result = createErrorResult(
+        canonicalToolCall,
+        createToolHandlerFailureError(canonicalToolCall, toolInputValidation),
       );
+      await emitToolCallError(deps, canonicalToolCall.id, traceContext, turnId, result.error);
+      // 工具专属校验以普通失败结果返回，不走 handler 执行的 try/catch 失败收口。
+      // 先发出 ToolCallError 更新工具行，再显式标记遥测失败，避免被记录为 abandoned。
       telemetry?.finishFailed("validation", "parse", result.error);
       return result;
     }
-  }
 
-  const permissionResult = await resolveToolPermission(
-    deps,
-    canonicalToolCall,
-    entry,
-    executionInput,
-    preToolHookResult,
-    mode,
-    traceContext,
-    options?.signal,
-    telemetry,
-  );
-  if (!permissionResult.allowed) {
-    const result = appendPreToolAdditionalContextsToErrorResult(
-      withWorkflowRefineDeniedFollowUp(
-        withPlanExitDeniedTurnStop(permissionResult.result, {
-          mode,
-          planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
-          toolName: canonicalToolCall.name,
-        }),
-        { toolName: canonicalToolCall.name },
-      ),
-      preToolHookResult.additionalContexts,
-    );
-    if (result.error?.type === CoreErrorType.PermissionDenied) {
-      telemetry?.finishDenied("user_denied");
-    } else {
-      telemetry?.finishFailed(
-        "permission",
-        errorCategoryForToolError(result.error?.type),
-        result.error,
+    // 归一化：把模型发出的入参换成「将要发生的执行事实」。位置刻意在 hook **之前**——此后
+    // hook、权限规则、确认窗载荷、prepareApproval 与 handler 读的都是同一份输入，于是
+    // 「策略看得到真正的脚本」「跨版本可见」「确认与执行同字节」三件事一次到位。
+    if (entry.resolveInput) {
+      const resolution = await entry.resolveInput(
+        executionInput,
+        buildToolInputResolutionContext(deps),
       );
+      if (isToolHandlerFailure(resolution)) {
+        // 与 validateInput 同一条生命周期出口：解析不出来是模型该立刻拿回去修的东西，
+        // 不该先弹一次注定失败的确认窗。
+        const result = createErrorResult(
+          canonicalToolCall,
+          createToolHandlerFailureError(canonicalToolCall, resolution),
+        );
+        await emitToolCallError(deps, canonicalToolCall.id, traceContext, turnId, result.error);
+        telemetry?.finishFailed("validation", "parse", result.error);
+        return result;
+      }
+      executionInput = resolution.input;
     }
-    return result;
-  }
-  executionInput = permissionResult.executionInput;
-  const permissionWaitMs = permissionResult.permissionWaitMs;
 
-  const startTime = Date.now();
-  // 按**执行入参**解析一次副作用旗标（Bash 的只读命令判定就在这里落定），随 ToolCallStarted 发出：
-  // 事件先于 handler，所以订阅者（dynamic-workflow driver 的导入缓存关门）在第一个字节落盘前就知道。
-  await emitToolCallStarted(
-    deps,
-    canonicalToolCall,
-    traceContext,
-    turnId,
-    startTime,
-    createMcpToolDisplay(entry.metadata.mcpPresentation),
-    resolveToolCallCapabilityFlags(deps, entry, executionInput),
-  );
-
-  deps.logger?.info("Tool call started", {
-    ...traceContextToLogContext(traceContext),
-    event: "tool.call.started",
-    module: "core.tool.executor",
-    status: "started",
-    toolCallId: canonicalToolCall.id,
-    toolName: canonicalToolCall.name,
-  });
-
-  const timeoutMs = resolveTimeoutMs(entry, executionInput, deps.defaultTimeoutMs, {
-    model,
-  });
-  const executionAbortController = new AbortController();
-  const unlinkParentAbort = linkAbortSignal(options?.signal, executionAbortController);
-  // 可暂停的 deadline：本次调用内部的模型请求在准入闸门前排队时暂停计时。排队的两端
-  // 以本 toolCallId 的 ModelNetworkStatus 会话事件到达，所以在事件出口拦一层即可，handler 无感。
-  const deadline = new ToolDeadline(timeoutMs);
-  const emitEvent =
-    deps.emitEvent === undefined
-      ? undefined
-      : async (event: SessionEvent): Promise<void> => {
-          observeToolAdmissionClock(event, canonicalToolCall.id, deadline);
-          await deps.emitEvent(event);
-        };
-  let readFileStateMetadata: ToolExecutionResult["readFileStateMetadata"];
-  let failureStage: "handler" | "serialize" | "post_hook" = "handler";
-  let skillTelemetryMetadata: SkillTelemetryMetadata | undefined;
-
-  try {
-    const model = options?.model ?? deps.model;
-    const bashShellSelection = deps.getBashShellSelection?.() ?? deps.bashShellSelection;
-    const embeddedSearchDecision = resolveEmbeddedSearchBranchCapability({
-      bashAvailable: deps.registry.has("Bash"),
-    });
-    const context: ToolExecutionContext = {
-      toolCallId: canonicalToolCall.id,
-      telemetry,
-      automationTurn: options?.automationTurn,
-      offPeakTurn: options?.offPeakTurn,
-      traceContext,
-      traceId,
-      spanId: traceContext.spanId,
-      parentSpanId: traceContext.parentSpanId,
-      abortSignal: executionAbortController.signal,
-      backgroundTaskControlPort: deps.backgroundTaskControlPort,
-      emitEvent,
-      executionPort: deps.executionPort,
-      browserControlPort: deps.browserControlPort,
-      browserDocumentationRoot: deps.browserDocumentationRoot,
-      fileSystemPort: deps.fileSystemPort,
-      httpClientPort: deps.httpClientPort,
-      imageProcessorPort: deps.imageProcessorPort,
-      pdfDocumentPort: deps.pdfDocumentPort,
-      // 工具内部的模型请求默认把状态事件发进会话：deadline 暂停与 driver 相位都靠这条流。
-      model: withDefaultToolModelStatusSink(
-        model,
-        createToolModelStatusSink({ emitEvent, sessionId: deps.sessionId, turnId, traceId }),
-      ),
-      subagentModelOverride: options?.subagentModelOverride,
-      embeddedSearch: {
-        ...(deps.embeddedSearchBackend ? { backend: deps.embeddedSearchBackend } : {}),
-        enabled: embeddedSearchDecision?.useEmbeddedSearchBranch ?? false,
-        ...(deps.nativeSearchEnhancementsEnabled === false ? { findAndGrepEnabled: false } : {}),
-      },
-      skillPort: deps.skillPort,
-      subagentPort: deps.subagentPort,
-      coordinatorResponsePort: deps.coordinatorResponsePort,
-      workflowSubmitPort: deps.workflowSubmitPort,
-      workflowEscalatePort: deps.workflowEscalatePort,
-      artifactStore: deps.artifactStore,
-      automationPort: deps.automationPort,
-      offPeakPort: deps.offPeakPort,
-      sessionStore: deps.sessionStore,
-      sessionModePort: deps.sessionModePort,
-      workflowPort: deps.workflowPort,
-      dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
-      dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
-      modelCatalogPort: deps.modelCatalogPort,
-      runtimeTaskRegistry: deps.runtimeTaskRegistry,
-      readFileState: deps.readFileState,
-      recordReadFileStateMetadata: (metadata) => {
-        readFileStateMetadata = metadata;
-      },
-      recordSkillTelemetryMetadata: (metadata) => {
-        skillTelemetryMetadata = metadata;
-      },
-      bashShellSelection,
-      setWorkingDirectory: deps.setWorkingDirectory,
-      workingDirectory: deps.getWorkingDirectory(),
-      workspaceRoot: deps.getWorkspaceRoot(),
-      workspaceIdentity: deps.workspaceIdentity,
-      remoteSessionId: deps.remoteSessionId,
-      clientMode: deps.clientMode,
-      deliveryKind: deps.deliveryKind,
-      memoryRoot: deps.getMemoryRoot?.(),
-      runtimeScope: deps.runtimeScope,
-      providerVisibleToolNames: deps.registry
-        .list()
-        .filter((name) => deps.registry.getMetadata(name)?.providerVisible !== false),
-      sessionId: deps.sessionId,
-      turnId,
-    };
-
-    const output = await executeWithTimeout(
-      entry.handler,
-      executionInput,
-      context,
-      deadline,
-      executionAbortController,
-      entry,
-    );
-    const durationMs = Date.now() - startTime;
-    if (isToolHandlerFailure(output)) {
-      // handler 用返回值表达可预期业务失败；这里只转换到既有异常控制流，
-      // 继续复用原来的 failure hook、事件和日志，不引入第二套执行生命周期。
-      throw createToolHandlerFailureError(canonicalToolCall, output);
-    }
-    validateOutput(output, entry);
-    // node_repl 同时承载 Browser Use 与 CUA，不能在注册时把整个 server 标成 official。
-    // CUA SDK 结果带 producer integrity metadata 时，才为本次序列化临时打开原子帧保护；
-    // 否则通用 resultBudget 会截断/重排 image_ref，或非 authority 路径会把引用剥掉。
-    const modelOutputEntry = resolveModelOutputEntry(entry, output);
-    failureStage = "serialize";
-    let serialization = await serializeOutput(
-      deps,
-      output,
-      modelOutputEntry,
-      traceContext,
-      canonicalToolCall.id,
-      executionAbortController.signal,
-    );
-    failureStage = "post_hook";
-    const postToolHookResult = await runPostToolUseHooks(
+    const preToolHookResult = await runPreToolUseHooks(
       deps,
       canonicalToolCall,
       executionInput,
-      output,
-      serialization.artifactPath,
+      entry,
+      mode,
       traceContext,
       options?.signal,
     );
-    serialization = appendHookAdditionalContexts(
-      serialization,
-      [...preToolHookResult.additionalContexts, ...postToolHookResult.additionalContexts],
-      modelOutputEntry,
-    );
-    const display = createToolResultDisplay(canonicalToolCall.name, output, {
-      mcp: entry.metadata.mcpPresentation,
-      officialCua: entry.modelContentProtection === OFFICIAL_CUA_FRAME_MODEL_CONTENT_PROTECTION,
-    });
-    const perf = mergeToolExecutionTelemetry(readToolExecutionTelemetry(output), {
-      permissionWaitMs,
-      // totalMs 是用户感知的工具生命周期：registry lookup、校验、Hook、权限等待、
-      // handler、序列化与 PostToolUse。durationMs 继续只表示 handler 主执行段。
-      totalMs: Date.now() - totalStartedAt,
-    });
-
-    const finalModelContent = serialization.modelContent ?? serialization.content;
-    const modelContentProtection = modelOutputEntry.modelContentProtection
-      ? attestOfficialCuaFrameContent(finalModelContent, modelOutputEntry.modelContentProtection)
-      : undefined;
-    if (
-      modelOutputEntry.modelContentProtection &&
-      Array.isArray(finalModelContent) &&
-      finalModelContent.some((block) => block.type === "image") &&
-      !modelContentProtection
-    ) {
-      throw createCoreError(
-        CoreErrorType.ToolExecutionFailed,
-        "Official CUA frame failed final model-content attestation",
-        { recoverable: true },
+    if (preToolHookResult.permissionBehavior === "deny" || preToolHookResult.preventContinuation) {
+      const result = appendPreToolAdditionalContextsToErrorResult(
+        withPlanExitDeniedTurnStop(
+          createPermissionErrorResult(
+            canonicalToolCall,
+            preToolHookResult.hookPermissionDecisionReason ??
+              preToolHookResult.stopReason ??
+              "Blocked by PreToolUse hook",
+            {
+              decision: "deny",
+              mode,
+              reason:
+                preToolHookResult.hookPermissionDecisionReason ?? preToolHookResult.stopReason,
+              source: "hook.PreToolUse",
+            },
+          ),
+          {
+            mode,
+            planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
+            toolName: canonicalToolCall.name,
+          },
+        ),
+        preToolHookResult.additionalContexts,
       );
+      telemetry?.setPermissionDecision("denied");
+      telemetry?.finishDenied("policy_denied");
+      return result;
+    }
+    if (preToolHookResult.updatedInput !== undefined) {
+      executionInput = normalizeToolExecutionInput({
+        entry,
+        input: preToolHookResult.updatedInput,
+        logger: deps.logger,
+        source: "hook",
+      });
+      const hookInputValidation = validateInput(executionInput, entry);
+      if (hookInputValidation) {
+        // Hook 修改后的输入校验失败会在 handler 前直接返回，旧分支没有走
+        // PreToolUse context 的统一追加逻辑，导致模型只看到 schema error，看不到 Hook
+        // 已产生的诊断上下文；与 deny、permission-deny 的提前失败契约不一致。
+        const result = appendPreToolAdditionalContextsToErrorResult(
+          createErrorResult(canonicalToolCall, hookInputValidation),
+          preToolHookResult.additionalContexts,
+        );
+        telemetry?.finishFailed("validation", "parse", result.error);
+        return result;
+      }
     }
 
-    const result: ToolExecutionResult = withTerminalToolTurnStop(
+    // Shell 已由 session owner 固定；匹配和执行复用同一选择，不为不存在的热切换再建快照。
+    const bashShellSelection = deps.getBashShellSelection?.() ?? deps.bashShellSelection;
+    const guardedWorkingDirectory = mode === "guarded" ? deps.getWorkingDirectory() : undefined;
+    if (mode === "guarded") executionInput = snapshotPermissionInput(executionInput);
+    const permissionResult = await resolveToolPermission(
+      deps,
+      canonicalToolCall,
+      entry,
+      executionInput,
+      preToolHookResult,
+      mode,
+      traceContext,
+      options?.signal,
+      telemetry,
       {
+        mode,
+        bashShellSelection,
+        ...(guardedWorkingDirectory === undefined
+          ? {}
+          : { workingDirectory: guardedWorkingDirectory }),
+      },
+    );
+    if (!permissionResult.allowed) {
+      const result = appendPreToolAdditionalContextsToErrorResult(
+        withWorkflowRefineDeniedFollowUp(
+          withPlanExitDeniedTurnStop(permissionResult.result, {
+            mode,
+            planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
+            toolName: canonicalToolCall.name,
+          }),
+          { toolName: canonicalToolCall.name },
+        ),
+        preToolHookResult.additionalContexts,
+      );
+      if (result.error?.type === CoreErrorType.PermissionDenied) {
+        telemetry?.finishDenied("user_denied");
+      } else {
+        telemetry?.finishFailed(
+          "permission",
+          errorCategoryForToolError(result.error?.type),
+          result.error,
+        );
+      }
+      return result;
+    }
+    executionInput = permissionResult.executionInput;
+    const permissionWaitMs = permissionResult.permissionWaitMs;
+    const inputAdjustments = permissionResult.inputAdjustments;
+
+    const startTime = Date.now();
+    // 按**执行入参**解析一次副作用旗标（Bash 的只读命令判定就在这里落定），随 ToolCallStarted 发出：
+    // 事件先于 handler，所以订阅者（dynamic-workflow driver 的导入缓存关门）在第一个字节落盘前就知道。
+    await emitToolCallStarted(
+      deps,
+      canonicalToolCall,
+      traceContext,
+      turnId,
+      startTime,
+      createMcpToolDisplay(entry.metadata.mcpPresentation),
+      resolveToolCallCapabilityFlags(deps, entry, executionInput),
+    );
+
+    deps.logger?.info("Tool call started", {
+      ...traceContextToLogContext(traceContext),
+      event: "tool.call.started",
+      module: "core.tool.executor",
+      status: "started",
+      toolCallId: canonicalToolCall.id,
+      toolName: canonicalToolCall.name,
+    });
+
+    const timeoutMs = resolveTimeoutMs(entry, executionInput, deps.defaultTimeoutMs, {
+      model,
+    });
+    const executionAbortController = new AbortController();
+    const unlinkParentAbort = linkAbortSignal(options?.signal, executionAbortController);
+    // 可暂停的 deadline：本次调用内部的模型请求在准入闸门前排队时暂停计时。排队的两端
+    // 以本 toolCallId 的 ModelNetworkStatus 会话事件到达，所以在事件出口拦一层即可，handler 无感。
+    const deadline = new ToolDeadline(timeoutMs);
+    const emitEvent =
+      deps.emitEvent === undefined
+        ? undefined
+        : async (event: SessionEvent): Promise<void> => {
+            observeToolAdmissionClock(event, canonicalToolCall.id, deadline);
+            await deps.emitEvent(event);
+          };
+    let readFileStateMetadata: ToolExecutionResult["readFileStateMetadata"];
+    let skillTelemetryMetadata: SkillTelemetryMetadata | undefined;
+    let failureStage: "handler" | "serialize" | "post_hook" = "handler";
+
+    try {
+      const model = options?.model ?? deps.model;
+      const embeddedSearchDecision = resolveEmbeddedSearchBranchCapability({
+        bashAvailable: deps.registry.has("Bash"),
+      });
+      const context: ToolExecutionContext = {
         toolCallId: canonicalToolCall.id,
-        toolName: canonicalToolCall.name,
-        success: true,
+        telemetry,
+        automationTurn: options?.automationTurn,
+        offPeakTurn: options?.offPeakTurn,
+        traceContext,
+        traceId,
+        spanId: traceContext.spanId,
+        parentSpanId: traceContext.parentSpanId,
+        abortSignal: executionAbortController.signal,
+        backgroundTaskControlPort: deps.backgroundTaskControlPort,
+        emitEvent,
+        executionPort: deps.executionPort,
+        browserControlPort: deps.browserControlPort,
+        browserDocumentationRoot: deps.browserDocumentationRoot,
+        fileSystemPort: deps.fileSystemPort,
+        httpClientPort: deps.httpClientPort,
+        imageProcessorPort: deps.imageProcessorPort,
+        pdfDocumentPort: deps.pdfDocumentPort,
+        // 工具内部的模型请求默认把状态事件发进会话：deadline 暂停与 driver 相位都靠这条流。
+        model: withDefaultToolModelStatusSink(
+          model,
+          createToolModelStatusSink({ emitEvent, sessionId: deps.sessionId, turnId, traceId }),
+        ),
+        subagentModelOverride: options?.subagentModelOverride,
+        embeddedSearch: {
+          ...(deps.embeddedSearchBackend ? { backend: deps.embeddedSearchBackend } : {}),
+          enabled: embeddedSearchDecision?.useEmbeddedSearchBranch ?? false,
+          ...(deps.nativeSearchEnhancementsEnabled === false ? { findAndGrepEnabled: false } : {}),
+        },
+        skillPort: deps.skillPort,
+        subagentPort: deps.subagentPort,
+        coordinatorResponsePort: deps.coordinatorResponsePort,
+        workflowSubmitPort: deps.workflowSubmitPort,
+        workflowEscalatePort: deps.workflowEscalatePort,
+        artifactStore: deps.artifactStore,
+        automationPort: deps.automationPort,
+        offPeakPort: deps.offPeakPort,
+        topicResourcePort: deps.topicResourcePort,
+        sessionStore: deps.sessionStore,
+        sessionModePort: deps.sessionModePort,
+        workflowPort: deps.workflowPort,
+        dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
+        dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
+        modelCatalogPort: deps.modelCatalogPort,
+        runtimeTaskRegistry: deps.runtimeTaskRegistry,
+        readFileState: deps.readFileState,
+        recordReadFileStateMetadata: (metadata) => {
+          readFileStateMetadata = metadata;
+        },
+        recordSkillTelemetryMetadata: (metadata) => {
+          skillTelemetryMetadata = metadata;
+        },
+        bashShellSelection,
+        setWorkingDirectory: deps.setWorkingDirectory,
+        workingDirectory: guardedWorkingDirectory ?? deps.getWorkingDirectory(),
+        workspaceRoot: deps.getWorkspaceRoot(),
+        workspaceIdentity: deps.workspaceIdentity,
+        remoteSessionId: deps.remoteSessionId,
+        clientMode: deps.clientMode,
+        deliveryKind: deps.deliveryKind,
+        memoryRoot: deps.getMemoryRoot?.(),
+        runtimeScope: deps.runtimeScope,
+        providerVisibleToolNames: deps.registry
+          .list()
+          .filter((name) => deps.registry.getMetadata(name)?.providerVisible !== false),
+        sessionId: deps.sessionId,
+        turnId,
+        ...(inputAdjustments === undefined ? {} : { inputAdjustments }),
+      };
+
+      const output = await executeWithTimeout(
+        entry.handler,
+        executionInput,
+        context,
+        deadline,
+        executionAbortController,
+        entry,
+      );
+      const durationMs = Date.now() - startTime;
+      if (isToolHandlerFailure(output)) {
+        // handler 用返回值表达可预期业务失败；这里只转换到既有异常控制流，
+        // 继续复用原来的 failure hook、事件和日志，不引入第二套执行生命周期。
+        throw createToolHandlerFailureError(canonicalToolCall, output);
+      }
+      validateOutput(output, entry);
+      // node_repl 同时承载 Browser Use 与 CUA，不能在注册时把整个 server 标成 official。
+      // CUA SDK 结果带 producer integrity metadata 时，才为本次序列化临时打开原子帧保护；
+      // 否则通用 resultBudget 会截断/重排 image_ref，或非 authority 路径会把引用剥掉。
+      const modelOutputEntry = resolveModelOutputEntry(entry, output);
+      failureStage = "serialize";
+      let serialization = await serializeOutput(
+        deps,
         output,
-        display,
-        modelContent: finalModelContent,
-        ...(readFileStateMetadata ? { readFileStateMetadata } : {}),
-        performance: perf,
+        modelOutputEntry,
+        traceContext,
+        canonicalToolCall.id,
+        executionAbortController.signal,
+      );
+      failureStage = "post_hook";
+      const postToolHookResult = await runPostToolUseHooks(
+        deps,
+        canonicalToolCall,
+        executionInput,
+        output,
+        serialization.artifactPath,
+        traceContext,
+        options?.signal,
+      );
+      serialization = appendHookAdditionalContexts(
+        serialization,
+        [...preToolHookResult.additionalContexts, ...postToolHookResult.additionalContexts],
+        modelOutputEntry,
+      );
+      const display = createToolResultDisplay(canonicalToolCall.name, output, {
+        mcp: entry.metadata.mcpPresentation,
+        officialCua: entry.modelContentProtection === OFFICIAL_CUA_FRAME_MODEL_CONTENT_PROTECTION,
+      });
+      const perf = mergeToolExecutionTelemetry(readToolExecutionTelemetry(output), {
+        permissionWaitMs,
+        // totalMs 是用户感知的工具生命周期：registry lookup、校验、Hook、权限等待、
+        // handler、序列化与 PostToolUse。durationMs 继续只表示 handler 主执行段。
+        totalMs: Date.now() - totalStartedAt,
+      });
+
+      const finalModelContent = serialization.modelContent ?? serialization.content;
+      const modelContentProtection = modelOutputEntry.modelContentProtection
+        ? attestOfficialCuaFrameContent(finalModelContent, modelOutputEntry.modelContentProtection)
+        : undefined;
+      if (
+        modelOutputEntry.modelContentProtection &&
+        Array.isArray(finalModelContent) &&
+        finalModelContent.some((block) => block.type === "image") &&
+        !modelContentProtection
+      ) {
+        throw createCoreError(
+          CoreErrorType.ToolExecutionFailed,
+          "Official CUA frame failed final model-content attestation",
+          { recoverable: true },
+        );
+      }
+
+      const result: ToolExecutionResult = withTerminalToolTurnStop(
+        {
+          toolCallId: canonicalToolCall.id,
+          toolName: canonicalToolCall.name,
+          success: true,
+          output,
+          display,
+          modelContent: finalModelContent,
+          ...(readFileStateMetadata ? { readFileStateMetadata } : {}),
+          performance: perf,
+          serialization,
+          durationMs,
+          startedAt: new Date(startTime),
+          completedAt: new Date(),
+        },
+        { entry },
+      );
+
+      await emitToolCallResult(
+        deps,
+        canonicalToolCall,
+        traceContext,
+        turnId,
         serialization,
         durationMs,
-        startedAt: new Date(startTime),
-        completedAt: new Date(),
-      },
-      { entry },
-    );
+        display,
+        perf,
+        skillTelemetryMetadata,
+      );
 
-    await emitToolCallResult(
-      deps,
-      canonicalToolCall,
-      traceContext,
-      turnId,
-      serialization,
-      durationMs,
-      display,
-      perf,
-      skillTelemetryMetadata,
-    );
+      await backgroundTasks.trackBackgroundTask(canonicalToolCall, output, traceContext, turnId);
 
-    await backgroundTasks.trackBackgroundTask(canonicalToolCall, output, traceContext, turnId);
-
-    deps.logger?.info("Tool call completed", {
-      ...traceContextToLogContext(traceContext),
-      durationMs,
-      event: "tool.call.completed",
-      module: "core.tool.executor",
-      status: "completed",
-      toolCallId: canonicalToolCall.id,
-      toolName: canonicalToolCall.name,
-    });
-
-    telemetry?.setOutputBytes(serialization.returnedBytes);
-    telemetry?.setOutputTruncated(serialization.truncated);
-    telemetry?.finishCompleted();
-    return result;
-  } catch (error) {
-    const durationMs = Date.now() - startTime;
-    const failureHookResult = await runPostToolUseFailureHooks(
-      deps,
-      canonicalToolCall,
-      executionInput,
-      error,
-      traceContext,
-      options?.signal,
-    );
-    let result = createErrorResult(
-      canonicalToolCall,
-      error instanceof Error ? error : new Error(String(error)),
-      durationMs,
-    );
-    const baseModelContent = result.error
-      ? isToolHandlerFailureError(error) && typeof result.modelContent === "string"
-        ? result.modelContent
-        : result.error.message
-      : undefined;
-    if (failureHookResult.additionalContexts.length > 0 && baseModelContent) {
-      result.modelContent = [
-        baseModelContent,
-        formatHookAdditionalContexts([
-          ...preToolHookResult.additionalContexts,
-          ...failureHookResult.additionalContexts,
-        ]),
-      ].join("\n\n");
-    } else if (preToolHookResult.additionalContexts.length > 0 && baseModelContent) {
-      result.modelContent = [
-        baseModelContent,
-        formatHookAdditionalContexts(preToolHookResult.additionalContexts),
-      ].join("\n\n");
-    }
-    result = withAutomationCreateLimitTurnStop(result, {
-      error,
-      toolName: canonicalToolCall.name,
-    });
-
-    // Skill 已解析成功后，serialize/post_hook 仍可能失败；错误事件也要保留
-    // resolved metadata，否则失败的 Skill agent_step 无法归因到具体 skill。
-    await emitToolCallError(
-      deps,
-      canonicalToolCall.id,
-      traceContext,
-      turnId,
-      result.error,
-      skillTelemetryMetadata,
-    );
-
-    deps.logger?.error(
-      "Tool call failed",
-      error instanceof Error ? error : new Error(String(error)),
-      {
+      deps.logger?.info("Tool call completed", {
         ...traceContextToLogContext(traceContext),
         durationMs,
-        event: "tool.call.failed",
+        event: "tool.call.completed",
         module: "core.tool.executor",
-        status: "failed",
+        status: "completed",
         toolCallId: canonicalToolCall.id,
         toolName: canonicalToolCall.name,
-      },
-    );
+      });
 
-    if (options?.signal?.aborted || result.error?.type === CoreErrorType.ToolCancelled) {
-      telemetry?.finishCancelled("abort_signal");
-    } else {
-      telemetry?.finishFailed(
-        failureStage,
-        errorCategoryForToolError(result.error?.type),
-        // 原始异常只交给 Telemetry 做受控脱敏；result.error 是面向业务协议重新包装后的错误，
-        // 不能覆盖 Trace 中用于定位根因的 source message/type/code。
+      telemetry?.setOutputBytes(serialization.returnedBytes);
+      telemetry?.setOutputTruncated(serialization.truncated);
+      telemetry?.finishCompleted();
+      return result;
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      const failureHookResult = await runPostToolUseFailureHooks(
+        deps,
+        canonicalToolCall,
+        executionInput,
         error,
+        traceContext,
+        options?.signal,
       );
+      let result = createErrorResult(
+        canonicalToolCall,
+        error instanceof Error ? error : new Error(String(error)),
+        durationMs,
+      );
+      const baseModelContent = result.error
+        ? isToolHandlerFailureError(error) && typeof result.modelContent === "string"
+          ? result.modelContent
+          : result.error.message
+        : undefined;
+      if (failureHookResult.additionalContexts.length > 0 && baseModelContent) {
+        result.modelContent = [
+          baseModelContent,
+          formatHookAdditionalContexts([
+            ...preToolHookResult.additionalContexts,
+            ...failureHookResult.additionalContexts,
+          ]),
+        ].join("\n\n");
+      } else if (preToolHookResult.additionalContexts.length > 0 && baseModelContent) {
+        result.modelContent = [
+          baseModelContent,
+          formatHookAdditionalContexts(preToolHookResult.additionalContexts),
+        ].join("\n\n");
+      }
+      result = withAutomationCreateLimitTurnStop(result, {
+        error,
+        toolName: canonicalToolCall.name,
+      });
+
+      // Skill 已解析成功后，serialize/post_hook 仍可能失败；错误事件也要保留
+      // resolved metadata，否则失败的 Skill agent_step 无法归因到具体 skill。
+      await emitToolCallError(
+        deps,
+        canonicalToolCall.id,
+        traceContext,
+        turnId,
+        result.error,
+        skillTelemetryMetadata,
+      );
+
+      deps.logger?.error(
+        "Tool call failed",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          ...traceContextToLogContext(traceContext),
+          durationMs,
+          event: "tool.call.failed",
+          module: "core.tool.executor",
+          status: "failed",
+          toolCallId: canonicalToolCall.id,
+          toolName: canonicalToolCall.name,
+        },
+      );
+
+      if (options?.signal?.aborted || result.error?.type === CoreErrorType.ToolCancelled) {
+        telemetry?.finishCancelled("abort_signal");
+      } else {
+        telemetry?.finishFailed(
+          failureStage,
+          errorCategoryForToolError(result.error?.type),
+          // 原始异常只交给 Telemetry 做受控脱敏；result.error 是面向业务协议重新包装后的错误，
+          // 不能覆盖 Trace 中用于定位根因的 source message/type/code。
+          error,
+        );
+      }
+      return result;
+    } finally {
+      unlinkParentAbort();
     }
-    return result;
   } finally {
-    unlinkParentAbort();
+    lifetime?.release();
   }
 }
 

@@ -40,7 +40,7 @@ import type { CompileDiagnostic, WorkflowProgram } from "../compiler/compile.js"
 import type { SiteTable } from "./sites.js";
 
 /** 两处字面量同名（子句 1）。9001 = facade-siting、9002 = schema、9003 = world-run、9004 = phase。 */
-const DUPLICATE_ACTOR_NAME_CODE = 9005;
+export const DUPLICATE_ACTOR_NAME_CODE = 9005;
 
 /**
  * fan-out 体内的静态名（子句 2），单独一个码而不是复用 9005。
@@ -145,7 +145,9 @@ function staticEffectiveName(call: ts.CallExpression): string | undefined {
       if (property.name !== undefined && ts.isComputedPropertyName(property.name)) return undefined;
       if (property.name === undefined || !isNameKey(property.name)) continue;
       if (!ts.isPropertyAssignment(property)) return undefined; // shorthand / 方法：动态
-      return ts.isStringLiteralLike(property.initializer) ? property.initializer.text : undefined;
+      return ts.isStringLiteralLike(property.initializer)
+        ? property.initializer.text
+        : undefined;
     }
     // 对象字面量里没有 name，落回 name 实参。
   }

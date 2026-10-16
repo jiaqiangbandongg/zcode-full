@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-availability-fallback",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-availability-fallback.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-availability-fallback.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-availability-fallback-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于模型 fallback 语义，只需稳定完成，避免误命中主流程 fixture。"
+    },
+    {
+      "id": "model-availability-fallback-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言从已完成的 source session 禁用 provider 后开始；首轮响应只需稳定完成。"
+    },
+    {
+      "id": "model-availability-fallback-target",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在真实续发请求的 target provider/model 与 UI 投影；响应只需稳定完成。"
+    },
+    {
+      "id": "model-availability-fallback-draft-target",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "I61 核心断言是未发送 prewarm fallback 后的首次真实请求继续使用 target provider/model；响应文本只需稳定完成。"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-goal-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-goal-queue-base-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "goal/text 混合 queue 需要当前轮保持 running；真实 provider 过快完成会让输入不再进入队列。"
+    },
+    {
+      "id": "upstream-goal-queue-order-base-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "queued goal 顺序消费前需要基础轮保持 running；真实 provider 过快完成会跳过 held queue 语义。"
+    },
+    {
+      "id": "upstream-goal-queue-order-first-continuation-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "测试需要在第一条 queued goal 已成为 active target 且仍 streaming 时验证可 stop。"
+    },
+    {
+      "id": "upstream-goal-queue-order-second-continuation-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "测试需要在第二条 queued goal 覆盖第一目标且仍 streaming 时验证最终 queue 清空。"
+    },
+    {
+      "id": "upstream-goal-queue-first-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "running 中 /goal 只进入本地 queue；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-goal-queue-text-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "running 中普通文本只进入本地 queue；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-goal-queue-second-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "running 中第二条 /goal 只进入本地 queue；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-goal-queue-second-edited-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "queue edit 只改本地队列项，不应触发 provider；fixture 只覆盖 marker 合同。"
+    }
+  ]
+}

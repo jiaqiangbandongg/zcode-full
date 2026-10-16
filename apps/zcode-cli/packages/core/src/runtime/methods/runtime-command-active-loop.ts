@@ -10,7 +10,7 @@ import { persistSubagentMessageCommand } from "./subagent-messages.js";
 import { isStaleBranchRuntimeCommand } from "./runtime-command-generation.js";
 import { createRuntimeUserEntry, type RuntimeMessageEntry } from "../../agent/message-history.js";
 
-interface ActiveLoopRuntimeCommandDrainResult {
+export interface ActiveLoopRuntimeCommandDrainResult {
   backgroundSubagentResultConsumed: boolean;
   workflowResultConsumed: boolean;
   consumedCommandIds: RuntimeCommandId[];

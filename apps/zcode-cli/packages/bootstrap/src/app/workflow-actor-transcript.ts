@@ -76,7 +76,7 @@ export async function countActorTranscript(
  *      只装着种子消息的会话是一截「复制到一半」的前缀，照旧补齐；装着别的东西的会话有自己的
  *      历史，一个字节都不许动。
  *
- *    第二条用于防止**边界增长后再次复制**：`inFlight.messageBoundary` 取自
+ *    第二条是 2026-09-19 补的，根因不是崩溃而是**边界会长大**：`inFlight.messageBoundary` 取自
  *    前驱会话此刻的消息条数，是导入缓存里唯一一个不是 journal 事实的数（见
  *    dynamic-workflow-import.ts 的文件头）。它在两次构建之间变大时（前驱被重新 resume 过又写了
  *    几轮，或者一条迟到的后台通知消息落了进去），修订 run 的一次普通「停止 → resume」就会带着

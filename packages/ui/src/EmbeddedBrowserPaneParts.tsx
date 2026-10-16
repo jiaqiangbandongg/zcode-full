@@ -44,6 +44,7 @@ import { runUserAction } from "@/lib/userActionTelemetry.js";
 export function BrowserToolbar({
   addressValue,
   browserState,
+  permissionControl,
   formatMessage,
   onAddressChange,
   onGoBack,
@@ -59,6 +60,8 @@ export function BrowserToolbar({
 }: {
   addressValue: string;
   browserState: BrowserState;
+  /** 地址栏左侧的站点设置入口；聚焦编辑 URL 时隐藏但不卸载。 */
+  permissionControl?: ReactNode;
   formatMessage: (descriptor: { id: string }) => string;
   onAddressChange: (value: string) => void;
   onGoBack: () => void;
@@ -105,16 +108,25 @@ export function BrowserToolbar({
         dataTestId={TID_BROWSER_REFRESH_BUTTON}
         onClick={onReload}
       />
-      <Input
-        type="text"
-        value={addressValue}
-        data-testid={TID_BROWSER_ADDRESS_INPUT}
-        size="sm"
-        className="h-7 rounded-lg"
-        onChange={(event) => onAddressChange(event.target.value)}
-        placeholder={formatMessage({ id: "browser.addressPlaceholder" })}
-        spellCheck={false}
-      />
+      <div
+        className="group/browser-address relative min-w-0 flex-1"
+        data-testid="browser-address-bar"
+      >
+        <Input
+          type="text"
+          value={addressValue}
+          data-testid={TID_BROWSER_ADDRESS_INPUT}
+          size="sm"
+          className="h-8 rounded-full px-14 text-center focus:px-3 focus:text-left"
+          onChange={(event) => onAddressChange(event.target.value)}
+          placeholder={formatMessage({ id: "browser.addressPlaceholder" })}
+          spellCheck={false}
+        />
+        {/* 编辑 URL 时隐藏入口但不卸载，避免将隐藏图标误当成关闭权限申请。 */}
+        <div className="absolute top-1/2 left-0.5 -translate-y-1/2 group-has-[input:focus]/browser-address:hidden">
+          {permissionControl}
+        </div>
+      </div>
       <BrowserIconButton
         icon={<MonitorSmartphone className="h-4 w-4" />}
         title={formatMessage({

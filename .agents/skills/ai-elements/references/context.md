@@ -36,58 +36,58 @@ npx ai-elements@latest add context
 
 ### `<Context />`
 
-| Prop         | Type                        | Default | Description                                                                               |
-| ------------ | --------------------------- | ------- | ----------------------------------------------------------------------------------------- |
-| `maxTokens`  | `number`                    | -       | The total context window size in tokens.                                                  |
-| `usedTokens` | `number`                    | -       | The number of tokens currently used.                                                      |
-| `usage`      | `LanguageModelUsage`        | -       | Detailed token usage breakdown from the AI SDK (input, output, reasoning, cached tokens). |
-| `modelId`    | `ModelId`                   | -       | Model identifier for cost calculation (e.g.,                                              |
-| `...props`   | `ComponentProps<HoverCard>` | -       | Any other props are spread to the HoverCard component.                                    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `maxTokens` | `number` | - | The total context window size in tokens. |
+| `usedTokens` | `number` | - | The number of tokens currently used. |
+| `usage` | `LanguageModelUsage` | - | Detailed token usage breakdown from the AI SDK (input, output, reasoning, cached tokens). |
+| `modelId` | `ModelId` | - | Model identifier for cost calculation (e.g.,  |
+| `...props` | `ComponentProps<HoverCard>` | - | Any other props are spread to the HoverCard component. |
 
 ### `<ContextTrigger />`
 
-| Prop       | Type                     | Default | Description                                                                                 |
-| ---------- | ------------------------ | ------- | ------------------------------------------------------------------------------------------- |
-| `children` | `React.ReactNode`        | -       | Custom trigger element. If not provided, renders a default button with percentage and icon. |
-| `...props` | `ComponentProps<Button>` | -       | Props spread to the default button element.                                                 |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom trigger element. If not provided, renders a default button with percentage and icon. |
+| `...props` | `ComponentProps<Button>` | - | Props spread to the default button element. |
 
 ### `<ContextContent />`
 
-| Prop        | Type                               | Default | Description                                        |
-| ----------- | ---------------------------------- | ------- | -------------------------------------------------- |
-| `className` | `string`                           | -       | Additional CSS classes for the hover card content. |
-| `...props`  | `ComponentProps<HoverCardContent>` | -       | Props spread to the HoverCardContent component.    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `className` | `string` | - | Additional CSS classes for the hover card content. |
+| `...props` | `ComponentProps<HoverCardContent>` | - | Props spread to the HoverCardContent component. |
 
 ### `<ContextContentHeader />`
 
-| Prop       | Type                  | Default | Description                                                                                   |
-| ---------- | --------------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `children` | `React.ReactNode`     | -       | Custom header content. If not provided, renders percentage and token count with progress bar. |
-| `...props` | `ComponentProps<div>` | -       | Props spread to the header div element.                                                       |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom header content. If not provided, renders percentage and token count with progress bar. |
+| `...props` | `ComponentProps<div>` | - | Props spread to the header div element. |
 
 ### `<ContextContentBody />`
 
-| Prop       | Type                  | Default | Description                                                    |
-| ---------- | --------------------- | ------- | -------------------------------------------------------------- |
-| `children` | `React.ReactNode`     | -       | Body content, typically containing usage breakdown components. |
-| `...props` | `ComponentProps<div>` | -       | Props spread to the body div element.                          |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Body content, typically containing usage breakdown components. |
+| `...props` | `ComponentProps<div>` | - | Props spread to the body div element. |
 
 ### `<ContextContentFooter />`
 
-| Prop       | Type                  | Default | Description                                                                          |
-| ---------- | --------------------- | ------- | ------------------------------------------------------------------------------------ |
-| `children` | `React.ReactNode`     | -       | Custom footer content. If not provided, renders total cost when modelId is provided. |
-| `...props` | `ComponentProps<div>` | -       | Props spread to the footer div element.                                              |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom footer content. If not provided, renders total cost when modelId is provided. |
+| `...props` | `ComponentProps<div>` | - | Props spread to the footer div element. |
 
 ### Usage Components
 
 All usage components (`ContextInputUsage`, `ContextOutputUsage`, `ContextReasoningUsage`, `ContextCacheUsage`) share the same props:
 
-| Prop        | Type                  | Default | Description                                                                                  |
-| ----------- | --------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `children`  | `React.ReactNode`     | -       | Custom content. If not provided, renders token count and cost for the respective usage type. |
-| `className` | `string`              | -       | Additional CSS classes.                                                                      |
-| `...props`  | `ComponentProps<div>` | -       | Props spread to the div element.                                                             |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom content. If not provided, renders token count and cost for the respective usage type. |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `ComponentProps<div>` | - | Props spread to the div element. |
 
 ## Component Architecture
 

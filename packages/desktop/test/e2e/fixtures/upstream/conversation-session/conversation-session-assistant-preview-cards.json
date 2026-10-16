@@ -1,0 +1,500 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-assistant-preview-cards",
+  "spec": "./test/e2e/conversation-session/conversation-session-assistant-preview-cards.test.ts",
+  "fixtures": [
+    {
+      "id": "assistant-preview-cards-title",
+      "description": "Assistant Preview Cards 各独立 task 的标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于预览卡片产品语义，只需避免 sidecar 请求误命中业务 fixture。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_ASSISTANT_PREVIEW_CARDS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Assistant Preview Cards E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-local-url",
+      "description": "APC01/APC04 输出两次同一本地 URL，验证完成态去重和 Browser 打开。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 assistant 文本中的动态随机端口 URL，稳定验证卡片投影和 Browser side pane。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_ASSISTANT_PREVIEW_CARDS_LOCAL_URL",
+          "E2E_BROWSER_FIXTURE_URL:"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-local-url",
+          "inputTokens": 96,
+          "outputTokens": 20,
+          "text": "[APC Local Preview]({{browserFixtureUrl}})\n再次打开 {{browserFixtureUrl}}。\nE2E_ASSISTANT_PREVIEW_CARDS_LOCAL_URL_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-interrupted",
+      "description": "APC02 在首段 URL 到达后保持流打开，供 spec 点击 Stop。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "interrupted 卡片必须在可重复的半流窗口中触发 Stop，普通 fast-text 无法提供该边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_INTERRUPTED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"assistant-preview-cards-interrupted\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 200,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"E2E_ASSISTANT_PREVIEW_CARDS_INTERRUPTED_EARLY http://localhost:41789/assistant-preview-stream\"}}\n\n"
+          },
+          {
+            "offsetMs": 20000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" E2E_ASSISTANT_PREVIEW_CARDS_INTERRUPTED_LATE\"}}\n\n"
+          },
+          {
+            "offsetMs": 20100,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 20200,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":96,\"output_tokens\":20,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 20300,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "assistant-preview-cards-streaming",
+      "description": "APC03 先输出 URL，再延迟正常完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "需要在 assistant text 已可见但 row 尚未 terminal 时断言没有卡片。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_STREAMING"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"assistant-preview-cards-streaming\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 200,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"E2E_ASSISTANT_PREVIEW_CARDS_STREAMING_EARLY http://localhost:41789/assistant-preview-stream\"}}\n\n"
+          },
+          {
+            "offsetMs": 5000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" E2E_ASSISTANT_PREVIEW_CARDS_STREAMING_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 5100,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 5200,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":96,\"output_tokens\":20,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 5300,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "assistant-preview-cards-suppression-write",
+      "description": "APC04 真实 Write HTML，确保 localhost 全局抑制不是因为缺少 fileChanges。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 Write 工具选择以建立本轮 active HTML fileChanges。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_LOCAL_SUPPRESSES_HTML"],
+        "bodyExcludes": ["Generate a concise title", "toolu_apc_suppression_write"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_apc_suppression_write",
+          "name": "Write",
+          "input": {
+            "file_path": "assistant-preview-e2e/本轮 输出/index 页面.html",
+            "content": "<!doctype html><html><body>APC04_HTML_PAGE</body></html>"
+          }
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-suppression-final",
+      "description": "APC04 同轮输出 localhost 和已 Write 的 HTML。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定现有业务语义：任一本地 HTTP URL 都抑制同轮全部 HTML 卡片。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASSISTANT_PREVIEW_CARDS_LOCAL_SUPPRESSES_HTML",
+          "toolu_apc_suppression_write"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-suppression-final",
+          "inputTokens": 120,
+          "outputTokens": 24,
+          "text": "[APC Local Only]({{browserFixtureUrl}})\n再次访问 {{browserFixtureUrl}}。\n已生成 assistant-preview-e2e/本轮 输出/index 页面.html。\nE2E_ASSISTANT_PREVIEW_CARDS_LOCAL_SUPPRESSES_HTML_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-office-pptx",
+      "description": "APC06/APC07 输出预置 stale source、Office/PDF 及一个缺失 PDF；本轮包含 PPTX 自动打开。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定给出 Unicode/空格文件引用和出现顺序，文件存在性与 renderer 仍走真实产品链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_OFFICE_PPTX"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-office-pptx",
+          "inputTokens": 128,
+          "outputTokens": 48,
+          "text": "assistant-preview-e2e/stale/旧 页面.html\nassistant-preview-e2e/stale/旧 说明.md\nassistant-preview-e2e/office/项目 简介.docx\nassistant-preview-e2e/office/年度 总结.xlsx\nassistant-preview-e2e/office/产品 路线.pptx\nassistant-preview-e2e/office/审计 报告.pdf\nassistant-preview-e2e/office/不存在.pdf\nE2E_ASSISTANT_PREVIEW_CARDS_OFFICE_PPTX_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-audio",
+      "description": "APC12 独立消息只输出预置 WAV 媒体文件。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "将音频从 PPTX 自动打开轮拆出，避免 side pane active tab 竞争。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_OFFICE_AUDIO"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-audio",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "assistant-preview-e2e/media/生成 音频.wav\nE2E_ASSISTANT_PREVIEW_CARDS_OFFICE_AUDIO_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-video",
+      "description": "APC12 独立消息只输出预置 MP4 媒体文件。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "将视频从 PPTX 自动打开轮拆出，避免 side pane active tab 竞争。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_OFFICE_VIDEO"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-video",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "assistant-preview-e2e/media/生成 视频.mp4\nE2E_ASSISTANT_PREVIEW_CARDS_OFFICE_VIDEO_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-max-ten",
+      "description": "APC08 输出 12 个均存在的 PDF，验证逆序最多 10 张。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定候选数量和文本顺序，真实存在性继续由 Host stat 决定。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_MAX_TEN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-max-ten",
+          "inputTokens": 128,
+          "outputTokens": 64,
+          "text": "assistant-preview-e2e/bounds/max-01.pdf\nassistant-preview-e2e/bounds/max-02.pdf\nassistant-preview-e2e/bounds/max-03.pdf\nassistant-preview-e2e/bounds/max-04.pdf\nassistant-preview-e2e/bounds/max-05.pdf\nassistant-preview-e2e/bounds/max-06.pdf\nassistant-preview-e2e/bounds/max-07.pdf\nassistant-preview-e2e/bounds/max-08.pdf\nassistant-preview-e2e/bounds/max-09.pdf\nassistant-preview-e2e/bounds/max-10.pdf\nassistant-preview-e2e/bounds/max-11.pdf\nassistant-preview-e2e/bounds/max-12.pdf\nE2E_ASSISTANT_PREVIEW_CARDS_MAX_TEN_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-no-backfill",
+      "description": "APC08 输出 16 个 PDF；逆序前 15 个仅 9 个存在，第 16 个候选存在但不得回填。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 15 候选边界和缺失分布，验证产品不会为了凑满 10 张继续探测。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_NO_BACKFILL"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-no-backfill",
+          "inputTokens": 128,
+          "outputTokens": 72,
+          "text": "assistant-preview-e2e/bounds/nofill-01.pdf\nassistant-preview-e2e/bounds/nofill-02.pdf\nassistant-preview-e2e/bounds/nofill-03.pdf\nassistant-preview-e2e/bounds/nofill-04.pdf\nassistant-preview-e2e/bounds/nofill-05.pdf\nassistant-preview-e2e/bounds/nofill-06.pdf\nassistant-preview-e2e/bounds/nofill-07.pdf\nassistant-preview-e2e/bounds/nofill-08.pdf\nassistant-preview-e2e/bounds/nofill-09.pdf\nassistant-preview-e2e/bounds/nofill-10.pdf\nassistant-preview-e2e/bounds/nofill-11.pdf\nassistant-preview-e2e/bounds/nofill-12.pdf\nassistant-preview-e2e/bounds/nofill-13.pdf\nassistant-preview-e2e/bounds/nofill-14.pdf\nassistant-preview-e2e/bounds/nofill-15.pdf\nassistant-preview-e2e/bounds/nofill-16.pdf\nE2E_ASSISTANT_PREVIEW_CARDS_NO_BACKFILL_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-source-write-html",
+      "description": "APC05/APC09/APC11 首步真实 Write Unicode/空格 HTML。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 Write 工具选择，建立可持久化的当前轮 HTML fileChanges。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD"],
+        "bodyExcludes": ["Generate a concise title", "toolu_apc_source_write_html"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_apc_source_write_html",
+          "name": "Write",
+          "input": {
+            "file_path": "assistant-preview-e2e/本轮 输出/index 页面.html",
+            "content": "<!doctype html><html><head><title>APC05 HTML</title></head><body>APC05_HTML_PAGE</body></html>"
+          }
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-source-write-markdown",
+      "description": "APC05/APC09/APC11 第二步真实 Write Unicode/空格 Markdown。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定第二次 Write，确保 HTML/Markdown 都属于同一 turn 的 active fileChanges。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD",
+          "toolu_apc_source_write_html"
+        ],
+        "bodyExcludes": ["Generate a concise title", "toolu_apc_source_write_markdown"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_apc_source_write_markdown",
+          "name": "Write",
+          "input": {
+            "file_path": "assistant-preview-e2e/本轮 输出/说明 文档.md",
+            "content": "# Assistant Preview Markdown\n\nAPC05 Markdown renderer marker\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-source-auto-compact",
+      "description": "APC05/APC09 双 Write 后的自动 compact 固定保留文件变更上下文。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E provider 的极小 context window 会在第二次 Write 后触发自动 compact；固定 summary，避免 replay 缺口打断文件预览与 cold resume 语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-source-auto-compact",
+          "inputTokens": 200,
+          "outputTokens": 56,
+          "text": "<analysis>Both workspace files were written successfully.</analysis>\n\n<summary>E2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD created toolu_apc_source_write_html and toolu_apc_source_write_markdown for assistant-preview-e2e/本轮 输出/index 页面.html and assistant-preview-e2e/本轮 输出/说明 文档.md. Report both files in that order.</summary>"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-source-final",
+      "description": "APC05/APC09 最终按 HTML 后 Markdown 的顺序输出路径。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定文本顺序，验证卡片逆序、打开目标和 cold resume 重建。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD",
+          "toolu_apc_source_write_markdown"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-source-final",
+          "inputTokens": 160,
+          "outputTokens": 32,
+          "text": "已生成 assistant-preview-e2e/本轮 输出/index 页面.html。\n已生成 [说明 文档](assistant-preview-e2e/本轮 输出/说明 文档.md)。\nE2E_ASSISTANT_PREVIEW_CARDS_SOURCE_AND_COLD_DONE"
+        }
+      }
+    },
+    {
+      "id": "assistant-preview-cards-parking",
+      "description": "APC09/APC11 切换或冷恢复前创建另一条已完成 parking session。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "冷启动后显式选择目标历史 task，避免把自动恢复当前 task 误算成 cold resume 证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASSISTANT_PREVIEW_CARDS_PARKING"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "assistant-preview-cards-parking",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_ASSISTANT_PREVIEW_CARDS_PARKING_DONE"
+        }
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import {
   materializeZCodeBuiltinProviderConfig,
   getAppConfigDir,
   ZCODE_BUILTIN_PROVIDER_CONFIG_FILE_ENV,
+  createTopicResourcePeers,
 } from "@zcode/services/node";
 import { IZCodeAgentService } from "@zcode/services";
 import { ZCODE_VERSION } from "@zcode/shared";
@@ -22,6 +23,7 @@ export async function runServerCore(generation: number): Promise<void> {
     if (shutdown) void shutdown("parent-disconnected");
     else parentDisconnected = true;
   });
+  const topicResourcePeers = createTopicResourcePeers();
   const explicitZCodeBuiltinProviderConfigFilePath =
     process.env[ZCODE_BUILTIN_PROVIDER_CONFIG_FILE_ENV]?.trim();
   const zcodeBuiltinProviderConfigFilePath = explicitZCodeBuiltinProviderConfigFilePath
@@ -40,9 +42,13 @@ export async function runServerCore(generation: number): Promise<void> {
   const services = createLocalServices({
     zcodeBuiltinProviderConfigFilePath,
     serviceAuthorityMode: "standalone-server",
+    topicResourceRelayChannel: (request) => topicResourcePeers.getChannel(request),
   });
   const taskActivityTracker = createTaskActivityTracker(services.getOptional(IZCodeAgentService));
-  const http = await createCoreHttpServer(services, { serverId: await resolveCoreServerId() });
+  const http = await createCoreHttpServer(services, {
+    serverId: await resolveCoreServerId(),
+    topicResourcePeers,
+  });
   const send = (message: unknown): Promise<void> => {
     if (typeof process.send !== "function" || process.connected === false) return Promise.resolve();
     return new Promise((resolve) => {

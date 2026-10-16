@@ -7,7 +7,7 @@
  * import 这些类型，保证桥接代码有严格类型。
  *
  * 方向约定：
- *   child → parent：create-actor（即发即忘）/ request（ask/world-read/publish-artifact，需应答）/
+ *   child → parent：create-actor（即发即忘）/ request（ask/world-read/publish-artifact/hole，需应答）/
  *                   event（log、report、declare-artifact）/ complete
  *   parent → child：response（应答 request，并搭载最新预算快照）
  *
@@ -60,12 +60,20 @@ export interface CreateActorMessage {
 export interface RequestMessage {
   kind: "request";
   id: string;
-  type: "ask" | "world-read" | "publish-artifact";
+  /**
+   * `hole`：脚本到达一处未补全的留白（docs/execution-engine.md「Holes」）。父进程经引擎把它停下，
+   * 直到主代理补全，再以 `{code}` 应答；停驻的分支是一条在飞请求，兄弟分支照跑、停滞检测不响。
+   */
+  type: "ask" | "world-read" | "publish-artifact" | "hole";
   siteId: string;
   /** ask 专属：child-local actor 句柄。 */
   actor?: string;
   /** ask 专属：指令正文。 */
   instructions?: string;
+  /** hole 专属：留白的字面名。 */
+  name?: string;
+  /** hole 专属：给主代理的提示（引擎记录前截到 4000 字符）。缺席即作者没写。 */
+  prompt?: string;
   /** world-read 专属：op（词汇表由 world-read 注册表推导，加原语不改本文件）。 */
   op?: WorldReadOp;
   /**

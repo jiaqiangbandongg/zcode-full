@@ -12,11 +12,12 @@ import {
   type FinalArmsCustomEventE2EController,
 } from "./desktopArmsCustomEvent.js";
 
-const REMOTE_USAGE_ARMS_GROUP = "remote_usage";
-const REMOTE_USAGE_ARMS_EVENT_CONNECT_RESULT = "remote_connect_result";
-const REMOTE_USAGE_ARMS_EVENT_ACTIVE_SESSION_COUNT = "remote_active_session_count";
-const REMOTE_USAGE_ARMS_EVENT_DISCONNECT = "remote_disconnect";
-const REMOTE_USAGE_GAUGE_INTERVAL_MS = 300_000;
+export const REMOTE_USAGE_ARMS_GROUP = "remote_usage";
+export const REMOTE_USAGE_ARMS_EVENT_CONNECT_RESULT = "remote_connect_result";
+export const REMOTE_USAGE_ARMS_EVENT_ACTIVE_SESSION_COUNT =
+  "remote_active_session_count";
+export const REMOTE_USAGE_ARMS_EVENT_DISCONNECT = "remote_disconnect";
+export const REMOTE_USAGE_GAUGE_INTERVAL_MS = 300_000;
 
 export interface RemoteConnectionStats {
   activeSessionCount: number;
@@ -32,7 +33,10 @@ export type RemoteGaugeTransition =
   | "app-shutdown"
   | "none";
 
-export type RemoteDisconnectReason = Exclude<RemoteGaugeTransition, "connected" | "none">;
+export type RemoteDisconnectReason = Exclude<
+  RemoteGaugeTransition,
+  "connected" | "none"
+>;
 
 interface RemoteUsageArmsTelemetryConfig {
   armsCustomContext: {
@@ -45,7 +49,10 @@ interface RemoteUsageArmsTelemetryConfig {
   sendCustom: (payload: FinalArmsCustomEventPayload) => void;
   e2eController?: FinalArmsCustomEventE2EController | null;
   logger: { warn: (...args: unknown[]) => void };
-  setInterval?: (callback: () => void, delayMs: number) => ReturnType<typeof setInterval>;
+  setInterval?: (
+    callback: () => void,
+    delayMs: number,
+  ) => ReturnType<typeof setInterval>;
   clearInterval?: (timer: ReturnType<typeof setInterval>) => void;
 }
 
@@ -53,7 +60,7 @@ let telemetryConfig: RemoteUsageArmsTelemetryConfig | null = null;
 let periodicTimer: ReturnType<typeof setInterval> | null = null;
 let lastGaugeRendererId: number | null = null;
 
-function buildRemoteConnectResultArmsPayload(params: {
+export function buildRemoteConnectResultArmsPayload(params: {
   result: RemoteUsageResult;
   remoteKind: RemoteUsageRemoteKind;
   connectTrigger: RemoteWorkspaceConnectTrigger;
@@ -67,12 +74,13 @@ function buildRemoteConnectResultArmsPayload(params: {
       result: params.result,
       remote_kind: params.remoteKind,
       connect_trigger: params.connectTrigger,
-      error_category: params.result === "success" ? "" : (params.errorCategory ?? "unknown"),
+      error_category:
+        params.result === "success" ? "" : (params.errorCategory ?? "unknown"),
     },
   };
 }
 
-function buildRemoteActiveSessionCountArmsPayload(
+export function buildRemoteActiveSessionCountArmsPayload(
   params: {
     sampleReason: "state-change" | "periodic";
     transition: RemoteGaugeTransition;
@@ -93,7 +101,7 @@ function buildRemoteActiveSessionCountArmsPayload(
   };
 }
 
-function buildRemoteDisconnectArmsPayload(params: {
+export function buildRemoteDisconnectArmsPayload(params: {
   remoteKind: RemoteUsageRemoteKind;
   disconnectReason: RemoteDisconnectReason;
   durationMs: number;
@@ -110,7 +118,9 @@ function buildRemoteDisconnectArmsPayload(params: {
   };
 }
 
-export function configureRemoteUsageArmsTelemetry(config: RemoteUsageArmsTelemetryConfig): void {
+export function configureRemoteUsageArmsTelemetry(
+  config: RemoteUsageArmsTelemetryConfig,
+): void {
   stopRemoteUsageArmsPeriodicSampling();
   telemetryConfig = config;
   const schedule = config.setInterval ?? setInterval;
@@ -118,7 +128,10 @@ export function configureRemoteUsageArmsTelemetry(config: RemoteUsageArmsTelemet
   periodicTimer.unref?.();
 }
 
-function dispatchSafely(rendererId: number, payload: ArmsCustomEventPayload): void {
+function dispatchSafely(
+  rendererId: number,
+  payload: ArmsCustomEventPayload,
+): void {
   const config = telemetryConfig;
   if (!config) return;
   try {
@@ -143,7 +156,10 @@ export function reportRemoteConnectResultToArms(params: {
   connectTrigger: RemoteWorkspaceConnectTrigger;
   errorCategory?: RemoteUsageErrorCategory;
 }): void {
-  dispatchSafely(params.rendererId, buildRemoteConnectResultArmsPayload(params));
+  dispatchSafely(
+    params.rendererId,
+    buildRemoteConnectResultArmsPayload(params),
+  );
 }
 
 function reportGauge(params: {
@@ -156,7 +172,10 @@ function reportGauge(params: {
   if (!config) return;
   try {
     const stats = config.getRemoteConnectionStats();
-    dispatchSafely(params.rendererId, buildRemoteActiveSessionCountArmsPayload(params, stats));
+    dispatchSafely(
+      params.rendererId,
+      buildRemoteActiveSessionCountArmsPayload(params, stats),
+    );
   } catch (error) {
     config.logger.warn("[remote-usage-arms] read stats failed", { error });
   }
@@ -207,4 +226,10 @@ export function stopRemoteUsageArmsPeriodicSampling(): void {
   if (!timer) return;
   (telemetryConfig?.clearInterval ?? clearInterval)(timer);
   periodicTimer = null;
+}
+
+export function resetRemoteUsageArmsTelemetryForTest(): void {
+  stopRemoteUsageArmsPeriodicSampling();
+  telemetryConfig = null;
+  lastGaugeRendererId = null;
 }

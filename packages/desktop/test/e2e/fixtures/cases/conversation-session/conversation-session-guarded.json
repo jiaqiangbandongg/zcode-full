@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-guarded",
+  "spec": "./test/e2e/conversation-session/conversation-session-guarded.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-guarded.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-guarded",
+      "source": "created-by-spec",
+      "description": "隔离目标、Bash 执行哨兵和一次批准测试；after 清理。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "guarded-title",
+      "description": "Guarded case-local title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离模式及审批 E2E 的标题 sidecar，不依赖真实模型。"
+    },
+    {
+      "id": "E2E_GUARDED_RM-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_RM-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_STORAGE-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_STORAGE-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_RESET-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_RESET-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_CLEAN-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_CLEAN-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_PUSH-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_PUSH-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_DISCARD-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_DISCARD-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_STASH-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_STASH-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_WORKTREE-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_WORKTREE-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_RSYNC-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_RSYNC-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_ALLOW-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_ALLOW-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_YOLO-call",
+      "description": "Guarded Bash tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+    },
+    {
+      "id": "E2E_GUARDED_YOLO-final",
+      "description": "Provider-visible tool result continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_PRESET-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_PRESET-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_CUSTOM-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_CUSTOM-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_EMPTY-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_EMPTY-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_DENY-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_DENY-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_PARENT-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_CHILD-call",
+      "description": "Guarded real interaction",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_CHILD-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    },
+    {
+      "id": "E2E_GUARDED_PARENT-final",
+      "description": "Guarded provider-visible continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+    }
+  ]
+}

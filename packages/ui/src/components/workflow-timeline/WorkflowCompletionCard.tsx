@@ -46,6 +46,13 @@ export interface WorkflowCompletionCardProps {
   renderPreview?: (artifact: WorkflowCompletionArtifact) => ReactNode;
   onOpenRun?: () => void;
   onOpenArtifact?: (artifactId: string) => void;
+  /**
+   * 表头状态之前的插槽：「已保存」芯片（docs/dynamic-workflow/transcript-and-notifications.md
+   * 「Saving the run, and running it again」）。宿主建，卡只摆。
+   */
+  headerLeading?: ReactNode;
+  /** 表头 ⤢ 之前的插槽：「保存」/「再次运行」。缺席即这张卡没有会话上下文，或两道门关着。 */
+  headerTrailing?: ReactNode;
   testIdKey: string;
 }
 
@@ -155,6 +162,8 @@ export function WorkflowCompletionCard({
   artifacts,
   artifactsTruncated = false,
   figures,
+  headerLeading,
+  headerTrailing,
   name,
   onOpenArtifact,
   onOpenRun,
@@ -195,7 +204,9 @@ export function WorkflowCompletionCard({
   return (
     <section
       aria-label={format({ id: WORKFLOW_RUN_KIND_ID.completed })}
-      className="wf-motion wf-arrive flex w-full min-w-0 flex-col gap-2.5 rounded-xl border border-border/70 bg-card/70 px-3.5 pb-3 pt-1.5"
+      // `@container/wf-card`：窄卡（<480px）上动词只剩图标——判据必须是**卡自己的宽度**，
+      // 视口断点在分栏、侧板与手机三种窄法之间对不上（docs/dynamic-workflow/transcript-and-notifications.md）。
+      className="wf-motion wf-arrive @container/wf-card flex w-full min-w-0 flex-col gap-2.5 rounded-xl border border-border/70 bg-card/70 px-3.5 pb-3 pt-1.5"
       data-testid={`workflow-completion-card-${testIdKey}`}
       data-workflow-completion-card="true"
     >
@@ -204,6 +215,8 @@ export function WorkflowCompletionCard({
         kind={format({ id: WORKFLOW_RUN_KIND_ID.completed })}
         name={name}
         status={<WorkflowRunStatus status="completed" testId="workflow-completion-status" />}
+        {...(headerLeading === undefined ? {} : { leading: headerLeading })}
+        {...(headerTrailing === undefined ? {} : { trailing: headerTrailing })}
         {...(onOpenRun === undefined ? {} : { onOpenDetails: onOpenRun })}
       />
       <WorkflowCompletionArtifacts

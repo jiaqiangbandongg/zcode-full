@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-pasted-image-path-edge-cases",
+  "spec": "./test/e2e/conversation-session/conversation-session-pasted-image-path-edge-cases.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-pasted-image-path-edge-cases.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode/cli/image-cache/<session>/image-*.png",
+      "source": "created-by-spec",
+      "description": "T16 首轮成功后删除真实派生图片，随后连同同 session 的 durable data URL artifact 一起删除。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "pasted-image-edge-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题内容不属于 T15-T17 语义；只需把三个首轮 title sidecar 与 provider-visible 功能请求隔离。"
+    },
+    {
+      "id": "pasted-image-edge-unknown",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；E2E 通过真实 PNG paste 和 requestJson 结构化断言 unknown capability 保留 image + path。"
+    },
+    {
+      "id": "pasted-image-edge-failure-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首轮响应只建立含 durable image 与派生 path 的 completed 历史；T16 核心断言发生在删除两类文件后的无 provider follow-up。"
+    },
+    {
+      "id": "pasted-image-edge-bmp-image",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；E2E 抓包固定有效 BMP 在 image-capable 模型中保留 image 且不追加 unsupported cache path。"
+    },
+    {
+      "id": "pasted-image-edge-bmp-text",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；E2E 抓包固定同一 BMP 历史切到 text-only 后只保留 omitted 文本且没有 image/path。"
+    }
+  ]
+}

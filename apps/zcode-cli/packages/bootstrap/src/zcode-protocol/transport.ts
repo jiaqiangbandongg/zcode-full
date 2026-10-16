@@ -6,7 +6,12 @@ import type {
   ZCodeProtocolRequestId,
   ZCodeProtocolResponse,
 } from "@zcode/shared";
-import { zcodeProtocolMessageSchema, zcodeProtocolMethods } from "@zcode/shared";
+import {
+  networkCaptureControlSchema,
+  zcodeProtocolMessageSchema,
+  zcodeProtocolMethods,
+  zcodeProtocolNotifications,
+} from "@zcode/shared";
 import type { Logger } from "@zcode/contracts";
 
 type ZCodeProtocolOutgoingMessage =
@@ -20,6 +25,27 @@ type ZCodeProtocolMessageHandler = (
 ) => Promise<ZCodeProtocolOutgoingMessage | undefined>;
 
 const PROTOCOL_EOF_DRAIN_MS = 100;
+// MCP App 的请求由实例凭证和 callId 隔离；若与普通命令一起等待完成，
+// uiCallTool 会挡住自己的 cancel/close，真实 stdio 链路将死锁。
+const MCP_APP_CONCURRENT_METHODS = new Set<string>([
+  zcodeProtocolMethods.mcpReadResource,
+  zcodeProtocolMethods.mcpUiOpenInstance,
+  zcodeProtocolMethods.mcpUiCloseInstance,
+  zcodeProtocolMethods.mcpUiValidateInstance,
+  zcodeProtocolMethods.mcpUiCallTool,
+  zcodeProtocolMethods.mcpUiSampling,
+  zcodeProtocolMethods.mcpUiCancelSampling,
+  zcodeProtocolMethods.mcpUiCancelCall,
+  zcodeProtocolMethods.mcpUiReadResource,
+  zcodeProtocolMethods.mcpUiListResources,
+  zcodeProtocolMethods.mcpUiListResourceTemplates,
+  zcodeProtocolMethods.mcpUiSubscribeResource,
+  zcodeProtocolMethods.mcpUiUnsubscribeResource,
+  zcodeProtocolMethods.mcpUiRegisterAppTools,
+  zcodeProtocolMethods.mcpUiUnregisterAppTools,
+  zcodeProtocolMethods.mcpUiClaimAppToolCall,
+  zcodeProtocolMethods.mcpUiResolveAppToolCall,
+]);
 
 interface ZCodeProtocolNdjsonConnectionOptions {
   signal?: AbortSignal;
@@ -73,6 +99,15 @@ export class ZCodeProtocolNdjsonConnection {
 
   send(message: ZCodeProtocolOutgoingMessage): void {
     if (this.terminal) return;
+    // 观测可丢弃，不能在 stdout 背压时无界积压或挤占业务协议输出。
+    if (
+      "method" in message &&
+      message.method === zcodeProtocolNotifications.processNetworkRequests &&
+      ((this.options.output as NodeJS.WritableStream & { writableLength?: number })
+        .writableLength ?? 0) >=
+        256 * 1024
+    )
+      return;
     try {
       this.options.output.write(`${JSON.stringify(message)}\n`);
     } catch (error) {
@@ -159,6 +194,19 @@ export class ZCodeProtocolNdjsonConnection {
     if (!message) {
       return;
     }
+    if (
+      !("id" in message) &&
+      "method" in message &&
+      message.method === zcodeProtocolMethods.processNetworkCapture
+    ) {
+      // 启停是进程观测控制，不等待正在执行的生成任务，也不进入 CommandInbox。
+      if (networkCaptureControlSchema.safeParse(message.params).success) {
+        void this.handleMessage(message).catch(() => {
+          /* 观测失败不关闭业务连接 */
+        });
+      }
+      return;
+    }
     if ("id" in message && ("result" in message || "error" in message)) {
       // Agent 发出反向 request 前已同步登记 pending response。
       // 若 response 等待“最后一个排队请求开始”，后续普通请求会把等待点推到当前长请求之后，
@@ -228,7 +276,8 @@ export class ZCodeProtocolNdjsonConnection {
       "id" in message &&
       "method" in message &&
       (message.method === zcodeProtocolMethods.sessionStop ||
-        message.method === zcodeProtocolMethods.workspaceCancelGenerateText)
+        message.method === zcodeProtocolMethods.workspaceCancelGenerateText ||
+        MCP_APP_CONCURRENT_METHODS.has(message.method))
     );
   }
 

@@ -65,7 +65,7 @@ function canonicalizeValue(value: unknown): string {
   }
 }
 
-function canonicalizeConversationShareJson(value: unknown): string {
+export function canonicalizeConversationShareJson(value: unknown): string {
   return canonicalizeValue(value);
 }
 

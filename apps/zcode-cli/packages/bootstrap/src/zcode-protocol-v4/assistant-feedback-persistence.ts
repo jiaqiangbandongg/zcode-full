@@ -8,7 +8,7 @@ import {
   type TraceId,
 } from "@zcode/contracts";
 
-interface PersistAssistantFeedbackInput {
+export interface PersistAssistantFeedbackInput {
   sessionStore: SessionStorePort;
   eventStore: SessionEventStorePort;
   sessionId: string;

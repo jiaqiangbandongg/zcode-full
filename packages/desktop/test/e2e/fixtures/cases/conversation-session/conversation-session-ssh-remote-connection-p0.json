@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-connection-p0",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-connection-p0.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-connection-p0.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "SSH-P0-CONN-01/02 只验证真实 password SSH 的失败、重试、目录选择、identity/session、单 Host 与 secret 边界，不启动模型请求。",
+  "requests": []
+}

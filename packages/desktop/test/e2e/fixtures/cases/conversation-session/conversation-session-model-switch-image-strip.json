@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-switch-image-strip",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-switch-image-strip.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-switch-image-strip.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-switch-image-strip-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中图片历史或 GLM follow-up 业务 fixture。"
+    },
+    {
+      "id": "model-switch-image-strip-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言发生在后续切到第三方 GLM 的 provider-visible 请求；首轮响应只需稳定完成并保留含 image + local path 的 user 历史。"
+    },
+    {
+      "id": "model-switch-image-strip-glm-followup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在第三方 GLM provider-visible request 不再包含历史 image block/data URL，而是包含不支持图片输入的 omitted 文本和普通 path text；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

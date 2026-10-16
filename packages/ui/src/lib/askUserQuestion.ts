@@ -70,7 +70,8 @@ function normalizeOption(value: unknown, index: number): AskUserQuestionOption |
   }
 
   const label =
-    readString(value, ["label", "name", "title", "text", "value"]) ?? JSON.stringify(value);
+    readString(value, ["label", "name", "title", "text", "value"]) ??
+    JSON.stringify(value);
   const id = readString(value, ["id", "optionId", "value", "key"]) ?? label;
   const placeholder = readString(value, [
     "placeholder",
@@ -85,7 +86,8 @@ function normalizeOption(value: unknown, index: number): AskUserQuestionOption |
     description: readString(value, ["description", "detail", "help", "hint"]),
     placeholder,
     requiresInput:
-      readBoolean(value, CUSTOM_INPUT_FLAGS) || (index >= 0 && placeholder !== undefined),
+      readBoolean(value, CUSTOM_INPUT_FLAGS) ||
+      (index >= 0 && placeholder !== undefined),
   };
 }
 
@@ -104,8 +106,12 @@ function readQuestions(input: unknown): unknown[] {
   if (Array.isArray(questions)) {
     return questions;
   }
-  // ZCode Agent 的单题输入与交互请求的多题输入共用展示管线。
-  return typeof input.question === "string" && Array.isArray(input.options) ? [input] : [];
+  // Bugfix: ZCode Agent 的 AskUserQuestion 工具输入是单题结构：
+  // { header, question, options }，不是多题结构 { questions: [...] }。
+  // 这里把单题结构归一化成同一条 questions 管线，避免消息流工具块显示“没有可回答的问题”。
+  return typeof input.question === "string" && Array.isArray(input.options)
+    ? [input]
+    : [];
 }
 
 function readAnswers(input: unknown): ZCodeUserQuestionAnswers | undefined {
@@ -114,6 +120,24 @@ function readAnswers(input: unknown): ZCodeUserQuestionAnswers | undefined {
   }
   const answers = input.answers;
   return isPlainRecord(answers) ? answers : undefined;
+}
+
+function parseClaudeAskUserQuestionOutput(output: unknown): ZCodeUserQuestionAnswers | undefined {
+  if (typeof output !== "string" || output.trim().length === 0) {
+    return undefined;
+  }
+
+  const answers: ZCodeUserQuestionAnswers = {};
+  const answerPattern = /"([^"]+)"="([^"]*)"/g;
+  for (const match of output.matchAll(answerPattern)) {
+    const question = match[1]?.trim();
+    if (!question) {
+      continue;
+    }
+    answers[question] = match[2] ?? "";
+  }
+
+  return Object.keys(answers).length > 0 ? answers : undefined;
 }
 
 function parseJsonRecord(output: unknown): Record<string, unknown> | undefined {
@@ -132,6 +156,11 @@ function parseJsonRecord(output: unknown): Record<string, unknown> | undefined {
 }
 
 function readNestedAskUserQuestionAnswers(input: unknown): ZCodeUserQuestionAnswers | undefined {
+  const directTextAnswers = parseClaudeAskUserQuestionOutput(input);
+  if (directTextAnswers) {
+    return directTextAnswers;
+  }
+
   const record = parseJsonRecord(input);
   if (!record) {
     return undefined;
@@ -154,6 +183,11 @@ function readNestedAskUserQuestionAnswers(input: unknown): ZCodeUserQuestionAnsw
         return itemAnswers;
       }
     }
+  }
+
+  const textAnswers = parseClaudeAskUserQuestionOutput(record.text);
+  if (textAnswers) {
+    return textAnswers;
   }
 
   const rawOutputAnswers = readNestedAskUserQuestionAnswers(record.rawOutput);
@@ -233,7 +267,8 @@ function normalizeQuestion(value: unknown, index: number): AskUserQuestionItem |
             requiresInput: true,
           }
         : undefined;
-  const normalizedOptions = lastOptionIsCustomInput ? options.slice(0, -1) : options;
+  const normalizedOptions =
+    lastOptionIsCustomInput ? options.slice(0, -1) : options;
   const type =
     value.multiple === true ||
     value.multiSelect === true ||
@@ -288,6 +323,13 @@ export function readAskUserQuestionAnswers(value: {
   if (nestedOutputAnswers) {
     return nestedOutputAnswers;
   }
+  // Bugfix: Claude 历史里的 AskUserQuestion output 会落成一段文本
+  // `"问题"="答案"`，而不是结构化 answers。历史 snapshot 覆盖实时态后，
+  // 只读结果会因为读不到 answers 退回 No answer provided，这里兼容解析该格式。
+  const parsedOutputAnswers = parseClaudeAskUserQuestionOutput(value.output);
+  if (parsedOutputAnswers) {
+    return parsedOutputAnswers;
+  }
   const parsedZCodeOutputAnswers = parseZCodeAskUserQuestionOutput(
     value.output,
     readAskUserQuestionInput(value),
@@ -303,6 +345,10 @@ export function readAskUserQuestionAnswers(value: {
     if (nestedRawOutputAnswers) {
       return nestedRawOutputAnswers;
     }
+    const parsedRawOutputAnswers = parseClaudeAskUserQuestionOutput(value.raw.rawOutput);
+    if (parsedRawOutputAnswers) {
+      return parsedRawOutputAnswers;
+    }
     const parsedRawZCodeOutputAnswers = parseZCodeAskUserQuestionOutput(
       value.raw.rawOutput,
       readAskUserQuestionInput(value),
@@ -313,6 +359,10 @@ export function readAskUserQuestionAnswers(value: {
     const nestedRawAnswers = readNestedAskUserQuestionAnswers(value.raw.output);
     if (nestedRawAnswers) {
       return nestedRawAnswers;
+    }
+    const parsedRawAnswers = parseClaudeAskUserQuestionOutput(value.raw.output);
+    if (parsedRawAnswers) {
+      return parsedRawAnswers;
     }
     const parsedRawZCodeAnswers = parseZCodeAskUserQuestionOutput(
       value.raw.output,
@@ -336,7 +386,9 @@ export function getAskUserQuestionAnswerText(
 ) {
   const value = answers?.[question.question] ?? answers?.[question.id];
   if (Array.isArray(value)) {
-    const values = value.map((item) => String(item).trim()).filter((item) => item.length > 0);
+    const values = value
+      .map((item) => String(item).trim())
+      .filter((item) => item.length > 0);
     return values.length > 0 ? values.join("，") : noAnswerText;
   }
   if (typeof value === "string") {

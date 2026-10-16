@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-CR-01",
+  "classification": "synthetic",
+  "syntheticReason": "定时任务终态回推需要可控触发 complete/error，并精确断言订阅发生在 prompt 派发之前，真实 provider 时序无法稳定复现。",
+  "timing": "controlled-stream",
+  "promptMarker": "E2E_BOT_AUTOMATION_RESULT_DELIVERY"
+}

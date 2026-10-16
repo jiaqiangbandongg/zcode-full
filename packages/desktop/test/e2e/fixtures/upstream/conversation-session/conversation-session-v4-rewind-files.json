@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-rewind-files",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-rewind-files.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-rewind-files-title",
+      "description": "PV4-21/22 文件 rewind case-local 标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与 workspace rewind 语义，用通用 marker 隔离两条 case。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_V4_REWIND_FILE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-rewind-files-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Rewind Files E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-safe-read",
+      "description": "PV4-21 先 Read safe.txt，建立 Write 前 read state。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定产生可安全回滚的已有文件 checkpoint。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REWIND_FILE_SAFE"],
+        "lastUserMessageExcludes": ["E2E_V4_REWIND_FILE_SAFE_EDITED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_v4_rewind_files_safe_read"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_rewind_files_safe_read",
+          "messageId": "msg_v4_rewind_files_safe_read",
+          "name": "Read",
+          "input": { "file_path": "v4-rewind-files-e2e/safe.txt" }
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-safe-write",
+      "description": "PV4-21 Write safe.txt 并产生安全 checkpoint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "实际改文件，供组合 rewind 恢复 beforeContent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_V4_REWIND_FILE_SAFE", "safe-before"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_v4_rewind_files_safe_write"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_rewind_files_safe_write",
+          "messageId": "msg_v4_rewind_files_safe_write",
+          "name": "Write",
+          "input": {
+            "file_path": "v4-rewind-files-e2e/safe.txt",
+            "content": "safe-after\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-safe-final",
+      "description": "PV4-21 文件写入后的原分支回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "给 branch cut 提供可见旧回复证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_V4_REWIND_FILE_SAFE",
+          "The file v4-rewind-files-e2e/safe.txt has been updated successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_V4_REWIND_FILE_SAFE_EDITED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-rewind-files-safe-final",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "V4_REWIND_FILE_SAFE_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-safe-edited",
+      "description": "PV4-21 文件恢复 + branch cut 后的编辑回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确认组合命令只重发编辑后 intent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REWIND_FILE_SAFE_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-rewind-files-safe-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "V4_REWIND_FILE_SAFE_EDITED_REPLY"
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-conflict-read",
+      "description": "PV4-22 先 Read conflict.txt，建立 checkpoint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "后续外部改写将使 preview 返回 external_modified。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REWIND_FILE_CONFLICT"],
+        "lastUserMessageExcludes": ["E2E_V4_REWIND_FILE_CONFLICT_EDITED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_v4_rewind_files_conflict_read"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_rewind_files_conflict_read",
+          "messageId": "msg_v4_rewind_files_conflict_read",
+          "name": "Read",
+          "input": { "file_path": "v4-rewind-files-e2e/conflict.txt" }
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-conflict-write",
+      "description": "PV4-22 Write conflict.txt 并产生 checkpoint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "在 edit 前由测试外部改写，触发 fail-closed。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_V4_REWIND_FILE_CONFLICT", "conflict-before"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_v4_rewind_files_conflict_write"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_rewind_files_conflict_write",
+          "messageId": "msg_v4_rewind_files_conflict_write",
+          "name": "Write",
+          "input": {
+            "file_path": "v4-rewind-files-e2e/conflict.txt",
+            "content": "conflict-after\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-conflict-final",
+      "description": "PV4-22 外部修改前的原分支回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "blocked 期间必须继续可见。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_V4_REWIND_FILE_CONFLICT",
+          "The file v4-rewind-files-e2e/conflict.txt has been updated successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_V4_REWIND_FILE_CONFLICT_EDITED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-rewind-files-conflict-final",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "V4_REWIND_FILE_CONFLICT_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "v4-rewind-files-conflict-edited",
+      "description": "PV4-22 仅重置对话降级命令的回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明新 commandId preserve 只发起一次新请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REWIND_FILE_CONFLICT_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-rewind-files-conflict-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "V4_REWIND_FILE_CONFLICT_EDITED_REPLY"
+        }
+      }
+    }
+  ]
+}

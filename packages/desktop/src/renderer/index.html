@@ -60,7 +60,7 @@
         inset: 0;
         pointer-events: none;
         content: "";
-        /* 启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重。*/
+        /* 修复原因：启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重。 */
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: inherit;
       }
@@ -107,13 +107,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <div
-      id="loading"
-      class="[app-region:drag]"
-      role="status"
-      aria-busy="true"
-      aria-label="Loading..."
-    >
+    <div id="loading" class="[app-region:drag]" role="status" aria-busy="true" aria-label="Loading...">
       <div class="startup-logo-shell">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -146,7 +140,7 @@
       let animationDone = false;
       let reactReady = false;
 
-      // 主入口不能依赖动画结束后的动态 import；一旦导入路径在 Electron/Vite 下失败，
+      // 修复原因：主入口不能依赖动画结束后的动态 import；一旦导入路径在 Electron/Vite 下失败，
       // 页面会永久停在 HTML loading。这里让主入口静态加载，只把启动壳作为动画遮罩延迟移除。
       const tryFinishStartupAnimation = () => {
         if (finished || !animationDone || !reactReady) return;
@@ -166,7 +160,7 @@
       };
 
       if (isUpdateStatusWindow) {
-        // 更新状态窗口本身就是一个轻量弹窗，复用主入口 HTML 时不应再显示启动壳。
+        // Bugfix: 更新状态窗口本身就是一个轻量弹窗，复用主入口 HTML 时不应再显示启动壳。
         // 否则透明独立窗口里的启动 logo 会短暂或持续盖在更新按钮上，看起来像弹窗 UI 异常。
         finished = true;
         document.body.classList.add("zcode-startup-ready");

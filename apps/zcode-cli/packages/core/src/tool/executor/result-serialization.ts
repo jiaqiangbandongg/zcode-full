@@ -39,7 +39,7 @@ const DEFAULT_RESULT_BUDGET: ToolResultBudget = {
   },
 };
 
-const OFFICIAL_CUA_INVALID_RASTER_RECOVERY_TEXT =
+export const OFFICIAL_CUA_INVALID_RASTER_RECOVERY_TEXT =
   "This CUA raster is invalid and cannot be used in this request. " +
   "Do not send a coordinate target; capture a new raster first.";
 

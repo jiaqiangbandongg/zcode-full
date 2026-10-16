@@ -396,7 +396,11 @@ export function provisionalFanoutId(order: number): string {
  * (a sound over-approximation, never a kill), and a member that actually HOLDS a tracked
  * script-local function dispatches as an ordinary call (see evalCall's mutator branch).
  */
-export const HEAP_MUTATORS = new Set<string>(["push", "unshift", "splice", "set", "add"]);
+// `send` 是 facade `Channel<T>` 的入队（docs/dynamic-workflow/authoring.md「Streams」）：一次向容器
+// 写入，与 push / Map.set 同规——`ch.send(x)` 把 x 的 taint 并进 channel 的 place，`for await` 再从
+// place 读出，于是每个生产者到每个消费者各画一条数据边。按名字匹配（与其余 mutator 一致），
+// 脚本自己声明的 `send` 方法照旧走 calls.ts 里「成员持有脚本函数则按调用分派」的守卫。
+export const HEAP_MUTATORS = new Set<string>(["push", "unshift", "splice", "set", "add", "send"]);
 
 /**
  * Every compound-assignment token (`+=`, `-=`, … and the logical `||=`/`&&=`/`??=`).
@@ -616,6 +620,8 @@ export interface TaintFacts {
   askActor: Map<string, TaintOcc[]>;
   /** Artifact occurrences reaching each world-read argument. */
   worldReadData: Map<string, TaintOcc[]>;
+  /** Artifact occurrences reaching each OPEN hole's prompt (a sink, like an ask's instructions). */
+  holeData: Map<string, TaintOcc[]>;
   /** Artifact occurrences reaching each join, carrying the join input port. */
   joinIn: Map<string, TaintOcc[]>;
   /** Artifact occurrences reaching each promoted fan-out (provisional id). */

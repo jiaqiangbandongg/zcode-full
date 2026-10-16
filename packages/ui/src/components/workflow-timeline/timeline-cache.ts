@@ -2,7 +2,9 @@ import type { WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
 import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/types.js";
 
 /**
- * 缓存 `timeline-model.ts` 的计算结果，同一对 (graph, run) 只构建一次。
+ * 一对 (graph, run) 只建一次时间线模型（docs/dynamic-workflow/presentation.md「The timeline
+ * model」的 Cost 段）。与 `timeline-model.ts` 分住两个文件：那里是模型本身，这里只是它的
+ * 记忆，且 oxlint 的 max-lines 门在那边已经不宽裕。
  *
  * 为什么按**对象身份**做键是对的：两个输入都是不可变的协议对象——图是行上那份已校验的
  * display 载荷里的 `causalityGraph`，run 是 `workflowRuns` 投影里的一条；投影的归约与键级

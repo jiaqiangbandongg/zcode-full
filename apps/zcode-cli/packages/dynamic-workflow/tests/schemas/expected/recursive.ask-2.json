@@ -1,0 +1,27 @@
+{
+  "$defs": {
+    "Category": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent": {
+          "$ref": "#/$defs/Category"
+        }
+      },
+      "required": [
+        "name",
+        "items"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/Category"
+}

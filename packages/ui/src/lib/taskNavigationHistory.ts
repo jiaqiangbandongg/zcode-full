@@ -48,11 +48,15 @@ export function createTaskNavigationHistory(): TaskNavigationHistory {
   return { entries: [], cursor: -1 };
 }
 
-function isTaskNavEntry(entry: WorkspaceNavEntry): entry is TaskNavEntry {
+export function isTaskNavEntry(
+  entry: WorkspaceNavEntry,
+): entry is TaskNavEntry {
   return entry.kind === "task";
 }
 
-export function isAutomationsNavEntry(entry: WorkspaceNavEntry): entry is AutomationsNavEntry {
+export function isAutomationsNavEntry(
+  entry: WorkspaceNavEntry,
+): entry is AutomationsNavEntry {
   return entry.kind === "automations";
 }
 
@@ -60,7 +64,10 @@ export function isPluginStoreNavEntry(entry: WorkspaceNavEntry): entry is Plugin
   return entry.kind === "plugin-store";
 }
 
-function isSameNavEntry(left: WorkspaceNavEntry, right: WorkspaceNavEntry): boolean {
+function isSameNavEntry(
+  left: WorkspaceNavEntry,
+  right: WorkspaceNavEntry,
+): boolean {
   if (
     left.kind !== right.kind ||
     left.workspacePath !== right.workspacePath ||
@@ -206,7 +213,8 @@ export function removeTaskFromHistory(
   history: TaskNavigationHistory,
   taskId: string,
 ): TaskNavigationHistory {
-  const currentEntry = history.cursor >= 0 ? history.entries[history.cursor] : null;
+  const currentEntry =
+    history.cursor >= 0 ? history.entries[history.cursor] : null;
   const filtered = history.entries.filter(
     (entry) => !isTaskNavEntry(entry) || entry.taskId !== taskId,
   );
@@ -222,7 +230,9 @@ export function removeTaskFromHistory(
   // 当前条目未被删除时保持指向它；被删时沿用旧位置选择最近目标。
   const currentEntryIndex = currentEntry ? filtered.indexOf(currentEntry) : -1;
   const cursor =
-    currentEntryIndex >= 0 ? currentEntryIndex : Math.min(history.cursor, filtered.length - 1);
+    currentEntryIndex >= 0
+      ? currentEntryIndex
+      : Math.min(history.cursor, filtered.length - 1);
 
   return { entries: filtered, cursor };
 }

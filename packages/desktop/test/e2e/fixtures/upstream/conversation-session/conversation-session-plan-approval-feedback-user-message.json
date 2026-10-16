@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-approval-feedback-user-message",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-approval-feedback-user-message.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-plan-approval-enter-plan-call",
+      "description": "首轮请求稳定返回 EnterPlanMode 工具调用，制造 plan mode 审批前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_APPROVAL_FEEDBACK_USER_MESSAGE"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_APPROVAL_FEEDBACK_USER_MESSAGE",
+          "E2E_PLAN_APPROVAL_ENTER_PLAN",
+          "E2E_PLAN_APPROVAL_EXIT_PLAN"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_approval_enter_plan_mode",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-plan-approval-exit-plan-call",
+      "description": "进入 plan mode 后返回 ExitPlanMode 工具调用，触发审批弹窗。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定触发 ExitPlanMode 审批弹窗，避免模型输出文本而跳过工具。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_APPROVAL_EXIT_PLAN",
+          "toolu_e2e_plan_approval_enter_plan_mode"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_approval_exit_plan_mode",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "E2E_PLAN_APPROVAL_PLAN_BODY: 1. Add runtime bridge. 2. Add UI regression coverage."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-plan-approval-feedback-final",
+      "description": "审批 custom feedback 被续作用户消息后返回最终文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要断言 custom feedback 出现在下一轮用户消息，而不是被塞回 ExitPlanMode tool_result。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_APPROVAL_FEEDBACK"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_APPROVAL_FEEDBACK",
+          "E2E_PLAN_APPROVAL_EXIT_PLAN",
+          "toolu_e2e_plan_approval_exit_plan_mode",
+          "The plan was not approved by the user."
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

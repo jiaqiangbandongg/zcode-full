@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-task-created-project-row",
+  "spec": "./test/e2e/conversation-session/conversation-session-task-created-project-row.test.ts",
+  "fixtures": [
+    {
+      "id": "task-created-project-row-title",
+      "description": "TSL26 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发会触发默认 title sidecar；固定 marker 响应避免回退共享 provider fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_TASK_CREATED_PROJECT_ROW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "task-created-project-row-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Task Created Project Row E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "task-created-project-row-main",
+      "description": "建立首发 task，并等待 task_created 驱动 Project task-row 换代。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 验证任务创建与列表持久化闭环，模型文本只作为确定性 turn 完成屏障。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TASK_CREATED_PROJECT_ROW"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "task-created-project-row-main",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "TASK_CREATED_PROJECT_ROW_OK"
+        }
+      }
+    }
+  ]
+}

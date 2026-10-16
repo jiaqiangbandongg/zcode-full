@@ -1,4 +1,7 @@
-import type { AssistantTextRow, UserInputRow } from "@zcode/shared/zcode-protocol-v4";
+import type {
+  AssistantTextRow,
+  UserInputRow,
+} from "@zcode/shared/zcode-protocol-v4";
 import type { ChatSearchResultHighlightRequest } from "@/v4/legacyChatViewTypes.js";
 import type { ConversationTurnRenderUnit } from "@/v4/conversationTurnRenderUnits.js";
 import { projectAssistantCodeComments } from "@/lib/assistantCodeComment.js";
@@ -16,7 +19,7 @@ export interface ConversationFindMatch {
   sourceText: string;
 }
 
-interface ConversationFindIndex {
+export interface ConversationFindIndex {
   query: string;
   matches: ConversationFindMatch[];
   matchCount: number;
@@ -36,7 +39,7 @@ interface ConversationFindTarget {
   text: string;
 }
 
-function normalizeConversationFindQuery(query: string): string {
+export function normalizeConversationFindQuery(query: string): string {
   return query.trim().toLocaleLowerCase();
 }
 
@@ -58,11 +61,12 @@ function addTargetsForUnit(
   for (const row of unit.assistantTextRows) {
     targets.push({
       ...createTarget(unitIndex, row),
-      text: projectUnitCodeComments
-        ? projectAssistantCodeComments(row.text, {
-            streaming: row.state === "streaming",
-          }).visibleText
-        : row.text,
+      text:
+        projectUnitCodeComments
+          ? projectAssistantCodeComments(row.text, {
+              streaming: row.state === "streaming",
+            }).visibleText
+          : row.text,
     });
   }
 }
@@ -87,7 +91,12 @@ export function buildConversationFindIndex(
   const normalizedQuery = normalizeConversationFindQuery(query);
   const targets: ConversationFindTarget[] = [];
   units.forEach((unit, unitIndex) =>
-    addTargetsForUnit(targets, unit, unitIndex, options.projectAssistantCodeComments === true),
+    addTargetsForUnit(
+      targets,
+      unit,
+      unitIndex,
+      options.projectAssistantCodeComments === true,
+    ),
   );
 
   if (!normalizedQuery) {
@@ -173,12 +182,16 @@ export function resolveConversationFindActiveIndex(
   return 0;
 }
 
+export function resolveConversationFindActiveMatch(
+  index: ConversationFindIndex,
+  preferredIndex: number,
+): ConversationFindMatch | null {
+  const activeIndex = resolveConversationFindActiveIndex(index, preferredIndex);
+  return activeIndex >= 0 ? (index.matches[activeIndex] ?? null) : null;
+}
+
 function normalizeSearchResultProbeText(text: string): string {
-  return text
-    .replace(/^\.{3}/, "")
-    .replace(/\.{3}$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return text.replace(/^\.{3}/, "").replace(/\.{3}$/, "").replace(/\s+/g, " ").trim();
 }
 
 function includesProbe(sourceText: string, probe: string): boolean {
@@ -197,7 +210,9 @@ export function resolveSearchResultHighlightMatch(
 
   const snippet = request.snippet?.trim();
   if (snippet) {
-    const snippetMatch = index.matches.find((match) => includesProbe(match.sourceText, snippet));
+    const snippetMatch = index.matches.find((match) =>
+      includesProbe(match.sourceText, snippet),
+    );
     if (snippetMatch) {
       return snippetMatch;
     }

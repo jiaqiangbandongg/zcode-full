@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "ios-simulator": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${CLAUDE_PROJECT_DIR}",
+      "env": {
+        "IOS_SIM_PACKAGE_ROOT": "${CLAUDE_PLUGIN_ROOT}",
+        "IOS_SIM_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "IOS_SIM_DEFAULT_DEVICE": "${user_config.default_device}",
+        "IOS_SIM_UI_BACKEND": "${user_config.ui_backend}"
+      }
+    }
+  }
+}

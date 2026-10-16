@@ -34,86 +34,86 @@ npx ai-elements@latest add model-selector
 
 ### `<ModelSelector />`
 
-| Prop       | Type                                  | Default | Description                                                    |
-| ---------- | ------------------------------------- | ------- | -------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof Dialog>` | -       | Any other props are spread to the underlying Dialog component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof Dialog>` | - | Any other props are spread to the underlying Dialog component. |
 
 ### `<ModelSelectorTrigger />`
 
-| Prop       | Type                                         | Default | Description                                                           |
-| ---------- | -------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof DialogTrigger>` | -       | Any other props are spread to the underlying DialogTrigger component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof DialogTrigger>` | - | Any other props are spread to the underlying DialogTrigger component. |
 
 ### `<ModelSelectorContent />`
 
-| Prop       | Type                                         | Default | Description                                                           |
-| ---------- | -------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `title`    | `ReactNode`                                  | -       | Accessible title for the dialog (rendered in sr-only).                |
-| `...props` | `React.ComponentProps<typeof DialogContent>` | -       | Any other props are spread to the underlying DialogContent component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `title` | `ReactNode` | - | Accessible title for the dialog (rendered in sr-only). |
+| `...props` | `React.ComponentProps<typeof DialogContent>` | - | Any other props are spread to the underlying DialogContent component. |
 
 ### `<ModelSelectorDialog />`
 
-| Prop       | Type                                         | Default | Description                                                           |
-| ---------- | -------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandDialog>` | -       | Any other props are spread to the underlying CommandDialog component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandDialog>` | - | Any other props are spread to the underlying CommandDialog component. |
 
 ### `<ModelSelectorInput />`
 
-| Prop       | Type                                        | Default | Description                                                          |
-| ---------- | ------------------------------------------- | ------- | -------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandInput>` | -       | Any other props are spread to the underlying CommandInput component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandInput>` | - | Any other props are spread to the underlying CommandInput component. |
 
 ### `<ModelSelectorList />`
 
-| Prop       | Type                                       | Default | Description                                                         |
-| ---------- | ------------------------------------------ | ------- | ------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandList>` | -       | Any other props are spread to the underlying CommandList component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandList>` | - | Any other props are spread to the underlying CommandList component. |
 
 ### `<ModelSelectorEmpty />`
 
-| Prop       | Type                                        | Default | Description                                                          |
-| ---------- | ------------------------------------------- | ------- | -------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandEmpty>` | -       | Any other props are spread to the underlying CommandEmpty component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandEmpty>` | - | Any other props are spread to the underlying CommandEmpty component. |
 
 ### `<ModelSelectorGroup />`
 
-| Prop       | Type                                        | Default | Description                                                          |
-| ---------- | ------------------------------------------- | ------- | -------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandGroup>` | -       | Any other props are spread to the underlying CommandGroup component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandGroup>` | - | Any other props are spread to the underlying CommandGroup component. |
 
 ### `<ModelSelectorItem />`
 
-| Prop       | Type                                       | Default | Description                                                         |
-| ---------- | ------------------------------------------ | ------- | ------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandItem>` | -       | Any other props are spread to the underlying CommandItem component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandItem>` | - | Any other props are spread to the underlying CommandItem component. |
 
 ### `<ModelSelectorShortcut />`
 
-| Prop       | Type                                           | Default | Description                                                             |
-| ---------- | ---------------------------------------------- | ------- | ----------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CommandShortcut>` | -       | Any other props are spread to the underlying CommandShortcut component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandShortcut>` | - | Any other props are spread to the underlying CommandShortcut component. |
 
 ### `<ModelSelectorSeparator />`
 
-| Prop       | Type                                            | Default | Description                                                              |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof CommandSeparator>` | -       | Any other props are spread to the underlying CommandSeparator component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CommandSeparator>` | - | Any other props are spread to the underlying CommandSeparator component. |
 
 ### `<ModelSelectorLogo />`
 
-| Prop       | Type                         | Default  | Description                                                                                        |
-| ---------- | ---------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `provider` | `string`                     | Required | The AI provider name. Supports major providers like                                                |
-| `...props` | `Omit<React.ComponentProps<` | -        | Any other props are spread to the underlying img element (except src and alt which are generated). |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `provider` | `string` | Required | The AI provider name. Supports major providers like  |
+| `...props` | `Omit<React.ComponentProps<` | - | Any other props are spread to the underlying img element (except src and alt which are generated). |
 
 ### `<ModelSelectorLogoGroup />`
 
-| Prop       | Type                    | Default | Description                                               |
-| ---------- | ----------------------- | ------- | --------------------------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the underlying div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div element. |
 
 ### `<ModelSelectorName />`
 
-| Prop       | Type                    | Default | Description                                                |
-| ---------- | ----------------------- | ------- | ---------------------------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the underlying span element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying span element. |

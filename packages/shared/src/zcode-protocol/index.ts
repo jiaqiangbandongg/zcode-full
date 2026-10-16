@@ -1,8 +1,23 @@
+import { requestVerificationReasons } from "../request-security-edition/verification-policy.js";
+import { zcodeProtocolTraceSchema } from "./trace.js";
+// Bot 反向回复的名字解析/待澄清结果与 App、CLI 使用同一严格 schema。
+export { channelReplyRequestSchema, channelReplyResultSchema } from "../channel-mention.js";
+export { zcodeProtocolTraceSchema, type ZCodeProtocolTrace } from "./trace.js";
 import {
+  databaseMigrationFactsSchema,
   databaseStartupErrorCodeSchema,
   databaseStartupErrorDetailsSchema,
-  databaseMigrationFactsSchema,
 } from "../database-startup.js";
+import {
+  MCP_APPS_APP_TOOLS_MAX_PER_INSTANCE,
+  MCP_APPS_APP_TOOL_CALL_ID_MAX_CHARS,
+  MCP_APPS_APP_TOOL_ERROR_MESSAGE_MAX_CHARS,
+  mcpAppsAppToolCallResultSchema,
+  mcpAppsAppToolDescriptorSchema,
+} from "../mcp-apps/appTools.js";
+import { mcpAppsSamplingParamsSchema, mcpAppsSamplingResultSchema } from "../mcp-apps/sampling.js";
+import { mcpAppInstanceSchema } from "../mcp-apps/instance.js";
+export { conversationQuoteSchema, conversationQuotesSchema } from "../conversationSelection.js";
 /* oxlint-disable eslint(max-lines) -- ZCode Protocol schema 需要单文件导出，方便 app 与 agent 共享同一份协议契约。 */
 // ── 旧协议删除边界──────────────────────
 // 剩余 ~257 个导出：旧 ZCode Protocol 方法契约、请求/响应/事件 schema、
@@ -16,53 +31,83 @@ import {
 // UI 旧投影（zcodeSessionProjection 等读路径）。
 // 上述旧协议 client/server 组删除时，本文件整体删除。
 // 注：外部零消费 schema 多为存活 schema 联合的内部依赖，随宿主文件一起处理，勿单删。
+import { z } from "zod";
+import { accountProviderUnavailableReasonSchema } from "../account-provider-state.js";
 import { bashOutputDisplaySchema } from "../bash-output-display.js";
+import { zcodeAutomationBotDeliveryTargetSchema } from "../bots.js";
+import { executionOutputPreviewSchema } from "../execution-output-preview.js";
+import { completeModelPropertiesDataSchema } from "../model-config.js";
+import { modelExecutionSchema } from "../model-execution.js";
+import { modelSelectionSchema } from "../model-selection.js";
+import { APP_USAGE_RANGES, appUsageSnapshotSchema } from "../usage-stats.js";
+import { DYNAMIC_WORKFLOW_MODES } from "../dynamic-workflow-feature.js";
+import { errorAttributionSchema } from "../zcode-protocol-v4/snapshot.js";
 // 后台详情共享精简的只读响应 schema，不携带命令或计时元数据。
 export * from "../background-bash-output.js";
-import { executionOutputPreviewSchema } from "../execution-output-preview.js";
-import { z } from "zod";
 export * from "../process-diagnostic.js";
-import { errorAttributionSchema } from "../zcode-protocol-v4/snapshot.js";
-import { modelSelectionSchema } from "../model-selection.js";
-import { completeModelPropertiesDataSchema } from "../model-config.js";
-import { accountProviderUnavailableReasonSchema } from "../account-provider-state.js";
-import { modelExecutionSchema } from "../model-execution.js";
-import { APP_USAGE_RANGES, appUsageSnapshotSchema } from "../usage-stats.js";
-import { zcodeAutomationBotDeliveryTargetSchema } from "../bots.js";
+export { attachmentSourceKindSchema, type AttachmentSourceKind } from "../attachment-source.js";
+import { PROTOCOL_V4_LIMITS } from "../zcode-protocol-v4/core.js";
+
+export const zcodeTopicResourceReadParamsSchema = z
+  .object({
+    requestId: z.string().min(1).max(256),
+    taskId: z.string().min(1).max(256),
+    inputId: z.string().min(1).max(256),
+    authorizationId: z.string().min(1).max(256),
+    messageId: z.string().min(1).max(256),
+    resourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+export const zcodeTopicResourceReadResultSchema = z
+  .object({
+    ref: z.string().min(1),
+    fileName: z.string().min(1).max(1024),
+    mime: z.string().min(1).max(256),
+    bytes: z.number().int().min(0).max(PROTOCOL_V4_LIMITS.attachmentMaxBytes),
+  })
+  .strict();
+export const zcodeTopicResourceCancelParamsSchema = z
+  .object({ requestId: z.string().min(1).max(256), taskId: z.string().min(1).max(256) })
+  .strict();
+export const zcodeTopicResourceCancelResultSchema = z.object({ cancelled: z.boolean() }).strict();
+export type ZCodeTopicResourceReadParams = z.infer<typeof zcodeTopicResourceReadParamsSchema>;
+export type ZCodeTopicResourceReadResult = z.infer<typeof zcodeTopicResourceReadResultSchema>;
+export { activeWorkSummarySchema, type ActiveWorkSummary } from "../zcode-protocol-v4/snapshot.js";
 // browser-use 命令/结果契约单一来源：agent 构造、协议校验和 main executor 共用同一 schema。
-import { browserClientModeSchema, browserCommandSchema } from "../browser-use/commands.js";
 import {
   browserBackendListResultSchema,
   browserSessionContextKindSchema,
 } from "../browser-use/backend.js";
+import { browserClientModeSchema, browserCommandSchema } from "../browser-use/commands.js";
 import { browserCommandResultSchema } from "../browser-use/result.js";
-import { integratedTerminalShellSelectionSchema } from "../validationAppSettings.js";
-import { zcodeTaskModeSchema } from "../zcode-task-mode-schema.js";
 import { OFFICIAL_MCP_AUTH_PORT_FAILURE_REASONS } from "../official-mcp-auth.js";
+import { integratedTerminalShellSelectionSchema } from "../validationAppSettings.js";
 import {
-  zcodeDeliveryKindSchema,
-  zcodeMessageVisibilitySchema,
   zcodeSyntheticUserMessageSourceSchema as legacyZcodeSyntheticUserMessageSourceSchema,
-  zcodeWorkspaceRefSchema,
+  zcodeDeliveryKindSchema,
+  zcodeInteractionRequestOriginSchema,
+  zcodeMessagePartSchema,
+  zcodeMessageVisibilitySchema,
+  zcodeMessageWithPartsSchema,
   zcodePermissionDecisionSchema,
   zcodePermissionResponseSchema,
   zcodePermissionUpdateSchema,
-  zcodeSessionModeSchema,
-  zcodeSessionStatusSchema,
-  zcodeSessionKindSchema,
+  zcodeSessionApiRetryStatusSchema,
+  zcodeSessionContextUsageSchema,
   zcodeSessionGoalSchema,
   zcodeSessionGoalVerificationSchema,
   zcodeSessionGoalVerificationTimelineSchema,
-  zcodeInteractionRequestOriginSchema,
-  zcodeToolStateSchema,
-  zcodeSessionApiRetryStatusSchema,
-  zcodeSessionContextUsageSchema,
   zcodeSessionInfoSchema,
+  zcodeSessionKindSchema,
+  zcodeSessionModeSchema,
   zcodeSessionRuntimeStateSchema,
-  zcodeMessageWithPartsSchema,
-  zcodeMessagePartSchema,
+  zcodeSessionStatusSchema,
+  zcodeToolStateSchema,
+  zcodeWorkspaceRefSchema,
 } from "../zcode-protocol-legacy-types.js";
+import { zcodeTaskModeSchema } from "../zcode-task-mode-schema.js";
 
+export * from "../localTtft.js";
 export {
   hookExecutionProjectionSchema,
   hookInvocationRowSchema,
@@ -142,7 +187,8 @@ const zcodeCreateWorkflowCausalityGraphDisplaySchema = z
         z
           .object({
             id: z.string().min(1).max(64),
-            kind: z.enum(["ask", "world-read"]),
+            // `hole`：开着的留白自己的站点（docs/dynamic-workflow/presentation.md「Holes on the timeline」）；镜像 v4。
+            kind: z.enum(["ask", "world-read", "hole"]),
             label: z.string().min(1).max(128),
             // 内联 `agent()` receiver 让 label 落到兜底串时，那个名字的静态形状。
             labelPattern: zcodeWorkflowNamePatternSchema.optional(),
@@ -157,6 +203,8 @@ const zcodeCreateWorkflowCausalityGraphDisplaySchema = z
             // 与图的 phases / phaseEdges / exits 同进同退：全在场或全缺席。
             phase: z.string().min(1).max(64).optional(),
             repeat: z.enum(["stack", "serial"]).optional(),
+            // 这个站点是某次补全写进来的：值是那个留白的站点 id；镜像 v4。
+            fill: z.string().min(1).max(64).optional(),
           })
           .strict(),
       )
@@ -215,12 +263,35 @@ const zcodeCreateWorkflowCausalityGraphDisplaySchema = z
             // 为空时缺席。是节点事实而不是边——控制没有从那里转移过来，所以不进 phaseEdges。
             // 时间轴据此把相邻阶段折成一条分叉的「带」，侧栏迷你轨道画成双线段。
             alongside: z.array(z.string().min(1).max(64)).min(1).max(32).optional(),
+            // 这个阶段是某次补全写进来的：值是那个留白的站点 id；镜像 v4。
+            fill: z.string().min(1).max(64).optional(),
           })
           .strict(),
       )
       .max(32)
       .optional(),
     phaseEdges: z.array(zcodeWorkflowEdgeSchema).max(128).optional(),
+    // 阶段流（docs/dynamic-workflow/presentation.md「Streams」）：两端互为 alongside 的 data 边，
+    // 只有 {from, to}——不是 runs after，不进 phaseEdges、不带 back。与词汇表同进同退。
+    phaseStreams: z
+      .array(z.object({ from: z.string().min(1).max(64), to: z.string().min(1).max(64) }).strict())
+      .max(128)
+      .optional(),
+    // 还开着的留白，源码序（docs/dynamic-workflow/authoring.md「Holes」）；镜像 v4。
+    holes: z
+      .array(
+        z
+          .object({
+            siteId: z.string().min(1).max(64),
+            name: z.string().min(1).max(128),
+            type: z.string().min(1).max(128),
+            phase: z.string().min(1).max(64).optional(),
+            tail: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .max(32)
+      .optional(),
     // 控制流可在其后正常完成的阶段（阶段视图的「阶段 → 返回物」箭头）；组内可为空数组。
     exits: z.array(z.string().min(1).max(64)).max(32).optional(),
     sink: z.array(z.string().min(1).max(64)).max(64).optional(),
@@ -247,6 +318,18 @@ export const zcodeCreateWorkflowToolResultDisplaySchema = z
       .max(100),
     causalityGraph: zcodeCreateWorkflowCausalityGraphDisplaySchema.optional(),
     truncated: z.boolean().optional(),
+    // FillWorkflowHole 行补的是哪处留白（docs/dynamic-workflow/presentation.md「The fill row」）；镜像 v4。
+    // 修复原因：dwf-recursive 只给 contracts 与 v4 加了留白字段，v3 的 .strict() 拒掉整条 tool.updated，
+    // 桌面端 v3 订阅于是把含留白的 CreateWorkflow / FillWorkflowHole 结果当无效事件丢掉。
+    fill: z
+      .object({
+        siteId: z.string().min(1).max(64),
+        name: z.string().min(1).max(128),
+        draftPath: z.string().min(1).max(1_024).optional(),
+        line: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -273,15 +356,42 @@ const zcodeToolResultObjectSchema = jsonObjectSchema.superRefine((result, contex
 export const zcodeProtocolRequestIdSchema = z.union([z.string(), z.number().int()]);
 export type ZCodeProtocolRequestId = z.infer<typeof zcodeProtocolRequestIdSchema>;
 
-export const zcodeProtocolTraceSchema = z
-  .object({
-    traceparent: nonEmptyString.optional(),
-    traceId: nonEmptyString.optional(),
-    parentId: nonEmptyString.optional(),
-    spanId: nonEmptyString.optional(),
+// 远程历史附件仅通过现有连接的私有反向频道传输，单块保持在 RPC 帧预算内。
+export const TOPIC_RESOURCE_RELAY_CHUNK_BYTES = 384 * 1024;
+export const TOPIC_RESOURCE_RELAY_CHANNEL = "host-topic-resource";
+export const zcodeTopicResourceRelayRequestSchema = zcodeTopicResourceReadParamsSchema
+  .extend({
+    workspacePath: z.string().min(1).max(4096),
+    workspaceIdentity: z.string().min(1).max(4096),
+    remoteSessionId: z.string().min(1).max(256),
+    trace: zcodeProtocolTraceSchema.optional(),
   })
   .strict();
-export type ZCodeProtocolTrace = z.infer<typeof zcodeProtocolTraceSchema>;
+export type ZCodeTopicResourceRelayRequest = z.infer<typeof zcodeTopicResourceRelayRequestSchema>;
+export const zcodeTopicResourceRelayKeySchema = zcodeTopicResourceCancelParamsSchema;
+export const zcodeTopicResourceRelayChunkRequestSchema = zcodeTopicResourceRelayKeySchema
+  .extend({
+    index: z.number().int().nonnegative(),
+  })
+  .strict();
+export const zcodeTopicResourceRelayMetadataSchema = z
+  .object({
+    fileName: z.string().min(1).max(1024),
+    mime: z.string().min(1).max(256),
+    bytes: z.number().int().min(0).max(PROTOCOL_V4_LIMITS.attachmentMaxBytes),
+    totalChunks: z
+      .number()
+      .int()
+      .min(0)
+      .max(Math.ceil(PROTOCOL_V4_LIMITS.attachmentMaxBytes / TOPIC_RESOURCE_RELAY_CHUNK_BYTES)),
+    checksum: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  })
+  .strict();
+export const zcodeTopicResourceRelayChunkSchema = z
+  .object({
+    dataBase64: z.string().max((TOPIC_RESOURCE_RELAY_CHUNK_BYTES / 3) * 4),
+  })
+  .strict();
 
 export const zcodeProtocolRequestSchema = z
   .object({
@@ -340,6 +450,7 @@ export const zcodeProtocolNotifications = {
   toolExecResource: "process/toolExecResource",
   pluginOperationProgress: "plugins/operationProgress",
   processResourceSample: "process/resourceSample",
+  processNetworkRequests: "process/networkRequests",
 } as const;
 
 /** 启动控制面独立于 task stream；数据库身份不可携带路径/凭据。 */
@@ -583,6 +694,7 @@ export type ZCodeProcessChildProcessesResult = z.infer<
 export type ZCodeDeliveryKind = z.infer<typeof zcodeDeliveryKindSchema>;
 // TurnStarted 与持久 message 必须共用同一来源词表；否则 live event 能通过而 cold
 // message 在 app/agent 边界被拒绝，造成 continuous/replayable 语义分叉。
+// 持久消息与输入沿用同一 source schema；agent_listing_delta 只作 provider context，不触发新 turn。
 const zcodeTurnInputSourceSchema = legacyZcodeSyntheticUserMessageSourceSchema;
 export const zcodeSessionPersistenceSchema = z.enum(["immediate", "deferred"]);
 export type ZCodeSessionPersistence = z.infer<typeof zcodeSessionPersistenceSchema>;
@@ -723,6 +835,231 @@ export const zcodeMcpListResultSchema = z
   .strict();
 export type ZCodeMcpListResult = z.infer<typeof zcodeMcpListResultSchema>;
 
+// 插件 UI：UI 发起的 MCP 资源读取与工具调用，
+// 按 pluginId 限定 server 归属，agent 侧 fail closed。
+export const zcodeMcpUiOpenInstanceParamsSchema = z
+  .object({
+    accountContext: z.string().max(256).optional(),
+    workspace: zcodeWorkspaceRefSchema,
+    sessionId: nonEmptyString,
+    pluginId: nonEmptyString,
+    serverName: nonEmptyString,
+    scopeId: nonEmptyString.max(4096),
+    resourceUri: nonEmptyString.max(2048),
+    ownerWebContentsId: z.number().int().positive(),
+  })
+  .strict();
+export const zcodeMcpUiOpenInstanceResultSchema = mcpAppInstanceSchema;
+export type ZCodeMcpUiOpenInstanceParams = z.infer<typeof zcodeMcpUiOpenInstanceParamsSchema>;
+const zcodeMcpUiPluginScopeShape = {
+  instance: mcpAppInstanceSchema,
+
+  workspace: zcodeWorkspaceRefSchema,
+  sessionId: nonEmptyString,
+  pluginId: nonEmptyString,
+  serverName: nonEmptyString,
+};
+export const zcodeMcpUiCloseInstanceParamsSchema = z
+  .object({ ...zcodeMcpUiPluginScopeShape, onlyIfIdle: z.boolean().optional() })
+  .strict();
+export const zcodeMcpUiCloseInstanceResultSchema = z.object({ closed: z.boolean() }).strict();
+export const zcodeMcpReadResourceParamsSchema = z
+  .object({ ...zcodeMcpUiPluginScopeShape, uri: nonEmptyString.max(2048) })
+  .strict();
+export type ZCodeMcpReadResourceParams = z.infer<typeof zcodeMcpReadResourceParamsSchema>;
+export const zcodeMcpResourceContentSchema = z
+  .object({
+    uri: z.string(),
+    mimeType: z.string().optional(),
+    text: z.string().optional(),
+    blob: z.string().optional(),
+    _meta: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export const zcodeMcpReadResourceResultSchema = z
+  .object({ contents: z.array(zcodeMcpResourceContentSchema) })
+  .strict();
+export type ZCodeMcpReadResourceResult = z.infer<typeof zcodeMcpReadResourceResultSchema>;
+
+/**
+ * 插件页面发起的 `resources/read` 代理。
+ * 与 `mcp/readResource`（宿主取 ui:// HTML）参数同形，但结果去掉 `_meta`、受 8 MiB 与 mimeType 白名单约束。
+ */
+export const zcodeMcpUiReadResourceParamsSchema = zcodeMcpReadResourceParamsSchema;
+export type ZCodeMcpUiReadResourceParams = z.infer<typeof zcodeMcpUiReadResourceParamsSchema>;
+export const zcodeMcpUiResourceContentSchema = z
+  .object({
+    uri: z.string(),
+    mimeType: z.string().optional(),
+    text: z.string().optional(),
+    blob: z.string().optional(),
+  })
+  .strict();
+export const zcodeMcpUiReadResourceResultSchema = z
+  .object({ contents: z.array(zcodeMcpUiResourceContentSchema) })
+  .strict();
+export type ZCodeMcpUiReadResourceResult = z.infer<typeof zcodeMcpUiReadResourceResultSchema>;
+
+export const zcodeMcpUiSamplingParamsSchema = z
+  .object({
+    ...zcodeMcpUiPluginScopeShape,
+    operationId: nonEmptyString.max(128),
+    request: mcpAppsSamplingParamsSchema,
+  })
+  .strict();
+export const zcodeMcpUiCancelSamplingParamsSchema = z
+  .object({ ...zcodeMcpUiPluginScopeShape, operationId: nonEmptyString.max(128) })
+  .strict();
+export const zcodeMcpUiSamplingResultSchema = mcpAppsSamplingResultSchema;
+export type ZCodeMcpUiSamplingParams = z.infer<typeof zcodeMcpUiSamplingParamsSchema>;
+export type ZCodeMcpUiCancelSamplingParams = z.infer<typeof zcodeMcpUiCancelSamplingParamsSchema>;
+
+export const zcodeMcpUiCallToolParamsSchema = z
+  .object({
+    ...zcodeMcpUiPluginScopeShape,
+    toolName: nonEmptyString,
+    arguments: z.record(z.string(), z.unknown()).optional(),
+    /** 宿主生成的调用 id，配合 `mcp/uiCancelCall` 取消进行中的调用。 */
+    callId: nonEmptyString.max(128),
+  })
+  .strict();
+export type ZCodeMcpUiCallToolParams = z.infer<typeof zcodeMcpUiCallToolParamsSchema>;
+/** 取消页面发起的工具调用（卡片卸载、会话切换）；agent 侧 abort 到 MCP client。 */
+export const zcodeMcpUiCancelCallParamsSchema = z
+  .object({ ...zcodeMcpUiPluginScopeShape, callId: nonEmptyString.max(128) })
+  .strict();
+export type ZCodeMcpUiCancelCallParams = z.infer<typeof zcodeMcpUiCancelCallParamsSchema>;
+export const zcodeMcpUiCancelCallResultSchema = z.object({ cancelled: z.boolean() }).strict();
+export type ZCodeMcpUiCancelCallResult = z.infer<typeof zcodeMcpUiCancelCallResultSchema>;
+/** 页面发起的 resources/list、resources/templates/list、subscribe、unsubscribe 代理。 */
+export const zcodeMcpUiListResourcesParamsSchema = z
+  .object({ ...zcodeMcpUiPluginScopeShape, cursor: nonEmptyString.max(2048).optional() })
+  .strict();
+export type ZCodeMcpUiListResourcesParams = z.infer<typeof zcodeMcpUiListResourcesParamsSchema>;
+const zcodeMcpUiResourceDescriptorSchema = z
+  .object({
+    uri: z.string(),
+    name: z.string().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    mimeType: z.string().optional(),
+    // MCP Resource 的标准字段；规范把资源级 csp / prefersBorder 放在这里，宿主读 HTML 项缺 _meta 时回退用。
+    _meta: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export const zcodeMcpUiListResourcesResultSchema = z
+  .object({
+    resources: z.array(zcodeMcpUiResourceDescriptorSchema),
+    nextCursor: z.string().optional(),
+  })
+  .strict();
+export type ZCodeMcpUiListResourcesResult = z.infer<typeof zcodeMcpUiListResourcesResultSchema>;
+export const zcodeMcpUiListResourceTemplatesResultSchema = z
+  .object({
+    resourceTemplates: z.array(
+      z
+        .object({
+          uriTemplate: z.string(),
+          name: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          mimeType: z.string().optional(),
+        })
+        .strict(),
+    ),
+    nextCursor: z.string().optional(),
+  })
+  .strict();
+export type ZCodeMcpUiListResourceTemplatesResult = z.infer<
+  typeof zcodeMcpUiListResourceTemplatesResultSchema
+>;
+/** 订阅者身份 = 会话 + 沙箱作用域 + 实例代际（initId）；dispose 只退订本代际，新实例不受影响。 */
+export const zcodeMcpUiResourceSubscriptionParamsSchema = z
+  .object({
+    ...zcodeMcpUiPluginScopeShape,
+    scopeId: nonEmptyString.max(256),
+    generation: z.number().int().nonnegative(),
+    uri: nonEmptyString.max(2048),
+  })
+  .strict();
+export type ZCodeMcpUiResourceSubscriptionParams = z.infer<
+  typeof zcodeMcpUiResourceSubscriptionParamsSchema
+>;
+export const zcodeMcpUiResourceSubscriptionResultSchema = z.object({}).strict();
+/**
+ * App-Provided Tools：实例身份 = 会话 + 沙箱作用域 + 代际（与资源订阅同一三元组）。
+ * 登记按实例整体替换；调用认领 / 回传按 callId 幂等。
+ */
+const zcodeMcpUiAppToolInstanceShape = {
+  ...zcodeMcpUiPluginScopeShape,
+  scopeId: nonEmptyString.max(256),
+  generation: z.number().int().nonnegative(),
+};
+export const zcodeMcpUiRegisterAppToolsParamsSchema = z
+  .object({
+    ...zcodeMcpUiAppToolInstanceShape,
+    tools: z.array(mcpAppsAppToolDescriptorSchema).max(MCP_APPS_APP_TOOLS_MAX_PER_INSTANCE),
+  })
+  .strict();
+export type ZCodeMcpUiRegisterAppToolsParams = z.infer<
+  typeof zcodeMcpUiRegisterAppToolsParamsSchema
+>;
+export const zcodeMcpUiRegisterAppToolsResultSchema = z
+  .object({ tools: z.array(z.object({ name: z.string(), modelName: z.string() }).strict()) })
+  .strict();
+export type ZCodeMcpUiRegisterAppToolsResult = z.infer<
+  typeof zcodeMcpUiRegisterAppToolsResultSchema
+>;
+export const zcodeMcpUiUnregisterAppToolsParamsSchema = z
+  .object(zcodeMcpUiAppToolInstanceShape)
+  .strict();
+export type ZCodeMcpUiUnregisterAppToolsParams = z.infer<
+  typeof zcodeMcpUiUnregisterAppToolsParamsSchema
+>;
+export const zcodeMcpUiUnregisterAppToolsResultSchema = z
+  .object({ removed: z.number().int().nonnegative() })
+  .strict();
+export type ZCodeMcpUiUnregisterAppToolsResult = z.infer<
+  typeof zcodeMcpUiUnregisterAppToolsResultSchema
+>;
+export const zcodeMcpUiClaimAppToolCallParamsSchema = z
+  .object({
+    ...zcodeMcpUiAppToolInstanceShape,
+    callId: nonEmptyString.max(MCP_APPS_APP_TOOL_CALL_ID_MAX_CHARS),
+  })
+  .strict();
+export type ZCodeMcpUiClaimAppToolCallParams = z.infer<
+  typeof zcodeMcpUiClaimAppToolCallParamsSchema
+>;
+export const zcodeMcpUiAppToolAcceptedResultSchema = z.object({ accepted: z.boolean() }).strict();
+export type ZCodeMcpUiAppToolAcceptedResult = z.infer<typeof zcodeMcpUiAppToolAcceptedResultSchema>;
+export const zcodeMcpUiResolveAppToolCallParamsSchema = z
+  .object({
+    ...zcodeMcpUiAppToolInstanceShape,
+    callId: nonEmptyString.max(MCP_APPS_APP_TOOL_CALL_ID_MAX_CHARS),
+    result: mcpAppsAppToolCallResultSchema.optional(),
+    error: z
+      .object({ message: z.string().max(MCP_APPS_APP_TOOL_ERROR_MESSAGE_MAX_CHARS) })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .refine((value) => (value.result === undefined) !== (value.error === undefined), {
+    message: "exactly one of result or error is required",
+  });
+export type ZCodeMcpUiResolveAppToolCallParams = z.infer<
+  typeof zcodeMcpUiResolveAppToolCallParamsSchema
+>;
+export const zcodeMcpUiCallToolResultSchema = z
+  .object({
+    content: z.array(z.record(z.string(), z.unknown())),
+    structuredContent: z.unknown().optional(),
+    isError: z.boolean().optional(),
+    _meta: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export type ZCodeMcpUiCallToolResult = z.infer<typeof zcodeMcpUiCallToolResultSchema>;
+
 export const zcodeSessionImportMessageSchema = z
   .object({
     role: z.enum(["user", "assistant"]),
@@ -842,7 +1179,15 @@ export const zcodeProviderAccountAccessSchema = z
   .object({
     type: z.literal("zhipu-account"),
     accountType: z.enum(["zai", "bigmodel"]),
-    mode: z.enum(["start-plan", "individual-coding-plan", "team-coding-plan", "off-peak"]),
+    // `highspeed` 指加速卡这一账号访问类别（隐藏 Provider + 免签网关），与模型名
+    // GLM-5.1-Highspeed 无关，仅字面重合。见 docs/highspeed/highspeed-access-mode-migration.md。
+    mode: z.enum([
+      "start-plan",
+      "individual-coding-plan",
+      "team-coding-plan",
+      "off-peak",
+      "highspeed",
+    ]),
     entitled: z.boolean(),
   })
   .strict();
@@ -1168,6 +1513,8 @@ export const zcodeSessionTitleUpdatedEventPayloadSchema = z
   .strict();
 export const zcodeTurnStartedEventPayloadSchema = z
   .object({
+    // CLI 的高精度执行时间可含小数；漏声明会使 strict 校验丢弃整条开始事件，Bot 因此无法清空上一轮回复。
+    executionStartedAt: z.number().nonnegative().optional(),
     turnNumber: z.number().int().nonnegative(),
     input: z.string(),
     inputId: nonEmptyString.optional(),
@@ -1392,6 +1739,7 @@ export const zcodePermissionRequestedEventPayloadSchema = z
     reason: z.string(),
     input: z.unknown(),
     suggestedPermissionUpdates: z.array(zcodePermissionUpdateSchema).optional(),
+    approvalMode: z.literal("user-once").optional(),
     origin: zcodeInteractionRequestOriginSchema.optional(),
     options: z.array(zcodePermissionOptionSchema).min(1),
     childSessionId: nonEmptyString.optional(),
@@ -1556,6 +1904,9 @@ export const zcodeSessionSubagentsResultSchema = z
   })
   .strict();
 export type ZCodeSessionSubagentsResult = z.infer<typeof zcodeSessionSubagentsResultSchema>;
+/** 服务端 feature key 的取值域在协议里的 zod 形态（packages/shared/src/dynamic-workflow-feature.ts）。 */
+export const zcodeDynamicWorkflowModeSchema = z.enum(DYNAMIC_WORKFLOW_MODES);
+
 export const zcodeSessionCreateParamsSchema = z
   .object({
     sessionId: nonEmptyString.optional(),
@@ -1576,6 +1927,9 @@ export const zcodeSessionCreateParamsSchema = z
     // 动态工作流灰度：与 offPeakToolEnabled 同一
     // 模式——host 裁决后下发，缺省不下发 = 不注册工作流工具簇（fail-closed）。
     dynamicWorkflowEnabled: z.boolean().optional(),
+    // 灰度 mode 随布尔同行下发（launch.md「On demand: activation」）：`onDemand` 让 CLI 把十个
+    // 工具推迟到会话首次 `/workflow` 才注册；缺席 = 按布尔行事（alwaysOn），供旧 Host 配对。
+    dynamicWorkflowMode: zcodeDynamicWorkflowModeSchema.optional(),
   })
   .strict();
 export type ZCodeSessionCreateParams = z.infer<typeof zcodeSessionCreateParamsSchema>;
@@ -1594,6 +1948,7 @@ export const zcodeSessionResumeParamsSchema = z
     offPeakToolEnabled: z.boolean().optional(),
     // 与 create 同语义；resume 不带会导致冷恢复丢工作流工具簇。
     dynamicWorkflowEnabled: z.boolean().optional(),
+    dynamicWorkflowMode: zcodeDynamicWorkflowModeSchema.optional(),
   })
   .strict();
 export type ZCodeSessionResumeParams = z.infer<typeof zcodeSessionResumeParamsSchema>;
@@ -1652,6 +2007,9 @@ export const zcodeSessionReadParamsSchema = z
     deliveryKind: zcodeDeliveryKindSchema.optional(),
     messageLimit: z.number().int().positive().optional(),
     afterSeq: z.number().int().nonnegative().optional(),
+    // "index"：仅 task index resync 使用，返回剥离 tool/reasoning/data URL 大载荷的同结构 snapshot，
+    // 结果禁止回写 UI 状态；缺省等同 "full"。
+    contentProfile: z.enum(["full", "index"]).optional(),
   })
   .strict();
 export type ZCodeSessionReadParams = z.infer<typeof zcodeSessionReadParamsSchema>;
@@ -1682,6 +2040,15 @@ export type ZCodeSessionRuntimePreferencesScope = z.infer<
   typeof zcodeSessionRuntimePreferencesScopeSchema
 >;
 
+// subagents/readRuntimeConfig 返回 Host 已解析的完整快照或显式内置回退，不再传 Markdown。
+export {
+  subagentRuntimeConfigSchema,
+  type SubagentRuntimeConfig,
+} from "../subagent-runtime-config.js";
+export const zcodeSubagentsReadRuntimeConfigParamsSchema = z
+  .object({ sessionId: nonEmptyString })
+  .strict();
+
 export const ZCODE_SESSION_RUNTIME_PREFERENCES_REQUEST_TIMEOUT_MS = 15_000;
 
 export const zcodeSessionRequestRuntimePreferencesParamsSchema = z
@@ -1703,6 +2070,7 @@ export type ZCodeModelContextBudgetStrategy = z.infer<typeof zcodeModelContextBu
 export const zcodeSessionRuntimePreferencesResultSchema = z
   .object({
     nativeSearchEnhancementsEnabled: z.boolean(),
+    subagentRuntimeConfigEnabled: z.boolean().optional(),
     memoryEnabled: z.boolean().default(false),
     askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
     integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
@@ -2260,6 +2628,8 @@ export const zcodeWorkspaceUpdateDynamicWorkflowPolicyParamsSchema = z
   .object({
     workspace: zcodeWorkspaceRefSchema,
     enabled: z.boolean(),
+    // launch.md「On demand: activation」：mode 与布尔同行；缺席时 CLI 按布尔行事（alwaysOn）。
+    mode: zcodeDynamicWorkflowModeSchema.optional(),
   })
   .strict();
 export type ZCodeWorkspaceUpdateDynamicWorkflowPolicyParams = z.infer<
@@ -2378,7 +2748,7 @@ export const zcodeUserInputResponseSchema = z
   .strict();
 export type ZCodeUserInputResponse = z.infer<typeof zcodeUserInputResponseSchema>;
 
-export const zcodeProviderRuntimeHeadersRequestReasonSchema = z.enum(["model-request"]);
+export const zcodeProviderRuntimeHeadersRequestReasonSchema = z.enum(requestVerificationReasons);
 export const zcodeProviderRuntimeHeadersRequestParamsSchema = z
   .object({
     requestId: nonEmptyString,
@@ -2388,6 +2758,14 @@ export const zcodeProviderRuntimeHeadersRequestParamsSchema = z
     modelSelection: modelSelectionSchema,
     providerId: nonEmptyString,
     accountAccess: zcodeProviderAccountAccessSchema.optional(),
+    expectedAccountScope: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    rejectedProjectTokenFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     reason: zcodeProviderRuntimeHeadersRequestReasonSchema,
   })
   .strict();
@@ -2415,6 +2793,11 @@ export const zcodeProviderRuntimeHeadersResponseSchema = z.discriminatedUnion("h
       requestAuth: z
         .object({
           apiKey: nonEmptyString.optional(),
+          apiKeyId: z.string().trim().min(1).optional(),
+          accountScope: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .optional(),
           headers: z.record(nonEmptyString, nonEmptyString).optional(),
         })
         .strict(),
@@ -2591,7 +2974,36 @@ export const zcodePluginsListResultSchema = z
   .strict();
 export type ZCodePluginsListResult = z.infer<typeof zcodePluginsListResultSchema>;
 
-// ── Plugin 对话引用 catalog──
+// ── 插件 UI 面板入口──
+// 工作区级只读投影：已启用插件清单 `ui.surfaces[]` 的合法条目；插件启停后 host 重新拉取。
+export const zcodePluginUiSurfaceSchema = z
+  .object({
+    pluginId: nonEmptyString,
+    pluginName: nonEmptyString,
+    id: nonEmptyString.max(128),
+    title: z.union([nonEmptyString, z.record(z.string(), z.string())]),
+    icon: z.string().optional(),
+    // 运行时 namespaced server 名（plugin:<name>:<server>），可直接用于 mcp/uiReadResource。
+    server: nonEmptyString,
+    resourceUri: nonEmptyString.max(2048),
+    availability: z.literal("session"),
+  })
+  .strict();
+export type ZCodePluginUiSurface = z.infer<typeof zcodePluginUiSurfaceSchema>;
+export const zcodePluginsListUiSurfacesParamsSchema = z
+  .object({ workspace: zcodeWorkspaceRefSchema })
+  .strict();
+export type ZCodePluginsListUiSurfacesParams = z.infer<
+  typeof zcodePluginsListUiSurfacesParamsSchema
+>;
+export const zcodePluginsListUiSurfacesResultSchema = z
+  .object({ surfaces: z.array(zcodePluginUiSurfaceSchema) })
+  .strict();
+export type ZCodePluginsListUiSurfacesResult = z.infer<
+  typeof zcodePluginsListUiSurfacesResultSchema
+>;
+
+// ── Plugin 对话引用 catalog（docs/plugin-reference-mention.md）──
 // Session-scoped 只读投影：带 sessionId → 该 Session 创建时冻结的身份 catalog；
 // 不带 → workspace 当前 catalog（新建草稿 Picker）。身份与能力字段保持
 // identifiers-only，不携带 rootPath/配置等；可选 icon/displayName(I18n)/description(I18n)
@@ -2937,6 +3349,99 @@ export const zcodeWorkflowsMoveResultSchema = z.union([
     .strict(),
 ]);
 export type ZCodeWorkflowsMoveResult = z.infer<typeof zcodeWorkflowsMoveResultSchema>;
+
+// ── 从一次 run 保存工作流（docs/dynamic-workflow/transcript-and-notifications.md「Saving the
+// run, and running it again」）──
+// 完成卡的「直接保存」走这条：**不收脚本，只收 runId**——要写的那份正文是这次 run 实际执行的
+// 脚本，agent 从 journal 记录（`scriptText`）里读。脚本不经 GUI 走一圈有两个后果值得写下来：
+// 修订过的 run 存下的是**结算它的**那一份，而工具行入参被快照裁成预览的老对话也照样存得出
+// 同样的字节。名字合法性、覆盖、遮蔽与类型检查全部复用 SaveWorkflow 的同一套实现（不变式 3）。
+/** 另一档已有同名定义（遮蔽事实）；与 contracts 的 SavedWorkflowShadowing 逐字对齐。 */
+export const zcodeSavedWorkflowShadowingSchema = z.enum(["hides_global", "hidden_by_project"]);
+export type ZCodeSavedWorkflowShadowing = z.infer<typeof zcodeSavedWorkflowShadowingSchema>;
+
+export const zcodeWorkflowsSaveParamsSchema = z
+  .object({
+    // 两用：既是载体运行时，也是这次 run 的项目——journal 在它那里，项目根也在它那里。
+    // 全局档同样带它（与 list/get 的「全局只当载体」不同）：脚本必须从这个 agent 的 journal 读。
+    workspace: zcodeWorkspaceRefSchema,
+    runId: nonEmptyString,
+    name: nonEmptyString,
+    meta: zcodeSavedWorkflowMetaSchema,
+    // 缺省 `project`。
+    scope: zcodeSavedWorkflowScopeSchema.optional(),
+    // 只有 GUI 已经把覆盖警告摆给用户看过时才为 true；缺省即「目标已存在就拒绝」——
+    // 覆盖是用户的决定，不是一次保存的副作用（与 `workflows/move` 不覆盖同一条纪律）。
+    overwrite: z.boolean().optional(),
+  })
+  .strict();
+export type ZCodeWorkflowsSaveParams = z.infer<typeof zcodeWorkflowsSaveParamsSchema>;
+export const zcodeWorkflowsSaveResultSchema = z.union([
+  z
+    .object({
+      ok: z.literal(true),
+      name: nonEmptyString,
+      scope: zcodeSavedWorkflowScopeSchema,
+      path: nonEmptyString,
+      /** 写的那一刻重新判定，不回抄入参里的 `overwrite`（与 SaveWorkflow 的 `overwritten` 同源）。 */
+      overwritten: z.boolean(),
+      shadowing: zcodeSavedWorkflowShadowingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      // run_not_found：journal 里没有这条 run；script_missing：老记录没存脚本原文；
+      // target_exists：目标已存在而调用方没说覆盖；compile_failed：类型检查没过，一个字节都没写。
+      reason: z.enum([
+        "invalid_name",
+        "run_not_found",
+        "script_missing",
+        "target_exists",
+        "compile_failed",
+        "write_error",
+      ]),
+      path: z.string().optional(),
+      detail: z.string().optional(),
+    })
+    .strict(),
+]);
+export type ZCodeWorkflowsSaveResult = z.infer<typeof zcodeWorkflowsSaveResultSchema>;
+
+// ── 一次 run 对应哪个已保存工作流 ──
+// 完成卡的「已保存」芯片与「再次运行」都问这一个问题，而答案**推导得来、不记在卡上**：重开
+// 会话、换一个窗口保存、在对话里保存，都走同一条判定。判定住在 agent 一侧，因为两份事实
+// （run 的 journal 记录与磁盘上的定义）都在那里；返回解析好的 entry，用户后来删掉的那一份
+// 因此会自动不再算数。
+/** 转写自对话的候选：模型用 `SaveWorkflow` 存过、并在入参里认领了这次 run。 */
+export const zcodeWorkflowsForRunCandidateSchema = z
+  .object({ name: nonEmptyString, scope: zcodeSavedWorkflowScopeSchema.optional() })
+  .strict();
+export type ZCodeWorkflowsForRunCandidate = z.infer<typeof zcodeWorkflowsForRunCandidateSchema>;
+/** 候选上界：一次 run 在一段对话里被存过的次数远小于它。 */
+export const ZCODE_WORKFLOWS_FOR_RUN_MAX_CANDIDATES = 8;
+export const zcodeWorkflowsForRunParamsSchema = z
+  .object({
+    workspace: zcodeWorkspaceRefSchema,
+    runId: nonEmptyString,
+    candidates: z
+      .array(zcodeWorkflowsForRunCandidateSchema)
+      .max(ZCODE_WORKFLOWS_FOR_RUN_MAX_CANDIDATES)
+      .optional(),
+  })
+  .strict();
+export type ZCodeWorkflowsForRunParams = z.infer<typeof zcodeWorkflowsForRunParamsSchema>;
+export const zcodeWorkflowsForRunResultSchema = z
+  .object({
+    /** 命中的定义；缺席即这次 run 还没有对应的已保存工作流。 */
+    entry: zcodeSavedWorkflowEntrySchema.optional(),
+    /** 命中的是哪一条规则（诊断与测试用；UI 只看 entry 在不在）。 */
+    match: z.enum(["candidate", "script", "name"]).optional(),
+    /** 这次 run 跑时用的实参（journal 原样），供「再次运行」预填实参窗。 */
+    runArgs: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export type ZCodeWorkflowsForRunResult = z.infer<typeof zcodeWorkflowsForRunResultSchema>;
 
 // 推荐 Prompt 的可信插件解析：UI 不拆解 stableId，也不从旧目录快照推断可安装性。
 export const zcodePluginSuggestedReferenceStatusSchema = z.enum([
@@ -3499,8 +4004,14 @@ export type ZCodeAutomationDeleteProtocolResult = z.infer<typeof zcodeAutomation
 // ---- Off-Peak（闲时任务）会话内创建协议----
 // 与 automation 兄弟并列（独立域，禁止互相复用标记/表）。workspace 由 host 端从
 // 当前 session 注入，不进协议参数（对称 automation/create）。permissionMode 只开放产品
-// 四档词表；缺省解析在 host 端（yolo / allowed_models 末位 / 最高推理档）。
-export const zcodeOffPeakPermissionModeSchema = z.enum(["build", "edit", "plan", "yolo"]);
+// 四档词表（D29-4）；缺省解析在 host 端（D49-4：yolo / allowed_models 末位 / 最高推理档）。
+export const zcodeOffPeakPermissionModeSchema = z.enum([
+  "build",
+  "edit",
+  "plan",
+  "yolo",
+  "guarded",
+]);
 export type ZCodeOffPeakProtocolPermissionMode = z.infer<typeof zcodeOffPeakPermissionModeSchema>;
 
 export const zcodeOffPeakCreateParamsSchema = z
@@ -3568,6 +4079,7 @@ export const zcodeProtocolMethods = {
   sessionList: "session/list",
   sessionSubagents: "session/subagents",
   sessionRequestRuntimePreferences: "session/requestRuntimePreferences",
+  subagentsReadRuntimeConfig: "subagents/readRuntimeConfig",
   sessionRead: "session/read",
   sessionMessages: "session/messages",
   sessionEvents: "session/events",
@@ -3614,8 +4126,27 @@ export const zcodeProtocolMethods = {
   workspaceCancelGenerateText: "workspace/cancelGenerateText",
   providerTestModelConnectivity: "provider/testModelConnectivity",
   mcpList: "mcp/list",
+  mcpReadResource: "mcp/readResource",
+  mcpUiOpenInstance: "mcp/uiOpenInstance",
+  mcpUiCloseInstance: "mcp/uiCloseInstance",
+  mcpUiValidateInstance: "mcp/uiValidateInstance",
+  mcpUiSampling: "mcp/uiSampling",
+  mcpUiCancelSampling: "mcp/uiCancelSampling",
+  mcpUiCallTool: "mcp/uiCallTool",
+  mcpUiCancelCall: "mcp/uiCancelCall",
+  mcpUiReadResource: "mcp/uiReadResource",
+  mcpUiListResources: "mcp/uiListResources",
+  mcpUiListResourceTemplates: "mcp/uiListResourceTemplates",
+  mcpUiSubscribeResource: "mcp/uiSubscribeResource",
+  mcpUiUnsubscribeResource: "mcp/uiUnsubscribeResource",
+  // App-Provided Tools：页面工具登记 / 注销，与模型调用的认领 / 回传（信箱投递走 v4 live 增量）。
+  mcpUiRegisterAppTools: "mcp/uiRegisterAppTools",
+  mcpUiUnregisterAppTools: "mcp/uiUnregisterAppTools",
+  mcpUiClaimAppToolCall: "mcp/uiClaimAppToolCall",
+  mcpUiResolveAppToolCall: "mcp/uiResolveAppToolCall",
   pluginsList: "plugins/list",
   pluginsReferenceCatalog: "plugins/referenceCatalog",
+  pluginsListUiSurfaces: "plugins/listUiSurfaces",
   pluginsReferenceCatalogWithCategory: "plugins/referenceCatalogWithCategory",
   skillsReferenceCatalog: "skills/referenceCatalog",
   // 已保存工作流的 GUI 中枢：workspace 级、无会话。
@@ -3626,6 +4157,10 @@ export const zcodeProtocolMethods = {
   workflowsRuns: "workflows/runs",
   // 在项目档 / 全局档之间移动同名文件。
   workflowsMove: "workflows/move",
+  // 完成卡的「直接保存」与「已保存」判定（docs/dynamic-workflow/transcript-and-notifications.md）：
+  // 前者按 runId 从 journal 取脚本落盘，后者回答「这次 run 对应哪个已保存工作流」。
+  workflowsSave: "workflows/save",
+  workflowsForRun: "workflows/forRun",
   pluginsResolveSuggestedReference: "plugins/resolveSuggestedReference",
   pluginsSetEnabled: "plugins/setEnabled",
   pluginsOverview: "plugins/overview",
@@ -3642,6 +4177,9 @@ export const zcodeProtocolMethods = {
   pluginsValidate: "plugins/validate",
   pluginsDescribe: "plugins/describe",
   automationCreate: "automation/create",
+  topicResourceRead: "topic/resource/read",
+  channelReply: "bot/channel/reply",
+  topicResourceCancel: "topic/resource/cancel",
   automationUpdate: "automation/update",
   automationCheckTaskBinding: "automation/checkTaskBinding",
   automationList: "automation/list",
@@ -3657,6 +4195,7 @@ export const zcodeProtocolMethods = {
   sessionUsage: "session/usage",
   // 资源管理器：CLI 回报其 MCP 子进程 pid 与插件归属（纯内存，无 I/O），采样在 Host 侧完成。
   processChildProcesses: "process/childProcesses",
+  processNetworkCapture: "process/networkCapture",
   interactionRequestPermission: "interaction/requestPermission",
   interactionRequestUserInput: "interaction/requestUserInput",
   interactionRequestProviderRuntimeHeaders: "interaction/requestProviderRuntimeHeaders",
@@ -3673,6 +4212,18 @@ export const zcodeProtocolEmptyResultSchema = z.object({}).strict();
 // 最新 V4 主链已不再依赖旧版全量方法表；这里仅保留仍被兼容测试和 browser broker
 // 消费的最小契约集合，避免重新引入已移除的 legacy 方法。
 export const zcodeProtocolSessionMethodContracts = {
+  [zcodeProtocolMethods.mcpUiOpenInstance]: {
+    params: zcodeMcpUiOpenInstanceParamsSchema,
+    result: zcodeMcpUiOpenInstanceResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiCloseInstance]: {
+    params: zcodeMcpUiCloseInstanceParamsSchema,
+    result: zcodeMcpUiCloseInstanceResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiValidateInstance]: {
+    params: zcodeMcpUiCloseInstanceParamsSchema,
+    result: zcodeMcpUiResourceSubscriptionResultSchema,
+  },
   [zcodeProtocolMethods.workspaceHookTrustGrant]: {
     params: zcodeWorkspaceHookTrustGrantParamsSchema,
     result: zcodeWorkspaceHookTrustGrantResultSchema,
@@ -3680,6 +4231,62 @@ export const zcodeProtocolSessionMethodContracts = {
   [zcodeProtocolMethods.mcpList]: {
     params: zcodeMcpListParamsSchema,
     result: zcodeMcpListResultSchema,
+  },
+  [zcodeProtocolMethods.mcpReadResource]: {
+    params: zcodeMcpReadResourceParamsSchema,
+    result: zcodeMcpReadResourceResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiSampling]: {
+    params: zcodeMcpUiSamplingParamsSchema,
+    result: zcodeMcpUiSamplingResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiCancelSampling]: {
+    params: zcodeMcpUiCancelSamplingParamsSchema,
+    result: zcodeMcpUiCancelCallResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiCallTool]: {
+    params: zcodeMcpUiCallToolParamsSchema,
+    result: zcodeMcpUiCallToolResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiCancelCall]: {
+    params: zcodeMcpUiCancelCallParamsSchema,
+    result: zcodeMcpUiCancelCallResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiReadResource]: {
+    params: zcodeMcpUiReadResourceParamsSchema,
+    result: zcodeMcpUiReadResourceResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiListResources]: {
+    params: zcodeMcpUiListResourcesParamsSchema,
+    result: zcodeMcpUiListResourcesResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiListResourceTemplates]: {
+    params: zcodeMcpUiListResourcesParamsSchema,
+    result: zcodeMcpUiListResourceTemplatesResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiSubscribeResource]: {
+    params: zcodeMcpUiResourceSubscriptionParamsSchema,
+    result: zcodeMcpUiResourceSubscriptionResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiUnsubscribeResource]: {
+    params: zcodeMcpUiResourceSubscriptionParamsSchema,
+    result: zcodeMcpUiResourceSubscriptionResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiRegisterAppTools]: {
+    params: zcodeMcpUiRegisterAppToolsParamsSchema,
+    result: zcodeMcpUiRegisterAppToolsResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiUnregisterAppTools]: {
+    params: zcodeMcpUiUnregisterAppToolsParamsSchema,
+    result: zcodeMcpUiUnregisterAppToolsResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiClaimAppToolCall]: {
+    params: zcodeMcpUiClaimAppToolCallParamsSchema,
+    result: zcodeMcpUiAppToolAcceptedResultSchema,
+  },
+  [zcodeProtocolMethods.mcpUiResolveAppToolCall]: {
+    params: zcodeMcpUiResolveAppToolCallParamsSchema,
+    result: zcodeMcpUiAppToolAcceptedResultSchema,
   },
   [zcodeProtocolMethods.interactionBrowserList]: {
     params: zcodeBrowserListParamsSchema,
@@ -3714,7 +4321,19 @@ export const zcodeStoragePreparationFrameSchema = z.discriminatedUnion("method",
 export const zcodeStoragePathReadySchema = z
   .object({ method: z.literal("startup/storagePathReady"), reuse: z.boolean().optional() })
   .strict();
-export * from "../localTtft.js";
 
 // 桌面本地 TTFT 的严格事实合同；检查点不能替代实际内容帧。
 export { localTtftFactsSchema } from "../localTtft.js";
+// 群来源由可信 Host 注入，V4 命令与持久化输入使用相同运行时校验。
+export {
+  botIdentitySchema,
+  botTopicInputMessageSchema,
+  botGroupInputSourceSchema,
+  type BotGroupInputSource,
+} from "../bots.js";
+export {
+  botTopicContextSchema,
+  botTopicMessageSchema,
+  type BotTopicHistoryBatch,
+  type BotTopicMessage,
+} from "../bots.js";

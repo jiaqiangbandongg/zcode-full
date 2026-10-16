@@ -1,6 +1,7 @@
 import {
   AMEND_WORKFLOW_TOOL_NAME,
   CREATE_WORKFLOW_TOOL_NAME,
+  FILL_WORKFLOW_HOLE_TOOL_NAME,
   RESOLVE_WORKFLOW_QUESTION_TOOL_NAME,
   RESPOND_TO_COORDINATOR_TOOL_NAME,
   RESUME_WORKFLOW_RUN_TOOL_NAME,
@@ -44,6 +45,9 @@ const WORKFLOW_CHILD_DISALLOWED_TOOLS = [
   // 先例）：那一份是 driver 侧 persona 工具面的减法；这一份按 taskType 覆盖全部 workflow
   // child，不依赖 driver 记得写。
   RESOLVE_WORKFLOW_QUESTION_TOOL_NAME,
+  // FillWorkflowHole 与 AmendWorkflow 同一个根因（alwaysAsk 在 child 里无窗可弹）加同一条不变式
+  // （留白是脚本向**主代理**要代码，子代理不得替它写）：一并进列。
+  FILL_WORKFLOW_HOLE_TOOL_NAME,
 ] as const;
 
 /**
@@ -62,17 +66,22 @@ export function resolveRuntimeDisallowedTools(
 }
 
 /**
- * 动态工作流开关在 registerBuiltInTools 上的取值。
- * **缺席即开启**：TUI 保留默认工具面；headless 根据 --enable-workflow 显式写 true/false，
+ * 动态工作流灰度门在 registerBuiltInTools 上的取值（docs/dynamic-workflow/launch.md「Gray release」）。
+ * **缺席即开启**：独立 CLI 的 TUI 与 headless 根据 --workflow-mode 显式写 true/false，
  * protocol session 由受信 Host 控制，workflow_child 继承父配置。fail-closed 的缺省值在
- * headless 入口和协议服务端的 appRuntimePreferences，不在这一层。
+ * 独立 CLI 入口和协议服务端的 appRuntimePreferences，不在这一层。
  *
  * 之所以和 resolveRuntimeDisallowedTools 一样收在这里而不是写在调用点：注册面有**两个**入口
  * （helpers/runtime-tools.ts 的首次装配、methods/embedded-search-branch.ts 的分支刷新），
  * 两个入口必须使用同一规则，否则刷新工具列表时可能重新注册已关闭的工作流工具。
  */
-export function resolveRuntimeDynamicWorkflowToolsIncluded(config: AgentRuntimeConfig): boolean {
-  return config.dynamicWorkflowEnabled !== false;
+export function resolveRuntimeDynamicWorkflowToolsIncluded(runtime: {
+  config: AgentRuntimeConfig;
+  dynamicWorkflowToolsActivated: boolean;
+}): boolean {
+  // enabled ∧ (¬onDemand ∨ activated)：激活态归 runtime（launch.md「On demand: activation」），
+  // 非 onDemand 会话出生即 activated，所以这里对 alwaysOn / TUI / headless 仍只看 enabled。
+  return runtime.config.dynamicWorkflowEnabled !== false && runtime.dynamicWorkflowToolsActivated;
 }
 
 export function resolveBuiltInToolAllowlist(

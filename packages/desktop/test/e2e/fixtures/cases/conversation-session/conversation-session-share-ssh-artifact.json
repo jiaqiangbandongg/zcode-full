@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-ssh-artifact",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-ssh-artifact.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-share-ssh-artifact.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "conversation-share-ssh-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The case validates remote file authority and publication wiring, not model content."
+    }
+  ]
+}

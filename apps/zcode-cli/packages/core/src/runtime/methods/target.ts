@@ -200,7 +200,7 @@ async function targetContinuationCandidateForCommand(
   return target;
 }
 
-async function hasRunningBackgroundTaskForGoalContinuation(
+export async function hasRunningBackgroundTaskForGoalContinuation(
   this: AgentRuntimeInternal,
 ): Promise<boolean> {
   return hasRunningBackgroundRuntimeTask(this.runtimeTaskRegistry);

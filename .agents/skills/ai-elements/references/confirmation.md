@@ -68,9 +68,9 @@ const Example = () => {
   };
 
   const latestMessage = messages[messages.length - 1];
-  const deleteTool = latestMessage?.parts?.find((part) => part.type === "tool-delete_file") as
-    | DeleteFileToolUIPart
-    | undefined;
+  const deleteTool = latestMessage?.parts?.find(
+    (part) => part.type === "tool-delete_file"
+  ) as DeleteFileToolUIPart | undefined;
 
   return (
     <div className="max-w-4xl mx-auto p-6 relative size-full rounded-lg border h-[600px]">
@@ -82,7 +82,8 @@ const Example = () => {
         {deleteTool?.approval && (
           <Confirmation approval={deleteTool.approval} state={deleteTool.state}>
             <ConfirmationRequest>
-              This tool wants to delete: <code>{deleteTool.input?.filePath}</code>
+              This tool wants to delete:{" "}
+              <code>{deleteTool.input?.filePath}</code>
               <br />
               Do you approve this action?
             </ConfirmationRequest>
@@ -221,48 +222,48 @@ See `scripts/confirmation-rejected.tsx` for this example.
 
 ### `<Confirmation />`
 
-| Prop        | Type                                 | Default | Description                                                                                                                                                                                                  |
-| ----------- | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `approval`  | `ToolUIPart[`                        | -       | The approval object containing the approval ID and status. If not provided or undefined, the component will not render.                                                                                      |
-| `state`     | `ToolUIPart[`                        | -       | The current state of the tool (input-streaming, input-available, approval-requested, approval-responded, output-denied, or output-available). Will not render for input-streaming or input-available states. |
-| `className` | `string`                             | -       | Additional CSS classes to apply to the Alert component.                                                                                                                                                      |
-| `...props`  | `React.ComponentProps<typeof Alert>` | -       | Any other props are spread to the Alert component.                                                                                                                                                           |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `approval` | `ToolUIPart[` | - | The approval object containing the approval ID and status. If not provided or undefined, the component will not render. |
+| `state` | `ToolUIPart[` | - | The current state of the tool (input-streaming, input-available, approval-requested, approval-responded, output-denied, or output-available). Will not render for input-streaming or input-available states. |
+| `className` | `string` | - | Additional CSS classes to apply to the Alert component. |
+| `...props` | `React.ComponentProps<typeof Alert>` | - | Any other props are spread to the Alert component. |
 
 ### `<ConfirmationTitle />`
 
 A styled description element for displaying a title or label within the confirmation alert.
 
-| Prop       | Type                                            | Default | Description                                                              |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof AlertDescription>` | -       | Any other props are spread to the underlying AlertDescription component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof AlertDescription>` | - | Any other props are spread to the underlying AlertDescription component. |
 
 ### `<ConfirmationRequest />`
 
-| Prop       | Type              | Default | Description                                                                   |
-| ---------- | ----------------- | ------- | ----------------------------------------------------------------------------- |
-| `children` | `React.ReactNode` | -       | The content to display when approval is requested. Only renders when state is |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | The content to display when approval is requested. Only renders when state is  |
 
 ### `<ConfirmationAccepted />`
 
-| Prop       | Type              | Default | Description                                                                                                |
-| ---------- | ----------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| `children` | `React.ReactNode` | -       | The content to display when approval is accepted. Only renders when approval.approved is true and state is |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | The content to display when approval is accepted. Only renders when approval.approved is true and state is  |
 
 ### `<ConfirmationRejected />`
 
-| Prop       | Type              | Default | Description                                                                                                 |
-| ---------- | ----------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `children` | `React.ReactNode` | -       | The content to display when approval is rejected. Only renders when approval.approved is false and state is |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | The content to display when approval is rejected. Only renders when approval.approved is false and state is  |
 
 ### `<ConfirmationActions />`
 
-| Prop        | Type                    | Default | Description                                                               |
-| ----------- | ----------------------- | ------- | ------------------------------------------------------------------------- |
-| `className` | `string`                | -       | Additional CSS classes to apply to the actions container.                 |
-| `...props`  | `React.ComponentProps<` | -       | Any other props are spread to the div element. Only renders when state is |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `className` | `string` | - | Additional CSS classes to apply to the actions container. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the div element. Only renders when state is  |
 
 ### `<ConfirmationAction />`
 
-| Prop       | Type                                  | Default | Description                                                                                          |
-| ---------- | ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof Button>` | -       | Any other props are spread to the Button component. Styled with h-8 px-3 text-sm classes by default. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof Button>` | - | Any other props are spread to the Button component. Styled with h-8 px-3 text-sm classes by default. |

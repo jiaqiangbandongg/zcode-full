@@ -8,17 +8,17 @@ import {
   type PhaseSourceFact,
 } from "./phase-graph.js";
 import type { SiteGraph, SiteLoc, SiteNode } from "./types.js";
-import { SINK_ID, UNKNOWN_LANE, WORKSPACE_LANE } from "./causality-graph-types.js";
+import { MAIN_LANE, SINK_ID, UNKNOWN_LANE, WORKSPACE_LANE } from "./causality-graph-types.js";
 import type { CausalityGraph, Certainty, Fact, Lane } from "./causality-graph-types.js";
 import type { OrderEdge, Region, Step, StepKind } from "./causality-graph-types.js";
-import { dedupeFacts, expandMaySetLanes, weakest } from "./causality-graph-lanes.js";
+import { dedupeFacts, expandMaySetLanes, fillOf, weakest } from "./causality-graph-lanes.js";
 
 /** Re-exported so the causality vocabulary is importable from one module. */
 export type { NamePattern } from "./types.js";
 // 拆分：本文件顶到 oxlint max-lines 上限（400 行）。公开类型与三个 lane 常量定义
 // 在 causality-graph-types.ts，may-set 车道展开与事实去重在 causality-graph-lanes.ts；这里原样
 // 再导出，既有的 `from "./causality-graph.js"` 引用一个不改。
-export { SINK_ID, UNKNOWN_LANE, WORKSPACE_LANE } from "./causality-graph-types.js";
+export { MAIN_LANE, SINK_ID, UNKNOWN_LANE, WORKSPACE_LANE } from "./causality-graph-types.js";
 export type { CausalityGraph, Certainty, Lane, OrderEdge } from "./causality-graph-types.js";
 export type { Phase, Region, Step, StepKind } from "./causality-graph-types.js";
 
@@ -57,7 +57,8 @@ export function projectCausalityGraph(core: AnalysisCore, site: SiteGraph): Caus
 
   const stepNodes = site.nodes.filter(
     (node): node is SiteNode & { loc: SiteLoc } =>
-      (node.kind === "ask" || node.kind === "world-read") && node.loc !== undefined,
+      (node.kind === "ask" || node.kind === "world-read" || node.kind === "hole") &&
+      node.loc !== undefined,
   );
   const stepIds = new Set(stepNodes.map((node) => node.id));
 
@@ -241,6 +242,10 @@ export function projectCausalityGraph(core: AnalysisCore, site: SiteGraph): Caus
       laneSet.set(node.id, [WORKSPACE_LANE]);
       continue;
     }
+    if (node.kind === "hole") {
+      laneSet.set(node.id, [MAIN_LANE]); // 留白等的是主代理：它的车道（docs/analysis.md「Sites」）
+      continue;
+    }
     const actors = node.actors ?? [];
     laneSet.set(node.id, actors.length > 0 ? [...actors] : [UNKNOWN_LANE]);
   }
@@ -291,7 +296,9 @@ export function projectCausalityGraph(core: AnalysisCore, site: SiteGraph): Caus
     (a, b) => (minIssue.get(a.id) ?? 0) - (minIssue.get(b.id) ?? 0),
   );
   const realLanes = (step: string): string[] =>
-    (laneSet.get(step) ?? []).filter((lane) => lane !== WORKSPACE_LANE && lane !== UNKNOWN_LANE);
+    (laneSet.get(step) ?? []).filter(
+      (lane) => lane !== WORKSPACE_LANE && lane !== UNKNOWN_LANE && lane !== MAIN_LANE,
+    );
   for (let i = 0; i < issueOrder.length; i += 1) {
     for (let j = i + 1; j < issueOrder.length; j += 1) {
       const a = issueOrder[i] as SiteNode;
@@ -469,6 +476,7 @@ export function projectCausalityGraph(core: AnalysisCore, site: SiteGraph): Caus
   for (const node of stepNodes) for (const lane of laneSet.get(node.id) ?? []) usedLanes.add(lane);
 
   const laneOrder: Lane[] = [];
+  if (usedLanes.has(MAIN_LANE)) laneOrder.push({ id: MAIN_LANE });
   if (usedLanes.has(WORKSPACE_LANE)) laneOrder.push({ id: WORKSPACE_LANE });
   for (const actor of site.actors) {
     if (!usedLanes.has(actor.id)) continue;
@@ -522,11 +530,15 @@ export function projectCausalityGraph(core: AnalysisCore, site: SiteGraph): Caus
     if (lane.families !== undefined) lane.families = lane.families.map(renamed);
   }
 
+  // 开放的留白自己的 id 不带前缀（名字键，hole-id.ts）：它属于哪次补全要问站点表。
+  const holeFill = new Map(core.sites.holes.map((hole) => [hole.id, hole.fill]));
   const steps: Step[] = stepNodes.map((node) => {
     const lanes = laneSet.get(node.id) ?? [UNKNOWN_LANE];
     const repeats = repeat.get(node.id);
+    const fill = fillOf(node.id) ?? holeFill.get(node.id);
     return {
       certainty: certaintyOf(node.id),
+      ...(fill === undefined ? {} : { fill }),
       id: node.id,
       kind: node.kind as StepKind,
       label: node.label,

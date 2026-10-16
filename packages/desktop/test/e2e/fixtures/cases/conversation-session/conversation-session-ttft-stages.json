@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ttft-stages",
+  "spec": "./test/e2e/conversation-session/conversation-session-ttft-stages.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ttft-stages.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/ttft/input.txt",
+      "source": "created-by-helper",
+      "description": "本用例通过异步 fs 创建，真实 Read 工具返回固定标记。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "ttft-text",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定正文首输出与模型等待，用最终 OTLP 验证阶段归因。"
+    },
+    {
+      "id": "ttft-stage-tool-call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定工具类型和输入，确保旧版与 V4 执行同一个只读工具。"
+    },
+    {
+      "id": "ttft-stage-tool-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "稳定结束工具轮，使 tool 和 generation 两个 step 可完整对账。"
+    },
+    {
+      "id": "ttft-stage-reasoning",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "真实模型是否输出 thought 不稳定，使用确定性 Anthropic SSE。"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-subagent-model-inheritance",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-subagent-model-inheritance.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-offpeak-subagent-model-inheritance.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "offpeak-subagents-ordinary-prompt",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "闲时 mock gateway 独立承载 execution-scoped Active Model；本响应只稳定证明下一条普通 prompt 已回到用户 provider。"
+    }
+  ]
+}

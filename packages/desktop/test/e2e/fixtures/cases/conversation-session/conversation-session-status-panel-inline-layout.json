@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-status-panel-inline-layout",
+  "spec": "./test/e2e/conversation-session/conversation-session-status-panel-inline-layout.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-status-panel-inline-layout.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "status-panel-inline-layout-empty-task-response",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 验证 renderer 布局合同；主回复只需要稳定完成并避免引入 goal/todo/running 内容。"
+    },
+    {
+      "id": "status-panel-inline-layout-goal-response",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 只需要稳定制造带 target 的 task；模型正文内容不参与断言。"
+    }
+  ]
+}

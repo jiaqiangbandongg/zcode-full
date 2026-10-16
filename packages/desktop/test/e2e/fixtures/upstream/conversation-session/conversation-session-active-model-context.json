@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-active-model-context",
+  "spec": "./test/e2e/conversation-session/conversation-session-active-model-context.test.ts",
+  "fixtures": [
+    {
+      "id": "active-model-title",
+      "description": "标题固定响应，不参与切模断言。",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"{\\\"title\\\":\\\"Active Model\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "active-model-step-0",
+      "description": "同一会话第 1 条请求，核对目标 URL 与 Context 身份。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_ACTIVE_MODEL_CONTEXT_STEP_0"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"active-model-context-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "active-model-step-1",
+      "description": "同一会话第 2 条请求，核对目标 URL 与 Context 身份。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_ACTIVE_MODEL_CONTEXT_STEP_1"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"active-model-context-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "active-model-step-2",
+      "description": "同一会话第 3 条请求，核对目标 URL 与 Context 身份。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_ACTIVE_MODEL_CONTEXT_STEP_2"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"active-model-context-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "active-model-step-3",
+      "description": "同一会话第 4 条请求，核对目标 URL 与 Context 身份。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_ACTIVE_MODEL_CONTEXT_STEP_3"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "data: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"active-model-context-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"active-model\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

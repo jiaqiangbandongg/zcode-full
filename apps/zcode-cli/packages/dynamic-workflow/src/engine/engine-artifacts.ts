@@ -20,7 +20,7 @@ import {
   primaryConflictMessage,
 } from "./engine-artifacts-primary.js";
 import { validateArtifactSpec } from "./artifact-spec.js";
-import { hashMismatch } from "./scheduler.js";
+import { hashMismatch } from "./hash-mismatch.js";
 import type { EngineState } from "./engine-state.js";
 import type {
   ArtifactPublishRequest,
@@ -108,7 +108,8 @@ export function publishContentArtifact(
       state.failRun(err);
       return Promise.reject(err);
     }
-    // 与 ask / world 命中同规：释放点过 replay 次序闸。发布是效应、脚本要 await 它，所以它也是一个能决定
+    // 与 ask / world 命中同规：释放点过 replay 次序闸（docs/execution-engine.md
+    // 「Replaying the settle order」）。发布是效应、脚本要 await 它，所以它也是一个能决定
     // 后续续体次序的释放点；预置声明是同步 void，从不走这条路，也就从不占闸。
     if (recorded.status === "completed") {
       const record = recorded.result as ArtifactVersionRecord;
@@ -384,12 +385,7 @@ function settleArtifactPublish(
       issued,
       new WorkflowError(
         "ArtifactPrimaryConflict",
-        primaryConflictMessage(
-          issued.id,
-          holder,
-          `publish "${issued.id}" without primary`,
-          instance,
-        ),
+        primaryConflictMessage(issued.id, holder, `publish "${issued.id}" without primary`, instance),
       ),
     );
   }

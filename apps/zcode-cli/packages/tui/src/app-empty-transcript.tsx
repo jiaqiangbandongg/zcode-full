@@ -8,7 +8,7 @@ const h = React.createElement as (
   ...children: React.ReactNode[]
 ) => React.ReactElement;
 
-const ZCODE_LOGO_LINES = [
+export const ZCODE_LOGO_LINES = [
   "███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
   "   ███╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝",
   "  ███╔╝ ██║     ██║   ██║██║  ██║█████╗  ",

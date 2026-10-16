@@ -31,7 +31,7 @@ export function createOpenAIResponsesJsonCompatFetch(baseFetch: ProviderFetch): 
   };
 }
 
-function normalizeOpenAIResponsesJson(value: unknown): Record<string, unknown> | undefined {
+export function normalizeOpenAIResponsesJson(value: unknown): Record<string, unknown> | undefined {
   const response = asRecord(value);
   if (!response || !Array.isArray(response.output)) {
     return undefined;

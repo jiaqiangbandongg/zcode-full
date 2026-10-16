@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-provider-registry-cold-start",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-provider-registry-cold-start.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-provider-registry-cold-start-title",
+      "description": "subagent provider registry 冷启动 case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-subagent-provider-registry-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Subagent Provider Registry\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-parent-tool",
+      "description": "父 agent 首轮请求返回 Agent tool_use，强制进入绑定 alternate provider 的 subagent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 child subagent provider registry 是否存在；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_REGISTRY_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_REGISTRY_PARENT",
+          "e2e-provider-registry-reviewer"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_provider_registry",
+          "name": "Agent",
+          "input": {
+            "description": "Run the alternate-provider E2E reviewer",
+            "prompt": "E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD: Reply with exactly \"E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD_OK\" and no other text.",
+            "subagent_type": "e2e-provider-registry-reviewer"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-child",
+      "description": "绑定 alternate provider 的 child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD"],
+        "bodyIncludes": ["E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-provider-registry-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-parent-final",
+      "description": "父 agent 收到 child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_REGISTRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_REGISTRY_CHILD_OK"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-provider-registry-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

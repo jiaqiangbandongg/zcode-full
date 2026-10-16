@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-mention",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-mention.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-mention-title",
+      "description": "E2E_V4_MENTION_SEED 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_MENTION_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_MENTION_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-mention-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Mention E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-mention-seed",
+      "description": "M5 mention 面板门禁：首轮固定回复建立可被 # 会话 mention 命中的 session（sessions-index 数据源）。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "mention 面板只需一个已存在 session 供 # 目录命中；首轮文案固定。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_MENTION_SEED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-mention-seed",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_MENTION_SEED_OK"
+        }
+      }
+    }
+  ]
+}

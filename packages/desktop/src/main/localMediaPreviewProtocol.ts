@@ -7,7 +7,7 @@ interface LocalMediaPreviewSchemeRegistrar {
   registerSchemesAsPrivileged(
     schemes: Array<{
       scheme: string;
-      privileges: { standard: boolean; secure: boolean; stream: boolean };
+      privileges: Record<string, boolean>;
     }>,
   ): void;
 }
@@ -31,7 +31,7 @@ interface LocalMediaPreviewProtocol {
 const installedProtocols = new WeakSet<object>();
 const NET_ERR_INVALID_URL = -300;
 
-interface LocalMediaPreviewPathRegistry {
+export interface LocalMediaPreviewPathRegistry {
   authorize(path: string): Promise<string>;
   isAuthorized(path: string): boolean;
   clear(): void;
@@ -134,12 +134,18 @@ export function createLocalMediaPreviewPathRegistry(
  * 缺少 standard 时 Chromium 不会按标准 URL 处理文件尾读取，导致 moov 位于 mdat
  * 之后的 MP4 被误判为不可解码；standard 与 stream 共同保留本地视频的元数据读取和 seek。
  */
-export function registerLocalMediaPreviewScheme(protocol: LocalMediaPreviewSchemeRegistrar): void {
+export function registerLocalMediaPreviewScheme(
+  protocol: LocalMediaPreviewSchemeRegistrar,
+  // registerSchemesAsPrivileged 只能调用一次（后一次覆盖前一次），其他 privileged scheme
+  // （如插件 UI 沙箱的 zcode-sandbox）必须在这同一次调用里一起注册。
+  additionalSchemes: Array<{ scheme: string; privileges: Record<string, boolean> }> = [],
+): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: LOCAL_MEDIA_PREVIEW_SCHEME,
       privileges: { standard: true, secure: true, stream: true },
     },
+    ...additionalSchemes,
   ]);
 }
 

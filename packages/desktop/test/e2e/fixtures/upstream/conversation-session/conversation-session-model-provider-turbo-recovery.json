@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-turbo-recovery",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-turbo-recovery.test.ts",
+  "fixtures": [
+    {
+      "id": "model-provider-turbo-recovery-title",
+      "description": "Turbo 重启恢复 case 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 Turbo 重启恢复语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"model-provider-turbo-recovery-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5-Turbo\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Turbo recovery\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"model-provider-turbo-recovery-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5-Turbo\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "model-provider-turbo-recovery-t02",
+      "description": "I36 重启后首发保持 Turbo + enabled。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是首发请求使用 Turbo + enabled，固定响应只用于稳定收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_RESTART_T02"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"model-provider-turbo-recovery-t02\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5-Turbo\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"model-provider-turbo-recovery-t02\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5-Turbo\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

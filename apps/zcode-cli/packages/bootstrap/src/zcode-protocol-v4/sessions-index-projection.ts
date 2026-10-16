@@ -21,7 +21,7 @@ export interface SessionSummaryDeriveExtra {
 const MAX_PREVIEW_CHARS = 120;
 
 /** 从 ConversationSnapshot + 会话元信息派生 SessionSummary（纯函数，golden 可测）。 */
-function deriveSessionSummary(
+export function deriveSessionSummary(
   snapshot: ConversationSnapshot,
   extra: SessionSummaryDeriveExtra,
 ): SessionSummary {

@@ -1,0 +1,10 @@
+lane actor#1 "keeper" @7:17
+lane actor#2 "picker" @9:28
+lane actor#3 "final" @10:8
+region seq#1 seq
+step ask#1 ask "keeper" @7:33 lane=actor#1 region=seq#1 always
+step ask#2 ask "picker" @9:44 lane=actor#2 region=seq#1 always
+step ask#3 ask "final" @10:23 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#2 data always exact
+edge ask#2 -> ask#3 seq always
+sink ask#3

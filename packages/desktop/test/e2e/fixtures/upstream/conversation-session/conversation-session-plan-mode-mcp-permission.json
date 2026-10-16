@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-mode-mcp-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-mode-mcp-permission.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plan-mode-mcp-enter-plan",
+      "description": "首轮请求返回 EnterPlanMode，让后续 MCP 工具调用处在 plan mode。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 plan mode 状态，避免依赖真实模型是否主动进入计划模式。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_MODE_MCP_PERMISSION"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_MCP_PERMISSION",
+          "mcp__plan_mode_e2e__lookup",
+          "mcp__plan_mode_e2e__reset"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mcp_enter_plan",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-mcp-lookup",
+      "description": "plan mode 内调用未声明 readOnlyHint 的非 destructive MCP 工具。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定覆盖 Plan mode 对非 destructive MCP 的 readonly 例外。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_MCP_PERMISSION",
+          "toolu_e2e_plan_mcp_enter_plan"
+        ],
+        "bodyExcludes": [
+          "E2E_PLAN_MCP_LOOKUP_RESULT",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mcp_lookup",
+          "name": "mcp__plan_mode_e2e__lookup",
+          "input": {
+            "query": "E2E_PLAN_MCP_LOOKUP_QUERY"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-mcp-destructive-reset",
+      "description": "lookup 工具真实执行后，继续尝试 destructive MCP 工具。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定覆盖同一 plan turn 中 destructive MCP 仍需被拒绝。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_MCP_PERMISSION",
+          "toolu_e2e_plan_mcp_lookup",
+          "E2E_PLAN_MCP_LOOKUP_RESULT:E2E_PLAN_MCP_LOOKUP_QUERY"
+        ],
+        "bodyExcludes": [
+          "toolu_e2e_plan_mcp_reset",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mcp_reset",
+          "name": "mcp__plan_mode_e2e__reset",
+          "input": {
+            "marker": "E2E_PLAN_MCP_DESTRUCTIVE_ATTEMPT"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-mcp-final",
+      "description": "destructive MCP 被 Plan mode 拒绝后，模型消费拒绝结果并最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 destructive MCP 的拒绝结果进入 provider-visible 请求且同一轮可正常收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_MCP_PERMISSION",
+          "toolu_e2e_plan_mcp_reset",
+          "Plan mode only allows read-only, non-destructive tools"
+        ],
+        "bodyExcludes": [
+          "E2E_PLAN_MCP_RESET_SHOULD_NOT_RUN",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

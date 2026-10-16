@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 
-type DrainWaitResult = "drain" | "closed";
+export type DrainWaitResult = "drain" | "closed";
 
 export function waitForDrainOrDisconnect(
   request: IncomingMessage,

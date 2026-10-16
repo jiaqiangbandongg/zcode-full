@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-native-search-setting",
+  "spec": "./test/e2e/conversation-session/conversation-session-native-search-setting.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-native-search-setting.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "nse-enabled-initial-title",
+      "description": "增强搜索默认启用 Session 的标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "用首发 marker 隔离标题请求。"
+    },
+    {
+      "id": "nse-enabled-initial-call",
+      "description": "默认启用 Session 执行真实 native search 版本检查。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定只读 Bash 命令，验证实际 bfs/ugrep/rg 输出。"
+    },
+    {
+      "id": "nse-enabled-initial-final",
+      "description": "默认启用 Session 在真实版本输出后收口。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只有 ugrep 与 rg 的真实版本进入 tool result 后才返回终态。"
+    },
+    {
+      "id": "nse-enabled-active-call",
+      "description": "关闭设置后 active Session 再次执行版本检查。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "复用同一只读命令，证明 active runtime 不热更新。"
+    },
+    {
+      "id": "nse-enabled-active-final",
+      "description": "active Session 仍命中 ugrep 后收口。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证设置切换不改写已物化 runtime。"
+    },
+    {
+      "id": "nse-disabled-new-title",
+      "description": "关闭增强搜索后新 Session 的标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "用首发 marker 隔离第二个 Session 的标题请求。"
+    },
+    {
+      "id": "nse-disabled-new-call",
+      "description": "关闭增强搜索的新 Session 执行 system find/grep 与 rg。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定只读 Bash 命令，验证 find/grep 未被注入且 rg 保持。"
+    },
+    {
+      "id": "nse-disabled-new-final",
+      "description": "system find/grep 与 rg 真实输出后收口。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只有非函数 find/grep 和 rg 版本进入 tool result 后才返回终态。"
+    },
+    {
+      "id": "nse-enabled-cold-resume-call",
+      "description": "App/Agent 冷重启后恢复旧 Session 并读取最新启用值。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "复用版本检查命令，证明 cold resume 重新物化 runtime。"
+    },
+    {
+      "id": "nse-enabled-cold-resume-final",
+      "description": "cold resume 后重新命中增强搜索并收口。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 cold resume 使用当前全局设置，不恢复旧 Session 开关快照。"
+    },
+    {
+      "id": "nse-disabled-cold-resume-call",
+      "description": "再次冷重启后恢复旧 Session 并读取最新关闭值。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "复用 system find/grep 命令，证明 cold resume 的反向设置切换。"
+    },
+    {
+      "id": "nse-disabled-cold-resume-final",
+      "description": "反向 cold resume 后 system find/grep 与 rg 输出收口。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 cold resume 使用当前关闭值，不恢复上一轮启用 runtime。"
+    }
+  ]
+}

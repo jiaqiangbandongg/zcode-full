@@ -53,12 +53,12 @@ function argList(args: readonly unknown[] | undefined, index: number): string[] 
 }
 
 /** 一条 argv 的展示：带空格的实参加引号，与终端里敲的样子一致。 */
-function formatCommandLine(cmd: string, args: readonly string[]): string {
+export function formatCommandLine(cmd: string, args: readonly string[]): string {
   const quote = (part: string) => (/[\s"']/.test(part) ? JSON.stringify(part) : part);
   return [cmd, ...args].map(quote).join(" ");
 }
 
-function workspaceCardKindOf(op: string | undefined): WorkspaceCardKind {
+export function workspaceCardKindOf(op: string | undefined): WorkspaceCardKind {
   if (op === undefined) return "step";
   if (op === "read") return "read";
   if (op === "glob" || op === "grep") return "search";
@@ -76,7 +76,9 @@ function gitSubcommand(op: string): string {
  * 站点 → 阶段的查找表。静态图的 step 带 `phase`；`source ?? id` 是站点 id（may-set 展开的
  * 拷贝带 `source`）。无 `phase()` 标记的脚本没有 phases，表为空，所有卡都不带源芯片。
  */
-function phaseBySiteId(graph: WorkflowCausalityGraphData | undefined): Map<string, PhaseNaming> {
+function phaseBySiteId(
+  graph: WorkflowCausalityGraphData | undefined,
+): Map<string, PhaseNaming> {
   const table = new Map<string, PhaseNaming>();
   if (graph === undefined) return table;
   const phases = new Map((graph.phases ?? []).map((phase) => [phase.id, phase] as const));
@@ -90,7 +92,9 @@ function phaseBySiteId(graph: WorkflowCausalityGraphData | undefined): Map<strin
 }
 
 /** 站点 → 静态步标签（历史行的兜底主文本）。 */
-function stepLabelBySiteId(graph: WorkflowCausalityGraphData | undefined): Map<string, string> {
+function stepLabelBySiteId(
+  graph: WorkflowCausalityGraphData | undefined,
+): Map<string, string> {
   const table = new Map<string, string>();
   for (const step of graph?.steps ?? []) table.set(step.source ?? step.id, step.label);
   return table;

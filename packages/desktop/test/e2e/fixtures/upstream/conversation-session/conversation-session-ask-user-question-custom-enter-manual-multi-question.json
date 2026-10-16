@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-manual-multi-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-manual-multi-question.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-manual-multi-question-call",
+      "description": "AskUserQuestion custom Enter: 首轮返回三题合法问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造三题 AskUserQuestion 等待态，避免真实模型生成非法选项数量或题目结构漂移影响 Enter 答案采集复现。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_CUSTOM_ENTER_MANUAL_MULTI"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_CUSTOM_ENTER_MANUAL_MULTI",
+          "E2E_ASK_USER_QUESTION_ENTER_MANUAL_MULTI_TOOL",
+          "E2E_AQ_ENTER_MANUAL_MULTI_Q1_CUSTOM",
+          "E2E_AQ_ENTER_MANUAL_MULTI_Q2_CUSTOM",
+          "E2E_AQ_ENTER_MANUAL_MULTI_Q3_CUSTOM"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_ask_user_question_custom_enter_manual_multi_question",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_AQ_ENTER_MANUAL_MULTI_Q1_CUSTOM: Which custom release feature should be prioritized?",
+                "header": "Enter Q1",
+                "options": [
+                  {
+                    "label": "Use default Q1",
+                    "description": "Continue with the first default answer."
+                  },
+                  {
+                    "label": "Use fallback Q1",
+                    "description": "Continue with the first fallback answer."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQ_ENTER_MANUAL_MULTI_Q2_CUSTOM: Which custom onboarding improvement should be prioritized?",
+                "header": "Enter Q2",
+                "options": [
+                  {
+                    "label": "Use default Q2",
+                    "description": "Continue with the second default answer."
+                  },
+                  {
+                    "label": "Use fallback Q2",
+                    "description": "Continue with the second fallback answer."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQ_ENTER_MANUAL_MULTI_Q3_CUSTOM: Which custom theme color should be prioritized?",
+                "header": "Enter Q3",
+                "options": [
+                  {
+                    "label": "Use default Q3",
+                    "description": "Continue with the third default answer."
+                  },
+                  {
+                    "label": "Use fallback Q3",
+                    "description": "Continue with the third fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-manual-multi-question-final",
+      "description": "AskUserQuestion custom Enter: 三题自定义回答进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明三题 Enter 提交后的自定义回答已被 agent 消费，核心断言在答案采集和 UI 已回答记录。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AQ_ENTER_MANUAL_MULTI_A1",
+          "E2E_AQ_ENTER_MANUAL_MULTI_A2",
+          "E2E_AQ_ENTER_MANUAL_MULTI_A3",
+          "E2E_ASK_USER_QUESTION_ENTER_MANUAL_MULTI_TOOL",
+          "toolu_e2e_ask_user_question_custom_enter_manual_multi_question"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

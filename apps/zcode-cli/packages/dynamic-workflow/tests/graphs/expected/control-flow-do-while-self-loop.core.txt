@@ -1,0 +1,11 @@
+actor actor#1 "planner" @2:17 order=0
+ask ask#1 "planner" @6:25 order=1 type="string"
+fact ask-data ask#1 <- ask#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact return <- ask#1 exact
+region seq#1 seq entered
+region loop#1 loop parent=seq#1 @5:1 entered
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1>loop#1 phase=unphased
+settle ask#1 in=seq#1>loop#1
+jump return seq#1 in=seq#1 phase=unphased

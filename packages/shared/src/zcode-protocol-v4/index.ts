@@ -12,6 +12,7 @@ export * from "./workflow-observation-display.js";
 export * from "./snapshot.js";
 export * from "./workflow-runs.js";
 export * from "./workflow-runs-reducer.js";
+export * from "./workflow-runs-holes.js";
 // workflowRuns 的键级增量（diff / apply / 规范键序）；op 本身在 delta.js。
 export * from "./workflow-runs-delta.js";
 // 界留下的痕迹：被拒实例计数、条目预算、步数读法；表满时的腾位；以及给旧消费者的裁剪。

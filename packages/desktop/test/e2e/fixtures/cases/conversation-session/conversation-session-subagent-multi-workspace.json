@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-multi-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-multi-workspace.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-multi-workspace.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "smw-a-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-hold-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-hold-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-hold-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-hold-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-hold-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-hold-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-project-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-project-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-a-project-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-project-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-project-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-project-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+    },
+    {
+      "id": "smw-b-fallback-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "B 项目读取失败时自定义 Agent 明确失败且不创建 child；A 保存/执行正常，B 恢复后重新消费用户配置。"
+    },
+    {
+      "id": "smw-b-fallback-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "B 项目读取失败时自定义 Agent 明确失败且不创建 child；A 保存/执行正常，B 恢复后重新消费用户配置。"
+    }
+  ]
+}

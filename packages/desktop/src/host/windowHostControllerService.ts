@@ -29,7 +29,7 @@ import {
   type WindowHostSessionsIndexObserver,
 } from "./windowHostSessionsIndexObserver.js";
 
-interface ResolvedWindowHostControllerSource {
+export interface ResolvedWindowHostControllerSource {
   scope: WindowHostControllerSourceScope;
   taskService?: IZCodeTaskService;
   agentService?: IZCodeAgentService;

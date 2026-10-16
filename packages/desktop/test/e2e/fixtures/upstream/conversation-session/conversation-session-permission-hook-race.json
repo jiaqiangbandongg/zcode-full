@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-hook-race",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-hook-race.test.ts",
+  "fixtures": [
+    {
+      "id": "permission-hook-race-title",
+      "description": "E2E_PERMISSION_HOOK_RACE 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_PERMISSION_HOOK_RACE 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_PERMISSION_HOOK_RACE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "permission-hook-race-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Permission Hook Race E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "permission-hook-race-write-call",
+      "description": "HK16 竞速回归：Write tool_use，默认模式触发权限弹窗，同时启动阻塞 PermissionRequest hook。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Write 是需要审批的破坏性工具；确认窗与阻塞 hook 并发出现后由 spec 在 UI 侧批准，验证 permission-responder-race 先到者胜。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PERMISSION_HOOK_RACE"],
+        "bodyIncludes": ["E2E_PERMISSION_HOOK_RACE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_permission_hook_race_write",
+          "name": "Write",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-permission-hook-race/write-output.txt",
+            "content": "E2E_PERMISSION_HOOK_RACE_RESULT\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "permission-hook-race-final",
+      "description": "HK16 竞速回归：用户批准胜出后 tool_result 回灌 → 最终文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "broker 应答胜出、hook 仍阻塞时工具立即执行成功，模型据 tool_result 给出终态文本，证明 turn 不再等 hook 收尾。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PERMISSION_HOOK_RACE",
+          "toolu_e2e_permission_hook_race_write"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "permission-hook-race-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_PERMISSION_HOOK_RACE_DONE"
+        }
+      }
+    }
+  ]
+}

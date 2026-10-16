@@ -18,11 +18,13 @@ import {
 } from "../../tool/handlers/workflow-analysis-display.js";
 import { writeWorkflowDraft } from "../../tool/handlers/workflow-drafts.js";
 import { analyzeScript } from "../../tool/handlers/workflow-script-analysis.js";
+import { bindScriptModels } from "../../tool/handlers/workflow-script-models.js";
 import type { ExecutableToolCall } from "../../tool/types.js";
 import { uuidv7 } from "@zcode/shared";
 import { createMessageId, traceContextToLogContext } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import { emitControlOnlyUserTurn, persistWorkflowLaunchUserMessage } from "./control-only-turn.js";
+import { activateDynamicWorkflowTools } from "./dynamic-workflow-activation.js";
 
 /**
  * `startSavedWorkflowRun` 的结构化结果。成功给 run 的两把关联键（`runId` ≡ backgroundTaskId ≡
@@ -122,16 +124,21 @@ export async function startSavedWorkflowRun(
   // (2) 编译。任一诊断即拒绝——与 CreateWorkflow 对编不过脚本的处理同一条原则（弹一个注定失败的
   // run 只是延迟同一个错误）。诊断进 message，有界。
   const analysis = analyzeScript(found.script);
-  if (!analysis.ok || analysis.diagnostics.length > 0) {
+  // 脚本点名的模型与 CreateWorkflow 同一段代码解析（docs/dynamic-workflow/launch.md「Models the script
+  // names」）；没绑定的名字是 9011，与编译诊断一起按 compile_failed 拒绝。
+  const models = analysis.ok ? bindScriptModels(analysis, this.modelCatalogPort) : undefined;
+  const diagnostics = [...analysis.diagnostics, ...(models?.unbound ?? [])];
+  if (!analysis.ok || diagnostics.length > 0) {
     return {
       ok: false,
       reason: "compile_failed",
       message: boundedCompileDiagnostics(
         `The saved workflow '${found.name}' has errors:`,
-        analysis.diagnostics,
+        diagnostics,
       ),
     };
   }
+  const modelSelections = models?.selections;
 
   // —— 到此为止零副作用：无 run、无消息、无事件、无任务。——
 
@@ -147,6 +154,9 @@ export async function startSavedWorkflowRun(
   // rejected ACK 后通过 deleteSession 回收空会话。
   await this.ensureContextInitialized(traceContext);
   await this.ensureSessionPersisted(found.name, traceContext);
+  // 直接启动即激活工具面（launch.md「On demand: activation」）：启动轮之后的通知要模型去调
+  // GetWorkflowRun；放在落盘之后，entry 才有会话可挂。
+  await activateDynamicWorkflowTools.call(this, { source: "run_control", traceContext });
 
   // (3) toolCallId：`launch-` 前缀，日志与工具卡可辨于模型工具调用 id（`tool_*`）与 resume 重臂。
   const toolCallId = `launch-${randomUUID()}`;
@@ -181,6 +191,7 @@ export async function startSavedWorkflowRun(
       launchInputId,
       ...(phaseNames === undefined ? {} : { phaseNames }),
       ...(phaseAlongside === undefined ? {} : { phaseAlongside }),
+      ...(modelSelections === undefined ? {} : { modelBindings: modelSelections }),
       ...(draft === undefined ? {} : { scriptPath: draft.path }),
       trace: traceContext,
     });

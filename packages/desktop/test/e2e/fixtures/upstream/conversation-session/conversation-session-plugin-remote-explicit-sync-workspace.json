@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-remote-explicit-sync-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-remote-explicit-sync-workspace.test.ts",
+  "fixtures": [
+    {
+      "id": "wpl-011-title",
+      "description": "WPL-011 remote pre-sync and post-sync tasks use deterministic titles.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 remote Plugin 显式同步合同，只需保持 task row 稳定。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_WPL_011_REMOTE_EXPLICIT_SYNC"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-011-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"WPL 011 Remote Plugin Sync\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-011-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "wpl-011-before-sync",
+      "description": "The remote task created before explicit sync has no Plugin MCP and receives plain text.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定建立 connect 后、显式同步前的 remote Session。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_WPL_011_REMOTE_EXPLICIT_SYNC_A_FIRST_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-011-before\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"WPL_011_REMOTE_EXPLICIT_SYNC_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-011-before\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "wpl-011-plugin-tool-call",
+      "description": "The new remote Session after explicit sync calls the lifecycle Plugin MCP.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，证明只有显式同步后新 Session 才获得 remote Plugin runtime。"
+      },
+      "replay": { "consumeOnce": true },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_WPL_011_REMOTE_EXPLICIT_SYNC_RUNTIME_PROMPT"],
+        "bodyIncludes": [
+          "E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0",
+          "mcp__plugin_e2e-plugin-lifecycle_lifecycle__version_marker"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-011-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-011-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_wpl_011_plugin\",\"type\":\"function\",\"function\":{\"name\":\"mcp__plugin_e2e-plugin-lifecycle_lifecycle__version_marker\",\"arguments\":\"{}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-011-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":64,\"completion_tokens\":8,\"total_tokens\":72}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "wpl-011-plugin-final",
+      "description": "The lifecycle Plugin MCP result closes the post-sync remote turn.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定最终回复，闭合 remote Plugin MCP 调用。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_WPL_011_REMOTE_EXPLICIT_SYNC_RUNTIME_PROMPT",
+          "call_wpl_011_plugin",
+          "E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-011-final\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"WPL_011_REMOTE_EXPLICIT_SYNC_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-011-final\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":96,\"completion_tokens\":8,\"total_tokens\":104}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

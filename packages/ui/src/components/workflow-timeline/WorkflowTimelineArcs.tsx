@@ -12,6 +12,7 @@ import {
   type TimelineLayout,
 } from "./timeline-geometry.js";
 import { MarchLight } from "./WorkflowMarchLight.js";
+import { STREAM_GAP, StreamChevrons } from "./WorkflowStreamChevrons.js";
 
 /**
  * 弧层：时间线唯一的一层 SVG，只画
@@ -60,10 +61,12 @@ export function WorkflowTimelineArcs({
   const { inset, rowY } = layout;
   const rowOf = (track: number): number => rowY[track] ?? rowY[0]!;
   const trackOf = (index: number): number => stations[index]?.track ?? 0;
+  // 整层是装饰，不接指针。修复原因（2026-09-29 实测）：这层 SVG 铺满整张时间线、又画在补全的头之后，
+  // 头那一行的悬停与点击全被它吞掉——框点不亮，点头也开不了侧板。站与药丸画在它之上，所以此前没人发现。
   return (
     <svg
       aria-hidden
-      className="absolute left-0 top-0 overflow-visible"
+      className="pointer-events-none absolute left-0 top-0 overflow-visible"
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       width={width}
@@ -105,12 +108,18 @@ export function WorkflowTimelineArcs({
         const ya = fromBand ? rowY[0]! - 3 : rowOf(trackOf(arc.from)) - 7;
         const yb = toBand ? rowY[0]! - 4 : rowOf(trackOf(arc.to)) - 9;
         const tail = `V${yb}`;
-        const path = `M${xa},${ya} V${ly + 8} Q${xa},${ly} ${xa + 8 * sign},${ly} H${xb - 8 * sign} Q${xb},${ly} ${xb},${ly + 8} ${tail}`;
+        // 流弧（presentation.md「Stream rails」）：横段在正中断开，让出朝弧的方向的一组 chevron。
+        const mid = (xa + xb) / 2;
+        const across = arc.stream
+          ? `H${mid - (STREAM_GAP / 2) * sign} M${mid + (STREAM_GAP / 2) * sign},${ly} H${xb - 8 * sign}`
+          : `H${xb - 8 * sign}`;
+        const path = `M${xa},${ya} V${ly + 8} Q${xa},${ly} ${xa + 8 * sign},${ly} ${across} Q${xb},${ly} ${xb},${ly + 8} ${tail}`;
         const ink = arc.ink === "march" ? "strong" : arc.ink;
         return (
           <g
             data-arc-from={arc.from}
             data-arc-ink={arc.ink}
+            data-arc-stream={arc.stream ? "true" : undefined}
             data-arc-to={arc.to}
             data-testid="workflow-timeline-arc"
             key={`${arc.from}-${arc.to}-${arc.air}`}
@@ -124,7 +133,15 @@ export function WorkflowTimelineArcs({
               stroke={INK_STROKE[ink]}
               strokeWidth={1}
             />
-            {arc.ink === "march" ? (
+            {arc.stream ? (
+              <StreamChevrons
+                direction={sign < 0 ? "left" : "right"}
+                ink={arc.ink}
+                x={mid}
+                y={ly}
+              />
+            ) : null}
+            {arc.ink === "march" && !arc.stream ? (
               // 行进边的光短 6px 收住，停在箭头根部。
               <MarchLight
                 d={`${path.slice(0, -tail.length)}V${yb - 6}`}

@@ -5,12 +5,19 @@
 // persona 的模型档位（`model?: "main" | "lite"`）已退场。宿主在 provider 重构后没有 lite 模型来源，
 // "lite" 与 "main" 早已同路——继承父会话当前模型。
 //
-// 于是本模块只回答一个问题：**这个 actor 的会话该跑在哪个模型上**。三个来源按优先级排：
-// 本 run 的 `subagentModel`（`CreateWorkflow` / `AmendWorkflow` 的 `subagent_model`）> resume pin（journal 里上一次实际跑的模型）> 父会话当前模型。
+// 于是本模块只回答一个问题：**这个 actor 的会话该跑在哪个模型上**。四个来源按优先级排：
+// persona 点名的模型（脚本里的 `agent(…, { model })`，经 run-launched 的绑定表解析；
+// docs/dynamic-workflow/authoring.md「Choosing a model per subagent」）> 本 run 的 `subagentModel`
+// （`CreateWorkflow` / `AmendWorkflow` 的 `subagent_model`，docs/dynamic-workflow/launch.md）>
+// resume pin（journal 里上一次实际跑的模型）> 父会话当前模型。
+//
+// 2026-09-26 追记：persona 的模型回来了，但不是退场的那个档位——脚本写的是具体模型名，launch 时已
+// 对着模型目录解析成绑定表，这里只查表（{@link resolveActorPersonaModel}）。
 // 与 workflow-actor-tools.ts 是同一个接缝上的姊妹模块：一个给出工具面，一个给出模型面，
 // 都由 driver 侧的 runtime 工厂在造 AgentRuntime 时展开。
 
 import type { ModelSelection } from "@zcode/shared/model-selection";
+import { parseModelPickerValue } from "@zcode/shared/model-selection";
 import { parseProviderQualifiedModelSelection } from "./provider-registry-selection.js";
 
 /** 解析模型面需要的宿主侧事实。 */
@@ -30,6 +37,12 @@ interface WorkflowActorModelHost {
    * 缺省（见下面的函数注释）。主代理不受它影响——它只描述子代理。
    */
   runSelection?: ModelSelection | undefined;
+  /**
+   * 这个 actor 的 persona 点名的模型，已按本 run 的绑定表解析成整条选择（含 reasoning 档位；
+   * {@link resolveActorPersonaModel}）。位置：**最高**——它是为这一个子代理写下、且用户在确认窗里
+   * 批准过绑定的选择，比「整个 run 的子代理默认模型」更具体。
+   */
+  actorSelection?: ModelSelection | undefined;
 }
 
 /** AgentRuntimeConfig 的模型面切片。 */
@@ -60,12 +73,50 @@ export class WorkflowActorPinnedModelError extends Error {
 }
 
 /**
- * 把 run 选择与 journal 里的 pin 映射成 AgentRuntime 的模型配置。纯函数。
+ * persona 点名了一个本 run 的绑定表里没有的名字。只有绕过编译器 9010 规则的类型断言走得到这里
+ * （编译期保证名字集合封闭、launch 时整张表解析过）；带上名字与表里有的名字，排查的人才知道是哪一行
+ * 脚本、差了什么。宁可大声失败——悄悄退回 run 的子代理模型，就是跑一个用户没批准过的模型。
+ */
+export class WorkflowActorModelUnboundError extends Error {
+  readonly modelName: string;
+
+  constructor(modelName: string, bound: readonly string[]) {
+    super(
+      `This subagent's persona names the model "${modelName}", which the run did not resolve at launch` +
+        (bound.length === 0
+          ? " (the script named no models)."
+          : ` (it resolved: ${bound.map((name) => `"${name}"`).join(", ")}).`),
+    );
+    this.name = "WorkflowActorModelUnboundError";
+    this.modelName = modelName;
+  }
+}
+
+/**
+ * persona 的模型名 → 整条选择（docs/dynamic-workflow/launch.md「Models the script names」）。纯函数。
+ *
+ * 名字按**逐字**查表：lowering 把 `model("x")` 抹成 `"x"`，persona 里带的就是脚本写下的那个串，
+ * 而表的键也是它。persona 没点名模型时回 undefined（交给 run 选择 / pin / 父模型）。
+ */
+export function resolveActorPersonaModel(
+  personaModel: string | undefined,
+  bindings: Readonly<Record<string, string>> | undefined,
+): ModelSelection | undefined {
+  if (personaModel === undefined) return undefined;
+  const canonical = bindings?.[personaModel];
+  if (canonical === undefined) {
+    throw new WorkflowActorModelUnboundError(personaModel, Object.keys(bindings ?? {}));
+  }
+  return parseModelPickerValue(canonical);
+}
+
+/**
+ * 把 persona 的模型、run 选择与 journal 里的 pin 映射成 AgentRuntime 的模型配置。纯函数。
  *
  * `pinnedModel` 是这个 actor 在 journal 里记下的 `resolvedModel`（`providerId/modelId`），
  * 只有 resume（含 amend-resume 从前驱承袭的种子）会带上它。
  *
- * 优先级：**本 run 的 `subagentModel` > resume pin > 父会话当前模型**。
+ * 优先级：**persona 点名的模型 > 本 run 的 `subagentModel` > resume pin > 父会话当前模型**。
  *
  * | run 选择 | pin | 解析结果 |
  * |---|---|---|
@@ -107,6 +158,10 @@ export function workflowActorModelPolicy(
   host: WorkflowActorModelHost,
   pinnedModel?: string,
 ): WorkflowActorModelPolicy {
+  // persona 点名了模型：它就是这个子代理的显式选择，run 选择与 pin 都只是它要替换的缺省。
+  if (host.actorSelection !== undefined) {
+    return { configOverrides: { modelSelection: host.actorSelection } };
+  }
   // run 选择在场：整条覆盖，pin 连解析都不解析——它只是本 run 要替换掉的那个缺省。
   if (host.runSelection !== undefined) {
     return { configOverrides: { modelSelection: host.runSelection } };

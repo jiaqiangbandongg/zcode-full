@@ -32,17 +32,17 @@ export type V4VisibleSlashCommand =
       displayText: string;
     };
 
-interface V4VisibleSlashCommandParseOptions {
+export interface V4VisibleSlashCommandParseOptions {
   contextAttachmentCount?: number;
 }
 
-interface SelectionSideSlashCommand {
+export interface SelectionSideSlashCommand {
   command: "side" | "btw";
   text: string;
   displayText: string;
 }
 
-interface SelectionSideSlashCommandParseOptions {
+export interface SelectionSideSlashCommandParseOptions {
   contextAttachmentCount?: number;
   /** CLI catalog 中已经注册的同名命令；同名 CLI 命令优先，不由 App 消费。 */
   enabledCommandNames?: readonly string[];
@@ -127,4 +127,9 @@ export function v4QueuedCommandText(kind: "sendText" | "sendGoalCommand", text: 
   const trimmed = text.trim();
   if (!trimmed) return text;
   return GOAL_COMMAND_RE.test(trimmed) ? text : `/goal ${trimmed}`;
+}
+
+export function extractV4GoalObjective(text: string): string {
+  const parsed = parseV4VisibleSlashCommand(v4QueuedCommandText("sendGoalCommand", text));
+  return parsed?.kind === "sendGoalCommand" ? parsed.objective : text.trim();
 }

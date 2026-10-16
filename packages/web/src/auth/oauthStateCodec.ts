@@ -1,8 +1,10 @@
 import { DEFAULT_ZCODE_ENDPOINT_ORIGIN } from "@zcode/shared";
 
-const PRODUCTION_WEB_ORIGIN = DEFAULT_ZCODE_ENDPOINT_ORIGIN;
-const WEB_CALLBACK_PATHS = new Set(["/cn/share/callback", "/share/callback"]);
+const PRODUCTION_WEB_REMOTE_ORIGIN = DEFAULT_ZCODE_ENDPOINT_ORIGIN;
+const WEB_REMOTE_PATHS = new Set(["/web-remote", "/web-remote/"]);
+const WEB_CALLBACK_PATHS = new Set(["/web-remote/callback", "/cn/share/callback", "/share/callback"]);
 const SHARE_PATH_PATTERN = /^\/(?:cn\/share|share)\/[A-Za-z0-9._~-]{1,512}$/u;
+const APP_RETURN_QUERY_ALLOWLIST = new Set(["remoteControlToken", "relayOrigin"]);
 const PRIVATE_DEV_RETURN_TO_PATTERN =
   /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?(\/|$)/;
 
@@ -18,7 +20,7 @@ interface ResolveSafeAppReturnToOptions {
 
 function getCurrentOrigin(): string {
   const location = globalThis.window?.location ?? globalThis.location;
-  return location?.origin ?? PRODUCTION_WEB_ORIGIN;
+  return location?.origin ?? PRODUCTION_WEB_REMOTE_ORIGIN;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -85,7 +87,9 @@ export function isTrustedDevReturnTo(url: URL): boolean {
 }
 
 function resolveAllowedAppReturnOrigin(currentOrigin: string): string {
-  return currentOrigin === PRODUCTION_WEB_ORIGIN ? PRODUCTION_WEB_ORIGIN : currentOrigin;
+  return currentOrigin === PRODUCTION_WEB_REMOTE_ORIGIN
+    ? PRODUCTION_WEB_REMOTE_ORIGIN
+    : currentOrigin;
 }
 
 export function resolveSafeAppReturnTo(
@@ -93,7 +97,7 @@ export function resolveSafeAppReturnTo(
   options: ResolveSafeAppReturnToOptions = {},
 ): string | null {
   const url = parseOptionalUrl(value);
-  if (!url || !SHARE_PATH_PATTERN.test(url.pathname)) {
+  if (!url || (!WEB_REMOTE_PATHS.has(url.pathname) && !SHARE_PATH_PATTERN.test(url.pathname))) {
     return null;
   }
 
@@ -103,7 +107,18 @@ export function resolveSafeAppReturnTo(
     return null;
   }
 
-  return url.pathname;
+  if (SHARE_PATH_PATTERN.test(url.pathname)) return url.pathname;
+
+  const safeSearch = new URLSearchParams();
+  for (const key of APP_RETURN_QUERY_ALLOWLIST) {
+    const existing = url.searchParams.get(key);
+    if (existing !== null) {
+      safeSearch.set(key, existing);
+    }
+  }
+
+  const query = safeSearch.toString();
+  return `${url.pathname}${query ? `?${query}` : ""}`;
 }
 
 export function buildReturnToCallbackUrl(

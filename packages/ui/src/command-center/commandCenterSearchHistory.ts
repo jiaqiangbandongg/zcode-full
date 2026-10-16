@@ -61,7 +61,7 @@ export function readCommandCenterSearchHistory(
   }
 }
 
-function writeCommandCenterSearchHistory(
+export function writeCommandCenterSearchHistory(
   workspaceKey: string,
   entries: CommandCenterSearchHistoryEntry[],
 ) {

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-fork-edit-branch",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-fork-edit-branch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-fork-edit-branch.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-fork-edit-branch-title",
+      "description": "E2E_V4_BRANCH_T1 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_BRANCH_T1 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-branch-edited",
+      "description": "E09：edit 重跑后的新分支回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "edit 重跑需要与原回复可区分的新分支哨兵。"
+    },
+    {
+      "id": "v4-branch-t1",
+      "description": "E09：原始首轮回复（edit 前的旧分支）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "fork-after-edit 需要旧分支哨兵证明 child 未继承被 rewind 的历史。"
+    }
+  ]
+}

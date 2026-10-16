@@ -1,3 +1,8 @@
+import {
+  createTurnAgentDefinitions,
+  createAgentDefinitionsReader,
+  type GetAgentDefinitions,
+} from "../subagent/definitions.js";
 import { DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY, resolveExecutionState } from "@zcode/shared";
 import type { BackgroundBashOutputResult } from "@zcode/shared";
 import {
@@ -84,6 +89,10 @@ import type {
   RuntimeBackgroundStopResult,
 } from "./methods/background.js";
 import { initializeRuntimeTooling } from "./helpers/runtime-tools.js";
+import {
+  resolveInitialDynamicWorkflowToolsActivated,
+  type DynamicWorkflowActivationSource,
+} from "./methods/dynamic-workflow-activation.js";
 import type {
   ActiveTurnInfo,
   ActiveForegroundExecutionState,
@@ -120,8 +129,12 @@ import type {
 } from "./types.js";
 import type { AgentRuntimeInternal } from "./internal.js";
 import { InMemoryRuntimeTaskRegistry, type RuntimeTaskRegistry } from "../runtime-task/registry.js";
+import { createMemoryRecallState } from "../memory/recall/index.js";
+import type { MemoryRecallState } from "../memory/recall/index.js";
 import type { ChildClientPortsContext, ClientFacingPorts } from "./helpers/child-client-ports.js";
+import type { ProjectMemoryRecallPrefetch } from "./helpers/project-memory-recall.js";
 import type { ProjectMemoryExtractionScheduler } from "./helpers/project-memory-extraction.js";
+import type { ProjectMemoryUpdate } from "./helpers/project-memory-dream.js";
 import { projectPersistentAgentMemoryTools } from "../subagent/persistent-memory.js";
 import { RuntimeTelemetryFacade } from "../telemetry/runtime-telemetry.js";
 import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-runtime-admission.js";
@@ -158,13 +171,20 @@ export class AgentRuntime {
   private messageHistory: MessageHistory;
   private readFileState: ReadFileStateMap;
   private cachedTools: ModelToolContract[] | null = null;
+  /** launch.md「On demand: activation」：onDemand 会话出生为 false，`activateDynamicWorkflowTools` 翻为 true。 */
+  private dynamicWorkflowToolsActivated: boolean;
+  private dynamicWorkflowActivationSource?: DynamicWorkflowActivationSource;
   private contextBuilder: ContextBuilder | null = null;
   private contextInitialized = false;
   private contextSourceSnapshot?: ContextSourceSnapshot;
   private latestContextBuildResult?: ContextBuildResult;
   private memoryRoot?: string;
   private memoryIndexContent?: string;
+  private memoryRecallState: MemoryRecallState;
+  private memoryRecallPrefetch?: ProjectMemoryRecallPrefetch;
   private memoryExtractionScheduler?: ProjectMemoryExtractionScheduler;
+  private memoryDreamLastScanAtMs = 0;
+  private pendingMemoryUpdate?: ProjectMemoryUpdate;
   private contextSourcePort?: ContextSourcePort;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
@@ -172,7 +192,14 @@ export class AgentRuntime {
   private residencyBlockingWorkCount = 0;
   private mcpInitialized = false;
   private mcpToolsRegistered = false;
+  private registeredMcpToolNames?: string[];
+  private mcpToolsSignature?: string;
+  private mcpToolListRevision?: number;
   private subagentPort?: SubagentPort;
+  private readonly getAgentDefinitions: GetAgentDefinitions;
+  private readonly prepareAgentDefinitions: ReturnType<
+    typeof createTurnAgentDefinitions
+  >["prepare"];
   private dynamicWorkflowRunPort?: DynamicWorkflowRunPort;
   private modelCatalogPort?: ModelCatalogPort;
   private runtimeTaskRegistry: RuntimeTaskRegistry;
@@ -235,6 +262,15 @@ export class AgentRuntime {
       modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
     });
     Object.assign(this.config, resolveExecutionState(config));
+    const definitions = createTurnAgentDefinitions(
+      deps.getAgentDefinitions ??
+        createAgentDefinitionsReader(this.config.subagents?.profiles ?? [], {
+          builtInModelSelectionOverrides: this.config.subagents?.builtInModelSelectionOverrides,
+        }),
+      deps.loadAgentDefinitions,
+    );
+    this.getAgentDefinitions = definitions.get;
+    this.prepareAgentDefinitions = definitions.prepare;
     this.agentTelemetry = new RuntimeTelemetryFacade({
       agentName: config.agentName,
       causation: deps.agentTelemetryCausation,
@@ -276,6 +312,7 @@ export class AgentRuntime {
       config.modelSelection && cloneModelSelection(config.modelSelection);
     this.messageHistory = new MessageHistoryImpl();
     this.readFileState = new Map();
+    this.memoryRecallState = createMemoryRecallState();
     this.runtimeCommandQueue = createRuntimeCommandQueue();
     this.workingDirectory = config.workingDirectory ?? ".";
     this.contextSourcePort = deps.contextSourcePort;
@@ -294,6 +331,8 @@ export class AgentRuntime {
     this.modelCatalogPort = deps.modelCatalogPort;
     this.registry = deps.toolRegistry ?? createToolRegistry();
     this.workspaceRoot = this.workingDirectory;
+    // 必须先于工具装配：registerRuntimeBuiltInTools 的灰度门读的就是这个状态。
+    this.dynamicWorkflowToolsActivated = resolveInitialDynamicWorkflowToolsActivated(this.config);
     const tooling = initializeRuntimeTooling(runtime, deps, sessionId);
     this.hookRunner = tooling.hookRunner;
     this.workspaceHookAdmission = deps.workspaceHookAdmission;
@@ -509,6 +548,11 @@ export interface AgentRuntime {
     childSessionId: SessionId;
     event: SessionEvent;
     traceContext?: TraceContext;
+    /**
+     * 子 runtime 的交互归属（与 `createChildClientPorts` 同一份）。在场时交互事件
+     * （PermissionRequested / Resolved / Denied）另镜像一份到本会话，确认窗才能在父界面出现。
+     */
+    interactionOrigin?: ChildClientPortsContext;
   }): Promise<void>;
   /**
    * 外部子 runtime 的接缝（三）：铸造子 runtime 的对外交互端口（permission broker +
@@ -528,7 +572,15 @@ export interface AgentRuntime {
   recordDynamicWorkflowRunProgress(
     input: DynamicWorkflowRunProgressPayload & { traceContext?: TraceContext },
   ): Promise<void>;
-  /** 恢复的 workflow run 的追踪重臂（registry 登记 + started 事件 + waiter + 结算通知）。 */
+  /** 恢复的 dwf run 的追踪重臂（registry 登记 + started 事件 + waiter + 结算通知）。 */
+  /**
+   * onDemand 会话注册十个工作流工具（docs/dynamic-workflow/launch.md「On demand: activation」）。
+   * 已激活时 no-op 返回 false。触发点：`/workflow` 展开、GUI 的 Resume / 配置 / 直接启动、冷恢复。
+   */
+  activateDynamicWorkflowTools(input: {
+    source: DynamicWorkflowActivationSource;
+    traceContext?: TraceContext;
+  }): Promise<boolean>;
   trackResumedDynamicWorkflowRun(input: {
     runId: string;
     toolCallId?: string;
@@ -648,6 +700,10 @@ export interface AgentRuntime {
     traceContext?: TraceContext;
     commitAfterApply?: () => Promise<void>;
   }): Promise<WorkspaceFileRewindApplyResult>;
+  sampleModel(
+    input: import("./methods/sample-model.js").SampleModelInput,
+    options: { abortSignal: AbortSignal; traceContext?: TraceContext },
+  ): Promise<import("@zcode/shared/mcp-apps").McpAppsSamplingResult>;
   generateWorkspaceText(
     input: WorkspaceGenerateTextInput,
     options?: { abortSignal?: AbortSignal; traceContext?: TraceContext },

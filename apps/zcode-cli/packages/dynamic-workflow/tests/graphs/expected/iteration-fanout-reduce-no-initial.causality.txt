@@ -1,0 +1,8 @@
+lane workspace
+lane actor#1 "checker" @8:3 families=fanout#1
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @7:15 label="reduce"
+step world-read#1 world-read "glob *.md" @6:27 lane=workspace region=seq#1 always
+step ask#1 ask "checker" @8:20 lane=actor#1 region=fanout#1 maybe stack
+edge world-read#1 -> ask#1 data maybe exact
+sink world-read#1

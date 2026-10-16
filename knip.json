@@ -1,33 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "tags": ["-lintignore"],
+  "tags": [
+    "-lintignore"
+  ],
   "workspaces": {
-    ".": {
-      "entry": [
-        ".release-it.mjs",
-        ".vscode/*.mjs",
-        "scripts/check-workspace-freshness.mjs",
-        "scripts/mise-run.mjs"
-      ]
-    },
-    "packages/desktop": {
-      "entry": [
-        "electron-builder.config.js",
-        "scripts/sign-windows-hook.cjs",
-        "src/renderer/*.html",
-        "src/renderer/cuaPermissionPanel.ts",
-        "src/renderer/src/resource-manager.tsx"
-      ]
-    },
-    "packages/server": {
-      "entry": ["src/index.ts", "src/entry-stdio.ts", "build-remote.ts"]
-    },
-    "packages/services": {
-      "entry": ["src/index.ts", "src/storage/module.ts"]
-    },
-    "apps/zcode-cli/packages/browser-use-plugin": {
-      "entry": ["src/browser-client.ts"]
-    }
+    ".": {}
   },
-  "ignore": [".agents/**", "docs/**", "packages/ui/src/components/**"]
+  "ignore": [".agents/**", ".claude/**", "docs/**", "packages/ui/src/components/**"]
 }

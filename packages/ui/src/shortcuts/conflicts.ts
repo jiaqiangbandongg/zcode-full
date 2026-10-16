@@ -19,7 +19,7 @@ import { resolveEffectiveShortcutBindings } from "./bindings.js";
  * 注：Escape/Enter/Tab/Space/Backspace 中 Enter 已入键名白名单（composer 作用域需要），
  * 显式列在黑名单里挡住 global 作用域；Escape/Tab/Space/Backspace 仍不在键名白名单内。
  */
-const RESERVED_BINDINGS: ReadonlySet<string> = new Set([
+export const RESERVED_BINDINGS: ReadonlySet<string> = new Set([
   // 编辑类原生行为（主修饰键组合）
   ...["c", "v", "x", "z", "a", "y", "s", "p", "l"].map((key) => `CmdOrCtrl+${key}`),
   "CmdOrCtrl+Shift+z",
@@ -120,7 +120,7 @@ function getReservedCanonicalKeys(): {
   return reservedCanonicalKeysCache;
 }
 
-interface ShortcutBindingConflict {
+export interface ShortcutBindingConflict {
   kind: "reserved" | "occupied";
   /** occupied 时的占用命令。 */
   ownerCommandId?: ShortcutCommandId;
@@ -264,7 +264,28 @@ export function buildShortcutOverridesAfterAppend(
   return next;
 }
 
-/** 拆行替换：把生效列表第 bindingIndex 条换成 newBinding 后整组写回 overrides。 */
+/**
+ * 拆行模型的行级操作都基于「生效列表整体写回 overrides」，三个构建器配套使用：
+ * AfterAppend（追加一条）、WithoutBindingAt（删除第 index 条，删空即显式 [] 未分配）、
+ * WithBindingAt（替换第 index 条）。同命令物理等价重复由设置页录制入口先行拒绝。
+ */
+
+/** 拆行删除：把生效列表第 bindingIndex 条移除后整组写回 overrides（spec §8）。 */
+export function buildShortcutOverridesWithoutBindingAt(
+  overrides: Record<string, readonly string[]> | undefined,
+  commandId: ShortcutCommandId,
+  bindingIndex: number,
+): Record<string, string[]> {
+  const effective = resolveEffectiveShortcutBindings(overrides);
+  const next: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    next[key] = [...value];
+  }
+  next[commandId] = (effective[commandId] ?? []).filter((_, index) => index !== bindingIndex);
+  return next;
+}
+
+/** 拆行替换：把生效列表第 bindingIndex 条换成 newBinding 后整组写回 overrides（spec §8）。 */
 export function buildShortcutOverridesWithBindingAt(
   overrides: Record<string, readonly string[]> | undefined,
   commandId: ShortcutCommandId,

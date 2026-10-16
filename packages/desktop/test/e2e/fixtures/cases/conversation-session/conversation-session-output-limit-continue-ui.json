@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-ui",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-ui.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-output-limit-continue-ui.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "output-limit-continue-ui-title",
+      "description": "OTC08 标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是 Continue UI 现状探针的产品语义；固定响应避免干扰三次主请求。"
+    },
+    {
+      "id": "output-limit-continue-ui-partial-p1",
+      "description": "第一次主请求在同一自然段的句中位置返回 p1 并以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性制造无标题、无换段的第一段句中截断正文，观察 Continue 后的 Desktop 投影。"
+    },
+    {
+      "id": "output-limit-continue-ui-partial-p2",
+      "description": "第二次主请求直接接续 p1，并在同一自然段的另一句中位置再次以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性制造无标题、无换段且直接接续 p1 的第二段句中截断正文，观察相邻 partial 的 Desktop 分块。"
+    },
+    {
+      "id": "output-limit-continue-ui-final-p3",
+      "description": "第三次主请求直接接续 p2、补完同一自然段并正常 end_turn。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "以无标题、无换段且直接接续 p2 的正文正常结束恢复链，供 Desktop 展示最终 assistant 段。"
+    }
+  ]
+}

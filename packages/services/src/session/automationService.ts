@@ -23,7 +23,7 @@ import {
 } from "#src/session/automationCron.js";
 
 /** 写/单查操作的 workspace 归属；用于跨 workspace 隔离校验。 */
-interface AutomationWorkspaceScope {
+export interface AutomationWorkspaceScope {
   workspacePath: string;
   workspaceIdentity?: string;
 }
@@ -46,7 +46,7 @@ export class InvalidCronExprError extends Error {
 }
 
 /** 非法的有限次数更新错误；用于阻止矛盾状态写入并误结束仍在运行的任务。 */
-class InvalidAutomationMaxRunsUpdateError extends Error {
+export class InvalidAutomationMaxRunsUpdateError extends Error {
   constructor(message = "清空 maxRuns 时必须在同一次更新中设置 recurring=true") {
     super(message);
     this.name = "InvalidAutomationMaxRunsUpdateError";
@@ -54,7 +54,7 @@ class InvalidAutomationMaxRunsUpdateError extends Error {
 }
 
 /** 非法自定义调度规则；规则必须先通过领域校验才能写入内部任务库。 */
-class InvalidAutomationScheduleRuleError extends Error {
+export class InvalidAutomationScheduleRuleError extends Error {
   constructor(message: string) {
     super(`非法的定时任务调度规则：${message}`);
     this.name = "InvalidAutomationScheduleRuleError";
@@ -62,7 +62,7 @@ class InvalidAutomationScheduleRuleError extends Error {
 }
 
 /** 相对延迟只用于一次性任务，并由服务端真实时钟生成调度规则。 */
-class InvalidAutomationRelativeDelayError extends Error {
+export class InvalidAutomationRelativeDelayError extends Error {
   constructor(message: string) {
     super(`非法的相对时间定时任务：${message}`);
     this.name = "InvalidAutomationRelativeDelayError";

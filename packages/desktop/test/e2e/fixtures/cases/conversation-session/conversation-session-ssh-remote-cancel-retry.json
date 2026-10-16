@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-cancel-retry",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-cancel-retry.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-cancel-retry.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "SSH-P0-CONN-03 只验证 pending SSH 取消、同 target 新凭据重试、目录选择、单 Host 与 secret 边界，不启动模型请求。",
+  "requests": []
+}

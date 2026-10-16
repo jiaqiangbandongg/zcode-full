@@ -1,6 +1,10 @@
-// Dynamic Workflow Run Port：调整运行中的并发上限。
-// 定义请求、结果与能力边界，由 dynamic-workflow-run.port.ts 统一再导出，
-// 调用方通过 `@zcode/contracts` 使用。
+// ============================================================
+// Dynamic Workflow Run Port：就地改一个在飞 run 的并发上界
+// ============================================================
+// docs/dynamic-workflow/concurrency.md「Retuning a live run」。与情势截面
+// （dynamic-workflow-run-roster.port.ts）同一条拆分理由：dynamic-workflow-run.port.ts 顶到
+// oxlint max-lines 上限（400 行），而这三个类型自成一组。公开面不变——那边原样再导出，
+// `@zcode/contracts` 的导入路径一字不改。
 
 /**
  * {@link import("./dynamic-workflow-run.port.js").DynamicWorkflowRunPort.retuneConcurrency}
@@ -31,12 +35,12 @@ export type DynamicWorkflowRunRetuneRefusalReason = "not_live" | "unchanged";
  * {@link import("./dynamic-workflow-run.port.js").DynamicWorkflowRunAmendResult} 同一条论证：
  * 两种理由都是调用方可预期的业务分支。
  *
- * `ceiling` 与 `previous` 不是锦上添花：模型面的回话要说「至多 n 个子代理同时运行」，而 n 等于
- * 天花板时该说的是「限制已解除」（与 `CreateWorkflow` 的回话同一条判据）；事件日志要说「8 → 2」，
- * 从单个新值推不出前一个。两者都只有端口这一侧知道，留给调用方重算就是第二份天花板实现。
+ * `defaultConcurrency` 与 `previous` 不是锦上添花：模型面的回话要说「至多 n 个子代理同时运行」，而
+ * n 等于默认并发时要注明「（默认）」（与 `CreateWorkflow` 的回话同一条判据）；事件日志要说「8 → 2」，
+ * 从单个新值推不出前一个。两者都只有端口这一侧知道，留给调用方重算就是第二份默认并发实现。
  */
 export type DynamicWorkflowRunRetuneResult =
-  | { ok: true; maxConcurrency: number; previous: number; ceiling: number }
+  | { ok: true; maxConcurrency: number; previous: number; defaultConcurrency: number }
   | {
       ok: false;
       reason: DynamicWorkflowRunRetuneRefusalReason;

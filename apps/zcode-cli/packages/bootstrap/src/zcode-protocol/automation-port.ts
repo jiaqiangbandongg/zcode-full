@@ -21,14 +21,14 @@ import {
   type ZCodeProtocolSessionRecord,
 } from "./server-types.js";
 
-const AUTOMATION_CREATE_FROM_AUTOMATION_RUN_ERROR =
+export const AUTOMATION_CREATE_FROM_AUTOMATION_RUN_ERROR =
   "Cannot create a scheduled task while running a scheduled task.";
 
-const AUTOMATION_CREATE_IN_BOUND_SESSION_ERROR =
+export const AUTOMATION_CREATE_IN_BOUND_SESSION_ERROR =
   "Cannot create a scheduled task inside a session that already belongs to a scheduled task. " +
   "Ask the user to start a new chat to create another scheduled task.";
 
-const AUTOMATION_CREATE_BOUND_SESSION_CHECK_ERROR =
+export const AUTOMATION_CREATE_BOUND_SESSION_CHECK_ERROR =
   "Cannot verify whether this session belongs to a scheduled task. Try again later.";
 
 export function createProtocolAutomationPort(
@@ -98,6 +98,9 @@ export function createProtocolAutomationPort(
       }
       // CronCreate 的工具上下文只携带了部分配置，导致权限或思考等级在跨层时丢失。
       // 协议边界按 sessionId 读取活跃 runtime，确保保存的是用户触发工具当下看到的配置。
+      // 定时任务只继承会话稳定 Selection：加速卡等单轮执行走 modelExecution
+      // （selectionScope=execution），从不改写 Session Selection，因此这里读到的一定不是
+      // turn-only 模型，不需要再区分持久/临时两套读取路径。
       const runtimeModelSelection =
         activeSession?.app.runtime.getSessionModelSelection() ??
         (() => {
@@ -230,10 +233,16 @@ function normalizeCronAutomationMode(
       return undefined;
     case "plan":
     case "edit":
+    case "guarded":
     case "yolo":
     case "build":
       return mode;
+    case "dontAsk":
+    case "bypassPermissions":
+      return "yolo";
+    case "default":
     case "auto":
+    case "acceptEdits":
     case "autoEdit":
       return "build";
     default: {

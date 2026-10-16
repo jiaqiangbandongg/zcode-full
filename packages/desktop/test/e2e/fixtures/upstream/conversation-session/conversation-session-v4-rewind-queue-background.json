@@ -1,0 +1,316 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-rewind-queue-background",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-rewind-queue-background.test.ts",
+  "fixtures": [
+    {
+      "id": "pv4-20-title",
+      "description": "PV4-20 held queue case-local 标题。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与 queue 守恒。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_PV4_20_ORIGINAL"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-title",
+          "inputTokens": 48,
+          "outputTokens": 8,
+          "text": "{\"title\":\"PV4 20 Queue Rewind\"}"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-original",
+      "description": "PV4-20 compact 覆盖前 latest query 回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "编辑后应退出 active branch。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_20_ORIGINAL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-original",
+          "inputTokens": 56,
+          "outputTokens": 8,
+          "text": "PV4_20_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-compact-interrupted",
+      "description": "PV4-20 首次 compact 保持 running，期间排入 future intents 与第二个 compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定运行窗口后 stop，建立当前产品可达的 held queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PV4_20_ORIGINAL",
+          "PV4_20_ORIGINAL_REPLY",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 30000,
+        "text": {
+          "id": "pv4-20-compact-interrupted",
+          "inputTokens": 128,
+          "outputTokens": 24,
+          "text": "<summary>PV4_20_INTERRUPTED_COMPACT_SHOULD_NOT_APPLY</summary>"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-compact-stable",
+      "description": "PV4-20 held queue 中 send-now 的第二个 compact 成功覆盖 latest query。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 stable compact 后 edit 仍保留另外两个 held future intents。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PV4_20_ORIGINAL",
+          "PV4_20_ORIGINAL_REPLY",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-compact-stable",
+          "inputTokens": 128,
+          "outputTokens": 24,
+          "text": "<summary>PV4_20_COMPACT_SUMMARY</summary>"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-edited",
+      "description": "PV4-20 queue 保持后 edited intent 回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "新请求只消费 edited intent，不 drain held queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_20_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "PV4_20_EDITED_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-queue-one",
+      "description": "PV4-20 rewind 后显式消费保留的第一条 queue item。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 queue 身份和顺序保留后只消费一次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_20_QUEUE_ONE"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-queue-one",
+          "inputTokens": 72,
+          "outputTokens": 8,
+          "text": "PV4_20_QUEUE_ONE_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-20-queue-two",
+      "description": "PV4-20 rewind 后显式消费保留的第二条 queue item。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 queue 身份和顺序保留后只消费一次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_20_QUEUE_TWO"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-20-queue-two",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "PV4_20_QUEUE_TWO_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-23-title",
+      "description": "PV4-23 background generation case-local 标题。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与后台 task generation。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_PV4_23_BACKGROUND_ORIGINAL"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-23-title",
+          "inputTokens": 48,
+          "outputTokens": 8,
+          "text": "{\"title\":\"PV4 23 Background Rewind\"}"
+        }
+      }
+    },
+    {
+      "id": "pv4-23-background-tool",
+      "description": "PV4-23 原 turn 启动长时后台 Bash。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "保持 running 直到 edit 的 stop barrier 取消它。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_23_BACKGROUND_ORIGINAL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "Command running in background"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_pv4_23_background",
+          "messageId": "msg_pv4_23_background",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 300",
+            "run_in_background": true,
+            "description": "PV4-23 rewind fence"
+          }
+        }
+      }
+    },
+    {
+      "id": "pv4-23-background-final",
+      "description": "PV4-23 后台分离后原 turn 结束回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "主轮稳定后仍保留 running task，供 edit 取消。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PV4_23_BACKGROUND_ORIGINAL",
+          "Command running in background"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-23-background-final",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "PV4_23_BACKGROUND_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-23-background-edited",
+      "description": "PV4-23 旧 Bash 取消后的 edited intent 回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "新 branch 只启动一次 provider request。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_23_BACKGROUND_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-23-background-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "PV4_23_BACKGROUND_EDITED_REPLY"
+        }
+      }
+    }
+  ]
+}

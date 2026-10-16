@@ -17,7 +17,7 @@ import { SAVED_WORKFLOW_SENTINEL, parseSavedWorkflow } from "./saved-workflows/i
 import { describeWorkflowScriptPath } from "./workflow-script-path.js";
 
 /** 读成功的脚本文件。 */
-interface WorkflowScriptFile {
+export interface WorkflowScriptFile {
   /** 绝对路径（journal 与模型面各取所需：前者存它，后者显示 {@link described}）。 */
   path: string;
   /** 模型面该看到的写法：工作区之下给相对路径，否则绝对路径。 */
@@ -32,7 +32,7 @@ interface WorkflowScriptFile {
   bodyLineOffset: number;
 }
 
-type WorkflowScriptFileResult =
+export type WorkflowScriptFileResult =
   | { ok: true; file: WorkflowScriptFile }
   | { ok: false; message: string };
 
@@ -44,7 +44,7 @@ type WorkflowScriptFileResult =
  * （`ToolInputResolutionContext`）刻意窄到只有 `workingDirectory`。两者在 `operation: "read"`
  * 上的行为本就相同——那个函数当前不硬拦工作区之外的路径，只做同一条 resolve/normalize。
  */
-function resolveWorkflowScriptFilePath(cwd: string, inputPath: string): string {
+export function resolveWorkflowScriptFilePath(cwd: string, inputPath: string): string {
   return path.isAbsolute(inputPath) ? path.normalize(inputPath) : path.resolve(cwd, inputPath);
 }
 

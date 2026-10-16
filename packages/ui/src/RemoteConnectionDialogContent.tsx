@@ -8,7 +8,12 @@ import type {
   SSHConfigAliasOption,
   WSLDistro,
 } from "@zcode/shared";
-import { TID_REMOTE_KIND_DOCKER, TID_REMOTE_KIND_SSH, TID_REMOTE_KIND_WSL } from "@zcode/shared";
+import {
+  TID_REMOTE_KIND_DOCKER,
+  TID_REMOTE_KIND_SERVER,
+  TID_REMOTE_KIND_SSH,
+  TID_REMOTE_KIND_WSL,
+} from "@zcode/shared";
 import type {
   IMcpSyncService,
   IPluginSyncService,
@@ -19,6 +24,7 @@ import type {
 import {
   AlertTriangleIcon,
   ChevronRightIcon,
+  CloudIcon,
   LoaderIcon,
   MonitorCogIcon,
   ServerIcon,
@@ -41,6 +47,8 @@ function getKindIcon(kind: RemoteTarget["kind"]) {
   switch (kind) {
     case "ssh":
       return ServerIcon;
+    case "server":
+      return CloudIcon;
     case "docker":
       return MonitorCogIcon;
     case "wsl":
@@ -75,12 +83,18 @@ export function RemoteConnectionKindStep({
               key={value}
               type="button"
               onClick={() => onKindChange(value)}
+              onDoubleClick={() => {
+                onKindChange(value);
+                onNext();
+              }}
               data-testid={
                 value === "ssh"
                   ? TID_REMOTE_KIND_SSH
-                  : value === "wsl"
-                    ? TID_REMOTE_KIND_WSL
-                    : TID_REMOTE_KIND_DOCKER
+                  : value === "server"
+                    ? TID_REMOTE_KIND_SERVER
+                    : value === "wsl"
+                      ? TID_REMOTE_KIND_WSL
+                      : TID_REMOTE_KIND_DOCKER
               }
               className={cn(
                 "flex min-h-32 flex-col items-start gap-4 rounded-2xl border p-4 text-left transition-colors",
@@ -148,6 +162,10 @@ export function RemoteConnectionSettingsStep({
   wslDistros,
   dockerContainer,
   manualDockerContainer,
+  serverUrl,
+  serverName,
+  serverToken,
+  serverWorkspacePath,
   dockerContainers,
   dockerAvailable,
   sshConfigAliases,
@@ -172,6 +190,10 @@ export function RemoteConnectionSettingsStep({
   onWslUserChange,
   onDockerContainerChange,
   onManualDockerContainerChange,
+  onServerUrlChange,
+  onServerNameChange,
+  onServerTokenChange,
+  onServerWorkspacePathChange,
   onDockerContainersRefresh,
   onApplySshConfigAlias,
   onClearSelectedSshConfigAlias,
@@ -191,6 +213,10 @@ export function RemoteConnectionSettingsStep({
   wslDistros: WSLDistro[];
   dockerContainer: string;
   manualDockerContainer: string;
+  serverUrl: string;
+  serverName: string;
+  serverToken: string;
+  serverWorkspacePath: string;
   dockerContainers: DockerContainerInfo[];
   dockerAvailable: boolean | null;
   sshConfigAliases: SSHConfigAliasOption[];
@@ -215,6 +241,10 @@ export function RemoteConnectionSettingsStep({
   onWslUserChange?: (value: string) => void;
   onDockerContainerChange: (value: string) => void;
   onManualDockerContainerChange: (value: string) => void;
+  onServerUrlChange: (value: string) => void;
+  onServerNameChange: (value: string) => void;
+  onServerTokenChange: (value: string) => void;
+  onServerWorkspacePathChange: (value: string) => void;
   onDockerContainersRefresh?: () => void;
   onApplySshConfigAlias: (value: SSHConfigAliasOption) => void;
   onClearSelectedSshConfigAlias: () => void;
@@ -252,6 +282,10 @@ export function RemoteConnectionSettingsStep({
           wslDistros={wslDistros}
           dockerContainer={dockerContainer}
           manualDockerContainer={manualDockerContainer}
+          serverUrl={serverUrl}
+          serverName={serverName}
+          serverToken={serverToken}
+          serverWorkspacePath={serverWorkspacePath}
           dockerContainers={dockerContainers}
           dockerAvailable={dockerAvailable}
           sshConfigAliases={sshConfigAliases}
@@ -274,6 +308,10 @@ export function RemoteConnectionSettingsStep({
           setWslUser={onWslUserChange}
           setDockerContainer={onDockerContainerChange}
           setManualDockerContainer={onManualDockerContainerChange}
+          setServerUrl={onServerUrlChange}
+          setServerName={onServerNameChange}
+          setServerToken={onServerTokenChange}
+          setServerWorkspacePath={onServerWorkspacePathChange}
           refreshDockerContainers={onDockerContainersRefresh}
         />
       </div>
@@ -417,7 +455,7 @@ export function RemoteConnectionDirectoryStep({
             onOpenPluginSync={() => setRemotePluginSyncOpen(true)}
           />
         </div>
-        {/* 该容器之前不是 flex，导致子级 DirectoryBrowser 的 flex-1 无法拿到有效高度，
+        {/* Bugfix: 该容器之前不是 flex，导致子级 DirectoryBrowser 的 flex-1 无法拿到有效高度，
             目录项变多时 overflow-y-auto 不生效，列表不能垂直滚动。 */}
         <div
           className={cn(

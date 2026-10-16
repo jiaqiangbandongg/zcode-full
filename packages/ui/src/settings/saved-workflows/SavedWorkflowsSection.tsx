@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import {
   TID_WORKFLOWS_CREATE_VIA_CHAT,
   TID_WORKFLOWS_EMPTY,
+  TID_WORKFLOWS_OPEN_SETTINGS,
   TID_WORKFLOWS_REFRESH,
+  isDynamicWorkflowOffered,
   resolveWorkspaceKey,
 } from "@zcode/shared";
 import { Button } from "@/components/ui/button.js";
@@ -12,6 +14,8 @@ import { cn } from "@/components/lib/utils.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
+import { useDynamicWorkflowAvailability } from "@/hooks/useDynamicWorkflowAvailability.js";
+import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
 import {
   buildAutomationWorkspaceOptions,
   type AutomationWorkspaceOption,
@@ -92,6 +96,19 @@ export function SavedWorkflowsSection({
 }: SavedWorkflowsSectionProps) {
   const { intl, locale } = useZCodeIntl();
   const tabs = useTabStore((store) => store.tabs);
+  const openSettingsTab = useTabStore((store) => store.openSettingsTab);
+  // launch.md「The hub page」「The user's choice」：标题行的「工作流设置」直达设置 › 常规的模式行，
+  // 旁边写当前生效模式。中枢只在生效模式不是关闭时出现，所以这里不处理关闭态。
+  // 链接与它要打开的设置行同进同退：行只在功能被提供时出现（isDynamicWorkflowOffered），旧 Host 的
+  // 快照没有 offeredMode，行不出，链接也不出——否则点过去是一个找不到的设置。
+  const dynamicWorkflowConfig = useDynamicWorkflowAvailability().config;
+  const dynamicWorkflowMode = dynamicWorkflowConfig?.mode;
+  const showWorkflowSettings =
+    dynamicWorkflowConfig !== null && isDynamicWorkflowOffered(dynamicWorkflowConfig);
+  const handleOpenWorkflowSettings = useCallback(() => {
+    setPendingSettingsSectionIntent("general");
+    openSettingsTab();
+  }, [openSettingsTab]);
   const projects = useMemo(() => buildAutomationWorkspaceOptions(tabs), [tabs]);
   // 全局组的运行 / 移动落点只能是本机项目：过滤掉远程 workspace。
   const localProjects = useMemo(
@@ -263,18 +280,40 @@ export function SavedWorkflowsSection({
             <span className="ml-1 font-normal text-foreground-subtlest">{totalCount}</span>
           ) : null}
         </h2>
-        <ControlHintTooltip title={intl.formatMessage({ id: "workflows.hub.refresh" })}>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label={intl.formatMessage({ id: "workflows.hub.refresh" })}
-            data-testid={TID_WORKFLOWS_REFRESH}
-            onClick={() => setRefreshSeq((seq) => seq + 1)}
-          >
-            <AutomationRefreshIcon className="size-3.5" aria-hidden="true" />
-          </Button>
-        </ControlHintTooltip>
+        <div className="flex items-center gap-3">
+          {showWorkflowSettings ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              data-testid={TID_WORKFLOWS_OPEN_SETTINGS}
+              className="text-foreground-subtle hover:text-foreground"
+              onClick={handleOpenWorkflowSettings}
+            >
+              <Settings2 className="size-4" aria-hidden="true" />
+              <span>{intl.formatMessage({ id: "workflows.hub.openSettings" })}</span>
+              {dynamicWorkflowMode ? (
+                <span className="ml-0.5 text-ui-sm text-foreground-subtlest">
+                  {intl.formatMessage({
+                    id: `settings.dynamicWorkflow.option.${dynamicWorkflowMode}`,
+                  })}
+                </span>
+              ) : null}
+            </Button>
+          ) : null}
+          <ControlHintTooltip title={intl.formatMessage({ id: "workflows.hub.refresh" })}>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={intl.formatMessage({ id: "workflows.hub.refresh" })}
+              data-testid={TID_WORKFLOWS_REFRESH}
+              onClick={() => setRefreshSeq((seq) => seq + 1)}
+            >
+              <AutomationRefreshIcon className="size-3.5" aria-hidden="true" />
+            </Button>
+          </ControlHintTooltip>
+        </div>
       </div>
 
       {!anyLoaded ? (

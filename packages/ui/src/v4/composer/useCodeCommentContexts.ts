@@ -10,18 +10,21 @@ import {
   type CodeCommentComposerAttachment,
 } from "@/lib/codeCommentContext.js";
 
-interface UseCodeCommentContextsOptions {
+export interface UseCodeCommentContextsOptions {
   listenAddToChatEvents?: boolean;
   onContextRemoved?: (context: CodeCommentComposerAttachment) => void;
   requestFocus?: () => void;
   scopeKey: string;
 }
 
-interface UseCodeCommentContextsResult {
+export interface UseCodeCommentContextsResult {
   contexts: readonly CodeCommentComposerAttachment[];
   hasContexts: boolean;
   removeContext: (
-    context: Pick<CodeCommentComposerAttachment, "id" | "workspaceIdentity" | "workspacePath">,
+    context: Pick<
+      CodeCommentComposerAttachment,
+      "id" | "workspaceIdentity" | "workspacePath"
+    >,
   ) => void;
   clearContexts: () => void;
   getContexts: () => readonly CodeCommentComposerAttachment[];
@@ -35,7 +38,10 @@ function createCodeCommentAttachmentId() {
 }
 
 function contextKey(
-  context: Pick<CodeCommentComposerAttachment, "id" | "workspaceIdentity" | "workspacePath">,
+  context: Pick<
+    CodeCommentComposerAttachment,
+    "id" | "workspaceIdentity" | "workspacePath"
+  >,
 ) {
   return `${getCodeCommentWorkspaceKey(context.workspacePath, context.workspaceIdentity)}\0${context.id}`;
 }
@@ -46,27 +52,39 @@ export function useCodeCommentContexts({
   requestFocus,
   scopeKey,
 }: UseCodeCommentContextsOptions): UseCodeCommentContextsResult {
-  const [contexts, setContexts] = useState<readonly CodeCommentComposerAttachment[]>([]);
+  const [contexts, setContexts] = useState<
+    readonly CodeCommentComposerAttachment[]
+  >([]);
   const contextsRef = useRef(contexts);
   const callbacksRef = useRef({ onContextRemoved, requestFocus });
   const scopeKeyRef = useRef(scopeKey);
   callbacksRef.current = { onContextRemoved, requestFocus };
 
-  const commitContexts = useCallback((next: readonly CodeCommentComposerAttachment[]) => {
-    const nextKeys = new Set(next.map(contextKey));
-    for (const context of contextsRef.current) {
-      if (!nextKeys.has(contextKey(context))) {
-        callbacksRef.current.onContextRemoved?.(context);
+  const commitContexts = useCallback(
+    (next: readonly CodeCommentComposerAttachment[]) => {
+      const nextKeys = new Set(next.map(contextKey));
+      for (const context of contextsRef.current) {
+        if (!nextKeys.has(contextKey(context))) {
+          callbacksRef.current.onContextRemoved?.(context);
+        }
       }
-    }
-    contextsRef.current = next;
-    setContexts(next);
-  }, []);
+      contextsRef.current = next;
+      setContexts(next);
+    },
+    [],
+  );
 
   const removeContext = useCallback(
-    (target: Pick<CodeCommentComposerAttachment, "id" | "workspaceIdentity" | "workspacePath">) => {
+    (
+      target: Pick<
+        CodeCommentComposerAttachment,
+        "id" | "workspaceIdentity" | "workspacePath"
+      >,
+    ) => {
       const targetKey = contextKey(target);
-      const next = contextsRef.current.filter((context) => contextKey(context) !== targetKey);
+      const next = contextsRef.current.filter(
+        (context) => contextKey(context) !== targetKey,
+      );
       if (next.length !== contextsRef.current.length) {
         commitContexts(next);
       }
@@ -109,7 +127,9 @@ export function useCodeCommentContexts({
         id: event.detail.id ?? createCodeCommentAttachmentId(),
       };
       const key = contextKey(attachment);
-      const existingIndex = contextsRef.current.findIndex((context) => contextKey(context) === key);
+      const existingIndex = contextsRef.current.findIndex(
+        (context) => contextKey(context) === key,
+      );
       const next =
         existingIndex < 0
           ? [...contextsRef.current, attachment]
@@ -121,7 +141,10 @@ export function useCodeCommentContexts({
     };
 
     const handleRemove = (event: Event) => {
-      if (!isCodeCommentRemoveFromChatEvent(event) || !isCodeCommentRemovePayload(event.detail)) {
+      if (
+        !isCodeCommentRemoveFromChatEvent(event) ||
+        !isCodeCommentRemovePayload(event.detail)
+      ) {
         return;
       }
       removeContext(event.detail);
@@ -131,7 +154,10 @@ export function useCodeCommentContexts({
     window.addEventListener(CODE_COMMENT_REMOVE_FROM_CHAT_EVENT, handleRemove);
     return () => {
       window.removeEventListener(CODE_COMMENT_ADD_TO_CHAT_EVENT, handleAdd);
-      window.removeEventListener(CODE_COMMENT_REMOVE_FROM_CHAT_EVENT, handleRemove);
+      window.removeEventListener(
+        CODE_COMMENT_REMOVE_FROM_CHAT_EVENT,
+        handleRemove,
+      );
     };
   }, [commitContexts, listenAddToChatEvents, removeContext]);
 

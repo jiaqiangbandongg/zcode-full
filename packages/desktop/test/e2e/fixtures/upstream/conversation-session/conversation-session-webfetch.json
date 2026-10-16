@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-webfetch",
+  "spec": "./test/e2e/conversation-session/conversation-session-webfetch.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-webfetch-title",
+      "description": "WebFetch case 的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 O10 产品语义，只需要稳定返回，避免标题请求误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_WEBFETCH_REQUEST"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-webfetch-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"WebFetch E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-webfetch-tool-use",
+      "description": "O10 首段响应：固定触发 WebFetch 访问本 case 的 MITM stub 目标。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "tool-use",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 WebFetch；本响应固定触发 WebFetch，专门验证 agent HttpClientPort 成功抓取闭环。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_WEBFETCH_REQUEST"],
+        "bodyIncludes": [
+          "E2E_WEBFETCH_REQUEST",
+          "E2E_WEBFETCH_FINAL_OK",
+          "https://webfetch.e2e.test/e2e-webfetch-success",
+          "WebFetch"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_webfetch_success",
+          "messageId": "msg_e2e_webfetch_tool_use",
+          "name": "WebFetch",
+          "input": {
+            "url": "https://webfetch.e2e.test/e2e-webfetch-success",
+            "prompt": "Extract the e2e marker from the fetched page."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-webfetch-lite-extraction",
+      "description": "WebFetch 内部 lite model 请求：从 MITM stub HTML 中提取固定 marker。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 lite model 输出不可控；本响应固定返回提取结果，用于验证 WebFetch 工具结果回灌主模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Web page content:",
+          "E2E_WEBFETCH_HTML_MARKER",
+          "Extract the e2e marker from the fetched page."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"msg_e2e_webfetch_lite\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"E2E_WEBFETCH_EXTRACTED_OK\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":180,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":12,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-webfetch-final",
+      "description": "O10 最终回复：WebFetch tool_result 已进入后续主模型请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 WebFetch 成功 tool_result 进入 continuation；最终文案只需稳定收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_WEBFETCH_REQUEST",
+          "toolu_e2e_webfetch_success",
+          "E2E_WEBFETCH_EXTRACTED_OK"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "msg_e2e_webfetch_final",
+          "inputTokens": 240,
+          "outputTokens": 12,
+          "text": "E2E_WEBFETCH_FINAL_OK"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "count": {
+      "type": "number"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "exact": {
+      "const": "only"
+    },
+    "nothing": {
+      "type": "null"
+    },
+    "priority": {
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "published",
+        "archived"
+      ]
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "count",
+    "enabled",
+    "nothing",
+    "status",
+    "priority",
+    "exact"
+  ],
+  "type": "object"
+}

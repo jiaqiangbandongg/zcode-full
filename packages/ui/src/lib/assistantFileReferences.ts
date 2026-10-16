@@ -35,7 +35,7 @@ export type AssistantPreviewFileSubtitleId =
   | "chat.previewCards.video"
   | "chat.previewCards.audio";
 
-interface AssistantPreviewFileTypeDefinition {
+export interface AssistantPreviewFileTypeDefinition {
   extensions: readonly string[];
   kind: AssistantPreviewFileKind;
   subtitleId: AssistantPreviewFileSubtitleId;

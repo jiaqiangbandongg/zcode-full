@@ -18,7 +18,8 @@ function modelName(canonical: string, deps: WorkflowSubagentModelDeps): string {
 
 /**
  * 转写行的各段（不含开头的「已调整设置」与末尾时刻）：只有改过的设置在场，模型在前、上限在后。
- * 上限的 `to` 缺席或不低于天花板，都读作「上限恢复为本机默认」。
+ * 上限的 `to` 缺席或等于默认并发（`ceiling`，键名早于「默认并发」），都读作「上限恢复为默认」；
+ * 其余的数——高于默认也一样——念它自己。
  */
 export function workflowSettingsChangeSegments(
   amend: WorkflowSettingsAmendMeta,
@@ -39,10 +40,10 @@ export function workflowSettingsChangeSegments(
   }
   if (amend.maxConcurrency !== undefined) {
     const to = amend.maxConcurrency.to;
-    const atCeiling = to === undefined || (amend.ceiling !== undefined && to >= amend.ceiling);
+    const atDefault = to === undefined || to === amend.ceiling;
     segments.push(
-      atCeiling
-        ? formatMessage({ id: "chat.toolCall.workflow.settingsChange.limitCeiling" })
+      atDefault
+        ? formatMessage({ id: "chat.toolCall.workflow.settingsChange.limitDefault" })
         : formatMessage({ id: "chat.toolCall.workflow.settingsChange.limit" }, { n: to }),
     );
   }
@@ -57,8 +58,8 @@ export interface WorkflowSettingsProvenanceRow {
 }
 
 /**
- * 详情页来龙去脉块的 from → to 行。缺席的一端写默认：模型写「会话模型」，上限写本机上限（知道
- * 天花板时带上数字，「13（本机上限）→ 4」）。
+ * 详情页来龙去脉块的 from → to 行。缺席的一端写默认：模型写「会话模型」，上限写默认（知道默认
+ * 并发时带上数字，「默认 13 → 4」）。等于默认的一端同样写默认；高于默认的一端念数。
  */
 export function workflowSettingsProvenanceRows(
   amend: WorkflowSettingsAmendMeta,
@@ -78,13 +79,16 @@ export function workflowSettingsProvenanceRows(
     });
   }
   if (amend.maxConcurrency !== undefined) {
-    const ceiling = amend.ceiling;
+    const defaultConcurrency = amend.ceiling;
     const end = (bound: number | undefined) =>
-      bound !== undefined && (ceiling === undefined || bound < ceiling)
+      bound !== undefined && bound !== defaultConcurrency
         ? String(bound)
-        : ceiling === undefined
-          ? formatMessage({ id: "chat.workflowLaunch.settings.machineLimit" })
-          : formatMessage({ id: "chat.workflowLaunch.settings.machineLimitValue" }, { n: ceiling });
+        : defaultConcurrency === undefined
+          ? formatMessage({ id: "chat.workflowLaunch.settings.defaultLimit" })
+          : formatMessage(
+              { id: "chat.workflowLaunch.settings.defaultLimitValue" },
+              { n: defaultConcurrency },
+            );
     rows.push({
       key: "limit",
       label: formatMessage({ id: "chat.workflowLaunch.settings.limit" }),

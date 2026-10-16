@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">ZCode</string>
+    <string name="remote_launcher_title">ZCode Remote</string>
+    <string name="remote_launcher_description">Open the remote control link from your desktop QR code.</string>
+    <string name="remote_url_label">Remote URL</string>
+    <string name="remote_url_placeholder">https://zcode.z.ai/remote?sid=...</string>
+    <string name="remote_url_invalid">Use a ZCode remote link.</string>
+    <string name="remote_open_button">Open remote control</string>
+    <string name="remote_scan_button">Scan QR code</string>
+    <string name="remote_scan_title">Scan desktop QR code</string>
+    <string name="remote_scan_hint">Point the camera at the ZCode remote control QR code.</string>
+    <string name="remote_scan_invalid">This QR code is not a ZCode remote link.</string>
+    <string name="remote_scan_permission_denied">Camera permission is needed to scan the QR code.</string>
+    <string name="remote_scan_camera_failed">Could not start the camera.</string>
+    <string name="remote_recent_title">Recent links</string>
+    <string name="remote_recent_clear">Clear</string>
+    <string name="remote_screen_title">Remote control</string>
+    <string name="remote_reload_button">Reload</string>
+    <string name="remote_close_button">Close</string>
+    <string name="remote_retry_button">Retry</string>
+    <string name="remote_load_failed_title">Could not load remote control</string>
+    <string name="remote_keep_alive_title">ZCode remote control is active</string>
+    <string name="remote_keep_alive_text">Keeping the remote session ready while this phone is in use.</string>
+    <string name="remote_keep_alive_channel">Remote control</string>
+    <string name="remote_keep_alive_channel_description">Connection status for ZCode remote control sessions.</string>
+</resources>

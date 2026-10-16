@@ -28,6 +28,13 @@ import {
   timelineWidth,
 } from "./timeline-geometry.js";
 import { WorkflowTimelineArcs } from "./WorkflowTimelineArcs.js";
+import {
+  WorkflowTimelineFills,
+  useFillHeadTarget,
+  useFreshFills,
+} from "./WorkflowTimelineFills.js";
+import type { TimelineFill } from "./timeline-holes.js";
+import { timelineFrames } from "./timeline-frames.js";
 import { WorkflowStationPlatform, WorkflowStationRow } from "./WorkflowTimelineStation.js";
 import { WorkflowTimelineLamps, WorkflowTimelineTracks } from "./WorkflowTimelineTracks.js";
 import {
@@ -41,6 +48,7 @@ import {
   type CameraFlight,
 } from "./timeline-ledge.js";
 import { useTimelineViewport } from "./use-timeline-viewport.js";
+import { slideClass, slideStyle, useFillGrowth } from "./use-fill-growth.js";
 import {
   WorkflowLedge,
   WorkflowTimelineScrollbar,
@@ -80,8 +88,13 @@ function stationHeight(station: TimelineStation): number {
  * 悬停 4px）——它贴着底缘叠在留白上，不改高度。
  */
 export function timelineHeight(model: WorkflowTimelineModel): number {
-  const rows = timelineLayout(model.arcs, model.bands);
+  const rows = timelineLayout(model.arcs, model.bands, hasFillHeads(model));
   return rows.pillsTop + Math.max(0, ...model.stations.map(stationHeight)) + 8;
+}
+
+/** 有补全的时间线才有头那一行（docs/dynamic-workflow/presentation.md「Holes on the timeline」）。 */
+function hasFillHeads(model: Pick<WorkflowTimelineModel, "fills">): boolean {
+  return (model.fills?.length ?? 0) > 0;
 }
 
 /** 药丸依次落地的间隔（与设计画布同值）。 */
@@ -109,11 +122,17 @@ export interface WorkflowTimelineProps {
    * 落到这一站；缺席即脚本药丸不可点。与 `onOpenPill` 各自门控各自的车道。
    */
   onOpenWorkspace?: (pill: TimelinePill) => void;
+  /**
+   * 点一次补全的头（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：开侧板、落到补全的
+   * 标题（它写下的第一站）。缺席即头不是控件。
+   */
+  onOpenFill?: (fill: TimelineFill) => void;
 }
 
 export const WorkflowTimeline = memo(function WorkflowTimeline({
   className,
   model,
+  onOpenFill,
   onOpenMore,
   onOpenPill,
   onOpenWorkspace,
@@ -143,11 +162,29 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
   // 行的排布：有带时主线落在最下面
   // 一行、分支叠在它上面、站头搬到站台行；没有带时整套式子逐像素退回从前的「弧道 + 轨道行」，
   // DOM 也走原来那一支。
-  const layout = timelineLayout(model.arcs, model.bands);
+  // 补全（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：有头时最上面多一行 24px；尾巴
+  // 留白在末站之后多 40px；指针或键盘焦点落在哪个**头**上（`data-fill-head`，无阶段补全的笔标也是）由根节点
+  // 委托得出，那一个框据此画出。站与药丸不点亮任何东西——修复原因见 timeline-frames.ts。
+  const fills = (model.fills ?? []).filter((fill) => fill.to < n);
+  const layout = timelineLayout(model.arcs, model.bands, fills.length > 0);
   const { banded, inset, pillsTop } = layout;
   const top = layout.rowY[0]! - RAIL_ROW / 2;
-  const width = timelineWidth(n, inset);
+  const width = timelineWidth(n, inset, model.tailStub !== undefined);
   const height = timelineHeight(draft ? { ...model, stations } : model);
+  const frames = timelineFrames({
+    columnHeight: (i) => stationHeight(stations[i]!),
+    fills,
+    height,
+    inset,
+    layout,
+    parents: model.holeParents ?? {},
+    stations,
+    width,
+  });
+  const fillTarget = useFillHeadTarget(frames.length > 0);
+  const fresh = useFreshFills(frames);
+  // 生长：补全接进 run 时插入列右侧的站滑开（`use-fill-growth.ts`）。
+  const slide = useFillGrowth(model);
   // 药丸按站从左到右、站内从上到下依次落地：第 k 枚延迟 k × 30 ms（「还有 n 个」那一行也排队）。
   let pillOrdinal = 0;
   const nextDelay = () => {
@@ -287,6 +324,7 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
       className={cn("wf-motion wf-timeline min-w-0", className)}
       data-testid="workflow-timeline"
       onKeyDown={onKeyDown}
+      {...fillTarget.handlers}
     >
       {/* 檐与滚动条叠在滚动层之上，以它（而不是带 padding 的外框）为基准定位。 */}
       <div className="relative">
@@ -306,6 +344,17 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
           style={mask}
         >
           <div className="relative" style={{ height, width }}>
+            {/* 补全的框（在一切之下）与头（在头那一行）：docs/dynamic-workflow/presentation.md「Holes on the timeline」。 */}
+            <WorkflowTimelineFills
+              active={fillTarget.active}
+              fills={fills}
+              frames={frames}
+              fresh={fresh}
+              height={height}
+              inset={inset}
+              width={width}
+              {...(onOpenFill === undefined ? {} : { onOpenFill })}
+            />
             <WorkflowTimelineArcs
               arcs={arcs}
               bands={model.bands}
@@ -331,6 +380,7 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
                 folded={folded}
                 layout={layout}
                 stations={stations}
+                {...(slide === undefined ? {} : { slide })}
               />
             ) : null}
 
@@ -341,12 +391,14 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
                 layout={layout}
                 stations={stations}
                 titleOf={stationTitle}
+                {...(slide === undefined ? {} : { slide })}
                 {...(onSelectStation === undefined ? {} : { onSelectStation })}
               />
             ) : (
               <WorkflowStationRow
                 draft={draft}
                 folded={folded}
+                fresh={fresh}
                 fullNames={fullNames}
                 pen={pen}
                 rails={railByPair}
@@ -354,6 +406,8 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
                 titleOf={stationTitle}
                 top={top}
                 width={width}
+                {...(slide === undefined ? {} : { slide })}
+                {...(model.tailStub === undefined ? {} : { tailStub: model.tailStub })}
                 {...(onSelectStation === undefined ? {} : { onSelectStation })}
               />
             )}
@@ -364,11 +418,17 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
               if (station.pills.length === 0 && roster === undefined) return null;
               return (
                 <div
-                  className="absolute flex flex-col"
+                  className={cn(
+                    "absolute flex flex-col",
+                    station.ghost && "wf-ghost",
+                    slideClass(i, slide),
+                  )}
+                  data-fill={station.fill}
                   data-station-roster={roster === undefined ? undefined : "true"}
                   data-testid="workflow-timeline-pills"
                   key={station.id}
                   style={{
+                    ...slideStyle(i, slide),
                     gap: PILL_GAP,
                     left: stationX(i, inset),
                     top: pillsTop,
@@ -394,7 +454,7 @@ export const WorkflowTimeline = memo(function WorkflowTimeline({
             })}
           </div>
         </div>
-        {/* 边檐：折到视口两侧的站，一排灯落在轨道行上，檐下的内容已被遮罩清空。 */}
+        {/* 边檐（追记「边檐」）：折到视口两侧的站，一排灯落在轨道行上，檐下的内容已被遮罩清空。 */}
         <WorkflowLedge
           indexes={fold.left}
           side="left"

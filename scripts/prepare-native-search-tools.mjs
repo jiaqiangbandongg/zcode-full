@@ -8,7 +8,11 @@ import {
   isNativeSearchBundleCurrent,
   writeNativeSearchBundleMeta,
 } from "./native-search-tools-bundle-meta.mjs";
-import { resolveNativeSearchPrebuiltPlan } from "./native-search-tools-config.mjs";
+import { downloadNativeSearchTools } from "./download-native-search-tools.mjs";
+import {
+  resolveNativeSearchArtifactSource,
+  resolveNativeSearchPrebuiltPlan,
+} from "./native-search-tools-config.mjs";
 import { verifyNativeSearchBinaryTarget } from "./native-search-tools-verify.mjs";
 import { extractPrebuiltBinary, verifyPrebuiltArchiveSha256 } from "./prebuilt-binary-extract.mjs";
 import { stageNativeSearchNotices } from "./third-party-notices.mjs";
@@ -23,13 +27,37 @@ function ensureCachedBinaryExecutable(binaryPath, targetPlatform) {
   chmodSync(binaryPath, 0o755);
 }
 
+/**
+ * native search 预编译工具的唯一准备入口（desktop prepare:native-search、SEA、server-cli、remote 共用）。
+ *
+ * 来源由 resolveNativeSearchArtifactSource 判定：内网依赖源已配置时原样走既有
+ * downloadNativeSearchTools（同一 release plan、SHA-256 校验与 bundle meta 缓存语义）；
+ * 未配置时才解包仓库内置归档。两条路径都在返回前刷新工具目录旁的许可声明。
+ */
 export async function prepareNativeSearchTools({
   platform = process.env.ZCODE_TARGET_OS || process.platform,
   arch = process.env.ZCODE_TARGET_ARCH || process.arch,
   outputDir,
   dependenciesDir,
+  env = process.env,
+  source = resolveNativeSearchArtifactSource(env),
   prebuiltPlan,
 } = {}) {
+  if (source === "intranet") {
+    const downloadedPlan = await downloadNativeSearchTools({
+      platform,
+      arch,
+      outputDir,
+      env,
+      prebuiltPlan,
+    });
+    await stageNativeSearchNotices(downloadedPlan, repoRoot, { origin: "intranet-mirror" });
+    return downloadedPlan;
+  }
+  if (source !== "repository") {
+    throw new Error(`Unsupported native search artifact source: ${String(source)}`);
+  }
+
   const plan =
     prebuiltPlan ?? resolveNativeSearchPrebuiltPlan({ platform, arch, outputDir, dependenciesDir });
 

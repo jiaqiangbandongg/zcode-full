@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-profile-fields",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-profile-fields.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-profile-fields.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "~/.zcode/agents/e2e-profile-fields.md",
+      "source": "created-by-spec",
+      "description": "经真实 Settings 创建和逐字段保存；不直接写配置。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "spf-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-seed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-seed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-resume-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-resume-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-spawn-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-spawn-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-effort-spawn-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-resume-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-resume-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-spawn-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-spawn-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-prompt-spawn-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-resume-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-resume-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-spawn-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-spawn-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    },
+    {
+      "id": "spf-tools-spawn-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+    }
+  ]
+}

@@ -119,6 +119,7 @@ export function OnboardingWizardHeader(props: { title: string; description: stri
 export function OnboardingWizardFooter(props: {
   currentStep: OnboardingWizardStep;
   selectedWorkspaceCount: number;
+  settingsTaskCount: number;
   finishRunning: boolean;
   finishReady: boolean;
   onBackToWelcome: () => void;
@@ -138,12 +139,45 @@ export function OnboardingWizardFooter(props: {
           { id: "onboarding.footer.workspaceSelection" },
           { count: String(props.selectedWorkspaceCount) },
         )
-      : intl.formatMessage({ id: "onboarding.footer.helper" });
+      : /*
+         * 暂时隐藏数据迁移向导里的代理设置步骤，保留原 helper 文案分支以便后续恢复。
+         * : props.currentStep === "agent-settings"
+         *   ? intl.formatMessage(
+         *       { id: "onboarding.footer.selection" },
+         *       { count: String(props.settingsTaskCount) },
+         *     )
+         */
+        intl.formatMessage({ id: "onboarding.footer.helper" });
+
+  /*
+   * 暂时隐藏数据迁移向导里的代理设置步骤，批量选择按钮随步骤一起隐藏。
+   * const showAgentSettingsBulk =
+   *   props.currentStep === "agent-settings" && props.onAgentSettingsBulkToggle;
+   */
 
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <span className="min-w-0 truncate text-ui-base text-foreground-subtle">{helperText}</span>
+        {/*
+          暂时隐藏数据迁移向导里的代理设置步骤，保留原批量选择按钮以便后续恢复。
+          {showAgentSettingsBulk ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-ui-base text-foreground-subtle hover:text-foreground"
+              disabled={props.agentSettingsBulkToggleDisabled}
+              onClick={props.onAgentSettingsBulkToggle}
+            >
+              {intl.formatMessage({
+                id: props.agentSettingsBulkIsClear
+                  ? "settingsSync.selection.clearAll"
+                  : "settingsSync.selection.selectAll",
+              })}
+            </Button>
+          ) : null}
+        */}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {props.currentStep === "session" ? (
@@ -189,6 +223,33 @@ export function OnboardingWizardFooter(props: {
             </Button>
           </>
         ) : null}
+
+        {/*
+          暂时隐藏数据迁移向导里的代理设置步骤，保留原开始迁移按钮分支以便后续恢复。
+          {props.currentStep === "agent-settings" ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="h-10 min-w-0 px-5"
+                onClick={props.onBackStep}
+              >
+                {intl.formatMessage({ id: "common.back" })}
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                className="h-10 min-w-0 px-5"
+                disabled={props.beginMigrationDisabled}
+                onClick={props.onBeginMigration}
+              >
+                {intl.formatMessage({ id: "onboarding.action.beginMigration" })}
+              </Button>
+            </>
+          ) : null}
+        */}
+
         {props.currentStep === "agents-file" ? (
           <>
             <Button

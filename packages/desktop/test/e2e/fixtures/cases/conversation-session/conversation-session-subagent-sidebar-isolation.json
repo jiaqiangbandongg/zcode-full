@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-sidebar-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-sidebar-isolation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-sidebar-isolation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "subagent-sidebar-parent-agent",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+    },
+    {
+      "id": "subagent-sidebar-child",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+    },
+    {
+      "id": "subagent-sidebar-parent-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+    }
+  ]
+}

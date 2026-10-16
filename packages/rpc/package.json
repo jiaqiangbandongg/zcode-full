@@ -11,10 +11,11 @@
     }
   },
   "scripts": {
+    "test": "vitest run",
     "build": "tsc",
     "demo:basic": "node --loader ts-node/esm examples/01-basic-ipc.ts",
     "demo:proxy": "node --loader ts-node/esm examples/02-proxy-channel.ts",
-    "demo:messageport": "node --loader ts-node/esm examples/03-ipc-server-client.ts",
+    "demo:messageport": "node --loader ts-node/esm examples/03-messageport-ipc.ts",
     "demo:remote": "node --loader ts-node/esm examples/04-remote-connection.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix"

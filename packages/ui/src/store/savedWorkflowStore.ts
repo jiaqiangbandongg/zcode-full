@@ -11,6 +11,7 @@ import {
 } from "@zcode/shared";
 import type { IZCodeAgentService, ZCodeAgentSavedWorkflowTarget } from "@zcode/services";
 import { logger } from "@/logger.js";
+import { useWorkflowRunSavedStore } from "@/store/workflowRunSavedStore.js";
 
 /** 一页里最多拉多少条 run 来算「上次运行」；一个项目的活跃工作流很少超过这个数。 */
 const SAVED_WORKFLOW_RUNS_PAGE = 50;
@@ -110,6 +111,10 @@ export const useSavedWorkflowStore = create<SavedWorkflowStoreState>((set) => ({
     }));
     const request = fetchWorkspace(target, agentService)
       .then(({ list, runs }) => {
+        // 中枢刚看过磁盘：把完成卡那张「这次 run 存成了哪个工作流」的读缓存一并作废
+        // （docs/dynamic-workflow/transcript-and-notifications.md「Which workflow a run is saved as」）。
+        // 中枢里的删除 / 移动 / 改元数据都以一次刷新收尾，这一行让那些动作也走到对话里的卡片上。
+        useWorkflowRunSavedStore.getState().invalidate();
         set((state) => ({
           byWorkspaceKey: {
             ...state.byWorkspaceKey,
@@ -156,4 +161,10 @@ export function selectSavedWorkflowState(
 ): SavedWorkflowWorkspaceState {
   if (!target) return EMPTY_SAVED_WORKFLOW_STATE;
   return state.byWorkspaceKey[savedWorkflowStoreKey(target)] ?? EMPTY_SAVED_WORKFLOW_STATE;
+}
+
+/** 测试用：清掉 in-flight 去重表。 */
+export function resetSavedWorkflowStoreForTests(): void {
+  inFlight.clear();
+  useSavedWorkflowStore.setState({ byWorkspaceKey: {} });
 }

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-scroll",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-scroll.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-scroll.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-scroll-title",
+      "description": "E2E_V4_SCROLL_HISTORY_001 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_SCROLL_HISTORY_001 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-scroll-turn1-long-history",
+      "description": "M5④ / SRM02 长会话滚动门禁：14 个 completed turn 形成稳定 turn render units，撑出远超视口的历史，并验证切到 draft 后恢复离底阅读位置。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "虚拟滚动断言需要确定的 completed turn 数和可滚动高度；真实 provider 无法稳定复现该窗口边界。"
+    },
+    {
+      "id": "v4-scroll-turn2-controlled-stream",
+      "description": "M5④ / SRM03 长会话滚动门禁 turn2：可控慢流（首 delta 0.4s，完流 ~11.5s），覆盖离底流式不拉回与吸底切走后后台输出、切回当前底部。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "「上滚不被流式拉回」断言需要稳定的 streaming 窗口。"
+    }
+  ]
+}

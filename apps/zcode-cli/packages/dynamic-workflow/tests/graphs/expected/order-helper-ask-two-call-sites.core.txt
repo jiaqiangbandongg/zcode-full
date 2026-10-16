@@ -1,0 +1,16 @@
+actor actor#1 "worker" @6:16 order=0
+ask ask#1 "worker" @8:23 order=1 type="string"
+fact ask-actor ask#1 <- actor#1 exact
+fact return <- ask#1 exact
+region seq#1 seq entered
+region call#1 call parent=seq#1 @10:21 entered label="run" strand
+region call#2 call parent=seq#1 @11:22 entered label="run" strand
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1>call#1 phase=unphased
+settle ask#1 in=seq#1>call#1
+jump return call#1 in=seq#1>call#1 phase=unphased
+settle ask#1 in=seq#1 joins=call#1
+issue ask#1 in=seq#1>call#2 phase=unphased
+jump return call#2 in=seq#1>call#2 phase=unphased
+settle in=seq#1 joins=call#2
+jump return seq#1 in=seq#1 phase=unphased

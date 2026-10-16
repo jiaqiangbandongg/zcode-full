@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-history-order",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-history-order.test.ts",
+  "fixtures": [
+    {
+      "id": "d19-title",
+      "description": "D19 工具历史顺序：d19-title。",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_TOOL_ORDER_SOURCE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "d19-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Tool history order\"}"
+        }
+      }
+    },
+    {
+      "id": "d19-tools",
+      "description": "D19 工具历史顺序：d19-tools。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_ORDER_SOURCE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_d19_bash"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_d19_bash",
+            "name": "Bash",
+            "input": {
+              "command": "node -e \"console.log(12345)\""
+            }
+          },
+          {
+            "id": "toolu_d19_read",
+            "name": "Read",
+            "input": {
+              "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-history-order/read.txt"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "d19-followup",
+      "description": "D19 工具历史顺序：d19-followup。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_TOOL_ORDER_SOURCE",
+          "tool_result",
+          "toolu_d19_bash",
+          "toolu_d19_read"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_TOOL_ORDER_LATER",
+          "E2E_TOOL_ORDER_EDITED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "d19-followup",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "D19_SOURCE_DONE"
+        }
+      }
+    },
+    {
+      "id": "d19-later",
+      "description": "D19 工具历史顺序：d19-later。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_ORDER_LATER"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "d19-later",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "D19_LATER_DONE"
+        }
+      }
+    },
+    {
+      "id": "d19-edited",
+      "description": "D19 工具历史顺序：d19-edited。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_ORDER_EDITED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "d19-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "D19_EDITED_DONE"
+        }
+      }
+    }
+  ]
+}

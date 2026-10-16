@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-webfetch",
+  "spec": "./test/e2e/conversation-session/conversation-session-webfetch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-webfetch.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-webfetch-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 O10 产品语义，只需要稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "upstream-conversation-webfetch-tool-use",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定触发 WebFetch，验证桌面会话到 agent runtime 的 WebFetch HttpClientPort 成功抓取闭环。"
+    },
+    {
+      "id": "upstream-conversation-webfetch-lite-extraction",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 WebFetch 内部 lite model 输出，验证 HTML 提取结果能进入 tool_result。"
+    },
+    {
+      "id": "upstream-conversation-webfetch-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终回复，验证 WebFetch tool_result 已进入主模型 continuation。"
+    }
+  ]
+}

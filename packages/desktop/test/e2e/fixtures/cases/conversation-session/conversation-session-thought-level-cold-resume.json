@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-thought-level-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-thought-level-cold-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-thought-level-cold-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "thought-cold-resume-seed-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 completed task 的 task-local thought 冷恢复；响应只需稳定结束首轮。"
+    },
+    {
+      "id": "thought-cold-resume-follow-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应正文不是产品变量；续发 request body 的 max 配置才是核心证据。"
+    }
+  ]
+}

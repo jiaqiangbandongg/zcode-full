@@ -1,0 +1,12 @@
+flowchart LR
+  subgraph workspace["workspace"]
+    world_read_1[/"glob src/**/*.ts<br/>world-read#1"/]
+  end
+  subgraph actor_1["reviewer (actor#1)  ×N"]
+    ask_1["reviewer<br/>ask#1<br/>×N"]
+  end
+  sink(["sink"])
+  world_read_1 --> ask_1
+  ask_1 --> sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

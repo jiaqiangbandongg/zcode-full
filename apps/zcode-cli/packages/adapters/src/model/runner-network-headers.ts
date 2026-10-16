@@ -1,6 +1,8 @@
+import { requestSecuritySensitiveHeaders } from "@zcode/shared";
 const HEADER_REDACTION_VALUE = "[redacted]";
 
 const redactedHeaderNames = new Set([
+  ...requestSecuritySensitiveHeaders,
   "authorization",
   "proxy-authorization",
   "cookie",

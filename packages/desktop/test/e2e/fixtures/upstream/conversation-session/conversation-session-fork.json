@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-fork-basic-source-final",
+      "description": "E01 基础 completed assistant fork 的 source turn 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "基础 fork case 只需要稳定形成 completed assistant 消息；真实 provider 文案不影响 fork 边界语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_SOURCE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_SOURCE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-basic-source-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-goal-seed-final",
+      "description": "E07 goal target 注入前 seed turn 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "seed turn 只用于形成可 fork 的稳定 assistant 历史，后续 goal target 通过 sqlite 注入。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_GOAL_SEED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_GOAL_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-goal-seed-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-goal-source-final",
+      "description": "E07 父 session 有 goal target 时的 source turn，用于让 renderer 同步已注入的 target。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 的核心语义是 fork child 继承父 target 且不复制父 queue；source turn 只负责完成一次 snapshot 同步，真实 provider 文案不影响断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_GOAL_SOURCE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_GOAL_SOURCE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-goal-source-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-goal-held-queue-contract",
+      "description": "E07 held queue marker 合同占位；fork 前父 session queue 不应立即发 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 queued prompt 的产品语义是停留在父 session held queue，fork child 不复制它；运行时若命中该 fixture 反而说明 queue guard 失效。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_GOAL_HELD_QUEUE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_GOAL_HELD_QUEUE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-goal-held-queue-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-edit-old-final",
+      "description": "E09 edit fork 原始分支 source turn 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "原始分支只用于随后 edit/rewind；真实 provider 文案不影响 active branch fork 断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_EDIT_OLD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_EDIT_OLD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-edit-old-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-edit-active-final",
+      "description": "E09 edit rerun 后 active branch 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只需要稳定形成编辑后的 active assistant turn，用于证明 fork child 不复制旧分支。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_EDIT_ACTIVE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_FORK_EDIT_ACTIVE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-conversation-fork-edit-active-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

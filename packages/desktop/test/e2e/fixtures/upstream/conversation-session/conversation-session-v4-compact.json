@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-compact",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-compact.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-compact-title",
+      "description": "E2E_V4_COMPACT_SEED 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_COMPACT_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_COMPACT_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-compact-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Compact E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-compact-seed",
+      "description": "M4 /compact 门禁：首轮固定文本回复，形成待压缩的历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "compact 需要一段已完成历史；首轮只需稳定产出可被压缩的 assistant 文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_COMPACT_SEED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-compact-seed",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_COMPACT_SEED_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-compact-success",
+      "description": "M4 /compact 门禁：手动 compact 的 streaming summary 成功响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "手动 compact 的核心断言是 v4 投影产出 [compact] · completed marker；summary 文案固定即可。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_V4_COMPACT_SEED",
+          "CRITICAL: Respond with TEXT ONLY",
+          "V4_COMPACT_SEED_OK",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 300,
+        "text": {
+          "id": "v4-compact-success",
+          "inputTokens": 256,
+          "outputTokens": 64,
+          "text": "<analysis>V4 manual compact e2e summarized the existing session without tools.</analysis>\n\n<summary>Conversation so far: the user asked the assistant to reply with V4_COMPACT_SEED_OK for the initial verification turn, and the assistant did. No files or tools were required.</summary>"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-subagent-rate-limit",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-subagent-rate-limit.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-background-subagent-rate-limit.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "background-subagent-rate-limit-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于本 case，只需稳定返回以免误匹配业务 fixture。"
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-launch",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定创建真实 Agent(run_in_background=true) 以覆盖 terminal notification 投影。"
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父会话先回 idle，随后由 failed task notification 唤醒。"
+    },
+    {
+      "id": "background-subagent-rate-limit-child-initial-429",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "首个 429 延迟到父 turn 消费 launch ACK 后返回；BG26 worker 禁用模型 retry，只验证 terminal/UI/snapshot 的原始错误投影。"
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "证明 failed notification 经 runtime command queue 回到父模型并正常收口。"
+    }
+  ]
+}

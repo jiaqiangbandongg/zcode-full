@@ -1,0 +1,27 @@
+flowchart TD
+  subgraph actor_1["first (actor#1)"]
+    ask_1["first<br/>ask#1"]
+  end
+  subgraph actor_2["second (actor#2)"]
+    ask_2["second<br/>ask#2"]
+  end
+  subgraph actor_3["third (actor#3)"]
+    ask_3["third<br/>ask#3"]
+  end
+  source(["source"])
+  join_1{{"join#1"}}
+  sink(["sink"])
+  ask_1 -->|"string"| ask_3
+  join_1 -->|"port 0 · string"| ask_3
+  ask_1 -->|"port 0 · string"| join_1
+  ask_2 -->|"port 1 · string"| join_1
+  ask_2 -->|"string"| sink
+  join_1 -->|"port 1 · string"| sink
+  ask_3 -->|"string"| sink
+  source --> ask_1
+  source --> ask_2
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  classDef relay fill:#fff2cc,stroke:#d6b656;
+  class source,sink endpoint;
+  class join_1 relay;

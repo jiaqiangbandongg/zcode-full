@@ -1,0 +1,3 @@
+actor-node actor#1 "solo" @7:8
+actor-node sink
+actor-edge actor#1 -> sink exact count=1 types="string"

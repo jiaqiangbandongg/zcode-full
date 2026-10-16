@@ -1,0 +1,8 @@
+phase unphased
+lane main
+lane actor#1 "审阅者" @6:24
+region seq#1 seq
+step ask#1 ask "审阅者" @6:37 lane=actor#1 phase=unphased region=seq#1 always
+step hole#cd7e8315 hole "评判" @7:14 lane=main phase=unphased region=seq#1 always
+edge ask#1 -> hole#cd7e8315 data always exact
+sink hole#cd7e8315

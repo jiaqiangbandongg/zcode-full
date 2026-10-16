@@ -19,7 +19,7 @@ export function ConversationSelectionReferenceChip({
   onRemove?: (id: string) => void;
   onRemoveAll?: () => void;
 }) {
-  const { intl } = useZCodeIntl();
+  const { intl, locale } = useZCodeIntl();
   if (references.length === 0) return null;
   const filePath = references.length === 1 ? references[0]?.path : undefined;
   // 文件引用沿用共用 pill，但不能再被「对话引用」计数隐藏来源。
@@ -59,6 +59,24 @@ export function ConversationSelectionReferenceChip({
         >
           <QuoteIcon className="mt-0.5 size-4 shrink-0 text-foreground-subtle" />
           <div className="min-w-0 flex-1">
+            {reference.senderName || reference.senderId || reference.sentAt ? (
+              <div className="mb-1 text-ui-sm text-foreground-subtle">
+                {reference.senderName ||
+                  (reference.senderId
+                    ? `${reference.senderId.slice(0, 8)}…${reference.senderId.slice(-4)}`
+                    : "")}
+                {reference.sentAt ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    {new Date(reference.sentAt).toLocaleTimeString(locale, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
             <div className="line-clamp-3 whitespace-pre-wrap break-words">{reference.text}</div>
             {reference.path || isConversationSelectionReference(reference) ? (
               <div className="mt-0.5 break-words text-ui-sm text-foreground-subtlest">

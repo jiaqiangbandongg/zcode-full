@@ -74,6 +74,12 @@ export interface PhaseInfo {
   name: string;
   /** The first marker that minted this phase; later same-name markers do not move it. */
   loc: ScriptLoc;
+  /**
+   * The filled hole whose body wrote this phase (docs/analysis.md「Sites」): a marker or a hole
+   * (open or filled) inside a body carries the innermost enclosing filled hole's id. Absent
+   * outside every fill — a top-level hole's own phase has none.
+   */
+  fill?: string;
 }
 
 /** A step's request was sent (the facade call expression was evaluated). */
@@ -124,6 +130,12 @@ export interface ActorEvent {
   at: "actor";
   actor: string;
   regions: readonly string[];
+  /**
+   * The phase current where the call was evaluated, as on {@link IssueEvent}: a lane's birth
+   * phase for the engine's lexical stamp (`collectSitePhases`). Not rendered in the core's
+   * text form — the `spawn` line predates it and the site-phase table has its own tests.
+   */
+  phase: string;
 }
 
 /** A `phase("…")` marker statement was evaluated: the current phase switched to `phase`. */

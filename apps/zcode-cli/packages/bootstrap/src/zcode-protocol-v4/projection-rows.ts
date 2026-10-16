@@ -18,15 +18,15 @@ import type {
 } from "@zcode/shared/zcode-protocol-v4";
 import { PROTOCOL_V4_LIMITS } from "@zcode/shared/zcode-protocol-v4";
 
-interface RowBaseInput {
+export interface RowBaseInput {
   rowId: number;
   turnId: string;
   createdAt: number;
   createdAtSeq: number;
 }
 
-// inputSource → turnHeader.origin。
-function mapTurnHeaderOrigin(
+// inputSource → turnHeader.origin（10 §4.4.2）。
+export function mapTurnHeaderOrigin(
   source: SyntheticUserMessageSource | undefined,
 ): TurnHeaderRow["origin"] {
   switch (source) {
@@ -41,8 +41,8 @@ function mapTurnHeaderOrigin(
   }
 }
 
-// inputSource → userInput.origin。
-function mapUserInputOrigin(
+// inputSource → userInput.origin（10 §4.4.3）。
+export function mapUserInputOrigin(
   source: SyntheticUserMessageSource | undefined,
 ): UserInputRow["origin"] {
   switch (source) {
@@ -92,11 +92,20 @@ export function buildUserInputRow(base: RowBaseInput, payload: TurnStartedPayloa
   return {
     ...base,
     kind: "userInput",
-    text: payload.input,
+    ...(payload.intent?.inputOrigin ? { inputOrigin: payload.intent.inputOrigin } : {}),
+    ...(payload.intent?.conversationQuotes
+      ? { conversationQuotes: payload.intent.conversationQuotes }
+      : {}),
+    ...(payload.intent?.botGroupSource ? { botGroupSource: payload.intent.botGroupSource } : {}),
+    text:
+      payload.intent?.conversationQuotes || payload.intent?.botGroupSource
+        ? (payload.intent.text ?? payload.input)
+        : payload.input,
     origin: mapUserInputOrigin(payload.inputSource),
     ...(sourceCommandId ? { sourceCommandId } : {}),
     ...(rootSourceCommandId ? { rootSourceCommandId } : {}),
     ...(payload.intent?.clientId ? { clientId: payload.intent.clientId } : {}),
+    ...(payload.intent?.highspeed ? { highspeed: payload.intent.highspeed } : {}),
     ...(payload.epilogueStart === undefined ? {} : { epilogueStart: payload.epilogueStart }),
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
   };

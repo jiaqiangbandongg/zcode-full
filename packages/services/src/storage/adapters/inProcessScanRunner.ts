@@ -8,7 +8,7 @@ import { createStorageUsageAccumulator } from "../domain/usageAggregate.js";
 import { walkStorageRoot } from "./fsWalker.js";
 import { createFsVolumeProbe } from "./volumeProbe.js";
 
-interface RunStorageScanOptions {
+export interface RunStorageScanOptions {
   roots: StorageRootSpec[];
   signal: AbortSignal;
   onProgress: (progress: StorageScanProgress) => void;

@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-mcp-oauth-status-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-mcp-oauth-status-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-mcp-oauth-status-isolation-direct-call",
+      "description": "OAuth 授权完成后先调用仍保持连接的用户级 stdio MCP ping 工具。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发用户级 stdio MCP 的真实 tools/call，避免依赖模型自行选择工具。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MCP_OAUTH_STATUS_ISOLATION"],
+        "bodyIncludes": [
+          "E2E_MCP_OAUTH_STATUS_ISOLATION",
+          "mcp__everything__ping",
+          "mcp__plain_http__ping"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_mcp_oauth_status_isolation_direct",
+          "name": "mcp__everything__ping",
+          "input": {
+            "marker": "E2E_MCP_OAUTH_STATUS_ISOLATION"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-mcp-oauth-status-isolation-http-call",
+      "description": "消费 stdio MCP tool_result 后调用普通无鉴权 HTTP MCP ping 工具。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 OAuth status refresh 后 stdio MCP tool_result 能进入 provider continuation，并继续选择普通 HTTP MCP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MCP_OAUTH_STATUS_ISOLATION",
+          "toolu_e2e_mcp_oauth_status_isolation_direct",
+          "E2E_MCP_DIRECT_PONG:E2E_MCP_OAUTH_STATUS_ISOLATION",
+          "mcp__plain_http__ping"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_mcp_oauth_status_isolation_http",
+          "name": "mcp__plain_http__ping",
+          "input": {
+            "marker": "E2E_MCP_OAUTH_STATUS_ISOLATION"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-mcp-oauth-status-isolation-final",
+      "description": "消费 stdio 与普通 HTTP MCP 的真实 tool_result 并完成会话。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明两类用户 MCP 的 tool_result 都能进入 provider continuation。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MCP_OAUTH_STATUS_ISOLATION",
+          "toolu_e2e_mcp_oauth_status_isolation_direct",
+          "E2E_MCP_DIRECT_PONG:E2E_MCP_OAUTH_STATUS_ISOLATION",
+          "toolu_e2e_mcp_oauth_status_isolation_http",
+          "E2E_MCP_HTTP_PONG:E2E_MCP_OAUTH_STATUS_ISOLATION"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

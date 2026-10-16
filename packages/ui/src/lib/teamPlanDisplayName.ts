@@ -1,4 +1,4 @@
-interface TeamPlanDisplayNameInput {
+export interface TeamPlanDisplayNameInput {
   organizationId?: string | null;
   organizationName?: string | null;
   projectId?: string | null;
@@ -8,7 +8,9 @@ interface TeamPlanDisplayNameInput {
   tier?: string | null;
 }
 
-export function formatTeamPlanDisplayName(input: TeamPlanDisplayNameInput): string | null {
+export function formatTeamPlanDisplayName(
+  input: TeamPlanDisplayNameInput,
+): string | null {
   const organizationName = input.organizationName?.trim() ?? "";
   return organizationName || null;
 }

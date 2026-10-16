@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/zcode-guide-plugin",
+  "version": "0.3.0",
+  "private": true,
+  "license": "MIT",
+  "description": "作为官方 ZCode 内置插件发布的使用与自诊断指南技能集。"
+}

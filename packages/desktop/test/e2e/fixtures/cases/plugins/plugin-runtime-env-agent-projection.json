@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "plugin-runtime-env-agent-projection",
+  "spec": "./test/e2e/plugins/plugin-runtime-env-agent-projection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/plugin-management/plugin-runtime-env-agent-projection.json"
+  ],
+  "fileFixtures": [
+    "runtime-generated plugin marketplace with one MCP secret env reference and one agent"
+  ],
+  "requests": [
+    {
+      "id": "plugin-runtime-env-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "Prove the installed plugin advertises and invokes its secret-env verifier MCP tool."
+    },
+    {
+      "id": "plugin-runtime-env-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Close the turn only after the MCP reports the environment variable was resolved."
+    }
+  ]
+}

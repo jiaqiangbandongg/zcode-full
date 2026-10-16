@@ -36,19 +36,24 @@ export const SERVER_HTTP_EXTERNAL_DEPENDENCIES = [
   "combined-stream",
   "proxy-from-env",
   "follow-redirects",
-  // node-forge 内部用动态 require("crypto")，内联进 server ESM bundle 后 Node 会报
+  "yazl",
+  // Bugfix: node-forge 内部用动态 require("crypto")，内联进 server ESM bundle 后 Node 会报
   // Dynamic require of "crypto" is not supported；这里和 desktop main/host 构建保持同一外置策略。
   "node-forge",
   "yaml",
   // services 的反馈日志压缩链路引入 CJS 包 yazl，被内联进 ESM bundle 后
   // 运行时命中 require("fs") 动态 require，entry-http 启动即崩；保留外部依赖交给 Node 原生加载。
   "yazl",
-  // 云内容 ZIP 解包链路引入 yauzl，其 CommonJS require("fs") 在 ESM
-  // bundle 加载时崩溃；与 desktop 相同，外置后交给 Node 原生加载。
+  // Bugfix: node-forge（appCaCert 自签 CA 链路）内部动态 require("crypto")，
+  // 与 desktop tsup.config 的处理一致，必须外置交给 Node 原生加载。
+  "node-forge",
+  // 修复：云内容 ZIP 解包链路（services/cloud-content）引入 CJS 包 yauzl，内联进 ESM bundle 后
+  // entry-http.js 加载即报 Dynamic require of "fs" is not supported；与 desktop 相同，外置交给 Node 原生加载。
   "yauzl",
 ];
 
 export default defineConfig({
+  // HTTP server 产物外置并内联第三方代码，dist 旁必须附带完整声明（Web/统一分发包直接复制 dist）。
   onSuccess: async () => {
     await stageThirdPartyNotices(resolve(import.meta.dirname, "dist"));
   },

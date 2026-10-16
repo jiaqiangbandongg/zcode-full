@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-config-independent-startup",
+  "spec": "./test/e2e/conversation-session/conversation-session-config-independent-startup.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-config-independent-startup.json"
+  ],
+  "requests": [
+    {
+      "id": "scb-cold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证发送前依赖隔离，模型回复只需稳定结束，不测推理延迟。"
+    },
+    {
+      "id": "scb-warm",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证发送前依赖隔离，模型回复只需稳定结束，不测推理延迟。"
+    },
+    {
+      "id": "scb-resume",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证发送前依赖隔离，模型回复只需稳定结束，不测推理延迟。"
+    }
+  ]
+}

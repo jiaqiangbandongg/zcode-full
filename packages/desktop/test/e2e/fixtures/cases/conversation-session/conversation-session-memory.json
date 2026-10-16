@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-memory",
+  "spec": "./test/e2e/conversation-session/conversation-session-memory.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-memory.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "<cli-storage-root>/memories/projects/<workspace-key>/memory/database-test-policy.md",
+      "source": "created-by-spec",
+      "description": "spec 在当前隔离 E2E HOME 下按 canonical root 预置事实，用于确认默认分支不启动 Selector 或自动修改文件。"
+    },
+    {
+      "path": "<cli-storage-root>/memories/projects/<workspace-key>/memory/MEMORY.md",
+      "source": "created-by-spec",
+      "description": "spec 预置 project Memory index，用于逐个断言 Memory-enabled Main provider request 含默认分支的 exact user-context source。"
+    },
+    {
+      "path": "<cli-storage-root>/memories/projects/secondary-project-with-an-intentionally-very-long-workspace-name-2222222222222222/memory/",
+      "source": "created-by-spec",
+      "description": "spec 预置第二个 Project Memory workspace，用于验证 Settings viewer 的 Workspace Scope 菜单、扁平文件列表和当前 Scope 文件名搜索。"
+    },
+    {
+      "path": "<cli-storage-root>/memories/projects/secondary-project-with-an-intentionally-very-long-workspace-name-2222222222222222/memory/manual-refresh.md",
+      "source": "created-by-spec",
+      "description": "spec 在已选 Workspace Scope 的 viewer 打开后新增事实文件，用于验证文件不会自动出现、显式刷新会保留 Scope 并更新 catalog，且关闭开关不会删除文件。"
+    },
+    {
+      "path": ".zcode/agents/memory-window-curator.md",
+      "source": "created-by-spec",
+      "description": "spec 在默认 workspace 预置 project custom-agent profile。"
+    },
+    {
+      "path": ".zcode/agent-memory/memory-window-curator/MEMORY.md",
+      "source": "created-by-spec",
+      "description": "spec 预置 custom-agent project Memory index。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "memory-window-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 Memory 验收，只用于避免标题 sidecar 干扰 case-local replay。"
+    },
+    {
+      "id": "memory-window-default-branch-boundary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "固定真实工具边界，验证默认分支在 continuation 中仍保留 Main Memory 且不启动 Selector。"
+    },
+    {
+      "id": "memory-window-default-branch-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定结束默认分支工具轮并提供 UI 终态 marker。"
+    },
+    {
+      "id": "memory-window-extraction-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 turn 不直接写 Memory，用于稳定触发既有 Extraction scheduler。"
+    },
+    {
+      "id": "memory-window-extraction-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "generateText 非流式响应固定返回事实 Write 与索引 Read，验证 scheduler、受限执行面和落盘。"
+    },
+    {
+      "id": "memory-window-extraction-index-edit",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定 Edit 已读取的 MEMORY.md，验证 Extraction 维护默认分支消费所需 pointer。"
+    },
+    {
+      "id": "memory-window-extraction-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定结束后台 loop，不扩展额外 Memory 行为。"
+    },
+    {
+      "id": "memory-window-extracted-default-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定证明新 session 从默认 MEMORY.md source 消费 Extraction 新 pointer，并由全局默认分支阻止 Selector。"
+    },
+    {
+      "id": "memory-window-custom-parent-agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定选择已 seed 的 custom profile。"
+    },
+    {
+      "id": "memory-window-custom-child-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定 Write 以验证 prompt、tool projection、scope root 和 originSessionId。"
+    },
+    {
+      "id": "memory-window-custom-child-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定结束 child tool loop。"
+    },
+    {
+      "id": "memory-window-custom-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定结束父 Agent tool turn并提供 UI 终态。"
+    },
+    {
+      "id": "memory-window-custom-extraction-noop",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "保持既有成功 Main turn 的 Extraction 调度，但不为此 case 新增 project fact。"
+    },
+    {
+      "id": "memory-window-active-after-disable",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "设置关闭后继续当前 Session，确认已冻结 Runtime 不热更新。"
+    },
+    {
+      "id": "memory-window-disabled-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定提供 Settings disabled gate 的 UI 终态；matcher 同时拒绝任何 Memory prompt。"
+    }
+  ]
+}

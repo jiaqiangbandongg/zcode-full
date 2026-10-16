@@ -36,8 +36,7 @@ export function refreshBranchAwareBuiltInTools(runtime: AgentRuntimeInternal): v
     // 十个工具在 shell 快照初始化时原样加回来（registry.register 会覆盖同名项，
     // silentDuplicateWarnings 还把告警吞掉，所以全程无声）。推导因此必须与 runtime-tools.ts
     // 共用同一个 helper，不能在这里重写一遍判断。
-    includeDynamicWorkflow: resolveRuntimeDynamicWorkflowToolsIncluded(runtime.config),
-    agentProfiles: runtime.config.subagents?.profiles,
+    includeDynamicWorkflow: resolveRuntimeDynamicWorkflowToolsIncluded(runtime),
     allowedTools: resolveBuiltInToolAllowlist(runtime.config),
     disallowedTools: runtime.config.toolDisallowlist,
     silentDuplicateWarnings: true,

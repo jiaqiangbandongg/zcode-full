@@ -110,6 +110,12 @@ function siteNodeDef(node: SiteNode, laneFamily: string | undefined): string {
     if (node.within !== undefined) parts.push(`per ${node.within}`);
     return `${id}[/${quote(parts.join("<br/>"))}/]`;
   }
+  // An open hole: a subroutine shape (double bars) named by the hole and typed by T.
+  if (node.kind === "hole") {
+    const parts = [escapeLabel(node.label), node.id];
+    if (node.artifactType !== undefined) parts.push(escapeLabel(node.artifactType));
+    return `${id}[[${quote(parts.join("<br/>"))}]]`;
+  }
   // join / fan-out: hexagon labeled by the original id (a stable folding target).
   const parts = [node.id];
   if (node.kind === "join" && node.within !== undefined) parts.push(`per ${node.within}`);
@@ -142,9 +148,14 @@ function classDefs(graph: SiteGraph): string[] {
   const endpoint = idsOf(["source", "sink"]);
   const world = idsOf(["world-read"]);
   const relay = idsOf(["join", "fan-out"]);
+  const hole = idsOf(["hole"]);
+  // 留白的 classDef 只在有留白时发：没有留白的脚本必须逐字节画出原来的图（快照钉住）。
+  if (hole.length > 0)
+    out.push("  classDef hole fill:#ffffff,stroke:#9a9aa5,stroke-dasharray: 4 3;");
   if (endpoint.length > 0) out.push(`  class ${endpoint.join(",")} endpoint;`);
   if (world.length > 0) out.push(`  class ${world.join(",")} world;`);
   if (relay.length > 0) out.push(`  class ${relay.join(",")} relay;`);
+  if (hole.length > 0) out.push(`  class ${hole.join(",")} hole;`);
   return out;
 }
 
@@ -342,6 +353,7 @@ function stepNodeDef(step: Step): string {
   if (step.repeat === "stack") parts.push("×N");
   if (step.lanes !== undefined) parts.push(`may: ${step.lanes.join("|")}`);
   const body = quote(parts.join("<br/>"));
+  if (step.kind === "hole") return `${safeId(step.id)}[[${body}]]`;
   return step.kind === "world-read" ? `${safeId(step.id)}[/${body}/]` : `${safeId(step.id)}[${body}]`;
 }
 

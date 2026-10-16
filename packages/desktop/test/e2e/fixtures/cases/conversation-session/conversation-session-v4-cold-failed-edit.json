@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-cold-failed-edit",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-cold-failed-edit.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-cold-failed-edit.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-cold-failed-edit-before-first-token",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "必须稳定制造 provider 首 token 前失败，才能验证 CLI 重启后的 cold hydration messageId 与 canEdit/command target。"
+    },
+    {
+      "id": "v4-cold-failed-edit-rerun-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "用固定回复证明 edit command 命中 transcript messageId 并真正发起重跑。"
+    }
+  ]
+}

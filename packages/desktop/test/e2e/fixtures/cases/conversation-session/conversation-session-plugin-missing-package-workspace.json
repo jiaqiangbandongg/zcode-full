@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-missing-package-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-missing-package-workspace.test.ts",
+  "fileFixtures": [],
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-missing-package-workspace.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-plugin-missing-package-workspace-tool-call",
+      "description": "显式安装 Workspace Plugin 后的 MCP tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定工具调用，证明缺包声明不会自动激活，显式安装后才进入 runtime。"
+    },
+    {
+      "id": "upstream-plugin-missing-package-workspace-final",
+      "description": "MCP tool_result 后的最终响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终响应，闭合显式安装后的 Plugin MCP 调用。"
+    }
+  ]
+}

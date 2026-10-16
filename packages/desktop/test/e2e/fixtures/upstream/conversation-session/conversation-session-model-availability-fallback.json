@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-availability-fallback",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-availability-fallback.test.ts",
+  "fixtures": [
+    {
+      "id": "model-availability-fallback-title",
+      "description": "模型可用性 fallback case 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于模型 fallback 语义，只需稳定完成，避免误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-model-availability-fallback-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Model Availability Fallback\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "model-availability-fallback-seed",
+      "description": "I56 使用 source provider 建立 idle session 的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言从已完成的 source session 禁用 provider 后开始；首轮响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_FALLBACK_SEED"],
+        "bodyIncludes": ["E2E_MODEL_FALLBACK_SEED", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-availability-fallback-seed",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-availability-fallback-target",
+      "description": "I56 Agent fallback 后 target provider 续发的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在真实续发请求的 target provider/model 与 UI 投影；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_FALLBACK_TARGET"],
+        "bodyIncludes": ["E2E_MODEL_FALLBACK_TARGET", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-availability-fallback-target",
+          "inputTokens": 156,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-availability-fallback-draft-target",
+      "description": "I61 未发送 prewarm fallback 后首次发送到 target provider 的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "I61 核心断言是未发送 prewarm fallback 后的首次真实请求继续使用 target provider/model；响应文本只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_FALLBACK_DRAFT_TARGET"],
+        "bodyIncludes": ["E2E_MODEL_FALLBACK_DRAFT_TARGET", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-availability-fallback-draft-target",
+          "inputTokens": 148,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

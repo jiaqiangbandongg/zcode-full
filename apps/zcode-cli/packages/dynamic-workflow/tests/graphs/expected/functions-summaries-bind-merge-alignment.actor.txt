@@ -1,0 +1,10 @@
+actor-node source
+actor-node actor#1 "judge" @10:15
+actor-node actor#2 "p" @11:19
+actor-node actor#3 "l" @12:21
+actor-node sink
+actor-edge source -> actor#2 exact count=1
+actor-edge source -> actor#3 exact count=1
+actor-edge actor#1 -> sink inexact count=2 types="string"
+actor-edge actor#2 -> actor#1 inexact count=2 types="string"
+actor-edge actor#3 -> actor#1 inexact count=2 types="string"

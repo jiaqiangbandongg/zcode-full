@@ -1,0 +1,208 @@
+:root {
+  /* Light 下使用反相后的深紫阶，保证模型标签、粒子与扫光在白底上可读（迁移自 ui/highspeed）。 */
+  --color-highspeed-accent: #9e77ed;
+  /* 浅色动画的马赛克终态与稳定态固定收敛到白底，不能继承可能被宿主覆盖的 input token。 */
+  --color-highspeed-composer-surface: #ffffff;
+  --color-highspeed-composer-border-idle: #6041ff;
+  --color-highspeed-composer-border-hover: #6041ff;
+  --color-highspeed-composer-border-pre-animation: var(--color-input-border);
+  --color-highspeed-glow-01: rgb(96 65 255 / 1%);
+  --color-highspeed-glow-04: rgb(96 65 255 / 4%);
+  --color-highspeed-glow-15: rgb(96 65 255 / 15%);
+  --color-highspeed-glow-26: rgb(96 65 255 / 26%);
+  --color-highspeed-particle: rgb(116 83 176 / 76%);
+  --color-highspeed-particle-highlight: rgb(116 83 176 / 100%);
+  --color-highspeed-particle-highlight-glow: rgb(116 83 176 / 38%);
+  --color-highspeed-model-sweep-highlight: #b392ff;
+}
+
+.dark,
+.theme-zai-dark {
+  --color-highspeed-accent: #b392ff;
+  --color-highspeed-composer-surface: #151515;
+  /* Dark 的预动画描边保持 transparent，避免深色壳层出现一圈中性描边。 */
+  --color-highspeed-composer-border-pre-animation: transparent;
+  --color-highspeed-glow-01: rgb(168 136 242 / 1%);
+  --color-highspeed-glow-04: rgb(168 136 242 / 4%);
+  --color-highspeed-glow-15: rgb(168 136 242 / 15%);
+  --color-highspeed-glow-26: rgb(168 136 242 / 26%);
+  --color-highspeed-particle: rgb(179 146 255 / 76%);
+  --color-highspeed-particle-highlight: rgb(179 146 255 / 100%);
+  --color-highspeed-particle-highlight-glow: rgb(179 146 255 / 68%);
+  --color-highspeed-model-sweep-highlight: #f0e9ff;
+}
+
+.chat-composer-input-surface {
+  border-color: transparent;
+}
+
+/* Highspeed 激活动效只覆盖现有输入壳的材质层，不改变输入、工具栏或发送逻辑。 */
+.highspeed-composer-surface {
+  isolation: isolate;
+  border: 1px solid transparent !important;
+  border-radius: 16px;
+  background-color: var(--color-input) !important;
+  transition:
+    border-color 1040ms cubic-bezier(0.45, 0, 0.55, 1),
+    box-shadow 1040ms cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.highspeed-composer-surface:hover,
+.highspeed-composer-surface:focus-within {
+  border-color: transparent !important;
+  background-color: var(--color-input-focused) !important;
+}
+
+.highspeed-composer-surface:has([data-phase="diffusing"]) {
+  /* Bug 原因：Light 下壳层激活时先把默认描边设为 transparent，溶解画布尚未开始就会露出一圈白边空洞。
+   * 预动画阶段保留主题中性描边与 Chat 原生底色，进入 stable 后再由 Highspeed 紫色描边接管；Dark 的 token 保持 transparent。 */
+  border: 1px solid var(--color-highspeed-composer-border-pre-animation) !important;
+}
+
+.highspeed-composer-surface:has([data-phase="handoff"]) {
+  border: 1px solid var(--color-highspeed-composer-border-pre-animation) !important;
+  background-color: var(--color-highspeed-composer-surface) !important;
+}
+
+.highspeed-composer-surface:has([data-phase="stable"]) {
+  /* stable 只由 Canvas opacity transitionend 触发；此时才把预动画描边切换为 Highspeed 紫色描边和辉光。 */
+  border: 1px solid var(--color-highspeed-composer-border-idle) !important;
+  background-color: var(--color-highspeed-composer-surface) !important;
+  box-shadow:
+    0 0 3px var(--color-highspeed-glow-01),
+    0 0 4px var(--color-highspeed-glow-04),
+    0 0 6.8px var(--color-highspeed-glow-15),
+    0 0 12px var(--color-highspeed-glow-26);
+}
+
+.highspeed-composer-surface:has([data-phase="stable"]):hover {
+  border-color: var(--color-highspeed-composer-border-hover) !important;
+}
+
+.highspeed-composer-surface:has([data-phase="stable"]):focus-within {
+  /* Highspeed 描边不随输入焦点切换，保持稳定态的紫色边框。 */
+  border: 1px solid var(--color-highspeed-composer-border-idle) !important;
+  background-color: var(--color-highspeed-composer-surface) !important;
+}
+
+.highspeed-composer-background {
+  z-index: 1;
+}
+
+.highspeed-particle-layer {
+  opacity: 0;
+  transition: opacity 444ms cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.highspeed-composer-background[data-phase="handoff"] .highspeed-particle-layer,
+.highspeed-composer-background[data-phase="stable"] .highspeed-particle-layer {
+  opacity: 1;
+}
+
+.highspeed-particle-canvas {
+  contain: strict;
+}
+
+.highspeed-diffusion-canvas {
+  z-index: 1;
+  opacity: 1;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transition: opacity 520ms cubic-bezier(0.45, 0, 0.55, 1) 24ms;
+}
+
+.highspeed-composer-background[data-phase="handoff"] .highspeed-diffusion-canvas {
+  opacity: 0;
+}
+
+.highspeed-inline-countdown {
+  animation: highspeed-inline-countdown-enter 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@keyframes highspeed-inline-countdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(35%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.highspeed-model-trigger-label-sweep {
+  --highspeed-model-sweep-width: 96px;
+  color: transparent;
+  background-color: var(--color-highspeed-accent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 6%,
+    color-mix(
+        in oklab,
+        var(--color-highspeed-model-sweep-highlight) 90%,
+        var(--color-highspeed-accent)
+      )
+      22%,
+    var(--color-highspeed-model-sweep-highlight) 34%,
+    var(--color-highspeed-model-sweep-highlight) 66%,
+    color-mix(
+        in oklab,
+        var(--color-highspeed-model-sweep-highlight) 90%,
+        var(--color-highspeed-accent)
+      )
+      78%,
+    transparent 94%,
+    transparent 100%
+  );
+  background-position: calc(0% - var(--highspeed-model-sweep-width)) 0;
+  background-repeat: no-repeat;
+  background-size: var(--highspeed-model-sweep-width) 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.highspeed-model-trigger-label-sweep.is-sweep-active {
+  animation: highspeed-model-trigger-sweep 800ms cubic-bezier(0.23, 1, 0.32, 1) 1 both;
+}
+
+@keyframes highspeed-model-trigger-sweep {
+  from {
+    background-position: calc(0% - var(--highspeed-model-sweep-width)) 0;
+  }
+
+  to {
+    background-position: calc(100% + var(--highspeed-model-sweep-width)) 0;
+  }
+}
+
+/* 恢复入场（切回 Task、快照恢复、组件重挂载）直接呈现稳定材质。
+ * Bug 根因：composer 跨 Task 复用同一实例，切回时 highspeed 类名加在已有输入壳上会重新触发
+ * 描边/辉光的 transition，倒计时重新挂载也会重播入场关键帧，看起来像动画又播了一遍。 */
+.highspeed-composer-surface[data-highspeed-entrance="restore"] {
+  transition: none;
+}
+
+.highspeed-composer-surface[data-highspeed-entrance="restore"] .highspeed-inline-countdown {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highspeed-particle-layer,
+  .highspeed-diffusion-canvas {
+    transition: none;
+  }
+
+  .highspeed-inline-countdown {
+    animation: none;
+  }
+
+  .highspeed-model-trigger-label-sweep {
+    color: var(--color-highspeed-accent);
+    background-image: none;
+    animation: none;
+    -webkit-text-fill-color: currentcolor;
+  }
+}

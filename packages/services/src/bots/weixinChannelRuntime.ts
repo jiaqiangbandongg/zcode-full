@@ -29,6 +29,8 @@ interface WeixinChannelRuntimeDeps {
     provider: "weixin",
     payload: unknown,
   ): Promise<BotProviderCallbackResult>;
+  getUpdates?: typeof getWeixinUpdates;
+  acquirePollingLock?: typeof acquireWeixinPollingLock;
 }
 
 export function createWeixinChannelRuntime(deps: WeixinChannelRuntimeDeps) {
@@ -69,7 +71,7 @@ export function createWeixinChannelRuntime(deps: WeixinChannelRuntimeDeps) {
     while (!signal.aborted) {
       let lock: Awaited<ReturnType<typeof acquireWeixinPollingLock>>;
       try {
-        lock = await acquireWeixinPollingLock(
+        lock = await (deps.acquirePollingLock ?? acquireWeixinPollingLock)(
           token,
           bot.id,
         );
@@ -106,7 +108,7 @@ export function createWeixinChannelRuntime(deps: WeixinChannelRuntimeDeps) {
         });
         while (!signal.aborted) {
           const buf = await deps.readWeixinGetUpdatesBuf(bot.id);
-          const result = await getWeixinUpdates({
+          const result = await (deps.getUpdates ?? getWeixinUpdates)({
             bot,
             deps: { loadCredential: (key) => deps.credentialService.load(key) },
             buf,

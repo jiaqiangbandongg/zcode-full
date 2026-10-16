@@ -10,17 +10,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.js";
 
-function scrollRemoteConnectionLogsToLatest(
+export function scrollRemoteConnectionLogsToLatest(
   viewport: Pick<HTMLElement, "scrollHeight" | "scrollTop">,
 ): void {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-function scheduleRemoteConnectionLogsScrollToLatest(
+export function scheduleRemoteConnectionLogsScrollToLatest(
   viewport: Pick<HTMLElement, "scrollHeight" | "scrollTop">,
   scheduleFrame: (callback: () => void) => number = (callback) =>
     window.requestAnimationFrame(callback),
-  cancelFrame: (frameId: number) => void = (frameId) => window.cancelAnimationFrame(frameId),
+  cancelFrame: (frameId: number) => void = (frameId) =>
+    window.cancelAnimationFrame(frameId),
 ): () => void {
   scrollRemoteConnectionLogsToLatest(viewport);
   const frameId = scheduleFrame(() => scrollRemoteConnectionLogsToLatest(viewport));
@@ -44,7 +45,8 @@ export function ReconnectingRemoteWorkspaceLogTooltip({
 
     // Tooltip 每次 hover 都会重新展示日志浮层，浏览器默认从 scrollTop=0 开始。
     // 连接日志需要优先看到最新进度，因此在节点挂载时先滚一次，并在下一帧布局稳定后再补滚一次。
-    cancelScheduledScrollRef.current = scheduleRemoteConnectionLogsScrollToLatest(viewport);
+    cancelScheduledScrollRef.current =
+      scheduleRemoteConnectionLogsScrollToLatest(viewport);
   }, []);
 
   const setLogViewportRef = useCallback(
@@ -105,7 +107,9 @@ export function ReconnectingRemoteWorkspaceLogTooltip({
               {logs.length > 0 ? (
                 logs.map((entry) => (
                   <div key={entry.id} className="flex min-w-0 items-start leading-5">
-                    <span className="shrink-0 text-tooltip-foreground/60">{entry.timestamp}</span>
+                    <span className="shrink-0 text-tooltip-foreground/60">
+                      {entry.timestamp}
+                    </span>
                     <span
                       className={cn(
                         "mx-2 shrink-0",

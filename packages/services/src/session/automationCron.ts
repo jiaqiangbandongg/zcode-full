@@ -27,7 +27,7 @@ export function scheduleRuleDefinition(rule: ZCodeAutomationScheduleRule): strin
 }
 
 /** 一次性固定日历任务使用了刚刚过去、但已不能安全补执行的目标时间。 */
-class StaleOneShotAutomationScheduleError extends Error {
+export class StaleOneShotAutomationScheduleError extends Error {
   constructor(targetAt: number) {
     super(
       `一次性定时任务的目标时间（${new Date(targetAt).toLocaleString()}）已过去；相对时间请使用 delayMinutes，绝对时间请确认未来时刻后重试`,

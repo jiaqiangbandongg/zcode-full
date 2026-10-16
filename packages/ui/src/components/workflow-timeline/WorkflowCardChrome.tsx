@@ -85,7 +85,7 @@ export function WorkflowRunStatus({
         aria-hidden
         className={cn("wf-lamp size-2 shrink-0 rounded-full", RUN_STATUS_DOT[effectiveStatus])}
       />
-      {/* 状态词按值换：旧词退场新词进场。 */}
+      {/* 状态词按值换：旧词退场新词进场（追记「悬停与运动」的 Kind 一节）。 */}
       <span
         className={cn("wf-swap text-ui-sm", RUN_STATUS_TEXT[effectiveStatus])}
         data-testid={testId}

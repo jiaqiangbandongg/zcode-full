@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-stop-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-stop-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-stop-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-stop-queue-title",
+      "description": "E2E_V4_HELD_SLOW 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_HELD_SLOW 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-stop-queue-q1",
+      "description": "held queue 项 1 的消费回复（sendQueuedNow / drain 后可见）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "held queue 项被显式消费后需要可断言的回复哨兵。"
+    },
+    {
+      "id": "v4-stop-queue-q2",
+      "description": "暂停队列项 2 在继续自动消费后的 FIFO 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "B14 需要第二个可区分的回复哨兵，证明点击继续后 Q1/Q2 由 CLI 按 FIFO 消费到空。"
+    },
+    {
+      "id": "v4-stop-queue-keep-send",
+      "description": "暂停队列 modal 选择保留并发送后的受控慢流回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "B06 需要可断言的 keepQueueAndSend 回复；B15 还需要稳定 running 窗口，在当前流完成前点击继续并证明旧暂停队首不抢占。"
+    },
+    {
+      "id": "v4-stop-queue-clear-send",
+      "description": "暂停队列 modal 选择“清空队列”后的新一轮回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "clearQueueAndSend 需要可断言的新回复哨兵，同时 queue 清空。"
+    },
+    {
+      "id": "v4-stop-queue-slow-turn",
+      "description": "B02/B04 held queue 门禁：可控慢流首轮，保持 running 以便入队后 stop。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "stop 保留 queue 的断言需要稳定 running 窗口（入队两条后 stop）。"
+    }
+  ]
+}

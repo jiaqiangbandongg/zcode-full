@@ -1,0 +1,9 @@
+lane actor#1 "alpha" @5:11
+lane actor#2 "beta" @6:11
+region seq#1 seq
+step ask#1 ask "a" @7:22 lane=actor#1 region=seq#1 always
+step ask#2~actor#1 ask "ask" @9:34 lane=actor#1 lanes=actor#1,actor#2 source=ask#2 region=seq#1 maybe
+step ask#2~actor#2 ask "ask" @9:34 lane=actor#2 lanes=actor#1,actor#2 source=ask#2 region=seq#1 maybe
+edge ask#1 -> ask#2~actor#1 data maybe exact
+edge ask#1 -> ask#2~actor#2 data maybe exact
+sink ask#2~actor#1,ask#2~actor#2

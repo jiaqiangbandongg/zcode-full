@@ -12,6 +12,7 @@ export function TaskListItemContextMenu({
   taskSessionFile,
   activeSessionId,
   taskNativeSessionLogFile,
+  providerConfigFile,
   onTogglePinTask,
   onStartRenameTask,
   onArchiveTask,
@@ -25,11 +26,15 @@ export function TaskListItemContextMenu({
   onCopyTaskLogPath,
   onCopySessionId,
   onViewModelTrajectory,
+  onOpenProviderConfig,
   disableTaskActions = false,
   disabledReason,
 }: {
   intl: {
-    formatMessage: (desc: { id: string }, values?: Record<string, string>) => string;
+    formatMessage: (
+      desc: { id: string },
+      values?: Record<string, string>,
+    ) => string;
   };
   isPinned: boolean;
   fileManagerLabel: string;
@@ -40,6 +45,7 @@ export function TaskListItemContextMenu({
     path: string | null;
     exists: boolean;
   };
+  providerConfigFile: { loading: boolean; path: string | null; exists: boolean };
   onTogglePinTask: () => void;
   onStartRenameTask: () => void;
   onArchiveTask: () => void;
@@ -55,6 +61,7 @@ export function TaskListItemContextMenu({
   onCopyTaskLogPath: () => void;
   onCopySessionId?: () => void;
   onViewModelTrajectory?: () => void;
+  onOpenProviderConfig: () => void;
   disableTaskActions?: boolean;
   disabledReason?: string;
 }) {
@@ -67,6 +74,7 @@ export function TaskListItemContextMenu({
         taskSessionFile={taskSessionFile}
         activeSessionId={activeSessionId}
         taskNativeSessionLogFile={taskNativeSessionLogFile}
+        providerConfigFile={providerConfigFile}
         Item={ContextMenuItem}
         Separator={ContextMenuSeparator}
         onTogglePinTask={onTogglePinTask}
@@ -82,6 +90,7 @@ export function TaskListItemContextMenu({
         onCopyTaskLogPath={onCopyTaskLogPath}
         onCopySessionId={onCopySessionId}
         onViewModelTrajectory={onViewModelTrajectory}
+        onOpenProviderConfig={onOpenProviderConfig}
         disableTaskActions={disableTaskActions}
         disabledReason={disabledReason}
       />

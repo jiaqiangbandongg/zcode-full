@@ -1,4 +1,4 @@
-interface RendererNavigationEntry {
+export interface RendererNavigationEntry {
   readonly type?: string;
 }
 

@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { FACADE_FILE_NAME } from "../facade/dts.js";
 
 /**
  * The callback-semantics registry: the ONE place that says what a library callee does with
@@ -89,6 +90,14 @@ const ONCE_METHODS: ReadonlyMap<string, { callbacks: readonly number[]; entered:
 const ONCE_GLOBALS: ReadonlySet<string> = new Set(["setTimeout", "setInterval", "setImmediate", "queueMicrotask"]);
 
 /**
+ * The one facade function that takes a callback: `future(body)` starts `body` at the call
+ * and returns its promise (docs/dynamic-workflow/authoring.md「Streams」). Once and ENTERED —
+ * the cell provably calls it — and NOT deferred: it runs now, not after anything settles, so
+ * the ordering walk inlines the body as an entered `call` region, a strand when it is async.
+ */
+const FUTURE_FUNCTION = "future";
+
+/**
  * The registry entry for a call or `new`, or undefined when the callee has none (callers
  * fall back to {@link DEFAULT_CALLBACK_SEMANTICS} for whatever function values reach it).
  * Never matches a callee declared in the authored script: a script-local `then` is a
@@ -135,7 +144,19 @@ export function callbackSemanticsOf(
   if (ts.isIdentifier(callee) && ONCE_GLOBALS.has(callee.text) && isGlobalLibValue(callee, callee.text, checker, program)) {
     return { callbacks: [0], deferred: true, entered: false, label: callee.text, multiplicity: "once" };
   }
+  if (ts.isIdentifier(callee) && callee.text === FUTURE_FUNCTION && isFacadeFunction(callee, checker)) {
+    return { callbacks: [0], entered: true, label: FUTURE_FUNCTION, multiplicity: "once" };
+  }
   return undefined;
+}
+
+/** True iff `expr` resolves to a function declared in the facade `.d.ts` (not a user shadow). */
+function isFacadeFunction(expr: ts.Expression, checker: ts.TypeChecker): boolean {
+  let symbol = checker.getSymbolAtLocation(expr);
+  if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol);
+  return (
+    symbol?.declarations?.some((declaration) => declaration.getSourceFile().fileName === FACADE_FILE_NAME) ?? false
+  );
 }
 
 /** True iff `expr` resolves to the ES-lib global `name` (not a user shadow). */

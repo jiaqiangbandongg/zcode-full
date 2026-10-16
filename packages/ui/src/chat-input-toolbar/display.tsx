@@ -40,7 +40,10 @@ import {
   ShieldCheckIcon,
   type LucideIcon,
 } from "lucide-react";
-import { ZCODE_MODE_OPTION_DESCRIPTION_IDS, ZCODE_MODE_OPTION_LABEL_IDS } from "./display-help.js";
+import {
+  ZCODE_MODE_OPTION_DESCRIPTION_IDS,
+  ZCODE_MODE_OPTION_LABEL_IDS,
+} from "./display-help.js";
 import { RollingToolbarLabel } from "@/chat-input-toolbar/RollingToolbarLabel.js";
 
 export {
@@ -50,16 +53,32 @@ export {
 } from "@/chat-input-toolbar/contextUsage.js";
 
 type ConfigSelectTriggerSize = ComponentProps<typeof SelectTrigger>["size"];
-type ConfigSelectTriggerVariant = ComponentProps<typeof SelectTrigger>["variant"];
+type ConfigSelectTriggerVariant = ComponentProps<
+  typeof SelectTrigger
+>["variant"];
 
 /** Radix Select 在受控值与子项注册竞争时可能发出空值等未渲染值；直接上抛会把
  * 系统事件误当成用户选择（如 Automations 编辑页仅打开详情就被标记未保存修改）。
  * 用户只能点到已渲染的 option，值域外的选择回调一律丢弃。 */
-function isConfigSelectValueInOptions(option: ZCodeConfigOption, value: string): boolean {
+export function isConfigSelectValueInOptions(
+  option: ZCodeConfigOption,
+  value: string,
+): boolean {
   return option.options?.some((entry) => String(entry.value) === value) ?? false;
 }
 
-function getConfigSelectTriggerTestId(option: ZCodeConfigOption): string | undefined {
+const HIGH_PERMISSION_MODE_VALUES = new Set([
+  "bypassPermissions",
+  "full-access",
+  // Bugfix: Agent 0.0.44 将旧 full-access mode id 改为 agent-full-access。
+  // 高权限视觉提示必须跟随协议 id，否则用户选中全权限后工具栏不再显示 warning 状态。
+  "agent-full-access",
+  "yolo",
+]);
+
+function getConfigSelectTriggerTestId(
+  option: ZCodeConfigOption,
+): string | undefined {
   if (option.category === "thought_level") {
     return TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER;
   }
@@ -83,6 +102,32 @@ function getConfigSelectItemTestId(
   }
 
   return undefined;
+}
+
+export function buildModelSearchText({
+  itemName,
+}: {
+  itemName: string;
+}): string {
+  // Bugfix: 需求要求模型搜索仅匹配“展示名”，不能再命中分组名/模型值。
+  // 这里统一只返回展示名，保证搜索范围收敛且稳定。
+  return itemName.trim();
+}
+
+export function matchesModelDisplayNameSearch(
+  modelDisplayName: string,
+  searchText: string,
+): boolean {
+  const normalizedSearchText = searchText.trim().toLocaleLowerCase();
+  if (normalizedSearchText.length === 0) {
+    return true;
+  }
+
+  // Bugfix: 统一用大小写不敏感匹配，避免用户输入大小写与展示名不一致时搜不到。
+  return modelDisplayName
+    .trim()
+    .toLocaleLowerCase()
+    .includes(normalizedSearchText);
 }
 
 export function ChatApiRetryStatus({
@@ -117,14 +162,16 @@ export function ChatApiRetryStatus({
   }
 
   const retryTitle =
-    apiRetry.errorStatus == null ? retryLabel : `${retryLabel} · HTTP ${apiRetry.errorStatus}`;
+    apiRetry.errorStatus == null
+      ? retryLabel
+      : `${retryLabel} · HTTP ${apiRetry.errorStatus}`;
 
   return (
     <span
       className="inline-flex h-7 items-center whitespace-nowrap px-1 text-ui-base"
       title={retryTitle}
     >
-      {/* Retry 需要保留 ToolCall/Thinking 的字号、扫光节奏和低透明度移动低谷，
+      {/* 样式修复原因：Retry 需要保留 ToolCall/Thinking 的字号、扫光节奏和低透明度移动低谷，
       但作为次级运行状态不应使用同等的纯黑/纯白峰值；这里只将峰值降到 secondary 文本色。 */}
       <span className="animated-gradient-text animated-gradient-text-subtle font-medium">
         {retryLabel}
@@ -146,7 +193,7 @@ export function getModeOptionDisplayLabel(
   return intl.formatMessage({ id: labelMessageId });
 }
 
-function getModeOptionLabelMessageId(
+export function getModeOptionLabelMessageId(
   provider: ZCodeProvider | undefined,
   entry: Pick<ZCodeConfigSelectValue, "value">,
 ): string | null {
@@ -181,7 +228,7 @@ export function getConfigOptionEntryLabel(
   return entry.name;
 }
 
-function getConfigOptionEntryDescription(
+export function getConfigOptionEntryDescription(
   intl: ReturnType<typeof useZCodeIntl>["intl"],
   provider: ZCodeProvider | undefined,
   option: ZCodeConfigOption,
@@ -191,7 +238,10 @@ function getConfigOptionEntryDescription(
     return entry.description;
   }
 
-  const descriptionMessageId = getModeOptionDescriptionMessageId(provider, entry);
+  const descriptionMessageId = getModeOptionDescriptionMessageId(
+    provider,
+    entry,
+  );
   if (descriptionMessageId) {
     return intl.formatMessage({ id: descriptionMessageId });
   }
@@ -199,8 +249,8 @@ function getConfigOptionEntryDescription(
   return entry.description;
 }
 
-function isHighPermissionModeValue(value: unknown): boolean {
-  return value === "yolo";
+export function isHighPermissionModeValue(value: unknown): boolean {
+  return typeof value === "string" && HIGH_PERMISSION_MODE_VALUES.has(value);
 }
 
 export function resolveModeOptionIcon(value: unknown): LucideIcon {
@@ -208,11 +258,16 @@ export function resolveModeOptionIcon(value: unknown): LucideIcon {
     return ShieldAlertIcon;
   }
 
-  // build 对应常规确认模式，使用确认图标。
-  if (typeof value === "string" && value.toLocaleLowerCase() === "build") return HandIcon;
-  if (typeof value === "string" && value.toLocaleLowerCase() === "plan") return NotepadText;
+  // Bugfix: build 会被本地化成“默认模式”，和 default 一样应使用常规确认图标。
+  if (typeof value === "string" && /^(default|build)$/i.test(value))
+    return HandIcon;
+  if (typeof value === "string" && value.toLocaleLowerCase() === "plan")
+    return NotepadText;
 
-  if (typeof value === "string" && /^(auto|agent|autoEdit|edit)$/i.test(value)) {
+  if (
+    typeof value === "string" &&
+    /^(auto|acceptEdits|agent|autoEdit|dontAsk|edit|guarded)$/i.test(value)
+  ) {
     return ShieldCheckIcon;
   }
 
@@ -262,27 +317,32 @@ export function ConfigSelect({
   // 本组件这次渲染执行的 hook 数量和上次不一致，React 会抛
   // "Rendered fewer hooks than expected" 导致工具栏区域崩溃。
   // 修复方式：early return 下移到所有 hook 之后，保证 hook 调用顺序稳定。
-  const handleContentKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Tab") {
-      return;
-    }
+  const handleContentKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Tab") {
+        return;
+      }
 
-    const highlightedItem =
-      event.currentTarget.querySelector<HTMLElement>(
-        '[data-slot="select-item"][data-highlighted]',
-      ) ??
-      event.currentTarget.querySelector<HTMLElement>(
-        '[data-slot="select-item"][data-state="checked"]',
-      ) ??
-      event.currentTarget.querySelector<HTMLElement>('[data-slot="select-item"]');
+      const highlightedItem =
+        event.currentTarget.querySelector<HTMLElement>(
+          '[data-slot="select-item"][data-highlighted]',
+        ) ??
+        event.currentTarget.querySelector<HTMLElement>(
+          '[data-slot="select-item"][data-state="checked"]',
+        ) ??
+        event.currentTarget.querySelector<HTMLElement>(
+          '[data-slot="select-item"]',
+        );
 
     if (!highlightedItem) {
       return;
     }
 
-    event.preventDefault();
-    highlightedItem.click();
-  }, []);
+      event.preventDefault();
+      highlightedItem.click();
+    },
+    [],
+  );
 
   // early return 必须在所有 hook 之后（见上方注释说明的崩溃原因）
   if (option.type !== "select" || !option.options?.length) {
@@ -292,15 +352,22 @@ export function ConfigSelect({
   const shouldUseToolbarFloatingSelect =
     option.category === "mode" || option.category === "thought_level";
   const shouldShowHighPermissionModeIcon =
-    option.category === "mode" && isHighPermissionModeValue(option.currentValue);
+    option.category === "mode" &&
+    isHighPermissionModeValue(option.currentValue);
   const ResolvedLeadingIcon =
-    option.category === "mode" ? resolveModeOptionIcon(option.currentValue) : LeadingIcon;
+    option.category === "mode"
+      ? resolveModeOptionIcon(option.currentValue)
+      : LeadingIcon;
   const resolvedTriggerClassName = cn(
     triggerClassName,
     shouldShowHighPermissionModeIcon &&
       // 高权限模式需要在工具栏中持续保持 warning 文字颜色，避免用户忽略当前风险级别。
       // 图标只负责替换为 shield-alert，颜色状态仍由 trigger 统一承载，保证 hover/展开态不闪回默认色。
       "text-warning hover:text-warning aria-expanded:text-warning",
+    // Guarded 与 YOLO 视觉区分；图标继承浅蓝色，hover/展开时也不回退为默认色。
+    option.category === "mode" &&
+      option.currentValue === "guarded" &&
+      "text-icon-blue hover:text-icon-blue aria-expanded:text-icon-blue",
   );
   const resolvedLeadingIconClassName = cn(
     "pointer-events-none size-4 text-current",
@@ -321,9 +388,17 @@ export function ConfigSelect({
       }
     : undefined;
   const triggerTestId = getConfigSelectTriggerTestId(option);
-  const currentEntry = option.options.find((entry) => entry.value === option.currentValue);
+  const currentEntry = option.options.find(
+    (entry) => entry.value === option.currentValue,
+  );
   const currentValueLabel = currentEntry
     ? getConfigOptionEntryLabel(intl, provider, option, currentEntry)
+    : option.category === "mode"
+      // 隐藏旧模式候选不应丢失其回显文案；只翻译当前值，不把它补回可选列表。
+      ? getModeOptionDisplayLabel(intl, provider, {
+          value: String(option.currentValue ?? ""),
+          name: String(option.currentValue ?? ""),
+        })
     : String(option.currentValue ?? "");
   const thoughtLevelTextClassName =
     option.category === "thought_level" ? "first-letter:uppercase" : undefined;
@@ -346,7 +421,11 @@ export function ConfigSelect({
       }}
       disabled={disabled}
     >
-      <ControlHintTooltip title={tooltipTitle} shortcut={shortcutLabel} triggerRef={triggerRef}>
+      <ControlHintTooltip
+        title={tooltipTitle}
+        shortcut={shortcutLabel}
+        triggerRef={triggerRef}
+      >
         <SelectTrigger
           variant={triggerVariant}
           size={triggerSize}
@@ -366,13 +445,15 @@ export function ConfigSelect({
             <ResolvedLeadingIcon className={resolvedLeadingIconClassName} />
           ) : null}
           <span className={labelVisibilityClassName}>
-            {/* mode 菜单项现在是“图标 + 标题 + 描述”的复合内容。
+            {/* Bugfix: mode 菜单项现在是“图标 + 标题 + 描述”的复合内容。
             如果继续让 Radix 从 ItemText 自动回填，trigger 会把描述也塞进按钮里。 */}
             {option.category === "mode" ? (
               <RollingToolbarLabel label={currentValueLabel} />
             ) : (
               <SelectValue>
-                <span className={thoughtLevelTextClassName}>{currentValueLabel}</span>
+                <span className={thoughtLevelTextClassName}>
+                  {currentValueLabel}
+                </span>
               </SelectValue>
             )}
           </span>
@@ -396,8 +477,9 @@ export function ConfigSelect({
           ) {
             return;
           }
-          // ConfigSelect 被非聊天界面复用时，关闭菜单不能强制抢焦点到聊天输入框。
-          const input = document.querySelector<HTMLElement>(restoreFocusSelector);
+          // Bugfix: ConfigSelect 被 Bot 弹窗复用时，关闭菜单不能强制抢焦点到聊天输入框。
+          const input =
+            document.querySelector<HTMLElement>(restoreFocusSelector);
           logger.debug("[ConfigSelect] picker focus handoff", {
             category: option.category,
             restoreFocusSelector,
@@ -409,7 +491,12 @@ export function ConfigSelect({
         {option.category === "mode"
           ? option.options.map((entry) => {
               const ModeIcon = resolveModeOptionIcon(entry.value);
-              const optionLabel = getConfigOptionEntryLabel(intl, provider, option, entry);
+              const optionLabel = getConfigOptionEntryLabel(
+                intl,
+                provider,
+                option,
+                entry,
+              );
               const optionDescription = getConfigOptionEntryDescription(
                 intl,
                 provider,

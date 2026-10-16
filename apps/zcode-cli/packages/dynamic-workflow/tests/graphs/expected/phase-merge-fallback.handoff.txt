@@ -1,0 +1,7 @@
+phase unphased
+participant unphased:workspace steps=world-read#1
+phase phase#1
+participant phase#1:workspace steps=world-read#2,world-read#3
+participant phase#1:actor#1 "reviewer" steps=ask#1,ask#2
+handoff phase#1:workspace -> phase#1:actor#1 types="string"
+handoff phase#1:actor#1 -> phase#1:workspace

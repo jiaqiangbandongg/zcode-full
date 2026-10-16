@@ -20,12 +20,12 @@ export interface StorageScanEntry {
   mtimeMs: number;
 }
 
-interface StorageUsageAccumulator {
+export interface StorageUsageAccumulator {
   add(entry: StorageScanEntry): void;
   snapshot(volume: StorageVolume | null): StorageRootUsage;
 }
 
-const DEFAULT_MAX_ENTRIES_PER_CATEGORY = 100;
+export const DEFAULT_MAX_ENTRIES_PER_CATEGORY = 100;
 
 interface CategoryBucket {
   bytes: number;

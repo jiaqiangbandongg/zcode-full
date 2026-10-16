@@ -18,7 +18,10 @@ import { useWorkflowRunWorkspace } from "@/hooks/useWorkflowRunWorkspace.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import type { WorkflowWorkspaceSidePaneTab } from "@/lib/workspaceSidePane.js";
-import { buildWorkflowGraphByToolCallId } from "@/v4/workflowRunCardJoin.js";
+import {
+  buildWorkflowFillGraphByRunId,
+  buildWorkflowGraphByToolCallId,
+} from "@/v4/workflowRunCardJoin.js";
 import { WorkflowWorkspaceCard } from "@/app-shell/WorkflowWorkspaceCard.js";
 import {
   buildWorkspaceChapters,
@@ -137,9 +140,13 @@ const WorkflowWorkspaceContent = memo(function WorkflowWorkspaceContent({
     () => snapshot?.workflowRuns?.runs.find((candidate) => candidate.runId === tab.runId),
     [snapshot?.workflowRuns, tab.runId],
   );
+  // 补全过的 run 取最新补全行的有效脚本图（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：
+  // 脚本 transcript 的落点按站，站必须是补全之后的那一张表。
   const graph = useMemo(
-    () => buildWorkflowGraphByToolCallId(snapshot?.rows.window).get(tab.toolCallId),
-    [snapshot?.rows.window, tab.toolCallId],
+    () =>
+      buildWorkflowFillGraphByRunId(snapshot?.rows.window).get(tab.runId)?.graph ??
+      buildWorkflowGraphByToolCallId(snapshot?.rows.window).get(tab.toolCallId),
+    [snapshot?.rows.window, tab.runId, tab.toolCallId],
   );
 
   const workspace = useWorkflowRunWorkspace({

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-grouped-header-pin-visibility",
+  "spec": "./test/e2e/conversation-session/conversation-session-grouped-header-pin-visibility.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-grouped-header-pin-visibility.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "纯 UI task membership case；使用隔离 HOME 预置的 tasks-index 与 CLI session，置顶/取消置顶只调用本地 task service，不发送 prompt 或 provider 请求。",
+  "requests": []
+}

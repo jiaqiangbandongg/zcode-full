@@ -1,0 +1,397 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-respond-to-coordinator",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-respond-to-coordinator.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-respond-to-coordinator.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "incoming-text-compact-overflow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-text-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-text-cold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-tool-compact-overflow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-tool-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-tool-cold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发真实 reactive compact，以校验 peer 所在保留段的持久化和冷恢复。"
+    },
+    {
+      "id": "incoming-source-matrix-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题为辅助请求，独立收口以确保轨迹没有无关 fixture miss 或 retry。"
+    },
+    {
+      "id": "upstream-subagent-response-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题生成不属于 BG25 产品语义，只用于避免严格 replay 的无关重试。"
+    },
+    {
+      "id": "upstream-subagent-response-agent-tool-call",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "稳定启动 background child，并用文件 barrier 保持 running 窗口。"
+    },
+    {
+      "id": "upstream-subagent-response-send-message-tool-call",
+      "kind": "main",
+      "timingPolicy": "controlled-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "延迟 SendMessage tool-use，让 child 先进入 barrier Bash，再用 replay 动态 agentId 注入 coordinator question。"
+    },
+    {
+      "id": "upstream-subagent-response-send-message-ack",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "让 parent 进入 idle，随后由 child response runtime command 唤醒。"
+    },
+    {
+      "id": "upstream-subagent-response-child-barrier-bash",
+      "kind": "subagent",
+      "timingPolicy": "controlled-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "文件 barrier 稳定制造第一个 child tool call 尚未完成的 steer 窗口。"
+    },
+    {
+      "id": "upstream-subagent-response-child-tool-calls",
+      "kind": "subagent",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "稳定证明 child 同一 response 调用 RespondToCoordinator 与普通 Read tool。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-subagent-response-child-continued-tool",
+      "kind": "subagent",
+      "timingPolicy": "controlled-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "在 response tool result 后继续 Bash，并等待 parent 已消费 coordinator response 后再结束，稳定验证两次独立 provider request。"
+    },
+    {
+      "id": "upstream-subagent-response-child-final-result",
+      "kind": "subagent",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "证明 child 回复后继续普通工具，并最终通过正常 completion 收口。"
+    },
+    {
+      "id": "upstream-subagent-response-parent-consumed",
+      "kind": "main",
+      "timingPolicy": "subagent-message",
+      "source": "synthetic",
+      "syntheticReason": "证明 response 不只入队，而是进入 parent provider request 并被 coordinator model 消费。"
+    },
+    {
+      "id": "upstream-subagent-response-notification-consumed",
+      "kind": "main",
+      "timingPolicy": "task-notification",
+      "source": "synthetic",
+      "syntheticReason": "证明 child 最终仍通过标准 background completion notification 收口。 验证来源提示及非用户授权边界。 新轮通知完整正文只包一对 system-reminder，MCS 开关下均保持 user。"
+    },
+    {
+      "id": "upstream-subagent-response-memory-extraction-noop",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "Memory extraction 默认在成功 Main turn 后异步运行；本 case 仅用 Nothing to save 收口，避免隐藏请求干扰严格 replay，不扩展 Memory 产品语义。"
+    },
+    {
+      "id": "upstream-task-output-card-tool-call",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "复用 BG25 已完成的真实 background Agent，验证 TaskOutput display 到专属卡片的完整链路。"
+    },
+    {
+      "id": "upstream-task-output-card-result-consumed",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "证明 TaskOutput 成功结果进入 provider continuation，并让专属卡片稳定收口。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题生成不属于 O19 错误投影语义，只用于避免严格 replay 的无关重试。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-agent-tool-call",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "启动真实 background child，并用文件 barrier 将输入校验错误稳定放在 parent 启动 turn 之后。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-agent-started",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "先让 parent 启动 turn 回到 idle，再释放 child 输入错误，避免 completion notification 合流竞态。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-child-barrier",
+      "kind": "subagent",
+      "timingPolicy": "controlled-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "文件 barrier 稳定隔离 parent launch 与 child validation error 两个 provider roundtrip。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-respond-call",
+      "kind": "subagent",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "通过真实 schema validation 制造可达的 RespondToCoordinator execution error，不增加生产 fault hook。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-child-final",
+      "kind": "subagent",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "证明专属工具 error row 收口后 child tool loop 仍可继续并正常完成。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-notification-consumed",
+      "kind": "main",
+      "timingPolicy": "task-notification",
+      "source": "synthetic",
+      "syntheticReason": "让 error child 通过标准 completion notification 收口，并为后续 TaskOutput 错误 turn 建立稳定 idle 前置状态。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-task-output-call",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "使用不存在的稳定 task id 触发 TaskOutput handler error，并验证真实 V4 error projection。"
+    },
+    {
+      "id": "upstream-tool-renderer-error-task-output-consumed",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "证明 TaskOutput handler failure 进入 provider continuation，并让专属 error card 稳定收口。"
+    },
+    {
+      "id": "incoming-tool-spawn",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-child-wait",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-tool-main-wait-peer",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-child-reply",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-tool-child-continue",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-child-final",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-tool-main-wait-task",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-main-task-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-resume",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-child-resumed",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-resume-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-tool-resume-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-spawn",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-child-wait",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-text-main-wait-peer",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-child-reply",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-text-child-continue",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-child-final",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。 CR-01：真实生产入口携带关闭/打开 reminder 与伪造授权载荷，校验 MCS 原文和 user 包装转义。"
+    },
+    {
+      "id": "incoming-text-main-wait-task",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-main-task-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-resume",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-child-resumed",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-resume-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    },
+    {
+      "id": "incoming-text-resume-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "控制主子 Agent 工作窗口，真实 CLI 生成来源和中途形态；MCS 与非 MCS 逐阶段验证实际 wire 全文与因果顺序。"
+    }
+  ]
+}

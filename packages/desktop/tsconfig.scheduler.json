@@ -1,14 +1,14 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "out/scheduler",
-    "rootDir": "src/scheduler",
-    "lib": ["es2025"],
-    // scheduler 只把 Electron.MessageEvent 当类型用、不 import "electron" 值，
-    // 故显式引入 node + electron 全局类型（process/setInterval/Electron 命名空间）。
-    "types": ["node", "electron"]
-  },
-  "include": ["src/scheduler"],
-  // scheduler 直接依赖 services(node 入口)/shared；补 references 复用上游声明产物。
-  "references": [{ "path": "../shared" }, { "path": "../services" }]
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "out/scheduler",
+		"rootDir": "src/scheduler",
+		"lib": ["es2025"],
+		// scheduler 只把 Electron.MessageEvent 当类型用、不 import "electron" 值，
+		// 故显式引入 node + electron 全局类型（process/setInterval/Electron 命名空间）。
+		"types": ["node", "electron"]
+	},
+	"include": ["src/scheduler"],
+	// scheduler 直接依赖 services(node 入口)/shared；补 references 复用上游声明产物。
+	"references": [{ "path": "../shared" }, { "path": "../services" }]
 }

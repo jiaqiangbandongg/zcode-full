@@ -1,0 +1,1199 @@
+{
+  "version": 1,
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-catalog-refresh.test.ts",
+  "fixtures": [
+    {
+      "id": "scr-user-title",
+      "description": "scr-user-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SCR_USER_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Subagent catalog refresh",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-seed",
+      "description": "scr-user-seed",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-add-tool",
+      "description": "scr-user-add-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_ADD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_add_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh add",
+              "prompt": "E2E_SCR_USER_ADD_CHILD",
+              "subagent_type": "e2e-refresh-a-user",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-add-child",
+      "description": "scr-user-add-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_ADD_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_USER_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_ADD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-add-final",
+      "description": "scr-user-add-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_user_add_spawn", "tool_result", "E2E_SCR_USER_ADD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_ADD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-renamed-old-tool",
+      "description": "scr-user-renamed-old-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_RENAMED_OLD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_renamed-old_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh renamed-old",
+              "prompt": "E2E_SCR_USER_RENAMED_OLD_CHILD",
+              "subagent_type": "e2e-refresh-a-user",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_user_renamed-old_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_USER_RENAMED_OLD_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-renamed-old-final",
+      "description": "scr-user-renamed-old-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_scr_user_renamed-old_spawn",
+          "tool_result",
+          "E2E_SCR_USER_RENAMED_OLD"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_RENAMED_OLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-renamed-new-tool",
+      "description": "scr-user-renamed-new-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_RENAMED_NEW:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_renamed-new_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh renamed-new",
+              "prompt": "E2E_SCR_USER_RENAMED_NEW_CHILD",
+              "subagent_type": "e2e-refresh-b-user",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-renamed-new-child",
+      "description": "scr-user-renamed-new-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_RENAMED_NEW_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_USER_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_RENAMED_NEW_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-renamed-new-final",
+      "description": "scr-user-renamed-new-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_scr_user_renamed-new_spawn",
+          "tool_result",
+          "E2E_SCR_USER_RENAMED_NEW"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_RENAMED_NEW_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-update-tool",
+      "description": "scr-user-update-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_UPDATE:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_update_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh update",
+              "prompt": "E2E_SCR_USER_UPDATE_CHILD",
+              "subagent_type": "e2e-refresh-b-user",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-update-child",
+      "description": "scr-user-update-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_UPDATE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_USER_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_UPDATE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-update-final",
+      "description": "scr-user-update-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_user_update_spawn", "tool_result", "E2E_SCR_USER_UPDATE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_UPDATE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-disabled-tool",
+      "description": "scr-user-disabled-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_DISABLED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_disabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh disabled",
+              "prompt": "E2E_SCR_USER_DISABLED_CHILD",
+              "subagent_type": "e2e-refresh-b-user",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_user_disabled_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_USER_DISABLED_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-disabled-final",
+      "description": "scr-user-disabled-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_user_disabled_spawn", "tool_result", "E2E_SCR_USER_DISABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_DISABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-reenabled-tool",
+      "description": "scr-user-reenabled-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_REENABLED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_reenabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh reenabled",
+              "prompt": "E2E_SCR_USER_REENABLED_CHILD",
+              "subagent_type": "e2e-refresh-b-user",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-reenabled-child",
+      "description": "scr-user-reenabled-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_REENABLED_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_USER_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_REENABLED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-reenabled-final",
+      "description": "scr-user-reenabled-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_user_reenabled_spawn", "tool_result", "E2E_SCR_USER_REENABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_REENABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-user-deleted-tool",
+      "description": "scr-user-deleted-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_USER_DELETED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_user_deleted_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh deleted",
+              "prompt": "E2E_SCR_USER_DELETED_CHILD",
+              "subagent_type": "e2e-refresh-b-user",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_user_deleted_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_USER_DELETED_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-user-deleted-final",
+      "description": "scr-user-deleted-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_user_deleted_spawn", "tool_result", "E2E_SCR_USER_DELETED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_USER_DELETED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-title",
+      "description": "scr-mcs-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SCR_MCS_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Subagent catalog refresh",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-seed",
+      "description": "scr-mcs-seed",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-add-tool",
+      "description": "scr-mcs-add-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_ADD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_add_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh add",
+              "prompt": "E2E_SCR_MCS_ADD_CHILD",
+              "subagent_type": "e2e-refresh-a-mcs",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-add-child",
+      "description": "scr-mcs-add-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_ADD_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_MCS_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_ADD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-add-final",
+      "description": "scr-mcs-add-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_mcs_add_spawn", "tool_result", "E2E_SCR_MCS_ADD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_ADD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-renamed-old-tool",
+      "description": "scr-mcs-renamed-old-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_RENAMED_OLD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_renamed-old_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh renamed-old",
+              "prompt": "E2E_SCR_MCS_RENAMED_OLD_CHILD",
+              "subagent_type": "e2e-refresh-a-mcs",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_mcs_renamed-old_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_MCS_RENAMED_OLD_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-renamed-old-final",
+      "description": "scr-mcs-renamed-old-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_scr_mcs_renamed-old_spawn",
+          "tool_result",
+          "E2E_SCR_MCS_RENAMED_OLD"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_RENAMED_OLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-renamed-new-tool",
+      "description": "scr-mcs-renamed-new-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_RENAMED_NEW:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_renamed-new_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh renamed-new",
+              "prompt": "E2E_SCR_MCS_RENAMED_NEW_CHILD",
+              "subagent_type": "e2e-refresh-b-mcs",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-renamed-new-child",
+      "description": "scr-mcs-renamed-new-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_RENAMED_NEW_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_MCS_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_RENAMED_NEW_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-renamed-new-final",
+      "description": "scr-mcs-renamed-new-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_scr_mcs_renamed-new_spawn",
+          "tool_result",
+          "E2E_SCR_MCS_RENAMED_NEW"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_RENAMED_NEW_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-update-tool",
+      "description": "scr-mcs-update-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_UPDATE:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_update_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh update",
+              "prompt": "E2E_SCR_MCS_UPDATE_CHILD",
+              "subagent_type": "e2e-refresh-b-mcs",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-update-child",
+      "description": "scr-mcs-update-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_UPDATE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_MCS_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_UPDATE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-update-final",
+      "description": "scr-mcs-update-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_mcs_update_spawn", "tool_result", "E2E_SCR_MCS_UPDATE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_UPDATE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-disabled-tool",
+      "description": "scr-mcs-disabled-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_DISABLED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_disabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh disabled",
+              "prompt": "E2E_SCR_MCS_DISABLED_CHILD",
+              "subagent_type": "e2e-refresh-b-mcs",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_mcs_disabled_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_MCS_DISABLED_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-disabled-final",
+      "description": "scr-mcs-disabled-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_mcs_disabled_spawn", "tool_result", "E2E_SCR_MCS_DISABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_DISABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-reenabled-tool",
+      "description": "scr-mcs-reenabled-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_REENABLED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_reenabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh reenabled",
+              "prompt": "E2E_SCR_MCS_REENABLED_CHILD",
+              "subagent_type": "e2e-refresh-b-mcs",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-reenabled-child",
+      "description": "scr-mcs-reenabled-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_REENABLED_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCR_MCS_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_REENABLED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-reenabled-final",
+      "description": "scr-mcs-reenabled-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_mcs_reenabled_spawn", "tool_result", "E2E_SCR_MCS_REENABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_REENABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scr-mcs-deleted-tool",
+      "description": "scr-mcs-deleted-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCR_MCS_DELETED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scr_mcs_deleted_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "description": "Catalog refresh deleted",
+              "prompt": "E2E_SCR_MCS_DELETED_CHILD",
+              "subagent_type": "e2e-refresh-b-mcs",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_scr_mcs_deleted_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SCR_MCS_DELETED_RESUME",
+              "summary": "Resume missing profile"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scr-mcs-deleted-final",
+      "description": "scr-mcs-deleted-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定模型工具选择，以真实 Settings 保存和实际 provider 请求验证动态目录、完整 profile、失败路径及连续前缀；usage 为模拟值，不作为真实缓存命中证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scr_mcs_deleted_spawn", "tool_result", "E2E_SCR_MCS_DELETED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCR_MCS_DELETED_DONE",
+          "inputTokens": 32
+        }
+      }
+    }
+  ],
+  "caseName": "conversation-session-subagent-catalog-refresh"
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-chat-reminder",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-chat-reminder.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-side-chat-reminder.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-spec",
+      "description": "父会话真实 Read 工具结果，用于断言 fork 后继承历史进入 child provider 请求。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "ssc-reminder-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+    },
+    {
+      "id": "ssc-reminder-seed-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+    },
+    {
+      "id": "ssc-reminder-query",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+    }
+  ]
+}

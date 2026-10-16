@@ -14,6 +14,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "node ../../scripts/clean-dist.mjs",
+    "test": "vitest tests",
+    "coverage": "vitest run tests --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
     "lint:fix": "oxlint --write src"
@@ -22,5 +24,6 @@
     "@zcode/contracts": "workspace:*"
   },
   "devDependencies": {
+    "vitest": "^4.1.5"
   }
 }

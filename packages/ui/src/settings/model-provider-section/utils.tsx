@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
-import { type BuiltinModelProviderId } from "@zcode/shared";
+import { type BuiltinModelProviderId, type OAuthProviderId } from "@zcode/shared";
 import { PackageIcon } from "lucide-react";
 import { ProviderLogo } from "./ProviderLogo.js";
-import { type ModelProviderNavItem } from "./constants.js";
+import {
+  CODING_PLAN_PROVIDER_SPECS,
+  PRESET_PROVIDER_SPEC_BY_ID,
+  type ModelProviderNavItem,
+} from "./constants.js";
 
 export function createPresetProviderNodeKey(id: BuiltinModelProviderId): string {
   return `preset:${id}`;
@@ -14,6 +18,16 @@ export function createCodingPlanProviderNodeKey(id: BuiltinModelProviderId): str
 
 export function createCustomProviderNodeKey(id: string): string {
   return `custom:${id}`;
+}
+
+export function resolveOAuthProviderIdByPreset(
+  presetId: BuiltinModelProviderId,
+): OAuthProviderId | null {
+  return (
+    PRESET_PROVIDER_SPEC_BY_ID.get(presetId)?.oauthProviderId ??
+    CODING_PLAN_PROVIDER_SPECS.find((spec) => spec.id === presetId)?.oauthProviderId ??
+    null
+  );
 }
 
 export function resolveModelProviderNavLogo(item: ModelProviderNavItem) {

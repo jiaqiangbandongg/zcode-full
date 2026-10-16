@@ -16,6 +16,12 @@ function canonicalPluginName(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
+export function needsMcpAttention(resource: {
+  authorization?: { authorizationUrl?: string };
+}): boolean {
+  return Boolean(resource.authorization?.authorizationUrl);
+}
+
 export function selectBuiltInPlugins(
   plugins: readonly ZCodePluginInfo[],
   installedPlugins: readonly ZCodeInstalledPluginSummary[],
@@ -24,7 +30,7 @@ export function selectBuiltInPlugins(
   return plugins.filter((plugin) => plugin.source === "official" && !installedIds.has(plugin.id));
 }
 
-interface PluginSettingsGroups {
+export interface PluginSettingsGroups {
   installed: ZCodePluginInfo[];
   builtIn: ZCodePluginInfo[];
 }
@@ -131,7 +137,7 @@ export function selectCommandsForScope(
   });
 }
 
-interface SkillSourceGroup {
+export interface SkillSourceGroup {
   id: string;
   label: string;
   pluginId?: string;

@@ -1,0 +1,6 @@
+lane actor#1 "w" @11:19 families=loop#1
+region seq#1 seq
+region loop#1 loop parent=seq#1 @10:1
+step ask#1 ask "w" @11:30 lane=actor#1 region=loop#1 maybe serial
+edge ask#1 -> ask#1 carry maybe
+sink ask#1

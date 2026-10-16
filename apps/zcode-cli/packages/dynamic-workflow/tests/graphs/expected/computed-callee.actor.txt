@@ -1,0 +1,5 @@
+actor-node source
+actor-node actor#1 "s" @7:22
+actor-node actor#2 "j" @8:29
+actor-edge source -> actor#1 exact count=1
+actor-edge actor#1 -> actor#2 inexact count=1 types="string"

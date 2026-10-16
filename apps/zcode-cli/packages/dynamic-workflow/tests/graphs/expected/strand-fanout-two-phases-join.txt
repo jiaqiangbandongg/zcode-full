@@ -1,0 +1,44 @@
+node source
+node fan-out#1 "fan-out" @26:15 type="string[]"
+node ask#1 "ask" @27:35 actors=actor#1 within=fan-out#1 type="string"
+node fan-out#2 "fan-out" @32:15 type="string[]"
+node ask#2 "ask" @33:35 actors=actor#2 within=fan-out#2 type="string"
+node join#1 "join" @37:30 type="[string[], string[]]"
+node join#2 "join" @37:43 type="string[]"
+node join#3 "join" @37:63 type="string[]"
+node join#4 "join" @40:30 type="string[]"
+node fan-out#3 "fan-out" @41:3 type="string[]"
+node ask#3 "ask" @42:37 actors=actor#3 within=fan-out#3 type="string"
+node sink
+actor actor#1 @27:19 within=fan-out#1
+actor actor#2 @33:19 within=fan-out#2
+actor actor#3 @42:21 within=fan-out#3
+edge source -> fan-out#1 data exact
+edge source -> fan-out#2 data exact
+edge source -> fan-out#3 data exact
+edge fan-out#1 -> ask#1 data exact type="string[]"
+edge fan-out#1 -> join#1 data exact port=0 type="string[]"
+edge fan-out#1 -> join#2 data exact type="string[]"
+edge fan-out#1 -> ask#3 data exact type="string[]"
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> join#2 data exact type="string"
+edge ask#1 -> ask#3 data exact type="string"
+edge fan-out#2 -> ask#2 data exact type="string[]"
+edge fan-out#2 -> join#1 data exact port=1 type="string[]"
+edge fan-out#2 -> join#3 data exact type="string[]"
+edge fan-out#2 -> ask#3 data exact type="string[]"
+edge ask#2 -> join#1 data exact port=1 type="string"
+edge ask#2 -> join#3 data exact type="string"
+edge ask#2 -> ask#3 data exact type="string"
+edge join#1 -> ask#3 data exact port=0 type="string[]"
+edge join#1 -> ask#3 data exact port=1 type="string[]"
+edge join#2 -> join#1 data exact port=0 type="string[]"
+edge join#2 -> ask#3 data exact type="string[]"
+edge join#3 -> join#1 data exact port=1 type="string[]"
+edge join#3 -> ask#3 data exact type="string[]"
+edge join#4 -> sink data exact type="string[]"
+edge fan-out#3 -> join#4 data exact type="string[]"
+edge fan-out#3 -> ask#3 data exact type="string[]"
+edge fan-out#3 -> sink data exact type="string[]"
+edge ask#3 -> join#4 data exact type="string"
+edge ask#3 -> sink data exact type="string"

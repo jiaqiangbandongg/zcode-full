@@ -9,6 +9,7 @@ import { cn } from "@/components/lib/utils.js";
 import { STATUS_DOT } from "@/components/workflow-graph/run-status-presentation.js";
 import type { StepRunStatus } from "@/components/workflow-graph/types.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import type { TimelineHole } from "./timeline-holes.js";
 import type { TimelineRail, TimelineStation } from "./timeline-model.js";
 import { LEDGE_PITCH, LEDGE_LAMP, ledgeLamps, railKey, scrollbarThumb } from "./timeline-ledge.js";
 import type { TimelineViewport } from "./use-timeline-viewport.js";
@@ -25,7 +26,23 @@ import type { TimelineViewport } from "./use-timeline-viewport.js";
  */
 
 /** 站灯：`STATUS_DOT` 词汇表，running 外加 3px 光晕（呼吸）——它是画面上唯一发光的东西。 */
-export function stationLampClass(status: StepRunStatus | undefined): string {
+export function stationLampClass(
+  status: StepRunStatus | undefined,
+  /**
+   * 留白灯（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：开着 / 等着的留白是一枚
+   * 1.5px 虚线、无填充的灯；等待时描边换警示色、外加 3px 常亮的光晕——**不搏动**，那里没有东西在跑。
+   * 补全后就是普通的灯。三处画灯的地方（轨道行、带的灯层、边檐）都经这里，留白在哪都长一样。
+   */
+  hole?: TimelineHole,
+): string {
+  if (hole !== undefined && hole.state !== "filled") {
+    return cn(
+      "wf-lamp wf-lamp-hole size-2.5 shrink-0 rounded-full border-[1.5px] border-dashed bg-transparent",
+      hole.state === "waiting"
+        ? "wf-lamp-hole-waiting border-warning"
+        : "border-foreground-subtlest",
+    );
+  }
   const resolved = status ?? "pending";
   return cn(
     "wf-lamp size-2.5 shrink-0 rounded-full",
@@ -144,7 +161,7 @@ export function WorkflowLedge({
         >
           <span
             aria-hidden
-            className={cn(stationLampClass(station.status), "wf-land")}
+            className={cn(stationLampClass(station.status, station.hole), "wf-land")}
             data-lamp={station.status ?? "pending"}
           />
         </button>

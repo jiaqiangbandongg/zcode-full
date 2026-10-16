@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-send-now",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-send-now.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-running-send-now.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-running-send-now-head-base",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定当前轮的 text-only assistant 输出并保持运行，验证抢占后 human reminder 的 MCS 位置降级。"
+    },
+    {
+      "id": "upstream-running-send-now-head-selected",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "保持下一轮 streaming，便于同时断言 user 投影、queue 清空与请求次数。"
+    },
+    {
+      "id": "upstream-running-send-now-promote-base",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定保留两条 typed queue，避免首轮提前完成并自动 drain。"
+    },
+    {
+      "id": "upstream-running-send-now-promote-first-not-selected",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "maxMatches=0 把未点项保持在 queue 的负向合同纳入 replay ledger。"
+    },
+    {
+      "id": "upstream-running-send-now-promote-second-selected",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定验证被点项成为 active，未点项仍保留。"
+    },
+    {
+      "id": "upstream-running-send-now-goal-base",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "确保 /goal 先形成 typed queue，再由用户显式提升。"
+    },
+    {
+      "id": "upstream-running-send-now-goal-continuation",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "保持 active target + streaming 窗口，直接验证 intent 未退化成普通 text。"
+    },
+    {
+      "id": "upstream-running-send-now-double-base",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "让两个 click 在同一 active turn 和同一 React 刷新边界内发生。"
+    },
+    {
+      "id": "upstream-running-send-now-double-first-not-selected",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "maxMatches=0 证明第二条 command 不会触发普通 drain 消费 sibling queue item。"
+    },
+    {
+      "id": "upstream-running-send-now-double-second-selected-once",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "maxMatches=1 将重复 provider 请求直接视为 replay 失败，并保留 streaming 断言窗口。"
+    }
+  ]
+}

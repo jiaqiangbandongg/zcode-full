@@ -1,5 +1,11 @@
 import { execFile } from "node:child_process";
-import { existsSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -10,13 +16,13 @@ const WINDOWS_PACKAGED_RESOURCE_DIRS = ["glm", "tools"];
 // 交接窗口。
 export const WINDOWS_UPDATE_LOCK_RELEASE_GRACE_MS = 750;
 
-interface WindowsInstallResourceLockProcess {
+export interface WindowsInstallResourceLockProcess {
   pid: number;
   commandLine?: string;
   executablePath?: string;
 }
 
-interface WindowsUpdateProcessCleanupResult<TTerminationResult> {
+export interface WindowsUpdateProcessCleanupResult<TTerminationResult> {
   initialLockProcesses: WindowsInstallResourceLockProcess[];
   terminationPids: number[];
   terminationResults: TTerminationResult[];
@@ -27,7 +33,9 @@ interface WindowsUpdateProcessCleanupResult<TTerminationResult> {
 interface WindowsUpdateProcessCleanupOptions<TTerminationResult> {
   resourceLockMarkers: readonly string[];
   lockReleaseGraceMs: number;
-  scan: (markers: readonly string[]) => Promise<WindowsInstallResourceLockProcess[]>;
+  scan: (
+    markers: readonly string[],
+  ) => Promise<WindowsInstallResourceLockProcess[]>;
   terminate: (pids: number[]) => Promise<TTerminationResult[]>;
   delay: (ms: number) => Promise<void>;
 }
@@ -47,7 +55,10 @@ export async function runWindowsUpdateProcessCleanup<TTerminationResult>(
     // 不能作为进程身份。即使扫描实现异常返回了额外行，也只保留清理时刻仍引用随包
     // 资源的进程，避免 taskkill /T /F 终止无关进程树。
     initialLockProcesses = scannedProcesses.filter((processInfo) =>
-      isWindowsProcessReferencingResourceMarkers(processInfo, options.resourceLockMarkers),
+      isWindowsProcessReferencingResourceMarkers(
+        processInfo,
+        options.resourceLockMarkers,
+      ),
     );
   } catch (error) {
     // 辅助扫描不可用不能阻断升级，错误返回给 main 记录后继续 NSIS 交接。
@@ -124,7 +135,9 @@ function normalizeForWindowsCommandLineMatch(value: string): string {
   return value.trim().replaceAll("/", "\\").toLowerCase();
 }
 
-export function resolveWindowsPackagedResourceLockMarkers(resourcesPath: string): string[] {
+export function resolveWindowsPackagedResourceLockMarkers(
+  resourcesPath: string,
+): string[] {
   return WINDOWS_PACKAGED_RESOURCE_DIRS.map((dir) => join(resourcesPath, dir));
 }
 
@@ -196,7 +209,7 @@ export function probeWindowsPackagedResourceWritable(
   });
 }
 
-function isWindowsProcessReferencingResourceMarkers(
+export function isWindowsProcessReferencingResourceMarkers(
   processInfo: WindowsInstallResourceLockProcess,
   markers: readonly string[],
 ): boolean {

@@ -6,29 +6,29 @@ import {
 } from "@zcode/shared";
 import { logger } from "@/logger.js";
 
-const UI_PERF_ARMS_GROUP = "ui_perf";
+export const UI_PERF_ARMS_GROUP = "ui_perf";
 
-const UI_PERF_EVENT_LAUNCH_TO_INPUT = "perf_ui_launch_to_input";
-const UI_PERF_EVENT_LAUNCH_ELECTRON_INIT = "perf_ui_launch_electron_init_ms";
-const UI_PERF_EVENT_LAUNCH_APP_READY = "perf_ui_launch_app_ready_ms";
-const UI_PERF_EVENT_LAUNCH_WINDOW = "perf_ui_launch_window_ms";
-const UI_PERF_EVENT_LAUNCH_RENDERER_LOAD = "perf_ui_launch_renderer_load_ms";
-const UI_PERF_EVENT_LAUNCH_REACT_COMMIT = "perf_ui_launch_react_commit_ms";
-const UI_PERF_EVENT_LAUNCH_STARTUP_GATE = "perf_ui_launch_startup_gate_ms";
+export const UI_PERF_EVENT_LAUNCH_TO_INPUT = "perf_ui_launch_to_input";
+export const UI_PERF_EVENT_LAUNCH_ELECTRON_INIT = "perf_ui_launch_electron_init_ms";
+export const UI_PERF_EVENT_LAUNCH_APP_READY = "perf_ui_launch_app_ready_ms";
+export const UI_PERF_EVENT_LAUNCH_WINDOW = "perf_ui_launch_window_ms";
+export const UI_PERF_EVENT_LAUNCH_RENDERER_LOAD = "perf_ui_launch_renderer_load_ms";
+export const UI_PERF_EVENT_LAUNCH_REACT_COMMIT = "perf_ui_launch_react_commit_ms";
+export const UI_PERF_EVENT_LAUNCH_STARTUP_GATE = "perf_ui_launch_startup_gate_ms";
 
 // 总时长超过该值视为时钟异常/挂起，整批丢弃，避免污染分布。
-const LAUNCH_TO_INPUT_SANITY_MAX_MS = 300000;
+export const LAUNCH_TO_INPUT_SANITY_MAX_MS = 300000;
 
-const UI_PERF_EVENT_FIRST_TOKEN = "perf_ui_first_token";
-const UI_PERF_EVENT_MESSAGE_COMPLETE = "perf_ui_message_complete";
-const UI_PERF_EVENT_TURN_BREAKDOWN = "perf_ui_turn_breakdown";
-const UI_PERF_EVENT_TOOL_CALL_DETAIL = "perf_ui_tool_call_detail";
-const UI_PERF_EVENT_STREAM_STALL = "perf_ui_stream_stall";
+export const UI_PERF_EVENT_FIRST_TOKEN = "perf_ui_first_token";
+export const UI_PERF_EVENT_MESSAGE_COMPLETE = "perf_ui_message_complete";
+export const UI_PERF_EVENT_TURN_BREAKDOWN = "perf_ui_turn_breakdown";
+export const UI_PERF_EVENT_TOOL_CALL_DETAIL = "perf_ui_tool_call_detail";
+export const UI_PERF_EVENT_STREAM_STALL = "perf_ui_stream_stall";
 
 // 超过该间隔(ms)未收到新 chunk 视为停顿并上报;value 仍为真实间隔。可据线上分布收紧。
 // 工具调用(tool_call/tool_call_update)期间不计入:工具事件会 clearStreamStallTracking,
 // 工具后第一个正文 chunk 视为首个,不与工具前的 chunk 比较,避免把工具执行误判为停顿。
-const STREAM_STALL_REPORT_THRESHOLD_MS = 3000;
+export const STREAM_STALL_REPORT_THRESHOLD_MS = 3000;
 
 type ArmsReporter = Pick<IPlatformService, "reportArmsCustomEvent">;
 
@@ -36,6 +36,11 @@ let armsReporter: ArmsReporter | null = null;
 
 export function setUiPerfArmsReporter(reporter: ArmsReporter | null): void {
   armsReporter = reporter;
+}
+
+export function clearUiPerfArmsReporterForTest(): void {
+  armsReporter = null;
+  lastChunkAtByTask.clear();
 }
 
 /**
@@ -349,16 +354,16 @@ export function clearStreamStallTracking(taskId: string): void {
 
 // 输入框卡顿:在 Lexical update listener 内测「单次输入处理耗时」(getEditorMarkdown+onChange 同步段)。
 // 与 stream_stall(输出侧)区分:此为输入侧。只上报超阈卡点,事件量最小。
-const UI_PERF_EVENT_INPUT_LAG = "perf_ui_input_lag";
+export const UI_PERF_EVENT_INPUT_LAG = "perf_ui_input_lag";
 
 // 保守起点:只抓最严重卡顿。可据线上分布往下收紧。
-const INPUT_LAG_REPORT_THRESHOLD_MS = 500;
+export const INPUT_LAG_REPORT_THRESHOLD_MS = 500;
 // 超此值大概率是断点调试/标签页挂起/设备休眠唤醒,丢弃避免污染分布。
-const INPUT_LAG_SANITY_MAX_MS = 5000;
+export const INPUT_LAG_SANITY_MAX_MS = 5000;
 
 // 判定抽成纯函数便于单测:程序化改写(粘贴/setText/mention/历史回填)与 IME 组合态
 // 都不算打字卡顿,即使耗时超阈也跳过。
-function shouldReportInputLag(args: {
+export function shouldReportInputLag(args: {
   lagMs: number;
   isProgrammatic: boolean;
   isComposing: boolean;

@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-turn-navigator",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-turn-navigator.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-turn-navigator-title",
+      "description": "Turn navigator case 内的标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是 TN case 的产品语义，只需要稳定返回，防止 title 请求阻塞主消息流。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_V4_TURN_NAV_1"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-turn-navigator-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Turn Navigator\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-turn-navigator-tool-call",
+      "description": "TN02 第一轮先返回 Read tool_use，形成真实 tool result 历史，用于断言 tooltip 不泄露工具正文。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "TN02 需要真实工具历史，但 navigator 摘要只允许 user + assistant text。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_TURN_NAV_1"],
+        "bodyIncludes": ["E2E_V4_TURN_NAV_1", "TN_TOOL_BACKED_PROMPT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "TN_TOOL_SECRET_CONTENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_turn_nav_read",
+          "messageId": "msg_v4_turn_nav_tool_call",
+          "name": "Read",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-v4-turn-navigator/tool-secret.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "v4-turn-navigator-turn1-final",
+      "description": "TN02 第一轮 Read tool_result 后固定收尾文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "navigator 摘要需要稳定 assistant text excerpt。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_V4_TURN_NAV_1",
+          "TN_TOOL_SECRET_CONTENT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-turn-navigator-turn1-final",
+          "inputTokens": 160,
+          "outputTokens": 96,
+          "text": "TN_ASSISTANT_1_EXCERPT Tool-backed answer is visible in the navigator preview.\n\nTN_FILLER_1_01 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_02 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_03 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_04 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_05 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_06 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_07 This paragraph gives the first turn enough height for scrolling.\nTN_FILLER_1_08 This paragraph gives the first turn enough height for scrolling."
+        }
+      }
+    },
+    {
+      "id": "v4-turn-navigator-turn2-final",
+      "description": "TN01 第二轮固定长文本，达到 2+ 可导航 turn 后显示 rail。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "TN01/TN03 需要稳定的多轮可滚动历史。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_TURN_NAV_2"],
+        "bodyIncludes": ["E2E_V4_TURN_NAV_2"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-turn-navigator-turn2-final",
+          "inputTokens": 128,
+          "outputTokens": 96,
+          "text": "TN_ASSISTANT_2_EXCERPT Second turn answer for navigator visibility.\n\nTN_FILLER_2_01 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_02 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_03 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_04 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_05 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_06 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_07 This paragraph keeps the timeline scrollable.\nTN_FILLER_2_08 This paragraph keeps the timeline scrollable."
+        }
+      }
+    },
+    {
+      "id": "v4-turn-navigator-turn3-final",
+      "description": "TN03 第三轮固定长文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "TN03 需要点击非当前 bar 并滚动到目标 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_TURN_NAV_3"],
+        "bodyIncludes": ["E2E_V4_TURN_NAV_3"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-turn-navigator-turn3-final",
+          "inputTokens": 128,
+          "outputTokens": 96,
+          "text": "TN_ASSISTANT_3_EXCERPT Third turn answer for navigator click target.\n\nTN_FILLER_3_01 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_02 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_03 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_04 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_05 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_06 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_07 This paragraph keeps the timeline scrollable.\nTN_FILLER_3_08 This paragraph keeps the timeline scrollable."
+        }
+      }
+    },
+    {
+      "id": "v4-turn-navigator-turn4-final",
+      "description": "TN03 第四轮固定长文本，让当前视口停在底部后点击前序 bar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "TN03 需要 4+ turn 构造非当前 bar 跳转。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_TURN_NAV_4"],
+        "bodyIncludes": ["E2E_V4_TURN_NAV_4"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-turn-navigator-turn4-final",
+          "inputTokens": 128,
+          "outputTokens": 96,
+          "text": "TN_ASSISTANT_4_EXCERPT Fourth turn answer at the bottom of the timeline.\n\nTN_FILLER_4_01 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_02 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_03 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_04 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_05 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_06 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_07 This paragraph keeps the timeline scrollable.\nTN_FILLER_4_08 This paragraph keeps the timeline scrollable."
+        }
+      }
+    }
+  ]
+}

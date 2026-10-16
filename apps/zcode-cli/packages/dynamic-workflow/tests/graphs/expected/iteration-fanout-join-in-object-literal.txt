@@ -1,0 +1,15 @@
+node source
+node fan-out#1 "fan-out" @11:15 type="{ pending: Promise<[string]>; }[]"
+node join#1 "join" @11:55 within=fan-out#1 type="[string]"
+node ask#1 "a" @11:62 actors=actor#1 within=fan-out#1 type="string"
+node ask#2 "reader" @13:24 actors=actor#2 type="string"
+node sink
+actor actor#1 "a" @10:11
+actor actor#2 "reader" @13:8
+edge source -> fan-out#1 data exact
+edge source -> ask#1 data exact
+edge fan-out#1 -> ask#2 data exact type="{ pending: Promise<[string]>; }[]"
+edge join#1 -> ask#2 data exact type="[string]"
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

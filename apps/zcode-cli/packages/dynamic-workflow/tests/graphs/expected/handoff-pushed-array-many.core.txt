@@ -1,0 +1,45 @@
+join join#1 "join" @9:30 order=0 type="Draft[]"
+fan-out fan-out#1 "fan-out" @9:34 order=1 type="Draft[]"
+ask ask#1 "ask" head="writer-" @9:73 order=2 within=fan-out#1 type="Draft"
+actor actor#1 head="writer-" @9:52 order=3 within=fan-out#1
+actor actor#2 "planner" @10:17 order=4
+ask ask#2 "planner" @11:28 order=5 type="string[]"
+join join#2 "join" @12:29 order=6 type="Draft[]"
+fan-out fan-out#2 "fan-out" @12:33 order=7 type="Draft[]"
+ask ask#3 "ask" head="writer-" @12:70 order=8 within=fan-out#2 type="Draft"
+actor actor#3 head="writer-" @12:49 order=9 within=fan-out#2
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#2 <- join#1 exact
+fact ask-data ask#2 <- fan-out#1 exact
+fact ask-data ask#3 <- ask#2 exact
+fact ask-data ask#3 <- fan-out#2 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact join-in join#1 <- ask#1 exact
+fact join-in join#1 <- fan-out#1 exact
+fact join-in join#2 <- ask#3 exact
+fact join-in join#2 <- ask#2 exact
+fact join-in join#2 <- fan-out#2 exact
+fact fan-out-in fan-out#2 <- ask#2 exact
+fact return <- ask#1 exact
+fact return <- join#1 exact
+fact return <- ask#3 exact
+fact return <- ask#2 exact
+fact return <- join#2 exact
+fact return <- fan-out#1 exact
+fact return <- fan-out#2 exact
+region seq#1 seq entered
+region fanout#1 fanout parent=seq#1 @9:34 label="map"
+region fanout#2 fanout parent=seq#1 @12:33 label="map"
+spawn actor#1 in=seq#1>fanout#1
+issue ask#1 in=seq#1>fanout#1 phase=unphased
+settle ask#1 in=seq#1
+spawn actor#2 in=seq#1
+issue ask#2 in=seq#1 phase=unphased
+settle ask#2 in=seq#1
+spawn actor#3 in=seq#1>fanout#2
+issue ask#3 in=seq#1>fanout#2 phase=unphased
+settle ask#3 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

@@ -42,7 +42,9 @@ interface WorkspaceReadableJournal
   extends JournalStorePort, Pick<DwfRunIntrospectionQueries, "listWorldNodes"> {}
 
 /** journal 是否带工作区读面。刻意是 `supportsArtifactReads` 的兄弟而不是把它扩宽（同一条论证）。 */
-function supportsWorkspaceReads(journal: JournalStorePort): journal is WorkspaceReadableJournal {
+export function supportsWorkspaceReads(
+  journal: JournalStorePort,
+): journal is WorkspaceReadableJournal {
   return typeof (journal as Partial<DwfRunIntrospectionQueries>).listWorldNodes === "function";
 }
 
@@ -175,7 +177,7 @@ function truncateUtf8(text: string, maxBytes: number): string {
  * - `world.run` 的 `{exitCode, stdout, stderr}`：exitCode 恒保留，两路输出各分一半预算；
  * - 其它：序列化后不超限原样，超限退化成切尾的 JSON 文本（形状已不可保）。
  */
-function boundWorkspaceResult(
+export function boundWorkspaceResult(
   result: unknown,
   maxBytes: number,
 ): { result: unknown; truncated: boolean; totalBytes: number } {

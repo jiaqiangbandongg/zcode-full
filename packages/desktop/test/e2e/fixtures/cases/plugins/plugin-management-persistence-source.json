@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-persistence-source",
+  "spec": "./test/e2e/plugins/plugin-management-persistence-source.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/plugin-management/plugin-management-persistence-source.json"
+  ],
+  "fileFixtures": ["runtime-generated marketplace plus persisted user plugin state"],
+  "requests": [
+    {
+      "id": "plugin-management-orphaned-runtime",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Prove a fresh session still receives the installed Skill after its marketplace source is removed."
+    }
+  ]
+}

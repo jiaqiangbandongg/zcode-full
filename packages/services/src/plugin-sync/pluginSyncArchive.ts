@@ -2,7 +2,10 @@ import { chmod, lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promi
 import { dirname, join, posix, resolve } from "node:path";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
-import { normalizePluginSyncRelativePath, resolvePluginSyncPathWithin } from "./pluginSyncPath.js";
+import {
+  normalizePluginSyncRelativePath,
+  resolvePluginSyncPathWithin,
+} from "./pluginSyncPath.js";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -11,7 +14,7 @@ const TAR_END_BLOCK_BYTES = TAR_BLOCK_SIZE * 2;
 
 export const PLUGIN_SYNC_METADATA_ARCHIVE_PATH = ".zcode-plugin-sync.json";
 
-type PluginSyncArchiveEntry =
+export type PluginSyncArchiveEntry =
   | {
       sourcePath: string;
       archivePath: string;
@@ -36,7 +39,7 @@ export interface PluginSyncArchiveMetadata {
   }>;
 }
 
-interface PluginSyncArchiveExtractOptions {
+export interface PluginSyncArchiveExtractOptions {
   maxExtractedBytes?: number;
 }
 
@@ -178,13 +181,7 @@ async function appendTarEntry(
     throw new Error(`unsupported plugin archive source: ${sourcePath}`);
   }
 
-  appendTarFile(
-    parts,
-    archivePath,
-    await readFile(sourcePath),
-    sourceStat.mode,
-    sourceStat.mtimeMs,
-  );
+  appendTarFile(parts, archivePath, await readFile(sourcePath), sourceStat.mode, sourceStat.mtimeMs);
 }
 
 function appendTarFile(
@@ -230,10 +227,7 @@ function createTarHeader(options: {
   writeTarString(header, "zcode", 265, 32);
   writeTarString(header, "zcode", 297, 32);
   writeTarString(header, prefix, 345, 155);
-  writeTarChecksum(
-    header,
-    header.reduce((sum, byte) => sum + byte, 0),
-  );
+  writeTarChecksum(header, header.reduce((sum, byte) => sum + byte, 0));
   return header;
 }
 
@@ -279,7 +273,12 @@ function readTarMode(header: Buffer): number {
   return mode & 0o777;
 }
 
-function writeTarString(buffer: Buffer, value: string, offset: number, length: number): void {
+function writeTarString(
+  buffer: Buffer,
+  value: string,
+  offset: number,
+  length: number,
+): void {
   const source = Buffer.from(value, "utf8");
   if (source.length > length) {
     throw new Error(`plugin archive header value is too long: ${value}`);
@@ -287,7 +286,12 @@ function writeTarString(buffer: Buffer, value: string, offset: number, length: n
   source.copy(buffer, offset);
 }
 
-function writeTarOctal(buffer: Buffer, value: number, offset: number, length: number): void {
+function writeTarOctal(
+  buffer: Buffer,
+  value: number,
+  offset: number,
+  length: number,
+): void {
   const encoded = value.toString(8).padStart(length - 1, "0");
   writeTarString(buffer, encoded, offset, length - 1);
   buffer[offset + length - 1] = 0;

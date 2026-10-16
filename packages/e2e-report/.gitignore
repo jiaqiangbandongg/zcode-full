@@ -1,0 +1,4 @@
+dist/
+dist-node/
+dist-viewer/
+*.tsbuildinfo

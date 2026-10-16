@@ -1,0 +1,9 @@
+lane actor#1 "critic" @5:24 families=loop#1
+lane actor#2 "writer" @10:20
+region seq#1 seq
+region loop#1 loop parent=seq#1 @4:1 label="refine"
+step ask#1 ask "critic" @5:40 lane=actor#1 region=loop#1 always serial
+step ask#2 ask "writer" @10:36 lane=actor#2 region=seq#1 always
+edge ask#2 -> ask#1 data always exact
+edge ask#1 -> ask#1 carry always
+sink ask#1

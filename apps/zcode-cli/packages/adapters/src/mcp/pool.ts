@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   Logger,
   McpCallToolOptions,
@@ -6,16 +5,19 @@ import type {
   McpConnectOptions,
   McpConnectionSnapshot,
   McpPort,
+  McpReadResourceRequest,
+  McpReadResourceResult,
   McpServerConfig,
   McpServerStatus,
   McpToolCallResult,
   McpToolDescriptor,
 } from "@zcode/contracts";
+import { randomUUID } from "node:crypto";
 import type { McpTelemetryTracker } from "./telemetry.js";
 
 const DEFAULT_IDLE_GRACE_MS = 30_000;
 
-interface CreateMcpAdapterForPoolInput {
+export interface CreateMcpAdapterForPoolInput {
   connectionContext: McpConnectionContext;
   config: McpServerConfig;
   serverName: string;
@@ -165,6 +167,15 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
     const sessionId = leaseOptions.sessionId?.trim() || undefined;
     const leased = new Map<string, string>();
     const configuredServers = new Map<string, McpServerConfig>();
+    const appListeners = new Map<string, Set<{ listener: () => void; off: () => void }>>();
+    const invalidateApps = (serverName: string) => {
+      const watchers = appListeners.get(serverName);
+      appListeners.delete(serverName);
+      for (const watcher of watchers ?? []) {
+        watcher.off();
+        watcher.listener();
+      }
+    };
     let leaseClosed = false;
     let sessionStartupReported = false;
 
@@ -179,6 +190,7 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
       const key = leased.get(serverName);
       if (!key) return;
       leased.delete(serverName);
+      invalidateApps(serverName);
       const entry = entries.get(key);
       if (!entry) return;
       if (!entry.refs.delete(leaseId)) return;
@@ -258,6 +270,7 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
         });
       }
       if (previousKey && previousKey !== key) {
+        invalidateApps(serverName);
         const previous = entries.get(previousKey);
         if (previous) {
           if (previous.refs.delete(leaseId)) {
@@ -333,11 +346,80 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
     };
 
     return {
+      appConnectionSnapshot(serverName) {
+        const key = leased.get(serverName);
+        return key ? (entries.get(key)?.adapter.appConnectionSnapshot?.(serverName) ?? null) : null;
+      },
+      onAppConnectionInvalidated(serverName, listener) {
+        const entry = requireEntry(serverName);
+        const watchers = appListeners.get(serverName) ?? new Set();
+        const watcher = {
+          listener,
+          off: entry.adapter.onAppConnectionInvalidated?.(serverName, listener) ?? (() => {}),
+        };
+        watchers.add(watcher);
+        appListeners.set(serverName, watchers);
+        return () => {
+          watcher.off();
+          watchers.delete(watcher);
+          if (!watchers.size) appListeners.delete(serverName);
+        };
+      },
       async callTool(
         request: McpCallToolRequest,
         callOptions?: McpCallToolOptions,
       ): Promise<McpToolCallResult> {
         return await requireEntry(request.serverName).adapter.callTool(request, callOptions);
+      },
+      async readResource(
+        request: McpReadResourceRequest,
+        callOptions?: McpCallToolOptions,
+      ): Promise<McpReadResourceResult> {
+        const adapter = requireEntry(request.serverName).adapter;
+        if (!adapter.readResource) {
+          throw new Error(`MCP adapter does not support resources: ${request.serverName}`);
+        }
+        return await adapter.readResource(request, callOptions);
+      },
+      // 资源列表与订阅经同一 entry 的 adapter；登记表在 adapter（连接层）里，多 session 共享。
+      async listResources(request, callOptions) {
+        const adapter = requireEntry(request.serverName).adapter;
+        if (!adapter.listResources) {
+          throw new Error(`MCP adapter does not support resources: ${request.serverName}`);
+        }
+        return await adapter.listResources(request, callOptions);
+      },
+      async listResourceTemplates(request, callOptions) {
+        const adapter = requireEntry(request.serverName).adapter;
+        if (!adapter.listResourceTemplates) {
+          throw new Error(`MCP adapter does not support resources: ${request.serverName}`);
+        }
+        return await adapter.listResourceTemplates(request, callOptions);
+      },
+      async subscribeResource(request, callOptions) {
+        const adapter = requireEntry(request.serverName).adapter;
+        if (!adapter.subscribeResource) {
+          throw new Error(`MCP adapter does not support resources: ${request.serverName}`);
+        }
+        await adapter.subscribeResource(request, callOptions);
+      },
+      async unsubscribeResource(request, callOptions) {
+        const adapter = requireEntry(request.serverName).adapter;
+        if (!adapter.unsubscribeResource) return;
+        await adapter.unsubscribeResource(request, callOptions);
+      },
+      async unsubscribeResourcesBySubscriber(prefix) {
+        let released = 0;
+        const seen = new Set<string>();
+        for (const key of leased.values()) {
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const adapter = entries.get(key)?.adapter;
+          if (adapter?.unsubscribeResourcesBySubscriber) {
+            released += await adapter.unsubscribeResourcesBySubscriber(prefix);
+          }
+        }
+        return released;
       },
       async close(): Promise<void> {
         if (leaseClosed) return;
@@ -386,6 +468,13 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
       },
       async listTools(): Promise<McpToolDescriptor[]> {
         return (await snapshot()).tools;
+      },
+      toolListRevision(): number {
+        let revision = 0;
+        for (const key of new Set(leased.values())) {
+          revision += entries.get(key)?.adapter.toolListRevision?.() ?? 0;
+        }
+        return revision;
       },
       async pingServer(serverName: string, pingOptions?: { timeoutMs?: number }): Promise<boolean> {
         const key = leased.get(serverName);

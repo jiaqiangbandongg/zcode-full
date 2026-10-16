@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-remote-identity-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-remote-identity-workspace.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-remote-identity-workspace.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "wpl-010-title",
+      "description": "两个 remote task 的标题生成固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 remote Plugin identity 合同，只需保持 task row 稳定。"
+    },
+    {
+      "id": "wpl-010-target-a",
+      "description": "target A 新 Session 的模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定建立 target A 的 session-owned Plugin catalog。"
+    },
+    {
+      "id": "wpl-010-target-b",
+      "description": "target B 新 Session 的模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定建立 target B 的 session-owned Plugin catalog。"
+    }
+  ]
+}

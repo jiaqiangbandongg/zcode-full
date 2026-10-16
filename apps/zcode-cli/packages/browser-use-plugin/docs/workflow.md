@@ -70,7 +70,7 @@ Return `{ controlledTabs, userTabs }` as that cell's final result so the model m
 
 Only load `agent.documentation.get("screenshots")` when the user explicitly requests a screenshot, visual layout/rendering/image content must be judged, or the required target is missing from the DOM snapshot (for example canvas/custom-drawn UI). Once that branch is selected, every screenshot must be emitted in the same JS cell with `nodeRepl.emitImage(await tab.screenshot())`; never leave `tab.screenshot()` as the final expression or return its `Uint8Array` bytes directly.
 
-After any Playwright timeout, strict-mode failure, or selector parse failure, do not retry the same locator. Take a fresh `domSnapshot()` and rebuild it from snapshot-proven facts. Routine locator and page-state waits fail within the 3000ms budget; use a longer fixed sleep only when no concrete state can be observed.
+After any Playwright timeout, strict-mode failure, or selector parse failure, do not retry the same locator. Take a fresh `domSnapshot()` and rebuild it from snapshot-proven facts. Routine locator and page-state waits fail within a 3000ms budget; use a longer fixed sleep only when no concrete state can be observed.
 
 Use `playwright.evaluate(...)` and locator `evaluate(...)` for page-side JavaScript that cannot be expressed through the high-level locator API. These calls execute in the page context, so keep the expression focused and use the normal action methods when they better communicate the intended interaction.
 

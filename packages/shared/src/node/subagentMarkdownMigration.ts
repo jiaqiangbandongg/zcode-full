@@ -5,7 +5,7 @@ import { migrateSubagentMarkdownProvider } from "../subagent-markdown-selection.
 import { importSubagentStateSelections } from "../subagent-state-migration.js";
 import { withFileLock } from "./privateFilePersistence.js";
 
-interface SubagentMarkdownMigrationResult {
+export interface SubagentMarkdownMigrationResult {
   migrated: string[];
   failures: Array<{ path: string; error: unknown }>;
 }

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-composer-recent-mode",
+  "spec": "./test/e2e/conversation-session/conversation-session-composer-recent-mode.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-composer-recent-mode.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-composer-recent-mode/result.txt",
+      "source": "created-by-spec",
+      "description": "隔离 workspace 中由真实 Write 工具生成，验证 yolo 执行权限。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "recent-mode-title",
+      "description": "I74: 新任务继承最近提交权限的受控响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离模型输出，验证真实 Composer 提交、新任务初始化及 Write 权限行为。"
+    },
+    {
+      "id": "recent-mode-seed",
+      "description": "I74: 新任务继承最近提交权限的受控响应。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "隔离模型输出，验证真实 Composer 提交、新任务初始化及 Write 权限行为。"
+    },
+    {
+      "id": "recent-mode-write",
+      "description": "I74: 新任务继承最近提交权限的受控响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离模型输出，验证真实 Composer 提交、新任务初始化及 Write 权限行为。"
+    },
+    {
+      "id": "recent-mode-final",
+      "description": "I74: 新任务继承最近提交权限的受控响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离模型输出，验证真实 Composer 提交、新任务初始化及 Write 权限行为。"
+    }
+  ]
+}

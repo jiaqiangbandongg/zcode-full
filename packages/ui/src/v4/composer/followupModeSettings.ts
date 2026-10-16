@@ -17,10 +17,17 @@ export function resolveOppositeFollowupDelivery(
 
 export function shouldEnableModifiedEnterSubmit({
   inputRoutingMode,
+  isMobileTextInputViewport,
+  isWebRemoteControl,
 }: {
   inputRoutingMode: InputRouting["mode"];
+  isMobileTextInputViewport: boolean;
+  isWebRemoteControl: boolean;
 }): boolean {
-  return inputRoutingMode !== "reject";
+  // Bug 原因：旧门禁把 draft 和通用移动媒体查询当成了“手机端”，导致桌面新任务以及
+  // Windows 窄窗口/触屏设备都没有注册 Ctrl+Enter，事件最终退回 Lexical 默认换行。
+  // 产品边界是手机 Web 远控；桌面 continuous 链路不应被视口或指针能力改变语义。
+  return inputRoutingMode !== "reject" && !(isWebRemoteControl && isMobileTextInputViewport);
 }
 
 export function shouldReverseFollowupDeliveryForPointer({
@@ -54,7 +61,7 @@ export function isPrimaryFollowupModifierPressed({
   return isApplePlatform ? metaKey : ctrlKey;
 }
 
-interface FollowupModifierTooltip {
+export interface FollowupModifierTooltip {
   delivery: "startNow" | "queue";
   shortcut: string;
   titleId: "chat.followup.sendNow" | "chat.followup.addToQueue";

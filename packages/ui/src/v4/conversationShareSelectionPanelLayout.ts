@@ -1,21 +1,21 @@
 /** 分享选择面板的几何约束；面板内容本身仍由 CSS 自适应。 */
-const CONVERSATION_SHARE_SELECTION_PANEL_EDGE_INSET_PX = 24;
-const CONVERSATION_SHARE_SELECTION_PANEL_DOCK_GAP_PX = 16;
+export const CONVERSATION_SHARE_SELECTION_PANEL_EDGE_INSET_PX = 24;
+export const CONVERSATION_SHARE_SELECTION_PANEL_DOCK_GAP_PX = 16;
 /** 两行候选（各 48px、间距 8px）加面板上下 padding 16px，低于此高度面板不再可用。 */
-const CONVERSATION_SHARE_SELECTION_PANEL_MIN_HEIGHT_PX = 120;
+export const CONVERSATION_SHARE_SELECTION_PANEL_MIN_HEIGHT_PX = 120;
 export const CONVERSATION_SHARE_SELECTION_PANEL_MAX_HEIGHT_PROPERTY =
   "--conversation-share-selection-panel-max-height";
 export const CONVERSATION_SHARE_SELECTION_PANEL_CENTER_Y_PROPERTY =
   "--conversation-share-selection-panel-center-y";
 
-interface ConversationShareSelectionPanelLayoutInput {
+export interface ConversationShareSelectionPanelLayoutInput {
   /** 会话内容容器高度，不包含 WorkspaceHeader。 */
   containerHeightPx: number;
   /** 底部 composer/share dock 顶部，相对于会话内容容器的坐标。 */
   dockStartPx: number;
 }
 
-interface ConversationShareSelectionPanelLayout {
+export interface ConversationShareSelectionPanelLayout {
   centerYPx: number;
   maxHeightPx: number;
   topPx: number;
@@ -37,7 +37,7 @@ function normalizeSize(value: number): number {
  * 后者会趋近 0，面板被压成不可用的零高度薄片。现在保留一个最小高度：
  * 先回收顶部安全距，仍不够时才允许侵入 dock 间距，且始终不超出容器本身。
  */
-function resolveConversationShareSelectionPanelLayout({
+export function resolveConversationShareSelectionPanelLayout({
   containerHeightPx,
   dockStartPx,
 }: ConversationShareSelectionPanelLayoutInput): ConversationShareSelectionPanelLayout {

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-sidebar-unread-clear",
+  "spec": "./test/e2e/conversation-session/conversation-session-sidebar-unread-clear.test.ts",
+  "fixtures": [
+    {
+      "id": "sidebar-unread-clear-title",
+      "description": "未读清除首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发会触发默认 title sidecar；固定 marker 响应避免回退共享 provider fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SIDEBAR_UNREAD_CLEAR_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "sidebar-unread-clear-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Unread Clear E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "sidebar-unread-clear-seed",
+      "description": "建立一个可由侧栏右键标记未读的正式 V4 session。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 验证任务列表与 tasks-index 的本地交互闭环，模型回复只用于确定性建立正式 session。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SIDEBAR_UNREAD_CLEAR_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "sidebar-unread-clear-seed",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "SIDEBAR_UNREAD_CLEAR_OK"
+        }
+      }
+    }
+  ]
+}

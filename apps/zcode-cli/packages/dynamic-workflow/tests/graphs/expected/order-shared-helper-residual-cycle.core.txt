@@ -1,0 +1,25 @@
+world-read world-read#1 "run ./bench" @9:30 order=0 type="WorldRunResult"
+actor actor#1 "optimizer" @12:19 order=1
+ask ask#1 "optimizer" @15:32 order=2 type="string"
+world-read world-read#2 "run cargo" @16:15 order=3 type="WorldRunResult"
+fact ask-data ask#1 <- world-read#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact world-read-data world-read#2 <- ask#1 exact
+fact return <- world-read#1 exact
+region seq#1 seq entered
+region call#1 call parent=seq#1 @13:18 entered label="bench" strand
+region loop#1 loop parent=seq#1 @14:1 entered bound=3
+region call#2 call parent=loop#1 @17:16 entered label="bench" strand
+spawn actor#1 in=seq#1
+issue world-read#1 in=seq#1>call#1 phase=unphased
+settle world-read#1 in=seq#1>call#1
+jump return call#1 in=seq#1>call#1 phase=unphased
+settle world-read#1 in=seq#1 joins=call#1
+issue ask#1 in=seq#1>loop#1 phase=unphased
+settle ask#1 in=seq#1>loop#1
+issue world-read#2 in=seq#1>loop#1 phase=unphased
+settle world-read#2 in=seq#1>loop#1
+issue world-read#1 in=seq#1>loop#1>call#2 phase=unphased
+jump return call#2 in=seq#1>loop#1>call#2 phase=unphased
+settle in=seq#1>loop#1 joins=call#2
+jump return seq#1 in=seq#1 phase=unphased

@@ -1,0 +1,9 @@
+node ask#1@1 issue site=ask#1 phase=unphased
+node ask#2@1 issue site=ask#2 phase=unphased
+node ask#3@1 issue site=ask#3 phase=unphased
+edge entry -> ask#1@1 next
+edge ask#1@1 -> ask#2@1 branch
+edge ask#1@1 -> ask#3@1 branch
+edge ask#1@1 -> sink jump via=return
+edge ask#2@1 -> sink join
+edge ask#3@1 -> sink join

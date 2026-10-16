@@ -1,0 +1,5 @@
+actor-node actor#1 @11:52 family=fan-out#1
+actor-node actor#2 "reviewer" @12:18
+actor-node sink
+actor-edge actor#1 -> actor#2 exact count=1 types="Draft"
+actor-edge actor#2 -> sink exact count=1 types="string"

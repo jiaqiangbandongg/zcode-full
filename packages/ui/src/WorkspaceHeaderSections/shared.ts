@@ -42,6 +42,9 @@ export interface WorkspaceHeaderTitleSectionProps {
   nativeSessionLogPath: string | null;
   nativeSessionLogExists: boolean;
   nativeSessionLogLoading: boolean;
+  providerWorkspaceConfigPath: string | null;
+  providerWorkspaceConfigExists: boolean;
+  providerWorkspaceConfigLoading: boolean;
   onReloadSession?: (options?: WorkspaceHeaderReloadSessionOptions) => void | Promise<void>;
   reloadSessionDisabled?: boolean;
   reloadSessionPending?: boolean;
@@ -50,6 +53,7 @@ export interface WorkspaceHeaderTitleSectionProps {
   isMacDesktop?: boolean;
   isMacFullscreen?: boolean;
   isWindowsDesktop?: boolean;
+  isWebRemoteControl?: boolean;
   simplifyForNarrowRemote?: boolean;
   selectedEditor: EditorInfo | null;
   compact?: boolean;
@@ -64,6 +68,7 @@ export interface WorkspaceHeaderActionSectionProps {
   workspaceIdentity?: string;
   remoteSessionId?: string;
   remoteTarget?: RemoteTarget;
+  isWebRemoteControl?: boolean;
   isDesktop?: boolean;
   isTerminalOpen: boolean;
   isSidePaneOpen: boolean;

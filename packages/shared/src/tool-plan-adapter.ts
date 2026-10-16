@@ -109,6 +109,18 @@ export function isTodoPlanToolName(value: string | null | undefined): boolean {
   return typeof value === "string" && TODO_TOOL_NAME_PATTERN.test(value.trim());
 }
 
+function readClaudeParentToolUseId(value: Record<string, unknown>): string | undefined {
+  const meta = value._meta;
+  if (!isRecord(meta)) {
+    return undefined;
+  }
+  const claudeCode = meta.claudeCode;
+  if (!isRecord(claudeCode)) {
+    return undefined;
+  }
+  return readString(claudeCode.parentToolUseId);
+}
+
 export function isMainAgentToolProjectionSource(...candidates: unknown[]): boolean {
   for (const candidate of candidates) {
     if (!isRecord(candidate)) {
@@ -119,7 +131,11 @@ export function isMainAgentToolProjectionSource(...candidates: unknown[]): boole
     if (readString(candidate.source) === "subagent") {
       return false;
     }
-    if (readString(candidate.parentToolCallId) || readString(candidate.parentToolUseId)) {
+    if (
+      readString(candidate.parentToolCallId) ||
+      readString(candidate.parentToolUseId) ||
+      readClaudeParentToolUseId(candidate)
+    ) {
       return false;
     }
   }

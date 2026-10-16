@@ -1,0 +1,29 @@
+actor actor#1 "fast" @7:14 order=0
+actor actor#2 "careful" @8:17 order=1
+ask ask#1 "triage" @9:37 order=2 type="string"
+actor actor#3 "triage" @9:21 order=3
+ask ask#2 "careful" @12:21 order=4 type="string"
+ask ask#3 "fast" @13:18 order=5 type="string"
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#3 <- ask#1 exact
+fact ask-actor ask#1 <- actor#3 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#1 exact
+fact return <- ask#2 exact
+fact return <- ask#3 exact
+region seq#1 seq entered
+region choice#1 choice parent=seq#1 @11:3 entered exhaustive
+region branch#1 branch parent=choice#1 @12:7
+region branch#2 branch parent=choice#1 @13:7
+spawn actor#1 in=seq#1
+spawn actor#2 in=seq#1
+spawn actor#3 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+issue ask#2 in=seq#1>choice#1>branch#1 phase=unphased
+settle ask#2 in=seq#1>choice#1>branch#1
+issue ask#3 in=seq#1>choice#1>branch#2 phase=unphased
+settle ask#3 in=seq#1>choice#1>branch#2
+jump return seq#1 in=seq#1 phase=unphased
+control branch#1 by=ask#1
+control branch#2 by=ask#1

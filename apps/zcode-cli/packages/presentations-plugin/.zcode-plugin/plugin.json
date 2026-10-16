@@ -1,0 +1,15 @@
+{
+  "name": "presentations",
+  "version": "0.1.8",
+  "description": "PPTX presentation production skills, published as an official ZCode plugin.",
+  "description_i18n": {
+    "en": "Presentation production skills for PPTX, with a visual acceptance reviewer agent.",
+    "zh-CN": "面向 PPTX 的演示文稿制作技能，并提供视觉验收评审 Agent。"
+  },
+  "author": {
+    "name": "Z.ai"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "agents": "agents"
+}

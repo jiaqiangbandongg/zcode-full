@@ -78,7 +78,7 @@ async function snoozeInteractionAutoResolution(
   return undefined;
 }
 
-class V4WorkspaceHookReviewRejectedError extends Error {
+export class V4WorkspaceHookReviewRejectedError extends Error {
   constructor(readonly reasonCode: string) {
     super(`Workspace Hook review command rejected: ${reasonCode}`);
     this.name = "V4WorkspaceHookReviewRejectedError";

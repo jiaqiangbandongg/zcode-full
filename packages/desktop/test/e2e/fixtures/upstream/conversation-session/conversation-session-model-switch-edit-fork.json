@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-switch-edit-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-switch-edit-fork.test.ts",
+  "fixtures": [
+    {
+      "id": "model-switch-edit-fork-title",
+      "description": "P0-10 completed 后 edit/fork 切模型 case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-model-switch-edit-fork-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-pro\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Model Switch Edit Fork\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "model-switch-edit-source-primary",
+      "description": "P0-10 edit 分支 source turn，以 primary 配置建立 completed 历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在请求 capture 的 primary model/thought 和后续 edit 重跑配置；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_EDIT_SOURCE"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_EDIT_SOURCE", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-switch-edit-source-primary",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-switch-edit-rerun-secondary",
+      "description": "P0-10 edit 分支 completed 后切 secondary 再重跑的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 edit rerun 请求 capture 的 secondary model/thought，响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_EDIT_RERUN"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_EDIT_RERUN", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-switch-edit-rerun-secondary",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-switch-fork-source-primary",
+      "description": "P0-10 fork 分支 source turn，以 primary 配置建立可 fork 的 completed assistant message。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 fork 前 source 请求和后续派生 session 配置；响应只需稳定完成并展示 fork 入口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_FORK_SOURCE"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_FORK_SOURCE", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-switch-fork-source-primary",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-switch-fork-followup-secondary",
+      "description": "P0-10 fork 分支派生 session follow-up 的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 fork follow-up 请求 capture 的 secondary model/thought，响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_FORK_FOLLOWUP"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_FORK_FOLLOWUP", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-switch-fork-followup-secondary",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+lane actor#1 "scout" @5:21
+lane actor#2 "judge" @6:21
+lane actor#3 "writer" @7:8
+region seq#1 seq
+step ask#1 ask "scout" @5:36 lane=actor#1 region=seq#1 always
+step ask#2 ask "judge" @6:36 lane=actor#2 region=seq#1 always
+step ask#3 ask "writer" @7:24 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#2 data always exact
+edge ask#2 -> ask#3 seq always
+sink ask#3

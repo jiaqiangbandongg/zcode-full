@@ -26,7 +26,13 @@ export function parsePluginSubagentModelSelectionOverrides(
   );
 }
 
-export type AgentPermissionMode = "auto" | "plan";
+export type AgentPermissionMode =
+  | "acceptEdits"
+  | "auto"
+  | "bypassPermissions"
+  | "default"
+  | "dontAsk"
+  | "plan";
 
 export type AgentColor =
   | "red"

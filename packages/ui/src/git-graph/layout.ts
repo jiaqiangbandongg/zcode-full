@@ -1,4 +1,8 @@
-import type { GitCommitGraphCommit, GitCommitGraphRef, GitCommitGraphRefKind } from "@zcode/shared";
+import type {
+  GitCommitGraphCommit,
+  GitCommitGraphRef,
+  GitCommitGraphRefKind,
+} from "@zcode/shared";
 import {
   createGitGraphLayoutModel,
   type BranchLineSeed,
@@ -35,7 +39,7 @@ export interface GitGraphLayoutEdge {
   truncated: boolean;
 }
 
-interface GitGraphLayoutLaneSegment {
+export interface GitGraphLayoutLaneSegment {
   id: string;
   hash: string;
   laneIndex: number;
@@ -131,7 +135,9 @@ function createGraphPath(
       lockedFirst: line.lockedFirst,
     }),
     relatedHashes:
-      line.sourceHash === line.targetHash ? [line.sourceHash] : [line.sourceHash, line.targetHash],
+      line.sourceHash === line.targetHash
+        ? [line.sourceHash]
+        : [line.sourceHash, line.targetHash],
   };
 }
 
@@ -171,7 +177,9 @@ function createEdges(params: {
     return commit.parents.map((parentHash, parentIndex): GitGraphLayoutEdge => {
       const parentVertex = vertexByHash.get(parentHash) ?? null;
       const fromLaneIndex = fromVertex.getLaneIndex();
-      const toLaneIndex = parentVertex ? parentVertex.getLaneIndex() : fromLaneIndex + parentIndex;
+      const toLaneIndex = parentVertex
+        ? parentVertex.getLaneIndex()
+        : fromLaneIndex + parentIndex;
       const fromRow = rows[rowIndex]!;
       const toRow = rowByHash.get(parentHash);
       const fromX = pixelOptions.lanePadding + fromLaneIndex * pixelOptions.laneGap;
@@ -228,16 +236,25 @@ export function layoutGitGraph(
     (max, line) => Math.max(max, line.from.laneIndex, line.to.laneIndex),
     0,
   );
-  const laneCount = Math.max(1, maxRowLaneIndex + 1, maxWidthLaneIndex + 1, maxLineLaneIndex + 1);
+  const laneCount = Math.max(
+    1,
+    maxRowLaneIndex + 1,
+    maxWidthLaneIndex + 1,
+    maxLineLaneIndex + 1,
+  );
   const height = topPadding + Math.max(0, commits.length - 1) * rowHeight + bottomPadding;
   const width = lanePadding * 2 + (laneCount - 1) * laneGap;
   const pixelOptions = { lanePadding, laneGap, topPadding, rowHeight };
-  const verticalLines = branchLines.filter((line) => line.from.laneIndex === line.to.laneIndex);
+  const verticalLines = branchLines.filter(
+    (line) => line.from.laneIndex === line.to.laneIndex,
+  );
 
   return {
     rows,
     edges: createEdges({ commits, rows, vertexByHash, rowByHash, pixelOptions }),
-    laneSegments: verticalLines.map((line, index) => createLaneSegment(line, index, pixelOptions)),
+    laneSegments: verticalLines.map((line, index) =>
+      createLaneSegment(line, index, pixelOptions),
+    ),
     paths: branchLines.map((line, index) => createGraphPath(line, index, pixelOptions)),
     laneCount,
     width,

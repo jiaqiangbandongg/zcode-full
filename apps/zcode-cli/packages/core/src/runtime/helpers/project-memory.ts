@@ -16,7 +16,7 @@ export function resolveEnabledProjectMemoryRoot(
   });
 }
 
-function isMainMemoryTaskType(taskType: AgentRuntimeConfig["taskType"]): boolean {
+export function isMainMemoryTaskType(taskType: AgentRuntimeConfig["taskType"]): boolean {
   return (
     taskType === undefined ||
     taskType === "interactive" ||

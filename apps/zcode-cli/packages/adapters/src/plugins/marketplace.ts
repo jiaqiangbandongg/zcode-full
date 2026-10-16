@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -41,15 +41,21 @@ import {
   createGitUnavailableError,
   getPluginSourceDiagnosticCode,
   isCommandUnavailableError,
+  PluginSourceMaterializationError,
 } from "./source-errors.js";
 
 const execFileAsync = promisify(execFile);
 const KNOWN_MARKETPLACES_FILE = "known_marketplaces.json";
 const INSTALLED_PLUGINS_FILE = "installed_plugins.json";
 const MARKETPLACE_FILE = "marketplace.json";
+const CLAUDE_OFFICIAL_MARKETPLACE = "claude-plugins-official";
+const PLUGIN_ICON_SOURCES_FILE = "icon-sources.json";
+const PLUGIN_ICON_ASSETS_BASE_URL = "https://cdn-zcode.z.ai/zcode/official-plugin/assets/";
+const PLUGIN_ICON_SOURCES_URL = `${PLUGIN_ICON_ASSETS_BASE_URL}${PLUGIN_ICON_SOURCES_FILE}`;
 const MARKETPLACE_JSON_MAX_BYTES = 10 * 1024 * 1024;
 const MARKETPLACE_JSON_MAX_REDIRECTS = 5;
 const MARKETPLACE_JSON_TIMEOUT_MS = 180_000;
+const claudeIconMigrationAttempts = new Set<string>();
 const CLAUDE_MARKETPLACE_FILE = join(".claude-plugin", "marketplace.json");
 const ZCODE_MANIFEST_PATH = join(".zcode-plugin", "plugin.json");
 const CLAUDE_MANIFEST_PATH = join(".claude-plugin", "plugin.json");
@@ -58,10 +64,16 @@ const DEFAULT_VERSION = "0.0.0";
 const GIT_CLONE_MAX_ATTEMPTS = 3;
 const GIT_COMMAND_TIMEOUT_MS = 90_000;
 const GIT_CLONE_RETRY_DELAY_MS = 1_000;
+const CLAUDE_MARKETPLACE_REFRESH_TIMEOUT_MS = 30_000;
 const MARKETPLACE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 const PLUGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 const SOURCE_SHA256_PATTERN = /^[a-f0-9]{64}$/u;
-const UNSUPPORTED_MANIFEST_FIELDS = ["channels", "lspServers", "outputStyles", "settings"] as const;
+const UNSUPPORTED_MANIFEST_FIELDS = [
+  "channels",
+  "lspServers",
+  "outputStyles",
+  "settings",
+] as const;
 
 export type MarketplaceSource =
   | { source: "url"; headers?: Record<string, string>; url: string }
@@ -137,12 +149,19 @@ export interface InstalledPluginRecord {
   cacheTransactionId?: string;
 }
 
-interface InstalledPluginsState {
+interface PluginIconSourceRecord {
+  name: string;
+  icon: string;
+  mimeType?: string;
+  sha256?: string;
+}
+
+export interface InstalledPluginsState {
   version: 1;
   plugins: InstalledPluginRecord[];
 }
 
-interface MarketplaceInstallResult {
+export interface MarketplaceInstallResult {
   closure: string[];
   installed: InstalledPluginRecord[];
 }
@@ -176,7 +195,7 @@ export interface PluginManifestDisplayMetadata {
   version?: string;
 }
 
-function buildMarketplaceGitEnv(
+export function buildMarketplaceGitEnv(
   sourceEnv: NodeJS.ProcessEnv = process.env,
 ): Record<string, string> {
   const env = sanitizeZCodeRuntimeEnv(sourceEnv);
@@ -197,9 +216,60 @@ function createPluginOperationCancelledError(): Error {
   return error;
 }
 
+interface MarketplaceOperationSignalScope {
+  cleanup: () => void;
+  signal?: AbortSignal;
+  timedOut: boolean;
+  timeoutError: Error;
+}
+
 interface KnownMarketplaceActivation {
   finalize: () => void;
   rollback: () => Promise<void>;
+}
+
+// Claude 官方市场只提供可选目录，外部网络不可达时必须中止底层请求，不能拖住其他插件市场。
+function createMarketplaceOperationSignalScope(
+  trustedId: string | undefined,
+  externalSignal?: AbortSignal,
+): MarketplaceOperationSignalScope {
+  if (trustedId !== CLAUDE_OFFICIAL_MARKETPLACE) {
+    return {
+      cleanup: () => {},
+      signal: externalSignal,
+      timedOut: false,
+      timeoutError: new Error("Marketplace operation timed out"),
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutError = new Error(
+    `Claude marketplace refresh timed out after ${CLAUDE_MARKETPLACE_REFRESH_TIMEOUT_MS / 1000} seconds`,
+  );
+  timeoutError.name = "TimeoutError";
+  const scope: MarketplaceOperationSignalScope = {
+    cleanup: () => {
+      clearTimeout(timeout);
+      externalSignal?.removeEventListener("abort", abortExternal);
+    },
+    signal: controller.signal,
+    timedOut: false,
+    timeoutError,
+  };
+  const abortExternal = (): void => {
+    controller.abort(externalSignal?.reason);
+  };
+  const timeout = setTimeout(() => {
+    scope.timedOut = true;
+    controller.abort(timeoutError);
+  }, CLAUDE_MARKETPLACE_REFRESH_TIMEOUT_MS);
+
+  if (externalSignal?.aborted) {
+    abortExternal();
+  } else {
+    externalSignal?.addEventListener("abort", abortExternal, { once: true });
+  }
+  return scope;
 }
 
 interface LoadMarketplaceResult {
@@ -343,11 +413,17 @@ export async function addMarketplace(input: {
   // 不可信 manifest.name 作为 target，先 rm 掉本地官方目录再 cp，等守卫抛错时
   // 官方 manifest 已被污染；守卫通过后才持久化。
   throwIfPluginOperationAborted(input.signal);
-  const operationSignal = input.signal;
+  const operationScope = createMarketplaceOperationSignalScope(input.trustedId, input.signal);
+  const operationSignal = operationScope.signal;
   let loaded: LoadMarketplaceResult | undefined;
   let knownMarketplaceActivation: KnownMarketplaceActivation | undefined;
   let marketplaceActivation: AtomicDirectoryActivation | undefined;
   try {
+    // Claude 官方目录与图标映射并行获取；图标只是展示增强，失败时会回退本地缓存或空映射。
+    const iconSourcesPromise =
+      input.trustedId === CLAUDE_OFFICIAL_MARKETPLACE
+        ? loadClaudePluginIconSources(input.storageRoot, operationSignal)
+        : null;
     loaded = await loadMarketplaceFromSource(input.source, input.storageRoot, {
       persist: false,
       signal: operationSignal,
@@ -371,6 +447,12 @@ export async function addMarketplace(input: {
         `Official marketplace source must provide ${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}, received ${loaded.manifest.name}`,
       );
     }
+    const iconSources = iconSourcesPromise ? await iconSourcesPromise : new Map<string, string>();
+    const enrichedRaw =
+      loaded.manifest.name === CLAUDE_OFFICIAL_MARKETPLACE
+        ? applyClaudePluginIcons(loaded.manifest.raw, iconSources)
+        : loaded.manifest.raw;
+    const enrichedManifest = parseRequiredMarketplaceManifest(enrichedRaw);
     const persistedManifest =
       loaded.manifest.name === ZCODE_OFFICIAL_PLUGIN_MARKETPLACE
         ? parseRequiredMarketplaceManifest(
@@ -379,8 +461,8 @@ export async function addMarketplace(input: {
               storageRoot: input.storageRoot,
             }),
           )
-        : loaded.manifest;
-    // 旧流程先删 marketplace target 再复制 source，刷新失败会丢失最后成功快照。
+        : enrichedManifest;
+    // 修复原因：旧流程先删 marketplace target 再复制 source，刷新失败会丢失最后成功快照。
     // source tree 与规范 manifest 在同一 staging 目录准备完毕后一次 rename 激活。
     if (loaded.sourceRoot) {
       marketplaceActivation = await stageMarketplaceDirectoryPlugins(
@@ -394,7 +476,7 @@ export async function addMarketplace(input: {
       marketplaceActivation = await stageMarketplaceManifest(
         input.storageRoot,
         loaded.manifest.name,
-        loaded.manifest.raw,
+        enrichedRaw,
         operationSignal,
       );
     }
@@ -414,7 +496,9 @@ export async function addMarketplace(input: {
     if (marketplaceActivation) {
       throwIfPluginOperationAborted(operationSignal);
     }
-    // authority state 已落盘后才进入不可取消的提交尾声，随后清理 backup/marker。
+    // authority state 已落盘且 deadline 检查通过后才进入不可取消的提交尾声；
+    // 先解除 timer，再清理 backup/marker，避免清理耗时把已提交事务反判成超时。
+    operationScope.cleanup();
     await marketplaceActivation?.finalize();
     knownMarketplaceActivation.finalize();
     return record;
@@ -438,9 +522,128 @@ export async function addMarketplace(input: {
           ? currentRollbackError
           : appendPluginSourceCleanupError(currentRollbackError, rollbackError);
     }
-    throw appendPluginSourceCleanupError(error, rollbackError);
+    const operationError = operationScope.timedOut
+      ? (() => {
+          const sourceDiagnosticCode = getPluginSourceDiagnosticCode(error);
+          return sourceDiagnosticCode
+            ? new PluginSourceMaterializationError(
+                sourceDiagnosticCode,
+                operationScope.timeoutError.message,
+              )
+            : operationScope.timeoutError;
+        })()
+      : error;
+    throw appendPluginSourceCleanupError(operationError, rollbackError);
   } finally {
     await cleanupPluginSourceBestEffort(loaded?.cleanup);
+    operationScope.cleanup();
+  }
+}
+
+export function parsePluginIconSources(value: unknown): Map<string, string> {
+  const result = new Map<string, string>();
+  if (!Array.isArray(value)) return result;
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    const icon = typeof item.icon === "string" ? item.icon.trim() : "";
+    const mimeType = typeof item.mimeType === "string" ? item.mimeType : undefined;
+    const sha256 = typeof item.sha256 === "string" ? item.sha256 : undefined;
+    if (!PLUGIN_NAME_PATTERN.test(name) || !isSafePluginIconPath(icon)) continue;
+    if (mimeType !== undefined && mimeType !== "image/png") continue;
+    if (sha256 !== undefined && !SOURCE_SHA256_PATTERN.test(sha256)) continue;
+    result.set(name, new URL(icon, PLUGIN_ICON_ASSETS_BASE_URL).href);
+  }
+  return result;
+}
+
+export function applyClaudePluginIcons(
+  manifest: Record<string, unknown>,
+  iconByPluginName: ReadonlyMap<string, string>,
+): Record<string, unknown> {
+  if (!Array.isArray(manifest.plugins) || iconByPluginName.size === 0) return manifest;
+  let changed = false;
+  const plugins = manifest.plugins.map((plugin) => {
+    if (!isRecord(plugin) || typeof plugin.name !== "string") return plugin;
+    if (typeof plugin.icon === "string" && plugin.icon.trim().length > 0) return plugin;
+    const icon = iconByPluginName.get(plugin.name);
+    if (!icon) return plugin;
+    changed = true;
+    return { ...plugin, icon };
+  });
+  return changed ? { ...manifest, plugins } : manifest;
+}
+
+export async function enrichCachedClaudeMarketplaceIcons(
+  storageRoot: string,
+  withWriteLock: (write: () => Promise<void>) => Promise<void> = (write) => write(),
+): Promise<void> {
+  const attemptKey = resolve(storageRoot);
+  if (claudeIconMigrationAttempts.has(attemptKey)) return;
+  claudeIconMigrationAttempts.add(attemptKey);
+
+  const manifest = loadMarketplaceManifestSync(storageRoot, CLAUDE_OFFICIAL_MARKETPLACE);
+  if (!manifest) return;
+  try {
+    const iconSources = await loadClaudePluginIconSources(storageRoot);
+    await withWriteLock(async () => {
+      // 网络请求期间不持 plugin storage 锁；获得锁后必须重读，避免覆盖并发 marketplace 更新。
+      const latest = loadMarketplaceManifestSync(storageRoot, CLAUDE_OFFICIAL_MARKETPLACE);
+      if (!latest) return;
+      const enriched = applyClaudePluginIcons(latest.raw, iconSources);
+      if (enriched === latest.raw) return;
+      // Bugfix：升级前已有 lastUpdated 的 catalog 不会触发 UI 自动刷新，导致新图标功能永远不可见。
+      // 这里只回写展示增强字段，不重拉 marketplace，也不改变更新检测时间。
+      await writeMarketplaceManifest(storageRoot, CLAUDE_OFFICIAL_MARKETPLACE, enriched);
+    });
+  } catch {
+    // 存量图标迁移是 best-effort；失败不能让 plugins/overview 不可用，下次 Agent 启动可重试。
+  }
+}
+
+function isSafePluginIconPath(icon: string): boolean {
+  if (!icon.endsWith(".png") || icon.startsWith("/") || icon.includes("\\")) return false;
+  const segments = icon.split("/");
+  return segments.length >= 2 && segments.every((segment) => PLUGIN_NAME_PATTERN.test(segment));
+}
+
+async function loadClaudePluginIconSources(
+  storageRoot: string,
+  operationSignal?: AbortSignal,
+): Promise<Map<string, string>> {
+  const cachePath = join(storageRoot, PLUGIN_ICON_SOURCES_FILE);
+  const cached = (): Map<string, string> => parsePluginIconSources(readJsonFileSync(cachePath));
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  operationSignal?.addEventListener("abort", abort, { once: true });
+  const timeout = setTimeout(abort, 10_000);
+  try {
+    const response = await requestMarketplaceJson(
+      PLUGIN_ICON_SOURCES_URL,
+      undefined,
+      controller.signal,
+      10_000,
+    );
+    const value = response;
+    const parsed = parsePluginIconSources(value);
+    if (parsed.size === 0) return cached();
+    // 缓存只保留产品需要的字段，不落盘素材源机器路径等 provenance 信息。
+    const sanitized: PluginIconSourceRecord[] = [...parsed.entries()].map(([name, iconUrl]) => ({
+      name,
+      icon: new URL(iconUrl).pathname.slice(new URL(PLUGIN_ICON_ASSETS_BASE_URL).pathname.length),
+      mimeType: "image/png",
+    }));
+    try {
+      await writeJsonFile(cachePath, sanitized);
+    } catch {
+      // 图标缓存写入失败不影响本次 marketplace 主数据刷新。
+    }
+    return parsed;
+  } catch {
+    return cached();
+  } finally {
+    clearTimeout(timeout);
+    operationSignal?.removeEventListener("abort", abort);
   }
 }
 
@@ -558,12 +761,12 @@ export function loadMarketplaceManifestSync(
   return parseMarketplaceManifest(parsed);
 }
 
-function loadInstalledPluginsSync(storageRoot: string): InstalledPluginsState {
+export function loadInstalledPluginsSync(storageRoot: string): InstalledPluginsState {
   const parsed = readJsonFileSync(join(storageRoot, INSTALLED_PLUGINS_FILE));
   return normalizeInstalledPluginsState(parsed);
 }
 
-async function saveInstalledPlugins(
+export async function saveInstalledPlugins(
   storageRoot: string,
   state: InstalledPluginsState,
 ): Promise<void> {
@@ -1008,9 +1211,7 @@ export async function validateLocalPluginPath(input: {
       },
     ];
   }
-  const rootPath = statSync(resolved).isDirectory()
-    ? resolved
-    : resolveManifestRootFromFile(resolved);
+  const rootPath = statSync(resolved).isDirectory() ? resolved : resolveManifestRootFromFile(resolved);
   if (findMarketplaceManifestPath(rootPath)) {
     return validateMarketplaceSource({
       signal: input.signal,
@@ -1060,7 +1261,7 @@ function resolveManifestRootFromFile(filePath: string): string {
   return dirName.startsWith(".") && dirName.endsWith("-plugin") ? dirname(dir) : dir;
 }
 
-function getMarketplaceManifestPath(storageRoot: string, marketplace: string): string {
+export function getMarketplaceManifestPath(storageRoot: string, marketplace: string): string {
   return join(storageRoot, "marketplaces", sanitizePluginId(marketplace), MARKETPLACE_FILE);
 }
 
@@ -1795,6 +1996,14 @@ async function stageMarketplaceManifest(
     signal,
     targetPath: targetDir,
   });
+}
+
+async function writeMarketplaceManifest(
+  storageRoot: string,
+  marketplace: string,
+  raw: Record<string, unknown>,
+): Promise<void> {
+  await writeJsonFile(getMarketplaceManifestPath(storageRoot, marketplace), raw);
 }
 
 async function upsertKnownMarketplace(

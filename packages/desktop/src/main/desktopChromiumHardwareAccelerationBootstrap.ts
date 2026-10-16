@@ -6,11 +6,13 @@ interface ChromiumHardwareAccelerationApp {
   disableHardwareAcceleration(): void;
 }
 
-function resolveChromiumHardwareAccelerationSettingsFile(homePath: string = homedir()): string {
+export function resolveChromiumHardwareAccelerationSettingsFile(
+  homePath: string = homedir(),
+): string {
   return join(homePath, ".zcode", "v2", "setting.json");
 }
 
-function extractBootstrapChromiumHardwareAccelerationEnabled(rawValue: unknown): boolean {
+export function extractBootstrapChromiumHardwareAccelerationEnabled(rawValue: unknown): boolean {
   if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) {
     return true;
   }

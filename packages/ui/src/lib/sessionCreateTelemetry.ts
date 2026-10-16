@@ -16,7 +16,7 @@ interface SessionCreateInput {
   clientKind: SessionCreateClientKind;
 }
 
-function createSessionCreateReporter() {
+export function createSessionCreateReporter() {
   const reported = new Set<string>();
   return async (
     platform: Pick<IPlatformService, "reportTelemetryEvent"> | null | undefined,

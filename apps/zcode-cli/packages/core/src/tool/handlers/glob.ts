@@ -22,7 +22,7 @@ const MAX_GLOB_MODEL_BYTES = 100_000;
 const GLOB_TOOL_DESCRIPTION =
   'Fast file pattern matching. Supports glob patterns like "**/*.js" or "src/**/*.ts". Returns matching file paths sorted by modification time.';
 
-const globHandler: ToolHandler = async (input, context) => {
+export const globHandler: ToolHandler = async (input, context) => {
   const { pattern, path } = GlobInputSchema.parse(input) as GlobInput;
   const fileSystemPort = context.fileSystemPort;
 
@@ -82,8 +82,7 @@ const globHandler: ToolHandler = async (input, context) => {
 };
 
 export const globToolEntry: ToolEntry = {
-  capability:
-    "Find files by glob pattern through the file-system adapter without reading file contents",
+  capability: "Find files by glob pattern through the file-system adapter without reading file contents",
   metadata: {
     name: "Glob",
     description: GLOB_TOOL_DESCRIPTION,

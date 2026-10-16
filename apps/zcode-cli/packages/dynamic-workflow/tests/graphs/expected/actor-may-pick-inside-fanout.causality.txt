@@ -1,0 +1,11 @@
+lane workspace
+lane actor#1 "a" @8:11
+lane actor#2 "b" @9:11
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @10:13 label="map"
+step world-read#1 world-read "glob *.md" @7:28 lane=workspace region=seq#1 always
+step ask#1~actor#1 ask "ask" @10:54 lane=actor#1 lanes=actor#1,actor#2 source=ask#1 region=fanout#1 maybe stack
+step ask#1~actor#2 ask "ask" @10:54 lane=actor#2 lanes=actor#1,actor#2 source=ask#1 region=fanout#1 maybe stack
+edge world-read#1 -> ask#1~actor#1 data maybe exact
+edge world-read#1 -> ask#1~actor#2 data maybe exact
+sink ask#1~actor#1,ask#1~actor#2

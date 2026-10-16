@@ -1,0 +1,5 @@
+{
+  "user": "- Since this memory is user-scope, keep learnings general since they apply across all projects",
+  "project": "- Since this memory is project-scope and shared with your team via version control, tailor your memories to this project",
+  "local": "- Since this memory is local-scope (not checked into version control), tailor your memories to this project and machine"
+}

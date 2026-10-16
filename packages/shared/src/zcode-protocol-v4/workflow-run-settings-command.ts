@@ -8,7 +8,7 @@ import { z } from "zod";
 import { WORKFLOW_RUNS_LIMITS } from "./workflow-runs.js";
 
 /**
- * 命令载荷。两项设置守工具的同一条三态规则：省略 = 沿用，`null` = 回到默认（会话模型 / 本机上限），
+ * 命令载荷。两项设置守工具的同一条三态规则：省略 = 沿用，`null` = 回到默认（会话模型 / 默认并发），
  * 值 = 设定。GUI 只发用户改过的那几项。刻意不携 baseRevision：与 cancelBackgroundWork /
  * resumeWorkflowRun 同类（workflowRuns 面免 revision）。
  */
@@ -22,7 +22,7 @@ export const amendWorkflowRunSettingsPayloadSchema = z.object({
     .max(WORKFLOW_RUNS_LIMITS.maxSubagentModelLength)
     .nullable()
     .optional(),
-  /** 同时运行的子代理上限；`null` = 解除本 run 自己的界（回到本机上限）。agent 侧钳到 `[1, 天花板]`。 */
+  /** 同时运行的子代理上限；`null` = 解除本 run 自己的界（回到默认并发）。没有上限：高于默认也行。 */
   maxConcurrency: z.number().int().min(1).nullable().optional(),
 });
 export type AmendWorkflowRunSettingsPayload = z.infer<typeof amendWorkflowRunSettingsPayloadSchema>;

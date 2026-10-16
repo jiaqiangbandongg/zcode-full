@@ -1,0 +1,17 @@
+phase unphased
+phase hole#21b40fca "决定分组" @15:20
+lane main
+lane actor#1 "勘察员" @14:22
+lane hole#21b40fca/actor#1 "分组员" @16:23
+lane actor#2 "执行者" @20:8
+region seq#1 seq
+step ask#1 ask "勘察员" @14:35 lane=actor#1 phase=unphased region=seq#1 always
+step hole#21b40fca/ask#1 ask "分组员" @16:36 lane=hole#21b40fca/actor#1 phase=hole#21b40fca region=seq#1 always fill=hole#21b40fca
+step hole#7c7fc07b hole "决定顺序" @17:23 lane=main phase=hole#21b40fca region=seq#1 always fill=hole#21b40fca
+step ask#2 ask "执行者" @20:21 lane=actor#2 phase=unphased region=seq#1 always
+edge ask#1 -> hole#21b40fca/ask#1 data always exact
+edge hole#21b40fca/ask#1 -> hole#7c7fc07b data always exact
+edge hole#7c7fc07b -> ask#2 data always exact
+phase-edge unphased -> hole#21b40fca data always
+phase-edge hole#21b40fca -> unphased data always
+sink ask#2

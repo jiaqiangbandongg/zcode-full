@@ -118,6 +118,8 @@ export function toolCallRowToLegacyNode(row: ToolCallRow): TaskChatToolCallTreeN
         v4Status: row.status,
         ...(row.cuaApp ? { cuaApp: row.cuaApp } : {}),
         ...(legacyDisplay ? { display: legacyDisplay } : {}),
+        // R7：运行中进度（MCP notifications/progress）供 McpToolCallBlock 头部进度条消费。
+        ...(row.progress ? { progress: row.progress } : {}),
         inputPreviewComplete: inputPreview.inputPreviewComplete,
         streamingRawInputLength: inputPreview.streamingRawInputLength,
       },

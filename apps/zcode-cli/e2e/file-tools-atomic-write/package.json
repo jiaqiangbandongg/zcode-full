@@ -1,0 +1,8 @@
+{
+  "name": "zcode-file-tools-atomic-write-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "node run.mjs"
+  }
+}

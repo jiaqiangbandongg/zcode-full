@@ -3,7 +3,6 @@ import type {
   WorkflowRunArtifactSummary,
   WorkflowRunPendingQuestion,
 } from "@zcode/shared/zcode-protocol-v4";
-import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/types.js";
 import { buildWorkflowTimeline } from "@/components/workflow-timeline/timeline-model.js";
 import { workflowSubagentModelCardLabel } from "@/components/workflow-timeline/subagent-model-label.js";
 import { workflowSummaryParts } from "@/components/workflow-timeline/timeline-summary.js";
@@ -19,6 +18,7 @@ import {
   workflowRunTabScope,
 } from "@/app-shell/useWorkflowRunPaneSettings.js";
 import { WorkflowRunSettingsPopover } from "@/components/workflow-timeline/WorkflowRunSettingsPopover.js";
+import { WorkflowRunPaneSaveSlots } from "@/app-shell/WorkflowRunPaneSaveSlots.js";
 import { resolveWorkflowLaunchProvenance } from "@/app-shell/workflowRunLaunchProvenance.js";
 import {
   describeWorkflowRunActionRejection,
@@ -46,8 +46,9 @@ import { useDynamicWorkflowAvailability } from "@/hooks/useDynamicWorkflowAvaila
 import { useWorkflowRunArtifacts } from "@/hooks/useWorkflowRunArtifacts.js";
 import { createCommandEnvelope } from "@/v4/commandFactory.js";
 import {
+  buildWorkflowFillGraphByRunId,
   buildWorkflowGraphByToolCallId,
-  resolveWorkflowRunGraph,
+  resolveWorkflowRunGraphForRun,
 } from "@/v4/workflowRunCardJoin.js";
 import type { PaneWorkspaceScope } from "@/v4/paneLayoutStore.js";
 import type { SessionLease } from "@/v4/sessionDataLayer.js";
@@ -124,15 +125,16 @@ const WorkflowRunContent = memo(function WorkflowRunContent({
   // 脚本 transcript 同一张表——CreateWorkflow 工具行或直接启动轮的元数据，谁挂着图都一样。行窗口是
   // 有界的，老对话里翻不到发起行是正常情况，不是错误——此时没有图可给。
   // 「配置」修订出来的 run 在设置轮落地之前借前驱的图（规则与理由见 resolveWorkflowRunGraph）。
-  const graph = useMemo<WorkflowCausalityGraphData | undefined>(
-    () =>
-      resolveWorkflowRunGraph(
-        buildWorkflowGraphByToolCallId(snapshot?.rows.window),
-        tab.toolCallId,
-        snapshot?.workflowRuns?.runs,
-      ),
-    [snapshot?.rows.window, snapshot?.workflowRuns, tab.toolCallId],
-  );
+  // 补全过的 run 取最新补全行的有效脚本图（docs/dynamic-workflow/presentation.md「Holes on the timeline」）。
+  const { graph, holeLabels } = useMemo(() => {
+    const fills = buildWorkflowFillGraphByRunId(snapshot?.rows.window);
+    const graphs = buildWorkflowGraphByToolCallId(snapshot?.rows.window);
+    const runs = snapshot?.workflowRuns?.runs;
+    return {
+      graph: resolveWorkflowRunGraphForRun(graphs, fills, tab.toolCallId, tab.runId, runs),
+      holeLabels: fills.get(tab.runId)?.holeLabels,
+    };
+  }, [snapshot?.rows.window, snapshot?.workflowRuns, tab.runId, tab.toolCallId]);
 
   // 直接启动的来龙去脉：作用域、说明、实参与
   // 「由你从工作流中枢启动」。只对中枢启动的 run 在场；工具路径发起的 run 没有这一节。
@@ -143,8 +145,8 @@ const WorkflowRunContent = memo(function WorkflowRunContent({
 
   // 一个模型，三处消费：清单与摘要行都从它出发。
   const model = useMemo(
-    () => (graph === undefined ? undefined : buildWorkflowTimeline(graph, run)),
-    [graph, run],
+    () => (graph === undefined ? undefined : buildWorkflowTimeline(graph, run, holeLabels)),
+    [graph, holeLabels, run],
   );
   // 子代理模型：状态头第一行不再摆芯片，
   // 模型名成了摘要行的第一段——这一行本来就是「这条 run 的几个数」。强度与规范串进 tooltip。
@@ -343,23 +345,30 @@ const WorkflowRunContent = memo(function WorkflowRunContent({
       data-workflow-run-id={tab.runId}
       data-workflow-run-status={run?.status ?? "absent"}
     >
-      <WorkflowRunStatusHeader
-        cancellable={cancellable}
-        configureOpen={settings.popover.open}
-        onCancel={handleCancel}
-        {...(settings.configurable ? { onConfigureFrom: settings.popover.toggleFrom } : {})}
-        {...(onOpenWorkflowRun === undefined || successor === undefined
-          ? {}
-          : { onOpenSuccessor: handleOpenSuccessor })}
-        onResume={handleResume}
-        {...(rejectionView === undefined ? {} : { rejection: rejectionView })}
-        resumable={resumable}
-        run={run}
-        {...(subagentModel === undefined ? {} : { subagentModel })}
-        summaryParts={summaryParts}
-        title={runTitle}
-        usage={run?.usage}
-      />
+      {/* 「保存 / 再次运行」（docs/dynamic-workflow/transcript-and-notifications.md「Saving the run,
+          and running it again」）：与完成卡同一个控制器，因此同一个 run 在两处说同一句话。 */}
+      <WorkflowRunPaneSaveSlots rows={snapshot?.rows.window} run={run} tab={tab}>
+        {(slots) => (
+          <WorkflowRunStatusHeader
+            cancellable={cancellable}
+            configureOpen={settings.popover.open}
+            onCancel={handleCancel}
+            {...(settings.configurable ? { onConfigureFrom: settings.popover.toggleFrom } : {})}
+            {...(onOpenWorkflowRun === undefined || successor === undefined
+              ? {}
+              : { onOpenSuccessor: handleOpenSuccessor })}
+            onResume={handleResume}
+            {...(rejectionView === undefined ? {} : { rejection: rejectionView })}
+            resumable={resumable}
+            run={run}
+            saveSlots={slots}
+            {...(subagentModel === undefined ? {} : { subagentModel })}
+            summaryParts={summaryParts}
+            title={runTitle}
+            usage={run?.usage}
+          />
+        )}
+      </WorkflowRunPaneSaveSlots>
 
       {run === undefined || !settings.configurable ? null : (
         <WorkflowRunSettingsPopover
@@ -399,6 +408,7 @@ const WorkflowRunContent = memo(function WorkflowRunContent({
             ? {}
             : { onOpenWorkspace: handleOpenWorkspace })}
           {...(landing === undefined ? {} : { landing })}
+          {...(subagentModelProviderName === undefined ? {} : { subagentModelProviderName })}
         />
       ) : (
         <p

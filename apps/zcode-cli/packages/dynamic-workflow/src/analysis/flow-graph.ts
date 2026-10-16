@@ -1,7 +1,7 @@
 import type { ScriptLoc } from "../compiler/compile.js";
 import type { JumpKind, OrderRegion } from "./causality-order.js";
 import type { AnalysisCore } from "./core.js";
-import { collectFlowPhases, quotientFlow } from "./flow-phase.js";
+import { collectFlowHoles, collectFlowPhases, quotientFlow } from "./flow-phase.js";
 import { createStrandPark } from "./flow-strands.js";
 import { buildTree, type LeafNode, type RegionNode, type TreeNode } from "./flow-tree.js";
 
@@ -82,6 +82,23 @@ export interface FlowPhase {
    * when empty. All-or-nothing with the rest of the phase vocabulary.
    */
   alongside?: string[];
+  /** The filled hole whose body wrote this phase (a hole's own phase names the hole enclosing it). */
+  fill?: string;
+}
+
+/**
+ * An OPEN hole as the display lists it (docs/dynamic-workflow/presentation.md, `holes`): the
+ * station the rail draws dashed ahead of the run. `phase` is where the hole STANDS — the
+ * phase of its issue node, the hole's own memberless phase being `siteId` itself.
+ */
+export interface FlowHole {
+  siteId: string;
+  name: string;
+  /** The author's spelling of the type argument. */
+  type: string;
+  phase?: string;
+  /** The tail form `return await hole<T>(...)`: the script's end is open. */
+  tail?: true;
 }
 
 /** Terminal node ids. `sink` is the causality graph's sink: the script completed normally. */
@@ -102,6 +119,8 @@ export interface ControlFlowGraph {
   phaseEdges?: FlowEdge[];
   /** Phases that appear on some node, in first-reach order, {@link UNPHASED_ID} first. */
   phases?: FlowPhase[];
+  /** The open holes in source order; present iff the script has one (see {@link FlowHole}). */
+  holes?: FlowHole[];
 }
 
 // --- Flow ---------------------------------------------------------------------------------
@@ -507,10 +526,12 @@ export function projectControlFlow(core: AnalysisCore): ControlFlowGraph {
 
   sortEdges(nodes, edges);
   const phases = collectFlowPhases(trace, nodes);
+  const holes = collectFlowHoles(core, nodes);
   return {
     edges,
     nodes,
     ...(trace.phases.length === 0 ? {} : { phaseEdges: quotientFlow(nodes, edges, phases), phases }),
+    ...(holes.length === 0 ? {} : { holes }),
   };
 }
 

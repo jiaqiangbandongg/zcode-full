@@ -9,8 +9,10 @@ import type { MessageFileLinkTarget } from "@/components/ai-elements/message.js"
 import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/types.js";
 import type { WorkflowRunSettingsChange } from "@/components/workflow-timeline/workflowRunSettings.js";
 import type { WorkflowDraftPosition, WorkflowRunCardSummary } from "@/ToolCallBlocks/shared.js";
+import type { WorkflowFillGraph } from "@/v4/workflowRunCardJoin.js";
 import type { Theme } from "@/useTheme.js";
 import type { ModelSelectionView } from "@zcode/services";
+import type { ZCodeWorkflowsForRunCandidate } from "@zcode/shared";
 import type { ConversationAttachmentReadParams, ConversationTransport } from "@/v4/transport.js";
 import type {
   OpenPlanDetailSideTabRequest,
@@ -52,6 +54,7 @@ export interface ConversationRowRenderContext {
   /** @deprecated 旧内联下钻标记；新的子会话统一打开侧栏详情。 */
   inSubagentDrilldown?: boolean;
   /** 手机 /remote 紧凑模式：隐藏外部 App 打开下拉，只保留应用内预览。 */
+  compactForRemoteControl?: boolean;
   /** 当前 session 正在 compact 或 goal verify；专用状态 UI 独占进度反馈。 */
   chatLoadingBlockedByActiveWork?: boolean;
   /** 当前 session 正在等待权限确认或 AskUserQuestion 回答，隐藏底部 ChatLoading。 */
@@ -87,6 +90,7 @@ export interface ConversationRowRenderContext {
   onOpenFileLink?: (target: MessageFileLinkTarget) => void;
   onOpenSubagentSession?: (request: OpenSubagentSideTabRequest) => void;
   onOpenPlanDetail?: (request: OpenPlanDetailSideTabRequest) => void;
+  /** 插件 UI：内联卡片请求在侧栏打开；RowView 补 parentSessionId 与 workspace 字段。 */
   onOpenWorkflowRun?: (request: OpenWorkflowRunSideTabRequest) => void;
   /**
    * 产物的全尺寸查看 tab 入口。
@@ -121,6 +125,19 @@ export interface ConversationRowRenderContext {
     workId: string,
     change: WorkflowRunSettingsChange,
   ) => Promise<CommandAck>;
+  /**
+   * 完成卡的「保存」/「再次运行」（docs/dynamic-workflow/transcript-and-notifications.md
+   * 「Saving the run, and running it again」）：把 GUI 写好的那条用户消息发进本会话，交给 ZCode
+   * 去提炼保存。与 Resume 同两道门（只读、灰度）且**同一个供给点**——写文件与起引擎都属于
+   * 「Resume 被收走的地方一并收走」。缺席即卡上只剩「已保存」芯片那条事实。
+   */
+  onSendWorkflowSaveRequest?: (text: string) => Promise<void>;
+  /**
+   * runId → 转写里认领过这次 run 的 SaveWorkflow 候选（`workflowRunCardJoin.buildWorkflowSaveCandidatesByRunId`），
+   * 由宿主从行窗口一遍建立。它是「模型另起名字存下的那份定义」与这次 run 之间仅有的联系
+   * （模型不会用 run 名当工作流名），所以必须从转写里读。
+   */
+  workflowSaveCandidatesByRunId?: ReadonlyMap<string, readonly ZCodeWorkflowsForRunCandidate[]>;
   /** 会话当前模型（「配置」弹层首项「会话模型」的名字）；读不到即缺席，首项只写「会话模型」。 */
   workflowSessionModel?: { providerId: string; modelId: string };
   /**
@@ -163,6 +180,11 @@ export interface ConversationRowRenderContext {
    * 直接启动轮上，都按 run 的发起 toolCallId 到这张表取图。
    */
   workflowGraphByToolCallId?: ReadonlyMap<string, WorkflowCausalityGraphData>;
+  /**
+   * runId → 最新一次成功补全的有效脚本图（`workflowRunCardJoin.buildWorkflowFillGraphByRunId`）：补全之后
+   * run 卡与侧板取它，而不是发起行的图（docs/dynamic-workflow/presentation.md「Holes on the timeline」）。
+   */
+  workflowFillGraphByRunId?: ReadonlyMap<string, WorkflowFillGraph>;
   /**
    * CreateWorkflow / AmendWorkflow 行 → 草稿位置（稿号、是否已被替代），由宿主从行窗口一遍建立
    * （`workflowDraftJoin.buildWorkflowDraftByToolCallId`）。编译反馈行据此写「第 n 稿」并决定空环灯的

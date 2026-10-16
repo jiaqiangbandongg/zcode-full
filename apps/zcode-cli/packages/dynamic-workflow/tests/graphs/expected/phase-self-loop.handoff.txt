@@ -1,0 +1,5 @@
+phase phase#1
+participant phase#1:actor#1 "planner" steps=ask#1
+participant phase#1:actor#2 "reviewer" steps=ask#2
+handoff phase#1:actor#1 -> phase#1:actor#2 types="string"
+handoff phase#1:actor#2 -> phase#1:actor#1 back types="Review"

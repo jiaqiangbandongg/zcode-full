@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-run-unread-clear",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-run-unread-clear.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-automation-run-unread-clear-main",
+      "description": "定时任务由 scheduler 到期派发并在 Automations 页面后台完成，固定回复终态 marker，稳定触发执行会话未读蓝点。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定命中定时任务 prompt 并快速结束，稳定验证后台终态写入未读，以及用户点击执行会话后的已读闭环。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AUTOMATION_UNREAD_CLEAR", "请汇报定时任务完成"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-automation-run-unread-clear-main",
+          "inputTokens": 96,
+          "outputTokens": 12,
+          "text": "定时任务已经完成。automation-unread-clear-done"
+        }
+      }
+    }
+  ]
+}

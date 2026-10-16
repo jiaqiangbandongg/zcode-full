@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-telemetry-parity-core",
+  "spec": "./test/e2e/conversation-session/conversation-session-telemetry-parity-core.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-telemetry-parity-core.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "prepareConversationE2E 创建的只读工具输入，两个版本执行完全相同的 Read。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "telemetry-parity-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定标题 sidecar，避免后台重试污染差分时序。"
+    },
+    {
+      "id": "telemetry-parity-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定 Read 工具调用，稳定覆盖 tool step 与 perf detail。"
+    },
+    {
+      "id": "telemetry-parity-tool-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具轮 generation 终态。"
+    },
+    {
+      "id": "telemetry-parity-compact-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "为 compact 建立稳定历史。"
+    },
+    {
+      "id": "telemetry-parity-compact-success-legacy",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "旧版非流式 compact 的等价响应。"
+    },
+    {
+      "id": "telemetry-parity-compact-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定产生 compaction success terminal。"
+    },
+    {
+      "id": "telemetry-parity-reasoning",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定 thought -> text 顺序。"
+    },
+    {
+      "id": "telemetry-parity-stall",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "固定 4001ms chunk gap；精确 3000/3001ms 边界由 fake clock 用例覆盖。"
+    },
+    {
+      "id": "telemetry-parity-interrupted",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "保持 running 直到 UI stop，稳定产生 interrupted。"
+    }
+  ]
+}

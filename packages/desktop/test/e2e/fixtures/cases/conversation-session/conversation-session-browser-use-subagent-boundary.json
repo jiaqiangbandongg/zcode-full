@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-use-subagent-boundary",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-use-subagent-boundary.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-browser-use-subagent-boundary.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "browser-subagent-boundary-title",
+      "description": "固定 Browser subagent boundary case 的异步标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于运行时 scope 边界，只需与父/child 请求隔离。"
+    },
+    {
+      "id": "browser-subagent-parent-init",
+      "description": "主 Agent 初始化 Browser runtime、打开自己的 Tab 并写入 parent-before。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "必须用真实共享 Node REPL 与 IAB guest 建立主 Agent 的 Tab，供 child 列出并在 child 结束后复验。"
+    },
+    {
+      "id": "browser-subagent-parent-agent",
+      "description": "主 Agent 收到初始化结果后启动 foreground general-purpose child。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造共享 Node REPL 内核中的 runtime_scope=subagent 请求。"
+    },
+    {
+      "id": "browser-subagent-child-browse",
+      "description": "Child 看到对话已有的 Tab，再打开一个新 Tab 并完成一次填写。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 runtime_scope=subagent 的真实 MCP call 以当前对话为 tab 归属：能列出主 Agent 的 Tab，新开的 Tab 也属于同一对话。"
+    },
+    {
+      "id": "browser-subagent-child-final",
+      "description": "Child 消费 Browser 检查结果并完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 结束不关 Tab，让父 Agent 收到 Agent tool_result 后复验两个 Tab 都在。"
+    },
+    {
+      "id": "browser-subagent-parent-resume",
+      "description": "主 Agent 收到 child 结果后复用原 Tab，并确认 child 开的 Tab 仍在对话里。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 child 没有改动主 Agent 的 Tab，且 child 开的 Tab 随子代理结束保留在当前对话。"
+    },
+    {
+      "id": "browser-subagent-parent-final",
+      "description": "主 Agent 消费复用结果并正常完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "形成正常 turn complete，供 E2E 在最终边界复验同一 guest。"
+    }
+  ]
+}

@@ -55,7 +55,7 @@ export interface ProcessProbe {
   readonly treeScope: ProcessTreeScope;
 }
 
-interface CreateProcessProbeOptions {
+export interface CreateProcessProbeOptions {
   execFile?: ProcessProbeExecFile;
   /** 列出 `/proc` 下的条目，仅 Linux 使用 */
   listProcDirectory?: () => Promise<readonly string[]>;
@@ -66,7 +66,7 @@ interface CreateProcessProbeOptions {
   readProcFile?: (path: string) => Promise<string>;
 }
 
-const PROCESS_PROBE_MAX_CONSECUTIVE_FAILURES = 3;
+export const PROCESS_PROBE_MAX_CONSECUTIVE_FAILURES = 3;
 
 const PROBE_TIMED_OUT = Symbol("process-probe-timed-out");
 

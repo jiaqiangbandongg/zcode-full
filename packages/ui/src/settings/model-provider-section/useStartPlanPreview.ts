@@ -80,6 +80,21 @@ export function useStartPlanPreview(options?: { enabled?: boolean }) {
   };
 }
 
+export function clearStartPlanPreviewCacheForTest() {
+  previewCache = null;
+  previewRequest = null;
+}
+
+export function primeStartPlanPreviewCacheForTest(
+  preview: StartPlanPreviewConfig | null,
+) {
+  previewCache = {
+    preview,
+    expiresAt: Date.now() + START_PLAN_PREVIEW_CACHE_TTL_MS,
+  };
+  previewRequest = null;
+}
+
 async function loadStartPlanPreview(
   service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
 ): Promise<StartPlanPreviewConfig | null> {

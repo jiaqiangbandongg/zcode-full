@@ -21,7 +21,7 @@ export interface WorkbenchSessionTarget extends PaneWorkspaceScope {
   readonly sessionId: string;
 }
 
-interface WorkbenchSplitPlacementOptions {
+export interface WorkbenchSplitPlacementOptions {
   readonly mode: "context-menu" | "drag";
   readonly side: PaneSplitSide;
   readonly anchorPaneId?: string;

@@ -18,7 +18,7 @@ import { logger } from "@/logger.js";
 // 闲时任务管理 store（与 automationManagementStore 独立）：走 IOffPeakTaskService RPC。
 // 位次/状态靠列表轮询刷新（host offPeakTaskSync 写 sqlite，renderer 只读快照）。
 
-interface CreateOffPeakTaskInput {
+export interface CreateOffPeakTaskInput {
   title: string;
   prompt: string;
   /** 权限四档（build/edit/plan/yolo）；类型收窄在服务端入参处完成。 */
@@ -28,7 +28,7 @@ interface CreateOffPeakTaskInput {
   workspaceIdentity?: string;
 }
 
-interface UpdateOffPeakTaskInput {
+export interface UpdateOffPeakTaskInput {
   title?: string;
   prompt?: string;
   permissionMode?: string;
@@ -118,13 +118,13 @@ export function isCurrentOffPeakCodingPlanSupported(
 }
 
 /** 服务端 3103（取号超限）只按结构化分类识别，不再解析跨 RPC 的错误文本。 */
-function isOffPeakQuotaError(result: OffPeakTaskCreateResult | null | undefined): boolean {
+export function isOffPeakQuotaError(result: OffPeakTaskCreateResult | null | undefined): boolean {
   return (
     result?.ok === false && result.errorCategory === "quota_3103" && result.errorCode === "3103"
   );
 }
 
-type OffPeakCreateErrorMessageId =
+export type OffPeakCreateErrorMessageId =
   | "offPeak.error.quota"
   | "offPeak.error.unavailable"
   | "offPeak.error.generic";

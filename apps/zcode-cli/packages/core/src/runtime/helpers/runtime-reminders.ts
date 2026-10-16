@@ -15,7 +15,7 @@ import type {
 import { ASK_USER_QUESTION_TOOL_NAME, EXIT_PLAN_MODE_TOOL_NAME } from "@zcode/contracts";
 import { EXPLORE_AGENT_TYPE } from "../../subagent/explore.js";
 
-const RUNTIME_MODE_REMINDER_CONFIG = Object.freeze({
+export const RUNTIME_MODE_REMINDER_CONFIG = Object.freeze({
   TURNS_BETWEEN_ATTACHMENTS: 5,
   FULL_REMINDER_EVERY_N_ATTACHMENTS: 5,
 });
@@ -78,12 +78,12 @@ const PLAN_MODE_EXIT_REMINDER = [
   `You have exited plan mode. You can now make edits, run tools, and take actions.`,
 ];
 
-const TODO_REMINDER_CONFIG = Object.freeze({
+export const TODO_REMINDER_CONFIG = Object.freeze({
   TURNS_SINCE_WRITE: 10,
   TURNS_BETWEEN_REMINDERS: 10,
 });
 
-interface TodoReminderTurnCounts {
+export interface TodoReminderTurnCounts {
   turnsSinceLastTodoWrite: number;
   turnsSinceLastReminder: number;
 }
@@ -111,19 +111,23 @@ export function runtimeMetadataForSyntheticUserMessageSource(
   if (source === "goal_state_change") {
     return systemReminderRuntimeMetadata("goal_state_change");
   }
+  if (source === "agent_listing_delta") {
+    return systemReminderRuntimeMetadata(source);
+  }
   if (source === "plugin_reference") {
     return systemReminderRuntimeMetadata("plugin_reference");
   }
   if (source === "selection_side_chat") {
     return systemReminderRuntimeMetadata("selection_side_chat");
   }
+  if (source === "bot_topic_context") return systemReminderRuntimeMetadata("bot_topic_context");
   if (source === "goal-continuation") {
     return systemReminderRuntimeMetadata("target_continuation");
   }
   return systemReminderRuntimeMetadata("rewind_notice");
 }
 
-function getTodoReminderTurnCounts(
+export function getTodoReminderTurnCounts(
   entries: readonly RuntimeMessageEntry[],
 ): TodoReminderTurnCounts {
   let assistantTurnsAfterCurrentEntry = 0;

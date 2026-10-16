@@ -127,7 +127,7 @@ export async function updateSession(
         time_title_updated = ?,
         time_compacting = ?,
         time_archived = ?,
-        -- 路径自愈可能携带并发读取前的旧时间，不能回退真实活动时间。
+        -- 修复原因：路径自愈可能携带并发读取前的旧时间，不能回退真实活动时间。
         time_updated = max(time_updated, ?)
       where id = ?
       `,

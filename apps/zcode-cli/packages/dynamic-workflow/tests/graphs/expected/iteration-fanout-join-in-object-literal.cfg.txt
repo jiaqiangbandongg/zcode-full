@@ -1,0 +1,5 @@
+node ask#1@1 issue site=ask#1 phase=unphased
+node ask#2@1 issue site=ask#2 phase=unphased
+edge entry -> ask#1@1 fork
+edge ask#1@1 -> ask#2@1 join
+edge ask#2@1 -> sink jump via=return

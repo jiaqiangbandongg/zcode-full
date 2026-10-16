@@ -21,7 +21,7 @@ import type { Src } from "./flow-graph.js";
  * exits. Like every other projection module it must not import `typescript`; it is a
  * separate file only because flow-graph.ts sits at the 400-line cap.
  */
-interface StrandPark {
+export interface StrandPark {
   /** Phases running alongside a mark: everything parked, minus its own and its ancestors'. */
   alongside: (phase: string, regions: readonly string[]) => string[];
   /** Forget everything parked, connecting nothing: a detached body's strands have no position. */

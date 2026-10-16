@@ -17,7 +17,7 @@ function encodedBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
 
-interface AckActivationBarrier<T extends { topic: string; subscriptionId: string }> {
+export interface AckActivationBarrier<T extends { topic: string; subscriptionId: string }> {
   begin(topic: string): object;
   bind(token: object, subscriptionId: string): void;
   cancel(token: object): void;

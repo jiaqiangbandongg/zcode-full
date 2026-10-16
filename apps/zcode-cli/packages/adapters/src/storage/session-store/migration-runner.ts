@@ -42,7 +42,7 @@ export interface AsyncSqliteMigrationOptions {
   onProgress?: (progress: SqliteMigrationProgress) => Promise<void>;
 }
 
-const DEFAULT_SQLITE_MIGRATION_WAIT_MS = 60 * 60_000;
+export const DEFAULT_SQLITE_MIGRATION_WAIT_MS = 60 * 60_000;
 const ASYNC_NATIVE_BUSY_TIMEOUT_MS = 25;
 type MigrationStep = SqliteMigrationProgress | { delayMs: number };
 

@@ -35,7 +35,7 @@ import { buildSubagentViews, NODE_ROW_RUNNING } from "./dynamic-workflow-run-ros
 const ASK_NODE_KIND = "ask";
 
 /** 情势截面的取数入参。 */
-interface WorkflowRunRosterInput {
+export interface WorkflowRunRosterInput {
   /**
    * 本 run 的归约状态（journal 事件重放进 run 面板同一个 reducer 的结果）。
    * 一条事件都没有的 run（注册表间隙）传 `undefined`：那时阶段表缺席、花名册为空。
@@ -43,9 +43,12 @@ interface WorkflowRunRosterInput {
   run: WorkflowRunState | undefined;
   /** 本 run 的全部 journal 事件，sequence 升序。时间的**唯一**来源。 */
   events: readonly StoredEvent[];
-  /** `journal.listNodes(runId)`。只贡献状态与 `stats`，行上没有任何时间列。 */
+  /**
+   * 非 report 的节点行、不带结果（`listNodes(runId, {kinds: NON_REPORT_NODE_KINDS, withResult:
+   * false})`）。只贡献状态与 `stats`，行上没有任何时间列。
+   */
   nodes: readonly NodeRecord[];
-  /** `journal.listActors(runId)`。花名册的名册本身。 */
+  /** `journal.listActors(runId, {withPersona: false})`。花名册的名册本身。 */
   actors: readonly ActorRecord[];
   /** run 的生命周期状态，与详情面给出的那一个同值（终态与否改写一半的状态词）。 */
   status: DynamicWorkflowRunLifecycleStatus;
@@ -60,7 +63,7 @@ interface WorkflowRunRosterInput {
 }
 
 /** 情势截面：详情面直接展开这三个键。 */
-interface WorkflowRunRoster {
+export interface WorkflowRunRoster {
   phases?: DynamicWorkflowRunPhaseView[];
   subagents: DynamicWorkflowRunSubagentView[];
   health: DynamicWorkflowRunHealth;
@@ -113,11 +116,12 @@ function buildHealth(input: {
 /**
  * 并发现状。
  *
- * `cap` 是**这个 run 自己的**上界：用户给它定过就是那个数，没定过就是本机天花板。
+ * `cap` 是**这个 run 自己的**上界：用户给它定过就是那个数，没定过就是默认并发（`concurrency.ceiling`，
+ * 键名早于「默认并发」这个概念）。
  * `effective` 是治理器此刻实际放行的数，即再与共享闸门取一次小。
  *
  * **只在 `effective < cap` 时在场**，与详情面的 `maxConcurrency` 同一条缺席规则：一个跑满自己
- * 那条界的 run 没有可说的。报天花板当 `cap` 是错的——一个以 `max_concurrency: 3` 起的 run 在
+ * 那条界的 run 没有可说的。报默认值当 `cap` 是错的——一个以 `max_concurrency: 3` 起的 run 在
  * 六核机器上会永远显示成「3/6」，读起来像被限流，而它正跑在用户亲手定的界上。
  */
 function concurrencyField(

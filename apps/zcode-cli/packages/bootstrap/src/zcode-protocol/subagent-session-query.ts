@@ -41,13 +41,13 @@ interface SubagentEventRelation {
   summary?: string;
 }
 
-interface SessionSubagentProjection {
+export interface SessionSubagentProjection {
   revision: number;
   running: ZCodeSessionRunningSubagent[];
   ended: ZCodeSessionEndedSubagent[];
 }
 
-interface ProjectSessionSubagentsInput {
+export interface ProjectSessionSubagentsInput {
   revision: number;
   parentSession: SessionInfo;
   messages: readonly MessageWithParts[];
@@ -267,7 +267,7 @@ function lastChildOutcome(messages: readonly MessageWithParts[] | undefined): {
     ...(text || errorSummary ? { summary: text || errorSummary } : {}),
     ...(errorName
       ? { status: CANCELLATION_PATTERN.test(errorName) ? "cancelled" : "failed" }
-      : // assistant 发出 tool call 后，该 model step 也会写 completed/finish；
+      : // Bug 根因：assistant 发出 tool call 后，该 model step 也会写 completed/finish；
         // 但 child session 仍在执行 Bash 等工具，不能把“本轮结束”当成“子会话终态”。
         // 只有不含 tool part 的最终 assistant message 才能提供成功 outcome。
         !hasToolRound && (last.info.time.completed || last.info.finish)

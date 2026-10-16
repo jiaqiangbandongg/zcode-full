@@ -13,8 +13,10 @@ const SKIPPED_SYNTHETIC_TEXT_SOURCES = new Set([
   "diagnostics",
   "goal_state_change",
   "hook_context",
+  "memory_update",
   "model_anomaly",
   "queued_system_notification",
+  "relevant_memory",
   "runtime_mode",
   "todo_reminder",
 ]);

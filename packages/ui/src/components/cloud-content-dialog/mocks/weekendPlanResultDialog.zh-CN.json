@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "weekend-plan-result-dialog",
+  "revision": 1,
+  "kind": "campaign",
+  "locale": "zh-CN",
+  "dialog": {
+    "hero": {
+      "type": "interactive_bundle",
+      "runtime": "zcode-hero-sandbox-v1",
+      "viewport": {
+        "aspectRatio": "4:3"
+      },
+      "data": {
+        "planName": "Weekend Plan",
+        "amountLabel": "300,000,000 Tokens",
+        "amountValue": "300,000,000",
+        "amountUnit": "Tokens",
+        "benefits": ["GLM-5.3-Flash 每日额度"],
+        "endsAtLabel": "2026/09/04 23:59",
+        "endsAtPrefix": "有效期至",
+        "replayLabel": "重新播放票券动画"
+      },
+      "events": {
+        "replay": "replay"
+      }
+    },
+    "title": "Weekend Plan 领取成功",
+    "description": {
+      "format": "plain_text",
+      "text": "GLM-5.3-Flash 已可使用。"
+    },
+    "buttons": [
+      {
+        "id": "open-model-settings",
+        "label": "模型设置",
+        "variant": "primary",
+        "actionId": "open-model-settings"
+      },
+      {
+        "id": "copy-share",
+        "label": "复制分享",
+        "variant": "secondary",
+        "actionId": "copy-share"
+      }
+    ]
+  },
+  "actions": {
+    "open-model-settings": {
+      "type": "navigate",
+      "destination": "model_settings"
+    },
+    "copy-share": {
+      "type": "copy_text",
+      "text": "我已领取 Weekend Plan，获得 300,000,000 Tokens。"
+    }
+  }
+}

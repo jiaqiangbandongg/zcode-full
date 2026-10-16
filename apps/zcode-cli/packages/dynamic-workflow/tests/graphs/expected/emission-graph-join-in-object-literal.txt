@@ -1,0 +1,24 @@
+node source
+node join#1 "join" @13:17 type="[string, string]"
+node ask#1 "a" @13:24 actors=actor#1 type="string"
+node ask#2 "a" @13:52 actors=actor#1 type="string"
+node join#2 "join" @14:17 type="[string]"
+node ask#3 "b" @14:24 actors=actor#2 type="string"
+node ask#4 "reviewer" @18:26 actors=actor#3 type="string"
+node sink
+actor actor#1 "analyst" @10:11
+actor actor#2 "builder" @11:11
+actor actor#3 "reviewer" @18:8
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> ask#3 data exact
+edge join#1 -> ask#4 data exact type="[string, string]"
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> ask#2 context exact
+edge ask#1 -> ask#4 data exact type="string"
+edge ask#2 -> join#1 data exact port=1 type="string"
+edge ask#2 -> ask#4 data exact type="string"
+edge join#2 -> ask#4 data exact type="[string]"
+edge ask#3 -> join#2 data exact port=0 type="string"
+edge ask#3 -> ask#4 data exact type="string"
+edge ask#4 -> sink data exact type="string"

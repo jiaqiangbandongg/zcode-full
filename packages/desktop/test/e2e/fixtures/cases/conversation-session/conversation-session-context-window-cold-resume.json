@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-context-window-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-context-window-cold-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-context-window-cold-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "cw-create-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过真实 UI 请求创建目标会话，替代直接写 sqlite 的伪冷历史。"
+    },
+    {
+      "id": "cw-create-parking",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确保目标会话在重启后首次点击前仍未被 Agent 恢复。"
+    },
+    {
+      "id": "cw-high-usage-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性复现用户日志中的 157762 provider usage，无需生成真实 15 万 token 历史。"
+    },
+    {
+      "id": "cw-tool-result-followup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定证明高 usage 后没有错误插入 Compact，而是直接消费 readonly tool result。"
+    },
+    {
+      "id": "cw-literal-continue",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "复现用户日志中的“继续”恢复链路，并让任何意外 Compact 因无 fixture 而 fail-closed。"
+    },
+    {
+      "id": "cw-manual-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 compact summary 并保留高 provider usage，使 CW04 可确定性验证冷恢复读取压缩后 boundary，而不是压缩前 assistant usage。"
+    }
+  ]
+}

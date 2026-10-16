@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "caseName": "provider-builtin-refresh",
+  "spec": "./test/e2e/settings/provider-builtin-refresh.test.ts",
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "runtime-generated",
+      "path": ".zcode-e2e/builtin-refresh",
+      "purpose": "测试 HTTPS 代理的版本化 Release、CA 与网络证据；不直接覆盖产品 Active。两次模型响应由 case 内本机 HTTP server 提供，不依赖共享 replay fixture。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "E2E_BUILTIN_REFRESH_OLD",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实连接测试发送 E2E_BUILTIN_REFRESH_MODEL，断言旧 Built-in 的 top_p=0.17；本机 server 固定返回 ok，不访问付费模型。"
+    },
+    {
+      "id": "E2E_BUILTIN_REFRESH_NEW",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "设置页刷新后再次真实创建模型，断言同模型的 top_p=0.37；只替代响应，不 mock Registry、下载器或 Model。"
+    }
+  ]
+}

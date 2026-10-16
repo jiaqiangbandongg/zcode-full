@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-multi-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-multi-question.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-custom-enter-multi-question.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-multi-question-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 多题等待态，复现 custom input Enter 不能提前提交整个问答。"
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-multi-question-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只证明多题回答已被 agent 消费，核心断言在 Enter 是否错误提前提交。"
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import {
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 
-interface ContextAttachmentPillProps {
+export interface ContextAttachmentPillProps {
   children: ReactNode;
   contentAlign?: AttachmentHoverCardContentProps["align"];
   icon: ReactNode;

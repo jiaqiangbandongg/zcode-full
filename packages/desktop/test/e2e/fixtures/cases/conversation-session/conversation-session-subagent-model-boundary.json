@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-model-boundary",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-model-boundary.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-model-boundary.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    { "id": "subagent-boundary-parent-agent", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "固定父 Agent tool_use。" },
+    { "id": "subagent-boundary-child-delayed", "kind": "main", "source": "synthetic", "timingPolicy": "delayed-text", "syntheticReason": "延迟 child 以验证在途快照。" },
+    { "id": "subagent-boundary-parent-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "父 continuation。" },
+    { "id": "subagent-nested-parent-agent", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "三层父 Agent。" },
+    { "id": "subagent-nested-child-agent", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "三层第二级 Agent。" },
+    { "id": "subagent-nested-grandchild-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "三层第三级回复。" },
+    { "id": "subagent-nested-child-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "第二级 continuation。" },
+    { "id": "subagent-nested-parent-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "父 continuation。" }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-node-repl-stateless-browser-multisession",
+  "spec": "./test/e2e/conversation-session/conversation-session-node-repl-stateless-browser-multisession.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-node-repl-stateless-browser-multisession.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "node-repl-browser-stateless-title",
+      "description": "固定两个 Browser Use session 的异步标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是本 case 的产品语义，只需避免误命中主请求。"
+    },
+    {
+      "id": "node-repl-browser-a-initial",
+      "description": "Session A 首次调用 node_repl，创建真实 IAB tab 并写入 kernel marker。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定构造 fresh kernel 与 BrowserControl 连续性的前置状态。"
+    },
+    {
+      "id": "node-repl-browser-a-verify",
+      "description": "Session A 第二次调用证明 kernel fresh 且 BrowserControl tab 连续。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "直接覆盖 Browser Use 的调用级无状态合同。"
+    },
+    {
+      "id": "node-repl-browser-a-final",
+      "description": "Session A 只在 fresh kernel 与 tab 连续同时成立后完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明真实 tool result 已进入同一 session continuation。"
+    },
+    {
+      "id": "node-repl-browser-b-verify",
+      "description": "Session B 证明没有继承 A 的 kernel 或 BrowserControl tab，再创建自己的 tab。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "覆盖共享 frontend 下的跨 session kernel、tab 与结果隔离。"
+    },
+    {
+      "id": "node-repl-browser-b-final",
+      "description": "Session B 只在跨 session 隔离成立后完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 B 的结果只回到 B continuation。"
+    }
+  ]
+}

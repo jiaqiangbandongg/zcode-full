@@ -20,7 +20,8 @@ import { promisify } from "node:util";
 const execFile = promisify(execFileCallback);
 const args = process.argv.slice(2);
 const maxBehindMainIndex = args.indexOf("--max-behind-main");
-const maxBehindMain = maxBehindMainIndex >= 0 ? Number(args[maxBehindMainIndex + 1]) : 50;
+const maxBehindMain =
+  maxBehindMainIndex >= 0 ? Number(args[maxBehindMainIndex + 1]) : 50;
 if (!Number.isInteger(maxBehindMain) || maxBehindMain < 0) {
   console.error("[freshness] --max-behind-main 需要一个非负整数");
   process.exit(2);
@@ -59,8 +60,12 @@ if (upstream) {
 let mainReport = "";
 try {
   await git("rev-parse", "--verify", "origin/main^{commit}");
-  const aheadMain = Number(await git("rev-list", "--count", `origin/main..HEAD`));
-  const behindMain = Number(await git("rev-list", "--count", `HEAD..origin/main`));
+  const aheadMain = Number(
+    await git("rev-list", "--count", `origin/main..HEAD`),
+  );
+  const behindMain = Number(
+    await git("rev-list", "--count", `HEAD..origin/main`),
+  );
   mainReport = `相对 origin/main：ahead ${aheadMain} / behind ${behindMain}（阈值 ${maxBehindMain}）`;
   if (behindMain > maxBehindMain) {
     const message = `落后 origin/main ${behindMain} 个提交，超过阈值 ${maxBehindMain}`;
@@ -69,7 +74,7 @@ try {
     } else {
       console.warn(
         `[freshness] 警告：${message}。这是特性/MR 分支（ahead ${aheadMain}），` +
-          `分叉本身正常；若要跟主线对齐请先确认 MR 状态（有未合并的草稿变更时不要盲目 rebase）。`,
+          `分叉本身正常；若要跟主线对齐请先确认 MR 状态（冻结中的 Draft MR 不要盲目 rebase）。`,
       );
     }
   }

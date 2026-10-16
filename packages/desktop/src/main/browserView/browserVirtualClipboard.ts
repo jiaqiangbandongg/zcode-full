@@ -7,7 +7,7 @@ import {
 
 export { IAB_INPUT_TARGET_TOKEN_PROPERTY } from "./browserVirtualClipboardPageScript.js";
 
-interface BrowserInputExecutionTarget {
+export interface BrowserInputExecutionTarget {
   contextId?: number;
   sessionId?: string;
 }
@@ -61,7 +61,9 @@ function runtimeError(response: RuntimeResponse): string | undefined {
   if (!exception) return undefined;
   return (
     exception.exception?.description ??
-    (exception.exception?.value == null ? undefined : String(exception.exception.value)) ??
+    (exception.exception?.value == null
+      ? undefined
+      : String(exception.exception.value)) ??
     exception.text ??
     "Browser Use virtual clipboard evaluation failed"
   );
@@ -85,7 +87,9 @@ async function detachAttachedSessions(
   sessionIds: readonly string[],
 ): Promise<void> {
   await Promise.allSettled(
-    sessionIds.map((sessionId) => view.cdp.send("Target.detachFromTarget", { sessionId })),
+    sessionIds.map((sessionId) =>
+      view.cdp.send("Target.detachFromTarget", { sessionId }),
+    ),
   );
 }
 
@@ -105,7 +109,9 @@ async function waitForOopifTarget(
 ): Promise<string | undefined> {
   const deadline = Date.now() + OOPIF_TARGET_REGISTRATION_TIMEOUT_MS;
   for (;;) {
-    const targets = (await view.cdp.send("Target.getTargets").catch(() => undefined)) as
+    const targets = (await view.cdp
+      .send("Target.getTargets")
+      .catch(() => undefined)) as
       | { targetInfos?: Array<{ targetId?: string; type?: string }> }
       | undefined;
     if (
@@ -118,7 +124,9 @@ async function waitForOopifTarget(
     }
     const remaining = deadline - Date.now();
     if (remaining <= 0) return undefined;
-    await new Promise((resolve) => setTimeout(resolve, Math.min(25, remaining)));
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(25, remaining)),
+    );
   }
 }
 
@@ -132,7 +140,8 @@ async function resolveFocusedTarget(
   try {
     for (;;) {
       const key = targetKey(target);
-      if (visited.has(key)) throw new Error("Browser Use encountered a focused frame cycle");
+      if (visited.has(key))
+        throw new Error("Browser Use encountered a focused frame cycle");
       visited.add(key);
       const response = (await send(view, target, "Runtime.evaluate", {
         ...(target.contextId == null ? {} : { contextId: target.contextId }),
@@ -152,7 +161,9 @@ async function resolveFocusedTarget(
         };
         frameId = described.node?.frameId;
       } finally {
-        await send(view, target, "Runtime.releaseObject", { objectId }).catch(() => undefined);
+        await send(view, target, "Runtime.releaseObject", { objectId }).catch(
+          () => undefined,
+        );
       }
       if (!frameId) return { attachedSessionIds, target };
 
@@ -183,7 +194,9 @@ async function resolveFocusedTarget(
       // 用有界 getTargets 轮询等待目标可用，禁止错误回落到顶层输入。
       const delayedSessionId = await waitForOopifTarget(view, frameId);
       if (!delayedSessionId)
-        throw new Error(`Browser Use could not resolve an input target for frame ${frameId}`);
+        throw new Error(
+          `Browser Use could not resolve an input target for frame ${frameId}`,
+        );
       attachedSessionIds.push(delayedSessionId);
       target = { sessionId: delayedSessionId };
       await Promise.all([
@@ -210,7 +223,8 @@ function escapeHtml(text: string): string {
 
 function clipboardItems(text: string, includeRichText: boolean) {
   const entries = [{ mime_type: "text/plain", text }];
-  if (includeRichText) entries.push({ mime_type: "text/html", text: escapeHtml(text) });
+  if (includeRichText)
+    entries.push({ mime_type: "text/html", text: escapeHtml(text) });
   return [{ entries, presentation_style: "unspecified" }];
 }
 
@@ -249,7 +263,10 @@ export async function assertFocusedInputTarget(
     returnByValue: true,
   })) as RuntimeResponse;
   const error = runtimeError(response);
-  if (error) throw new Error(`Browser Use could not verify the focused input target: ${error}`);
+  if (error)
+    throw new Error(
+      `Browser Use could not verify the focused input target: ${error}`,
+    );
   if (response.result?.value !== true)
     throw new Error("Active element is no longer the expected input target");
 }
@@ -270,12 +287,16 @@ export async function pasteTextIntoFocusedTarget(
       options.includeRichText ?? shouldIncludeRichText(view.webContents.getURL());
     const args = {
       clipboardItems: clipboardItems(text, includeRichText),
-      ...(options.inputTargetToken == null ? {} : { inputTargetToken: options.inputTargetToken }),
+      ...(options.inputTargetToken == null
+        ? {}
+        : { inputTargetToken: options.inputTargetToken }),
       replaceInputValue: options.replaceInputValue === true,
       richTextFallback: includeRichText,
     };
     const response = (await send(view, resolution.target, "Runtime.evaluate", {
-      ...(resolution.target.contextId == null ? {} : { contextId: resolution.target.contextId }),
+      ...(resolution.target.contextId == null
+        ? {}
+        : { contextId: resolution.target.contextId }),
       expression: `(async () => {
         try {
           const pageFunction = ${VIRTUAL_PASTE_PAGE_FUNCTION};
@@ -300,7 +321,8 @@ export async function pasteTextIntoFocusedTarget(
       );
     if ((value as { ok?: unknown }).ok !== true) {
       const message =
-        "error" in value && typeof (value as { error?: unknown }).error === "string"
+        "error" in value &&
+        typeof (value as { error?: unknown }).error === "string"
           ? (value as { error: string }).error
           : "type failed";
       throw new Error(

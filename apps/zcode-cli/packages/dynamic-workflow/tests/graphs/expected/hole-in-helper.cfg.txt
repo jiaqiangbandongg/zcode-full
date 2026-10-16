@@ -1,0 +1,24 @@
+phase unphased
+phase hole#cd7e8315 "评判"
+hole hole#cd7e8315 "评判" type="Verdict" phase=unphased
+node ask#1@1 issue site=ask#1 phase=unphased
+node hole#cd7e8315@1 issue site=hole#cd7e8315 phase=unphased
+node hole#cd7e8315@2 mark phase=hole#cd7e8315
+node ask#1@2 issue site=ask#1 phase=unphased
+node hole#cd7e8315@3 issue site=hole#cd7e8315 phase=unphased
+node hole#cd7e8315@4 mark phase=hole#cd7e8315
+edge entry -> ask#1@1 fork
+edge entry -> ask#1@2 fork
+edge entry -> sink jump via=return
+edge ask#1@1 -> hole#cd7e8315@1 next
+edge hole#cd7e8315@1 -> hole#cd7e8315@2 next
+edge hole#cd7e8315@2 -> ask#1@2 join via=return
+edge hole#cd7e8315@2 -> sink join via=return
+edge ask#1@2 -> hole#cd7e8315@3 next
+edge hole#cd7e8315@3 -> hole#cd7e8315@4 next
+edge hole#cd7e8315@4 -> sink join via=return
+phase-edge entry -> unphased fork
+phase-edge entry -> sink jump via=return
+phase-edge unphased -> hole#cd7e8315 next
+phase-edge hole#cd7e8315 -> unphased join via=return
+phase-edge hole#cd7e8315 -> sink join via=return

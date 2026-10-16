@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-p0",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-p0.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-p0.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-remote-p0-title",
+      "description": "两个远端 task 的标题生成固定响应，避免标题请求干扰主链路。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题内容不属于本 case 语义，只需保持 task row 稳定。"
+    },
+    {
+      "id": "ssh-remote-p0-a-first",
+      "description": "workspace A 首发模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "slow-stream",
+      "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+    },
+    {
+      "id": "ssh-remote-p0-b-first",
+      "description": "workspace B 首发模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "slow-stream",
+      "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+    },
+    {
+      "id": "ssh-remote-p0-a-follow",
+      "description": "切回 workspace A task 后的续发模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "slow-stream",
+      "syntheticReason": "稳定验证 task A 续发历史隔离。"
+    },
+    {
+      "id": "ssh-remote-p0-b-follow",
+      "description": "切回 workspace B task 后的续发模型回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "slow-stream",
+      "syntheticReason": "稳定验证 task B 续发历史隔离。"
+    }
+  ]
+}

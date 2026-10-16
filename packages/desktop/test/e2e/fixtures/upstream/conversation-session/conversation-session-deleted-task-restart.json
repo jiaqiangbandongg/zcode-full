@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-deleted-task-restart",
+  "spec": "./test/e2e/conversation-session/conversation-session-deleted-task-restart.test.ts",
+  "fixtures": [
+    {
+      "id": "deleted-task-restart-title",
+      "description": "TSL20 待删除任务的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定标题用于在 Archived 真实 UI 中定位目标行；标题本身不是产品断言。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_DELETED_TASK_RESTART"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "deleted-task-restart-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Deleted Task Restart E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "deleted-task-restart-turn",
+      "description": "TSL20 建立可归档并永久删除的 interactive task。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 tombstone 与冷启动 join；provider 只需稳定提交一个普通任务。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_DELETED_TASK_RESTART"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "deleted-task-restart-turn",
+          "inputTokens": 96,
+          "outputTokens": 12,
+          "text": "DELETED_TASK_RESTART_OK"
+        }
+      }
+    }
+  ]
+}

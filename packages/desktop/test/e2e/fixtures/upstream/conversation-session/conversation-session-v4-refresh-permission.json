@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-refresh-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-refresh-permission.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-refresh-permission-title",
+      "description": "E2E_V4_REFRESH_PERM 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_REFRESH_PERM 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_REFRESH_PERM"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-refresh-permission-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Refresh Permission E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-refresh-permission-write-call",
+      "description": "刷新恢复×权限挂起：Bash redirect exact tool_use，触发权限弹窗后 renderer 刷新。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "redirect 强制 exact suggestion，稳定验证刷新前后 scope 与 response。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REFRESH_PERM"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_V4_REFRESH_PERM_REPEAT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_refresh_perm_bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_V4_REFRESH_PERM_RESULT\\n' > .zcode-e2e/conversation-session-v4-refresh-permission/write-output.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "v4-refresh-permission-final",
+      "description": "刷新恢复×权限挂起：批准后 tool_result 回灌 → 最终文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "刷新后批准仍能路由回 CLI broker deferred，工具执行并收口。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_V4_REFRESH_PERM", "toolu_v4_refresh_perm_bash"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_V4_REFRESH_PERM_REPEAT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-refresh-permission-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_REFRESH_PERM_DONE"
+        }
+      }
+    },
+    {
+      "id": "v4-refresh-permission-repeat-call",
+      "description": "刷新后重复完全相同 Bash exact command。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 allowAlways updates 已持久化且 v4 optionId 映射未丢失。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_REFRESH_PERM_REPEAT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_v4_refresh_perm_repeat_bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_V4_REFRESH_PERM_RESULT\\n' > .zcode-e2e/conversation-session-v4-refresh-permission/write-output.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "v4-refresh-permission-repeat-final",
+      "description": "重复 exact command 自动允许后的终态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "无二次权限弹窗时稳定收口。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_V4_REFRESH_PERM_REPEAT", "toolu_v4_refresh_perm_repeat_bash"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-refresh-permission-repeat-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_REFRESH_PERM_REPEAT_DONE"
+        }
+      }
+    }
+  ]
+}

@@ -52,9 +52,129 @@ modules:
   - id: formal-proof
     roots: [packages/formal-proof/src]
     managed: false
+  - id: stream-animate
+    roots: [packages/stream-animate/src]
+    managed: false
+  - id: e2e-report
+    roots: [packages/e2e-report/src]
+    managed: false
   - id: zcode-cli
     roots: [apps/zcode-cli]
     managed: false
+
+  - id: gen-ui-protocol
+    roots: [packages/shared/src/gen-ui]
+    managed: true
+    requires: []
+    publicEntrypoints: [packages/shared/src/gen-ui/index.ts, packages/shared/src/gen-ui/contract.ts]
+    layers: { domain: "." }
+    owner: conversation
+  - id: gen-ui-service
+    roots: [packages/services/src/gen-ui]
+    managed: true
+    requires: [services, shared, rpc, gen-ui-protocol, mcp-apps-protocol]
+    publicEntrypoints:
+      [
+        packages/services/src/gen-ui/index.ts,
+        packages/services/src/gen-ui/contract.ts,
+        packages/services/src/gen-ui/node.ts,
+      ]
+    layers: { domain: domain, app: app, adapters: adapters }
+    layerOrder: [domain, app, adapters]
+    owner: conversation
+
+  - id: gen-ui
+    roots: [packages/ui/src/gen-ui]
+    managed: true
+    requires: [ui, services, gen-ui-service, gen-ui-protocol, mcp-apps-protocol, plugin-ui]
+    publicEntrypoints:
+      [
+        packages/ui/src/gen-ui/index.ts,
+        packages/ui/src/gen-ui/contract.ts,
+        packages/ui/src/gen-ui/host.ts,
+      ]
+    layers: { domain: domain, app: app, adapters: adapters, ui: components }
+    layerOrder: [domain, app, adapters, ui]
+    owner: conversation
+
+  # 插件 UI（MCP Apps 沙箱）：模块边界见各模块 CONTRACT.md。
+  - id: mcp-apps-protocol
+    roots: [packages/shared/src/mcp-apps]
+    managed: true
+    requires: []
+    publicEntrypoints:
+      [
+        packages/shared/src/mcp-apps/index.ts,
+        packages/shared/src/mcp-apps/contract.ts,
+        packages/shared/src/mcp-apps/hostContract.ts,
+      ]
+    layers:
+      domain: "."
+    owner: plugin
+  - id: mcp-ui
+    roots: [apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui]
+    managed: true
+    requires: [zcode-cli, shared, mcp-apps-protocol]
+    publicEntrypoints:
+      [
+        apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/index.ts,
+        apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/contract.ts,
+      ]
+    layers:
+      app: "."
+    owner: plugin
+  - id: plugin-ui-bridge
+    roots: [packages/services/src/plugin-ui-bridge]
+    managed: true
+    requires: [services, shared, mcp-apps-protocol]
+    publicEntrypoints:
+      [
+        packages/services/src/plugin-ui-bridge/index.ts,
+        packages/services/src/plugin-ui-bridge/contract.ts,
+        packages/services/src/plugin-ui-bridge/appToolsContract.ts,
+        packages/services/src/plugin-ui-bridge/samplingContract.ts,
+      ]
+    layers:
+      app: "."
+    owner: plugin
+  - id: plugin-sandbox
+    roots:
+      - packages/desktop/src/main/pluginSandbox
+      - packages/desktop/src/host/pluginSandbox
+      - packages/desktop/src/preload/pluginSandbox
+      - packages/desktop/src/renderer/src/plugin-sandbox
+    managed: true
+    requires: [desktop, shared, mcp-apps-protocol, gen-ui-protocol]
+    publicEntrypoints: [
+        packages/desktop/src/host/pluginSandbox/index.ts,
+        packages/desktop/src/host/pluginSandbox/contract.ts,
+        packages/desktop/src/preload/pluginSandbox/hostBridge.ts,
+        packages/desktop/src/main/pluginSandbox/index.ts,
+        packages/desktop/src/main/pluginSandbox/contract.ts,
+        # 页面兼容接口由宿主及其契约测试维护。
+        packages/desktop/src/renderer/src/plugin-sandbox/aliasRuntime.ts,
+        packages/desktop/src/renderer/src/plugin-sandbox/aliasApi.ts,
+      ]
+    layers:
+      adapters: "."
+    owner: plugin
+  - id: plugin-ui
+    roots: [packages/ui/src/plugin-ui]
+    managed: true
+    requires: [ui, shared, mcp-apps-protocol, plugin-ui-bridge, plugin-sandbox]
+    publicEntrypoints:
+      [
+        packages/ui/src/plugin-ui/index.ts,
+        packages/ui/src/plugin-ui/contract.ts,
+        packages/ui/src/plugin-ui/hostPrimitives.ts,
+      ]
+    layers:
+      domain: domain
+      app: app
+      adapters: adapters
+      ui: components
+    layerOrder: [domain, app, adapters, ui]
+    owner: plugin
 
 global:
   maxFileLines: 400
@@ -64,4 +184,12 @@ global:
   forbidDeepImports: true
   managedOnly: true
 
-exceptions: []
+exceptions:
+  - id: gen-ui-tweak-runtime-size
+    rule: max-file-lines
+    paths: [packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js]
+    reason: Keep parameter binding and registration lifecycle together; runtime-manifest.json and tests verify file integrity.
+  - id: gen-ui-tweak-runtime-lint
+    rule: disable-count
+    paths: [packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js]
+    reason: Allow the control-character validation regex and the single-file parameter-control runtime.

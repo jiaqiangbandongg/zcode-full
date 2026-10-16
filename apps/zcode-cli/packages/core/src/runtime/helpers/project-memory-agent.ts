@@ -52,7 +52,6 @@ export function captureProjectMemoryAgentContext(
       querySource: input.operation,
       skipTranscript: true,
     },
-    modelRequestSessionType: "other",
     modelCall: { operation: input.operation },
     refreshRuntimeHeadersBeforeAttempt: createRefreshRuntimeHeadersBeforeModelAttempt(runtime, {
       abortSignal: request.abortSignal,

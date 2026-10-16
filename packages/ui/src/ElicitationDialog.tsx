@@ -35,12 +35,16 @@ interface ElicitationDialogProps {
   onFormDraftChange?: (requestId: string, draft: ElicitationFormDraft) => void;
 }
 
-type ElicitationAutoResolutionSnoozeSource = "panelHover" | "answer" | "navigation" | "countdown";
+export type ElicitationAutoResolutionSnoozeSource =
+  | "panelHover"
+  | "answer"
+  | "navigation"
+  | "countdown";
 
 const ELICITATION_FINAL_MINUTE_MS = 60_000;
 const PLAN_APPROVAL_APPROVE_VALUE = "approve";
 
-function getElicitationCountdownSeconds(
+export function getElicitationCountdownSeconds(
   autoResolution: InteractionAutoResolution | undefined,
   now: number,
 ): number | null {
@@ -98,18 +102,18 @@ function useElicitationCountdownSeconds(autoResolution: InteractionAutoResolutio
   return getElicitationCountdownSeconds(autoResolution, clockNow);
 }
 
-interface NormalizedElicitationQuestion extends ZCodeElicitationQuestion {
+export interface NormalizedElicitationQuestion extends ZCodeElicitationQuestion {
   key: string;
 }
 
-interface AnswerDraft {
+export interface AnswerDraft {
   selectedValues: string[];
   customAnswer: string;
 }
 
-type DraftState = Record<string, AnswerDraft>;
+export type DraftState = Record<string, AnswerDraft>;
 
-type ElicitationCustomInputKeyAction =
+export type ElicitationCustomInputKeyAction =
   | "advance"
   | "submit"
   | "previous"
@@ -117,7 +121,7 @@ type ElicitationCustomInputKeyAction =
   | "previousOption"
   | "nextOption";
 
-function resolveElicitationCustomInputKeyAction(event: {
+export function resolveElicitationCustomInputKeyAction(event: {
   key: string;
   advanceKind?: "next" | "submit";
   ctrlKey?: boolean;
@@ -157,7 +161,7 @@ function resolveElicitationCustomInputKeyAction(event: {
   return null;
 }
 
-function normalizeElicitationQuestions(
+export function normalizeElicitationQuestions(
   request: ZCodeElicitationRequest,
 ): NormalizedElicitationQuestion[] {
   const sourceQuestions =
@@ -196,7 +200,7 @@ function isPlanApprovalElicitationRequest(request: ZCodeElicitationRequest): boo
   );
 }
 
-function createInitialElicitationDrafts(
+export function createInitialElicitationDrafts(
   questions: readonly NormalizedElicitationQuestion[],
   request: ZCodeElicitationRequest,
 ): DraftState {
@@ -265,7 +269,7 @@ function getQuestionAnswers(question: NormalizedElicitationQuestion, drafts: Dra
   return [...draft.selectedValues, ...(customAnswer ? [customAnswer] : [])];
 }
 
-function buildElicitationResponseContent(
+export function buildElicitationResponseContent(
   questions: readonly NormalizedElicitationQuestion[],
   drafts: DraftState,
 ): Record<string, unknown> {
@@ -298,7 +302,7 @@ function buildElicitationResponseContent(
   return content;
 }
 
-function updateElicitationDraftsForOption(
+export function updateElicitationDraftsForOption(
   drafts: DraftState,
   question: NormalizedElicitationQuestion,
   optionValue: string,
@@ -321,7 +325,7 @@ function updateElicitationDraftsForOption(
   };
 }
 
-function getElicitationQuestionAdvanceKind(
+export function getElicitationQuestionAdvanceKind(
   questions: readonly NormalizedElicitationQuestion[],
   questionIndex: number,
 ): "next" | "submit" {
@@ -786,7 +790,7 @@ function ElicitationDialogContent({
             {index + 1}.
           </span>
         )}
-        {/* 界面字号可动态增大，固定 20px 行高会让大字号文字贴边或裁切。*/}
+        {/* 修复原因：界面字号可动态增大，固定 20px 行高会让大字号文字贴边或裁切。 */}
         <span className="min-w-0 flex-1 text-ui-base leading-normal">
           <span className="text-ui-base font-medium leading-normal text-foreground">
             {optionLabel}
@@ -958,7 +962,7 @@ function ElicitationDialogContent({
 
   return (
     <div className="w-full shrink-0">
-      {/* 手机远控视口较短，长问题和多选项会把按钮顶出弹窗；卡片限高后让内容区内部滚动。*/}
+      {/* Bugfix: 手机远控视口较短，长问题和多选项会把按钮顶出弹窗；卡片限高后让内容区内部滚动。 */}
       <div
         ref={cardRef}
         tabIndex={activeOptionIndex < 0 ? 0 : -1}
@@ -986,7 +990,7 @@ function ElicitationDialogContent({
                     {titleHeader}
                   </Badge>
                 ) : null}
-                {/* 问题不能只放在会截断的标题行；移动端没有 hover，必须在 tag 后直接完整可读。*/}
+                {/* Bugfix: 问题不能只放在会截断的标题行；移动端没有 hover，必须在 tag 后直接完整可读。 */}
                 <span
                   title={titleQuestion}
                   className={cn(

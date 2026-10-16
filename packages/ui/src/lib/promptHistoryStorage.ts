@@ -19,7 +19,7 @@ function getBrowserStorage(): StorageLike | null {
   }
 }
 
-function getPromptHistoryStorageKey(workspacePath: string) {
+export function getPromptHistoryStorageKey(workspacePath: string) {
   return `${PROMPT_HISTORY_STORAGE_KEY_PREFIX}${workspacePath}`;
 }
 
@@ -62,5 +62,8 @@ export function persistPromptHistoryEntries(
   // 之前聊天输入历史只挂在 ChatView 内存里，刷新页面或重启窗口后就会整段丢失，
   // 用户按上键也拿不到刚发过的消息。这里改成按 workspace 写入 localStorage，
   // 既保留重开后的历史，又避免不同项目之间把提示词历史串在一起。
-  storage?.setItem(getPromptHistoryStorageKey(workspacePath), JSON.stringify(normalizedEntries));
+  storage?.setItem(
+    getPromptHistoryStorageKey(workspacePath),
+    JSON.stringify(normalizedEntries),
+  );
 }

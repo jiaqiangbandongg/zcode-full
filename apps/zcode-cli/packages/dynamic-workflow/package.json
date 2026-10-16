@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
     "./projections": {
       "types": "./dist/projections.d.ts",
       "import": "./dist/projections.js"
@@ -20,13 +24,16 @@
     "charts": "node scripts/generate-libs.mjs && tsc && node scripts/generate-mermaid.mjs",
     "clean": "node ../../scripts/clean-dist.mjs",
     "typecheck": "node scripts/generate-libs.mjs && tsc --noEmit",
-    "lint": "oxlint src",
-    "lint:fix": "oxlint --write src"
+    "test": "node scripts/generate-libs.mjs && vitest run tests --reporter=verbose",
+    "coverage": "node scripts/generate-libs.mjs && vitest run tests --coverage",
+    "lint": "oxlint src tests",
+    "lint:fix": "oxlint --write src tests"
   },
   "dependencies": {
     "typescript": "^5.9.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "vitest": "^4.1.5"
   }
 }

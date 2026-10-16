@@ -1,5 +1,10 @@
 /* eslint-disable max-lines -- Side pane tab 状态集中维护 Browser/Git/CodeViewer/Treemapping/Whiteboard 的打开、复用、关闭和排序规则；拆分需要同步迁移现有内存恢复逻辑。 */
-import { createUuid, type BrowserTabResidencyState } from "@zcode/shared";
+import {
+  createUuid,
+  type BrowserTabResidencyState,
+  type BrowserViewRestoredTabShell,
+} from "@zcode/shared";
+import type { PluginUiSidePaneTab } from "@/plugin-ui/contract.js";
 import { inferMediaPreview, isPptxPreviewPath, type CodeViewerSource } from "@/lib/codeViewer.js";
 import { normalizeCodeViewerSource } from "@/lib/codeViewerSource.js";
 
@@ -24,6 +29,15 @@ export interface BrowserSidePaneTab {
 export type BrowserSidePaneMetadata = Partial<Pick<BrowserSidePaneTab, "faviconUrl" | "title">>;
 
 export const BROWSER_USE_OPERATION_INDICATOR_DURATION_MS = 5_000;
+
+export interface BrowserPermissionsSidePaneTab {
+  id: string;
+  type: "browser-permissions";
+  origin: string;
+  ownerTaskId?: string | null;
+  workspaceKey?: string | null;
+  openedAt?: number;
+}
 
 export interface GitSidePaneTab {
   id: "git";
@@ -516,6 +530,7 @@ export interface OpenScopedSubagentSideTabRequest extends OpenSubagentSideTabReq
 export type WorkspaceSidePaneTab =
   | BackgroundBashSidePaneTab
   | BrowserSidePaneTab
+  | BrowserPermissionsSidePaneTab
   | GitSidePaneTab
   | CodeViewerSidePaneTab
   | TreemappingSidePaneTab
@@ -528,6 +543,7 @@ export type WorkspaceSidePaneTab =
   | SubagentDirectorySidePaneTab
   | SelectionSideChatPaneTab
   | PlanDetailSidePaneTab
+  | PluginUiSidePaneTab
   | WorkflowRunSidePaneTab
   | WorkflowRunDirectorySidePaneTab
   | WorkflowActorSessionSidePaneTab
@@ -650,6 +666,17 @@ function createGitSidePaneTab(): GitSidePaneTab {
   return { id: "git", type: "git", openedAt: Date.now() };
 }
 
+function createTreemappingSidePaneTab(
+  source: TreemappingSidePaneSource = { kind: "current" },
+): TreemappingSidePaneTab {
+  return {
+    id: "treemapping",
+    type: "treemapping",
+    openedAt: Date.now(),
+    source,
+  };
+}
+
 function createModelTrajectorySidePaneTab(options: {
   taskId: string;
   title?: string | null;
@@ -687,11 +714,11 @@ function createTerminalSidePaneTab(options: {
   };
 }
 
-function encodeSidePaneTabIdPart(value: string): string {
+export function encodeSidePaneTabIdPart(value: string): string {
   return encodeURIComponent(value);
 }
 
-function createSubagentSessionSidePaneTab(options: {
+export function createSubagentSessionSidePaneTab(options: {
   workspaceKey: string;
   workspacePath: string;
   workspaceIdentity?: string;
@@ -724,7 +751,7 @@ function createSubagentSessionSidePaneTab(options: {
   };
 }
 
-function createSubagentDirectorySidePaneTab(options: {
+export function createSubagentDirectorySidePaneTab(options: {
   workspaceKey: string;
   workspacePath: string;
   workspaceIdentity?: string;
@@ -751,7 +778,7 @@ function createSubagentDirectorySidePaneTab(options: {
   };
 }
 
-function createSelectionSideChatPaneTab(
+export function createSelectionSideChatPaneTab(
   options: OpenSelectionSideChatRequest & {
     workspaceKey: string;
     ordinal: number;
@@ -776,7 +803,7 @@ function createSelectionSideChatPaneTab(
   };
 }
 
-function createPlanDetailSidePaneTab(
+export function createPlanDetailSidePaneTab(
   options: OpenScopedPlanDetailSideTabRequest & { workspaceKey: string },
 ): PlanDetailSidePaneTab {
   return {
@@ -1009,7 +1036,7 @@ function findTabIndexById(tabs: WorkspaceSidePaneTab[], tabId: string): number {
   return tabs.findIndex((tab) => tab.id === tabId);
 }
 
-function activateSidePaneTab(
+export function activateSidePaneTab(
   current: WorkspaceSidePaneState | null,
   tab: WorkspaceSidePaneTab,
 ): WorkspaceSidePaneState {
@@ -1057,11 +1084,11 @@ const WORKSPACE_GLOBAL_SIDE_PANE_TAB_TYPES = new Set<WorkspaceSidePaneTab["type"
   "treemapping",
 ]);
 
-function isWorkspaceGlobalSidePaneTab(tab: WorkspaceSidePaneTab): boolean {
+export function isWorkspaceGlobalSidePaneTab(tab: WorkspaceSidePaneTab): boolean {
   return WORKSPACE_GLOBAL_SIDE_PANE_TAB_TYPES.has(tab.type);
 }
 
-interface SidePaneVisibilityScope {
+export interface SidePaneVisibilityScope {
   workspaceKey: string | null;
   ownerTaskId: string | null;
 }
@@ -1121,6 +1148,7 @@ function getVisibleSidePaneTabsByScope(
     if (
       tab.type === "selection-side-chat" ||
       tab.type === "plan-detail" ||
+      tab.type === "plugin-ui" ||
       tab.type === "workflow-run" ||
       tab.type === "workflow-actor-session" ||
       tab.type === "workflow-workspace" ||
@@ -1132,7 +1160,7 @@ function getVisibleSidePaneTabsByScope(
   });
 }
 
-function resolveActiveTabForOwner(
+export function resolveActiveTabForOwner(
   state: WorkspaceSidePaneState | null,
   scope: SidePaneVisibilityScope,
   preferredTabId?: string | null,
@@ -1185,7 +1213,7 @@ export function restoreSidePaneTab(
   });
 }
 
-function activateBrowserSidePane(
+export function activateBrowserSidePane(
   current: WorkspaceSidePaneState | null,
   options?: {
     tabId?: string;
@@ -1209,6 +1237,29 @@ function activateBrowserSidePane(
   }
 
   return activateSidePaneTab(current, createBrowserSidePaneTab(options));
+}
+
+/** 打开/复用站点权限设置标签：同站点 + 同工作区 + 同对话只保留一个标签。 */
+export function openBrowserPermissionsSidePane(
+  current: WorkspaceSidePaneState | null,
+  options: Pick<BrowserPermissionsSidePaneTab, "origin" | "ownerTaskId" | "workspaceKey">,
+): WorkspaceSidePaneState {
+  const existing = current?.tabs.find(
+    (tab) =>
+      tab.type === "browser-permissions" &&
+      tab.origin === options.origin &&
+      tab.workspaceKey === options.workspaceKey &&
+      sidePaneOwnerKey(tab.ownerTaskId) === sidePaneOwnerKey(options.ownerTaskId),
+  );
+  return activateSidePaneTab(
+    current,
+    existing ?? {
+      ...options,
+      id: `browser-permissions:${createUuid()}`,
+      type: "browser-permissions",
+      openedAt: Date.now(),
+    },
+  );
 }
 
 export function openBrowserSidePane(
@@ -1286,7 +1337,7 @@ export function openOrActivateBrowserSidePaneByUrl(
 }
 
 /** 打开或更新一个受控 browser-use tab；ready 重放按 tabId 幂等。 */
-function openBrowserUseSidePane(
+export function openBrowserUseSidePane(
   current: WorkspaceSidePaneState | null,
   options: {
     workspaceKey: string;
@@ -1350,7 +1401,7 @@ function openBrowserUseSidePane(
   return { ...current, tabs: [...current.tabs, tab] };
 }
 
-interface BrowserUseSidePaneScope {
+export interface BrowserUseSidePaneScope {
   workspaceKey: string;
   remoteSessionId?: string;
   ownerTaskId: string | null;
@@ -1482,6 +1533,102 @@ export function applyBrowserTabResidencyEvent(
   return { ...current, tabs };
 }
 
+export function restoreBrowserTabShells(
+  current: WorkspaceSidePaneState | null,
+  shells: readonly BrowserViewRestoredTabShell[],
+  scope?: {
+    workspaceKey: string;
+    remoteSessionId?: string;
+    sessionId: string;
+  },
+): WorkspaceSidePaneState {
+  let next: WorkspaceSidePaneState = current ?? { tabs: [], activeTabId: "" };
+  const hadActiveTabInScope = Boolean(
+    scope &&
+    current?.tabs.some(
+      (tab) =>
+        tab.id === current.activeTabId &&
+        (tab.type === "browser" || tab.type === "browser-use") &&
+        tab.workspaceKey === scope.workspaceKey &&
+        (tab.remoteSessionId ?? "") === (scope.remoteSessionId ?? "") &&
+        (tab.type === "browser-use"
+          ? tab.sessionId === scope.sessionId
+          : (tab.ownerTaskId ?? "unscoped") === scope.sessionId),
+    ),
+  );
+  for (const shell of shells) {
+    const existing = next.tabs.find(
+      (tab) =>
+        (tab.type === "browser" && tab.id === shell.tabId) ||
+        (tab.type === "browser-use" && tab.tabId === shell.tabId),
+    );
+    if (existing) continue;
+    const tab: BrowserSidePaneTab | BrowserUseSidePaneTab =
+      shell.origin === "agent"
+        ? {
+            id: `browser-use:${shell.tabId}`,
+            type: "browser-use",
+            ownerTaskId: shell.sessionId,
+            workspaceKey: shell.workspaceKey,
+            ...(shell.remoteSessionId ? { remoteSessionId: shell.remoteSessionId } : {}),
+            sessionId: shell.sessionId,
+            tabId: shell.tabId,
+            browserId: shell.browserId,
+            browserGeneration: shell.browserGeneration,
+            openedAt: shell.openedAt,
+            title: shell.title,
+            faviconUrl: shell.faviconUrl,
+            residency: "suspended",
+            residencyGeneration: 0,
+          }
+        : {
+            id: shell.tabId,
+            type: "browser",
+            // Bug 原因：草稿态内存 owner 是 null，但 IPC/持久层编码为 "unscoped"；
+            // 冷恢复必须对称解码，否则 tab 虽已恢复到状态中，却会被草稿 scope 永久隐藏。
+            ownerTaskId: shell.sessionId === "unscoped" ? null : shell.sessionId,
+            workspaceKey: shell.workspaceKey,
+            ...(shell.remoteSessionId ? { remoteSessionId: shell.remoteSessionId } : {}),
+            initialUrl: shell.restoreUrl,
+            title: shell.title,
+            faviconUrl: shell.faviconUrl,
+            openedAt: shell.openedAt,
+            residency: "suspended",
+            residencyGeneration: 0,
+          };
+    next = {
+      tabs: [...next.tabs, tab],
+      activeTabId: next.activeTabId || tab.id,
+    };
+  }
+  if (scope && !hadActiveTabInScope) {
+    const preferred = shells
+      .filter(
+        (shell) =>
+          shell.workspaceKey === scope.workspaceKey &&
+          (shell.remoteSessionId ?? "") === (scope.remoteSessionId ?? "") &&
+          shell.sessionId === scope.sessionId,
+      )
+      .sort(
+        (left, right) =>
+          (right.lastSelectedAt ?? Number.NEGATIVE_INFINITY) -
+            (left.lastSelectedAt ?? Number.NEGATIVE_INFINITY) ||
+          left.openedAt - right.openedAt ||
+          left.tabId.localeCompare(right.tabId),
+      )[0];
+    if (preferred) {
+      // Bug 原因：旧恢复直接激活 openedAt 第一条，持久化的 lastSelectedAt 完全未消费。
+      // tab strip 仍按 openedAt 保持原顺序，只单独选择当前 scope 的最近使用项。
+      next = {
+        ...next,
+        activeTabId:
+          preferred.origin === "agent" ? `browser-use:${preferred.tabId}` : preferred.tabId,
+      };
+    }
+  }
+  return next;
+}
+
 export function openCodeViewerSidePane(
   current: WorkspaceSidePaneState | null,
   source: CodeViewerSource,
@@ -1558,6 +1705,13 @@ export function activateGitSidePane(
   current: WorkspaceSidePaneState | null,
 ): WorkspaceSidePaneState {
   return activateSidePaneTab(current, createGitSidePaneTab());
+}
+
+export function activateTreemappingSidePane(
+  current: WorkspaceSidePaneState | null,
+  source?: TreemappingSidePaneSource,
+): WorkspaceSidePaneState {
+  return activateSidePaneTab(current, createTreemappingSidePaneTab(source));
 }
 
 export function openWhiteboardSidePane(
@@ -1789,7 +1943,7 @@ export function replaceWorkflowRunSidePane(
   );
   const previous = current.tabs[index];
   if (index < 0 || previous?.type !== "workflow-run") return current;
-  // 就地生效的修订（只改并发上限、run 仍在运行）没有后继，
+  // 就地生效的修订（只改并发上限、run 又在飞：docs/dynamic-workflow/concurrency.md）没有后继，
   // 结果里的 runId 就是被替换的这一个。tab 的 id 只由 runId 铸，所以不挡在这里的话，下面那支
   // 「新 tab 已经开着」会认出它自己、把这个 tab 关掉，只留一个指向已不存在 tab 的 activeTabId。
   if (nextTab.id === previous.id) return current;
@@ -1908,6 +2062,7 @@ export function isSidePaneTabVisibleForParent(
   if (
     tab.type === "selection-side-chat" ||
     tab.type === "plan-detail" ||
+    tab.type === "plugin-ui" ||
     tab.type === "workflow-run" ||
     tab.type === "workflow-directory" ||
     tab.type === "workflow-actor-session" ||
@@ -1945,7 +2100,7 @@ export function getVisibleSidePaneTabs(
   return input?.tabs.filter((tab) => isSidePaneTabVisibleForParent(tab, parentSessionId)) ?? [];
 }
 
-function selectSidePaneTabsForParent(
+export function selectSidePaneTabsForParent(
   current: WorkspaceSidePaneState | null,
   parentSessionId: string | null,
   preferredTabId?: string | null,
@@ -2045,6 +2200,31 @@ export function closeSidePaneTab(
     tabs: nextTabs,
     activeTabId: nextTabs[fallbackIndex]!.id,
   };
+}
+
+export function closeOtherSidePaneTabs(
+  current: WorkspaceSidePaneState | null,
+  tabId: string,
+): WorkspaceSidePaneState | null {
+  if (!current) {
+    return null;
+  }
+
+  const targetTab = current.tabs.find((tab) => tab.id === tabId);
+  if (!targetTab || current.tabs.length <= 1) {
+    return current;
+  }
+
+  return {
+    // 交互说明：右键“关闭其他标签”以当前被操作的 tab 为保留对象，
+    // 即使它原本不是激活项，也要同步激活，避免内容区指向一个已被移除的 activeTabId。
+    tabs: [targetTab],
+    activeTabId: targetTab.id,
+  };
+}
+
+export function closeAllSidePaneTabs(): WorkspaceSidePaneState | null {
+  return null;
 }
 
 export function setActiveSidePaneTab(

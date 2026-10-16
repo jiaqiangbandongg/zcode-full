@@ -34,7 +34,7 @@ function getBrowserStorage(): StorageLike | null {
   }
 }
 
-function getComposerDraftStorageKey(workspacePath: string, workspaceIdentity?: string) {
+export function getComposerDraftStorageKey(workspacePath: string, workspaceIdentity?: string) {
   const workspaceKey = workspaceIdentity?.trim() || workspacePath;
   return `${STORAGE_KEY_PREFIX}${encodeURIComponent(workspaceKey)}`;
 }

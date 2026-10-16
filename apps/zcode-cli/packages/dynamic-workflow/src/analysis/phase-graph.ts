@@ -284,7 +284,12 @@ export function projectPhaseGraph(
   for (const phase of phases) {
     // 成员为零的阶段丢掉（may-set 收窄可能把某阶段的全部 step 拿走）——空节点没有家可指。
     if (!members.has(phase.id)) continue;
-    phaseList.push({ id: phase.id, loc: phase.loc, name: phase.name });
+    phaseList.push({
+      id: phase.id,
+      loc: phase.loc,
+      name: phase.name,
+      ...(phase.fill === undefined ? {} : { fill: phase.fill }),
+    });
   }
   const live = new Set(phaseList.map((phase) => phase.id));
 

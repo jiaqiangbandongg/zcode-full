@@ -20,7 +20,7 @@ import type { CuaPermissionKind, Locale } from "@zcode/shared";
 import { resolvePanelBounds, type PanelSize, type Rect } from "./cuaPermissionPanelPositioner.js";
 
 /** 浮窗需要的最小窗口能力面，便于测试替身实现。 */
-interface CuaPermissionPanelWindow {
+export interface CuaPermissionPanelWindow {
   onceReadyToShow(callback: () => void): void;
   setBounds(bounds: Rect): void;
   showInactive(): void;
@@ -30,7 +30,7 @@ interface CuaPermissionPanelWindow {
   send(channel: string, payload: unknown): void;
 }
 
-interface CreateCuaPermissionDragPanelOptions {
+export interface CreateCuaPermissionDragPanelOptions {
   createWindow: (initialBounds: Rect) => CuaPermissionPanelWindow;
   getDisplayWorkArea: () => Rect;
   /** 系统设置窗口 bounds 数据源；缺失或抛错时 fail-open 到屏幕底部。 */

@@ -1,6 +1,7 @@
 import type { PresentationPageElement } from "@/presentation/types.js";
 
-export const PPTX_ELEMENT_REFERENCE_ADD_TO_CHAT_EVENT = "zcode:pptx-element-reference-add-to-chat";
+export const PPTX_ELEMENT_REFERENCE_ADD_TO_CHAT_EVENT =
+  "zcode:pptx-element-reference-add-to-chat";
 const PPTX_ELEMENT_COMMENT_BLOCK_TITLE = "# Presentation element comments:";
 const PPTX_ELEMENT_COMMENT_BLOCK_DIRECTIVE =
   "Each item below is an independent comment on one presentation element. Treat every non-empty `comment` as the user's instruction for that element, process all of them, and never apply one item's comment to another reference.";
@@ -13,7 +14,9 @@ function escapeRegExp(value: string) {
 // 标题与 JSON 围栏之间若用通配匹配 directive，正文里出现的同名标题也会命中，
 // 并把它之后的用户正文整段吞进尾块。这里改成按 directive 常量精确匹配。
 const PPTX_ELEMENT_COMMENT_BLOCK_PATTERN = new RegExp(
-  `(?:^|\\n\\n)${escapeRegExp(PPTX_ELEMENT_COMMENT_BLOCK_TITLE)}\\s*\\n\\n${escapeRegExp(
+  `(?:^|\\n\\n)${escapeRegExp(
+    PPTX_ELEMENT_COMMENT_BLOCK_TITLE,
+  )}\\s*\\n\\n${escapeRegExp(
     PPTX_ELEMENT_COMMENT_BLOCK_DIRECTIVE,
   )}\\s*\\n\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\`\\s*$`,
   "u",
@@ -70,7 +73,10 @@ export function getPptxElementReferenceWorkspaceKey(
 }
 
 export function isPptxElementReferenceInWorkspaceScope(
-  reference: Pick<PptxElementReference, "workspacePath" | "workspaceIdentity" | "remoteSessionId">,
+  reference: Pick<
+    PptxElementReference,
+    "workspacePath" | "workspaceIdentity" | "remoteSessionId"
+  >,
   scope: {
     workspacePath: string;
     workspaceIdentity?: string;
@@ -78,17 +84,30 @@ export function isPptxElementReferenceInWorkspaceScope(
   },
 ) {
   return (
-    getPptxElementReferenceWorkspaceKey(reference.workspacePath, reference.workspaceIdentity) ===
-      getPptxElementReferenceWorkspaceKey(scope.workspacePath, scope.workspaceIdentity) &&
-    (reference.remoteSessionId ?? "") === (scope.remoteSessionId ?? "")
+    getPptxElementReferenceWorkspaceKey(
+      reference.workspacePath,
+      reference.workspaceIdentity,
+    ) ===
+      getPptxElementReferenceWorkspaceKey(
+        scope.workspacePath,
+        scope.workspaceIdentity,
+      ) && (reference.remoteSessionId ?? "") === (scope.remoteSessionId ?? "")
   );
 }
 
-function isPptxElementReferencePayload(payload: unknown): payload is PptxElementReference {
+export function isPptxElementReferencePayload(
+  payload: unknown,
+): payload is PptxElementReference {
   if (!isRecord(payload) || !isRecord(payload.bounds)) {
     return false;
   }
-  const nodeTypes = new Set(["shape", "picture", "chart", "table", "table-cell"]);
+  const nodeTypes = new Set([
+    "shape",
+    "picture",
+    "chart",
+    "table",
+    "table-cell",
+  ]);
   const hasCellCoordinates =
     Number.isInteger(payload.rowIndex) &&
     (payload.rowIndex as number) >= 0 &&
@@ -134,15 +153,20 @@ function isPptxElementReferencePayload(payload: unknown): payload is PptxElement
   );
 }
 
-function createPptxElementReferenceId() {
+export function createPptxElementReferenceId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `pptx-element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export async function sha256Fingerprint(value: ArrayBuffer | string): Promise<string> {
-  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+export async function sha256Fingerprint(
+  value: ArrayBuffer | string,
+): Promise<string> {
+  const bytes =
+    typeof value === "string"
+      ? new TextEncoder().encode(value)
+      : new Uint8Array(value);
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   const hex = [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -167,8 +191,12 @@ export async function createPptxElementReference(options: {
     ...options.element,
     id: createPptxElementReferenceId(),
     workspacePath: options.workspacePath,
-    ...(options.workspaceIdentity ? { workspaceIdentity: options.workspaceIdentity } : {}),
-    ...(options.remoteSessionId ? { remoteSessionId: options.remoteSessionId } : {}),
+    ...(options.workspaceIdentity
+      ? { workspaceIdentity: options.workspaceIdentity }
+      : {}),
+    ...(options.remoteSessionId
+      ? { remoteSessionId: options.remoteSessionId }
+      : {}),
     sourcePath: options.sourcePath,
     sourceTitle: options.sourceTitle,
     sourceFingerprint: options.sourceFingerprint,
@@ -199,11 +227,15 @@ export function addPptxElementReference(
   reference: PptxElementReference,
 ): readonly PptxElementReference[] {
   const key = getReferenceDedupeKey(reference);
-  const existingIndex = references.findIndex((item) => getReferenceDedupeKey(item) === key);
+  const existingIndex = references.findIndex(
+    (item) => getReferenceDedupeKey(item) === key,
+  );
   if (existingIndex < 0) {
     return [...references, reference];
   }
-  return references.map((item, index) => (index === existingIndex ? reference : item));
+  return references.map((item, index) =>
+    index === existingIndex ? reference : item,
+  );
 }
 
 export function buildPromptWithPptxElementReferences(
@@ -259,7 +291,9 @@ export function isPptxElementReferenceAddToChatEvent(
   );
 }
 
-export function dispatchPptxElementReferenceAddToChat(reference: PptxElementReference) {
+export function dispatchPptxElementReferenceAddToChat(
+  reference: PptxElementReference,
+) {
   window.dispatchEvent(
     new CustomEvent(PPTX_ELEMENT_REFERENCE_ADD_TO_CHAT_EVENT, {
       detail: reference,

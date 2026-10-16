@@ -15,7 +15,7 @@ import type {
   DynamicWorkflowRunArtifactKind,
   DynamicWorkflowRunArtifactVersion,
 } from "@zcode/contracts";
-import type { JournalStorePort, NodeRecord } from "@zcode/dynamic-workflow";
+import type { JournalStorePort } from "@zcode/dynamic-workflow";
 
 /**
  * 终态快照与 `getRunDetail` 上的 `artifacts`：**用户面产物**。
@@ -40,14 +40,11 @@ import type { JournalStorePort, NodeRecord } from "@zcode/dynamic-workflow";
  *   - `itemCount` = 打了这个 id 标签的 `report` 行数（预置看板的数据量，也是 UI 的刷新信号）。
  *     内容产物恒 0。
  *
- * `nodes` 是调用方已在手的节点列表（快照那条路径同一次 `listNodes` 供 reports 与本函数共用）；
- * 缺席时自己取一次。零件时整字段缺席——空数组读起来像「跑过但没产出」，而缺席才是「这个 run
- * 没有产物这个概念」。
+ * 零件时整字段缺席——空数组读起来像「跑过但没产出」，而缺席才是「这个 run 没有产物这个概念」。
  */
 export function artifactsOf(
   runId: string,
   journal: JournalStorePort,
-  nodes?: readonly NodeRecord[],
 ): { artifacts?: readonly DynamicWorkflowRunArtifact[] } {
   const candidate = journal as Partial<DwfRunIntrospectionQueries>;
   if (typeof candidate.listArtifactRows !== "function") return {};
@@ -77,10 +74,10 @@ export function artifactsOf(
   }
   if (byId.size === 0) return {};
 
-  // 标签计数只在**真有预置看板**时才扫节点表：内容产物的 `itemCount` 恒 0，而 `listNodes`
-  // 是一次全表解码。中枢一页 50 行、每行调一次本函数，这条短路是那条路径上唯一的挡板。
+  // 标签计数只在**真有预置看板**时才查：内容产物的 `itemCount` 恒 0。中枢一页 50 行、每行调一次
+  // 本函数，这条短路让没有看板的 run 连那条 group by 都不发。
   const needsTally = [...byId.values()].some((bucket) => PRESET_ARTIFACT_KINDS.has(bucket.kind));
-  const itemCounts = needsTally ? tagItemCounts(nodes ?? journal.listNodes(runId)) : undefined;
+  const itemCounts = needsTally ? tagItemCounts(runId, journal) : undefined;
   const artifacts = [...byId].map(([id, bucket]) => {
     const versions = [...bucket.versions].sort((left, right) => left.version - right.version);
     // 最新版 = 版本号最大的那一条。空 bucket 不可能（构造时至少一条）。
@@ -108,11 +105,21 @@ export function artifactsOf(
   return { artifacts };
 }
 
-/** 标签 report 行的按 id 计数（`kind = "report" ∧ artifact_id = ?`——看板的数据量）。 */
-function tagItemCounts(nodes: readonly NodeRecord[]): Map<string, number> {
+/**
+ * 标签 report 行的按 id 计数（`kind = "report" ∧ artifact_id = ?`——看板的数据量）。
+ *
+ * SQLite 实现带 `countTaggedReports`（`group by` 下推，行一条都不读）；不带它的 store（引擎的内存
+ * 实现、测试替身）退回读 report 行的**元数据**（不带 item）在内存里数——两条路给同一个数。修复
+ * 原因：此前这里把整张节点表连同每条 report item 读进内存再数（docs/execution-engine.md
+ * 「Reading the journal」）。
+ */
+function tagItemCounts(runId: string, journal: JournalStorePort): ReadonlyMap<string, number> {
+  const candidate = journal as Partial<DwfRunIntrospectionQueries>;
+  if (typeof candidate.countTaggedReports === "function")
+    return candidate.countTaggedReports(runId);
   const counts = new Map<string, number>();
-  for (const node of nodes) {
-    if (node.kind !== "report" || node.artifactId === undefined) continue;
+  for (const node of journal.listNodes(runId, { kinds: ["report"], withResult: false })) {
+    if (node.artifactId === undefined) continue;
     counts.set(node.artifactId, (counts.get(node.artifactId) ?? 0) + 1);
   }
   return counts;

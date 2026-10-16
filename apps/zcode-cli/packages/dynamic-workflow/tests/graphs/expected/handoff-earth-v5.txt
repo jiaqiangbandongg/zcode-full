@@ -1,0 +1,65 @@
+node source
+node ask#1 "architect" @44:34 actors=actor#1 type="Contract"
+node join#1 "join" @50:39 type="[BuildReport, ...BuildReport[]]"
+node ask#2 "harness" @51:11 actors=actor#2 type="BuildReport"
+node fan-out#1 "fan-out" @52:6 type="BuildReport[]"
+node ask#3 "ask" @52:45 actors=actor#3 within=fan-out#1 type="BuildReport"
+node world-read#1 "run node" @60:27 type="WorldRunResult"
+node ask#4 "fixer" @62:29 actors=actor#4 type="FixReport"
+node world-read#2 "run node" @66:27 type="WorldRunResult"
+node ask#5 "fixer" @69:17 actors=actor#4 type="FixReport"
+node world-read#3 "run node" @87:29 type="WorldRunResult"
+node ask#6 "fixer" @89:17 actors=actor#4 type="FixReport"
+node join#2 "join" @92:34 type="JuryVerdict[]"
+node fan-out#2 "fan-out" @92:38 type="JuryVerdict[]"
+node ask#7 "j" @92:73 actors=actor#5,actor#6,actor#7 within=fan-out#2 type="JuryVerdict"
+node ask#8 "polisher" @97:18 actors=actor#8 type="FixReport"
+node world-read#4 "run node" @101:29 type="WorldRunResult"
+node ask#9 "juryA" @103:33 actors=actor#5 type="JuryVerdict"
+node world-read#5 "run node" @110:30 type="WorldRunResult"
+node world-read#6 "run node" @111:30 type="WorldRunResult"
+node sink
+actor actor#1 "architect" @43:19
+actor actor#2 "harness" @48:17
+actor actor#3 @52:23 within=fan-out#1
+actor actor#4 "fixer" @57:15
+actor actor#5 "jury-a" @79:15
+actor actor#6 "jury-b" @80:15
+actor actor#7 "jury-c" @81:15
+actor actor#8 "polisher" @82:18
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> fan-out#1 data exact
+edge source -> world-read#1 data exact
+edge source -> world-read#2 data exact
+edge source -> world-read#3 data exact
+edge source -> fan-out#2 data exact
+edge source -> ask#7 data exact
+edge source -> world-read#4 data exact
+edge source -> ask#9 data exact
+edge source -> world-read#5 data exact
+edge source -> world-read#6 data exact
+edge ask#1 -> sink data exact type="Contract"
+edge ask#2 -> join#1 data exact type="BuildReport"
+edge fan-out#1 -> join#1 data exact type="BuildReport[]"
+edge fan-out#1 -> ask#3 data exact type="BuildReport[]"
+edge ask#3 -> join#1 data exact type="BuildReport"
+edge world-read#1 -> ask#4 data exact type="WorldRunResult"
+edge ask#4 -> ask#5 context exact
+edge ask#4 -> ask#6 context exact
+edge world-read#2 -> ask#5 data exact type="WorldRunResult"
+edge ask#5 -> ask#6 context exact
+edge world-read#3 -> ask#6 data exact type="WorldRunResult"
+edge join#2 -> ask#8 data exact type="JuryVerdict[]"
+edge join#2 -> sink data exact type="JuryVerdict[]"
+edge fan-out#2 -> join#2 data exact type="JuryVerdict[]"
+edge fan-out#2 -> ask#8 data exact type="JuryVerdict[]"
+edge fan-out#2 -> sink data exact type="JuryVerdict[]"
+edge ask#7 -> join#2 data exact type="JuryVerdict"
+edge ask#7 -> ask#8 data exact type="JuryVerdict"
+edge ask#7 -> ask#9 context inexact
+edge ask#7 -> sink data exact type="JuryVerdict"
+edge ask#9 -> ask#8 data exact type="JuryVerdict"
+edge ask#9 -> sink data exact type="JuryVerdict"
+edge world-read#5 -> sink data exact type="WorldRunResult"
+edge world-read#6 -> sink data exact type="WorldRunResult"

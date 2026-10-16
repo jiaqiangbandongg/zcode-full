@@ -30,6 +30,7 @@ export function createBotRemoteWorkspaceService(params: {
   parentPort?: ParentPortLike | null;
   settingService: ISettingService;
   credentialService: ICredentialService;
+  createRuntimeServicesFromPort?: (port: unknown) => RemoteBotWorkspaceRuntimeServices;
 }) {
   const parentPort = params.parentPort;
   if (!parentPort) {
@@ -308,7 +309,9 @@ export function createBotRemoteWorkspaceService(params: {
     // Bugfix: Bot 任务以前只知道远端 identity，却继续调用本地 task service。
     // 这里把 main 转发来的远端 RPC 端口包装成一组 runtime services；
     // task wrapper 命令走 IZCodeTaskService，session 主状态走 ZCode session facade。
-    const services = createRemoteRuntimeServicesFromPort(result.port);
+    const services =
+      params.createRuntimeServicesFromPort?.(result.port) ??
+      createRemoteRuntimeServicesFromPort(result.port);
     // 远端 Bot 与 UI workspace 共用同一个远端 Environment。这里只确认远端
     // Model Selection Facade 已就绪，Desktop 不再向远端注入完整 Provider Registry。
     await services.modelSelectionService.getView();

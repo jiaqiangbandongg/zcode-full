@@ -1,0 +1,3 @@
+actor-node workspace
+actor-node actor#1 @10:22
+actor-edge workspace -> actor#1 inexact count=1 types="string[]"

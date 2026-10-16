@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-anthropic-reasoning-history-replay",
+  "spec": "./test/e2e/conversation-session/conversation-session-anthropic-reasoning-history-replay.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-anthropic-reasoning-history-replay.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "anthropic-reasoning-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是本 case 的产品语义；固定响应避免标题请求误命中 reasoning 主请求。"
+    },
+    {
+      "id": "anthropic-reasoning-signature-start-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实兼容问题的 provider wire shape：start 有签名但没有原生 signature_delta。"
+    },
+    {
+      "id": "anthropic-reasoning-standard-signature-delta-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "显式锁定标准原生 signature_delta 解析，避免只覆盖 start-signature 兼容分支。"
+    },
+    {
+      "id": "anthropic-reasoning-native-signature-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "同时验证已有原生 delta 不被重复补、三类 reasoning metadata 能进入 live history。"
+    },
+    {
+      "id": "anthropic-reasoning-live-replay",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "用独立 provider attempt 证明标准 delta、start fallback 与 native precedence 均已进入多轮 live history。"
+    },
+    {
+      "id": "anthropic-reasoning-cold-replay",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只需稳定完成；核心证据是 cold request body 保留历史 metadata 与 provenance。"
+    },
+    {
+      "id": "anthropic-reasoning-cross-model",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "matcher 直接锁定跨模型 signed/redacted 被移除、unsigned 被保留的 provider wire。"
+    },
+    {
+      "id": "anthropic-reasoning-orphan-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "需要真实持久化 reasoning-only turn，下一逻辑请求才能验证孤立 assistant 清理。"
+    },
+    {
+      "id": "anthropic-reasoning-orphan-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "matcher 要求孤立 reasoning marker 已从 provider request 移除。"
+    },
+    {
+      "id": "anthropic-reasoning-empty-envelope-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 turn 只产出 signed reasoning，下一轮切模型后应由结构修复补 assistant envelope。"
+    },
+    {
+      "id": "anthropic-reasoning-empty-envelope-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "matcher 约束 signed reasoning 已删除但 (no content) assistant 仍存在。"
+    },
+    {
+      "id": "anthropic-reasoning-whitespace-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "切模型清理签名后只剩 whitespace，验证删除 assistant 与普通 user 合并。"
+    },
+    {
+      "id": "anthropic-reasoning-whitespace-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "matcher 约束两个普通 user marker 同时存在且无 signed reasoning。"
+    },
+    {
+      "id": "anthropic-reasoning-retry-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后续每个 retry 分支都复用同一真实持久历史，验证修复只修改请求副本。"
+    },
+    {
+      "id": "anthropic-reasoning-http-signature-400",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性触发首 token 前签名拒绝，验证请求副本修复和零退避一次重试。"
+    },
+    {
+      "id": "anthropic-reasoning-http-signature-retry-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "matcher 证明第二 attempt 只移除 signed/redacted，保留 unsigned 与普通回答。"
+    },
+    {
+      "id": "anthropic-reasoning-retry-canonical-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 retry 清理没有写回 MessageHistory 或持久化数据。"
+    },
+    {
+      "id": "anthropic-reasoning-sse-signature-400",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "覆盖错误来自 stream consume 而非 HTTP setup 的同一签名修复入口。"
+    },
+    {
+      "id": "anthropic-reasoning-sse-signature-retry-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二 attempt 的 matcher 与 HTTP 分支相同，保证两条错误入口使用同一修复投影。"
+    },
+    {
+      "id": "anthropic-reasoning-unrelated-400",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证窄化错误文案匹配，其他 invalid_request 不得修改历史或额外请求。"
+    },
+    {
+      "id": "anthropic-reasoning-double-signature-400-first",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首腿允许 request-local repair，maxMatches 保证下一物理请求进入第二拒绝 fixture。"
+    },
+    {
+      "id": "anthropic-reasoning-double-signature-400-second",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二腿要求 signed/redacted 已删除，并再次返回相同 400 验证 one-shot 上限。"
+    },
+    {
+      "id": "anthropic-reasoning-visible-signature-error",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "Bug 根因：覆盖率插桩下 180ms 不足以保证 AI SDK 消费已结束的 text block，错误会先到达并被误判为 pre-output；保留 5s 消费窗口后再注入签名错误，验证已提交可见输出时不得重试。"
+    },
+    {
+      "id": "anthropic-reasoning-unsigned-only-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "持久化只有 unsigned reasoning 的旧会话，并在完整重启后验证 cold replay。"
+    },
+    {
+      "id": "anthropic-reasoning-no-change-signature-400",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "冷恢复的 unsigned reasoning 会先发给 provider；既有清理无变化，因此必须只有一个物理 attempt。"
+    }
+  ]
+}

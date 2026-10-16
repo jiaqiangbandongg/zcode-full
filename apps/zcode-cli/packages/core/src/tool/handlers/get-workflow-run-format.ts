@@ -56,6 +56,7 @@ export function formatGetWorkflowRunModelContent(output: unknown): ModelMessageC
     `<summary>${escapeWorkflowRunText(run.summary)}</summary>`,
     ...identityBlocks(run),
     ...pendingQuestionBlocks(run),
+    ...holeBlocks(run),
     formatWorkflowRunHealthBlock(run, terminal),
     ...optionalBlock(formatWorkflowRunPhasesBlock(run, terminal)),
     formatWorkflowRunSubagentsBlock(run),
@@ -92,6 +93,17 @@ function identityBlocks(run: GetWorkflowRunOutput): string[] {
     ...(run.subagentModel === undefined
       ? []
       : [`<subagent_model>${escapeWorkflowRunText(run.subagentModel)}</subagent_model>`]),
+    // 同一族：脚本点名的模型，一行一个 `"名字" = 规范串`，只在脚本点名过模型时在场。
+    ...(run.modelBindings === undefined || Object.keys(run.modelBindings).length === 0
+      ? []
+      : [
+          `<script_models>\n${Object.entries(run.modelBindings)
+            .map(
+              ([name, canonical]) =>
+                `"${escapeWorkflowRunText(name)}" = ${escapeWorkflowRunText(canonical)}`,
+            )
+            .join("\n")}\n</script_models>`,
+        ]),
     ...(run.supersededBy === undefined
       ? []
       : [`<superseded_by>${escapeWorkflowRunText(run.supersededBy)}</superseded_by>`]),
@@ -140,6 +152,32 @@ function pendingQuestionBlocks(run: GetWorkflowRunOutput): string[] {
   return [
     `<pending_questions>\n${rendered.join("\n\n")}\n\n${PENDING_QUESTIONS_INSTRUCTION}\n</pending_questions>`,
   ];
+}
+
+/**
+ * 留白（docs/dynamic-workflow/launch.md「The `FillWorkflowHole` tool」），紧随停驻的问题：等着的留白
+ * 与待答问题是同一种「此刻等着模型做的事」，补过的留白列在后面只为让模型知道那一支已经续上。
+ * 与 `<amendable>` 同一种路由姿态：块尾点名 FillWorkflowHole 与要传的 hole_id。
+ */
+function holeBlocks(run: GetWorkflowRunOutput): string[] {
+  const holes = run.holes ?? [];
+  if (holes.length === 0) return [];
+  const rendered = holes.map((hole) => {
+    const head = `[${escapeWorkflowRunText(hole.siteId)}] "${escapeWorkflowRunText(hole.name)}": ${escapeWorkflowRunText(hole.type)}`;
+    if (hole.state === "waiting") {
+      const age = formatRelativeAge(run.generatedAt, hole.since);
+      return `${head} — waiting${age === undefined ? "" : ` ${age.replace(/ ago$/u, "")}`}`;
+    }
+    const age = formatRelativeAge(run.generatedAt, hole.filledAt);
+    const by = hole.filledBy === undefined ? "" : ` by ${escapeWorkflowRunText(hole.filledBy)}`;
+    return `${head} — filled${age === undefined ? "" : ` ${age}`}${by}`;
+  });
+  const waiting = holes.filter((hole) => hole.state === "waiting").length;
+  const instruction =
+    waiting === 0
+      ? "Every hole above has been filled; its body is part of the run's script now (see <amendable> to change it)."
+      : `Each waiting hole parks one branch of the script until you supply its body, and nothing times out on its behalf. Read the run's draft for context, write only the statements of the hole's function returning its type, and call FillWorkflowHole with run_id="${escapeWorkflowRunText(run.runId)}" and the hole id in brackets as hole_id. The rest of the run keeps running meanwhile.`;
+  return [`<holes>\n${rendered.join("\n")}\n\n${instruction}\n</holes>`];
 }
 
 /** nodes_observed 是已落库节点的行数，绝不冒充「总步数」：动态工作流没有静态总数。 */

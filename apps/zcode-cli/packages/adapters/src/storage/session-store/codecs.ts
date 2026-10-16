@@ -31,6 +31,7 @@ export function isCollaborationMode(value: unknown): value is CollaborationMode 
     value === "build" ||
     value === "edit" ||
     value === "yolo" ||
+    value === "guarded" ||
     value === "auto"
   );
 }

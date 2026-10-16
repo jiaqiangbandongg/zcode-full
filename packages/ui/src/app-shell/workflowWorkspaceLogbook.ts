@@ -107,7 +107,7 @@ interface PeekLine {
   error: boolean;
 }
 
-function isErrorLine(line: string): boolean {
+export function isErrorLine(line: string): boolean {
   const trimmed = line.trim();
   return /^([×✗✖]|x\s|FAIL\b|ERR(OR)?\b|Error\b|error:)/i.test(trimmed) || /Error:/.test(trimmed);
 }
@@ -136,4 +136,9 @@ export function rememberedOpen(key: string): boolean {
 
 export function setRememberedOpen(key: string, open: boolean): void {
   openState.set(key, open);
+}
+
+/** 测试用：清空展开态记忆。 */
+export function resetWorkspaceEntryOpenState(): void {
+  openState.clear();
 }

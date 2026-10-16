@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-prompt-assembly",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-prompt-assembly.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-prompt-assembly.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "~/.zcode/agents/e2e-prompt-assembly-reviewer.md",
+      "source": "created-by-spec",
+      "description": "覆盖 custom subagent prompt assembly，验证 markdown body 进入 child provider-visible system[1]。"
+    },
+    {
+      "path": "~/.zcode/cli/agents/e2e-prompt-assembly-reviewer.md",
+      "source": "created-by-spec",
+      "description": "兼容 CLI legacy agents root，避免路径差异让 custom subagent 解析停在 not found。"
+    },
+    {
+      "path": "~/.zcode/agents/e2e-prompt-assembly-isolated.md",
+      "source": "created-by-spec",
+      "description": "覆盖显式 injectAgentsMd=false 的 custom subagent。"
+    },
+    {
+      "path": "~/.zcode/cli/agents/e2e-prompt-assembly-isolated.md",
+      "source": "created-by-spec",
+      "description": "兼容 CLI legacy agents root，确保显式关闭继承的 custom profile 可加载。"
+    },
+    {
+      "path": "~/.zcode/AGENTS.md",
+      "source": "created-by-spec",
+      "description": "提供唯一 user AGENTS marker，验证 child trajectory 的继承次数和顺序。"
+    },
+    {
+      "path": "AGENTS.md",
+      "source": "created-by-spec",
+      "description": "提供唯一 workspace AGENTS marker，验证 child trajectory 的继承次数和顺序。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "subagent-prompt-assembly-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 child provider-visible prompt assembly；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 Explore child 省略父级 AGENTS.md；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Explore child 请求本身是省略 AGENTS.md 的 trajectory 证据；响应只需稳定完成。"
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Explore 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 custom child provider-visible prompt assembly；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "custom child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "custom 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 custom false child 省略父级 AGENTS.md；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "custom false child 请求本身是省略 AGENTS.md 的 trajectory 证据；响应只需稳定完成。"
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "custom false 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+    }
+  ]
+}

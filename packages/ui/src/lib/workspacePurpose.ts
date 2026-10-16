@@ -1,11 +1,17 @@
 import type { WorkspacePurpose } from "@zcode/shared";
 import type { WorkspaceTabState } from "@/store/tabStore.js";
 
-function getWorkspacePurpose(target: { workspacePurpose?: WorkspacePurpose }): WorkspacePurpose {
-  return target.workspacePurpose === "conversation" ? "conversation" : "project";
+export function getWorkspacePurpose(target: {
+  workspacePurpose?: WorkspacePurpose;
+}): WorkspacePurpose {
+  return target.workspacePurpose === "conversation"
+    ? "conversation"
+    : "project";
 }
 
-export function partitionWorkspaceTabsByPurpose(workspaceTabs: WorkspaceTabState[]): {
+export function partitionWorkspaceTabsByPurpose(
+  workspaceTabs: WorkspaceTabState[],
+): {
   allTaskWorkspaceTabs: WorkspaceTabState[];
   conversationWorkspaceTabs: WorkspaceTabState[];
   projectWorkspaceTabs: WorkspaceTabState[];

@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "maybe": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ok",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ok",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "error": {
+              "type": "string"
+            },
+            "ok": {
+              "const": false
+            }
+          },
+          "required": [
+            "ok",
+            "error"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "record": {
+      "additionalProperties": false,
+      "properties": {
+        "createdAtEpoch": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "createdAtEpoch"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "outcome",
+    "maybe",
+    "record"
+  ],
+  "type": "object"
+}

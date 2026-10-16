@@ -470,7 +470,7 @@ function WeekdayPicker({
               }}
               className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-ui-base text-foreground transition-colors hover:bg-menu-hover"
             >
-              {/* 勾选位放在行首会让星期菜单偏离标准的尾部状态布局。 */}
+              {/* Bug 原因：勾选位放在行首会让星期菜单偏离标准的尾部状态布局。 */}
               <span className="min-w-0 flex-1 truncate">
                 {intl.formatMessage({ id: `automations.weekday.${day}` })}
               </span>
@@ -1011,7 +1011,7 @@ function CustomRepeatDialog({
                 })}
               </button>
             </div>
-            {/* 原生 date input 会在暗色主题中弹出不可控的系统白色月历。*/}
+            {/* 修复原因：原生 date input 会在暗色主题中弹出不可控的系统白色月历。 */}
             <EndDatePicker
               value={endDate}
               min={toDateInputValue(Date.now())}
@@ -1064,7 +1064,7 @@ export interface AutomationEditSubmit {
   workspaceIdentity?: string;
 }
 
-interface AutomationEditViewProps {
+export interface AutomationEditViewProps {
   /** null = 新建；否则编辑。 */
   editing: ZCodeAutomation | null;
   /** 新建预填(来自 More ideas 模板)。 */
@@ -1087,7 +1087,7 @@ interface AutomationEditViewProps {
   onOpenSession?: (sessionId: string) => void;
 }
 
-async function saveAndRunAutomation(
+export async function saveAndRunAutomation(
   save: () => Promise<boolean>,
   run: () => Promise<void> | void,
 ): Promise<boolean> {
@@ -2088,7 +2088,7 @@ export function AutomationEditView({
                   {intl.formatMessage({ id: "automations.form.status.label" })}
                 </div>
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
-                  {/* 状态圆点与胶囊沿用了偏大的 8px / 36px 尺寸，未遵循 6px glyph + 20px frame 的规格。 */}
+                  {/* Bug 原因：状态圆点与胶囊沿用了偏大的 8px / 36px 尺寸，未遵循 6px glyph + 20px frame 的规格。 */}
                   <span className="inline-flex h-8 max-w-full items-center gap-1 rounded-lg bg-card pl-2 pr-4 text-ui-base leading-5 text-foreground">
                     <span className="flex size-5 shrink-0 items-center justify-center">
                       <span
@@ -2117,7 +2117,7 @@ export function AutomationEditView({
               >
                 {intl.formatMessage({ id: "automations.form.title.label" })}
               </label>
-              {/* Task title 是标准 Input，不能局部移除全局描边语义。*/}
+              {/* 修复原因：Task title 是标准 Input，不能局部移除全局描边语义。 */}
               <Input
                 id="automation-title"
                 size="lg"
@@ -2227,7 +2227,7 @@ export function AutomationEditView({
                   </DropdownMenu>
                 ) : (
                   <>
-                    {/* 调度栏不用 min-height、换行布局和全行摘要——那些会在新增 tag 后被第二行撑高。
+                    {/* Bugfix：调度栏原先使用 min-height、换行布局和全行摘要，新增 tag 后会被第二行撑高。
                         恢复全局 Input 的 1px 描边后，用 7px 左内边距抵消边框占位，保持首个 tag
                         距外边缘仍为 8px；tag 增加上下各 1px padding 后仍在 36px input 内垂直居中。 */}
                     <div className="relative flex h-9 flex-nowrap items-center gap-1 overflow-hidden rounded-xl border border-input-border bg-input py-1 pl-[7px] pr-9 text-ui-base leading-5 text-foreground transition-colors hover:border-input-border-hover focus-within:border-input-border-focused focus-within:bg-input-focused">
@@ -2255,7 +2255,7 @@ export function AutomationEditView({
                           }));
                         }}
                       >
-                        {/* 频率触发器曾写死深色值，导致浅色主题下对比失真；
+                        {/* 修复原因：频率触发器曾写死深色值，导致浅色主题下对比失真；
                             改用 hover/selected 语义 token，并在 20px 行高外增加上下各 1px padding。 */}
                         <SelectTrigger
                           variant="ghost"
@@ -2326,7 +2326,7 @@ export function AutomationEditView({
                         />
                       ) : null}
 
-                      {/* 重复周期曾写死 #F8F8F8 且三段 tag 圆角不一致；统一语义文字色与 pill 圆角。*/}
+                      {/* Bugfix：重复周期曾写死 #F8F8F8 且三段 tag 圆角不一致；统一语义文字色与 pill 圆角。 */}
                       {builder.frequency === "custom" ? (
                         <button
                           type="button"
@@ -2366,7 +2366,7 @@ export function AutomationEditView({
 
                       {builder.frequency !== "custom" && builder.frequency !== "hourly" ? (
                         <>
-                          {/* 连接词曾单独使用二级色，和相邻 tag 主文字形成错误的高亮断层。*/}
+                          {/* 修复原因：连接词曾单独使用二级色，和相邻 tag 主文字形成错误的高亮断层。 */}
                           <span className="text-foreground">
                             {intl.formatMessage({
                               id: "automations.form.schedule.at",
@@ -2638,7 +2638,7 @@ export function AutomationEditView({
                       </Button>
                     )}
 
-                    {/* 自动化曾复制首页权限菜单，导致图标、字号和选中态逐渐分叉。
+                    {/* Bugfix：自动化曾复制首页权限菜单，导致图标、字号和选中态逐渐分叉。
                         直接复用首页 ConfigSelect，只覆盖紧凑 trigger 布局。 */}
                     <ConfigSelect
                       option={modeOption}
@@ -2733,7 +2733,7 @@ export function AutomationEditView({
         ) : (
           // History tab：运行历史内联表
           <div>
-            {/* 运行条件已在设置入口说明，历史页重复提示会挤占表格上方空间。*/}
+            {/* 修复原因：运行条件已在设置入口说明，历史页重复提示会挤占表格上方空间。 */}
             {runsLoading && runs.length === 0 ? (
               <div className="flex h-32 items-center justify-center">
                 <Spinner className="size-5" />
@@ -2749,7 +2749,7 @@ export function AutomationEditView({
               </AutomationHistoryEmptyState>
             ) : (
               <div className="overflow-x-auto rounded-[8px]">
-                {/* 运行历史使用可缩放字号，不能继续绑定固定 18px 行高。*/}
+                {/* 修复原因：运行历史使用可缩放字号，不能继续绑定固定 18px 行高。 */}
                 <table className="w-full text-left text-ui-base font-normal leading-normal tracking-[-0.08px]">
                   <thead className="bg-surface text-foreground-subtle">
                     <tr className="h-[30px] border-b border-border">

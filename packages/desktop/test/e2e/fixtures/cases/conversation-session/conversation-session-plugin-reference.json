@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-reference",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-reference.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-reference.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "plugin-reference-e2e/note.md",
+      "source": "created-by-spec",
+      "description": "Read 测试工具的目标文件；spec 在发送前写入 DEFAULT_WORKSPACE。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "plugin-reference-title",
+      "description": "E2E_PLUGIN_REFERENCE 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首发会触发默认 title sidecar；固定 case-local 标题响应并用首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "plugin-reference-reminder-tool-call",
+      "description": "PLG01 wire 门禁：请求 body 必须携带 identifiers-only 的 <plugin_reference> reminder（含 skill-creator stable id）才放行，并驱动一次 Read 测试工具调用。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 provider 收到 reminder：fixture 以 bodyIncludes <plugin_reference> 作为匹配门禁，不依赖真实模型的随机偏好。"
+    },
+    {
+      "id": "plugin-reference-final-reply",
+      "description": "Read 工具结果回灌后的收口回复，输出时间线断言 marker。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二步以工具结果内容 + tool id 匹配，保证顺序确定性。"
+    }
+  ]
+}

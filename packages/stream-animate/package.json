@@ -1,0 +1,28 @@
+{
+  "name": "@zcode/stream-animate",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server/index.ts --dev",
+    "build": "tsc -p tsconfig.server.json && vite build",
+    "preview": "node dist-server/server/index.js",
+    "run:sample": "tsx src/server/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
+  },
+  "dependencies": {
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.2"
+  }
+}

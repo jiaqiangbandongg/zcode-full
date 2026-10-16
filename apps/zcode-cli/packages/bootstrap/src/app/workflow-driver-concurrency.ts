@@ -113,7 +113,8 @@ export function createActorModelActivity(input: {
   live?: () => InstanceRef | undefined;
   handlers: ActorModelActivityHandlers;
   /**
-   * 本 run 的座位闸门与这个子代理在闸门里的键。在场时准入端口再包一层：先等座位、再过治理器。缺席即这个 run
+   * 本 run 的座位闸门与这个子代理在闸门里的键（docs/dynamic-workflow/concurrency.md
+   * 「Retuning a live run」）。在场时准入端口再包一层：先等座位、再过治理器。缺席即这个 run
    * 的上界从不中途变动（snippet 执行、不带闸门的装配），准入端口与从前逐字相同。
    */
   seat?: { gate: WorkflowRunSeatGate; key: string };
@@ -169,8 +170,7 @@ export function createActorModelActivity(input: {
     if (!chains.delete(key) || anyExecuting()) return;
     let latest: Chain | undefined;
     for (const chain of chains.values()) {
-      if (chain.wait !== undefined && (latest === undefined || chain.waitSeq > latest.waitSeq))
-        latest = chain;
+      if (chain.wait !== undefined && (latest === undefined || chain.waitSeq > latest.waitSeq)) latest = chain;
     }
     if (latest?.wait !== undefined) reportWaiting(latest.wait);
   };
@@ -190,7 +190,8 @@ export function createActorModelActivity(input: {
             );
           },
         };
-  // 本 run 自己的上界在**共享 cap 之上**再包一层。闸门要的那条子代理事实——
+  // 本 run 自己的上界在**共享 cap 之上**再包一层（两条界的分工见
+  // docs/dynamic-workflow/concurrency.md「Two bounds on a run」）。闸门要的那条子代理事实——
   // 此刻有没有工具在跑——就取自同一个对象里的工具观察面，所以两个读者共用一份账。
   const admission =
     seat === undefined
@@ -222,8 +223,7 @@ export function createActorModelActivity(input: {
       if (typeof (runtime as Partial<AgentRuntime>).subscribeEvents !== "function") return;
       unsubscribeEvents = runtime.subscribeEvents({
         onSessionEvent: (event: SessionEvent) => {
-          if (event.type !== SessionEventType.ModelNetworkStatus || event.sessionId !== sessionId)
-            return;
+          if (event.type !== SessionEventType.ModelNetworkStatus || event.sessionId !== sessionId) return;
           const status = event.payload as ModelNetworkStatusEvent;
           const key = chainKey(status);
           switch (status.type) {
@@ -288,8 +288,8 @@ function chainKey(status: ModelNetworkStatusEvent): string {
 
 // ————————————————————————————— run 级 stall 时钟—————————————————————————————
 
-/** 连续多久没有一次成功的模型请求就通知主代理一次。 */
-const WORKFLOW_STALL_NOTIFY_AFTER_MS = 20 * 60_000;
+/** 连续多久没有一次成功的模型请求就通知主代理一次（apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md「Terminal states」）。 */
+export const WORKFLOW_STALL_NOTIFY_AFTER_MS = 20 * 60_000;
 
 /** 时钟与定时器（可注入，测试用假时间）。 */
 export interface WorkflowClock {

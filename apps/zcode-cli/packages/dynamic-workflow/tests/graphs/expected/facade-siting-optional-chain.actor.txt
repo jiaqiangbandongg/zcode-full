@@ -1,0 +1,9 @@
+actor-node source
+actor-node workspace
+actor-node actor#1 "seed" @4:20
+actor-node actor#2 "planner" @6:17
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge workspace -> actor#2 exact count=1 types="string"
+actor-edge actor#1 -> workspace exact count=1 types="string"
+actor-edge actor#2 -> sink exact count=1 types="string"

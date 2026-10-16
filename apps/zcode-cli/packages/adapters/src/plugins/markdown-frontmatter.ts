@@ -24,7 +24,7 @@ export function readMarkdownFrontmatter(filePath: string): {
 }
 
 /** 纯函数版：直接解析 Markdown 文本的 frontmatter，便于单测覆盖块标量分支。 */
-function parseMarkdownFrontmatter(content: string): {
+export function parseMarkdownFrontmatter(content: string): {
   name?: string;
   description?: string;
 } {
@@ -104,7 +104,10 @@ function readBlockScalar(
     line.trim().length === 0 ? "" : line.slice(indent ?? 0),
   );
   return {
-    value: style === "folded" ? foldBlockScalarLines(contentLines) : contentLines.join("\n").trim(),
+    value:
+      style === "folded"
+        ? foldBlockScalarLines(contentLines)
+        : contentLines.join("\n").trim(),
     nextIndex: index,
   };
 }

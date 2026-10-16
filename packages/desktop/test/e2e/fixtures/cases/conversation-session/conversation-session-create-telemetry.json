@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-create-telemetry",
+  "spec": "./test/e2e/conversation-session/conversation-session-create-telemetry.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-create-telemetry.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "session-create-first",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+    },
+    {
+      "id": "session-create-next",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+    },
+    {
+      "id": "session-create-group",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+    },
+    {
+      "id": "session-create-direct",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+    }
+  ]
+}

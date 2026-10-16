@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-p0",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-p0.test.ts",
+  "fixtures": [
+    {
+      "id": "ssh-remote-p0-title",
+      "description": "远端 task 标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不属于本 case 语义，只需保持 task row 稳定。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_REMOTE_P0"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-ssh-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH Remote P0\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-remote-p0-a-first",
+      "description": "workspace A 首发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_SSH_REMOTE_P0_A_FIRST_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-ssh-a1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_SSH_REMOTE_P0_A_FIRST_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-a1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-remote-p0-b-first",
+      "description": "workspace B 首发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_SSH_REMOTE_P0_B_FIRST_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-ssh-b1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_SSH_REMOTE_P0_B_FIRST_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-b1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-remote-p0-a-follow",
+      "description": "workspace A 续发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证 task A 续发历史隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_SSH_REMOTE_P0_A_FOLLOW_PROMPT"],
+        "bodyIncludes": ["E2E_SSH_REMOTE_P0_A_FIRST_PROMPT"],
+        "bodyExcludes": [
+          "E2E_SSH_REMOTE_P0_B_FIRST_PROMPT",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-ssh-a2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_SSH_REMOTE_P0_A_FOLLOW_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-a2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":48,\"completion_tokens\":8,\"total_tokens\":56}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-remote-p0-b-follow",
+      "description": "workspace B 续发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证 task B 续发历史隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_SSH_REMOTE_P0_B_FOLLOW_PROMPT"],
+        "bodyIncludes": ["E2E_SSH_REMOTE_P0_B_FIRST_PROMPT"],
+        "bodyExcludes": [
+          "E2E_SSH_REMOTE_P0_A_FIRST_PROMPT",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-ssh-b2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_SSH_REMOTE_P0_B_FOLLOW_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-b2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-p0-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":48,\"completion_tokens\":8,\"total_tokens\":56}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

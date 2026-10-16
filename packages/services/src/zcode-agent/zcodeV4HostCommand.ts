@@ -35,7 +35,11 @@ export function uuidv7(now: number = Date.now()): string {
 /** host services 进程稳定 clientId；pendingCommands 展示与幂等表以它区分提交端。 */
 const hostV4ClientId = `host-services-${uuidv7()}`;
 
-interface CreateHostCommandEnvelopeInput<T extends CommandType> {
+export function getHostV4ClientId(): string {
+  return hostV4ClientId;
+}
+
+export interface CreateHostCommandEnvelopeInput<T extends CommandType> {
   type: T;
   payload: CommandPayloadMap[T];
   /** createSession 时为 null。 */
@@ -58,16 +62,22 @@ export function createHostCommandEnvelope<T extends CommandType>(
   input: CreateHostCommandEnvelopeInput<T>,
 ): CommandEnvelope {
   if (COMMANDS_REQUIRING_BASE_REVISION.has(input.type) && input.baseRevision === undefined) {
-    throw new Error(`command ${input.type} 是 CAS 命令，必须携带 baseRevision`);
+    throw new Error(
+      `command ${input.type} 是 CAS 命令，必须携带 baseRevision（10-protocol-spec §6.4）`,
+    );
   }
   if (ROW_TARGETING_COMMANDS.has(input.type) && !input.baseLogEpoch) {
-    throw new Error(`command ${input.type} 是 row target 命令，必须携带 baseLogEpoch`);
+    throw new Error(
+      `command ${input.type} 是 row target 命令，必须携带 baseLogEpoch`,
+    );
   }
   return {
     commandId: input.commandId ?? uuidv7(),
     clientId: input.clientId ?? hostV4ClientId,
     sessionId: input.sessionId,
-    ...(input.baseRevision !== undefined ? { baseRevision: input.baseRevision } : {}),
+    ...(input.baseRevision !== undefined
+      ? { baseRevision: input.baseRevision }
+      : {}),
     ...(input.baseLogEpoch ? { baseLogEpoch: input.baseLogEpoch } : {}),
     type: input.type,
     payload: input.payload,
@@ -76,7 +86,7 @@ export function createHostCommandEnvelope<T extends CommandType>(
 }
 
 /** v4 命令被服务端否决（rejected/stale/failed）。code 供调用方结构化分流，不匹配错误文案。 */
-class ZCodeV4CommandRejectedError extends Error {
+export class ZCodeV4CommandRejectedError extends Error {
   readonly code = "ZCODE_V4_COMMAND_REJECTED";
 
   constructor(

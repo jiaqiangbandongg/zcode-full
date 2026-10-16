@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/superpowers-plugin",
+  "version": "5.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Superpowers skills and startup hooks published as an official ZCode plugin."
+}

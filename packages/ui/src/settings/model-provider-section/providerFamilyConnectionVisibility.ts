@@ -6,6 +6,7 @@ import type {
   UsageEntitlementSubscriptionDetail,
   UsageQuotaLimit,
 } from "@zcode/shared";
+import type { ProviderSettingsFormProvider } from "@/lib/providerSettingsFormTypes.js";
 import {
   getModelProviderFamilySpec,
   isIndividualCodingPlanModelProviderId,
@@ -37,7 +38,7 @@ function createTeamPlanNavigationKey(
     .join(":");
 }
 
-interface ResolvedCodingPlanEntitlementState {
+export interface ResolvedCodingPlanEntitlementState {
   statusLabelId?: string;
   status: CodingPlanStatus;
   planLevel: string | null;
@@ -277,6 +278,30 @@ export function buildVisibleFamilyConnectionItems({
   });
 }
 
+export function buildVisibleFamilyConnectionKeys({
+  items,
+  subscribedTeamProducts,
+  showPurchasedTeamPlanFallback,
+  modelProviders,
+}: {
+  items: Array<Extract<ModelProviderNavGroup["items"][number], { type: "codingPlan" }>>;
+  subscribedTeamProducts: EnterpriseCodingPlanProductDisplay[];
+  showPurchasedTeamPlanFallback: boolean;
+  modelProviders: readonly ProviderSettingsFormProvider[];
+}): Set<string> {
+  const visibleItems = buildVisibleFamilyConnectionItems({
+    items,
+    codingPlanEntitlements: {},
+    subscribedTeamProducts,
+    connectionSelections: {},
+    teamPlanSelections: {},
+    showPurchasedTeamPlanFallback,
+  });
+  const keys = new Set(visibleItems.map((item) => item.key));
+  void modelProviders;
+  return keys;
+}
+
 function filterStartPlanItemsByEntitlement({
   items,
   codingPlanEntitlements,
@@ -482,7 +507,7 @@ function appendSubscribedTeamPlanItems({
           // Team Plan 复用对应 family 的 Coding Plan provider，但管理入口必须进入团队套餐页；
           // 继续继承个人 Coding Plan 的 personal/overview 会把用户带到错误的套餐上下文。
           purchaseUrl: getModelProviderFamilySpec(productFamily).teamCodingPlanManageUrl,
-          // Team Plan 入口存在、项目 API Key 可复制，都不能证明团队套餐有效。
+          // 修复原因：Team Plan 入口存在、项目 Key ID 已就绪，都不能证明团队套餐有效。
           // 有效性必须由团队 quota snapshot 决定，避免继续显示个人套餐的已启用状态。
           status: teamPlanUnavailable ? ("unavailable" as const) : ("purchased" as const),
           // Project Key 不可用和 Team quota 未分配是不同事实。
@@ -498,7 +523,7 @@ function appendSubscribedTeamPlanItems({
           subscriptionBillingCycle: null,
           subscriptionRenewTime: null,
           subscriptionExpireTime: null,
-          // Team Plan 项目没有可用 zcode-team-api-key 时，不能继续当作已启用连接方式。
+          // 修复原因：Team Plan 项目无法取得专用 Key ID 时不能换 Token，连接方式应标为不可用。
           // 服务端会按组织/项目返回 apiKeyStatus；UI 需要在连接项和状态卡中明确标成不可用。
           statusActive: !teamPlanUnavailable,
         },

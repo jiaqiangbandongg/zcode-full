@@ -1,0 +1,16 @@
+node source
+node join#1 "join" @11:30 type="Draft[]"
+node fan-out#1 "fan-out" @11:34 type="Draft[]"
+node ask#1 "ask" @11:73 actors=actor#1 within=fan-out#1 type="Draft"
+node ask#2 "reviewer" @13:32 actors=actor#2 type="string"
+node sink
+actor actor#1 @11:52 within=fan-out#1
+actor actor#2 "reviewer" @12:18
+edge source -> fan-out#1 data exact
+edge join#1 -> ask#2 data exact type="Draft[]"
+edge fan-out#1 -> join#1 data exact type="Draft[]"
+edge fan-out#1 -> ask#1 data exact type="Draft[]"
+edge fan-out#1 -> ask#2 data exact type="Draft[]"
+edge ask#1 -> join#1 data exact type="Draft"
+edge ask#1 -> ask#2 data exact type="Draft"
+edge ask#2 -> sink data exact type="string"

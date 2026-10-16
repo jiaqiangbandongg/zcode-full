@@ -2,7 +2,7 @@ import { materializeZCodeBuiltinProviderConfig } from "@zcode/services/node";
 
 declare const __ZCODE_BUILTIN_PROVIDER_CONFIG_JSON__: string | undefined;
 
-interface MaterializeBundledZCodeBuiltinProviderConfigOptions {
+export interface MaterializeBundledZCodeBuiltinProviderConfigOptions {
   readonly environmentConfigRoot: string;
   readonly content: string;
 }

@@ -1,0 +1,6 @@
+lane actor#1 "r" @36:10 families=loop#1
+region seq#1 seq
+region loop#1 loop parent=seq#1 @35:1 label="refine"
+step ask#1 ask "r" @37:6 lane=actor#1 region=loop#1 always serial
+edge ask#1 -> ask#1 carry always
+sink ask#1

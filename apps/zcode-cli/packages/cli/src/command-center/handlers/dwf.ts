@@ -5,6 +5,7 @@ import type {
 } from "@zcode/contracts";
 import type { CommandCenterDeps } from "../types.js";
 import { splitArgs } from "../utils.js";
+import { isWorkflowModeEnabled, WORKFLOW_DISABLED_NOTICE } from "../../workflow-mode.js";
 
 const DWF_USAGE = "Usage: /dwf [list|cancel [runId]|resume <runId>]";
 
@@ -39,6 +40,8 @@ export async function handleDwfCommand(
   }
 
   if (action === "resume") {
+    // resume 会起引擎，disabled 下在问服务端之前拒绝；list / cancel 不起引擎，照常。
+    if (!isWorkflowModeEnabled(deps.workflowMode)) return respond(deps, WORKFLOW_DISABLED_NOTICE);
     if (!runId) return respond(deps, DWF_USAGE);
     if (!app.resumeWorkflowRun) return unavailable(deps);
     const result = await app.resumeWorkflowRun({ workId: runId });

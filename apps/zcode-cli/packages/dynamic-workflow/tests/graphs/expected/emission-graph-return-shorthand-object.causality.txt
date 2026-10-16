@@ -1,0 +1,7 @@
+lane actor#1 "planner" @8:23
+lane actor#2 "nested" @9:20
+region seq#1 seq
+step ask#1 ask "planner" @8:40 lane=actor#1 region=seq#1 always
+step ask#2 ask "nested" @9:36 lane=actor#2 region=seq#1 always
+edge ask#1 -> ask#2 seq always
+sink ask#1,ask#2

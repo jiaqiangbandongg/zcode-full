@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-composer-provider-identity",
+  "spec": "./test/e2e/conversation-session/conversation-session-composer-provider-identity.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-composer-provider-identity.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "纯 UI 模型选择和窗口缩放，不发送 prompt；provider 通过正式 Personal Config 在隔离 HOME 准备。",
+  "requests": []
+}

@@ -61,11 +61,14 @@ const outputSchema = `z.object({
 export default function Page() {
   return (
     <Agent>
-      <AgentHeader name="Sentiment Analyzer" model="anthropic/claude-sonnet-4-5" />
+      <AgentHeader
+        name="Sentiment Analyzer"
+        model="anthropic/claude-sonnet-4-5"
+      />
       <AgentContent>
         <AgentInstructions>
-          Analyze the sentiment of the provided text and return a structured analysis with sentiment
-          classification, confidence score, and summary.
+          Analyze the sentiment of the provided text and return a structured
+          analysis with sentiment classification, confidence score, and summary.
         </AgentInstructions>
         <AgentTools>
           <AgentTool tool={webSearch} value="web_search" />
@@ -91,48 +94,48 @@ export default function Page() {
 
 ### `<Agent />`
 
-| Prop       | Type                    | Default | Description                           |
-| ---------- | ----------------------- | ------- | ------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any props are spread to the root div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any props are spread to the root div. |
 
 ### `<AgentHeader />`
 
-| Prop       | Type                    | Default  | Description                                      |
-| ---------- | ----------------------- | -------- | ------------------------------------------------ |
-| `name`     | `string`                | Required | The name of the agent.                           |
-| `model`    | `string`                | -        | The model identifier (e.g.                       |
-| `...props` | `React.ComponentProps<` | -        | Any other props are spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | Required | The name of the agent. |
+| `model` | `string` | - | The model identifier (e.g.  |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
 
 ### `<AgentContent />`
 
-| Prop       | Type                    | Default | Description                                      |
-| ---------- | ----------------------- | ------- | ------------------------------------------------ |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
 
 ### `<AgentInstructions />`
 
-| Prop       | Type                    | Default  | Description                                      |
-| ---------- | ----------------------- | -------- | ------------------------------------------------ |
-| `children` | `string`                | Required | The instruction text.                            |
-| `...props` | `React.ComponentProps<` | -        | Any other props are spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `string` | Required | The instruction text. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |
 
 ### `<AgentTools />`
 
-| Prop       | Type                                     | Default | Description                                            |
-| ---------- | ---------------------------------------- | ------- | ------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof Accordion>` | -       | Any other props are spread to the Accordion component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof Accordion>` | - | Any other props are spread to the Accordion component. |
 
 ### `<AgentTool />`
 
-| Prop       | Type                                         | Default  | Description                                                             |
-| ---------- | -------------------------------------------- | -------- | ----------------------------------------------------------------------- |
-| `tool`     | `Tool`                                       | Required | The tool object from the AI SDK containing description and inputSchema. |
-| `value`    | `string`                                     | Required | Unique identifier for the accordion item.                               |
-| `...props` | `React.ComponentProps<typeof AccordionItem>` | -        | Any other props are spread to the AccordionItem component.              |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `tool` | `Tool` | Required | The tool object from the AI SDK containing description and inputSchema. |
+| `value` | `string` | Required | Unique identifier for the accordion item. |
+| `...props` | `React.ComponentProps<typeof AccordionItem>` | - | Any other props are spread to the AccordionItem component. |
 
 ### `<AgentOutput />`
 
-| Prop       | Type                    | Default  | Description                                                         |
-| ---------- | ----------------------- | -------- | ------------------------------------------------------------------- |
-| `schema`   | `string`                | Required | The output schema as a string (displayed with syntax highlighting). |
-| `...props` | `React.ComponentProps<` | -        | Any other props are spread to the container div.                    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `schema` | `string` | Required | The output schema as a string (displayed with syntax highlighting). |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the container div. |

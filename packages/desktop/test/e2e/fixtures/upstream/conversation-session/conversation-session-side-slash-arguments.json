@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-slash-arguments",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-slash-arguments.test.ts",
+  "fixtures": [
+    {
+      "id": "side-slash-arguments-title",
+      "description": "所有 slash argument child 的标题 sidecar 固定返回，避免标题请求抢占主消息 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是 slash argument 语义；按统一 E2E marker 返回固定标题，隔离 replay 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SLASH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Slash arguments E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-parent-running",
+      "description": "父任务 running 窗口：首 delta 很快到达，完流延迟到 60 秒，允许在父 turn 期间提交 /btw 参数。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "running 组合需要稳定的父 active turn；真实 provider 完流时间不可控。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_PARENT_RUNNING"],
+        "bodyIncludes": ["E2E_SLASH_PARENT_RUNNING"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"side-slash-arguments-parent-running\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 700,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"E2E_SLASH_PARENT_RUNNING_STREAMING\"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 60000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" done\"}}\n\n"
+          },
+          {
+            "sequence": 4,
+            "offsetMs": 60100,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "sequence": 5,
+            "offsetMs": 60200,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":96,\"output_tokens\":12,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "sequence": 6,
+            "offsetMs": 60300,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "side-slash-arguments-parent-seed",
+      "description": "父会话首发 seed 的固定快速文本响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父会话只需稳定建立 session，不依赖真实 provider 生成。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_PARENT_SEED"],
+        "bodyIncludes": ["E2E_SLASH_PARENT_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-parent-seed",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-side-idle",
+      "description": "idle /side firstInput 的固定快速文本响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "idle alias 断言只需稳定的 child 文本响应。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_SIDE_IDLE"],
+        "bodyIncludes": ["E2E_SLASH_SIDE_IDLE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-side-idle",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-btw-multiline",
+      "description": "带外层空白和内部换行的 /btw firstInput 固定响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 parser trim 边界与多行参数保留。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_BTW_MULTILINE"],
+        "bodyIncludes": ["E2E_SLASH_BTW_MULTILINE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-btw-multiline",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-second-side",
+      "description": "连续提交组合中的 /side child 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "连续 child 创建只需稳定响应，验证不复用 child。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_SECOND_SIDE"],
+        "bodyIncludes": ["E2E_SLASH_SECOND_SIDE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-second-side",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-second-btw",
+      "description": "连续提交组合中的 /btw child 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "连续 child 创建只需稳定响应，验证不复用 child。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_SECOND_BTW"],
+        "bodyIncludes": ["E2E_SLASH_SECOND_BTW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-second-btw",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "side-slash-arguments-running-child",
+      "description": "父任务 running 时 /btw child 的固定快速响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child startNow 断言需要在父 controlled stream 期间快速完成。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SLASH_RUNNING_CHILD"],
+        "bodyIncludes": ["E2E_SLASH_RUNNING_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "side-slash-arguments-running-child",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

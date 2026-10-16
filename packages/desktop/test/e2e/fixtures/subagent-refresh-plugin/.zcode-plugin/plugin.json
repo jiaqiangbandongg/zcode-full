@@ -1,0 +1,6 @@
+{
+  "name": "e2e-subagent-refresh",
+  "version": "1.0.0",
+  "description": "E2E plugin agent model override fixture",
+  "agents": "agents"
+}

@@ -44,7 +44,7 @@ const WORKFLOW_DRAFT_MAX_SLUG_CHARS = 64;
 /**
  * 名字里一个可用字符都不剩时的兜底（中文名是最常见的那一种）。
  */
-const WORKFLOW_DRAFT_FALLBACK_SLUG = "workflow";
+export const WORKFLOW_DRAFT_FALLBACK_SLUG = "workflow";
 
 /**
  * 同名时的后缀上界。撞满这么多次只可能是有人在拿同一个名字刷提交，此时放弃写草稿（返回
@@ -52,7 +52,7 @@ const WORKFLOW_DRAFT_FALLBACK_SLUG = "workflow";
  */
 const WORKFLOW_DRAFT_MAX_ATTEMPTS = 1_000;
 
-interface WriteWorkflowDraftInput {
+export interface WriteWorkflowDraftInput {
   /**
    * 会话工作目录；草稿落在它的 `.zcode/workflow-drafts/` 下。缺席即宿主没有工作目录概念
    * （端口 stub / 无会话上下文），此时无处可写，与写失败同义。
@@ -119,7 +119,7 @@ export function resolveWorkflowDraftName(
  * 截到上限（按码点，不按 UTF-16 单元，免得把一个字切成半个代理对）；什么都不剩、或只剩点
  * （`.` / `..` 是目录项，不是文件名）时用兜底词。
  */
-function workflowDraftSlug(name: string): string {
+export function workflowDraftSlug(name: string): string {
   const reduced = Array.from(
     name
       .trim()

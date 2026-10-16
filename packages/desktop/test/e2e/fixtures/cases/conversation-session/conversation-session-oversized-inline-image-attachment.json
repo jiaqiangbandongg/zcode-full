@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-oversized-inline-image-attachment",
+  "spec": "./test/e2e/conversation-session/conversation-session-oversized-inline-image-attachment.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-oversized-inline-image-attachment.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "oversized-local-path-image-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 provider-visible 请求的附件形态；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

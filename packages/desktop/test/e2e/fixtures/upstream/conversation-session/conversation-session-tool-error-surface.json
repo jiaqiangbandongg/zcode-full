@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-error-surface",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-error-surface.test.ts",
+  "fixtures": [
+    {
+      "id": "tool-error-surface-title",
+      "description": "tool error surface case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-tool-error-surface-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Tool Error Surface\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "tool-error-surface-parent-agent-tools",
+      "description": "父 agent 首轮请求返回一个 stale Agent 和一个 healthy Agent，用于覆盖失败展示和 sibling 不被阻断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造同轮两个 Agent tool_use，其中 stale profile 在 runtime 启动 child 前失败。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_ERROR_SURFACE_PARENT"],
+        "bodyIncludes": [
+          "E2E_TOOL_ERROR_SURFACE_PARENT",
+          "E2E_TOOL_ERROR_SURFACE_PARENT_DONE",
+          "E2E_TOOL_ERROR_SURFACE_STALE_CHILD",
+          "E2E_TOOL_ERROR_SURFACE_HEALTHY_CHILD",
+          "e2e-stale-error-reviewer",
+          "e2e-healthy-error-reviewer"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_tool_error_surface_stale_agent",
+            "name": "Agent",
+            "input": {
+              "description": "Run stale provider Agent for error surface coverage",
+              "prompt": "E2E_TOOL_ERROR_SURFACE_STALE_CHILD: attempt to inspect the workspace. This child should fail before any model request because its profile model uses custom:e2e-stale-provider:e2e-stale-model.",
+              "subagent_type": "e2e-stale-error-reviewer"
+            }
+          },
+          {
+            "id": "toolu_e2e_tool_error_surface_healthy_agent",
+            "name": "Agent",
+            "input": {
+              "description": "Run healthy sibling Agent for error surface coverage",
+              "prompt": "E2E_TOOL_ERROR_SURFACE_HEALTHY_CHILD: reply with exactly E2E_TOOL_ERROR_SURFACE_HEALTHY_OK and no other text.",
+              "subagent_type": "e2e-healthy-error-reviewer"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "tool-error-surface-healthy-child-final",
+      "description": "healthy sibling child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明 stale Agent 失败不会阻断同轮 healthy Agent child 请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_ERROR_SURFACE_HEALTHY_CHILD"],
+        "bodyIncludes": ["E2E_TOOL_ERROR_SURFACE_HEALTHY_CHILD"],
+        "bodyExcludes": [
+          "E2E_TOOL_ERROR_SURFACE_STALE_CHILD",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-tool-error-surface-healthy-child-final",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_TOOL_ERROR_SURFACE_HEALTHY_OK"
+        }
+      }
+    },
+    {
+      "id": "tool-error-surface-parent-final",
+      "description": "父 agent 收到 stale failed tool_result 和 healthy success tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复用于证明父 continuation 看到的 failed tool_result 已经是具体 provider 根因而不是泛化 Turn failure。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_TOOL_ERROR_SURFACE_PARENT",
+          "toolu_e2e_tool_error_surface_stale_agent",
+          "toolu_e2e_tool_error_surface_healthy_agent",
+          "Model provider is not configured: e2e-stale-provider",
+          "E2E_TOOL_ERROR_SURFACE_HEALTHY_OK"
+        ],
+        "bodyExcludes": [
+          "Turn execution failed",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-tool-error-surface-parent-final",
+          "inputTokens": 180,
+          "outputTokens": 12,
+          "text": "E2E_TOOL_ERROR_SURFACE_PARENT_DONE"
+        }
+      }
+    }
+  ]
+}

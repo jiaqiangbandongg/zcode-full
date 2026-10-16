@@ -1,0 +1,16 @@
+flowchart LR
+  source(["source"])
+  actor_1["scanner"]
+  actor_2["planner"]
+  actor_3["reviewer"]
+  actor_4["judge ×N"]
+  sink(["sink"])
+  source --> actor_1
+  actor_1 -->|"Flaky"| actor_4
+  actor_1 -->|"Flaky"| sink
+  actor_2 -->|"string"| actor_3
+  actor_2 -->|"string"| sink
+  actor_3 -->|"Review"| actor_2
+  actor_4 -->|"Review"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class source,sink endpoint;

@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "data": {},
+    "id": {
+      "type": "string"
+    },
+    "meta": {
+      "additionalProperties": {},
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "data",
+    "meta"
+  ],
+  "type": "object"
+}

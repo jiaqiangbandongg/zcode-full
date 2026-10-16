@@ -1,22 +1,30 @@
+import type { RequestVerificationReason } from "@zcode/shared";
+import { createHash } from "node:crypto";
 import {
   BIGMODEL_PROVIDER_ID,
   type OAuthProviderId,
   type ProviderFamilyDomain,
+  type ProjectAccessTokenMaterial,
   type ZCodeAccountAccess,
   type ZCodeProviderAccountAccess,
   ZAI_PROVIDER_ID,
 } from "@zcode/shared";
 
 export interface AccountRequestAuthMaterial {
+  /** 私有传输字段兼容旧命名；套餐 OAuth 实际传入短期 Project Token。 */
   apiKey?: string;
+  apiKeyId?: string;
   headers?: Record<string, string>;
+  accountScope?: string;
 }
 
 export interface AccountRequestAuthInput {
   providerId: string;
   modelId?: string;
   accountAccess: ZCodeProviderAccountAccess | ZCodeAccountAccess;
-  reason: "model-request" | "off-peak" | "usage";
+  expectedAccountScope?: string;
+  rejectedProjectTokenFingerprint?: string;
+  reason: RequestVerificationReason | "off-peak" | "usage";
 }
 
 export interface AccountAccessIdentityInput {
@@ -45,13 +53,15 @@ interface AccountProviderRequestAuthServiceOptions {
     accessToken?: string | null;
     zcodeJwtToken?: string | null;
   } | null>;
-  loadIndividualPlanApiKey(
+  loadIndividualPlanMaterial(
     providerId: string,
     family: ProviderFamilyDomain,
-  ): Promise<string | null>;
-  resolveTeamPlanApiKey(
+    rejectedProjectTokenFingerprint?: string,
+  ): Promise<ProjectAccessTokenMaterial | null>;
+  resolveTeamPlanMaterial(
     access: Extract<ZCodeAccountAccess, { planKind: "team-coding-plan" }>,
-  ): Promise<string | null>;
+    rejectedProjectTokenFingerprint?: string,
+  ): Promise<ProjectAccessTokenMaterial | null>;
 }
 
 class AccountProviderRequestAuthService implements AccountRequestAuthResolver {
@@ -75,13 +85,53 @@ class AccountProviderRequestAuthService implements AccountRequestAuthResolver {
       return { apiKey: requireApiKey(tokenSet?.zcodeJwtToken, providerId) };
     }
 
-    if (access.planKind === "individual-coding-plan") {
-      const apiKey = await this.#options.loadIndividualPlanApiKey(providerId, access.family);
-      return { apiKey: requireApiKey(apiKey, providerId) };
+    const scoped = input.reason !== "usage" || input.expectedAccountScope !== undefined;
+    if (input.rejectedProjectTokenFingerprint && !input.expectedAccountScope)
+      throw new Error("project_token_scope_invalidated");
+    const accountScope = scoped ? await this.#scope(access) : undefined;
+    if (input.expectedAccountScope !== undefined && input.expectedAccountScope !== accountScope)
+      throw new Error("project_token_scope_invalidated");
+    const material =
+      access.planKind === "individual-coding-plan"
+        ? await this.#options.loadIndividualPlanMaterial(
+            providerId,
+            access.family,
+            input.rejectedProjectTokenFingerprint,
+          )
+        : await this.#options.resolveTeamPlanMaterial(
+            access,
+            input.rejectedProjectTokenFingerprint,
+          );
+    if (scoped) {
+      // 换证 IO 前后校验原请求身份，避免 401 重试或闲时票据串用新账号/项目。
+      const latest = await this.#resolveAccess(input.accountAccess);
+      if (!latest || accountScope !== (await this.#scope(latest)))
+        throw new Error("project_token_scope_invalidated");
     }
+    return {
+      apiKey: requireApiKey(material?.token, providerId),
+      apiKeyId: material?.apiKeyId,
+      ...(accountScope ? { accountScope } : {}),
+    };
+  }
 
-    const apiKey = await this.#options.resolveTeamPlanApiKey(access);
-    return { apiKey: requireApiKey(apiKey, providerId) };
+  async #scope(access: ZCodeAccountAccess): Promise<string> {
+    const login = await this.#options.loadOAuthTokenSet(resolveOAuthProviderId(access.family));
+    if (!login?.accessToken?.trim())
+      throw new AccountRequestCredentialUnavailableError(access.family);
+    return createHash("sha256")
+      .update(
+        JSON.stringify([
+          access.family,
+          access.planKind,
+          access.planKind === "team-coding-plan"
+            ? [access.organizationId, access.projectId, access.productId]
+            : null,
+          login.accessToken.trim(),
+          login.zcodeJwtToken?.trim() ?? null,
+        ]),
+      )
+      .digest("hex");
   }
 
   async assertCurrent(input: AccountAccessIdentityInput): Promise<void> {

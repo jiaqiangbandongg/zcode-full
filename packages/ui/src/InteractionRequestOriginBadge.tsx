@@ -15,13 +15,23 @@ export function InteractionRequestOriginBadge({
     return null;
   }
 
-  const label = intl.formatMessage({ id: "chat.interactionOrigin.subagent" });
-  const title = origin.agentType
-    ? intl.formatMessage(
-        { id: "chat.interactionOrigin.subagent.title" },
-        { agentType: origin.agentType },
-      )
-    : label;
+  // description 点名是哪个子代理在问（动态工作流子代理为 `<名字> (<siteId>@<ordinal>)`，
+  // docs/dynamic-workflow/launch.md「Permissions inside a run」）；徽标截断，完整文本留在 tooltip。
+  const description = origin.description?.trim();
+  const label = description
+    ? intl.formatMessage({ id: "chat.interactionOrigin.subagent.named" }, { description })
+    : intl.formatMessage({ id: "chat.interactionOrigin.subagent" });
+  const title = !origin.agentType
+    ? label
+    : description
+      ? intl.formatMessage(
+          { id: "chat.interactionOrigin.subagent.titleNamed" },
+          { agentType: origin.agentType, description },
+        )
+      : intl.formatMessage(
+          { id: "chat.interactionOrigin.subagent.title" },
+          { agentType: origin.agentType },
+        );
 
   return (
     <Badge

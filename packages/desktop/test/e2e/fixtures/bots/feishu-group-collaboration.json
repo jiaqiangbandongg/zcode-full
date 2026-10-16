@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-GR-01",
+  "classification": "synthetic",
+  "timing": "controlled-admission",
+  "syntheticReason": "Deterministic Feishu/Lark HTTP and task admission responses validate provider-to-service group isolation. This fixture does not claim real CLI FIFO, renderer DOM or live tenant validation.",
+  "promptMarker": "E2E_FEISHU_GROUP_COLLABORATION"
+}

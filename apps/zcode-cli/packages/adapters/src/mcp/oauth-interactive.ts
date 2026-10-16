@@ -47,7 +47,7 @@ export type McpInteractiveAuthorizationOutcome =
   | { status: "pending"; authorizationUrl?: string }
   | { status: "failed"; error: unknown };
 
-interface McpInteractiveAuthorizationInput {
+export interface McpInteractiveAuthorizationInput {
   adapterInstanceId?: string;
   config: McpAuthorizationCodeOAuthConfig;
   credentialStore: SharedZCodeCredentialStore;

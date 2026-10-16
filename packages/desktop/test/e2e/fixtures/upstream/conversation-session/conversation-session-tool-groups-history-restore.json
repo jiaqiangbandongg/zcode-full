@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-groups-history-restore",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-groups-history-restore.test.ts",
+  "fixtures": [
+    {
+      "id": "tge05-read",
+      "description": "TGE05 creates persisted Explore history.",
+      "metadata": { "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定三类 group 的最小历史，验证 cold restore。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_TOOL_GROUPS_HISTORY_RESTORE"], "bodyExcludes": ["Generate a concise title", "toolu_tge05_read"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_tge05_read", "name": "Read", "input": { "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-groups-history-restore/read.txt" } } }
+    },
+    {
+      "id": "tge05-execute",
+      "description": "TGE05 creates persisted Terminal history.",
+      "metadata": { "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定单命令 Terminal，比较 live 与 cold summary。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_TOOL_GROUPS_HISTORY_RESTORE", "toolu_tge05_read"], "bodyExcludes": ["Generate a concise title", "toolu_tge05_execute"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_tge05_execute", "name": "Bash", "input": { "command": "node -e \"console.log('TGE05_EXEC')\"" } } }
+    },
+    {
+      "id": "tge05-write",
+      "description": "TGE05 creates persisted Changes history.",
+      "metadata": { "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定单文件 Changes，比较 live 与 cold summary。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_TOOL_GROUPS_HISTORY_RESTORE", "toolu_tge05_execute"], "bodyExcludes": ["Generate a concise title", "toolu_tge05_write"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_tge05_write", "name": "Write", "input": { "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-groups-history-restore/write.ts", "content": "export const restored = true;\n" } } }
+    },
+    {
+      "id": "tge05-final",
+      "description": "TGE05 completes the persisted history turn.",
+      "metadata": { "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "固定 assistant 终态，确保 cold restore 比较同一完整轮。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_TOOL_GROUPS_HISTORY_RESTORE", "toolu_tge05_write"], "bodyExcludes": ["Generate a concise title"] },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+diff --git a/dist/canvas/scene.js b/dist/canvas/scene.js
+index 3dde731c3c5da72761f19eb8f4d0014a3e142a42..c7c603393477a2bc88dca607bb8fba5effd12951 100644
+--- a/dist/canvas/scene.js
++++ b/dist/canvas/scene.js
+@@ -250,7 +250,8 @@ function drawVectorPathStrokes(r, canvas, vectorPaths, stroke, sc, miterLimit, o
+ 		r.strokePaint.setPathEffect(effect);
+ 		for (const vp of vectorPaths) canvas.drawPath(vp, r.strokePaint);
+ 		r.strokePaint.setPathEffect(null);
+-		effect.delete();
++		// 导入稿可能含 [0, 0]：CanvasKit 返回 null 并按实线绘制，释放空效果会同时打断画布和保存缩略图。
++		effect?.delete();
+ 		return;
+ 	}
+ 	const strokeOpts = {

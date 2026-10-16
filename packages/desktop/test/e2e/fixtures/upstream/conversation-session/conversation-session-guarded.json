@@ -1,0 +1,993 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-guarded",
+  "spec": "./test/e2e/conversation-session/conversation-session-guarded.test.ts",
+  "fixtures": [
+    {
+      "id": "guarded-title",
+      "description": "Guarded case-local title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离模式及审批 E2E 的标题 sidecar，不依赖真实模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_GUARDED_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "guarded-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Guarded E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RM-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_RM"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_RM",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded && echo executed >> E2E_GUARDED_RM.executed && rm -rf remove-target --help --version"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RM-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RM", "toolu_E2E_GUARDED_RM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_RM-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_RM_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_STORAGE-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_STORAGE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_STORAGE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_STORAGE",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_STORAGE.executed; dd if=.zcode-e2e/conversation-session-guarded/missing-input of=.zcode-e2e/conversation-session-guarded/disk-output count=0"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_STORAGE-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_STORAGE", "toolu_E2E_GUARDED_STORAGE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_STORAGE-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_STORAGE_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RESET-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RESET"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_RESET"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_RESET",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_RESET.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo reset --hard"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RESET-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RESET", "toolu_E2E_GUARDED_RESET"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_RESET-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_RESET_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_CLEAN-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_CLEAN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_CLEAN"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_CLEAN",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_CLEAN.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo clean -fd"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_CLEAN-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_CLEAN", "toolu_E2E_GUARDED_CLEAN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_CLEAN-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_CLEAN_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_PUSH-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_PUSH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_PUSH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_PUSH",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_PUSH.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo push --force .zcode-e2e/conversation-session-guarded/missing-remote HEAD"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_PUSH-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_PUSH", "toolu_E2E_GUARDED_PUSH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_PUSH-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_PUSH_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DISCARD-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DISCARD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DISCARD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DISCARD",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_DISCARD.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo checkout -f main"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DISCARD-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DISCARD", "toolu_E2E_GUARDED_DISCARD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DISCARD-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DISCARD_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_STASH-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_STASH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_STASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_STASH",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_STASH.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo stash clear"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_STASH-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_STASH", "toolu_E2E_GUARDED_STASH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_STASH-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_STASH_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_WORKTREE-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_WORKTREE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_WORKTREE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_WORKTREE",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_WORKTREE.executed; git -C .zcode-e2e/conversation-session-guarded/missing-repo worktree remove -ff .zcode-e2e/conversation-session-guarded/missing-tree"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_WORKTREE-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_WORKTREE", "toolu_E2E_GUARDED_WORKTREE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_WORKTREE-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_WORKTREE_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RSYNC-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RSYNC"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_RSYNC"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_RSYNC",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_RSYNC.executed; rsync --delete .zcode-e2e/conversation-session-guarded/missing-source/ .zcode-e2e/conversation-session-guarded/missing-dest/"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_RSYNC-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_RSYNC", "toolu_E2E_GUARDED_RSYNC"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_RSYNC-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_RSYNC_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_ALLOW-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_ALLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_ALLOW"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_ALLOW",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_ALLOW.executed; rm -rf .zcode-e2e/conversation-session-guarded/E2E_GUARDED_ALLOW.target"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_ALLOW-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_ALLOW", "toolu_E2E_GUARDED_ALLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_ALLOW-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_ALLOW_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_YOLO-call",
+      "description": "Guarded Bash tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定危险命令，授权由真实 broker 执行；命令只引用 case 自有或不存在的目标。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_YOLO"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_YOLO"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_YOLO",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_YOLO.executed; rm -rf .zcode-e2e/conversation-session-guarded/E2E_GUARDED_YOLO.target"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_YOLO-final",
+      "description": "Provider-visible tool result continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只有收到对应 tool_result 才返回终态；spec 检查 isError 和拒绝反馈。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_YOLO", "toolu_E2E_GUARDED_YOLO"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_YOLO-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_YOLO_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_PRESET-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_PRESET"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_QUESTION_PRESET"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_QUESTION_PRESET",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "header": "Guarded",
+                "question": "Which color?",
+                "options": [
+                  {
+                    "label": "Blue",
+                    "description": "Use blue"
+                  },
+                  {
+                    "label": "Red",
+                    "description": "Use red"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_PRESET-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_PRESET", "toolu_E2E_GUARDED_QUESTION_PRESET"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_QUESTION_PRESET-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_QUESTION_PRESET_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_CUSTOM-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_CUSTOM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_QUESTION_CUSTOM"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_QUESTION_CUSTOM",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "header": "Guarded",
+                "question": "Which color?",
+                "options": [
+                  {
+                    "label": "Blue",
+                    "description": "Use blue"
+                  },
+                  {
+                    "label": "Red",
+                    "description": "Use red"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_CUSTOM-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_CUSTOM", "toolu_E2E_GUARDED_QUESTION_CUSTOM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_QUESTION_CUSTOM-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_QUESTION_CUSTOM_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_EMPTY-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_EMPTY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_QUESTION_EMPTY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_QUESTION_EMPTY",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "header": "Guarded",
+                "question": "Which color?",
+                "options": [
+                  {
+                    "label": "Blue",
+                    "description": "Use blue"
+                  },
+                  {
+                    "label": "Red",
+                    "description": "Use red"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_EMPTY-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_EMPTY", "toolu_E2E_GUARDED_QUESTION_EMPTY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_QUESTION_EMPTY-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_QUESTION_EMPTY_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_DENY-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_DENY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_QUESTION_DENY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_QUESTION_DENY",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "header": "Guarded",
+                "question": "Which color?",
+                "options": [
+                  {
+                    "label": "Blue",
+                    "description": "Use blue"
+                  },
+                  {
+                    "label": "Red",
+                    "description": "Use red"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_QUESTION_DENY-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_QUESTION_DENY", "toolu_E2E_GUARDED_QUESTION_DENY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_QUESTION_DENY-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_QUESTION_DENY_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_PARENT-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_PARENT",
+          "name": "Agent",
+          "input": {
+            "description": "Guarded child approval",
+            "prompt": "E2E_GUARDED_CHILD Run the fixture command once.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_CHILD-call",
+      "description": "Guarded real interaction",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_CHILD",
+          "name": "Bash",
+          "input": {
+            "command": "echo executed >> .zcode-e2e/conversation-session-guarded/E2E_GUARDED_CHILD.executed; rm -rf .zcode-e2e/conversation-session-guarded/child-target"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_CHILD-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_CHILD", "toolu_E2E_GUARDED_CHILD", "Guarded child refused"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_CHILD-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_PARENT-final",
+      "description": "Guarded provider-visible continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具调用，使用真实用户交互 broker；断言 provider-visible 答案/拒绝和单次执行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_GUARDED_PARENT",
+          "toolu_E2E_GUARDED_PARENT",
+          "E2E_GUARDED_CHILD_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_PARENT-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_PARENT_DONE"
+        }
+      }
+    }
+  ]
+}

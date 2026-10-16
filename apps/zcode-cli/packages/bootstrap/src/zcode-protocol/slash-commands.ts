@@ -12,8 +12,9 @@ import {
 
 export interface ListProtocolSlashCommandsOptions extends ListZCodeCustomCommandsOptions {
   /**
-   * 动态工作流开关。只有显式 false 才从目录中剔除内置 `workflow`。
-   * 未传入该字段的调用方保留默认目录；协议服务端从 appRuntimePreferences 传入显式布尔。
+   * 动态工作流灰度门（docs/dynamic-workflow/launch.md「Gray release」）。**只有显式 false
+   * 才剔除** 内置 `workflow`：CLI 自身的目录装配（TUI / 未参与灰度的调用方）缺席该字段，
+   * 必须保持原样。协议服务端一律从 appRuntimePreferences 传入显式布尔。
    */
   dynamicWorkflowEnabled?: boolean;
 }
@@ -21,7 +22,7 @@ export interface ListProtocolSlashCommandsOptions extends ListZCodeCustomCommand
 export async function listProtocolSlashCommands(
   options: ListProtocolSlashCommandsOptions = {},
 ): Promise<ZCodeSlashCommand[]> {
-  // 动态工作流关闭时：composer 的加号菜单与 `/` 面板都只读这份目录，剔除即两个入口一起消失。
+  // 灰度关闭：composer 的加号菜单与 `/` 面板都只读这份目录，剔除即两个入口一起消失（DWG-03）。
   // `workflow` 是内置命令且是保留名，用户/插件的同名自定义命令在下面的 reserved 过滤里一并消失，
   // 不会在门关着时借自定义命令的身份漏回目录。
   const builtins = listAppProtocolBuiltinSlashCommands().filter(

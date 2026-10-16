@@ -1,8 +1,4 @@
-import {
-  InsufficientScopeError,
-  SdkErrorCode,
-  UnauthorizedError,
-} from "@modelcontextprotocol/client";
+import { InsufficientScopeError, SdkErrorCode, UnauthorizedError } from "@modelcontextprotocol/client";
 
 /**
  * 交互授权需求的稳定标识。
@@ -15,8 +11,9 @@ import {
 const INTERACTIVE_REQUIRED_BRAND = Symbol.for("zcode.mcp.oauth.interactiveAuthorizationRequired");
 const TEMPORARY_REFRESH_FAILURE_BRAND = Symbol.for("zcode.mcp.oauth.temporaryRefreshFailure");
 
-const MCP_OAUTH_INTERACTIVE_REQUIRED_ERROR_CODE = "MCP_OAUTH_INTERACTIVE_REQUIRED";
-const MCP_OAUTH_TEMPORARY_REFRESH_FAILURE_ERROR_CODE = "MCP_OAUTH_TEMPORARY_REFRESH_FAILURE";
+export const MCP_OAUTH_INTERACTIVE_REQUIRED_ERROR_CODE = "MCP_OAUTH_INTERACTIVE_REQUIRED";
+export const MCP_OAUTH_TEMPORARY_REFRESH_FAILURE_ERROR_CODE =
+  "MCP_OAUTH_TEMPORARY_REFRESH_FAILURE";
 
 export type McpOAuthInteractiveRequiredReason =
   | "no_credentials"
@@ -27,14 +24,14 @@ export type McpOAuthInteractiveRequiredReason =
   | "unauthorized"
   | "legacy_provider_seam";
 
-interface McpOAuthInteractiveRequiredError extends Error {
+export interface McpOAuthInteractiveRequiredError extends Error {
   code: typeof MCP_OAUTH_INTERACTIVE_REQUIRED_ERROR_CODE;
   reason: McpOAuthInteractiveRequiredReason;
   requiredScope?: string;
   resourceMetadataUrl?: string;
 }
 
-interface McpOAuthTemporaryRefreshFailureError extends Error {
+export interface McpOAuthTemporaryRefreshFailureError extends Error {
   code: typeof MCP_OAUTH_TEMPORARY_REFRESH_FAILURE_ERROR_CODE;
 }
 
@@ -82,13 +79,13 @@ export function createTemporaryRefreshFailureError(input: {
   return error;
 }
 
-function isInteractiveAuthorizationRequiredError(
+export function isInteractiveAuthorizationRequiredError(
   error: unknown,
 ): error is McpOAuthInteractiveRequiredError {
   return hasBrand(error, INTERACTIVE_REQUIRED_BRAND);
 }
 
-function isTemporaryRefreshFailureError(
+export function isTemporaryRefreshFailureError(
   error: unknown,
 ): error is McpOAuthTemporaryRefreshFailureError {
   return hasBrand(error, TEMPORARY_REFRESH_FAILURE_BRAND);
@@ -149,7 +146,10 @@ function isSdkAuthenticationHttpError(error: unknown): boolean {
 }
 
 function hasBrand(error: unknown, brand: symbol): boolean {
-  return (typeof error === "object" && error !== null) || typeof error === "function"
-    ? (error as Record<symbol, unknown>)[brand] === true
-    : false;
+  return (
+    (typeof error === "object" && error !== null) ||
+    typeof error === "function"
+      ? (error as Record<symbol, unknown>)[brand] === true
+      : false
+  );
 }

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "caseName": "subagent-coding-plan-login-catalog-stale",
+  "spec": "./test/e2e/subagent-coding-plan-login-catalog-stale.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "以空 OAuth 凭据启动，再通过受控 BigModel callback 触发登录后 provider 刷新。"
+    },
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/provider_config.json",
+      "purpose": "登录前通过版本化 Personal Config 预置带 reasoning metadata 的自定义 上游，作为同一 workspace runtime catalog 的阳性对照。"
+    }
+  ],
+  "requests": []
+}

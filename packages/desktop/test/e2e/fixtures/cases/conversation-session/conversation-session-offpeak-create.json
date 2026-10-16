@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-create",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-create.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-offpeak-create.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-offpeak-create-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于闲时任务产品语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "upstream-conversation-offpeak-create-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 OffPeakCreate；本响应固定触发工具，专门验证会话内创建→轮尾卡→按 offPeakTaskId 直达闲时编辑表单。"
+    },
+    {
+      "id": "upstream-conversation-offpeak-create-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "OffPeakCreate tool_result 进入历史后结束 case，真实 provider 回复内容不影响产品语义。"
+    }
+  ]
+}

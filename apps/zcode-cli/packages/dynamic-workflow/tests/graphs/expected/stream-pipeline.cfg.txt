@@ -1,0 +1,36 @@
+phase phase#1 "Gather facts from three angles"
+phase phase#2 "Verify each fact as it arrives" alongside=phase#1
+phase phase#3 "Write the report"
+node phase#1@1 mark phase=phase#1
+node ask#1@1 issue site=ask#1 phase=phase#1
+node phase#2@1 mark phase=phase#2 alongside=phase#1
+node ask#2@1 issue site=ask#2 phase=phase#2
+node phase#3@1 mark phase=phase#3
+node ask#3@1 issue site=ask#3 phase=phase#3
+edge entry -> phase#1@1 fork
+edge entry -> phase#2@1 fork
+edge entry -> phase#3@1 next
+edge phase#1@1 -> ask#1@1 fork
+edge phase#1@1 -> phase#3@1 join
+edge phase#1@1 -> abort throw
+edge ask#1@1 -> phase#3@1 join
+edge ask#1@1 -> phase#3@1 may-throw
+edge ask#1@1 -> abort may-throw
+edge ask#1@1 -> abort throw
+edge phase#2@1 -> ask#2@1 fork
+edge phase#2@1 -> phase#3@1 join
+edge ask#2@1 -> ask#2@1 loop
+edge ask#2@1 -> phase#3@1 exit
+edge phase#3@1 -> ask#3@1 next
+edge ask#3@1 -> sink jump via=return
+phase-edge entry -> phase#1 fork
+phase-edge entry -> phase#2 fork
+phase-edge entry -> phase#3 next
+phase-edge phase#1 -> phase#3 join
+phase-edge phase#1 -> phase#3 may-throw
+phase-edge phase#1 -> abort may-throw
+phase-edge phase#1 -> abort throw
+phase-edge phase#2 -> phase#2 loop
+phase-edge phase#2 -> phase#3 exit
+phase-edge phase#2 -> phase#3 join
+phase-edge phase#3 -> sink jump via=return

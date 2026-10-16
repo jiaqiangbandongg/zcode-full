@@ -12,7 +12,7 @@ export interface WindowsJobObjectController {
   close(): void;
 }
 
-interface WindowsJobObjectApi {
+export interface WindowsJobObjectApi {
   create(): WindowsJobHandle | undefined;
   assign(job: WindowsJobHandle, pid: number): boolean;
   terminate(job: WindowsJobHandle): void;
@@ -110,12 +110,12 @@ async function createWindowsJobObjectApi(): Promise<WindowsJobObjectApi | undefi
       "void *",
       "str16",
     ]);
-    const setInformationJobObject = kernel32.func("__stdcall", "SetInformationJobObject", "bool", [
-      handleType,
-      "uint32",
-      koffi.pointer(extendedLimitInformation),
-      "uint32",
-    ]);
+    const setInformationJobObject = kernel32.func(
+      "__stdcall",
+      "SetInformationJobObject",
+      "bool",
+      [handleType, "uint32", koffi.pointer(extendedLimitInformation), "uint32"],
+    );
     const openProcess = kernel32.func("__stdcall", "OpenProcess", handleType, [
       "uint32",
       "bool",
@@ -176,11 +176,9 @@ async function createWindowsJobObjectApi(): Promise<WindowsJobObjectApi | undefi
         return job;
       },
       assign(job, pid) {
-        const processHandle = openProcess(
-          PROCESS_SET_QUOTA | PROCESS_TERMINATE,
-          false,
-          pid,
-        ) as WindowsJobHandle | null;
+        const processHandle = openProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) as
+          | WindowsJobHandle
+          | null;
         if (!processHandle) return false;
         try {
           return Boolean(assignProcessToJobObject(job, processHandle));

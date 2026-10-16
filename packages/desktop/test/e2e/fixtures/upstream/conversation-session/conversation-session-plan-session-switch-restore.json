@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-session-switch-restore",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-session-switch-restore.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-plan-session-switch-enter",
+      "description": "首轮请求返回 EnterPlanMode，建立计划模式前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定进入 plan mode，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLAN_SESSION_SWITCH_RESTORE"],
+        "bodyIncludes": [
+          "E2E_PLAN_SESSION_SWITCH_RESTORE",
+          "E2E_PLAN_SESSION_SWITCH_ENTER",
+          "E2E_PLAN_SESSION_SWITCH_EXIT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_session_switch_enter",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-plan-session-switch-exit-controlled-stream",
+      "description": "先发送 ExitPlanMode tool_input_start，8 秒后再完成 plan 参数和 tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造用户在 ExitPlanMode 参数生成期间切走、完整 tool call 在后台到达的恢复窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_SESSION_SWITCH_EXIT",
+          "E2E_PLAN_SESSION_SWITCH_RESTORED_BODY",
+          "toolu_e2e_plan_session_switch_enter"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"upstream-e2e-plan-session-switch-exit\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_e2e_plan_session_switch_exit\",\"name\":\"ExitPlanMode\",\"input\":{}}}\n\n"
+          },
+          {
+            "offsetMs": 200,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"plan\\\":\\\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 8000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"E2E_PLAN_SESSION_SWITCH_RESTORED_BODY: 1. Hydrate the persisted plan. 2. Keep the task waiting for approval. 3. Verify before stop.\\\",\\\"allowedPrompts\\\":[]}\"}}\n\n"
+          },
+          {
+            "offsetMs": 8100,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 8200,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":120,\"output_tokens\":24,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 8300,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    }
+  ]
+}

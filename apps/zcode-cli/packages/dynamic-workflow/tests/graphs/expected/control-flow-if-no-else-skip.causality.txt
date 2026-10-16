@@ -1,0 +1,18 @@
+lane actor#1 "scanner" @4:20
+lane actor#2 "fixer" @6:9
+lane actor#3 "auditor" @10:19
+lane actor#4 "approver" @12:19
+region seq#1 seq
+region branch#1 branch parent=seq#1 @5:28
+region branch#2 branch parent=seq#1 @9:29
+region branch#3 branch parent=seq#1 @11:8
+step ask#1 ask "scanner" @4:37 lane=actor#1 region=seq#1 always
+step ask#2 ask "fixer" @6:24 lane=actor#2 region=branch#1 maybe
+step ask#3 ask "auditor" @10:36 lane=actor#3 region=branch#2 maybe
+step ask#4 ask "approver" @12:37 lane=actor#4 region=branch#3 maybe
+edge ask#1 -> ask#2 control maybe
+edge ask#1 -> ask#3 control maybe
+edge ask#1 -> ask#4 control maybe
+edge ask#2 -> ask#3 seq maybe
+edge ask#3 -> ask#4 seq maybe
+sink ask#3,ask#4

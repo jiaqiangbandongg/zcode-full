@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-detail-toggle-stability",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-detail-toggle-stability.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-tool-detail-toggle-stability.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-tool-detail-toggle-stability",
+      "source": "created-by-spec",
+      "description": "P08 spec 为两次连续 Read 创建独立沙箱文件，结束后删除。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-tool-detail-toggle-read-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定触发两次连续 Read，满足至少两个同类工具才创建 Explore 父分组的产品契约。"
+    },
+    {
+      "id": "upstream-tool-detail-toggle-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "工具结果回填后稳定结束当前轮，使测试只观测已完成详情的展开和收起几何。"
+    }
+  ]
+}

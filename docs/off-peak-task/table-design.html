@@ -1,0 +1,3076 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="ZCode Off-Peak Task 完整架构、对象模型、双轴状态机、数据表、业务分支与平滑演进说明。"
+    />
+    <title>Off-Peak Task · 完整架构与业务逻辑</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --paper: #f0eadb;
+        --paper-dim: #c6bead;
+        --ink: #101820;
+        --night: #101820;
+        --night-2: #17242d;
+        --night-3: #21323c;
+        --line: rgba(240, 234, 219, 0.18);
+        --line-strong: rgba(240, 234, 219, 0.34);
+        --acid: #d6ff47;
+        --blue: #60a5fa;
+        --orange: #ff9b54;
+        --red: #ff6b6b;
+        --green: #71e6a5;
+        --violet: #c4a7ff;
+        --muted: #93a4ae;
+        --shadow: 0 28px 80px rgba(2, 8, 12, 0.32);
+        --radius: 16px;
+        --mono: "SFMono-Regular", "Cascadia Code", "Liberation Mono", Menlo, monospace;
+        --sans: "Avenir Next", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --serif: "Iowan Old Style", "Songti SC", "STSong", Georgia, serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 28px;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background:
+          linear-gradient(rgba(240, 234, 219, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(240, 234, 219, 0.025) 1px, transparent 1px),
+          var(--night);
+        background-size: 28px 28px;
+        color: var(--paper);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 20;
+        width: 4px;
+        background: var(--acid);
+        transform: scaleY(var(--scroll-progress, 0));
+        transform-origin: top;
+        content: "";
+      }
+
+      ::selection {
+        background: var(--acid);
+        color: var(--ink);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      code {
+        border: 1px solid rgba(214, 255, 71, 0.2);
+        border-radius: 5px;
+        background: rgba(214, 255, 71, 0.08);
+        color: var(--acid);
+        font-family: var(--mono);
+        font-size: 0.88em;
+        padding: 0.08em 0.32em;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .rail {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        height: 100vh;
+        flex-direction: column;
+        border-right: 1px solid var(--line);
+        background: rgba(16, 24, 32, 0.94);
+        padding: 26px 22px 20px;
+        backdrop-filter: blur(18px);
+      }
+
+      .rail-brand {
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 30px;
+      }
+
+      .rail-mark {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid var(--acid);
+        border-radius: 50%;
+        color: var(--acid);
+        font: 700 11px/1 var(--mono);
+        letter-spacing: -0.04em;
+      }
+
+      .rail-brand strong {
+        display: block;
+        font: 650 13px/1.2 var(--sans);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .rail-brand span {
+        color: var(--muted);
+        font: 11px/1.4 var(--mono);
+      }
+
+      .rail-label {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font: 700 10px/1.2 var(--mono);
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      .rail nav {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .rail nav a {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border-radius: 8px;
+        color: var(--paper-dim);
+        font-size: 13px;
+        padding: 8px 9px;
+        text-decoration: none;
+        transition:
+          background 160ms ease,
+          color 160ms ease,
+          transform 160ms ease;
+      }
+
+      .rail nav a::before {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+        content: "";
+        opacity: 0.45;
+      }
+
+      .rail nav a:hover,
+      .rail nav a.active {
+        background: var(--paper);
+        color: var(--ink);
+        transform: translateX(2px);
+      }
+
+      .rail nav a.active::before {
+        background: var(--ink);
+        opacity: 1;
+      }
+
+      .rail-meta {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font: 11px/1.6 var(--mono);
+        padding-top: 14px;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .hero {
+        position: relative;
+        display: grid;
+        min-height: 760px;
+        align-content: end;
+        overflow: hidden;
+        border-bottom: 1px solid var(--line);
+        padding: 68px clamp(28px, 6vw, 88px) 62px;
+      }
+
+      .hero::before {
+        position: absolute;
+        top: -240px;
+        right: -210px;
+        width: 620px;
+        height: 620px;
+        border: 1px solid rgba(214, 255, 71, 0.34);
+        border-radius: 50%;
+        box-shadow:
+          0 0 0 52px rgba(214, 255, 71, 0.03),
+          0 0 0 104px rgba(214, 255, 71, 0.02);
+        content: "";
+      }
+
+      .hero::after {
+        position: absolute;
+        top: 46px;
+        right: 62px;
+        color: rgba(240, 234, 219, 0.07);
+        content: "01";
+        font: 800 clamp(180px, 26vw, 390px) / 0.8 var(--mono);
+        letter-spacing: -0.12em;
+        pointer-events: none;
+      }
+
+      .eyebrow {
+        position: absolute;
+        top: 48px;
+        left: clamp(28px, 6vw, 88px);
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--acid);
+        font: 700 11px/1 var(--mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 34px;
+        height: 1px;
+        background: var(--acid);
+        content: "";
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 1;
+        max-width: 1080px;
+        animation: hero-arrive 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      }
+
+      @keyframes hero-arrive {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      h1 {
+        max-width: 920px;
+        margin: 0;
+        font: 500 clamp(56px, 9.3vw, 134px) / 0.83 var(--serif);
+        letter-spacing: -0.055em;
+      }
+
+      h1 em {
+        color: var(--acid);
+        font-style: italic;
+      }
+
+      .hero-deck {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+        gap: 42px;
+        align-items: end;
+        max-width: 930px;
+        margin-top: 46px;
+      }
+
+      .hero-deck > p {
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: clamp(17px, 2vw, 22px);
+        line-height: 1.55;
+      }
+
+      .formula {
+        border-left: 3px solid var(--acid);
+        background: rgba(214, 255, 71, 0.055);
+        font: 12px/1.7 var(--mono);
+        padding: 16px 18px;
+      }
+
+      .formula strong {
+        color: var(--acid);
+      }
+
+      .content {
+        width: min(1220px, calc(100% - 56px));
+        margin: 0 auto;
+        padding: 84px 0 120px;
+      }
+
+      section {
+        position: relative;
+        margin-bottom: 112px;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 24px;
+        align-items: start;
+        margin-bottom: 34px;
+      }
+
+      .section-no {
+        color: var(--acid);
+        font: 700 13px/1 var(--mono);
+        letter-spacing: 0.1em;
+        padding-top: 10px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font: 500 clamp(35px, 5vw, 64px) / 1 var(--serif);
+        letter-spacing: -0.035em;
+      }
+
+      .section-head p {
+        max-width: 780px;
+        margin: 14px 0 0;
+        color: var(--paper-dim);
+        font-size: 16px;
+      }
+
+      .callout {
+        display: grid;
+        grid-template-columns: minmax(160px, 0.35fr) 1fr;
+        gap: 30px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--paper);
+        box-shadow: var(--shadow);
+        color: var(--ink);
+        padding: clamp(24px, 4vw, 46px);
+      }
+
+      .callout-label {
+        color: #53626b;
+        font: 700 11px/1.3 var(--mono);
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .callout-main {
+        margin: 0;
+        font: 500 clamp(25px, 3.5vw, 44px) / 1.18 var(--serif);
+        letter-spacing: -0.025em;
+      }
+
+      .callout-main strong {
+        background: var(--acid);
+        font-weight: 600;
+        padding: 0 0.12em;
+      }
+
+      .architecture {
+        display: grid;
+        grid-template-columns: repeat(9, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .arch-node {
+        position: relative;
+        display: flex;
+        min-height: 148px;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--night-2);
+        padding: 16px;
+      }
+
+      .arch-node::after {
+        position: absolute;
+        top: 50%;
+        right: -10px;
+        z-index: 2;
+        width: 10px;
+        border-top: 1px solid var(--acid);
+        content: "";
+      }
+
+      .arch-node:last-child::after {
+        display: none;
+      }
+
+      .arch-node.wide {
+        grid-column: span 2;
+      }
+
+      .arch-node.db {
+        border-color: var(--acid);
+        background: var(--acid);
+        color: var(--ink);
+      }
+
+      .arch-node.server {
+        border-color: rgba(96, 165, 250, 0.7);
+      }
+
+      .arch-node small {
+        color: var(--muted);
+        font: 10px/1.35 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .arch-node.db small {
+        color: rgba(16, 24, 32, 0.64);
+      }
+
+      .arch-node strong {
+        font: 600 17px/1.2 var(--serif);
+      }
+
+      .arch-node span {
+        color: var(--paper-dim);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .arch-node.db span {
+        color: rgba(16, 24, 32, 0.72);
+      }
+
+      .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        box-shadow: var(--shadow);
+      }
+
+      .guide-card {
+        position: relative;
+        min-height: 310px;
+        overflow: hidden;
+        border-right: 1px solid var(--line);
+        padding: 24px;
+      }
+
+      .guide-card:last-child {
+        border-right: 0;
+      }
+
+      .guide-card::after {
+        position: absolute;
+        right: -10px;
+        bottom: -46px;
+        color: rgba(240, 234, 219, 0.05);
+        content: attr(data-step);
+        font: 800 154px/1 var(--mono);
+        letter-spacing: -0.12em;
+      }
+
+      .guide-kicker {
+        position: relative;
+        z-index: 1;
+        color: var(--acid);
+        font: 700 10px/1 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .guide-card h3 {
+        position: relative;
+        z-index: 1;
+        margin: 52px 0 12px;
+        font: 600 24px/1.08 var(--serif);
+      }
+
+      .guide-card p {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .guide-glyph {
+        position: absolute;
+        top: -8px;
+        right: 0;
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+        color: var(--paper);
+        font: 12px/1 var(--mono);
+      }
+
+      .reading-rule {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 14px;
+        align-items: center;
+        margin-top: 18px;
+        border: 1px solid rgba(214, 255, 71, 0.32);
+        border-radius: 12px;
+        background: rgba(214, 255, 71, 0.05);
+        padding: 14px 16px;
+      }
+
+      .reading-rule strong,
+      .reading-rule span {
+        font: 11px/1.5 var(--mono);
+      }
+
+      .reading-rule strong {
+        color: var(--acid);
+      }
+
+      .reading-rule span {
+        color: var(--paper-dim);
+      }
+
+      .reading-rule b {
+        color: var(--acid);
+        font: 18px/1 var(--mono);
+      }
+
+      .entity-board {
+        display: grid;
+        grid-template-columns: minmax(0, 0.95fr) 68px minmax(0, 1.25fr);
+        gap: 12px;
+        align-items: stretch;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background:
+          radial-gradient(circle at 70% 50%, rgba(96, 165, 250, 0.09), transparent 34%),
+          var(--night-2);
+        padding: clamp(20px, 4vw, 42px);
+      }
+
+      .entity-primary {
+        display: grid;
+        min-height: 420px;
+        align-content: space-between;
+        border: 1px solid var(--acid);
+        border-radius: 18px;
+        background: var(--acid);
+        color: var(--ink);
+        padding: 28px;
+      }
+
+      .entity-primary small,
+      .entity-secondary small {
+        font: 700 10px/1.3 var(--mono);
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .entity-primary h3,
+      .entity-secondary h3 {
+        margin: 10px 0;
+        font: 600 clamp(25px, 3vw, 38px) / 1 var(--serif);
+      }
+
+      .entity-primary p,
+      .entity-secondary p {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .entity-primary ul {
+        margin: 28px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .entity-primary li {
+        border-top: 1px solid rgba(16, 24, 32, 0.18);
+        font: 11px/1.5 var(--mono);
+        padding: 9px 0;
+      }
+
+      .entity-key {
+        width: fit-content;
+        border: 1px solid rgba(16, 24, 32, 0.42);
+        border-radius: 999px;
+        font: 700 10px/1 var(--mono);
+        padding: 8px 10px;
+        text-transform: uppercase;
+      }
+
+      .entity-relations {
+        display: grid;
+        align-content: space-around;
+        justify-items: center;
+        color: var(--acid);
+        font: 10px/1.4 var(--mono);
+        text-align: center;
+      }
+
+      .entity-relations i {
+        display: block;
+        width: 100%;
+        border-top: 1px solid var(--acid);
+      }
+
+      .entity-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .entity-secondary {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(16, 24, 32, 0.5);
+        padding: 22px;
+      }
+
+      .entity-secondary.session {
+        border-color: rgba(196, 167, 255, 0.45);
+      }
+
+      .entity-secondary.ticket {
+        border-color: rgba(96, 165, 250, 0.55);
+      }
+
+      .entity-secondary.history {
+        border-color: rgba(113, 230, 165, 0.45);
+      }
+
+      .entity-secondary .tag {
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        color: var(--muted);
+        font: 9px/1 var(--mono);
+        padding: 5px 7px;
+      }
+
+      .truth-strip {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        margin-top: 18px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--line);
+      }
+
+      .truth-item {
+        background: var(--night);
+        padding: 16px;
+      }
+
+      .truth-item strong {
+        display: block;
+        color: var(--paper);
+        font: 12px/1.4 var(--mono);
+      }
+
+      .truth-item span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .api-ladder {
+        display: grid;
+        gap: 12px;
+      }
+
+      .api-step {
+        display: grid;
+        grid-template-columns: 52px minmax(260px, 1fr) minmax(260px, 0.85fr);
+        gap: 18px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--night-2);
+        padding: 16px 18px;
+      }
+
+      .api-number {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border: 1px solid var(--acid);
+        border-radius: 50%;
+        color: var(--acid);
+        font: 11px/1 var(--mono);
+      }
+
+      .api-path {
+        font: 12px/1.55 var(--mono);
+      }
+
+      .api-path strong {
+        display: block;
+        color: var(--blue);
+        font-weight: 600;
+      }
+
+      .api-owner {
+        color: var(--paper-dim);
+        font-size: 12px;
+      }
+
+      .api-result {
+        border-left: 1px solid var(--line);
+        color: var(--muted);
+        font: 10px/1.75 var(--mono);
+        padding-left: 18px;
+      }
+
+      .api-result span {
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        color: var(--muted);
+        font: 9px/1.2 var(--mono);
+        padding: 5px 7px;
+      }
+
+      .api-result .hot {
+        border-color: var(--acid);
+        color: var(--acid);
+      }
+
+      .axis-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+      }
+
+      .axis-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        padding: 26px;
+      }
+
+      .axis-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .axis-title h3 {
+        margin: 0;
+        font: 600 25px/1.1 var(--serif);
+      }
+
+      .axis-title span {
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        color: var(--acid);
+        font: 10px/1 var(--mono);
+        padding: 6px 8px;
+      }
+
+      .state-line {
+        display: grid;
+        grid-template-columns: minmax(118px, 0.38fr) 24px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        border-top: 1px solid var(--line);
+        padding: 12px 0;
+      }
+
+      .state-line:first-of-type {
+        border-top: 0;
+      }
+
+      .state-pill {
+        width: fit-content;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(240, 234, 219, 0.04);
+        font: 11px/1 var(--mono);
+        padding: 7px 9px;
+      }
+
+      .state-arrow {
+        color: var(--acid);
+        font-family: var(--mono);
+        text-align: center;
+      }
+
+      .state-desc {
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .axis-note {
+        margin: 24px 0 0;
+        border-left: 2px solid var(--orange);
+        color: var(--paper-dim);
+        font-size: 13px;
+        padding-left: 13px;
+      }
+
+      .mapping-table {
+        width: 100%;
+        margin-top: 22px;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .mapping-table th,
+      .mapping-table td {
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .mapping-table th {
+        background: var(--night-3);
+        color: var(--muted);
+        font: 700 10px/1.3 var(--mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .mapping-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .mapping-table td:first-child {
+        width: 190px;
+        color: var(--acid);
+        font: 12px/1.6 var(--mono);
+      }
+
+      .schema-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .search {
+        display: flex;
+        min-width: min(100%, 330px);
+        align-items: center;
+        gap: 10px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--night-2);
+        padding: 9px 15px;
+      }
+
+      .search span {
+        color: var(--acid);
+        font: 12px/1 var(--mono);
+      }
+
+      .search input {
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--paper);
+      }
+
+      .search input::placeholder {
+        color: #6f808a;
+      }
+
+      .toolbar-note {
+        color: var(--muted);
+        font: 11px/1.4 var(--mono);
+      }
+
+      .schema-groups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .schema-group {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        transition:
+          border-color 180ms ease,
+          opacity 180ms ease;
+      }
+
+      .schema-group.hidden {
+        display: none;
+      }
+
+      .schema-group:hover {
+        border-color: var(--line-strong);
+      }
+
+      .schema-group-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+        border-bottom: 1px solid var(--line);
+        padding: 18px 20px;
+      }
+
+      .schema-group-head h3 {
+        margin: 0;
+        font: 600 21px/1.1 var(--serif);
+      }
+
+      .schema-group-head span {
+        color: var(--muted);
+        font: 10px/1 var(--mono);
+      }
+
+      .field {
+        display: grid;
+        grid-template-columns: minmax(140px, 0.42fr) minmax(0, 1fr);
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 20px;
+      }
+
+      .field:last-child {
+        border-bottom: 0;
+      }
+
+      .field-name {
+        color: var(--blue);
+        font: 11px/1.55 var(--mono);
+        overflow-wrap: anywhere;
+      }
+
+      .field-name b {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        font-weight: 400;
+      }
+
+      .field-desc {
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .field-desc strong {
+        color: var(--paper);
+        font-weight: 600;
+      }
+
+      .flow-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .control-button {
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: transparent;
+        cursor: pointer;
+        font: 11px/1 var(--mono);
+        padding: 9px 13px;
+        transition:
+          border-color 150ms ease,
+          background 150ms ease,
+          color 150ms ease;
+      }
+
+      .control-button:hover {
+        border-color: var(--acid);
+        background: var(--acid);
+        color: var(--ink);
+      }
+
+      .flow-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .flow-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--night-2);
+      }
+
+      .flow-card[open] {
+        border-color: var(--line-strong);
+      }
+
+      .flow-card summary {
+        display: grid;
+        grid-template-columns: 44px minmax(170px, 0.45fr) minmax(0, 1fr) 24px;
+        gap: 14px;
+        align-items: center;
+        min-height: 78px;
+        cursor: pointer;
+        list-style: none;
+        padding: 12px 18px;
+      }
+
+      .flow-card summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .flow-index {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+        color: var(--acid);
+        font: 10px/1 var(--mono);
+      }
+
+      .flow-card summary h3 {
+        margin: 0;
+        font: 600 18px/1.25 var(--serif);
+      }
+
+      .flow-card summary p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .flow-toggle {
+        color: var(--acid);
+        font: 18px/1 var(--mono);
+        transition: transform 180ms ease;
+      }
+
+      .flow-card[open] .flow-toggle {
+        transform: rotate(45deg);
+      }
+
+      .flow-body {
+        display: grid;
+        grid-template-columns: minmax(0, 0.95fr) minmax(260px, 0.55fr);
+        gap: 24px;
+        border-top: 1px solid var(--line);
+        padding: 22px 24px 26px 76px;
+      }
+
+      .branch-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .branch {
+        display: grid;
+        grid-template-columns: 14px 1fr;
+        gap: 9px;
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .branch::before {
+        width: 7px;
+        height: 7px;
+        margin-top: 8px;
+        border: 1px solid var(--acid);
+        border-radius: 50%;
+        content: "";
+      }
+
+      .branch strong {
+        color: var(--paper);
+      }
+
+      .flow-code {
+        align-self: start;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(2, 8, 12, 0.35);
+        color: var(--green);
+        font: 11px/1.65 var(--mono);
+        margin: 0;
+        padding: 15px;
+        white-space: pre-wrap;
+      }
+
+      .architecture-ascii {
+        margin-top: 18px;
+        color: var(--blue);
+      }
+
+      .history-logic {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .history-card {
+        position: relative;
+        min-height: 220px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        padding: 22px;
+      }
+
+      .history-card::after {
+        position: absolute;
+        right: -12px;
+        bottom: -42px;
+        color: rgba(240, 234, 219, 0.055);
+        content: attr(data-count);
+        font: 800 150px/1 var(--mono);
+        letter-spacing: -0.1em;
+      }
+
+      .history-card h3 {
+        position: relative;
+        z-index: 1;
+        margin: 0 0 12px;
+        font: 600 21px/1.2 var(--serif);
+      }
+
+      .history-card p {
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .history-card code {
+        display: inline-block;
+        margin-top: 13px;
+      }
+
+      .risk-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        counter-reset: risk;
+      }
+
+      .risk {
+        position: relative;
+        min-height: 182px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 107, 107, 0.35);
+        border-radius: 14px;
+        background: rgba(255, 107, 107, 0.045);
+        counter-increment: risk;
+        padding: 22px 22px 22px 70px;
+      }
+
+      .risk::before {
+        position: absolute;
+        top: 22px;
+        left: 20px;
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 1px solid var(--red);
+        border-radius: 50%;
+        color: var(--red);
+        content: counter(risk, decimal-leading-zero);
+        font: 10px/1 var(--mono);
+      }
+
+      .risk h3 {
+        margin: 0 0 9px;
+        color: var(--paper);
+        font: 600 18px/1.2 var(--serif);
+      }
+
+      .risk p {
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .risk.good {
+        border-color: rgba(113, 230, 165, 0.36);
+        background: rgba(113, 230, 165, 0.045);
+      }
+
+      .risk.good::before {
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .final-definition {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .definition-side {
+        min-height: 420px;
+        padding: clamp(28px, 5vw, 60px);
+      }
+
+      .definition-side:first-child {
+        background: var(--acid);
+        color: var(--ink);
+      }
+
+      .definition-side:last-child {
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      .definition-side span {
+        font: 700 10px/1 var(--mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .definition-side h3 {
+        margin: 28px 0 20px;
+        font: 500 clamp(30px, 4vw, 50px) / 1 var(--serif);
+        letter-spacing: -0.035em;
+      }
+
+      .definition-side ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .definition-side li {
+        border-top: 1px solid rgba(16, 24, 32, 0.18);
+        font-size: 14px;
+        padding: 11px 0;
+      }
+
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .decision-card {
+        display: flex;
+        min-height: 330px;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        padding: 24px;
+      }
+
+      .decision-card.recommended {
+        border-color: var(--acid);
+        background:
+          linear-gradient(160deg, rgba(214, 255, 71, 0.1), transparent 48%),
+          var(--night-2);
+      }
+
+      .decision-card .decision-label {
+        width: fit-content;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        color: var(--muted);
+        font: 9px/1 var(--mono);
+        letter-spacing: 0.08em;
+        padding: 6px 8px;
+        text-transform: uppercase;
+      }
+
+      .decision-card.recommended .decision-label {
+        color: var(--acid);
+      }
+
+      .decision-card h3 {
+        margin: 30px 0 12px;
+        font: 600 25px/1.08 var(--serif);
+      }
+
+      .decision-card p {
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 13px;
+      }
+
+      .decision-card ul {
+        margin: auto 0 0;
+        padding: 20px 0 0;
+        list-style: none;
+      }
+
+      .decision-card li {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        padding: 8px 0;
+      }
+
+      .target-schema {
+        display: grid;
+        grid-template-columns: minmax(0, 0.75fr) 60px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        margin-top: 22px;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+        background: var(--night-2);
+        padding: clamp(22px, 4vw, 42px);
+      }
+
+      .table-box {
+        min-height: 360px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--night);
+        padding: 20px;
+      }
+
+      .table-box.current {
+        border-color: var(--acid);
+      }
+
+      .table-box h3 {
+        margin: 0 0 16px;
+        font: 600 23px/1 var(--serif);
+      }
+
+      .table-box small {
+        display: block;
+        margin-bottom: 18px;
+        color: var(--muted);
+        font: 9px/1 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .table-box code {
+        display: block;
+        margin-top: 7px;
+        border-color: var(--line);
+        background: transparent;
+        color: var(--paper-dim);
+        line-height: 1.45;
+      }
+
+      .table-box p {
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .schema-relation {
+        display: grid;
+        justify-items: center;
+        color: var(--acid);
+        font: 10px/1.5 var(--mono);
+        text-align: center;
+      }
+
+      .schema-relation::before,
+      .schema-relation::after {
+        width: 100%;
+        border-top: 1px solid var(--acid);
+        content: "";
+      }
+
+      .migration-track {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .migration-step {
+        position: relative;
+        min-height: 250px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--night-2);
+        padding: 22px;
+      }
+
+      .migration-step::after {
+        position: absolute;
+        top: 32px;
+        right: -13px;
+        z-index: 2;
+        width: 14px;
+        border-top: 1px solid var(--acid);
+        content: "";
+      }
+
+      .migration-step:last-child::after {
+        display: none;
+      }
+
+      .migration-step b {
+        color: var(--acid);
+        font: 10px/1 var(--mono);
+      }
+
+      .migration-step h3 {
+        margin: 42px 0 11px;
+        font: 600 21px/1.1 var(--serif);
+      }
+
+      .migration-step p {
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 12px;
+      }
+
+      .compat-note {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        margin-top: 16px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--line);
+      }
+
+      .compat-note article {
+        background: var(--night);
+        padding: 18px;
+      }
+
+      .compat-note strong {
+        color: var(--paper);
+      }
+
+      .compat-note p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font: 11px/1.5 var(--mono);
+        padding: 24px clamp(28px, 6vw, 88px) 36px;
+      }
+
+      @media (max-width: 1060px) {
+        .shell {
+          display: block;
+        }
+
+        .rail {
+          position: sticky;
+          display: grid;
+          height: auto;
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 16px;
+          align-items: center;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+          padding: 12px 18px;
+        }
+
+        .rail-brand {
+          margin: 0;
+        }
+
+        .rail-brand strong,
+        .rail-brand span,
+        .rail-label,
+        .rail-meta {
+          display: none;
+        }
+
+        .rail nav {
+          flex-direction: row;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .rail nav::-webkit-scrollbar {
+          display: none;
+        }
+
+        .rail nav a {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        .hero {
+          min-height: 670px;
+        }
+
+        .architecture {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .guide-grid,
+        .migration-track {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .guide-card:nth-child(2) {
+          border-right: 0;
+        }
+
+        .guide-card:nth-child(-n + 2) {
+          border-bottom: 1px solid var(--line);
+        }
+
+        .migration-step:nth-child(2)::after {
+          display: none;
+        }
+
+        .arch-node.wide {
+          grid-column: span 2;
+        }
+
+        .arch-node:nth-child(4)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .hero {
+          min-height: 610px;
+          padding-top: 100px;
+        }
+
+        .hero::after {
+          top: 100px;
+          right: 26px;
+          font-size: 160px;
+        }
+
+        .hero-deck,
+        .callout,
+        .axis-grid,
+        .schema-groups,
+        .history-logic,
+        .risk-grid,
+        .final-definition,
+        .decision-grid,
+        .compat-note {
+          grid-template-columns: 1fr;
+        }
+
+        .content {
+          width: min(100% - 30px, 1220px);
+          padding-top: 58px;
+        }
+
+        section {
+          margin-bottom: 76px;
+        }
+
+        .section-head {
+          grid-template-columns: 52px 1fr;
+          gap: 10px;
+        }
+
+        .architecture {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .guide-grid,
+        .migration-track {
+          grid-template-columns: 1fr;
+        }
+
+        .guide-card {
+          min-height: 250px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .guide-card:nth-child(3) {
+          border-bottom: 1px solid var(--line);
+        }
+
+        .guide-card:last-child {
+          border-bottom: 0;
+        }
+
+        .entity-board,
+        .target-schema {
+          grid-template-columns: 1fr;
+        }
+
+        .entity-primary {
+          min-height: 330px;
+        }
+
+        .entity-relations {
+          grid-template-columns: 1fr auto 1fr;
+          min-height: 40px;
+        }
+
+        .entity-relations i {
+          width: 100%;
+        }
+
+        .truth-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .api-step {
+          grid-template-columns: 44px minmax(0, 1fr);
+        }
+
+        .api-owner,
+        .api-result {
+          grid-column: 2;
+        }
+
+        .schema-relation {
+          grid-template-columns: 1fr auto 1fr;
+        }
+
+        .migration-step {
+          min-height: 210px;
+        }
+
+        .migration-step::after {
+          display: none;
+        }
+
+        .arch-node,
+        .arch-node.wide {
+          grid-column: span 1;
+        }
+
+        .arch-node:nth-child(even)::after {
+          display: none;
+        }
+
+        .mapping-table {
+          display: block;
+          overflow-x: auto;
+        }
+
+        .flow-card summary {
+          grid-template-columns: 42px minmax(0, 1fr) 22px;
+        }
+
+        .flow-card summary p {
+          display: none;
+        }
+
+        .flow-body {
+          grid-template-columns: 1fr;
+          padding: 20px;
+        }
+
+        .reading-rule {
+          grid-template-columns: 1fr;
+        }
+
+        .reading-rule b {
+          display: none;
+        }
+
+        .definition-side {
+          min-height: auto;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+        }
+
+        body {
+          background: white;
+          color: #111;
+        }
+
+        body::before,
+        .rail,
+        .schema-toolbar,
+        .flow-controls {
+          display: none;
+        }
+
+        .shell {
+          display: block;
+        }
+
+        .hero {
+          min-height: 0;
+          border: 0;
+          color: #111;
+          padding: 30px 0;
+        }
+
+        .hero::before,
+        .hero::after {
+          display: none;
+        }
+
+        .hero-deck > p,
+        .section-head p,
+        .branch,
+        .risk p {
+          color: #333;
+        }
+
+        .content {
+          width: 100%;
+          padding: 20px 0;
+        }
+
+        section {
+          break-inside: avoid;
+          margin-bottom: 40px;
+        }
+
+        .axis-card,
+        .schema-group,
+        .flow-card,
+        .history-card,
+        .risk,
+        .arch-node,
+        .guide-card,
+        .entity-secondary,
+        .table-box,
+        .migration-step,
+        .decision-card {
+          border-color: #bbb;
+          background: white;
+          color: #111;
+        }
+
+        .flow-card:not([open]) .flow-body {
+          display: grid;
+        }
+
+        .flow-card summary {
+          color: #111;
+        }
+
+        .flow-toggle {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <div class="rail-brand">
+          <div class="rail-mark">OP</div>
+          <div>
+            <strong>Field Manual</strong>
+            <span>architecture + lifecycle / v1</span>
+          </div>
+        </div>
+        <div class="rail-label">Contents</div>
+        <nav aria-label="页面章节">
+          <a href="#guide">阅读导览</a>
+          <a href="#definition">核心定义</a>
+          <a href="#entities">对象模型</a>
+          <a href="#architecture">整体架构</a>
+          <a href="#api-contract">五组接口</a>
+          <a href="#axes">双轴状态</a>
+          <a href="#schema">字段设计</a>
+          <a href="#flows">完整分支流</a>
+          <a href="#history">History 0/1</a>
+          <a href="#run-decision">Run / Ticket 取舍</a>
+          <a href="#migration">平滑演进</a>
+          <a href="#audit">实现核对</a>
+          <a href="#boundary">能力边界</a>
+        </nav>
+        <div class="rail-meta">
+          SOURCE OF TRUTH<br />
+          client code + server contract<br />
+          2026-07-20
+        </div>
+      </aside>
+
+      <main>
+        <header class="hero">
+          <div class="eyebrow">ZCode / Off-Peak Task</div>
+          <div class="hero-content">
+            <h1>一个任务，<br /><em>多段续跑</em></h1>
+            <div class="hero-deck">
+              <p>
+                从用户提交到服务端取号，从本地认领到 Agent 分段执行，再到 History 和核销：
+                完整解释 Task、Session、Ticket 三种身份如何协作。
+              </p>
+              <div class="formula">
+                <strong>1 USER TASK</strong><br />
+                = 1 logical run<br />
+                + 1 reusable session<br />
+                + N server tickets<br />
+                + 0 / 1 history row
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <section id="guide" class="reveal">
+            <div class="section-head">
+              <div class="section-no">00 /</div>
+              <div>
+                <h2>先选对观察视角</h2>
+                <p>
+                  Off-Peak 不是单纯的定时任务。它把一次用户任务拆成产品身份、本地控制、
+                  Agent 执行和服务端准入四个层次；每层回答的问题不同。
+                </p>
+              </div>
+            </div>
+            <div class="guide-grid">
+              <article class="guide-card">
+                <div class="guide-kicker"><span class="guide-glyph">01</span>PRODUCT</div>
+                <h3>用户看到什么</h3>
+                <p>提交一次性任务，等待低峰执行；无论中间续跑多少段，任务卡片和 History 都保持一个身份。</p>
+              </article>
+              <article class="guide-card">
+                <div class="guide-kicker"><span class="guide-glyph">02</span>LOCAL CONTROL</div>
+                <h3>客户端控制什么</h3>
+                <p>SQLite 保存聚合当前态；Service 同步票据；Scheduler 负责认领、派发、超时回收和退避。</p>
+              </article>
+              <article class="guide-card">
+                <div class="guide-kicker"><span class="guide-glyph">03</span>AGENT RUNTIME</div>
+                <h3>任务如何真正执行</h3>
+                <p>首段创建 Session，后续段恢复同一 Session；每次模型请求都必须携带当段有效 ticket。</p>
+              </article>
+              <article class="guide-card">
+                <div class="guide-kicker"><span class="guide-glyph">04</span>SERVER GATE</div>
+                <h3>谁决定何时能跑</h3>
+                <p>服务端维护 FIFO、并发和 ticket 生命周期。客户端只观察结果，不复制服务端排队真相。</p>
+              </article>
+            </div>
+            <div class="reading-rule">
+              <strong>推荐阅读顺序</strong>
+              Product → Local Service / Scheduler → Host / Agent → Server Gateway。
+              但运行时状态会反向回流：服务端票据决定准入，Agent 结果决定本地终态，本地聚合再决定 UI。
+            </div>
+          </section>
+
+          <section id="definition" class="reveal">
+            <div class="section-head">
+              <div class="section-no">01 /</div>
+              <div>
+                <h2>先把表的角色说准</h2>
+                <p>
+                  每一行代表一个跨多段执行仍保持稳定身份的逻辑任务。服务端 ticket 可以反复更换，
+                  Session 始终复用，History 只做一次执行摘要。
+                </p>
+              </div>
+            </div>
+            <div class="callout">
+              <div class="callout-label">Canonical definition</div>
+              <p class="callout-main">
+                <strong>off_peak_tasks</strong> 是当前态聚合根，同时兼任调度锁、服务端快照、
+                核销 outbox 和 History tombstone。
+              </p>
+            </div>
+          </section>
+
+          <section id="entities" class="reveal">
+            <div class="section-head">
+              <div class="section-no">02 /</div>
+              <div>
+                <h2>四个对象，三种基数</h2>
+                <p>
+                  任务是稳定聚合根，Session 是连续上下文，Ticket 是每一执行分段的准入凭证，
+                  History 则只是面向用户的派生投影。
+                </p>
+              </div>
+            </div>
+            <div class="entity-board">
+              <article class="entity-primary">
+                <small>STABLE AGGREGATE ROOT</small>
+                <h3>OffPeakTask</h3>
+                <p>
+                  用户只创建一次。<code>task_id</code>、Prompt、工作区、产品状态和最终结果都挂在这里；
+                  暂停、取消、删除 History 也以它为入口。
+                </p>
+                <div class="entity-key">1 task = 1 logical run</div>
+              </article>
+              <div class="entity-relations" aria-hidden="true">
+                <span>1 : 1</span>
+                <span>1 : N</span>
+                <span>1 : 0..1</span>
+              </div>
+              <div class="entity-stack">
+                <article class="entity-secondary session">
+                  <small>EXECUTION CONTEXT</small>
+                  <h3>Session · 1 : 1</h3>
+                  <p>首段 create，续跑 resume。它保留上下文，但不是 Off-Peak 调度状态的真源。</p>
+                </article>
+                <article class="entity-secondary ticket">
+                  <small>ADMISSION SEGMENT</small>
+                  <h3>Ticket · 1 : N</h3>
+                  <p>每个最多约 3 小时的准入分段一张票。当前本地聚合行只留“现在这张”，旧票会被覆盖。</p>
+                </article>
+                <article class="entity-secondary history">
+                  <small>PRODUCT PROJECTION</small>
+                  <h3>History · 1 : 0..1</h3>
+                  <p>只有真正启动过才出现；删除只写 tombstone，不删除任务、Session 或执行字段。</p>
+                </article>
+              </div>
+            </div>
+            <div class="truth-strip">
+              <div class="truth-item"><strong>产品真相</strong><span>off_peak_tasks</span></div>
+              <div class="truth-item"><strong>上下文真相</strong><span>Session runtime</span></div>
+              <div class="truth-item"><strong>准入真相</strong><span>Server ticket DB</span></div>
+              <div class="truth-item"><strong>展示真相</strong><span>Derived History</span></div>
+            </div>
+          </section>
+
+          <section id="architecture" class="reveal">
+            <div class="section-head">
+              <div class="section-no">03 /</div>
+              <div>
+                <h2>端到端架构</h2>
+                <p>
+                  Renderer 不直接调度；Host 负责取号和同步；Scheduler 只读写 SQLite；Main 只路由；
+                  Agent 的每一次模型请求再经过服务端细粒度准入。
+                </p>
+              </div>
+            </div>
+            <div class="architecture" aria-label="Off-Peak 整体架构流程">
+              <article class="arch-node">
+                <small>Renderer</small>
+                <strong>Automations UI</strong>
+                <span>灰度 / 表单 / 卡片 / History</span>
+              </article>
+              <article class="arch-node">
+                <small>Host RPC</small>
+                <strong>Task Service</strong>
+                <span>CRUD / sync / settle / retake</span>
+              </article>
+              <article class="arch-node db wide">
+                <small>WAL · multi-process</small>
+                <strong>off_peak_tasks</strong>
+                <span>~/.zcode/v2/tasks-index.sqlite</span>
+              </article>
+              <article class="arch-node">
+                <small>Utility Process</small>
+                <strong>Scheduler</strong>
+                <span>claim / backoff / recovery</span>
+              </article>
+              <article class="arch-node">
+                <small>Desktop Main</small>
+                <strong>Router</strong>
+                <span>resolve local host / forward result</span>
+              </article>
+              <article class="arch-node">
+                <small>Workspace Host</small>
+                <strong>Run Dispatch</strong>
+                <span>create or resume + sendPrompt</span>
+              </article>
+              <article class="arch-node">
+                <small>ZCode CLI</small>
+                <strong>Agent Loop</strong>
+                <span>per-turn idle plan overlay</span>
+              </article>
+              <article class="arch-node server wide">
+                <small>Server Authority</small>
+                <strong>Off-Peak Gateway</strong>
+                <span>FIFO / ready / active / 429 / 3102</span>
+              </article>
+            </div>
+            <div class="reading-rule">
+              <strong>权责边界</strong>
+              客户端 timer 负责“什么时候再来问”，服务端 Promote timer 负责“什么时候从 queued 推进到 ready”。
+              Status 查询只是读取服务端状态，不应承担推进 FIFO 的职责。
+            </div>
+            <pre class="flow-code architecture-ascii" aria-label="Off-Peak 状态与事件顺序 ASCII 图">User
+  │ create task
+  ▼
+Renderer ─RPC─▶ Host Service ─take/status/settle─▶ Server Ticket DB
+                    │                                  │
+                    │ persist current snapshot         │ Promote timer
+                    ▼                                  ▼
+            off_peak_tasks ◀──── queued / ready / active / expired
+                    │
+                    │ claim ready task
+                    ▼
+               Scheduler ─dispatch─▶ Workspace Host ─create/resume─▶ Session
+                                             │
+                                             │ sendPrompt + ticket overlay
+                                             ▼
+                                          Agent Loop ─each model call─▶ Gateway
+                                             │                            │
+                                             └──── result / 3102 / 429 ──┘
+                    ▲
+                    └──── task terminal or continuation ────</pre>
+          </section>
+
+          <section id="api-contract" class="reveal">
+            <div class="section-head">
+              <div class="section-no">04 /</div>
+              <div>
+                <h2>五组接口串起完整闭环</h2>
+                <p>
+                  取票和核销由 Host Service 负责；真正的模型准入发生在 CLI 请求模型时。
+                  把这两层混在一起，会误以为“ready 就等于已经执行”。
+                </p>
+              </div>
+            </div>
+            <div class="api-ladder">
+              <article class="api-step">
+                <div class="api-number">01</div>
+                <div>
+                  <div class="api-owner">HOST SERVICE · QUOTA SNAPSHOT</div>
+                  <h3 class="api-path">GET /ticket/availability</h3>
+                  <p>读取当前用户能否创建新 ticket；不可创建时返回精确的 <code>next_take_at</code>，供 UI 提前置灰并到点重查。</p>
+                </div>
+                <div class="api-result">true → enable create<br />false → disable until next_take_at<br />error → disable until refresh</div>
+              </article>
+              <article class="api-step">
+                <div class="api-number">02</div>
+                <div>
+                  <div class="api-owner">HOST SERVICE · TAKE</div>
+                  <h3 class="api-path">POST /ticket</h3>
+                  <p><code>task_id</code> 换取当前 <code>ticket_id</code>。服务端可能立即 queued，也可能返回额度、资格或网络错误。</p>
+                </div>
+                <div class="api-result">OK → persist ticket<br />3101 / 3103 → reject + refresh snapshot<br />5xx / network → backoff</div>
+              </article>
+              <article class="api-step">
+                <div class="api-number">03</div>
+                <div>
+                  <div class="api-owner">HOST SERVICE · OBSERVE</div>
+                  <h3 class="api-path">POST /ticket/status</h3>
+                  <p>批量读取最多 100 张票，按 <code>ticket_id</code> 回写 queued / ready / active / expired / settled / not_found 投影。</p>
+                </div>
+                <div class="api-result">ready → next_run_at<br />expired → continuation<br />not_found → needs repair</div>
+              </article>
+              <article class="api-step">
+                <div class="api-number">04</div>
+                <div>
+                  <div class="api-owner">ZCODE CLI · ADMIT EACH MODEL CALL</div>
+                  <h3 class="api-path">POST /anthropic/v1/messages</h3>
+                  <p>每一次模型请求携带 <code>X-Off-Peak-Ticket-ID</code>。Agent 已启动不代表后续每个 turn 都天然获准。</p>
+                </div>
+                <div class="api-result">2xx → model response<br />429 / 3105 → retry later<br />400 / 3102 → segment expired</div>
+              </article>
+              <article class="api-step">
+                <div class="api-number">05</div>
+                <div>
+                  <div class="api-owner">HOST SERVICE · SETTLE OUTBOX</div>
+                  <h3 class="api-path">POST /ticket/:ticket_id/settle</h3>
+                  <p>任务终态或分段结束后核销。客户端先落本地 pending，再异步发送，避免一次网络失败丢失终态意图。</p>
+                </div>
+                <div class="api-result">2xx / 4xx → acknowledged<br />5xx / network → retry<br />delete row → current risk</div>
+              </article>
+            </div>
+            <div class="reading-rule">
+              <strong>关键结论</strong>
+              队列位置、Promote、并发和票据有效性都由服务端 MySQL 真源决定。本地 SQLite 只保存调度所需的当前快照。
+            </div>
+          </section>
+
+          <section id="axes" class="reveal">
+            <div class="section-head">
+              <div class="section-no">05 /</div>
+              <div>
+                <h2>两条轴，不能硬合并</h2>
+                <p>
+                  本地轴描述“任务执行到哪一步”；服务端轴描述“当前 ticket 获得了什么准入资格”。
+                  本地表不会保存服务端完整 state，只保存面向调度的投影。
+                </p>
+              </div>
+            </div>
+
+            <div class="axis-grid">
+              <article class="axis-card">
+                <div class="axis-title">
+                  <h3>本地任务执行轴</h3>
+                  <span>7 STATES</span>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">queued</div>
+                  <div class="state-arrow">→</div>
+                  <div class="state-desc">等待服务端 ready；可 Pause、编辑、删除</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">paused</div>
+                  <div class="state-arrow">⇄</div>
+                  <div class="state-desc">仅停止本地派发；服务端 ticket 继续存在</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">running</div>
+                  <div class="state-arrow">→</div>
+                  <div class="state-desc">Prompt 已被 Host/Agent 接受，Agent turn 在跑</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">terminal</div>
+                  <div class="state-arrow">■</div>
+                  <div class="state-desc">completed / failed / cancelled，不可逆出</div>
+                </div>
+              </article>
+
+              <article class="axis-card">
+                <div class="axis-title">
+                  <h3>服务端票据准入轴</h3>
+                  <span>6 STATES</span>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">queued</div>
+                  <div class="state-arrow">→</div>
+                  <div class="state-desc">进入服务端 FIFO，拥有 position</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">ready</div>
+                  <div class="state-arrow">→</div>
+                  <div class="state-desc">粗阀开放；本地投影为 schedulable=1</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">active</div>
+                  <div class="state-arrow">→</div>
+                  <div class="state-desc">首个 message 准入，获得本段 3h 窗口</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">expired</div>
+                  <div class="state-arrow">↺</div>
+                  <div class="state-desc">ready TTL 或 active 3h 到期；需要换票</div>
+                </div>
+                <div class="state-line">
+                  <div class="state-pill">settled / not_found</div>
+                  <div class="state-arrow">■</div>
+                  <div class="state-desc">已核销，或票不存在/不属于当前用户</div>
+                </div>
+              </article>
+            </div>
+
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th>本地状态</th>
+                  <th>可能对应的服务端状态</th>
+                  <th>为什么不一一对应</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>queued</td>
+                  <td>queued / ready / expired / not_found</td>
+                  <td>ready 快照到 scheduler 派发之间有窗口；废票重取也有短暂窗口。</td>
+                </tr>
+                <tr>
+                  <td>paused</td>
+                  <td>queued / ready / expired</td>
+                  <td>Pause 只停本地派发，不退出服务端 FIFO。</td>
+                </tr>
+                <tr>
+                  <td>running</td>
+                  <td>ready / active / expired</td>
+                  <td>当前实现先写 running，首个模型请求可能仍在 429 细阀等待。</td>
+                </tr>
+                <tr>
+                  <td>terminal</td>
+                  <td>active / settled</td>
+                  <td>本地先落终态，服务端资源通过 settle outbox 异步释放。</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="schema" class="reveal">
+            <div class="section-head">
+              <div class="section-no">06 /</div>
+              <div>
+                <h2>字段分组地图</h2>
+                <p>
+                  用搜索框可按字段名或语义过滤。内部调度字段不会进入 UI 领域对象，但和业务字段共处一行，
+                  这是该表既是聚合根又是基础设施状态表的直接体现。
+                </p>
+              </div>
+            </div>
+
+            <div class="schema-toolbar">
+              <label class="search">
+                <span>/</span>
+                <input id="schema-search" type="search" placeholder="搜索字段：ticket、session、history…" />
+              </label>
+              <div class="toolbar-note"><span id="schema-count">8</span> GROUPS · 30 COLUMNS</div>
+            </div>
+
+            <div class="schema-groups" id="schema-groups">
+              <article class="schema-group" data-search="身份 表单 task title prompt permission model thought">
+                <div class="schema-group-head">
+                  <h3>身份与表单</h3>
+                  <span>6 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">off_peak_task_id<b>TEXT · PK</b></div>
+                  <div class="field-desc">
+                    <strong>稳定逻辑身份</strong>；同时作为服务端 task_id，跨多张 ticket 不变。
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="field-name">title<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">任务卡标题；空标题兼容时 UI 回落显示 prompt。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">prompt<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">用户提交的 Instructions；首跑派发时读取最新值。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">permission_mode<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">复用 ZCodeTaskMode；随每次首跑或 resume 派发。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">model<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">指定 idle 模型；为空时派发阶段回落 allowed_models 第一项。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">thought_level<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">推理强度；为空时走 workspace 默认。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="workspace path identity key 本地 远程 项目">
+                <div class="schema-group-head">
+                  <h3>Workspace 边界</h3>
+                  <span>3 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">workspace_key<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">
+                    身份隔离键：<strong>workspaceIdentity?.trim() || workspacePath</strong>。
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="field-name">workspace_path<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">文件读写、命令 cwd 和 Host 执行路径。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">workspace_identity<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">
+                    远程身份预留；当前新建入口只允许本地项目，存量仍可携带。
+                  </div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="session conversation 对话 会话 resume 续跑">
+                <div class="schema-group-head">
+                  <h3>Session 绑定</h3>
+                  <span>2 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">conversation_id<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">首次派发后回填 ZCode taskId；续跑用它定位同一任务。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">session_id<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">History/卡片跳转与冷恢复 resume；没有数据库外键。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="状态 时间 failure files queued started ended 终态">
+                <div class="schema-group-head">
+                  <h3>本地执行聚合</h3>
+                  <span>6 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">status<b>TEXT · NOT NULL</b></div>
+                  <div class="field-desc">七态本地状态；Repo 用条件 UPDATE 实现迁移守卫。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">queued_at<b>INTEGER · NOT NULL</b></div>
+                  <div class="field-desc">本地首次创建和 claim 排序依据；换票时不覆盖。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">started_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">首段 Host 接受 Prompt 的时间；续跑使用 COALESCE 保留。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">ended_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">最终 completed / failed / cancelled 的时间。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">failure_reason<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">最终失败错误；3102 票过期不会作为普通失败保留。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">files_changed<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">从现有 task diff 汇总；部分 Bash 改动可能不在统计内。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="服务端 ticket 注册 调度 位次 poll ready schedulable">
+                <div class="schema-group-head">
+                  <h3>服务端调度快照</h3>
+                  <span>5 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">server_ticket_id<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">只保存当前分段 ticket；重新取号覆盖，不保留旧票历史。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">registered_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">最近一次取号成功时间；重新取号会更新。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">schedulable<b>INTEGER · DEFAULT 0</b></div>
+                  <div class="field-desc">服务端 ready 的布尔投影；scheduler 的粗阀。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">queue_position<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">服务端 FIFO 位次；queued/paused 卡片展示。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">next_poll_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">已持久化，但当前同步循环没有按任务实际过滤使用。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="claim lease scheduler lock attempt error 认领 退避">
+                <div class="schema-group-head">
+                  <h3>调度 Lease 与诊断</h3>
+                  <span>4 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">claim_running<b>INTEGER · DEFAULT 0</b></div>
+                  <div class="field-desc">single-flight 认领锁；只防单任务重复，不限制任务间并发。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">claimed_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">认领开始时间；超过 10 分钟可按僵尸认领回收。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">attempt_count<b>INTEGER · DEFAULT 0</b></div>
+                  <div class="field-desc">Host 派发失败次数；成功 markRunning 后不归零但不暴露 UI。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">last_error<b>TEXT · NULLABLE</b></div>
+                  <div class="field-desc">最近一次派发错误；进入 running 时清空。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="settle outbox history delete 隐藏 核销">
+                <div class="schema-group-head">
+                  <h3>核销与 History</h3>
+                  <span>2 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">settled_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">服务端核销 ack；NULL 的终态行构成可补报 outbox。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">history_deleted_at<b>INTEGER · NULLABLE</b></div>
+                  <div class="field-desc">History tombstone；只隐藏摘要，不删任务、Session 或执行字段。</div>
+                </div>
+              </article>
+
+              <article class="schema-group" data-search="审计 created updated timestamp 时间">
+                <div class="schema-group-head">
+                  <h3>审计时间</h3>
+                  <span>2 fields</span>
+                </div>
+                <div class="field">
+                  <div class="field-name">created_at<b>INTEGER · NOT NULL</b></div>
+                  <div class="field-desc">本地任务创建时间；当前 UI 额度预判按它计数。</div>
+                </div>
+                <div class="field">
+                  <div class="field-name">updated_at<b>INTEGER · NOT NULL</b></div>
+                  <div class="field-desc">状态、调度快照、History 操作等最近更新时间。</div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section id="flows" class="reveal">
+            <div class="section-head">
+              <div class="section-no">07 /</div>
+              <div>
+                <h2>完整分支流</h2>
+                <p>
+                  每个折叠块是一段具有独立失败语义的业务链路。默认展开关键路径，可一键查看全部分支。
+                </p>
+              </div>
+            </div>
+
+            <div class="flow-controls">
+              <button class="control-button" id="expand-all" type="button">展开全部</button>
+              <button class="control-button" id="collapse-all" type="button">收起全部</button>
+            </div>
+
+            <div class="flow-list">
+              <details class="flow-card" open>
+                <summary>
+                  <span class="flow-index">01</span>
+                  <h3>灰度、订阅与额度</h3>
+                  <p>先决定入口是否存在，再由服务端决定请求能否真正取号。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>灰度关闭且无存量：</strong>整个闲时区域隐藏。</span></div>
+                    <div class="branch"><span><strong>灰度关闭但有存量：</strong>只藏创建入口，任务继续跑。</span></div>
+                    <div class="branch"><span><strong>非 Coding Plan：</strong>按钮锁定并展示升级提示。</span></div>
+                    <div class="branch"><span><strong>client/configs：</strong>只负责功能曝光与 allowed models，不再下发静态 limit。</span></div>
+                    <div class="branch"><span><strong>availability=false：</strong>按服务端 next_take_at 提前置灰并展示 Tooltip；到点自动重查。</span></div>
+                    <div class="branch"><span><strong>服务端 3103：</strong>处理查询后的并发竞态，展示错误并刷新 availability，不保存永久 boolean。</span></div>
+                    <div class="branch"><span><strong>桌面远程 / 手机 remote：</strong>不提供新建入口。</span></div>
+                  </div>
+                  <pre class="flow-code">client/configs: exposure + models
+  -&gt; GET /ticket/availability
+     -&gt; false: disable until next_take_at, then refresh
+     -&gt; true/error: allow create
+        -&gt; POST /ticket
+           -&gt; success: create local task
+           -&gt; 3103: show error + refresh availability
+
+POST /ticket remains the final quota authority</pre>
+                </div>
+              </details>
+
+              <details class="flow-card" open>
+                <summary>
+                  <span class="flow-index">02</span>
+                  <h3>创建与首次取号</h3>
+                  <p>先取号，成功才 INSERT；创建阶段不会预建 Session。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>3101 / 3103 / 凭证缺失 / 网络失败：</strong>不落本地任务行。</span></div>
+                    <div class="branch"><span><strong>ticket=queued：</strong>保存 position，等待状态同步。</span></div>
+                    <div class="branch"><span><strong>ticket=ready：</strong>schedulable=1，并立即唤醒 scheduler。</span></div>
+                    <div class="branch"><span><strong>异常返回 active/expired/settled/not_found：</strong>仍会创建本地 queued 行且 schedulable=0；只有后续 expired 分支会自动重取，settled/not_found 可能停滞。</span></div>
+                    <div class="branch"><span><strong>取号成功但 SQLite INSERT 失败：</strong>存在服务端孤儿票风险，当前无主动 settle。</span></div>
+                  </div>
+                  <pre class="flow-code">random offPeakTaskId
+  → POST /ticket
+    → failure: no row
+    → success: INSERT queued</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">03</span>
+                  <h3>状态同步与服务端分支</h3>
+                  <p>先 flush settle outbox，再批量读取最多 100 张非终态 ticket。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>ready：</strong>写 schedulable=1；queued 新晋级时 wake scheduler。</span></div>
+                    <div class="branch"><span><strong>queued：</strong>写 schedulable=0 和 position。</span></div>
+                    <div class="branch"><span><strong>active：</strong>只清 position，不直接改本地状态。</span></div>
+                    <div class="branch"><span><strong>expired + local queued：</strong>清快照并同 taskId 重取票。</span></div>
+                    <div class="branch"><span><strong>expired + local paused：</strong>原地等待用户 Continue。</span></div>
+                    <div class="branch"><span><strong>settled / not_found / 未匹配：</strong>当前实现忽略。</span></div>
+                    <div class="branch"><span><strong>整轮失败：</strong>10s 指数退避到 5min；running 不受影响。</span></div>
+                  </div>
+                  <pre class="flow-code">outbox → nonTerminal
+  → missing ticket: retake
+  → batchStatus ≤ 100
+  → apply by ticketId
+  → schedule next cycle</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">04</span>
+                  <h3>Pause / Continue / 编辑</h3>
+                  <p>Pause 只停本地，Continue 决定复用旧票还是显式消耗额度重取。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>Pause：</strong>仅 queued 且未认领可进入 paused；票继续排队。</span></div>
+                    <div class="branch"><span><strong>Continue + 活票：</strong>paused→queued，零成本恢复。</span></div>
+                    <div class="branch"><span><strong>Continue + expired/not_found/无票：</strong>同 taskId 重取号。</span></div>
+                    <div class="branch"><span><strong>Continue + settled：</strong>当前会被视为“票仍活着”，但后续同步又不处理 settled，存在停滞边界。</span></div>
+                    <div class="branch"><span><strong>Continue 状态查询失败：</strong>按票活处理，避免白耗额度。</span></div>
+                    <div class="branch"><span><strong>编辑：</strong>只允许 queued/paused；workspace 不可改。</span></div>
+                  </div>
+                  <pre class="flow-code">queued --pause--> paused
+paused --continue--> queued
+  ├─ alive ticket: reuse
+  └─ dead ticket: retake</pre>
+                </div>
+              </details>
+
+              <details class="flow-card" open>
+                <summary>
+                  <span class="flow-index">05</span>
+                  <h3>Scheduler 认领与派发</h3>
+                  <p>BEGIN IMMEDIATE 保证单任务 single-flight；任务间没有本地并发上限。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>认领条件：</strong>queued + schedulable=1 + claim_running=0。</span></div>
+                    <div class="branch"><span><strong>僵尸认领：</strong>claimed_at 超过 10min 后释放。</span></div>
+                    <div class="branch"><span><strong>内存退避未到：</strong>立即 release claim，等待后续 tick。</span></div>
+                    <div class="branch"><span><strong>没有 Host / forward 失败：</strong>保持 queued，30s 指数退避到 15min。</span></div>
+                    <div class="branch"><span><strong>Host ok：</strong>markRunning 并回填 conversation/session。</span></div>
+                    <div class="branch"><span><strong>结果迟到且任务已 Pause/Cancel：</strong>markRunning 守卫拒绝。</span></div>
+                  </div>
+                  <pre class="flow-code">BEGIN IMMEDIATE
+  SELECT due
+  UPDATE claim_running = 1
+COMMIT
+
+dispatch → main → host</pre>
+                </div>
+              </details>
+
+              <details class="flow-card" open>
+                <summary>
+                  <span class="flow-index">06</span>
+                  <h3>Host 首跑 / 续跑 / Provider</h3>
+                  <p>Session 常驻模型不被污染，idle plan 只活在自动派发的当前 turn。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>首跑：</strong>createTask + 原始 prompt；派发后才产生 Session。</span></div>
+                    <div class="branch"><span><strong>续跑：</strong>resume 同一 Session + 固定 continuation prompt。</span></div>
+                    <div class="branch"><span><strong>无 ticket / 无模型 / 无凭证：</strong>Host 返回 transient，scheduler 重试。</span></div>
+                    <div class="branch"><span><strong>Session 正忙：</strong>拒绝 turnRuntimeModel 延迟入队，避免边界失真。</span></div>
+                    <div class="branch"><span><strong>Turn 结束：</strong>清临时 overlay，恢复用户原 provider。</span></div>
+                    <div class="branch"><span><strong>用户插话/终态后聊天：</strong>天然走用户 provider。</span></div>
+                  </div>
+                  <pre class="flow-code">first:
+  createTask → send original prompt
+
+resume:
+  resumeTask → send continuation
+
+both:
+  turnRuntimeModel = idle plan</pre>
+                </div>
+              </details>
+
+              <details class="flow-card" open>
+                <summary>
+                  <span class="flow-index">07</span>
+                  <h3>模型请求：429 / 3102 / 真错误</h3>
+                  <p>细阀可在每一次模型请求发生；排队不消耗普通 API 重试预算。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>429/3105：</strong>min(Retry-After, 5min)，无头默认 60s，无限探测。</span></div>
+                    <div class="branch"><span><strong>用户 Cancel：</strong>AbortSignal 中止 sleep 和在途请求。</span></div>
+                    <div class="branch"><span><strong>400/3102 或旧 3001：</strong>写稳定错误标记，由 Host 改走换票续跑。</span></div>
+                    <div class="branch"><span><strong>其他错误：</strong>使用普通 Agent retry；耗尽后进入 failed。</span></div>
+                    <div class="branch"><span><strong>普通 Provider 429：</strong>不享受无限探测，保持原重试预算。</span></div>
+                  </div>
+                  <pre class="flow-code">429/3105 → queued hold → retry ∞
+3102      → marker → requeue + retake
+other     → normal retry → failed?</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">08</span>
+                  <h3>敏感操作与确认</h3>
+                  <p>当前代码只复用普通 Session 的 permission / elicitation 交互，聚合态保持 running。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>敏感工具请求：</strong>普通 Session 展示确认，Off-Peak 卡片保持 Running。</span></div>
+                    <div class="branch"><span><strong>批准 / 拒绝：</strong>同一自动 turn 继续，仍使用 idle plan。</span></div>
+                    <div class="branch"><span><strong>通知：</strong>由 Session 通用链路负责，不重复发送 Off-Peak 等确认通知。</span></div>
+                    <div class="branch"><span><strong>取消：</strong>进入 cancelled，并中止 Agent loop。</span></div>
+                    <div class="branch"><span><strong>历史兼容：</strong>旧库预留值初始化时迁移为 running。</span></div>
+                  </div>
+                  <pre class="flow-code">permission requested
+  → session waits for response
+  → off_peak_tasks stays running
+  → same turn keeps idle plan</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">09</span>
+                  <h3>3h 换票续跑</h3>
+                  <p>逻辑任务和 Session 不变，只替换当前 ticket；History 仍是一条完整执行。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>触发：</strong>模型请求收到 3102，不依赖客户端本地计时。</span></div>
+                    <div class="branch"><span><strong>回队：</strong>running/awaiting→queued，保留 startedAt/session。</span></div>
+                    <div class="branch"><span><strong>重取成功：</strong>覆盖 server_ticket_id，等待新票 ready。</span></div>
+                    <div class="branch"><span><strong>重取失败：</strong>保持 queued，后续同步继续补取。</span></div>
+                    <div class="branch"><span><strong>Runtime 不可用：</strong>无法续跑，按普通 failed 收口。</span></div>
+                  </div>
+                  <pre class="flow-code">task-A + ticket-1 + session-X
+           ↓ 3102
+task-A + ticket-2 + session-X</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">10</span>
+                  <h3>终态、通知与核销</h3>
+                  <p>本地终态先落库，服务端资源释放通过异步 settle outbox 完成。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>succeeded：</strong>completed；stopped：cancelled；其他：failed。</span></div>
+                    <div class="branch"><span><strong>终态回写：</strong>endedAt、failureReason、filesChanged，清 claim/schedulable。</span></div>
+                    <div class="branch"><span><strong>迟到终态：</strong>终态不可逆守卫拒绝覆盖。</span></div>
+                    <div class="branch"><span><strong>settle 2xx：</strong>写 settledAt。</span></div>
+                    <div class="branch"><span><strong>settle 4xx：</strong>按幂等 ack 写 settledAt。</span></div>
+                    <div class="branch"><span><strong>网络/5xx：</strong>保留 NULL，下个 sync 周期补报。</span></div>
+                    <div class="branch"><span><strong>通知：</strong>completed / failed / awaiting 状态边沿触发。</span></div>
+                  </div>
+                  <pre class="flow-code">local terminal
+  → unread + history status
+  → settle current ticket
+    ├─ ack: settled_at
+    └─ retryable: outbox</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">11</span>
+                  <h3>Cancel / Delete / Delete history</h3>
+                  <p>三个入口分别是终止、物理删除和视觉隐藏，数据后果完全不同。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>Cancel：</strong>先写 cancelled，再 best-effort stopGeneration，异步 settle。</span></div>
+                    <div class="branch"><span><strong>Delete 非终态：</strong>先 Cancel，再 DELETE 本地任务行。</span></div>
+                    <div class="branch"><span><strong>Delete 终态：</strong>直接 DELETE，不删除 Session。</span></div>
+                    <div class="branch"><span><strong>Delete history：</strong>只写 historyDeletedAt，无确认、无 Undo。</span></div>
+                    <div class="branch"><span><strong>未启动任务删 History：</strong>不写 tombstone。</span></div>
+                    <div class="branch"><span><strong>重复删 History：</strong>幂等，保留首次时间。</span></div>
+                  </div>
+                  <pre class="flow-code">cancel  = terminal state
+delete  = physical row delete
+history = visibility tombstone</pre>
+                </div>
+              </details>
+
+              <details class="flow-card">
+                <summary>
+                  <span class="flow-index">12</span>
+                  <h3>重启、崩溃与 Keep Awake</h3>
+                  <p>Off-Peak 没有 misfire skip；中断统一回队并复用 Session 接续。</p>
+                  <span class="flow-toggle">+</span>
+                </summary>
+                <div class="flow-body">
+                  <div class="branch-list">
+                    <div class="branch"><span><strong>App 重启：</strong>running/awaiting→queued，保留 session、startedAt、queuedAt。</span></div>
+                    <div class="branch"><span><strong>Scheduler 正常退出：</strong>主动 release in-flight claim。</span></div>
+                    <div class="branch"><span><strong>Scheduler 崩溃：</strong>认领超过 10min 后回收。</span></div>
+                    <div class="branch"><span><strong>机器休眠：</strong>queued 原地保留，唤醒后继续同步，无 skip。</span></div>
+                    <div class="branch"><span><strong>Keep Awake：</strong>设置开启且 running/awaiting 数量&gt;0 时阻止闲置休眠。</span></div>
+                    <div class="branch"><span><strong>合盖：</strong>powerSaveBlocker 无法阻止。</span></div>
+                  </div>
+                  <pre class="flow-code">recoverInterrupted:
+  running / awaiting
+    → queued
+    → resume same session later</pre>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <section id="history" class="reveal">
+            <div class="section-head">
+              <div class="section-no">08 /</div>
+              <div>
+                <h2>为什么 History 是 0 / 1</h2>
+                <p>
+                  没有独立 runs 表。UI 直接从任务聚合行计算一条摘要，因此多张 ticket、多段执行对用户保持透明。
+                </p>
+              </div>
+            </div>
+            <div class="history-logic">
+              <article class="history-card" data-count="0">
+                <h3>从未启动</h3>
+                <p>纯 queued / paused，没有 startedAt，History 显示空态。</p>
+                <code>started_at IS NULL</code>
+              </article>
+              <article class="history-card" data-count="1">
+                <h3>已经启动</h3>
+                <p>
+                  startedAt 存在且未隐藏，展示 Prompt、Triggered、Status、Duration 和 Session 入口。
+                </p>
+                <code>started_at IS NOT NULL</code>
+              </article>
+              <article class="history-card" data-count="0">
+                <h3>用户隐藏</h3>
+                <p>只写 tombstone；任务后续完成、失败或核销都不会让该行重新出现。</p>
+                <code>history_deleted_at IS NOT NULL</code>
+              </article>
+            </div>
+
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th>本地任务状态</th>
+                  <th>History 文案</th>
+                  <th>Duration 终点</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>running</td><td>In progress</td><td>Date.now()</td></tr>
+                <tr><td>completed</td><td>Succeeded</td><td>endedAt</td></tr>
+                <tr><td>failed</td><td>Failure</td><td>endedAt</td></tr>
+                <tr><td>cancelled after start</td><td>Skipped</td><td>endedAt</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="run-decision" class="reveal">
+            <div class="section-head">
+              <div class="section-no">09 /</div>
+              <div>
+                <h2>要不要像普通定时任务一样加 Run History</h2>
+                <p>
+                  普通 Automation 的同一定义会按周期产生很多次独立触发，runs 表既是幂等账本也是历史。
+                  Off-Peak 当前只有一次逻辑运行，重复发生的是 ticket 分段。
+                </p>
+              </div>
+            </div>
+            <div class="decision-grid">
+              <article class="decision-card">
+                <span class="decision-label">CURRENT · V1</span>
+                <h3>继续只用聚合行</h3>
+                <p>最少的表和写路径，足够完成一次性任务、分段续跑与 0/1 History。</p>
+                <ul>
+                  <li>优点：模型简单，升级成本最低</li>
+                  <li>代价：旧 ticket 被覆盖</li>
+                  <li>代价：删除任务可能丢 settle 重试</li>
+                </ul>
+              </article>
+              <article class="decision-card">
+                <span class="decision-label">NOT RECOMMENDED</span>
+                <h3>照搬 off_peak_runs</h3>
+                <p>如果一条任务仍然只允许一次逻辑执行，那么 task 与 run 永远接近 1:1，只会把同一状态拆写两遍。</p>
+                <ul>
+                  <li>适合：未来支持重复触发同一任务定义</li>
+                  <li>不适合：只为保存 ticket 分段</li>
+                  <li>风险：History 语义被误改成 1:N</li>
+                </ul>
+              </article>
+              <article class="decision-card recommended">
+                <span class="decision-label">RECOMMENDED EVOLUTION</span>
+                <h3>按需增加 off_peak_tickets</h3>
+                <p>让聚合表继续回答“任务现在怎样”，子表专门记录“每张票怎样流转与核销”。产品 History 仍保持 0/1。</p>
+                <ul>
+                  <li>解决：本地额度与票据链审计</li>
+                  <li>解决：任务删除后的 settle outbox</li>
+                  <li>解决：每一分段的重试与结束原因</li>
+                </ul>
+              </article>
+            </div>
+
+            <div class="target-schema" aria-label="推荐的 task 与 ticket 表关系">
+              <article class="table-box current">
+                <small>AGGREGATE · KEEP</small>
+                <h3>off_peak_tasks</h3>
+                <code>id · title · prompt · workspace</code>
+                <code>status · started_at · ended_at</code>
+                <code>session_id · history_deleted_at</code>
+                <code>current_ticket_id · current snapshot</code>
+                <code>scheduler claim · task-level failure</code>
+                <p>回答产品与调度问题：这项任务是谁、现在在哪、是否终态、用户是否隐藏历史。</p>
+              </article>
+              <div class="schema-relation">
+                <span>1</span>
+                <strong>→ N</strong>
+                <span>segments</span>
+              </div>
+              <article class="table-box">
+                <small>LOCAL LEDGER · ADD ONLY WHEN NEEDED</small>
+                <h3>off_peak_tickets</h3>
+                <code>ticket_id PK · task_id FK</code>
+                <code>ordinal · server_state · taken_at</code>
+                <code>ready_at · active_at · expires_at</code>
+                <code>segment_started_at · segment_ended_at</code>
+                <code>end_reason · last_error</code>
+                <code>settle_state · settle_attempts · settled_at</code>
+                <p>回答可靠性问题：经历过哪些准入分段、哪张票待核销、一次续跑为什么结束。</p>
+              </article>
+            </div>
+            <div class="reading-rule">
+              <strong>不要越权</strong>
+              服务端已经有权威的 MySQL ticket 生命周期和审计；本地 ticket 表只是可靠执行账本与诊断缓存，
+              不能成为 FIFO、并发额度或准入有效性的第二真源。
+            </div>
+          </section>
+
+          <section id="migration" class="reveal">
+            <div class="section-head">
+              <div class="section-no">10 /</div>
+              <div>
+                <h2>引入 Ticket 表可以平滑升级</h2>
+                <p>
+                  采用纯增量迁移，不改现有任务主键、不立刻删除旧字段。新旧代码在一段时间内都能读取
+                  <code>off_peak_tasks</code> 完成核心流程。
+                </p>
+              </div>
+            </div>
+            <div class="migration-track">
+              <article class="migration-step">
+                <b>PHASE 01</b>
+                <h3>只加表，不改读路径</h3>
+                <p>使用 <code>CREATE TABLE IF NOT EXISTS</code> 创建 ticket ledger 和索引；原任务表、原 RPC、原 UI 全部不动。</p>
+              </article>
+              <article class="migration-step">
+                <b>PHASE 02</b>
+                <h3>回填当前票快照</h3>
+                <p>每个任务最多回填当前 <code>server_ticket_id</code>，标记为 legacy backfill。已经被覆盖的历史票无法凭空恢复。</p>
+              </article>
+              <article class="migration-step">
+                <b>PHASE 03</b>
+                <h3>先双写，再观察</h3>
+                <p>Take、status、segment end、settle 同时写旧聚合字段与新子表；对账后再把诊断和 outbox 查询切到子表。</p>
+              </article>
+              <article class="migration-step">
+                <b>PHASE 04</b>
+                <h3>逐项切换消费方</h3>
+                <p>先切 settle 重试，再切本地额度与诊断；任务卡片和 0/1 History 继续从聚合表读取，避免产品语义漂移。</p>
+              </article>
+            </div>
+            <div class="compat-note">
+              <article>
+                <strong>向前升级：可以无感</strong>
+                <p>新版本首次启动自动建表并回填当前票。旧任务照常运行；没有历史票时只影响审计完整度，不影响执行。</p>
+              </article>
+              <article>
+                <strong>回退旧版：功能可用，但有边界</strong>
+                <p>保留聚合字段即可让旧版本继续跑；旧版本期间产生的新票不会写 ledger，重新升级后无法补回完整链路。</p>
+              </article>
+            </div>
+            <div class="reading-rule">
+              <strong>删除策略</strong>
+              若 ticket 子表承担 settle outbox，不应简单使用 <code>ON DELETE CASCADE</code>。
+              任务删除后至少保留未核销票据和最小任务标识，直到 acknowledged 或明确放弃。
+            </div>
+          </section>
+
+          <section id="audit" class="reveal">
+            <div class="section-head">
+              <div class="section-no">11 /</div>
+              <div>
+                <h2>当前实现核对</h2>
+                <p>
+                  以下项目是从代码全链路得出的事实，包含已经闭环的不变量，也包含文档目标和当前实现之间的差异。
+                </p>
+              </div>
+            </div>
+
+            <div class="risk-grid">
+              <article class="risk good">
+                <h3>终态不可逆</h3>
+                <p>所有终态写入都带非终态 WHERE 守卫，Cancel 可以稳定压住迟到 stopped 回写。</p>
+              </article>
+              <article class="risk good">
+                <h3>单任务 single-flight</h3>
+                <p>BEGIN IMMEDIATE + claim_running 原子认领，多个任务之间不做错误的本地串行化。</p>
+              </article>
+              <article class="risk good">
+                <h3>确认链路已收敛</h3>
+                <p>Permission / elicitation 只走普通 Session；Off-Peak 聚合保持 running，不暴露不可达状态。</p>
+              </article>
+              <article class="risk">
+                <h3>running 写入早于网关 admitted</h3>
+                <p>sendPrompt 受理后即 markRunning，因此细阀 429 期间本地已经显示 In progress。</p>
+              </article>
+              <article class="risk">
+                <h3>not_found 没有自动修复</h3>
+                <p>普通同步对 not_found 不做重取；queued 任务可能持续携带旧票，只有 Continue 会处理。</p>
+              </article>
+              <article class="risk">
+                <h3>next_poll_at 尚未真正驱动</h3>
+                <p>字段会写库，但同步仍是 Service 级公共 timer，不按每条任务的 next_poll_at 过滤；即使无任务，finally 仍会约 5 分钟后再排一次 timer。</p>
+              </article>
+              <article class="risk good">
+                <h3>额度误判改为服务端快照</h3>
+                <p>D39 删除本地 task.createdAt 与静态 limit 预判，改由 availability 返回实时 can_take_number 与 next_take_at。</p>
+              </article>
+              <article class="risk good">
+                <h3>client/configs 不再携带 limit</h3>
+                <p>共享配置只控制曝光和模型列表；服务端内部 limit/window 不再泄漏为客户端推断规则。</p>
+              </article>
+              <article class="risk good">
+                <h3>3103 不再形成永久锁</h3>
+                <p>客户端保存的是带 next_take_at 的短期服务端快照，不保存 quotaExhausted boolean；到点重查，查询失败则保持禁入直到成功刷新。</p>
+              </article>
+              <article class="risk">
+                <h3>Delete 可丢 settle outbox</h3>
+                <p>行被物理删除后，如果异步 settle 遇到网络/5xx，已经没有本地记录可继续补报。</p>
+              </article>
+              <article class="risk">
+                <h3>多 Host 重复同步</h3>
+                <p>每个窗口 Host 都启动 sync；写入和接口幂等，但批量状态请求和 settle 扫描会放大。</p>
+              </article>
+              <article class="risk">
+                <h3>客户端没有票据审计历史</h3>
+                <p>服务端有 ticket 真源和审计，但本地旧 ticket 会被覆盖；离线诊断无法还原每段耗时、结束原因与 settle 重试。</p>
+              </article>
+              <article class="risk">
+                <h3>客户端注释与服务端 Promote 已漂移</h3>
+                <p>当前服务端由独立 timer 推进 queued → ready；若客户端仍假定 status 查询会触发 Promote，轮询语义和故障判断会失真。</p>
+              </article>
+            </div>
+          </section>
+
+          <section id="boundary" class="reveal">
+            <div class="section-head">
+              <div class="section-no">12 /</div>
+              <div>
+                <h2>最终能力边界</h2>
+                <p>一眼判断一个需求是否还能继续塞进当前表，还是已经应该拆出 runs / tickets / events。</p>
+              </div>
+            </div>
+            <div class="final-definition">
+              <article class="definition-side">
+                <span>It is</span>
+                <h3>当前态聚合与可靠执行控制面</h3>
+                <ul>
+                  <li>逻辑任务当前态快照</li>
+                  <li>当前服务端 ticket 快照</li>
+                  <li>跨进程 scheduler lease</li>
+                  <li>终态 settle outbox</li>
+                  <li>History 可见性 tombstone</li>
+                  <li>一个 Session 的分段续跑锚点</li>
+                </ul>
+              </article>
+              <article class="definition-side">
+                <span>It is not</span>
+                <h3>事件溯源或多运行审计系统</h3>
+                <ul>
+                  <li>不是多次执行 History 表</li>
+                  <li>不是多 ticket 审计表</li>
+                  <li>不是 Session 生命周期真源</li>
+                  <li>不是服务端 FIFO 队列副本</li>
+                  <li>不是模型请求事件流水</li>
+                  <li>不能回答每一执行分段的历史细节</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <footer>
+          <span>ZCODE · OFF-PEAK TASK FIELD MANUAL</span>
+          <span>Source: current client code + server contract · docs/off-peak-task · 2026-07-20</span>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      const updateProgress = () => {
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = scrollable > 0 ? window.scrollY / scrollable : 0;
+        document.body.style.setProperty("--scroll-progress", String(progress));
+      };
+
+      const navLinks = [...document.querySelectorAll(".rail nav a")];
+      const sections = [...document.querySelectorAll("main section[id]")];
+      const activateSection = () => {
+        const active =
+          sections
+            .filter((section) => section.getBoundingClientRect().top <= 160)
+            .at(-1)?.id ?? sections[0]?.id;
+        navLinks.forEach((link) => {
+          link.classList.toggle("active", link.getAttribute("href") === `#${active}`);
+        });
+      };
+
+      document.getElementById("schema-search")?.addEventListener("input", (event) => {
+        const query = event.target.value.trim().toLowerCase();
+        const groups = [...document.querySelectorAll(".schema-group")];
+        let visible = 0;
+        groups.forEach((group) => {
+          const text = `${group.dataset.search ?? ""} ${group.textContent}`.toLowerCase();
+          const hidden = query.length > 0 && !text.includes(query);
+          group.classList.toggle("hidden", hidden);
+          if (!hidden) visible += 1;
+        });
+        document.getElementById("schema-count").textContent = String(visible);
+      });
+
+      const flowCards = [...document.querySelectorAll(".flow-card")];
+      document.getElementById("expand-all")?.addEventListener("click", () => {
+        flowCards.forEach((card) => {
+          card.open = true;
+        });
+      });
+      document.getElementById("collapse-all")?.addEventListener("click", () => {
+        flowCards.forEach((card) => {
+          card.open = false;
+        });
+      });
+
+      window.addEventListener(
+        "scroll",
+        () => {
+          updateProgress();
+          activateSection();
+        },
+        { passive: true },
+      );
+      updateProgress();
+      activateSection();
+    </script>
+  </body>
+</html>

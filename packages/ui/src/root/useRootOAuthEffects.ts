@@ -29,7 +29,7 @@ import { useAccountConnectionLossNotification } from "@/root/useAccountConnectio
 
 export { refreshRestoredOAuthProviderFamilyAfterStartup } from "@/root/oauthProviderFamilySelectionRefresh.js";
 
-async function handleOAuthCallbackSuccess(params: {
+export async function handleOAuthCallbackSuccess(params: {
   result: OAuthSessionCallbackResult;
   platform: Pick<IPlatformService, "reportTelemetryEvent">;
   refreshLatestModelProviderFamilySelection?: (

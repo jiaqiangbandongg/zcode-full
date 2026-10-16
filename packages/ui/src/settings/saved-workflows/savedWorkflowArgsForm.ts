@@ -16,7 +16,10 @@ export interface SavedWorkflowArgField {
 export type SavedWorkflowArgFieldError = "required" | "invalid_number" | "invalid_json";
 
 /** 把一个默认值 / 已有值按类型转成编辑器文本。 */
-function formatSavedWorkflowArgValue(type: ZCodeSavedWorkflowArgType, value: unknown): string {
+export function formatSavedWorkflowArgValue(
+  type: ZCodeSavedWorkflowArgType,
+  value: unknown,
+): string {
   if (value === undefined) return type === "boolean" ? "false" : "";
   switch (type) {
     case "string":
@@ -30,18 +33,28 @@ function formatSavedWorkflowArgValue(type: ZCodeSavedWorkflowArgType, value: unk
   }
 }
 
+/**
+ * 声明 → 可编辑字段。`initialArgs` 在场时逐个字段**优先**用它的值（完成卡「再次运行」把这次
+ * run 跑过的那一份实参预填进来，docs/dynamic-workflow/transcript-and-notifications.md「Run again」）：
+ * 上一次跑成了什么，下一次多半还要跑什么。声明里没有的键不进表单——表单的形状由声明决定，
+ * 一份旧实参不该凭空长出字段。
+ */
 export function buildSavedWorkflowArgFields(
   declaration: ZCodeSavedWorkflowArgsDeclaration | undefined,
+  initialArgs?: Record<string, unknown>,
 ): SavedWorkflowArgField[] {
   if (!declaration) return [];
-  return Object.entries(declaration).map(([name, spec]) => ({
-    name,
-    type: spec.type,
-    ...(spec.description === undefined ? {} : { description: spec.description }),
-    required: spec.required === true,
-    hasDefault: spec.default !== undefined,
-    value: formatSavedWorkflowArgValue(spec.type, spec.default),
-  }));
+  return Object.entries(declaration).map(([name, spec]) => {
+    const initial = initialArgs?.[name];
+    return {
+      name,
+      type: spec.type,
+      ...(spec.description === undefined ? {} : { description: spec.description }),
+      required: spec.required === true,
+      hasDefault: spec.default !== undefined,
+      value: formatSavedWorkflowArgValue(spec.type, initial === undefined ? spec.default : initial),
+    };
+  });
 }
 
 type SavedWorkflowArgParse =
@@ -53,7 +66,7 @@ type SavedWorkflowArgParse =
  * 单个字段 → 实参值。空文本对 string / number / json 意味着「不传」：有默认值的由服务端回填，
  * 无默认值又非必填的就是缺席；必填而空是唯一的 required 错误。boolean 永远有值。
  */
-function parseSavedWorkflowArgField(field: SavedWorkflowArgField): SavedWorkflowArgParse {
+export function parseSavedWorkflowArgField(field: SavedWorkflowArgField): SavedWorkflowArgParse {
   const raw = field.value;
   if (field.type === "boolean") {
     return { ok: true, omitted: false, value: raw === "true" };

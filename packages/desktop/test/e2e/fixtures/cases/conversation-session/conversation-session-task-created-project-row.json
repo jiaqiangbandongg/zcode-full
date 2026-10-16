@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-task-created-project-row",
+  "spec": "./test/e2e/conversation-session/conversation-session-task-created-project-row.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-task-created-project-row.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "task-created-project-row-title",
+      "description": "TSL26 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首发会触发默认 title sidecar；固定 marker 响应避免回退共享 provider fixture。"
+    },
+    {
+      "id": "task-created-project-row-main",
+      "description": "建立首发 task，并等待 task_created 驱动 Project task-row 换代。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 验证任务创建与列表持久化闭环，模型文本只作为确定性 turn 完成屏障。"
+    }
+  ]
+}

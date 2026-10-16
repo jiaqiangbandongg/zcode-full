@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-file-summary-cold-start",
+  "spec": "./test/e2e/conversation-session/conversation-session-file-summary-cold-start.test.ts",
+  "fixtures": [
+    {
+      "id": "file-summary-cold-start-title",
+      "description": "O16 cold-start 文件摘要 case-local 标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与冷物化语义，只用 marker 隔离标题请求。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_FILE_SUMMARY_COLD_START"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "file-summary-cold-start-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Cold File Summary E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "file-summary-cold-start-write",
+      "description": "O16 单次 Write 创建两行文件并产生 workspace checkpoint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不保证稳定选择单次 Write；固定两行内容用于精确断言 +2/-0。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_FILE_SUMMARY_COLD_START"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_file_summary_cold_start_write"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_file_summary_cold_start_write",
+          "messageId": "msg_file_summary_cold_start_write",
+          "name": "Write",
+          "input": {
+            "file_path": "file-summary-cold-start-e2e/summary.txt",
+            "content": "cold-summary-line-1\ncold-summary-line-2\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "file-summary-cold-start-final",
+      "description": "O16 Write 成功后结束轮次，供完整冷启动重开同一 session。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定最终 marker，避免模型文本波动干扰冷启动摘要断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FILE_SUMMARY_COLD_START",
+          "toolu_file_summary_cold_start_write",
+          "File created successfully at: file-summary-cold-start-e2e/summary.txt"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "file-summary-cold-start-final",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "E2E_FILE_SUMMARY_COLD_START_OK"
+        }
+      }
+    }
+  ]
+}

@@ -24,7 +24,9 @@ async function walk(root, files) {
     if (["node_modules", "dist", "out", "coverage", ".git"].includes(entry.name)) continue;
     const target = path.join(root, entry.name);
     if (entry.isDirectory()) await walk(target, files);
-    else if (entry.isFile() && isSourceFile(target)) files.push(target);
+    // 契约文档也是必需产物；只枚举源码会把实际存在的 CONTRACT.md 误报为缺失。
+    else if (entry.isFile() && (isSourceFile(target) || entry.name === "CONTRACT.md"))
+      files.push(target);
   }
 }
 

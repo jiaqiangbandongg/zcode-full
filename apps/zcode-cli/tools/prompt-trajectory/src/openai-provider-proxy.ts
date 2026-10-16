@@ -2,14 +2,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { URL } from "node:url";
-import {
-  assembleNonStreamingAssistantMessage,
-  assembleStreamingAssistantMessage,
-} from "./openai-response-assembler.js";
+import { assembleNonStreamingAssistantMessage, assembleStreamingAssistantMessage } from "./openai-response-assembler.js";
 import type { MessageLedger } from "./message-ledger.js";
 import type { JsonObject } from "./types.js";
 
-interface OpenAiProviderProxy {
+export interface OpenAiProviderProxy {
   baseURL: string;
   close(): Promise<void>;
 }

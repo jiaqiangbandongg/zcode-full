@@ -12,14 +12,14 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Rect } from "./cuaPermissionPanelPositioner.js";
 
-interface SystemSettingsWindowWatcher {
+export interface SystemSettingsWindowWatcher {
   start(): void;
   stop(): void;
   /** 最近一次成功解析到的系统设置主窗口 bounds；拿不到时为 null。 */
   latest(): Rect | null;
 }
 
-interface CreateSystemSettingsWindowWatcherOptions {
+export interface CreateSystemSettingsWindowWatcherOptions {
   binaryPath: string;
   intervalMs?: number;
   platform?: NodeJS.Platform;

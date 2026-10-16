@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-compact-manual-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-compact-manual-queue.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-compact-manual-queue-prep-one",
+      "description": "manual compact held queue 第一轮预置纯文本回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第一轮只用于形成可 compact 的普通历史，真实 provider 文案不影响 held queue 语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_COMPACT_PREP_ONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_COMPACT_PREP_ONE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-compact-manual-queue-prep-one",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-compact-manual-queue-readonly-final",
+      "description": "manual compact held queue 第二轮 Read tool_result 后最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第二轮只用于构造含 readonly tool_result 的 compact 历史，工具业务由本地文件 fixture 决定。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_COMPACT_PREP_TWO",
+          "E2E_READONLY_TOOL_FILE_CONTENT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-compact-manual-queue-readonly-final",
+          "inputTokens": 190,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-compact-manual-queue-summary-success",
+      "description": "held queue 存在时手动 /compact 成功的 summary 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只用于证明 manual compact marker 完成且 held queue 未被消费，不依赖真实 summary 内容。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_COMPACT_PREP_ONE",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Do NOT call any tools",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "E2E_AUTO_COMPACT",
+          "E2E_AUTO_ACTIONS"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 650,
+        "text": {
+          "id": "upstream-e2e-compact-manual-queue-summary-success",
+          "inputTokens": 256,
+          "outputTokens": 64,
+          "text": "<analysis>Manual compact e2e replay summarized the existing main session without tools.</analysis>\n\n<summary>Conversation so far: the user asked the assistant to reply with exactly upstream-e2e-ok for the initial verification turns. The assistant replied with upstream-e2e-ok. A held queue item existed during manual compact and was intentionally not consumed.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-compact-manual-queue-held-contract",
+      "description": "manual compact held queue marker 合同占位；不应被 provider 消费。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "held queue 在 manual compact 前后都必须保留；fixture 只覆盖 marker 合同。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_COMPACT_QUEUE_HELD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_COMPACT_QUEUE_HELD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-compact-manual-queue-held-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-compact-manual-queue-append-contract",
+      "description": "manual compact 完成后追加 held queue marker 合同占位；不应立即发送。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "manual compact 完成后 queue 仍 held，追加文本应入队而不是触发 provider。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_COMPACT_QUEUE_APPEND_AFTER_SUCCESS"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_COMPACT_QUEUE_APPEND_AFTER_SUCCESS"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-compact-manual-queue-append-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

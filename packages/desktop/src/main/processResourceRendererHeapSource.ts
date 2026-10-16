@@ -26,7 +26,7 @@ const pendingHeapUsedKb = new Map<number, number>();
  * main 侧的信任边界：payload 来自 renderer，按 `strict` schema 校验，
  * 非法消息（字段缺失、类型错误、夹带路径等多余字段）直接丢弃，不抛错。
  */
-function ingestRendererHeapSample(webContentsId: number, raw: unknown): void {
+export function ingestRendererHeapSample(webContentsId: number, raw: unknown): void {
   if (!isMainApplicationWindowWebContents(webContentsId)) {
     return;
   }

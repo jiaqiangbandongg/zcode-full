@@ -58,23 +58,7 @@ export function mirrorSubagentToolEvent(
   }
 
   if (MIRRORED_INTERACTION_EVENT_TYPES.has(event.type)) {
-    // V4 只从父 task 的实时投影生成阻塞交互；仅转发 broker request 会让
-    // 子 agent 的 permission / AskUserQuestion 停留在子 session，父界面无法响应。
-    const mirroredPayload = {
-      ...payload,
-      toolCallId,
-      ...(toolName ? { toolName } : {}),
-      childSessionId: context.childSessionId,
-      ...(context.background ? { background: true } : {}),
-      ...(event.type === SessionEventType.PermissionRequested
-        ? { origin: buildSubagentInteractionOrigin(context, event.turnId) }
-        : {}),
-    };
-
-    return createSessionEvent(event.type, context.parentSessionId, mirroredPayload, {
-      traceId: event.traceId,
-      turnId: context.parentTurnId,
-    });
+    return mirrorInteraction(event, payload, toolCallId, toolName, context);
   }
 
   const mirroredPayload = {
@@ -92,6 +76,54 @@ export function mirrorSubagentToolEvent(
     source: SUBAGENT_EVENT_SOURCE,
   };
 
+  return createSessionEvent(event.type, context.parentSessionId, mirroredPayload, {
+    traceId: event.traceId,
+    turnId: context.parentTurnId,
+  });
+}
+
+/**
+ * 只镜像交互事件（PermissionRequested / Resolved / Denied），不镜像工具活动。
+ * 供 class 外构造的子 runtime（dwf actor）使用：它们的工具活动有自己的呈现面（run 卡片 /
+ * 子会话 transcript），父 timeline 不该出现；但确认窗只从父会话的实时投影生成，交互必须过来
+ * （docs/dynamic-workflow/launch.md「Permissions inside a run」）。
+ */
+export function mirrorSubagentInteractionEvent(
+  event: SessionEvent,
+  context: SubagentInteractionOriginContext,
+): SessionEvent | undefined {
+  if (!MIRRORED_INTERACTION_EVENT_TYPES.has(event.type)) return undefined;
+  const payload = asRecord(event.payload);
+  const childToolCallId = stringField(payload, "toolCallId");
+  if (!childToolCallId) return undefined;
+  return mirrorInteraction(
+    event,
+    payload,
+    mirroredToolCallId(context.agentId, childToolCallId),
+    stringField(payload, "toolName"),
+    context,
+  );
+}
+
+function mirrorInteraction(
+  event: SessionEvent,
+  payload: Record<string, unknown>,
+  toolCallId: ToolCallId,
+  toolName: string | undefined,
+  context: SubagentInteractionOriginContext & { background?: boolean },
+): SessionEvent {
+  // 修复原因：V4 只从父 task 的实时投影生成阻塞交互；仅转发 broker request 会让
+  // 子 agent 的 permission / AskUserQuestion 停留在子 session，父界面无法响应。
+  const mirroredPayload = {
+    ...payload,
+    toolCallId,
+    ...(toolName ? { toolName } : {}),
+    childSessionId: context.childSessionId,
+    ...(context.background ? { background: true } : {}),
+    ...(event.type === SessionEventType.PermissionRequested
+      ? { origin: buildSubagentInteractionOrigin(context, event.turnId) }
+      : {}),
+  };
   return createSessionEvent(event.type, context.parentSessionId, mirroredPayload, {
     traceId: event.traceId,
     turnId: context.parentTurnId,

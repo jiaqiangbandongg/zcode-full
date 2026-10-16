@@ -105,7 +105,7 @@ function readResultRecord(value: unknown): ListSavedWorkflowsResult | null {
  * raw 兜底卡）；legacy JSON 探针保留，兜老会话与非 v4 宿主。一个都读不出来就交回
  * fallback——空列表与「读不懂」必须可分辨，不能把解析失败画成「这个项目里没有工作流」。
  */
-function readListSavedWorkflowsResult(
+export function readListSavedWorkflowsResult(
   toolCall: ToolCallBlockRenderContext["toolCallNode"]["toolCall"],
 ): ListSavedWorkflowsResult | null {
   const display = readToolResultDisplay(toolCall.raw);

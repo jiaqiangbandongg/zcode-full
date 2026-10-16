@@ -5,13 +5,17 @@
 import { z } from "zod";
 import { toToolJsonSchema } from "./json-schema.js";
 import { SAVED_WORKFLOW_MAX_NAME_CHARS, SavedWorkflowScopeSchema } from "./saved-workflow.js";
+import {
+  WorkflowAdjustableSettingsSchema,
+  WorkflowModelBindingsSchema,
+} from "./workflow-settings.js";
 
 export const CREATE_WORKFLOW_TOOL_NAME = "CreateWorkflow";
 
 /**
  * 教模型写工作流的内置技能名（apps/zcode-cli/packages/bundled-skills/skills/<name>/SKILL.md）。
  * 四个创作工具（Create/Amend/Save/EvalWorkflowSnippet）的 resolveInput 以它为门：会话里没有
- * 加载过这份技能就拒绝提交脚本。
+ * 加载过这份技能就拒绝提交脚本（docs/dynamic-workflow/authoring.md「The authoring surface」）。
  * 住在 contracts 里是因为 core 的门与 bootstrap 的技能包都读它，而两者不能互相 import。
  */
 export const DYNAMIC_WORKFLOW_SKILL_NAME = "dynamic-workflows";
@@ -93,7 +97,9 @@ const CreateWorkflowModelInputSchema = z
     script: z
       .string()
       .optional()
-      .describe("The whole workflow script, inline. Exactly one of `script`, `saved` and `path`."),
+      .describe(
+        "The whole workflow script, inline. Exactly one of `script`, `saved` and `path`.",
+      ),
     saved: CreateWorkflowSavedSourceSchema.optional().describe(
       "A saved workflow to run, by name. Exactly one of `script`, `saved` and `path`.",
     ),
@@ -119,9 +125,9 @@ const CreateWorkflowModelInputSchema = z
       .optional()
       .describe("Values for the arguments a `path` file declares. Only with `path`."),
     /**
-     * run 自己的并发上界。只压低、不抬高：
-     * `resolveInput` 钳到 `[1, 天花板]`，确认窗与 handler 看到的就是将要生效的值。缺席即天花板。
-     * 只在用户要求时设——provider 限流由运行时自适应，模型不该拿它当保险。
+     * run 自己的并发上界（docs/dynamic-workflow/concurrency.md「Two bounds on a run」）。高于或低于
+     * 默认并发都行、没有上限：`resolveInput` 只向下取整到至少 1，确认窗与 handler 看到的就是将要生效的
+     * 值。缺席即默认并发。只在用户要求时设——provider 限流由运行时自适应，模型不该拿它当保险。
      */
     max_concurrency: z
       .number()
@@ -129,7 +135,7 @@ const CreateWorkflowModelInputSchema = z
       .positive()
       .optional()
       .describe(
-        "Upper bound on subagents working at once. Only when the user asks to limit parallelism; never as a reaction to provider errors.",
+        "Subagents working at once, above or below the default. Only when the user asks for more or less parallelism; never as a reaction to provider errors.",
       ),
     /**
      * 本 run 子代理跑在哪个模型上。与
@@ -163,11 +169,21 @@ export const CreateWorkflowInputSchema = CreateWorkflowModelInputSchema.extend({
    * 加它，好让行号能直接粘进一次对该文件的 `Edit`。
    */
   script_line_offset: z.number().int().nonnegative().optional(),
+  /**
+   * 确认窗可调的两项设置（docs/dynamic-workflow/launch.md「Adjusting the settings in the window」），
+   * 端口在场时由 `resolveInput` 回填。同上：解析结果，模型的 JSON schema 不列它。
+   */
+  adjustable_settings: WorkflowAdjustableSettingsSchema.optional(),
+  /**
+   * 脚本点名的模型解析成的绑定表（docs/dynamic-workflow/launch.md「Models the script names」），
+   * `resolveInput` 回填。同上：解析结果，模型的 JSON schema 不列它。
+   */
+  model_bindings: WorkflowModelBindingsSchema.optional(),
 }).strict();
 
 export type CreateWorkflowInput = z.infer<typeof CreateWorkflowInputSchema>;
 
-/** 交给模型的 JSON schema：不含 `script_line_offset`，`saved` 里也不含 `draft`。 */
+/** 交给模型的 JSON schema：不含 `script_line_offset`、`adjustable_settings` 与 `model_bindings`，`saved` 里也不含 `draft`。 */
 export const CreateWorkflowInputJsonSchema = toToolJsonSchema(CreateWorkflowModelInputSchema);
 
 export const CreateWorkflowDiagnosticSchema = z
@@ -214,7 +230,9 @@ export const CREATE_WORKFLOW_GRAPH_MAX_PHASE_EDGES = 128;
 export const CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS = 64;
 export const CREATE_WORKFLOW_GRAPH_MAX_NAME_CHARS = 128;
 
-export const CREATE_WORKFLOW_STEP_KINDS = ["ask", "world-read"] as const;
+// `hole`：还开着的留白是一个站点（docs/dynamic-workflow/presentation.md「Holes on the timeline」），
+// 车道是主代理的 `main`；补过的留白不再是站点。
+export const CREATE_WORKFLOW_STEP_KINDS = ["ask", "world-read", "hole"] as const;
 
 // 名字只在运行时成形（`` agent(`研究员${i + 1}`) ``）时静态能拿到的那部分：第一个洞之前的
 // 字面量（head）与最后一个洞之后的字面量（tail）。两者至少有一个在场——分析器拿不到就整个
@@ -261,6 +279,12 @@ export const CreateWorkflowStepSchema = z
      */
     phase: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS).optional(),
     repeat: z.enum(["stack", "serial"]).optional(),
+    /**
+     * 这个站点是某次留白补全写进来的：值是补全它的留白站点 id（名字键 `hole#<8 位十六进制>`）；留白**自己的**阶段上是包着它的留白。时间轴据它画补全的
+     * 笔头与区域（docs/dynamic-workflow/presentation.md「Holes on the timeline」）；没有补全过的脚本
+     * 一律缺席。
+     */
+    fill: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS).optional(),
   })
   .strict();
 
@@ -293,6 +317,20 @@ export const CreateWorkflowEdgeSchema = z
   .strict();
 
 export type CreateWorkflowEdge = z.infer<typeof CreateWorkflowEdgeSchema>;
+
+/**
+ * 阶段流（docs/dynamic-workflow/presentation.md「Streams」）：`from` 阶段在两者都在跑的时候把东西
+ * 交给 `to` 阶段——channel 串起来的两个 future 阶段。它**不是** runs after，所以不进 `phaseEdges`、
+ * 不带 `back`（方向由 UI 按站的位置判断），也不带分析器的边种类。
+ */
+export const CreateWorkflowStreamSchema = z
+  .object({
+    from: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS),
+    to: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS),
+  })
+  .strict();
+
+export type CreateWorkflowStream = z.infer<typeof CreateWorkflowStreamSchema>;
 
 // 参与者 = 板面第二层的一张卡：某阶段里在某条车道上有 step 的那个子代理（或工作区 /
 // 未解析）。fan-out 家族按字面量基数展开时每成员一张（`member`），基数未知时一张 `many`
@@ -357,10 +395,35 @@ export const CreateWorkflowPhaseSchema = z
       .min(1)
       .max(CREATE_WORKFLOW_GRAPH_MAX_PHASES)
       .optional(),
+    /** 这个阶段是某次留白补全写进来的：值是补全它的留白站点 id（同 `Step.fill`）。 */
+    fill: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS).optional(),
   })
   .strict();
 
 export type CreateWorkflowPhase = z.infer<typeof CreateWorkflowPhaseSchema>;
+
+/** `holes` 的上界，与阶段表同一个数：一处留白就是一个阶段。 */
+export const CREATE_WORKFLOW_GRAPH_MAX_HOLES = CREATE_WORKFLOW_GRAPH_MAX_PHASES;
+
+// 一处**还开着的**留白（docs/dynamic-workflow/authoring.md「Holes」；presentation.md「Holes on the
+// timeline」）：时间轴画成一个虚线站点，确认窗列成一枚 chip。补过的留白不在这里——它的函数体已经
+// 是普通的站点与阶段，只带 `fill` 标记。
+export const CreateWorkflowHoleSchema = z
+  .object({
+    /** 留白的站点 id（名字键 `hole#<8 位十六进制>`），也是它作为阶段的 id。 */
+    siteId: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS),
+    /** 留白的字面名。 */
+    name: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_NAME_CHARS),
+    /** 类型实参原文（`Verdict`）。 */
+    type: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_NAME_CHARS),
+    /** 它出生的阶段 id（`phases[].id`）；与阶段词汇表同进同退。 */
+    phase: z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS).optional(),
+    /** 尾留白：`return await hole(...)`，脚本的结尾还没写。 */
+    tail: z.literal(true).optional(),
+  })
+  .strict();
+
+export type CreateWorkflowHole = z.infer<typeof CreateWorkflowHoleSchema>;
 
 // 名字沿用历史（它曾只装因果图）。三层：step 层是站点（运行状态的键，不再画）；参与者层
 // 是每阶段的卡与交接（因果事实按卡取商）；阶段层是控制流事实（控制流图的阶段商）。层间的桥
@@ -384,6 +447,14 @@ export const CreateWorkflowCausalityGraphSchema = z
       .max(CREATE_WORKFLOW_GRAPH_MAX_PHASE_EDGES)
       .optional(),
     /**
+     * 阶段流：因果图阶段商里两端互为 `alongside` 的 `data` 边（bounds 层求得），与词汇表同进同退，
+     * 组内没有时缺席。时间线据它把流水线的各阶段从带里拿出来排成一条线，画成流轨。
+     */
+    phaseStreams: z
+      .array(CreateWorkflowStreamSchema)
+      .max(CREATE_WORKFLOW_GRAPH_MAX_PHASE_EDGES)
+      .optional(),
+    /**
      * 控制流可以在其后正常完成的阶段（控制流图阶段商里指向 sink 终端的边的源），阶段表序。
      * 阶段视图的「阶段 → 返回物」箭头读它，让那张画面上的每条箭头都是控制流。组内可为空
      * （脚本没有正常完成路径），组外不得单独出现。
@@ -397,6 +468,12 @@ export const CreateWorkflowCausalityGraphSchema = z
       .array(z.string().min(1).max(CREATE_WORKFLOW_GRAPH_MAX_ID_CHARS))
       .max(CREATE_WORKFLOW_GRAPH_MAX_STEPS)
       .optional(),
+    /**
+     * 还开着的留白，源序（docs/dynamic-workflow/presentation.md「The display contract」）。一处留白
+     * 就是一个阶段，所以上界与阶段表同值；补过的留白不在这里，它写进来的阶段与站点带 `fill`。
+     * 零处时整字段缺席。
+     */
+    holes: z.array(CreateWorkflowHoleSchema).max(CREATE_WORKFLOW_GRAPH_MAX_HOLES).optional(),
     truncated: z.boolean().optional(),
   })
   .strict();
@@ -483,22 +560,38 @@ export const CreateWorkflowOutputSchema = z
     /** 后台任务 id ≡ taskId ≡ runId（取消与状态查询都以它为键）。 */
     backgroundTaskId: z.string().min(1).optional(),
     /**
-     * `AmendWorkflow` 只改并发、就地生效时才在场：**没有**新 run，所以既没有 `status: "backgrounded"` 也没有
+     * `AmendWorkflow` 只改并发、就地生效时才在场（docs/dynamic-workflow/launch.md「Changing only
+     * the parallelism of a live run」）：**没有**新 run，所以既没有 `status: "backgrounded"` 也没有
      * `backgroundTaskId`，run 还是调用里那一个。
      *
      * 是一个显式的块而不是让消费方按形状去猜：「ok 且没有 status」在这个工具上还有别的来路
-     * （没有 run 端口时的「只 typecheck」）。数都是绝对值，`maxConcurrency === ceiling` 即
+     * （没有 run 端口时的「只 typecheck」）。数都是绝对值，`maxConcurrency === defaultConcurrency` 即
      * 「这个 run 没有自己的界」。
      *
      * ⚠ 这条事实**不跨 v4**：协议的 `toolOutputSchema` 只带 `text` / `display` / `truncated`，
-     * 所以它服务的是 CLI/TUI、进程内消费方，桌面 UI 读不到它。
+     * 所以它服务的是 CLI/TUI、进程内消费方与契约测试，桌面 UI 读不到它。
      */
     retuned: z
       .object({
         runId: z.string().min(1),
         maxConcurrency: z.number().int().positive(),
         previous: z.number().int().positive(),
-        ceiling: z.number().int().positive(),
+        defaultConcurrency: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
+    /**
+     * `FillWorkflowHole` 补的是哪处留白（docs/dynamic-workflow/launch.md「The `FillWorkflowHole` tool」）：
+     * 站点 id 与**名字**，外加草稿路径与行号。成功与被拒都在场，且**跨 v4**——display 投影原样带上它，
+     * 工具行靠它给自己起名。不能从行的入参读：transcript 存的是模型自己的入参，resolveInput 回填的
+     * `hole` 块只给权限规则与 handler 看，到不了行（2026-09-28 首次接龙实测：行标题成了留白的站点 id）。
+     */
+    fill: z
+      .object({
+        siteId: z.string().min(1).max(64),
+        name: z.string().min(1).max(128),
+        draftPath: z.string().min(1).optional(),
+        line: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),

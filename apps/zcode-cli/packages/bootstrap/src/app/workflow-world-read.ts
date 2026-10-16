@@ -43,12 +43,6 @@ export interface WorldReadDeps {
   readonly executionPort: ExecutionPort;
   /** 路径解析与相对化的基准目录（workspace 根）。 */
   readonly cwd: string;
-  /**
-   * world.run 的已批准命令集（编译期从字面量 cmd 收集、确认窗展示过的那一份）。**缺席即拒绝一切 world.run**（fail-closed）：
-   * 授权面的空集与「忘了接线」必须同样安全，而复验在这里只是纵深防御——真正的授权
-   * 发生在编译期字面量 + 提交确认。
-   */
-  readonly declaredRunCommands?: ReadonlySet<string>;
 }
 
 /**
@@ -297,9 +291,12 @@ interface WorldRunResult {
  *   1. **非零退出是值**。执行适配器把非零退出映射成 `status:"failed"` 且 `error` 缺席
  *      （node-execution-adapter-results.ts 的 statusFromExit/statusFailure），据此与
  *      spawn 失败 / 超时可靠区分。门控循环的常态路径不该走异常控制流。
- *   2. **cmd 复验**。授权发生在编译期字面量 + 提交确认；这里对 declaredRunCommands 的
- *      比对只防接线错误（lowering / 线协议把别的字符串送了进来），且 fail-closed——
- *      集合缺席与命令不在集合里同样拒绝。
+ *   2. **没有运行期命令白名单**。授权只在编译期：cmd 必须是字面量（9003），脚本能跑的命令
+ *      因此在提交前就全部可读、确认图逐条展示。这里曾经再拿一份 launch 时从种子脚本收集的
+ *      `declaredRunCommands` 复验一遍（"只防接线错误"）——但补全（FillWorkflowHole）编译的是
+ *      有效脚本，driver 手里的集合却还是种子那份，函数体里第一次出现的命令就被当"接线错误"
+ *      拒掉了。lowering 跑的就是脚本自己的文本，补全的 code 也是有效脚本自己的 lowering，
+ *      那份复验防不住任何真实情况，只多出一个要手工同步的第二数据源，故删除。
  *   3. **超时无上限**。缺省 300s，脚本可任意加大（为真正长跑的测试设计）；
  *      cancel 仍是最后的控制。
  *
@@ -308,15 +305,6 @@ interface WorldRunResult {
  */
 async function worldRun(deps: WorldReadDeps, args: unknown[]): Promise<WorldRunResult> {
   const { argv, cmd, timeoutMs } = worldRunArgs(args);
-
-  const declared = deps.declaredRunCommands;
-  if (declared === undefined || !declared.has(cmd)) {
-    // fail-closed 的接线防御：能到这里的 cmd 理应经过编译期字面量收集与确认。
-    throw new WorkflowError(
-      "DriverError",
-      `world.run: command '${cmd}' is not in the declared set of commands (a wiring error).`,
-    );
-  }
 
   const stdoutCap = WORLD_READ_CAPS.runStdoutMaxBytes;
   const stderrCap = WORLD_READ_CAPS.runStderrMaxBytes;

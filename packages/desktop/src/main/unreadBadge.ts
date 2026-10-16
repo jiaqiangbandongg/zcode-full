@@ -18,7 +18,7 @@ export function sumWindowUnreadCounts(windowUnreadCountMap: ReadonlyMap<number, 
   return totalUnreadCount;
 }
 
-function supportsAppUnreadBadge(platform: NodeJS.Platform): boolean {
+export function supportsAppUnreadBadge(platform: NodeJS.Platform): boolean {
   return platform === "darwin" || platform === "linux";
 }
 

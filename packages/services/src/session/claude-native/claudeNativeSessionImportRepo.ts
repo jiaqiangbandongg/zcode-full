@@ -45,7 +45,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-class ClaudeNativeSessionImportRepo {
+export class ClaudeNativeSessionImportRepo {
   private getNativeProjectsRoots(): string[] {
     const homes = new Set<string>();
     homes.add(homedir());

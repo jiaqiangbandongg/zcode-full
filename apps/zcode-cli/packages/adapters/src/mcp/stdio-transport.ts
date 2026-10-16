@@ -15,9 +15,9 @@ type SdkStdioDispose = (this: StdioClientTransport) => Promise<void>;
 const sdkDispose = Object.getOwnPropertyDescriptor(StdioClientTransport.prototype, "_dispose")
   ?.value as SdkStdioDispose | undefined;
 
-type StdioRequestMetaProvider = () => Promise<Record<string, unknown> | undefined>;
+export type StdioRequestMetaProvider = () => Promise<Record<string, unknown> | undefined>;
 
-interface StdioProcessExitInfo {
+export interface StdioProcessExitInfo {
   exitCode: number | null;
   exitedAt: number;
   signal: NodeJS.Signals | null;
@@ -32,8 +32,10 @@ type ProcessTreeStdioServerParameters = StdioServerParameters & {
   requestMetaProvider?: StdioRequestMetaProvider;
 };
 
-interface ProcessTreeStdioClientTransportOptions {
-  windowsJobObjectFactory?: (pid: number) => Promise<WindowsJobObjectController | undefined>;
+export interface ProcessTreeStdioClientTransportOptions {
+  windowsJobObjectFactory?: (
+    pid: number,
+  ) => Promise<WindowsJobObjectController | undefined>;
 }
 
 /**

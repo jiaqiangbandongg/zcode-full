@@ -22,7 +22,7 @@ function normalizeAxisDelta(rawDelta: number, event: WheelEvent, pageSize: numbe
 }
 
 /** 将触控板、滚轮和 Shift+滚轮统一成宿主画布使用的 CSS pixel 二维 delta。 */
-function normalizeEmbeddedBrowserWheelDelta(
+export function normalizeEmbeddedBrowserWheelDelta(
   event: WheelEvent,
   targetWindow: Window,
 ): EmbeddedBrowserWheelBoundaryPayload {

@@ -1,0 +1,432 @@
+openapi: 3.1.0
+info:
+  title: ZCode Release Platform API
+  version: 1.0.0
+  description: Candidate/build/approval/publication contract for the ZCode packaging platform.
+servers:
+  - url: https://packaging.example.internal/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: candidates
+  - name: builds
+  - name: approval
+  - name: publications
+paths:
+  /release-candidates:
+    post:
+      tags: [candidates]
+      operationId: createReleaseCandidate
+      security:
+        - bearerAuth: [candidate:create]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateRequest"
+      responses:
+        "201":
+          description: Candidate created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseCandidate"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+  /release-candidates/{candidateId}:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    get:
+      tags: [candidates]
+      operationId: getReleaseCandidate
+      responses:
+        "200":
+          description: Candidate state and manifest.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseCandidate"
+        "404":
+          $ref: "#/components/responses/CandidateNotFound"
+  /release-candidates/{candidateId}/builds:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    post:
+      tags: [builds]
+      operationId: createBuild
+      security:
+        - bearerAuth: [build:create]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBuildRequest"
+      responses:
+        "202":
+          description: Build queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildAccepted"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+  /release-candidates/{candidateId}/builds/{buildId}/complete:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+      - $ref: "#/components/parameters/BuildId"
+    post:
+      tags: [builds]
+      operationId: completeBuild
+      security:
+        - bearerAuth: [build:complete]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildCompleteRequest"
+      responses:
+        "200":
+          description: Build accepted after object and digest verification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildResult"
+        "422":
+          $ref: "#/components/responses/ContractViolation"
+  /release-candidates/{candidateId}/notes:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    post:
+      tags: [approval]
+      operationId: createNotesDraft
+      security:
+        - bearerAuth: [notes:submit]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotesDraftRequest"
+      responses:
+        "201":
+          description: Notes draft created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotesDraft"
+        "422":
+          $ref: "#/components/responses/ContractViolation"
+  /release-candidates/{candidateId}/approvals:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    post:
+      tags: [approval]
+      operationId: approveReleaseCandidate
+      security:
+        - bearerAuth: [notes:approve]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalRequest"
+      responses:
+        "200":
+          description: Approval recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
+        "409":
+          $ref: "#/components/responses/InvalidState"
+  /release-candidates/{candidateId}/publications:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    post:
+      tags: [publications]
+      operationId: createPublication
+      security:
+        - bearerAuth: [publish:create]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicationRequest"
+      responses:
+        "202":
+          description: Publication started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Publication"
+        "409":
+          $ref: "#/components/responses/InvalidState"
+        "422":
+          $ref: "#/components/responses/ContractViolation"
+  /release-candidates/{candidateId}/retry:
+    parameters:
+      - $ref: "#/components/parameters/CandidateId"
+    post:
+      tags: [publications]
+      operationId: retryReleaseCandidate
+      security:
+        - bearerAuth: [publish:retry]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Retry started without changing existing artifact digests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetryResult"
+        "409":
+          $ref: "#/components/responses/InvalidState"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: OIDC
+      description: Short-lived OIDC service token with scope claims.
+  parameters:
+    CandidateId:
+      name: candidateId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^cand_[A-Za-z0-9_-]{8,128}$"
+    BuildId:
+      name: buildId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^build_[A-Za-z0-9_-]{8,128}$"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 256
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+  responses:
+    CandidateNotFound:
+      description: Candidate does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    IdempotencyConflict:
+      description: Same idempotency key was used with a different request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InvalidState:
+      description: Requested state transition is not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ContractViolation:
+      description: Manifest, digest, version, or notes contract failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    Platform:
+      type: object
+      additionalProperties: false
+      required: [os, arch]
+      properties:
+        os:
+          type: string
+          enum: [macos, windows, linux]
+        arch:
+          type: string
+          enum: [x64, arm64]
+    Source:
+      type: object
+      additionalProperties: false
+      required: [repository, commit, version]
+      properties:
+        repository: { type: string }
+        commit: { type: string, pattern: "^[0-9a-f]{40,64}$" }
+        version: { type: string }
+        ref: { type: string }
+    CreateCandidateRequest:
+      type: object
+      additionalProperties: false
+      required: [source, targets]
+      properties:
+        source: { $ref: "#/components/schemas/Source" }
+        targets:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/Platform" }
+    ReleaseCandidate:
+      type: object
+      additionalProperties: true
+      required: [schemaVersion, candidateId, source, state, platforms, provenance, createdAt]
+      properties:
+        schemaVersion: { const: release-candidate.v1 }
+        candidateId: { type: string }
+        source: { $ref: "#/components/schemas/Source" }
+        state:
+          type: string
+          enum:
+            [
+              created,
+              building,
+              ready,
+              approval_pending,
+              approved,
+              publishing,
+              published,
+              build_failed,
+              rejected,
+              publish_failed_retryable,
+              cancelled,
+            ]
+        platforms:
+          type: array
+          items: { type: object }
+        provenance: { type: object }
+        createdAt: { type: string, format: date-time }
+    CreateBuildRequest:
+      type: object
+      additionalProperties: false
+      required: [platform]
+      properties:
+        platform: { $ref: "#/components/schemas/Platform" }
+        workerPool: { type: string }
+        constraints: { type: object, additionalProperties: true }
+    BuildAccepted:
+      type: object
+      required: [buildId, candidateId, state, upload]
+      properties:
+        buildId: { type: string }
+        candidateId: { type: string }
+        state: { type: string, enum: [queued, running] }
+        upload:
+          type: object
+          required: [manifestUploadUrl, artifactUploadPrefix, expiresAt]
+          properties:
+            manifestUploadUrl: { type: string, format: uri }
+            artifactUploadPrefix: { type: string }
+            expiresAt: { type: string, format: date-time }
+    BuildCompleteRequest:
+      type: object
+      required: [platformManifest, provenance]
+      properties:
+        platformManifest: { type: object }
+        provenance: { type: object }
+    BuildResult:
+      type: object
+      required: [buildId, candidateId, state]
+      properties:
+        buildId: { type: string }
+        candidateId: { type: string }
+        state: { type: string, enum: [succeeded] }
+    NotesDraftRequest:
+      type: object
+      required: [revision, locales]
+      properties:
+        revision: { type: string, pattern: "^sha256:[a-f0-9]{64}$" }
+        locales:
+          type: object
+          required: [zh-CN, en-US]
+          properties:
+            zh-CN: { $ref: "#/components/schemas/LocalizedNotes" }
+            en-US: { $ref: "#/components/schemas/LocalizedNotes" }
+    LocalizedNotes:
+      type: object
+      required: [markdown]
+      properties:
+        markdown: { type: string, minLength: 1 }
+    NotesDraft:
+      allOf:
+        - $ref: "#/components/schemas/NotesDraftRequest"
+        - type: object
+          required: [notesDraftId, candidateId, status]
+          properties:
+            notesDraftId: { type: string }
+            candidateId: { type: string }
+            status: { type: string, enum: [pending] }
+    ApprovalRequest:
+      type: object
+      required: [notesRevision, decision]
+      properties:
+        notesRevision: { type: string }
+        decision: { type: string, enum: [approve, reject] }
+    Approval:
+      type: object
+      required: [candidateId, notesRevision, decision, approvedBy, approvedAt]
+      properties:
+        candidateId: { type: string }
+        notesRevision: { type: string }
+        decision: { type: string, enum: [approve, reject] }
+        approvedBy: { type: object }
+        approvedAt: { type: string, format: date-time }
+    PublicationRequest:
+      type: object
+      required: [notesRevision, channel]
+      properties:
+        notesRevision: { type: string }
+        channel: { type: string, enum: [gray, stable] }
+    Publication:
+      type: object
+      required: [publicationId, candidateId, notesRevision, channel, state]
+      properties:
+        publicationId: { type: string }
+        candidateId: { type: string }
+        notesRevision: { type: string }
+        channel: { type: string, enum: [gray, stable] }
+        state: { type: string, enum: [publishing, published, publish_failed_retryable] }
+    RetryResult:
+      type: object
+      required: [candidateId, attempt, state]
+      properties:
+        candidateId: { type: string }
+        attempt: { type: integer, minimum: 1 }
+        state: { type: string, enum: [building, publishing] }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable, requestId]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            retryable: { type: boolean }
+            requestId: { type: string }

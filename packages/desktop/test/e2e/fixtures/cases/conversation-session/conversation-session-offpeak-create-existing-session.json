@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-create-existing-session",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-create-existing-session.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-offpeak-create-existing-session.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于闲时任务产品语义，只需稳定返回。"
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-warmup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只需要一条稳定的已完成历史，回复内容不影响产品语义。"
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 OffPeakCreate；固定触发工具，专门验证 v4 冷恢复会话仍有工具面并可直达编辑。"
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "tool_result 进入历史后结束 case，真实回复内容不影响产品语义。"
+    }
+  ]
+}

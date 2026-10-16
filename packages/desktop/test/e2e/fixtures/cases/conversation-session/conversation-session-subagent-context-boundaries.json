@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-context-boundaries",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-context-boundaries.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-context-boundaries.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "scb-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-seed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-seed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-seed-child-final",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-continuation",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-message-next",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-deliver-running-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-deliver-running-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-cross-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-cross-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-cross-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-background-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-resume-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-resume-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-running-resume-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-stable-retry",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-stable-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-stable-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-stable-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-stable-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    },
+    {
+      "id": "scb-next-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+    }
+  ]
+}

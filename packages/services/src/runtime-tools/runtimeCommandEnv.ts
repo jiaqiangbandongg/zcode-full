@@ -109,7 +109,7 @@ function shouldInheritLoginShellEnvKey(key: string): boolean {
   return INHERITED_LOGIN_SHELL_ENV_KEY_PATTERNS.some((pattern) => pattern.test(key));
 }
 
-function buildLoginShellEnvPatch(
+export function buildLoginShellEnvPatch(
   snapshot: Record<string, string | undefined>,
 ): Record<string, string> {
   const patch: Record<string, string> = {};

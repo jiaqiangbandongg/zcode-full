@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "caseName": "windows-agent-metric-probe-absence",
+  "spec": "./test/e2e/windows-agent-metric-probe-absence.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "cli-session-seed",
+      "path": "~/.zcode/cli/db/db.sqlite",
+      "purpose": "预置 interactive Agent 历史，使冷启动走真实只读 Agent 注册链路。"
+    },
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/tasks-index.sqlite",
+      "purpose": "预置同一 task membership，使侧栏通过真实冷启动读取历史。"
+    }
+  ],
+  "requests": []
+}

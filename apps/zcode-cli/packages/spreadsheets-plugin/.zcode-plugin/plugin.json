@@ -1,0 +1,15 @@
+{
+  "name": "spreadsheets",
+  "version": "0.1.8",
+  "description": "XLSX spreadsheet production skills, published as an official ZCode plugin.",
+  "description_i18n": {
+    "en": "Spreadsheet skills for XLSX: create, edit, analyze, chart, and convert workbooks.",
+    "zh-CN": "面向 XLSX 的电子表格技能：创建、编辑、分析、图表与格式转换。"
+  },
+  "author": {
+    "name": "Z.ai"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "agents": "agents"
+}

@@ -1,0 +1,8 @@
+lane workspace
+lane actor#1 "worker" @10:16 families=fanout#1
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @9:1 label="forEach"
+step world-read#1 world-read "glob src/*.ts" @7:27 lane=workspace region=seq#1 always
+step ask#1 ask "worker" @10:32 lane=actor#1 region=fanout#1 maybe stack
+edge world-read#1 -> ask#1 data maybe exact
+sink ask#1

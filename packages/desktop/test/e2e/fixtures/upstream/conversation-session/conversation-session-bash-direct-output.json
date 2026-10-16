@@ -1,0 +1,924 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bash-direct-output",
+  "spec": "./test/e2e/conversation-session/conversation-session-bash-direct-output.test.ts",
+  "fixtures": [
+    {
+      "id": "bdo-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BDO_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "bdo-title",
+          "text": "{\"title\":\"Bash output regression\"}",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_small-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_SMALL"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_small",
+          "toolu_bdo_empty_error"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_small",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" small",
+              "timeout": 120000
+            }
+          },
+          {
+            "id": "toolu_bdo_empty_error",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" empty-error",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_small-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_SMALL", "toolu_bdo_small", "toolu_bdo_empty_error"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_small-done",
+          "text": "E2E_BDO_SMALL_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_large-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_LARGE"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_large"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_large",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" large",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_large-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_LARGE", "toolu_bdo_large"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_large-done",
+          "text": "E2E_BDO_LARGE_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_progress-a-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_PROGRESS_A"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_progress_a"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_progress_a",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" progress A",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_progress-b-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_PROGRESS_B"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_progress_b"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_progress_b",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" progress B",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_progress-a-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_PROGRESS_A", "toolu_bdo_progress_a"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_progress-done",
+          "text": "E2E_BDO_PROGRESS_A_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_progress-b-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_PROGRESS_B", "toolu_bdo_progress_b"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_progress-done",
+          "text": "E2E_BDO_PROGRESS_B_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "bdo-query-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_QUERY", "<task-notification>", "<status>completed</status>"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "bdo-query-notification",
+          "text": "E2E_BDO_QUERY_NOTIFIED",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_query-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_QUERY"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_query"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_query",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" query",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_query-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_QUERY", "toolu_bdo_query"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_query-done",
+          "text": "E2E_BDO_QUERY_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_query_first-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_QUERY_FIRST"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_query_first"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_query_first",
+            "name": "TaskOutput",
+            "input": {
+              "task_id": "{{latestBashTaskId}}",
+              "block": false,
+              "timeout": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_query_first-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_QUERY_FIRST", "toolu_bdo_query_first"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_query_first-done",
+          "text": "E2E_BDO_QUERY_FIRST_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_query_second-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_QUERY_SECOND"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_query_second"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_query_second",
+            "name": "TaskOutput",
+            "input": {
+              "task_id": "{{latestBashTaskId}}",
+              "block": false,
+              "timeout": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_query_second-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_QUERY_SECOND", "toolu_bdo_query_second"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_query_second-done",
+          "text": "E2E_BDO_QUERY_SECOND_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_query_final-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_QUERY_FINAL"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_query_final"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_query_final",
+            "name": "TaskOutput",
+            "input": {
+              "task_id": "{{latestBashTaskId}}",
+              "block": false,
+              "timeout": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_query_final-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_QUERY_FINAL", "toolu_bdo_query_final"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_query_final-done",
+          "text": "E2E_BDO_QUERY_FINAL_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_limit_foreground-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_LIMIT_FOREGROUND"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_limit_foreground"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_limit_foreground",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" limit foreground",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_limit_foreground-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_LIMIT_FOREGROUND", "toolu_bdo_limit_foreground"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_limit_foreground-done",
+          "text": "E2E_BDO_LIMIT_FOREGROUND_KILLED",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "bdo-limit-background-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BDO_LIMIT_BACKGROUND",
+          "<task-notification>",
+          "<status>killed</status>"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "bdo-limit-background-notification",
+          "text": "E2E_BDO_LIMIT_BACKGROUND_KILLED",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_limit_background-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_LIMIT_BACKGROUND"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_limit_background"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_limit_background",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" limit background",
+              "timeout": 120000,
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_limit_background-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_LIMIT_BACKGROUND", "toolu_bdo_limit_background"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_limit_background-done",
+          "text": "E2E_BDO_LIMIT_BACKGROUND_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_read_failure-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_READ_FAILURE"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_read_failure"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_read_failure",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" read-failure",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_read_failure-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_READ_FAILURE", "toolu_bdo_read_failure"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_read_failure-done",
+          "text": "E2E_BDO_READ_FAILURE_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_open_failure-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_OPEN_FAILURE"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_open_failure"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_open_failure",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" small",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_open_failure-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_OPEN_FAILURE", "toolu_bdo_open_failure"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_open_failure-done",
+          "text": "E2E_BDO_OPEN_FAILURE_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_recovery-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_RECOVERY"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_recovery"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_recovery",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" small",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_recovery-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_RECOVERY", "toolu_bdo_recovery"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_recovery-done",
+          "text": "E2E_BDO_RECOVERY_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "e2e_bdo_realtime-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定单个前台 Bash；真实 producer 由文件 barrier 分五段写 stdout/stderr，验证退出前刷新、最多五行且短输出自适应、默认吸底、上滚暂停和滚回底部恢复及终态阅读位置。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BDO_REALTIME"],
+        "bodyIncludes": [],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_bdo_realtime"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_bdo_realtime",
+            "name": "Bash",
+            "input": {
+              "command": "node \".zcode-e2e/bash-direct-output/中文 空格/writer.cjs\" realtime",
+              "timeout": 120000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "e2e_bdo_realtime-done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定单个前台 Bash；真实 producer 由文件 barrier 分五段写 stdout/stderr，验证退出前刷新、最多五行且短输出自适应、默认吸底、上滚暂停和滚回底部恢复及终态阅读位置。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BDO_REALTIME", "toolu_bdo_realtime"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e_bdo_realtime-done",
+          "text": "E2E_BDO_REALTIME_DONE",
+          "inputTokens": 96,
+          "outputTokens": 16
+        }
+      }
+    }
+  ]
+}

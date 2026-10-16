@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-resident-freeze-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-resident-freeze-cold-resume.test.ts",
+  "fixtures": [
+    {
+      "id": "resident-enabled-title",
+      "description": "WPL-008 resident S1 的标题 sidecar。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 Plugin 生命周期语义；固定返回避免后台 title retry 干扰 cold resume。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_WPL_008_RESIDENT_ENABLED"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "resident-enabled-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"WPL-008 resident enabled\"}"
+        }
+      }
+    },
+    {
+      "id": "new-session-disabled-title",
+      "description": "WPL-008 新 Session S2 的标题 sidecar。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 Plugin 生命周期语义；固定返回避免后台 title retry 干扰 Desktop 重启。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_WPL_008_NEW_SESSION_DISABLED"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "new-session-disabled-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"WPL-008 new session disabled\"}"
+        }
+      }
+    },
+    {
+      "id": "resident-enabled-tool-call",
+      "description": "WPL-008 resident S1 保持创建时 Plugin MCP tool。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定 resident tool_use，验证 App catalog 冻结。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_WPL_008_RESIDENT_ENABLED"],
+        "bodyIncludes": ["E2E_WPL_008_RESIDENT_ENABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_wpl_008_resident",
+          "name": "mcp__plugin_e2e-plugin-mcp-ping_ping__ping",
+          "input": { "message": "wpl-008-resident" }
+        }
+      }
+    },
+    {
+      "id": "resident-enabled-final",
+      "description": "WPL-008 resident S1 tool_result 后完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 resident 最终响应。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_WPL_008_RESIDENT_ENABLED", "toolu_e2e_wpl_008_resident"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": { "statusCode": 200, "text": "wpl-008-resident-ok" }
+    },
+    {
+      "id": "new-session-disabled-final",
+      "description": "WPL-008 新 Session S2 读取 Workspace disabled。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定新 Session 无 Plugin MCP tool 的最终响应。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_WPL_008_NEW_SESSION_DISABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": { "statusCode": 200, "text": "wpl-008-new-session-ok" }
+    },
+    {
+      "id": "cold-resume-disabled-final",
+      "description": "WPL-008 S1 cold resume 重建后读取 Workspace disabled。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 cold resume 无 Plugin MCP tool 的最终响应。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_WPL_008_COLD_RESUME_DISABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "wpl-008-cold-resume-ok" }
+    }
+  ]
+}

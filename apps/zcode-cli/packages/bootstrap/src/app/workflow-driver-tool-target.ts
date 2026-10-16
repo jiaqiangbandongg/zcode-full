@@ -33,7 +33,7 @@ const TARGET_KEYS: readonly { key: string; keep: "head" | "tail" }[] = [
 const ELLIPSIS = "…";
 
 /** 一次工具调用的窄视图：名字 + 入参。两者都可能缺席（老事件、空名调用）。 */
-interface ToolCallSummaryInput {
+export interface ToolCallSummaryInput {
   toolName?: string;
   input?: unknown;
 }
@@ -52,7 +52,7 @@ export function summarizeToolCall(call: ToolCallSummaryInput): AskLastTool | und
 }
 
 /** 从入参里取目标线索；不是对象、没有已知键、或该键不是非空字符串时缺席。 */
-function deriveToolTarget(input: unknown): string | undefined {
+export function deriveToolTarget(input: unknown): string | undefined {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return undefined;
   const record = input as Record<string, unknown>;
   for (const { key, keep } of TARGET_KEYS) {

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-disabled",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-disabled.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-mcp-skill-workspace-disabled.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "workspace-disabled-noop",
+      "description": "Workspace 显式 false 时不广告 Plugin MCP tool。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定普通文本响应，配合 tools 数组缺失断言证明 Plugin 被禁用。"
+    }
+  ]
+}

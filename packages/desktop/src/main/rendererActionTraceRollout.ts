@@ -12,7 +12,9 @@ import {
 
 export type RendererActionTraceRollout = SingleFeatureRollout<RendererActionTraceConfigV1>;
 
-function resolveRendererActionTraceConfig(payload: unknown): RendererActionTraceConfigV1 | null {
+export function resolveRendererActionTraceConfig(
+  payload: unknown,
+): RendererActionTraceConfigV1 | null {
   if (typeof payload !== "object" || payload === null) return null;
   const envelope = payload as {
     code?: unknown;

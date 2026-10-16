@@ -1,0 +1,12 @@
+{
+  "name": "@zcode/plugin-creator-plugin",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Built-in ZCode plugin authoring skill and scaffolding helpers.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:integration": "node test/dev-workflow.integration.mjs ../cli/dist/zcode.cjs"
+  }
+}

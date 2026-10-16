@@ -1,0 +1,18 @@
+node source
+node world-read#1 "grep eval\(" @8:26 type="GrepMatch[]"
+node join#1 "join" @9:32 type="Finding[]"
+node fan-out#1 "fan-out" @10:3 type="Finding[]"
+node ask#1 "auditor" @11:22 actors=actor#1 within=fan-out#1 type="Finding"
+node sink
+actor actor#1 "auditor" @11:5 within=fan-out#1
+edge source -> world-read#1 data exact
+edge world-read#1 -> join#1 data exact type="GrepMatch[]"
+edge world-read#1 -> fan-out#1 data exact type="GrepMatch[]"
+edge world-read#1 -> ask#1 data exact type="GrepMatch[]"
+edge world-read#1 -> sink data exact type="GrepMatch[]"
+edge join#1 -> sink data exact type="Finding[]"
+edge fan-out#1 -> join#1 data exact type="Finding[]"
+edge fan-out#1 -> ask#1 data exact type="Finding[]"
+edge fan-out#1 -> sink data exact type="Finding[]"
+edge ask#1 -> join#1 data exact type="Finding"
+edge ask#1 -> sink data exact type="Finding"

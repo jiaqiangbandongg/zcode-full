@@ -1,0 +1,8 @@
+lane actor#1 "judge" @5:15
+lane actor#2 "s" @6:22
+region seq#1 seq
+region branch#1 branch parent=seq#1 @7:1
+step ask#1 ask "s" @6:33 lane=actor#2 region=seq#1 always
+step ask#2 ask "judge" @8:16 lane=actor#1 region=branch#1 maybe
+edge ask#1 -> ask#2 data maybe inexact
+sink ask#2

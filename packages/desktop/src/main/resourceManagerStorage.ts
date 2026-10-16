@@ -54,7 +54,7 @@ function bindSubscriber(event: IpcMainInvokeEvent): void {
 }
 
 /** 纯函数：定位路径必须落在某个数据根内，防止 renderer 传任意路径让系统文件管理器打开。 */
-function isPathInsideStorageRoots(absolutePath: string, roots: StorageRootSpec[]): boolean {
+export function isPathInsideStorageRoots(absolutePath: string, roots: StorageRootSpec[]): boolean {
   const target = resolve(absolutePath);
   return roots.some((root) => {
     const back = relative(resolve(root.path), target);

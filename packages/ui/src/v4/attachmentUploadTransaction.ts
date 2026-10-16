@@ -15,16 +15,16 @@ import type {
 import { logger } from "@/logger.js";
 
 /** 384KiB 可被 3 整除，除末片外 base64 不含 padding；同时为两层 envelope 留足空间。 */
-const ATTACHMENT_UPLOAD_CHUNK_BYTES = 384 * 1024;
+export const ATTACHMENT_UPLOAD_CHUNK_BYTES = 384 * 1024;
 
-interface AttachmentUploadAgent {
+export interface AttachmentUploadAgent {
   attachmentBeginV4(params: ZCodeAgentAttachmentBeginParams): Promise<V4AttachmentBeginResult>;
   attachmentChunkV4(params: ZCodeAgentAttachmentChunkParams): Promise<V4AttachmentChunkResult>;
   attachmentCommitV4(params: ZCodeAgentAttachmentTerminalParams): Promise<V4AttachmentPutResult>;
   attachmentAbortV4(params: ZCodeAgentAttachmentTerminalParams): Promise<void>;
 }
 
-interface AttachmentUploadWorkspace {
+export interface AttachmentUploadWorkspace {
   workspacePath: string;
   workspaceIdentity?: string;
 }
@@ -105,7 +105,7 @@ function createUploadId(): string {
 }
 
 /** 用 production ChannelClient 相同的 serializer 计量完整 method+args physical request。 */
-function measureAttachmentChannelRequestBytes(method: string, params: unknown): number {
+export function measureAttachmentChannelRequestBytes(method: string, params: unknown): number {
   const writer = new BufferWriter();
   // RequestType.Promise=100；max int id 比正常短生命周期 request id 更保守。
   serialize(writer, [100, 2_147_483_647, ServiceChannels.ZCodeAgent, method]);

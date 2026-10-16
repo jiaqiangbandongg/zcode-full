@@ -13,7 +13,7 @@ import type { DynamicWorkflowRunSummary } from "@zcode/contracts";
 /**
  * 脚本派生标签的字符上限。80 是一行列表能读完的长度；派生值是启发式，越长越不像标签。
  */
-const DYNAMIC_WORKFLOW_RUN_LABEL_MAX_CHARS = 80;
+export const DYNAMIC_WORKFLOW_RUN_LABEL_MAX_CHARS = 80;
 
 /**
  * 派生 run 的展示标签：`name` → 脚本首个非空行（trim 后截 80）→ runId。

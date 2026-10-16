@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-readstate-model-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-readstate-model-isolation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-readstate-model-isolation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "readstate-model-isolation-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "readstate-model-isolation-first",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在历史 session 首轮请求使用 provider 下非首个模型；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "readstate-model-isolation-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在新建草稿 readState 水合并切回旧 session 后，follow-up 请求仍使用旧 session 的非首个模型。"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "jwt-expiry-reauthentication",
+  "spec": "./test/e2e/manual-review/pending/jwt-expiry-reauthentication.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "冷启动前写入完整 OAuth 缓存与已过期 zcodejwttoken，验证清理和重新认证交互。"
+    }
+  ],
+  "requests": []
+}

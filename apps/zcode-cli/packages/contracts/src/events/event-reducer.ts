@@ -522,6 +522,7 @@ export class EventReducer {
         requestId: payload.requestId,
         toolCallId: payload.toolCallId,
         toolName: payload.toolName,
+        ...(payload.approvalMode ? { approvalMode: payload.approvalMode } : {}),
         ...(payload.suggestedPermissionUpdates
           ? { suggestedPermissionUpdates: payload.suggestedPermissionUpdates }
           : {}),

@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-output-token-budget",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-output-token-budget.test.ts",
+  "fixtures": [
+    {
+      "id": "model-output-token-budget-title",
+      "description": "输出预算 case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需避免干扰预算请求匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Output Budget\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb01-default-main",
+      "description": "OTB01 未声明模型输出上限时，真实主请求必须发送 32K fallback。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心证据来自成功 model-io 的 request.body.max_completion_tokens；响应只需稳定结束。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB01_MAIN"],
+        "bodyIncludes": ["E2E_OTB01_MAIN", "\"max_completion_tokens\":32000", "otb-default"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb01\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb01\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb01-output-budget-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb01\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-default\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":8,\"total_tokens\":136}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb02-16k-main",
+      "description": "OTB02 首轮 16K 主请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心证据来自成功 model-io 的请求体；响应只需稳定结束。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB02_MAIN"],
+        "bodyIncludes": ["E2E_OTB02_MAIN", "\"max_completion_tokens\":16000", "otb-16k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb02\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb02-output-budget-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":160,\"completion_tokens\":8,\"total_tokens\":168}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb02-16k-history",
+      "description": "OTB02 第二轮 16K 主请求形成可手动压缩历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第二轮只用于满足现有 Compact 的两轮历史前置条件，且仍需保持 16K。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB02_HISTORY"],
+        "bodyIncludes": ["E2E_OTB02_HISTORY", "\"max_completion_tokens\":16000", "otb-16k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb02-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb02-history-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb02-16k-compact",
+      "description": "OTB02 effective=16K 时 Compact summary 请求也必须为 16K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心证据来自 querySource=compact 的成功 model-io 请求体。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB02_MAIN",
+          "create a detailed summary",
+          "\"max_completion_tokens\":16000",
+          "otb-16k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb02-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB02 retained its two 16K-budget turns.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb02-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-16k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":256,\"completion_tokens\":32,\"total_tokens\":288}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb03-64k-main",
+      "description": "OTB03 模型级 64K 必须原样进入真实主请求，不能被 32K 裁剪。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只为完成请求；model-io 请求体是验收证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB03_MAIN"],
+        "bodyIncludes": ["E2E_OTB03_MAIN", "\"max_completion_tokens\":64000", "otb-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb03\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb03\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb03-output-budget-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb03\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb06-64k-history",
+      "description": "OTB06 先形成一轮低 usage 历史，确保 Auto Compact 有至少两轮可总结内容。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Auto Compact 会保留最新轮；先形成低 usage 历史，才能让后续高 usage seed 触发真实 summary 请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB06_HISTORY"],
+        "bodyIncludes": ["E2E_OTB06_HISTORY", "\"max_completion_tokens\":64000", "otb-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb06-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb06-history-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb06-64k-seed",
+      "description": "OTB06 第二轮返回超过 94K threshold 的 provider usage，驱动下一轮 Auto Compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "受控 usage 用于稳定触发 128K context、21K reserve 的 Auto Compact 决策。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB06_SEED"],
+        "bodyIncludes": ["E2E_OTB06_SEED", "\"max_completion_tokens\":64000", "otb-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb06-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb06-seed-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":95000,\"completion_tokens\":8,\"total_tokens\":95008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb06-64k-auto-compact",
+      "description": "OTB06 Auto Compact summary 使用 min(64K, 20K)=20K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Auto Compact 的成功请求体和决策日志共同证明 reserve/summary 预算一致。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB06_SEED",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb06-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB06 retained the seed turn before continuing.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":256,\"completion_tokens\":32,\"total_tokens\":288}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb06-64k-post-compact-main",
+      "description": "OTB06 压缩后的主请求仍必须发送 64K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 Auto Compact 后主请求没有回退到旧 32K cap。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB06_POST"],
+        "bodyIncludes": ["E2E_OTB06_POST", "\"max_completion_tokens\":64000", "otb-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb06-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb06-post-compact-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb06-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":320,\"completion_tokens\":8,\"total_tokens\":328}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb07-before-refresh-main",
+      "description": "OTB07 当前模型未声明输出上限时，热更新前主请求使用 32K fallback。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "先建立同一 active session 的旧 runtime 预算，核心证据来自成功 model-io 请求体。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB07_BEFORE_REFRESH"],
+        "bodyIncludes": [
+          "E2E_OTB07_BEFORE_REFRESH",
+          "\"max_completion_tokens\":32000",
+          "otb-runtime-refresh"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb07-before\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-before\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb07-before-refresh-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-before\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb07-after-refresh-main",
+      "description": "OTB07 registry 为同一模型补齐 64K 后，同一 session 的下一主请求立即使用 64K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "请求响应只需稳定结束；session identity 与成功 model-io 请求体共同证明 active runtime 已刷新。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB07_AFTER_REFRESH"],
+        "bodyIncludes": [
+          "E2E_OTB07_AFTER_REFRESH",
+          "\"max_completion_tokens\":64000",
+          "otb-runtime-refresh"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb07-after\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-after\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb07-after-refresh-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-after\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":224,\"completion_tokens\":8,\"total_tokens\":232}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb07-after-refresh-compact",
+      "description": "OTB07 热更新后的手动 Compact 使用 min(64K, 20K)=20K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心证据来自同一 session 中 querySource=compact 的成功 model-io 请求体。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB07_BEFORE_REFRESH",
+          "E2E_OTB07_AFTER_REFRESH",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-runtime-refresh"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-otb07-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB07 retained both turns across the runtime registry refresh.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb07-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-runtime-refresh\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":288,\"completion_tokens\":32,\"total_tokens\":320}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

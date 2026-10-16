@@ -10,15 +10,7 @@ import {
   unregisterRecommendedPromptPane,
 } from "@/v4/featureSuggestedPromptRotation.js";
 /* oxlint-disable eslint(max-lines) -- 推荐 Prompt 同时收口 latest-wins、取消、可信解析、操作反馈和 Composer 收尾，拆分会打散这条状态机。 */
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ZCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
 import { toast } from "@/components/ui/toast.js";
@@ -42,6 +34,7 @@ import {
 } from "@/v4/draftSuggestedPromptItems.js";
 import {
   resolveDraftSuggestedPluginFlowStage,
+  resolveSuggestedPluginClientBoundary,
   type ConversationDraftSuggestedPromptsContainerProps,
   type DraftSuggestedPluginFlow,
   type DraftSuggestedPluginOperation,
@@ -86,6 +79,7 @@ export function ConversationDraftSuggestedPromptsContainer({
   remoteSessionId,
   onOpenAutomations,
   isDesktop = false,
+  isWebRemoteControl = false,
 }: Props) {
   const { intl, locale } = useZCodeIntl();
   const platform = usePlatform();
@@ -297,8 +291,7 @@ export function ConversationDraftSuggestedPromptsContainer({
       const resolved =
         await resolution.services.pluginManagementService.resolveSuggestedPluginReference({
           ...targetParams(),
-          clientMode: "desktop-continuous" as const,
-          deliveryKind: "desktop-continuous" as const,
+          ...resolveSuggestedPluginClientBoundary(isWebRemoteControl),
           stableId: current.plugin.stableId,
           operationId: current.operationId,
         });
@@ -307,6 +300,7 @@ export function ConversationDraftSuggestedPromptsContainer({
       return prependResolvedPlugin(current.plugin, requestVersion, resolved.icon);
     },
     [
+      isWebRemoteControl,
       prependResolvedPlugin,
       resolution.services.pluginManagementService,
       resolution.services.zcodeSessionService,
@@ -616,8 +610,7 @@ export function ConversationDraftSuggestedPromptsContainer({
           operation,
           resolution.services.pluginManagementService.resolveSuggestedPluginReference({
             ...targetParams(),
-            clientMode: "desktop-continuous" as const,
-            deliveryKind: "desktop-continuous" as const,
+            ...resolveSuggestedPluginClientBoundary(isWebRemoteControl),
             stableId: plugin.stableId,
             operationId: operation.operationId,
           }),
@@ -706,6 +699,8 @@ export function ConversationDraftSuggestedPromptsContainer({
     [
       cancelOperation,
       clearOperationFeedback,
+      isDesktop,
+      isWebRemoteControl,
       locale,
       onOpenAutomations,
       platform,
@@ -714,7 +709,6 @@ export function ConversationDraftSuggestedPromptsContainer({
       resolution.rpcReady,
       resolution.services.pluginManagementService,
       handleMutation,
-      isDesktop,
       showMutationConfirmation,
       showPluginActionPopover,
       targetParams,

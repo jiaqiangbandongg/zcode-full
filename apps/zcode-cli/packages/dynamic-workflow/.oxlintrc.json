@@ -1,11 +1,17 @@
 {
   // 本包自带的 oxlint 配置：必须显式存在，否则从仓库根运行 `pnpm --filter @zcode/dynamic-workflow lint`
-  // 时配置自动发现会向上找到根 .oxlintrc.json，而根配置的 ignorePatterns 含 "apps/zcode-cli"，
-  // 导致整个包 0 个文件可 lint、以 exit 1 失败。就近发现本文件后，规则仍通过 extends
-  // 完整继承根配置，只有下方 ignorePatterns 是本包特有的差异。
+  // 时 PATH 会先解析到根 workspace 的旧版 oxlint（1.60），其配置自动发现会向上找到根 .oxlintrc.json，
+  // 而根配置的 ignorePatterns 含 "apps/zcode-cli"，导致整个包 0 个文件可 lint、以 exit 1 失败。
+  // 就近发现本文件后，规则仍通过 extends 完整继承根配置，只有下方 override 是本包特有的差异。
   //
-  // 分析测试的图体语料（顶层 return、顶层 for-await、裸 agent()）不是合法模块语法，
-  // 在 ignorePatterns 统一排除——根 `pnpm lint` 与包内 lint 两个入口共用这一份豁免清单。
+  // Bugfix（2026-08-28，合并 dwf-submit-repair-violations 后根 pnpm lint 挂掉）：本配置文件的出现
+  // 会让从仓库根运行的 `pnpm lint`（oxlint）顺着嵌套配置把本包也扫进来（根 ignorePatterns 的
+  // "apps/zcode-cli" 就近被本文件覆盖）。而 tests/graphs 等目录是喂给 analyzeWorkflowScript 的
+  // 图体语料——顶层 return、顶层 for-await、裸 agent() 都不是合法模块语法，本包 package.json 的
+  // lint 脚本一直用 --ignore-pattern 把它们排除。此前这份语料豁免只活在 CLI 参数里、没进配置文件，
+  // 两个 lint 入口（根 pnpm lint / 包 pnpm --filter lint）看到的世界不一致，根入口于是把语料当
+  // 普通 TS 解析出 2 个 parse error。修复：语料豁免清单收进本配置文件作为单一事实源，
+  // package.json 里不再重复一份 CLI 参数。
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["../../../../.oxlintrc.json"],
   "ignorePatterns": [
@@ -15,6 +21,8 @@
     "tests/schemas/**",
     "tests/schema-errors/**"
   ],
-  // override 留空：文件超出 max-lines 上限时应拆模块，而不是回到这里加豁免名单。
+  // 2026-09-12：此前这里对 causality-graph/causality-order/sites/engine/scheduler/journal-contract
+  // 六个稠密文件关闭 max-lines。该轮把它们各拆成 ≤370 计数行的兄弟模块（公开面仍从原文件导出），
+  // 豁免随之删除；再越界应拆文件，而不是回到这里加名单。
   "overrides": []
 }

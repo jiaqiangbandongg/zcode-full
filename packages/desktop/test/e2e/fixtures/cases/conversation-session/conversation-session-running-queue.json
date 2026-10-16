@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-running-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-running-queue-first-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "running queue 需要 active turn 保持 streaming，真实模型可能过快完成。"
+    },
+    {
+      "id": "upstream-running-queue-second-queued-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 queued text 的产品语义是不打断当前轮且暂不发送；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-running-queue-third-queued-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 queued text 的产品语义是不打断当前轮且暂不发送；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-running-queue-fourth-queued-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 queued text 的产品语义是不打断当前轮且暂不发送；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-running-queue-fifth-queued-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 queued text 的产品语义是不打断当前轮且暂不发送；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-running-queue-goal-queued-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "running 中 /goal 只进入本地 queue，不能立即触发 provider 请求。"
+    }
+  ]
+}

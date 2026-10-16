@@ -2,7 +2,12 @@ import { basename, relative, sep } from "node:path";
 import type { FileSystemPort } from "@zcode/contracts";
 import { parse as parseYaml } from "yaml";
 
-import { MEMORY_RECALL_TYPES, type MemoryManifestEntry, type MemoryRecallType } from "./types.js";
+import {
+  MEMORY_RECALL_TYPES,
+  type MemoryManifestEntry,
+  type MemoryRecallState,
+  type MemoryRecallType,
+} from "./types.js";
 
 const MANIFEST_FILE_LIMIT = 200;
 const MANIFEST_PREVIEW_LINE_LIMIT = 30;
@@ -32,6 +37,25 @@ export async function scanMemoryManifest(input: {
   }
 }
 
+export async function getMemoryRecallManifest(input: {
+  fileSystem: FileSystemPort;
+  rootDir: string;
+  signal?: AbortSignal;
+  state: MemoryRecallState;
+}): Promise<MemoryManifestEntry[]> {
+  if (input.state.manifest && input.state.manifest.length > 0) {
+    return input.state.manifest;
+  }
+
+  const manifest = await scanMemoryManifest(input);
+  if (input.signal?.aborted) return [];
+  if (manifest.length > 0) {
+    input.state.manifest = manifest;
+    input.state.selectorMessages = [createManifestMessage(manifest)];
+  }
+  return manifest;
+}
+
 export function formatMemoryManifest(manifest: readonly MemoryManifestEntry[]): string {
   return manifest
     .map((entry) => {
@@ -41,6 +65,14 @@ export function formatMemoryManifest(manifest: readonly MemoryManifestEntry[]): 
       return entry.description ? `${base}: ${entry.description}` : base;
     })
     .join("\n");
+}
+
+function createManifestMessage(manifest: readonly MemoryManifestEntry[]) {
+  return {
+    role: "user" as const,
+    content: `Available memories:\n${formatMemoryManifest(manifest)}`,
+    cacheControl: { type: "ephemeral" as const },
+  };
 }
 
 async function collectMemoryPaths(

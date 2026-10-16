@@ -1,0 +1,18 @@
+node source
+node join#1 "join" @6:31 type="[PromiseSettledResult<string>, PromiseSettledResult<string>]"
+node ask#1 "alpha" @7:18 actors=actor#1 type="string"
+node ask#2 "beta" @8:17 actors=actor#2 type="string"
+node ask#3 "merger" @14:24 actors=actor#3 type="string"
+node sink
+actor actor#1 "alpha" @7:3
+actor actor#2 "beta" @8:3
+actor actor#3 "merger" @14:8
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge join#1 -> ask#3 data exact port=0 type="string"
+edge join#1 -> ask#3 data exact port=1 type="string"
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> ask#3 data exact type="string"
+edge ask#2 -> join#1 data exact port=1 type="string"
+edge ask#2 -> ask#3 data exact type="string"
+edge ask#3 -> sink data exact type="string"

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-keyboard-default-focus",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-keyboard-default-focus.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-keyboard-default-focus.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-default-focus-empty-submit-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 单选题等待态，测试无预聚焦鼠标点 Submit 提交空答案"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-empty-submit-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "模拟 Agent 收到空 answers 后的简短确认"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-tab-enter-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 两题等待态，测试 Tab 与初始方向键聚焦、Enter 选中推进"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-tab-enter-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "模拟 Agent 收到 Q1_A 和 Q2_A 后的确认"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-enter-skip-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 两题等待态，测试 Enter 跳过 Q1"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-enter-skip-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "模拟 Agent 收到 Q2_A 且 Q1 跳过后的确认"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-multiselect-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 多选题等待态，测试 Space 勾选/取消 Enter 确认"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-multiselect-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "模拟 Agent 收到 Q2_OPT_A + Q2_OPT_C 后的确认"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-escape-dismiss-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造单题 AskUserQuestion 等待态，验证没有选项聚焦时卡片层 Escape 关闭整组问答"
+    },
+    {
+      "id": "upstream-conversation-ask-default-focus-escape-dismiss-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定验证 dismiss 关闭 UI 后 declined tool_result 按当前产品语义回传模型，避免用未命中 fixture 的 500 重试做负向计时断言"
+    }
+  ]
+}

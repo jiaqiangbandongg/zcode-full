@@ -1,6 +1,6 @@
 import type { ConversationShareFailureIssue } from "@zcode/services";
 
-interface ConversationShareErrorDetails {
+export interface ConversationShareErrorDetails {
   name: string;
   kind: string;
   reasonCode?: string;
@@ -8,6 +8,7 @@ interface ConversationShareErrorDetails {
   status?: number;
   code?: number;
   requestId?: string;
+  clientRequestId?: string;
   issues?: readonly ConversationShareFailureIssue[];
   issueCount?: number;
   omittedIssueCount?: number;
@@ -25,7 +26,7 @@ const PUBLISH_ERROR_MESSAGE_BY_KIND: Readonly<Record<string, string>> = {
   invalid_conversation: "conversationShare.error.invalidConversation",
   unsafe_structure: "conversationShare.error.invalidConversation",
   artifact_protocol_not_ready: "conversationShare.error.invalidConversation",
-  invalid_contract: "conversationShare.error.invalidConversation",
+  invalid_contract: "conversationShare.error.invalidContract",
   disclosure_required: "conversationShare.error.disclosureRequired",
   upload_incomplete: "conversationShare.error.uploadFailed",
   connection_unavailable: "conversationShare.error.connectionUnavailable",
@@ -202,6 +203,12 @@ export function getConversationShareErrorDetails(error: unknown): ConversationSh
     typeof requestIdValue === "string" && /^[A-Za-z0-9._:-]{1,128}$/u.test(requestIdValue)
       ? requestIdValue
       : undefined;
+  const clientRequestIdValue = readField("clientRequestId");
+  const clientRequestId =
+    typeof clientRequestIdValue === "string" &&
+    /^[A-Za-z0-9._:-]{1,128}$/u.test(clientRequestIdValue)
+      ? clientRequestIdValue
+      : undefined;
   const rawIssues = readField("issues");
   const issues = (Array.isArray(rawIssues) ? rawIssues : [])
     .map(sanitizeIssue)
@@ -221,9 +228,29 @@ export function getConversationShareErrorDetails(error: unknown): ConversationSh
     ...(status === undefined ? {} : { status }),
     ...(code === undefined ? {} : { code }),
     ...(requestId === undefined ? {} : { requestId }),
+    ...(clientRequestId === undefined ? {} : { clientRequestId }),
     ...(issues.length === 0 ? {} : { issues }),
     ...(issueCount === 0 ? {} : { issueCount }),
     ...(omittedIssueCount === 0 ? {} : { omittedIssueCount }),
+  };
+}
+
+export function formatConversationShareErrorSummary(error: unknown): {
+  titleId: string;
+  issueCount: number;
+  turnOrdinals: number[];
+} {
+  const details = getConversationShareErrorDetails(error);
+  return {
+    titleId: "conversationShare.error.summary",
+    issueCount: details.issueCount ?? details.issues?.length ?? 0,
+    turnOrdinals: [
+      ...new Set(
+        (details.issues ?? []).flatMap((issue) =>
+          issue.turnOrdinal === undefined ? [] : [issue.turnOrdinal],
+        ),
+      ),
+    ].sort((left, right) => left - right),
   };
 }
 
@@ -357,7 +384,9 @@ export function resolveConversationShareFallbackIssueCode(
 }
 
 export function resolveConversationSharePublishErrorMessageId(error: unknown): string {
-  const { kind, reasonCode } = getConversationShareErrorDetails(error);
+  const { kind, reasonCode, status } = getConversationShareErrorDetails(error);
+  if (kind === "invalid_contract" && status !== undefined && status >= 400)
+    return "conversationShare.error.invalidContractHttp";
   if (reasonCode && PUBLISH_ERROR_MESSAGE_BY_REASON[reasonCode]) {
     return PUBLISH_ERROR_MESSAGE_BY_REASON[reasonCode];
   }

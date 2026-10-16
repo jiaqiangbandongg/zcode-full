@@ -1,0 +1,1503 @@
+schemaVersion: 1
+catalogId: model-selection-regression
+title: Model selection and provider regression factor catalog
+status: planning
+language: zh-CN
+sourceOfTruth:
+  productSemantics:
+    - docs/conversation-product-state-space.md
+    - docs/conversation-protocol-declaration.md
+    - docs/conversation-product-protocol.md
+  modelSelection:
+    - docs/chat/manual-model-switch-resolution-chain.md
+    - docs/chat/new-task-model-resolution-chain.md
+    - docs/ui/chat-model-select-menu.md
+  providerRegistry:
+    - docs/working-memory/provider-refactor/design/registry/provider-and-model-configuration-overview.md
+    - docs/working-memory/provider-refactor/design/registry/model-membership-and-enablement.md
+    - docs/superpowers/specs/2026-08-21-model-provider-modality-settings-design.md
+  implementation:
+    - packages/shared/src/model-selection.ts
+    - packages/provider/src/config/model-config.ts
+    - packages/provider/src/resolver.ts
+    - packages/provider/src/registry.ts
+    - packages/provider-node/src/model-selection-config-file-codec.ts
+    - packages/provider-node/src/model-selection-config-repository.ts
+    - packages/provider-node/src/zcode-builtin-release.ts
+    - packages/provider-node/src/zcode-builtin-provider-config-source.ts
+    - packages/provider-node/src/zcode-builtin-remote-synchronizer.ts
+    - apps/zcode-cli/packages/bootstrap/src/app/provider-registry-model-runtime.ts
+    - apps/zcode-cli/packages/adapters/src/model/runner.ts
+    - apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/commands/handlers/model-config.ts
+    - apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/commands/input-intent.ts
+  graph:
+    - .agents/skills/feature-boundary-planner/references/zcode-feature-graph.yaml
+  graphIndex:
+    status: unavailable
+    note: No live codegraph index was present; live-code evidence was checked with rg and direct source reading.
+
+decisionBacklog:
+  file: docs/testing/model-selection-regression-decision-backlog.yaml
+  questionnaireFile: docs/testing/model-selection-regression-decision-questionnaire.md
+  purpose: 将因子目录中不适合直接假设的隐含产品决策、契约冲突和实现核验项单独管理
+  totalEntries: 114
+  decisionEntries: 64
+  contractConflictEntries: 12
+  proofEntries: 38
+  note: totalEntries 不等于需要用户逐条拍板的数量；proofEntries 是已有口径需要补证据，contractConflictEntries 是文档或实现需要先收敛。
+
+statuses:
+  - accepted
+  - undefined
+  - pruned
+  - ignored
+  - bug-candidate
+
+dimensions:
+  - id: surface
+    category: product
+    owner: surface-local
+    values:
+      - id: chat-draft
+        label: 对话空草稿
+      - id: chat-existing-session
+        label: 已有会话工具栏
+      - id: chat-task-restore
+        label: 历史任务切换与恢复
+      - id: automation-editor
+        label: Automation 编辑
+      - id: automation-run
+        label: Automation 手动或定时运行
+      - id: offpeak-editor
+        label: Off-Peak 编辑
+      - id: offpeak-run
+        label: Off-Peak 调度与执行
+      - id: user-subagent
+        label: User Subagent
+      - id: builtin-subagent
+        label: Built-in Subagent
+      - id: provider-settings
+        label: Provider 设置
+      - id: login-welcome
+        label: 登录与 Welcome 初始选择
+      - id: bot
+        label: Bot /model 与 Bot 请求
+      - id: official-mcp
+        label: 官方 MCP Coding Plan 鉴权
+      - id: git-commit
+        label: Git commit message
+      - id: title-sidecar
+        label: 标题与 Goal 标题 sidecar
+      - id: goal-verifier
+        label: Goal completion verifier
+      - id: compact
+        label: 手动或自动 Compact
+      - id: project-memory
+        label: Project memory
+      - id: steering-guide
+        label: Steering / Guide
+      - id: connectivity
+        label: Provider/model connectivity
+      - id: manual-claim-plan
+        label: Manual claim plan
+      - id: tui
+        label: CLI/TUI model、effort、variant
+
+  - id: operation
+    category: event
+    values:
+      - id: display
+      - id: open-picker
+      - id: select-model
+      - id: select-thought
+      - id: create-session
+      - id: first-input
+      - id: send-text
+      - id: send-goal
+      - id: switch-model-config
+      - id: queue-submission
+      - id: send-queued-now
+      - id: stop
+      - id: compact
+      - id: auto-compact
+      - id: retry
+      - id: fork
+      - id: edit-query
+      - id: restore-session
+      - id: prewarm
+      - id: provider-save
+      - id: provider-refresh
+      - id: provider-connectivity
+      - id: login
+      - id: automation-save
+      - id: automation-run
+      - id: offpeak-create
+      - id: offpeak-run
+      - id: subagent-create
+      - id: subagent-run
+      - id: bot-model
+      - id: mcp-auth
+      - id: generate-text
+      - id: title
+      - id: goal-verify
+      - id: memory-generate
+      - id: tui-effort
+
+  - id: provider-identity
+    category: provider
+    values:
+      - id: native
+      - id: custom
+      - id: ghost
+      - id: hidden-internal
+      - id: legacy-claude
+      - id: legacy-opencode
+      - id: legacy-gemini
+      - id: legacy-codex
+      - id: legacy-glm
+      - id: account-zai-api-key
+      - id: account-zai-start-plan
+      - id: account-zai-individual-coding-plan
+      - id: account-zai-team-coding-plan
+      - id: account-bigmodel-api-key
+      - id: account-bigmodel-start-plan
+      - id: account-bigmodel-individual-coding-plan
+      - id: account-bigmodel-team-coding-plan
+
+  - id: provider-source
+    category: provider
+    values:
+      - id: zcode-builtin
+      - id: account-builtin
+      - id: personal
+      - id: legacy-import
+      - id: remote-host-mirror
+      - id: execution-only
+
+  - id: provider-family
+    category: provider
+    values:
+      - id: zai
+      - id: bigmodel
+      - id: generic-custom
+      - id: openai-compatible
+      - id: anthropic-compatible
+      - id: openai-native
+      - id: offpeak-family
+
+  - id: access-mode
+    category: auth
+    values:
+      - id: oauth
+      - id: api-key
+      - id: start-plan
+      - id: individual-coding-plan
+      - id: team-coding-plan
+      - id: offpeak
+      - id: none
+
+  - id: entitlement-state
+    category: auth
+    values:
+      - id: unknown
+      - id: loading
+      - id: available
+      - id: exhausted
+      - id: unavailable
+      - id: expired
+      - id: team-scope-missing
+      - id: product-mismatch
+
+  - id: connection-state
+    category: auth
+    values:
+      - id: disconnected
+      - id: connecting
+      - id: connected
+      - id: expired
+      - id: auth-error
+      - id: network-error
+      - id: server-error
+      - id: credentials-missing
+      - id: credentials-invalid
+
+  - id: api-format
+    category: transport
+    values:
+      - id: anthropic-messages
+      - id: openai-chat-completions
+      - id: openai-responses
+
+  - id: auth-profile
+    category: transport
+    values:
+      - id: static-api-key
+      - id: dynamic-api-key
+      - id: oauth-token
+      - id: start-jwt
+      - id: individual-jwt-signing
+      - id: team-jwt-signing
+      - id: offpeak-ticket
+      - id: security-verification-challenge
+      - id: missing-dynamic-credentials
+      - id: invalid-credentials
+
+  - id: endpoint-state
+    category: transport
+    values:
+      - id: default
+      - id: custom
+      - id: trailing-slash
+      - id: anthropic-v1-normalized
+      - id: proxy-route
+      - id: stale-route-cache
+      - id: refresh-route-cache
+      - id: invalid-base-url
+
+  - id: registry-state
+    category: registry
+    values:
+      - id: bundled-valid
+      - id: account-valid
+      - id: personal-valid
+      - id: complete
+      - id: incomplete
+      - id: loading
+      - id: stale
+      - id: refresh-failed
+      - id: revision-match
+      - id: revision-mismatch
+      - id: no-selectable-model
+      - id: provider-not-found
+      - id: model-not-found
+
+  - id: provider-flags
+    category: registry
+    values:
+      - id: enabled-visible
+      - id: enabled-hidden
+      - id: disabled-visible
+      - id: disabled-hidden
+      - id: account-enabled
+      - id: account-disabled
+      - id: family-materialized
+      - id: family-not-materialized
+
+  - id: model-flags
+    category: registry
+    values:
+      - id: enabled
+      - id: disabled
+      - id: retired
+      - id: complete
+      - id: incomplete
+      - id: builtin-member
+      - id: personal-member
+      - id: duplicate-cross-source
+      - id: duplicate-within-source
+      - id: exact-hidden
+      - id: ghost-unavailable
+
+  - id: model-capability
+    category: model
+    values:
+      - id: text-only
+      - id: image-input
+      - id: video-input
+      - id: audio-input
+      - id: pdf-input
+      - id: tools
+      - id: structured-output
+      - id: native-web-search
+      - id: mid-conversation-system
+      - id: tools-and-structured-output
+      - id: unknown-legacy-modalities
+      - id: large-context
+      - id: small-context
+      - id: limited-output
+      - id: unlimited-output
+      - id: adapter-capability-mismatch
+
+  - id: input-shape
+    category: request
+    values:
+      - id: text
+      - id: text-image
+      - id: text-video
+      - id: text-audio
+      - id: text-pdf
+      - id: attachment-only
+      - id: tool-result-media
+      - id: empty-text-with-attachment
+      - id: empty-text-no-attachment
+
+  - id: reasoning-profile
+    category: reasoning
+    values:
+      - id: unsupported
+      - id: fixed-single-level
+      - id: generic-effort
+      - id: glm52-max-high-nothink
+      - id: glm53-low-high-max
+      - id: kimi-k3-low-high-max
+      - id: upstream-v4-special
+      - id: qwen-enable-thinking
+      - id: kimi-mimo-toggle
+      - id: anthropic-adaptive-effort
+      - id: anthropic-fixed-budget
+      - id: openai-reasoning-effort
+      - id: openrouter-ox-alpha
+
+  - id: reasoning-selection
+    category: reasoning
+    values:
+      - id: absent
+      - id: default
+      - id: explicit
+      - id: disabled
+      - id: inherited
+      - id: invalid
+      - id: stale-level
+      - id: unknown-alias
+
+  - id: reasoning-level
+    category: reasoning
+    values:
+      - id: none
+      - id: low
+      - id: medium
+      - id: high
+      - id: xhigh
+      - id: max
+      - id: enabled
+      - id: off
+      - id: nothink
+      - id: adaptive
+      - id: fixed-budget
+      - id: unknown
+
+  - id: max-output
+    category: request
+    values:
+      - id: omitted
+      - id: model-default
+      - id: positive-within-limit
+      - id: exact-limit
+      - id: over-limit
+      - id: zero
+      - id: negative
+      - id: non-integer
+      - id: anthropic-thinking-clamped
+
+  - id: selection-source
+    category: state
+    values:
+      - id: explicit-user-selection
+      - id: renderer-draft
+      - id: host-preferred
+      - id: workspace-default
+      - id: recent
+      - id: session-runtime
+      - id: conversation-snapshot
+      - id: automation-record
+      - id: automation-run-snapshot
+      - id: offpeak-task-record
+      - id: subagent-profile
+      - id: parent-inheritance
+      - id: fork-time-config
+      - id: fallback
+      - id: legacy-migration
+
+  - id: draft-state
+    category: state
+    values:
+      - id: empty
+      - id: model-selected
+      - id: thought-selected
+      - id: prewarming
+      - id: prewarm-failed
+      - id: unavailable-selection
+      - id: provider-sync-pending
+
+  - id: session-phase
+    category: session
+    values:
+      - id: draft
+      - id: prewarming
+      - id: running
+      - id: completed-success
+      - id: completed-interrupted
+      - id: error
+
+  - id: active-work
+    category: session
+    values:
+      - id: none
+      - id: primary-turn
+      - id: foreground-subagent
+      - id: compact
+      - id: goal-verifier
+      - id: goal-continuation
+      - id: turn-steer
+
+  - id: queue-state
+    category: session
+    values:
+      - id: empty
+      - id: text
+      - id: goal
+      - id: compact
+      - id: mixed
+      - id: held
+      - id: selected-submission
+
+  - id: queue-auto-drain
+    category: session
+    values:
+      - id: "true"
+      - id: "false"
+
+  - id: command-result
+    category: protocol
+    values:
+      - id: accepted
+      - id: rejected
+      - id: stale
+      - id: duplicate
+      - id: failed
+      - id: noop
+      - id: provider-not-in-registry
+      - id: model-not-found
+      - id: reasoning-not-supported
+      - id: max-output-out-of-range
+
+  - id: history-shape
+    category: request
+    values:
+      - id: clean-text
+      - id: tool-history
+      - id: signed-reasoning
+      - id: unsigned-reasoning
+      - id: redacted-reasoning
+      - id: cross-model-reasoning
+      - id: orphan-reasoning
+      - id: trailing-reasoning
+      - id: whitespace-assistant
+      - id: empty-assistant
+      - id: responses-stored-references
+
+  - id: recovery-state
+    category: recovery
+    values:
+      - id: none
+      - id: auth-failure
+      - id: model-not-found
+      - id: rate-limit
+      - id: network-failure
+      - id: server-failure
+      - id: stream-idle
+      - id: stream-interrupted-before-output
+      - id: stream-interrupted-after-output
+      - id: empty-completion
+      - id: signature-repair
+      - id: registry-refresh
+      - id: reconnect
+      - id: cli-restart
+      - id: offpeak-expired
+      - id: compact-required
+
+  - id: delivery-kind
+    category: delivery
+    values:
+      - id: desktop-continuous
+      - id: web-remote-replayable
+
+  - id: host-kind
+    category: environment
+    values:
+      - id: desktop-local
+      - id: desktop-ssh
+      - id: desktop-wsl
+      - id: desktop-docker
+      - id: web-remote-shared-host
+
+  - id: workspace-identity
+    category: environment
+    values:
+      - id: local-path-fallback
+      - id: remote-identity
+      - id: same-path-different-identity
+      - id: missing-identity-invalid-remote
+      - id: remote-session-id-changed
+
+  - id: persistence-state
+    category: persistence
+    values:
+      - id: not-persisted
+      - id: persisted-valid
+      - id: persisted-legacy
+      - id: persisted-model-missing
+      - id: persisted-model-disabled
+      - id: revision-migrated
+      - id: cold-resume
+      - id: cross-process-refresh
+      - id: renderer-recent
+
+  - id: query-source
+    category: product
+    values:
+      - id: main-turn
+      - id: compact-summary
+      - id: git-commit-message
+      - id: title
+      - id: goal-title
+      - id: goal-verifier
+      - id: project-memory
+      - id: connectivity
+      - id: subagent
+      - id: automation
+      - id: offpeak
+
+  - id: presentation-context
+    category: presentation
+    values:
+      - id: desktop-wide
+      - id: desktop-narrow
+      - id: mobile
+      - id: light
+      - id: dark
+      - id: locale-zh
+      - id: locale-en
+      - id: keyboard
+      - id: pointer
+      - id: reduced-motion
+
+constraints:
+  - id: MSR-PRUNE-001
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: model-flags
+          in: [disabled, incomplete]
+        - dimension: operation
+          in:
+            [
+              select-model,
+              create-session,
+              first-input,
+              switch-model-config,
+              send-text,
+              queue-submission,
+            ]
+    decision: reject-or-hide
+    effect:
+      - Settings retains the record for repair or re-enable.
+      - Registry, picker, default, fallback, and exact ModelFactory reject it.
+    invariant: disabled-or-incomplete-model-is-not-executable
+    representativeCases: [MSR-REG-006]
+
+  - id: MSR-PRUNE-002
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: provider-flags
+          in: [enabled-hidden, disabled-hidden]
+        - dimension: surface
+          in: [chat-draft, chat-existing-session, automation-editor, user-subagent]
+    decision: not-visible
+    effect:
+      - Hidden providers are absent from ordinary Settings and Selection facades.
+      - Complete hidden providers remain available for exact internal creation when enabled.
+    invariant: provider-visibility-is-not-model-enabled
+    representativeCases: [MSR-REG-007, MSR-OFF-001]
+
+  - id: MSR-PRUNE-003
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: access-mode
+          in: [start-plan]
+        - dimension: surface
+          in: [offpeak-editor, offpeak-run]
+    decision: reject
+    effect: Off-Peak does not use Start Plan execution.
+    invariant: offpeak-start-plan-is-unsupported
+    representativeCases: [MSR-OFF-002]
+
+  - id: MSR-PRUNE-004
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: model-capability
+          in: [text-only]
+        - dimension: input-shape
+          in: [text-image, text-video, text-audio, text-pdf, attachment-only, tool-result-media]
+    decision: reject-before-network
+    effect: Adapter returns InvalidModelRequest without provider network I/O.
+    invariant: capability-validation-precedes-network
+    representativeCases: [MSR-REQ-004]
+
+  - id: MSR-PRUNE-005
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: reasoning-profile
+          in: [unsupported, fixed-single-level]
+        - dimension: reasoning-selection
+          in: [explicit, inherited]
+        - dimension: reasoning-level
+          in: [low, medium, high, xhigh, max, enabled, adaptive, fixed-budget]
+    decision: reject-or-use-target-default
+    effect: Unsupported explicit thought never reaches provider wire.
+    invariant: reasoning-level-must-be-model-supported
+    representativeCases: [MSR-REASON-004]
+
+  - id: MSR-PRUNE-006
+    status: pruned
+    kind: invalid
+    when:
+      all:
+        - dimension: access-mode
+          in: [team-coding-plan]
+        - dimension: entitlement-state
+          in: [team-scope-missing, product-mismatch]
+    decision: unavailable
+    effect: Do not silently downgrade Team to Individual or API Key.
+    invariant: team-scope-is-explicit
+    representativeCases: [MSR-AUTH-004]
+
+  - id: MSR-PRUNE-007
+    status: pruned
+    kind: invariant
+    when:
+      all:
+        - dimension: surface
+          in: [title-sidecar, git-commit]
+        - dimension: reasoning-selection
+          in: [inherited]
+    decision: operation-specific-projection
+    effect: Title disables reasoning; Git commit preserves explicit thought but disables it when there is no explicit value.
+    invariant: sidecar-reasoning-policy-is-not-main-turn-policy
+    representativeCases: [MSR-SIDE-001, MSR-SIDE-002]
+
+  - id: MSR-PRUNE-008
+    status: pruned
+    kind: invariant
+    when:
+      all:
+        - dimension: delivery-kind
+          in: [desktop-continuous, web-remote-replayable]
+        - dimension: presentation-context
+          in: [light, dark, locale-zh, locale-en, desktop-wide, desktop-narrow, mobile]
+    decision: pairwise-representative
+    effect: Presentation axes are covered by shared UI tests and a small number of desktop/mobile representatives, not by every provider/model cross-product.
+    invariant: delivery-and-presentation-axes-do-not-change-model-authority
+    representativeCases: [MSR-UI-001, MSR-REMOTE-001]
+
+  - id: MSR-PRUNE-009
+    status: pruned
+    kind: invariant
+    when:
+      all:
+        - dimension: surface
+          in:
+            [
+              chat-draft,
+              chat-existing-session,
+              automation-editor,
+              user-subagent,
+              builtin-subagent,
+            ]
+        - dimension: provider-source
+          in: [zcode-builtin, account-builtin, personal, remote-host-mirror]
+    decision: signature-class-representative
+    effect: Model IDs are grouped by provider/auth/API/capability/reasoning signatures; literal model IDs are not all multiplied together.
+    invariant: model-id-is-opaque-but-wire-profile-is-the-test-equivalence-key
+    representativeCases: [MSR-REG-001, MSR-REASON-001, MSR-REQ-001]
+
+  - id: MSR-PRUNE-010
+    status: pruned
+    kind: invariant
+    when:
+      all:
+        - dimension: delivery-kind
+          in: [desktop-continuous, web-remote-replayable]
+        - dimension: host-kind
+          in: [web-remote-shared-host]
+    decision: shared-host-attachment
+    effect: Mobile remote attaches to an existing host and reuses the same CLI/runtime; it never creates an independent model runtime.
+    invariant: remote-does-not-create-independent-agent-runtime
+    representativeCases: [MSR-REMOTE-001, MSR-REMOTE-002]
+
+  - id: MSR-UNDEFINED-001
+    status: undefined
+    kind: product-decision
+    when:
+      all:
+        - dimension: operation
+          in: [queue-submission, send-queued-now]
+        - dimension: selection-source
+          in: [session-runtime, explicit-user-selection]
+    decision: choose-queue-model-semantics
+    effect:
+      - Candidate A: queue item freezes the complete Submission model/thought at admission.
+      - Candidate B: queue item reads the latest Session model/thought at consumption.
+      - Current state-space text and live input-intent code support A; older accepted invariants still state B.
+    invariant: queued-model-contract-must-be-single-valued
+    evidence:
+      - docs/conversation-product-state-space.md
+      - docs/conversation-protocol-declaration.md
+      - docs/conversation-product-protocol.md
+      - apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/commands/input-intent.ts
+    representativeCases: [MSR-QUEUE-001]
+
+  - id: MSR-BUG-001
+    status: bug-candidate
+    kind: implementation-gap
+    when:
+      all:
+        - dimension: operation
+          in: [switch-model-config]
+        - dimension: model-capability
+          in: [large-context, small-context]
+        - dimension: session-phase
+          in: [running, completed-success, completed-interrupted]
+    decision: context-window-guard
+    effect: Target context window guard should compact/stop/wait before committing the switch; current audit says V4 migration may not fully enforce it.
+    invariant: model-switch-context-budget-is-safe
+    evidence:
+      - docs/superpowers/specs/2026-06-10-model-switch-context-window-guard-design.md
+      - docs/chat/model-resolution-chain-audit.md
+    representativeCases: [MSR-SESSION-006]
+
+  - id: MSR-BUG-002
+    status: bug-candidate
+    kind: contract-drift
+    when:
+      all:
+        - dimension: operation
+          in: [open-picker, select-model]
+        - dimension: model-flags
+          in: [disabled]
+    decision: lock-disabled-model
+    effect: Shared picker supports locked items, while the V4 toolbar path currently appears to disable the lock flag; verify product intent before using it as an E2E oracle.
+    invariant: disabled-current-model-is-not-selectable
+    evidence:
+      - docs/ui/chat-model-select-menu.md
+      - packages/ui/src/ModelConfigSelect.tsx
+      - packages/ui/src/v4/composer/V4ComposerToolbar.tsx
+    representativeCases: [MSR-UI-003]
+
+  - id: MSR-DRIFT-001
+    status: ignored
+    kind: stale-source
+    when:
+      all:
+        - dimension: provider-source
+          in: [legacy-import]
+    decision: legacy-only
+    effect: Old client-config model facts, magic_name, fallback, and tombstone paths are not current Registry inputs; cover only migration compatibility where explicitly requested.
+    evidence:
+      - docs/model-provider-client-config-remote-model-facts.md
+      - apps/zcode-cli/packages/bootstrap/src/app/legacy-cli-model-config.ts
+
+highRiskCrossProducts:
+  - id: MSR-X-001
+    dimensions: [provider-family, access-mode, api-format, auth-profile]
+    risk: Provider family and transport determine credentials, signing, metadata, and wire shape.
+    preferredLayer: provider-unit-and-adapter-wire
+  - id: MSR-X-002
+    dimensions: [model-capability, reasoning-profile, reasoning-level, max-output]
+    risk: Model defaults, thought mapping, Anthropic budget, and output limits interact.
+    preferredLayer: resolver-runtime-and-wire
+  - id: MSR-X-003
+    dimensions: [selection-source, session-phase, operation, command-result]
+    risk: Draft, active Session, queue, switch ACK, and fallback have different authority.
+    preferredLayer: bootstrap-core-and-desktop-e2e
+  - id: MSR-X-004
+    dimensions: [registry-state, provider-flags, model-flags, persistence-state]
+    risk: Refresh, stale revisions, disabled models, recent/default and cold resume can diverge.
+    preferredLayer: provider-and-cold-resume
+  - id: MSR-X-005
+    dimensions: [session-phase, active-work, queue-state, recovery-state]
+    risk: Stop, compact, retry, empty completion, and context guard change model timing.
+    preferredLayer: core-runtime-and-stream-replay
+  - id: MSR-X-006
+    dimensions: [delivery-kind, host-kind, workspace-identity, registry-state]
+    risk: Remote attachment must preserve target Host facts and replayable recovery without creating a second runtime.
+    preferredLayer: service-integration-and-remote-e2e
+  - id: MSR-X-007
+    dimensions: [surface, selection-source, persistence-state, query-source]
+    risk: Shared picker callers have different owners and commit sinks.
+    preferredLayer: surface-focused-and-cross-surface-e2e
+
+caseSeeds:
+  - id: MSR-REG-001
+    status: accepted
+    state: personal provider is complete, enabled, visible, and selectable
+    event: open-picker then select-model
+    target: provider-settings -> chat-draft
+    guard: target provider/model exists in target Host Registry
+    effect: picker and first request preserve complete provider/model identity
+    assertions:
+      - provider/model are not inferred from model ID alone
+      - first request uses the selected provider and model
+      - no unrelated Session or workspace is changed
+    evidenceLayers: [ui, runtime, network, persistence]
+
+  - id: MSR-REG-002
+    status: accepted
+    state: same model ID exists under two custom providers
+    event: switch between the two providers
+    target: chat-existing-session
+    guard: full provider/model tuple comparison
+    effect: Session and picker restore the correct provider identity
+    assertions:
+      - A and B do not collapse by model ID
+      - subsequent requests use the correct endpoint and provider
+    evidenceLayers: [ui, snapshot, network]
+
+  - id: MSR-REG-003
+    status: accepted
+    state: Provider Registry is loading or remote target is waiting
+    event: open-picker
+    target: chat-draft
+    guard: target Host is not ready
+    effect: show pending state without falling back to Base/Local registry
+    assertions:
+      - remote candidates are not replaced by local candidates
+      - workspaceIdentity and remoteSessionId remain attached
+    evidenceLayers: [ui, service, remote]
+
+  - id: MSR-REG-004
+    status: accepted
+    state: Account snapshot revision does not match ZCode Built-in revision
+    event: provider-refresh
+    target: provider-settings -> chat-draft
+    guard: revision pair mismatch
+    effect: retain prior complete Registry while recomputing Account overlay
+    assertions:
+      - no partial Registry is published
+      - Personal-only updates are not blocked
+      - active model is not interrupted
+    evidenceLayers: [provider-unit, runtime, persistence]
+
+  - id: MSR-REG-005
+    status: accepted
+    state: Provider/model has sparse Personal overlay
+    event: provider-save
+    target: provider-settings
+    guard: resolve then validateComplete
+    effect: complete effective config enters Registry only after validation
+    assertions:
+      - overlay precedence is Built-in -> Account -> Personal
+      - missing fields are filled from the correct source
+      - invalid Personal data is preserved for recovery
+    evidenceLayers: [provider-unit, persistence]
+
+  - id: MSR-REG-006
+    status: accepted
+    state: model is disabled or incomplete
+    event: select-model or create-session
+    target: chat-draft
+    guard: disabled/incomplete execution gate
+    effect: picker/default/fallback/factory reject it while Settings retains it
+    assertions:
+      - no network request is made
+      - existing Active Model is not interrupted by refresh
+    evidenceLayers: [ui, registry, runtime, network]
+
+  - id: MSR-REG-007
+    status: accepted
+    state: complete hidden Provider contains an enabled internal model
+    event: ordinary picker display and internal exact creation
+    target: chat-draft + offpeak-run
+    guard: visibility is separate from execution availability
+    effect: absent from ordinary picker but available to permitted internal path
+    assertions:
+      - ordinary user cannot select it
+      - Off-Peak exact creation can validate it through Registry
+    evidenceLayers: [ui, registry, runtime]
+
+  - id: MSR-AUTH-001
+    status: accepted
+    state: Z.ai or BigModel is in API Key mode
+    event: login then first-input
+    target: login-welcome -> chat-draft
+    guard: API Key provider selected and key valid
+    effect: selected family/provider/model reaches request with API-key auth
+    assertions:
+      - selected key persistence is family-scoped
+      - no OAuth-only fields are required
+    evidenceLayers: [ui, persistence, network]
+
+  - id: MSR-AUTH-002
+    status: accepted
+    state: Start/Individual/Team entitlement is loading
+    event: open-picker
+    target: chat-draft
+    guard: entitlement is inconclusive
+    effect: preserve saved selection until conclusive unavailability
+    assertions:
+      - saved model is not prematurely hidden
+      - loading state is visible and deterministic
+    evidenceLayers: [ui, service, registry]
+
+  - id: MSR-AUTH-003
+    status: accepted
+    state: Start Plan is conclusively unavailable
+    event: provider-refresh
+    target: chat-draft
+    guard: entitlement unavailable
+    effect: hide unavailable Start provider and follow Agent-safe fallback
+    assertions:
+      - fallback is persisted only after authoritative validation
+      - active model is not retroactively interrupted
+    evidenceLayers: [service, runtime, persistence]
+
+  - id: MSR-AUTH-004
+    status: accepted
+    state: Team mode lacks organization/project scope
+    event: first-input
+    target: automation-run or chat-draft
+    guard: Team access context incomplete
+    effect: unavailable/auth error without silent downgrade
+    assertions:
+      - request does not use Individual or API Key credentials
+      - error identifies provider/access cause
+    evidenceLayers: [runtime, network, logs]
+
+  - id: MSR-REASON-001
+    status: accepted
+    state: GLM-5.2-like model exposes max/high/nothink
+    event: select each level and send
+    target: chat-draft
+    guard: exact model reasoning mapping
+    effect: wire request receives the matching provider-specific reasoning option
+    assertions:
+      - default is max
+      - high and nothink remain distinguishable
+      - provider/model identity is preserved
+    evidenceLayers: [ui, runtime, network]
+
+  - id: MSR-REASON-002
+    status: accepted
+    state: Qwen or Kimi/MiMo OpenAI-compatible model
+    event: select enabled and disabled thought modes
+    target: chat-existing-session
+    guard: model-specific extra-body projection
+    effect: Qwen uses enable_thinking; Kimi/MiMo uses thinking.type
+    assertions:
+      - no unintended extra_body nesting remains
+      - inherited reasoning options are cleared by explicit no-thinking
+    evidenceLayers: [runtime, network]
+
+  - id: MSR-REASON-003
+    status: accepted
+    state: Anthropic adaptive or fixed-budget reasoning model
+    event: send with small and normal max output
+    target: chat-existing-session + compact
+    guard: Anthropic thinking budget calculation
+    effect: thinking budget is clamped and total budget remains valid
+    assertions:
+      - visible output budget is not negative or zero
+      - shared model config is not mutated
+      - compact uses the correct output budget
+    evidenceLayers: [runtime, network, unit]
+
+  - id: MSR-REASON-004
+    status: accepted
+    state: model exposes one fixed reasoning level or no reasoning
+    event: submit unsupported explicit level
+    target: chat-draft
+    guard: Registry validates reasoning option
+    effect: reject before network or use the target model default only where the command contract permits
+    assertions:
+      - unsupported level never appears as a provider request
+      - UI does not offer a fake generic five-level list
+    evidenceLayers: [ui, registry, runtime, network]
+
+  - id: MSR-REASON-005
+    status: accepted
+    state: source model and target model have different thought vocabularies
+    event: cross-provider/model switch
+    target: chat-existing-session
+    guard: target model capability resolution
+    effect: clear source thought and use target default until explicit target selection
+    assertions:
+      - source thought is not inherited by spelling
+      - final Snapshot and next request agree
+    evidenceLayers: [ui, snapshot, network]
+
+  - id: MSR-REQ-001
+    status: accepted
+    state: model supports image/video/PDF or tools/structured output
+    event: send matching request
+    target: chat-existing-session
+    guard: Adapter capability validation
+    effect: request is projected with supported content and options
+    assertions:
+      - model capability and actual wire request agree
+      - tool/structured/media options are not silently dropped
+    evidenceLayers: [runtime, network, model-io]
+
+  - id: MSR-REQ-002
+    status: accepted
+    state: provider uses custom endpoint or OpenAI-compatible format
+    event: first-input
+    target: provider-settings -> chat-draft
+    guard: endpoint normalization and provider kind binding
+    effect: request uses configured endpoint, headers, and provider namespace
+    assertions:
+      - trailing slash and Anthropic /v1 normalization are stable
+      - temporary route cache is refreshed when stale
+      - secrets are absent from logs and persistence
+    evidenceLayers: [provider-unit, runtime, network, logs]
+
+  - id: MSR-REQ-003
+    status: accepted
+    state: request auth is dynamic and missing
+    event: first-input or retry
+    target: chat-existing-session
+    guard: request-auth preflight
+    effect: fail before network I/O
+    assertions:
+      - provider receives no request
+      - error is classified as auth/configuration, not network
+    evidenceLayers: [runtime, network, logs]
+
+  - id: MSR-REQ-004
+    status: accepted
+    state: model capability does not support input shape
+    event: send attachment request
+    target: chat-existing-session
+    guard: model adapter capability check
+    effect: InvalidModelRequest before provider network
+    assertions:
+      - no provider request is emitted
+      - composer/session remains recoverable
+    evidenceLayers: [ui, runtime, network]
+
+  - id: MSR-DRAFT-001
+    status: accepted
+    state: empty draft has selectable Recent and Host preferred selections
+    event: open new task
+    target: chat-draft
+    guard: Recent is still selectable
+    effect: seed draft with Recent; otherwise use Host preferred then safe fallback
+    assertions:
+      - workspaceKey isolates Recent
+      - resolved defaults are not written back as explicit selection
+    evidenceLayers: [ui, localstorage, service]
+
+  - id: MSR-DRAFT-002
+    status: accepted
+    state: draft model changes before first send
+    event: select-model then first-input
+    target: chat-draft
+    guard: submission freezes draft selection
+    effect: createSession.config and first request use the selected tuple
+    assertions:
+      - provider/model/thought are frozen together
+      - prewarm cannot send a stale model
+      - no existing Session model switch Toast is emitted
+    evidenceLayers: [ui, protocol, runtime, network]
+
+  - id: MSR-SESSION-001
+    status: accepted
+    state: two Sessions have different provider/model/thought tuples
+    event: switch A -> B -> A
+    target: chat-task-restore
+    guard: sessionConfigScoped
+    effect: each Session restores its own Snapshot config
+    assertions:
+      - Task index is not used as Session authority
+      - A and B requests remain isolated
+    evidenceLayers: [ui, snapshot, runtime, network]
+
+  - id: MSR-SESSION-002
+    status: accepted
+    state: existing Session receives switchModelConfig
+    event: same model thought-only switch, cross-model switch, duplicate switch
+    target: chat-existing-session
+    guard: CAS, identity compare, target capability validation
+    effect: accepted/stale/duplicate/noop outcomes are distinct
+    assertions:
+      - same tuple is noop
+      - stale command refreshes projection and does not silently replay
+      - duplicate returns prior result without a second execution
+    evidenceLayers: [ui, protocol, runtime]
+
+  - id: MSR-SESSION-003
+    status: accepted
+    state: switch is pending while send is submitted
+    event: switch then send
+    target: chat-existing-session
+    guard: config barrier
+    effect: send cannot use a second uncommitted model
+    assertions:
+      - request order is deterministic
+      - provider/model in request matches authoritative runtime
+    evidenceLayers: [protocol, runtime, network]
+
+  - id: MSR-SESSION-004
+    status: accepted
+    state: provider is missing from target Registry during switch
+    event: switch-model-config
+    target: local or remote existing Session
+    guard: one registry refresh and one retry
+    effect: successful refresh applies target; repeated absence fails structurally
+    assertions:
+      - no Base/Local fallback on remote
+      - workspaceIdentity and remoteSessionId are included
+    evidenceLayers: [service, protocol, runtime, remote]
+
+  - id: MSR-SESSION-005
+    status: accepted
+    state: current request is streaming and model switch is accepted
+    event: switch model during stream
+    target: chat-existing-session
+    guard: active request immutability
+    effect: in-flight request finishes or is stopped according to switch contract; next model step uses new selection
+    assertions:
+      - old request does not change to new provider mid-flight
+      - late old events cannot revive old work
+    evidenceLayers: [runtime, stream, snapshot]
+
+  - id: MSR-SESSION-006
+    status: bug-candidate
+    state: current used tokens exceed target model effective context budget
+    event: switch to smaller-context model
+    target: chat-existing-session
+    guard: context-window guard
+    effect: compact/stop/wait before committing switch
+    assertions:
+      - no request is sent with an unsafe budget
+      - queue is preserved
+      - model switch is committed only after fresh usage fits
+    evidenceLayers: [runtime, stream, snapshot, network]
+
+  - id: MSR-QUEUE-001
+    status: undefined
+    state: queue has Q1 and Session model changes before Q1 consumption
+    event: consume Q1 or sendQueuedNow
+    target: chat-existing-session
+    guard: queued model contract decision required
+    effect: pending decision between frozen Submission and latest Session config
+    assertions:
+      - do not promote this to a formal E2E until the duplicate invariant is reconciled
+    evidenceLayers: [protocol, runtime, network]
+
+  - id: MSR-QUEUE-002
+    status: accepted
+    state: desktop and mobile submit while Session is busy
+    event: send-text from both clients
+    target: shared Session
+    guard: CLI CommandInbox serial admission
+    effect: one FIFO, no renderer or host shadow queue
+    assertions:
+      - admission order is CLI order
+      - sourceCommandId, workspace identity, and delivery are retained
+      - desktop continuous and mobile replayable projections remain separate
+    evidenceLayers: [protocol, runtime, remote, snapshot]
+
+  - id: MSR-QUEUE-003
+    status: accepted
+    state: queued Submission contains model/thought and current provider config later changes
+    event: queue promotion
+    target: chat-existing-session
+    guard: Submission model contract plus latest Provider facts
+    effect: model/thought intent remains stable while credentials/config are resolved at execution time
+    assertions:
+      - no second queue is created
+      - provider config revision used by ModelFactory is observable
+    evidenceLayers: [runtime, network, persistence]
+
+  - id: MSR-RECOVERY-001
+    status: accepted
+    state: Anthropic history contains unsigned reasoning
+    event: follow-up request
+    target: chat-existing-session
+    guard: request-local reasoning normalization
+    effect: preserve canonical history; repair signature only once when provider rejects
+    assertions:
+      - canonical/persisted history is unchanged
+      - retry count is bounded
+      - subsequent request uses normalized history
+    evidenceLayers: [runtime, network, model-io]
+
+  - id: MSR-RECOVERY-002
+    status: accepted
+    state: stream finishes with zero output/usage
+    event: stream completion
+    target: chat-existing-session
+    guard: empty-completion retry budget
+    effect: one retry, no leaked empty turn
+    assertions:
+      - physical requests are exactly first-empty then retry
+      - final provenance and usage are correct
+    evidenceLayers: [runtime, stream, network, snapshot]
+
+  - id: MSR-RECOVERY-003
+    status: accepted
+    state: provider returns auth/model/rate-limit/network/server error
+    event: generate or stream request
+    target: chat-existing-session
+    guard: failure classifier and retry policy
+    effect: classified error with bounded retry and correct UI/runtime status
+    assertions:
+      - retryable and non-retryable errors differ
+      - request auth and model identity remain stable across retry
+    evidenceLayers: [runtime, network, logs, snapshot]
+
+  - id: MSR-RECOVERY-004
+    status: accepted
+    state: CLI/Host restarts after a model-bearing command
+    event: cold resume
+    target: chat-task-restore
+    guard: durable Session/queue/provenance recovery
+    effect: restore only authoritative facts; do not replay discarded startNow automatically
+    assertions:
+      - queue/guide/unknown are settled according to delivery lifetime
+      - Session model timeline and assistant provenance remain consistent
+    evidenceLayers: [persistence, snapshot, remote]
+
+  - id: MSR-REMOTE-001
+    status: accepted
+    state: remote SSH/WSL/Docker workspace has a distinct workspaceIdentity
+    event: open picker, switch model, reconnect
+    target: chat-existing-session
+    guard: target Host registry and identity isolation
+    effect: remote model candidates and selection survive reconnect
+    assertions:
+      - workspaceKey is not workspacePath alone
+      - remoteSessionId is carried through switch/recovery
+      - local workspace with same path does not receive the selection
+    evidenceLayers: [ui, service, protocol, remote, persistence]
+
+  - id: MSR-REMOTE-002
+    status: accepted
+    state: mobile `/remote` attaches to an existing shared host
+    event: switch or send while desktop is also attached
+    target: shared Session
+    guard: trusted delivery profile and owner routing
+    effect: one runtime, two delivery profiles, no cross-connection frame leakage
+    assertions:
+      - desktop remains desktop-continuous
+      - mobile remains web-remote-replayable
+      - relay/main has no model/session/queue authority
+    evidenceLayers: [remote, protocol, snapshot]
+
+  - id: MSR-SURFACE-001
+    status: accepted
+    state: Automation form has explicit model, thought, or inherit value
+    event: save then run
+    target: automation-editor -> automation-run
+    guard: automation record/run snapshot boundary
+    effect: automation uses its own selection without changing current Chat Session
+    assertions:
+      - legacy model/thought format migrates correctly
+      - run snapshot contains the intended provider/model/thought
+      - Chat workspace default is unchanged
+    evidenceLayers: [ui, service, persistence, network]
+
+  - id: MSR-SURFACE-002
+    status: accepted
+    state: Subagent profile omits or specifies model
+    event: create child and run foreground/background child
+    target: user-subagent or builtin-subagent
+    guard: profile model authority and parent inheritance
+    effect: omitted model inherits parent; explicit model is child authority
+    assertions:
+      - child model provenance/timeline is durable
+      - readonly child detail does not expose a model picker
+      - background restrictions are enforced
+    evidenceLayers: [service, runtime, persistence, network]
+
+  - id: MSR-OFF-001
+    status: accepted
+    state: Off-Peak model is hidden from ordinary picker but available in internal Registry
+    event: create and execute Off-Peak task
+    target: offpeak-editor -> offpeak-run
+    guard: exact hidden selection plus ticket/auth context
+    effect: internal task executes without changing ordinary Recent/default/session model
+    assertions:
+      - Start Plan is rejected
+      - personal/team credentials and ticket are consistent
+      - ordinary busy queue is not polluted
+    evidenceLayers: [ui, service, runtime, persistence, network]
+
+  - id: MSR-OFF-002
+    status: accepted
+    state: Off-Peak request ticket is missing, expired, or provider-mismatched
+    event: offpeak-run
+    target: offpeak-run
+    guard: execution context validation
+    effect: fail before provider request or enter expired state
+    assertions:
+      - failure does not fall back to ordinary Chat model
+      - task record preserves diagnosable provider/model identity
+    evidenceLayers: [service, runtime, persistence, logs]
+
+  - id: MSR-SIDE-001
+    status: accepted
+    state: title/goal-title sidecar uses configured or Session model
+    event: title
+    target: title-sidecar
+    guard: sidecar projection
+    effect: force reasoning disabled, no tools, JSON title output
+    assertions:
+      - main Session reasoning preference is not mutated
+      - provenance identifies the actual sidecar model
+    evidenceLayers: [runtime, network, persistence]
+
+  - id: MSR-SIDE-002
+    status: accepted
+    state: Git commit generator receives explicit or absent reasoning
+    event: generate-text
+    target: git-commit
+    guard: git querySource policy
+    effect: explicit thought is preserved; absent thought disables reasoning; max output is 256
+    assertions:
+      - inherited thought is not mistaken for explicit thought
+      - provider/model in result is complete
+    evidenceLayers: [service, runtime, network]
+
+  - id: MSR-UI-001
+    status: accepted
+    state: shared picker is rendered in desktop and mobile widths
+    event: open-picker, Ctrl+M, Ctrl+T
+    target: chat-draft or chat-existing-session
+    guard: shared UI presentation contract
+    effect: group/badge/keyboard/focus behavior is correct without changing authority
+    assertions:
+      - model IDs containing slash and colon remain opaque
+      - mobile does not force input focus
+      - dark/light and zh/en labels are stable
+    evidenceLayers: [ui, accessibility]
+
+  - id: MSR-UI-002
+    status: accepted
+    state: model has fixed, multiple, or no thought levels
+    event: open thought control and press Ctrl+T
+    target: chat-draft or chat-existing-session
+    guard: displayed options and semantic no-thinking mapping
+    effect: fixed controls do not cycle; multi-level controls wrap in display order
+    assertions:
+      - unsupported generic levels are not fabricated
+      - no-thinking has correct label/aria/value mapping
+    evidenceLayers: [ui, accessibility]
+
+  - id: MSR-UI-003
+    status: bug-candidate
+    state: current model is disabled or restricted
+    event: open picker
+    target: chat-existing-session
+    guard: current V4 lock/disable behavior
+    effect: verify whether current disabled model is visibly locked, hidden, or unavailable
+    assertions:
+      - do not finalize E2E expectation until shared picker and V4 toolbar contract agree
+    evidenceLayers: [ui, code-review]
+
+coverageLayers:
+  - id: provider-unit
+    scope: resolver, overlay, membership, complete validation, ordering, duplicate handling, revision
+    preferredDimensions: [provider-source, registry-state, provider-flags, model-flags]
+  - id: selection-unit
+    scope: ModelSelection encoding, grouping, Recent, defaults, thought options, workspaceKey
+    preferredDimensions:
+      [selection-source, reasoning-selection, reasoning-level, workspace-identity]
+  - id: runtime-unit
+    scope: ModelFactory, active model, context/output validation, session config and command outcomes
+    preferredDimensions: [model-capability, reasoning-profile, max-output, command-result]
+  - id: adapter-wire
+    scope: API format, request projection, auth, history normalization, retry, usage
+    preferredDimensions: [api-format, auth-profile, endpoint-state, history-shape, recovery-state]
+  - id: service-integration
+    scope: automation, Subagent, Off-Peak, official MCP, workspace identity
+    preferredDimensions: [surface, query-source, persistence-state, workspace-identity]
+  - id: desktop-e2e
+    scope: representative user-visible paths with case-local provider replay
+    delivery: desktop-continuous
+    preferredDimensions: [surface, operation, selection-source, model-capability, reasoning-profile]
+  - id: remote-replay-e2e
+    scope: shared-host attachment, snapshot/gap recovery, owner routing, model registry sync
+    delivery: web-remote-replayable
+    preferredDimensions: [delivery-kind, host-kind, workspace-identity, recovery-state]
+  - id: formal-state-space
+    scope: queue, compact, goal, fork/edit, model-bearing Submission and delivery boundaries
+    preferredDimensions: [session-phase, active-work, queue-state, operation, command-result]
+
+generationPolicy:
+  firstPass: pairwise
+  highRiskPass: 3-wise
+  fullCartesian: only within a declared cross-product, never across all dimensions
+  modelExpansion: by capability-and-wire signature, not literal model ID
+  statusGate:
+    - accepted only for executable formal/E2E cases
+    - undefined requires decision record before E2E assertion
+    - bug-candidate becomes regression after product contract is confirmed
+    - pruned requires a named guard or invariant
+  requiredCaseFields:
+    - id
+    - status
+    - state
+    - event
+    - target
+    - guard
+    - effect
+    - assertions
+    - evidenceLayers
+
+graphDrift:
+  - id: GRAPH-DRIFT-001
+    status: candidate
+    liveSurface: packages/ui/src/settings/OffPeakEditView.tsx
+    graphRelation: off-peak settings editor is not fully declared as a distinct UI surface
+    followUp: confirm whether it should become a stable surface node
+  - id: GRAPH-DRIFT-002
+    status: candidate
+    liveSurface: login, bot, official MCP, Git commit, title, goal verifier, project memory
+    graphRelation: model consumers are only partially represented in the model-selection surface graph
+    followUp: keep as downstream consumers or add stable surface nodes after product ownership review
+  - id: GRAPH-DRIFT-003
+    status: candidate
+    liveSurface: current provider Registry and V4 runtime
+    graphRelation: older graph/spec references to client-config magic_name/fallback/tombstone are stale
+    followUp: mark legacy-only and remove stale semantic edges after migration audit
+
+unresolvedQuestions:
+  - id: MSR-Q-001
+    question: queue item consumption should use which model/thought selection?
+    options:
+      - id: freeze-submission
+        recommendation: current state-space and input-intent implementation
+        includes: queue item persists complete model/thought intent; execution refreshes Provider facts only
+        prunes: latest-session-model behavior for already admitted items
+      - id: latest-session
+        includes: queue item reads Session model/thought at consumption
+        prunes: admission-time model freeze
+    blockingCases: [MSR-QUEUE-001]
+  - id: MSR-Q-002
+    question: should V4 disabled current models render as locked selectable-history entries, hidden entries, or unavailable placeholders?
+    options:
+      - id: locked-history
+        includes: current historical model remains visible but cannot be selected
+      - id: unavailable-placeholder
+        includes: current value can render, ordinary list excludes it
+      - id: hidden
+        includes: no visible current item after Registry rejects it
+    blockingCases: [MSR-UI-003]
+  - id: MSR-Q-003
+    question: is the context-window guard a required current V4 behavior or a future design target?
+    options:
+      - id: current-contract
+        includes: model switch must compact/stop/wait before commit
+      - id: future-target
+        includes: current regression records a known gap without failing existing E2E
+    blockingCases: [MSR-SESSION-006]

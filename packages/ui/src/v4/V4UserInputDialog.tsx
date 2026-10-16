@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input.js";
 import type { V4UserInputViewModel } from "@/v4/pendingInteractionAdapter.js";
 import { runUserAction } from "@/lib/userActionTelemetry.js";
 
-interface V4UserInputDialogProps {
+export interface V4UserInputDialogProps {
   model: V4UserInputViewModel;
   onSubmit: (answer: { optionId?: string; freeText?: string }) => void;
 }
@@ -22,11 +22,7 @@ export function V4UserInputDialog({ model, onSubmit }: V4UserInputDialogProps) {
   const handleOption = useCallback(
     (optionId: string) => {
       runUserAction({
-        input: {
-          featureId: "conversation.blocking.user_input",
-          action: "select_option",
-          trigger: "button",
-        },
+        input: { featureId: "conversation.blocking.user_input", action: "select_option", trigger: "button" },
         operation: () => onSubmit({ optionId }),
         completed: { resultSource: "optimistic_projection" },
         failureStage: "user_input_submit",

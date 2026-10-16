@@ -1,4 +1,4 @@
-interface ParsedAssistantDirective {
+export interface ParsedAssistantDirective {
   end: number;
   name: string;
   parameters: Readonly<Record<string, string>> | null;
@@ -8,13 +8,13 @@ interface ParsedAssistantDirective {
 
 export type AssistantTextRange = readonly [start: number, end: number];
 
-interface AssistantDirectiveSyntaxOptions {
+export interface AssistantDirectiveSyntaxOptions {
   allowSmartQuotes?: boolean;
   allowSingleColon?: boolean;
   allowTripleColon?: boolean;
 }
 
-interface AssistantDirectivePrefixOptions {
+export interface AssistantDirectivePrefixOptions {
   minimumSingleColonPrefixLength?: number;
   singleColonDirectiveNames?: readonly string[];
   tripleColonDirectiveNames?: readonly string[];
@@ -275,7 +275,9 @@ export function findUnclosedAssistantDirectiveStart(
   content: string,
   directiveName: string,
   protectedRanges: readonly AssistantTextRange[] = [],
-  options: AssistantDirectiveSyntaxOptions = {},
+  options: AssistantDirectiveSyntaxOptions & {
+    isParameterPrefix?: (source: string) => boolean;
+  } = {},
 ): number | null {
   const startPattern = createDirectiveStartPattern(directiveName, options);
   let unclosedStart: number | null = null;
@@ -304,6 +306,7 @@ export function findUnclosedAssistantDirectiveStart(
         }
       }
       const isParameterPrefix =
+        options.isParameterPrefix?.(parameterPrefix) === true ||
         parseDirectiveParameters(parameterPrefix, options) !== null ||
         quote !== null ||
         /(?:^|[\s,])[a-zA-Z_][a-zA-Z\d_-]*\s*(?:=\s*)?$/.test(parameterPrefix);

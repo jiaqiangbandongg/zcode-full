@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "access-token-401-auto-logout",
+  "spec": "./test/e2e/manual-review/pending/access-token-401-auto-logout.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "隔离的 BigModel 旧资料、不同值的业务 token/JWT 与独立 Bot 凭据；本地 HTTP fixture 控制 userinfo HTTP 401 或 HTTP 200 + 业务 401。"
+    }
+  ],
+  "requests": []
+}

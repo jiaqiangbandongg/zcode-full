@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-thought-level-session-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-thought-level-session-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "thought-level-session-isolation-title",
+      "description": "thought session 隔离 case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 thought session 隔离语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-thought-level-session-isolation-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Thought Session Isolation\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "thought-level-session-isolation-a-seed",
+      "description": "I55 Session A 使用共享模型和 high 思考深度的首轮固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言需要先用相同模型和 high 思考深度建立 completed Session A；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_SEED"],
+        "bodyIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-thought-level-session-isolation-a-seed",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "I55_A_SEED_DONE"
+        }
+      }
+    },
+    {
+      "id": "thought-level-session-isolation-b-seed",
+      "description": "I55 Session B 使用共享模型和 high 思考深度的首轮固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言需要先用相同模型和 high 思考深度建立 completed Session B；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_B_SEED"],
+        "bodyIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_B_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-thought-level-session-isolation-b-seed",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "I55_B_SEED_DONE"
+        }
+      }
+    },
+    {
+      "id": "thought-level-session-isolation-b-follow",
+      "description": "I55 Session A 切到 max 后，Session B 保持 high 的续发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 Session A 切为 max 后，Session B 的真实续发请求仍使用 high；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_B_FOLLOW"],
+        "bodyIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_B_FOLLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-thought-level-session-isolation-b-follow",
+          "inputTokens": 156,
+          "outputTokens": 12,
+          "text": "I55_B_FOLLOW_DONE"
+        }
+      }
+    },
+    {
+      "id": "thought-level-session-isolation-a-follow",
+      "description": "I55 切回 Session A 后保持 max 的续发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 A/B 切换后，Session A 的真实续发请求仍使用 max；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_FOLLOW"],
+        "bodyIncludes": ["E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_FOLLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-thought-level-session-isolation-a-follow",
+          "inputTokens": 156,
+          "outputTokens": 12,
+          "text": "I55_A_FOLLOW_DONE"
+        }
+      }
+    }
+  ]
+}

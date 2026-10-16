@@ -44,7 +44,7 @@ export function createTaskRealtimeBridgeForHostInit(
   });
 }
 
-function createTaskRealtimeBridge(params: {
+export function createTaskRealtimeBridge(params: {
   hostId: string;
   deliveryKind?: TaskRealtimeHostDeliveryKind;
   parentPort: ParentPortLike;

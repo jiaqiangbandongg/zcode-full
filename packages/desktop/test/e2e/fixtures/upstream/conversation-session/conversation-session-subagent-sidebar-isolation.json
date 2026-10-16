@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-sidebar-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-sidebar-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-sidebar-parent-agent",
+      "description": "subagent-sidebar-parent-agent",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_SUBAGENT_SIDEBAR_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_sidebar",
+          "name": "Agent",
+          "input": {
+            "description": "Sidebar isolation child",
+            "prompt": "E2E_SUBAGENT_SIDEBAR_CHILD: reply with exactly E2E_SUBAGENT_SIDEBAR_CHILD_DONE",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-sidebar-child",
+      "description": "subagent-sidebar-child",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_SUBAGENT_SIDEBAR_CHILD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "child",
+          "text": "E2E_SUBAGENT_SIDEBAR_CHILD_DONE",
+          "inputTokens": 64,
+          "outputTokens": 8
+        }
+      }
+    },
+    {
+      "id": "subagent-sidebar-parent-final",
+      "description": "subagent-sidebar-parent-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只固定模型回复；真实 Agent 派发、SQLite、冷恢复与 UI 路径执行生产代码。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_SIDEBAR_PARENT",
+          "E2E_SUBAGENT_SIDEBAR_CHILD_DONE",
+          "E2E_SUBAGENT_SIDEBAR_PARENT_DONE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "parent-final",
+          "text": "E2E_SUBAGENT_SIDEBAR_PARENT_DONE",
+          "inputTokens": 64,
+          "outputTokens": 8
+        }
+      }
+    }
+  ]
+}

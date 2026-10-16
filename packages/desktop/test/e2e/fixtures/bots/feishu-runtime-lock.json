@@ -1,0 +1,6 @@
+{
+  "caseId": "BOT-E2E-RT-01",
+  "classification": "synthetic",
+  "syntheticReason": "The case controls the process runtime-lock lifetime directly so ownership and takeover are deterministic without opening a real Feishu WebSocket.",
+  "timing": "controlled-process"
+}

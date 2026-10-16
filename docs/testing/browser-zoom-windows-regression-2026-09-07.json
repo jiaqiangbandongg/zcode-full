@@ -1,0 +1,383 @@
+{
+  "date": "2026-09-07",
+  "branch": "feat/fix-browser-zoom-coordinates-windows",
+  "baseCommit": "8a669c3b9279bf3bf55d2ae7adbe5239c7644b94",
+  "os": "Windows_NT 10.0.26200",
+  "case": "conversation-session-browser-zoom-coordinates",
+  "notes": [
+    "One Windows x64 machine; forced DPI values are Chromium simulations, not separate physical displays.",
+    "Case-local replay supplies model decisions only. Electron raster, CDP and trusted input are real.",
+    "Each case asserts screenshot release and actual preview scale restoration.",
+    "macOS not rerun for this patch; Linux outside this execution scope."
+  ],
+  "matrix": [
+    {
+      "dpi": "system 125%",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1536,
+            "height": 960
+          },
+          "scaleFactor": 1.25
+        }
+      ],
+      "artifact": "desktop-e2e-20260907-153516-455",
+      "status": "passed",
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000149011612,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "894ccdf1094ab16ecf87b3ca45789df7ce2ec4546832bb0408653455645afb84"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000149011612,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "e0200fe11a32b365b2f3f8a3395db7226ee0f857fc08f1e6d5ead5558e3a9c5d"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000149011612,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "894ccdf1094ab16ecf87b3ca45789df7ce2ec4546832bb0408653455645afb84"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000001102685943,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "6ff7a07621036168d8c2d04dbbb156d7a898d73c89c49794950e38aa09a685f3"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000149011612,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "d204eaae19a888391a982543dccc7ce52c4e89d691ca085debbf53f92e7da8eb"
+        }
+      ]
+    },
+    {
+      "dpi": "forced 100%",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1200
+          },
+          "scaleFactor": 1
+        }
+      ],
+      "artifact": "desktop-e2e-20260907-153630-178",
+      "status": "passed",
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "cb402a69ddffdb30e367803a595ece4125da10a5ebb0f07ca531b6ae5001e3e6"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "9fb541764cb7cff6728d2b397d2cf258b7064ddc643fbe731fad4620bba6295d"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "cb402a69ddffdb30e367803a595ece4125da10a5ebb0f07ca531b6ae5001e3e6"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "5cd131c7da477f5ebdf37ef9f9264e9b7231b14c867d9601b8f3fba0f8d6d250"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "4c07f3a09b02e397ad3b401ff88cd813f2476bb03368d961b9efcfcfd02b17e0"
+        }
+      ]
+    },
+    {
+      "dpi": "forced 150%",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 853,
+            "height": 533
+          },
+          "scaleFactor": 1.5
+        }
+      ],
+      "artifact": "desktop-e2e-20260907-153744-604",
+      "status": "passed",
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000298023224,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "19449fb2b4a43529abba3464d2d0c6de1cd2c14a469ef29ee85f3c63866d258c"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000298023224,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "7886f2905a3a08418ebeda38be31e332444db6e9c67fe78074ff1399cce88c01"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000298023224,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "19449fb2b4a43529abba3464d2d0c6de1cd2c14a469ef29ee85f3c63866d258c"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000298023224,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "77dff55bd60999b09d4b1f53b6a8254873ba6b9c31f9be4b0d2c5ff00b699337"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1.0000000298023224,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "371a1a43da8b5f21007b52ec8d648a60fc3d39811ff62598ce1d88c95bde9ae1"
+        }
+      ]
+    },
+    {
+      "dpi": "forced 200%",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 480,
+            "height": 300
+          },
+          "scaleFactor": 2
+        }
+      ],
+      "artifact": "desktop-e2e-20260907-153901-372",
+      "status": "passed",
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "52a7ec7160edf7d41fa939cf1ef58f67b1a8d4d7b3fb69852333cf77dac9ebd0"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "c0d411406fa3f3d0da5ec4eceb26213a7d627d28a6e20ef19697da7ddb9a4958"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "52a7ec7160edf7d41fa939cf1ef58f67b1a8d4d7b3fb69852333cf77dac9ebd0"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 0,
+          "maxPixelError": 0,
+          "pngSha256": "865443e78f6b07bcd22ddd79f0a7eed6c93d7b3d9bb982ef9f2d992986c4ba3f"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "guestId": 2,
+          "guestZoom": 1,
+          "viewport": [1280, 720],
+          "pageDpr": 1,
+          "pngSize": [1280, 720],
+          "trustedClicks": 3,
+          "maxClickError": 1,
+          "maxPixelError": 0,
+          "pngSha256": "30e8d83ffb41a6eac7de6381d1e0e7004ec106974a06019693d4ff149b1ee095"
+        }
+      ]
+    }
+  ]
+}

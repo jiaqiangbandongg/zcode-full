@@ -1,7 +1,7 @@
 /* off-peak 服务端五接口客户端。
    只负责 额度快照/取号/批量查状态/结算 四个 JSON 接口——messages 调模型不走这里
-   （由 idle plan per-turn provider 在 agent 进程内直连）。
-   无内建重试：排队/退避语义在调用方（offPeakTaskService 轮询 / 适配层）。 */
+   （由 idle plan per-turn provider 在 agent 进程内直连，D33）。
+   无内建重试：排队/退避语义在调用方（offPeakTaskService 轮询 / 适配层 D24）。 */
 import { z } from "zod";
 import type { OffPeakTakeNumberAvailability } from "@zcode/shared";
 import type { ServiceLogger } from "../logger/serviceLogger.js";
@@ -125,7 +125,7 @@ export class OffPeakServerError extends Error {
   }
 }
 
-interface OffPeakServerClientDeps {
+export interface OffPeakServerClientDeps {
   /** API origin（真实服务端或 mock 网关，ZCODE_OFFPEAK_MOCK 切换在装配层）；mock 网关懒启动故允许异步。 */
   resolveOrigin: () => string | Promise<string>;
   /** 凭证快照：四个 ticket 接口统一携带同一次 selected credential snapshot。 */

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-mode-capabilities",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-mode-capabilities.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plan-mode-capabilities.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-plan-mode-deny-enter-plan-call",
+      "description": "首轮请求返回 EnterPlanMode，进入 plan mode。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+    },
+    {
+      "id": "upstream-plan-mode-deny-exit-plan-call",
+      "description": "plan mode 内返回 ExitPlanMode，触发审批弹窗。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发 ExitPlanMode 审批弹窗，避免模型输出文本而跳过工具。"
+    },
+    {
+      "id": "upstream-plan-mode-deny-follow-up-final",
+      "description": "无反馈拒绝后，下一条普通用户输入仍处于 plan mode。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心合同是拒绝后 provider 不继续当前 turn，但后续真实用户输入仍带 plan mode reminder。"
+    },
+    {
+      "id": "upstream-plan-mode-boundary-enter-plan-call",
+      "description": "工具边界 case 首轮请求进入 plan mode。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+    },
+    {
+      "id": "upstream-plan-mode-boundary-mixed-tools-call",
+      "description": "同一 assistant message 返回 Write 和 Read 两个 tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 plan mode 写工具拒绝不会阻断同条回复里的后续只读工具执行。"
+    },
+    {
+      "id": "upstream-plan-mode-boundary-final",
+      "description": "工具结果回到 provider-visible 请求后返回固定文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心合同是 provider 请求同时包含写拒绝和只读工具真实结果，回复文本只需稳定收口。"
+    }
+  ]
+}

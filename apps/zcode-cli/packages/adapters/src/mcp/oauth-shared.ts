@@ -2,11 +2,11 @@ import type { OAuthDiscoveryState } from "@modelcontextprotocol/client";
 import type { SharedZCodeCredentialStore } from "../auth/shared-credentials.js";
 import { isRecord, mcpOAuthCredentialKey } from "./oauth-credentials.js";
 
-const MCP_OAUTH_DISCOVERY_STATE_KEY = "discovery_state";
-const MCP_OAUTH_DISCOVERY_FETCHED_AT_KEY = "discovery_state_fetched_at";
+export const MCP_OAUTH_DISCOVERY_STATE_KEY = "discovery_state";
+export const MCP_OAUTH_DISCOVERY_FETCHED_AT_KEY = "discovery_state_fetched_at";
 
 /** discovery metadata 缓存寿命。过期后重新发现，避免长期使用换过端点的旧 AS metadata。 */
-const MCP_OAUTH_DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
+export const MCP_OAUTH_DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface McpOAuthAuthorizationContext {
   authorizationUrl: string;

@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-AQ-01",
+  "classification": "synthetic",
+  "syntheticReason": "The case injects a deterministic elicitation_request and controlled Feishu card callbacks because model replay cannot control interactive card callback timing.",
+  "promptMarker": "E2E_BOT_ASK_USER_QUESTION",
+  "timing": "controlled-stream"
+}

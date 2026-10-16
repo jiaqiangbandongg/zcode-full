@@ -1,0 +1,11 @@
+node source
+node fan-out#1 "fan-out" @14:1 type="Promise<void>[]"
+node ask#1 "ask" @15:25 actors=actor#1 within=fan-out#1 type="string"
+node ask#2 "b" @19:25 actors=actor#2 type="string"
+node sink
+actor actor#1 @15:9 within=fan-out#1
+actor actor#2 "b" @19:14
+edge source -> fan-out#1 data exact
+edge source -> ask#2 data exact
+edge fan-out#1 -> ask#1 data exact type="Promise<void>[]"
+edge ask#2 -> sink data exact type="string"

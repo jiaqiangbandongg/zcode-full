@@ -1,6 +1,6 @@
 import type { RuntimeTaskSnapshot, RuntimeTaskType } from "./registry.js";
 
-function runtimeTaskTypeOf(
+export function runtimeTaskTypeOf(
   task: Pick<RuntimeTaskSnapshot, "taskType" | "type"> | undefined,
 ): RuntimeTaskType | undefined {
   return task?.taskType ?? task?.type;

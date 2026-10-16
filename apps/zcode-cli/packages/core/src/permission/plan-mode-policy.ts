@@ -11,7 +11,7 @@ interface PlanModeTransitionContext {
   prePlanMode?: Exclude<CollaborationMode, "plan">;
 }
 
-interface PlanModeTransitionPermission {
+export interface PlanModeTransitionPermission {
   behavior: "allow" | "deny";
   reason: string;
   ruleId: string;

@@ -1,0 +1,17 @@
+lane actor#1 "scanner" @14:24
+lane actor#2 "planner" @17:17
+lane actor#3 "reviewer" @18:18
+lane actor#4 "judge" @29:32 families=fanout#1
+region seq#1 seq
+region loop#1 loop parent=seq#1 @21:1 bound=5
+region fanout#1 fanout parent=seq#1 @29:3 label="map"
+step ask#1 ask "scanner" @14:41 lane=actor#1 region=seq#1 always
+step ask#2 ask "planner" @22:30 lane=actor#2 region=loop#1 always serial
+step ask#3 ask "reviewer" @23:33 lane=actor#3 region=loop#1 always serial
+step ask#4 ask "judge" @29:47 lane=actor#4 region=fanout#1 maybe stack
+edge ask#1 -> ask#2 seq always
+edge ask#1 -> ask#4 data maybe exact
+edge ask#2 -> ask#3 data always exact
+edge ask#3 -> ask#2 carry always
+edge ask#3 -> ask#4 seq maybe
+sink ask#2,ask#4

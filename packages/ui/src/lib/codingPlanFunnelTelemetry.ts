@@ -38,14 +38,14 @@ export interface CodingPlanFunnelContext {
   channel: string;
 }
 
-interface CodingPlanEntryPlanState {
+export interface CodingPlanEntryPlanState {
   entryPlanStatus: CodingPlanEntryPlanStatus;
   entryPlanLevel: string;
 }
 
 type TelemetryPlatform = Pick<IPlatformService, "reportTelemetryEvent">;
 
-function createPurchaseFunnelId(): string {
+export function createPurchaseFunnelId(): string {
   return globalThis.crypto?.randomUUID?.() ?? createFallbackFunnelId();
 }
 
@@ -185,7 +185,7 @@ export function reportCodingPlanUpgradeClick(
   );
 }
 
-function buildFunnelBaseDetail(context: CodingPlanFunnelContext): Record<string, string> {
+export function buildFunnelBaseDetail(context: CodingPlanFunnelContext): Record<string, string> {
   return stringifyDetail({
     purchase_funnel_id: context.purchaseFunnelId,
     upgrade_source: context.upgradeSource,
@@ -198,7 +198,7 @@ function buildFunnelBaseDetail(context: CodingPlanFunnelContext): Record<string,
   });
 }
 
-function resolveCodingPlanProviderFamily(providerId: string): CodingPlanProviderFamily {
+export function resolveCodingPlanProviderFamily(providerId: string): CodingPlanProviderFamily {
   if (
     providerId === BIGMODEL_PROVIDER_ID ||
     providerId === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan ||
@@ -213,11 +213,11 @@ function resolveCodingPlanProviderFamily(providerId: string): CodingPlanProvider
   return "unknown";
 }
 
-function resolveCodingPlanChannel(providerFamily: CodingPlanProviderFamily): string {
+export function resolveCodingPlanChannel(providerFamily: CodingPlanProviderFamily): string {
   return { bigmodel: "MaaS", zai: "Z_AI", unknown: "" }[providerFamily];
 }
 
-function stringifyDetail(detail: Record<string, unknown>): Record<string, string> {
+export function stringifyDetail(detail: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(detail).map(([key, value]) => [
       key,

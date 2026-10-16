@@ -13,8 +13,11 @@ import {
   collectSites,
   isFacadeDeclared,
   resolveSymbol,
+  type HoleSite,
   type SiteTable,
 } from "../analysis/sites.js";
+import { collectHoleDiagnostics } from "../analysis/hole-sites.js";
+import { lowerHoleCall, printHoleBodies, TRANSPILE_OPTIONS } from "./lower-hole.js";
 
 /**
  * Lowering（instrumentation emit step）：把已 typecheck + analyze 干净的 workflow 脚本降级为沙箱可跑的
@@ -37,6 +40,11 @@ import {
  *        artifact.chart(id, spec)    -> __host.declareArtifact("artifact#2", "chart", [id, spec])
  *        log(msg)                    -> __host.log(msg)
  *        phase("gate")               -> __host.enterPhase("gate")（无站点；引擎只发一条事件）
+ *        model("GLM-5.3-Flash")      -> "GLM-5.3-Flash"（无站点、无 host 调用：ModelRef 运行期即名字）
+ *        channel<T>("facts")         -> __host.channel("facts")（无站点；队列在 cell 内构造）
+ *        future(async () => {...})   -> __host.future(async () => {...})（无站点；cell 立即调用）
+ *        hole<T>(n, p?, body?)       -> __host.hole("hole#1", n, p ?? void 0, (__src) => eval(__src), body?)
+ *                                       （lower-hole.ts；已补全的函数体另以文本形式进 holeBodies）
  *      Join（Promise.all）与 fan-out 是沙箱内的普通 promise 机制，不是 host 调用，原样保留。
  *
  * ————————————————————————————————————————————————————————————————
@@ -62,12 +70,24 @@ import {
 /** harness 必须为 lowered code 绑定的自由标识符（Boundary A 的 host 句柄）。 */
 export const HOST_BINDING = "__host";
 
+/**
+ * 无站点、按名字原样透传到 `__host.<name>(...)` 的顶层 facade 函数：`log`（进度叙事）、
+ * `channel` / `future`（沙箱内的流水线原语，docs/dynamic-workflow/authoring.md「Streams」）。
+ * 它们都没有 journal 键，所以不进站点表；身份仍按 checker 解析到 facade 声明判定。
+ */
+const HOST_PASSTHROUGH_FUNCTIONS: ReadonlySet<string> = new Set(["log", "channel", "future"]);
+
 /** lowering 的产物：sandbox 输入的 JS 体 + 打桩到的 site id 清单。 */
 export interface LoweredWorkflow {
   /** lowered 脚本的 async 函数体（顶层 await / 末尾 return 合法；自由标识符仅 `__host`）。 */
   code: string;
-  /** 被打桩的 facade site id，按源码顺序（不含 log，它无 site id）。 */
+  /** 被打桩的 facade site id，按源码顺序（不含 log，它无 site id；留白与其函数体内的站点在内）。 */
   siteIds: string[];
+  /**
+   * 每个**已补全**留白的函数体文本 `(async () => {\n…\n})`，按站点 id：与主体同一趟 transform
+   * 打印、同一套参数擦除（execution-engine.md「The text that runs」）。开放的留白不在其中。
+   */
+  holeBodies: Record<string, string>;
 }
 
 /** {@link lowerWorkflowScript} 的结果：与 analyze 同构——脏脚本不降级，`lowered` 仅在 `ok` 时给出。 */
@@ -82,6 +102,8 @@ type SiteEmit =
   | { kind: "actor"; siteId: string }
   | { kind: "artifact"; siteId: string; op: ArtifactOp }
   | { kind: "ask"; siteId: string }
+  /** 留白：改写要读名字 / 提示 / 函数体三个实参，所以带整个站点（lower-hole.ts）。 */
+  | { kind: "hole"; site: HoleSite }
   /** 阶段标记：无 site id，只带去了两端空白的名字（名字缺席的标记退回 `void 0`）。 */
   | { kind: "phase"; name: string | undefined }
   | { kind: "report"; siteId: string }
@@ -97,7 +119,12 @@ export function lowerWorkflowScript(scriptText: string): LowerResult {
   if (diagnostics.length > 0) return { diagnostics, ok: false };
 
   const table = collectSites(workflow);
-  const misuse = collectFacadeMisuse(workflow, table);
+  // 留白规则（9012）与 facade-siting 同席：一个没等值、或落在 fan-out 里的留白降级出去就是
+  // 运行期的错，与 analyzeWorkflowScript 同一道门。
+  const misuse = [
+    ...collectFacadeMisuse(workflow, table),
+    ...collectHoleDiagnostics(workflow, table),
+  ];
   if (misuse.length > 0) return { diagnostics: misuse, ok: false };
 
   return { diagnostics, lowered: lowerWorkflow(workflow, table), ok: true };
@@ -112,6 +139,8 @@ export function lowerWorkflowScript(scriptText: string): LowerResult {
 export function lowerWorkflow(workflow: WorkflowProgram, table: SiteTable): LoweredWorkflow {
   const checker = workflow.program.getTypeChecker();
   const siteMap = buildSiteMap(table);
+  // 已补全留白的函数体（改写后的节点），transform 结束后打印成 holeBodies。
+  const holeBodyNodes = new Map<string, ts.Expression>();
 
   // 第一趟：instrumentation。在同一份 scriptFile（站点表引用的正是它的节点）上做 transform，
   // 从而能按节点身份命中站点表；此时类型尚未擦除。
@@ -134,11 +163,21 @@ export function lowerWorkflow(workflow: WorkflowProgram, table: SiteTable): Lowe
       if (ts.isCallExpression(node)) {
         const emit = siteMap.get(node);
         if (emit !== undefined) return lowerSited(node, emit);
-        // 非站点的 facade 调用只可能是 log（agent/ask/glob/read 必定成站点、已在 siteMap）。
+        // 非站点的 facade 调用：log、channel、future（agent/ask/glob/read 必定成站点、已在 siteMap）。
+        // 三者同规：按 checker 解析到 facade 声明的名字识别，改写成同名的 `__host.*`，丢弃类型
+        // 实参（`channel<Fact>(...)`），实参原样递进。channel / future 是沙箱内的纯 promise 机制
+        // （docs/dynamic-workflow/authoring.md「Streams」），不过线、无 journal 行，所以不需要站点 id。
         const name = facadeCalleeName(node, checker);
-        if (name === "log") {
+        // model("x") -> "x"：`ModelRef` 只活在类型系统里，运行期它就是名字字符串本身
+        // （docs/dynamic-workflow/authoring.md「Choosing a model per subagent」），宿主按这个
+        // 字符串查 launch 时解析好的绑定表。无站点、不过 host；实参缺席（9010 先挡）退回 `void 0`。
+        if (name === "model") {
+          const arg = node.arguments[0];
+          return arg === undefined ? factory.createVoidZero() : visitExpr(arg);
+        }
+        if (name !== undefined && HOST_PASSTHROUGH_FUNCTIONS.has(name)) {
           return factory.createCallExpression(
-            hostMember("log"),
+            hostMember(name),
             undefined,
             node.arguments.map(visitExpr),
           );
@@ -161,6 +200,17 @@ export function lowerWorkflow(workflow: WorkflowProgram, table: SiteTable): Lowe
         return factory.createCallExpression(hostMember("enterPhase"), undefined, [
           factory.createStringLiteral(name),
         ]);
+      }
+      if (emit.kind === "hole") {
+        return lowerHoleCall(
+          call,
+          emit.site,
+          factory,
+          hostMember,
+          siteArg,
+          visitExpr,
+          holeBodyNodes,
+        );
       }
       if (emit.kind === "actor") {
         // agent(name?, persona?) -> __host.createActor(siteId, name?, persona?)
@@ -258,21 +308,16 @@ export function lowerWorkflow(workflow: WorkflowProgram, table: SiteTable): Lowe
   const instrumented = workflowBody(transformed)
     .map((statement) => printer.printNode(ts.EmitHint.Unspecified, statement, transformed))
     .join("\n");
+  const holeBodies = printHoleBodies(holeBodyNodes, printer, transformed);
   result.dispose();
 
   // 第二趟：类型擦除。此时打桩已完成、不再需要节点身份，故对文本做 transpile-级擦除即可。
   const code = ts.transpileModule(instrumented, {
-    compilerOptions: {
-      isolatedModules: false,
-      module: ts.ModuleKind.ESNext,
-      newLine: ts.NewLineKind.LineFeed,
-      removeComments: false,
-      target: ts.ScriptTarget.ES2022,
-    },
+    compilerOptions: TRANSPILE_OPTIONS,
     reportDiagnostics: false,
   }).outputText;
 
-  return { code, siteIds: sourceOrderSiteIds(table) };
+  return { code, holeBodies, siteIds: sourceOrderSiteIds(table) };
 }
 
 /**
@@ -287,6 +332,7 @@ function buildSiteMap(table: SiteTable): Map<ts.CallExpression, SiteEmit> {
     map.set(site.call, { kind: "artifact", op: site.op, siteId: site.id });
   }
   for (const site of table.asks) map.set(site.call, { kind: "ask", siteId: site.id });
+  for (const site of table.holes) map.set(site.call, { kind: "hole", site });
   for (const marker of table.phases) map.set(marker.call, { kind: "phase", name: marker.name });
   for (const site of table.reports) map.set(site.call, { kind: "report", siteId: site.id });
   for (const site of table.worldReads) {
@@ -301,6 +347,7 @@ function sourceOrderSiteIds(table: SiteTable): string[] {
     ...table.actors,
     ...table.artifacts,
     ...table.asks,
+    ...table.holes,
     ...table.reports,
     ...table.worldReads,
   ];

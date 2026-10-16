@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-create",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-create.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-offpeak-create-title",
+      "description": "闲时任务会话内创建 case 的标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于闲时任务产品语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_OFFPEAK_CHAT_CREATE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-offpeak-create-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"OffPeak Chat Create E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":20,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-offpeak-create-tool",
+      "description": "首段响应：返回 OffPeakCreate tool_use，只给 title/prompt，让 permissionMode/model/thoughtLevel 走 D49-4 缺省（yolo / 白名单末位 / 最高档）。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 OffPeakCreate；本响应固定触发工具，专门验证会话内创建→轮尾卡→按 offPeakTaskId 直达闲时编辑表单。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OFFPEAK_CHAT_CREATE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_OFFPEAK_DIGEST"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_offpeak_create",
+          "messageId": "msg_e2e_offpeak_create",
+          "name": "OffPeakCreate",
+          "input": {
+            "title": "E2E_OFFPEAK_DIGEST",
+            "prompt": "Summarize today's changed files in this workspace and write a short digest to DIGEST.md."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-offpeak-create-final",
+      "description": "收尾响应：OffPeakCreate tool_result 进入历史后返回简短确认文本，稳定完成 case。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "OffPeakCreate tool_result 进入历史后结束 case，真实 provider 回复内容不影响产品语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OFFPEAK_CHAT_CREATE", "E2E_OFFPEAK_DIGEST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-offpeak-create-final",
+          "inputTokens": 200,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

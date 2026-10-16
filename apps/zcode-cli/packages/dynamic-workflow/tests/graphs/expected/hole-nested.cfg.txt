@@ -1,0 +1,24 @@
+phase unphased
+phase hole#21b40fca "决定分组"
+phase hole#7c7fc07b "决定顺序" fill=hole#21b40fca
+hole hole#7c7fc07b "决定顺序" type="Order" phase=hole#21b40fca
+node ask#1@1 issue site=ask#1 phase=unphased
+node hole#21b40fca@1 mark phase=hole#21b40fca
+node hole#21b40fca/ask#1@1 issue site=hole#21b40fca/ask#1 phase=hole#21b40fca
+node hole#7c7fc07b@1 issue site=hole#7c7fc07b phase=hole#21b40fca
+node hole#7c7fc07b@2 mark phase=hole#7c7fc07b
+node ask#2@1 issue site=ask#2 phase=unphased
+edge entry -> ask#1@1 next
+edge ask#1@1 -> hole#21b40fca@1 next
+edge hole#21b40fca@1 -> hole#21b40fca/ask#1@1 fork
+edge hole#21b40fca@1 -> ask#2@1 next
+edge hole#21b40fca/ask#1@1 -> hole#7c7fc07b@1 next
+edge hole#7c7fc07b@1 -> hole#7c7fc07b@2 next
+edge hole#7c7fc07b@2 -> ask#2@1 join via=return
+edge ask#2@1 -> sink jump via=return
+phase-edge entry -> unphased next
+phase-edge unphased -> hole#21b40fca next
+phase-edge unphased -> sink jump via=return
+phase-edge hole#21b40fca -> unphased next
+phase-edge hole#21b40fca -> hole#7c7fc07b next
+phase-edge hole#7c7fc07b -> unphased join via=return

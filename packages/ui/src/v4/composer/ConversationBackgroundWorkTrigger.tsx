@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
-interface ComposerBackgroundWorkCounts {
+export interface ComposerBackgroundWorkCounts {
   bashCount: number;
   workflowCount: number;
   subagentCount: number;
   totalCount: number;
 }
 
-function getComposerBackgroundWorkCounts(
+export function getComposerBackgroundWorkCounts(
   backgroundWorks: readonly BackgroundWorkSummary[],
   runningSubagentCount = 0,
 ): ComposerBackgroundWorkCounts {
@@ -38,7 +38,7 @@ function getComposerBackgroundWorkCounts(
   };
 }
 
-interface ConversationBackgroundWorkTriggerProps {
+export interface ConversationBackgroundWorkTriggerProps {
   backgroundWorks: readonly BackgroundWorkSummary[];
   runningSubagentCount?: number;
   onOpen?: () => void;
@@ -58,7 +58,8 @@ function ConversationBackgroundWorkTriggerImpl({
 }: ConversationBackgroundWorkTriggerProps) {
   const { intl } = useZCodeIntl();
   const counts = useMemo(
-    () => getComposerBackgroundWorkCounts(backgroundWorks, runningSubagentCount),
+    () =>
+      getComposerBackgroundWorkCounts(backgroundWorks, runningSubagentCount),
     [backgroundWorks, runningSubagentCount],
   );
 
@@ -145,4 +146,6 @@ function ConversationBackgroundWorkTriggerImpl({
   );
 }
 
-export const ConversationBackgroundWorkTrigger = memo(ConversationBackgroundWorkTriggerImpl);
+export const ConversationBackgroundWorkTrigger = memo(
+  ConversationBackgroundWorkTriggerImpl,
+);

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-chat-loading-live-tail",
+  "spec": "./test/e2e/conversation-session/conversation-session-chat-loading-live-tail.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-chat-loading-live-tail.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-chat-loading-live-tail-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "CHL05/CHL07/CHL08/P08 需要稳定制造可折叠 assistant history、长正文、持续 loading，以及 following、用户上滚和手动折叠的滚动权竞争。"
+    }
+  ]
+}

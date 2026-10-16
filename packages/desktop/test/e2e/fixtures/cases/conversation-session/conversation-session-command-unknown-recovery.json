@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-command-unknown-recovery",
+  "spec": "./test/e2e/conversation-session/conversation-session-command-unknown-recovery.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-command-unknown-recovery.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "command-unknown-recovery-title",
+      "description": "PV4-25U 前置 session 的 case-local 标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定创建一个可在 renderer reload 后恢复的普通 session；标题不是断言目标。"
+    },
+    {
+      "id": "command-unknown-recovery-turn",
+      "description": "PV4-25U 建立已完成 session，随后用真实 commands/query 对账未知 commandId。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 renderer reload 后 unknown 静默清账；provider 只负责稳定创建前置 session。"
+    }
+  ]
+}

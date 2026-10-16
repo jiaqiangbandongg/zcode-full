@@ -38,7 +38,7 @@ export function ConversationWorkflowDigests({
         const { runId, summary } = digest;
         const name = digest.name ?? fallbackName;
         const sessionId = context.sessionId;
-        // 就地生效的设置轮：那一行就是
+        // 就地生效的设置轮（docs/dynamic-workflow/presentation.md「The settings turn」）：那一行就是
         // 全部呈现。提前返回，下面整套卡的接线（打开、Resume、Stop、药丸、「配置」）一条都不建——
         // 那些都是卡上的控件，而这一轮没有卡。
         if (digest.rowOnly && digest.settings !== undefined) {
@@ -149,6 +149,7 @@ export function ConversationWorkflowDigests({
         const card = (
           <WorkflowRunDigest
             graph={digest.graph}
+            {...(digest.holeLabels === undefined ? {} : { holeLabels: digest.holeLabels })}
             key={digest.key}
             name={name}
             pendingQuestions={pendingQuestions}

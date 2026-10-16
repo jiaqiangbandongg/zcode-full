@@ -1,6 +1,6 @@
 # Worked dynamic-workflow examples
 
-Five complete scripts, end to end. Each is a whole arc — world read, topology, loop or
+Seven complete scripts, end to end. Each is a whole arc — world read, topology, loop or
 fan-out, salvage, artifacts, return shape — so read one when you want to see how the pieces
 sit together rather than looking up a single shape (`patterns.md` is for that).
 
@@ -258,6 +258,7 @@ if (scan.findings.length === 0) {
 // candidate is confirmed the moment its judge rules, not after every judge has. What the
 // confirmer cannot reproduce is kept and labelled, not dropped.
 phase("Judge each candidate and confirm the real ones as they are judged");
+// One join: the planner below needs every real finding before it can plan.
 const outcomes = await Promise.all(
   scan.findings.map(async (finding): Promise<ReportedFinding | undefined> => {
     const judgement = await agent(`judge-${finding.testId}`).ask<Judgement>(
@@ -428,6 +429,7 @@ const MIGRATOR = {
 // One migrator per file: the edits are disjoint, so they can run at once, and a fresh
 // context per file keeps one file's oddities from leaking into another's rewrite.
 phase("Migrate each file and verify the result");
+// One join: the whole-tree suite below needs every file migrated first.
 const results = await Promise.all(
   paths.map(async (path) => {
     try {
@@ -799,3 +801,310 @@ reviewer, and they start the moment their file's triage is done: with twelve fil
 slow reviewer, eleven files' findings are confirmed and reported while it is still reading.
 Nothing gets a second reader on top: each finding was confirmed, and the editor's job is
 merging and writing up, not re-checking.
+
+## 6. Fact-finding pipeline with a fresh verifier per fact
+
+Research a topic from five angles at once, check every fact as it arrives with a verifier
+that did not do the research, then write the report from the facts that held. The hand-off
+from research to verification is a channel, so the first verifier starts while four
+researchers are still reading; the writer sits after the one join, because it needs every
+verified fact.
+
+<!-- compile -->
+```ts
+interface Fact {
+  /** Stable id built from the angle and a sequence number: "tests-3". */
+  id: string;
+  /** One sentence that can be checked against the repository. */
+  claim: string;
+  /** Where the researcher saw it: a path with a line, or a command and its output. */
+  source: string;
+  /** The research angle it came from. */
+  angle: string;
+}
+interface Research {
+  facts: { claim: string; source: string }[];
+}
+interface Verdict {
+  /** True only when you confirmed the claim yourself from the source given. */
+  holds: boolean;
+  /** What you did to check, one sentence. */
+  note: string;
+}
+interface Finding {
+  /** Where the fact lives: the source the verifier confirmed. */
+  where: string;
+  /** The fact, one sentence. */
+  what: string;
+  /** How the verifier confirmed it. */
+  evidence: string;
+  /** Every finding here was confirmed by a verifier that did not do the research. */
+  status: "verified";
+}
+interface Draft {
+  /** The report in markdown, for the user. */
+  markdown: string;
+  /** Two or three sentences a reader can act on. */
+  summary: string;
+}
+interface WorkflowReport {
+  /** Two or three sentences answering what the user asked for. */
+  conclusion: string;
+  findings: Finding[];
+  /** What the run checked and how. */
+  verified: string[];
+  /** What the run did not look at or could not check, and why. */
+  notCovered: string[];
+}
+
+const topic = String(args.topic ?? "this repository");
+const angles = ["architecture", "data flow", "error handling", "tests", "history"];
+
+// The hand-off between research and verification: a researcher that is still reading keeps
+// sending while verifiers already work on what has landed. The research stage owns the close.
+const facts = channel<Fact>("facts");
+const passed: Finding[] = [];
+const rejected: string[] = [];
+
+const research = future(async () => {
+  phase("Research the topic from five angles");
+  try {
+    await Promise.all(
+      angles.map(async (angle) => {
+        const found = await agent(
+          `researcher-${angle}`,
+          "You research a codebase and state only what you saw, each fact with the place you saw it.",
+        ).ask<Research>(
+          `Research ${topic} from the angle of ${angle}. Return up to eight facts, each with its source.`,
+        );
+        found.facts.forEach((fact, index) => facts.send({ ...fact, id: `${angle}-${index + 1}`, angle }));
+        log(`${angle}: ${found.facts.length} facts found`);
+      }),
+    );
+  } finally {
+    facts.close(); // a failed researcher still ends the stream for the verifiers
+  }
+});
+
+const verify = future(async () => {
+  phase("Check each fact as it arrives");
+  // A fresh verifier per fact, named after it: cache identity stays per fact on a revised
+  // run, and the name says which fact each card is about.
+  const checks: Promise<void>[] = [];
+  for await (const fact of facts) {
+    checks.push(
+      future(async () => {
+        const verdict = await agent(
+          `verifier-${fact.id}`,
+          "You check one claim about a codebase against its source. Do not edit any file.",
+        ).ask<Verdict>(`Does this hold? Read the source yourself.\n${JSON.stringify(fact)}`);
+        if (verdict.holds) {
+          const finding: Finding = { where: fact.source, what: fact.claim, evidence: verdict.note, status: "verified" };
+          passed.push(finding);
+          report(finding); // published now, so it survives a later failure
+        } else {
+          rejected.push(`${fact.claim} (${verdict.note})`);
+        }
+      }),
+    );
+  }
+  // The join is what tells this stage it is done: without it the stage ends when the channel
+  // closes, with checks still running and half the results missing.
+  await Promise.all(checks);
+});
+
+// Start both, then join once. No await in between: while the script awaits one stage, a
+// failure in the other has no listener and surfaces as an unhandled rejection instead of
+// failing the run with its error.
+await Promise.all([research, verify]);
+log(`${passed.length} facts verified, ${rejected.length} did not hold`);
+
+phase("Write the report from the verified facts");
+const draft = await agent(
+  "writer",
+  "You write short technical reports for engineers from verified facts only.",
+).ask<Draft>(`Write a report on ${topic} from these verified facts:\n${JSON.stringify(passed)}`);
+await artifact.markdown("report", draft.markdown, { title: `What we know about ${topic}` });
+
+const result: WorkflowReport = {
+  conclusion: draft.summary,
+  findings: passed,
+  verified: [`${passed.length} facts each re-checked against their source by a separate subagent`],
+  notCovered: rejected.length > 0 ? rejected.map((claim) => `did not hold on re-check: ${claim}`) : [],
+};
+return result;
+```
+
+Two stages as futures, one channel, one join. Each future opens with its own phase marker,
+and stamping is lexical, so the two stages that run at the same time keep their own steps on
+the timeline. The research stage owns `facts.close()` in a `finally`: a researcher that fails
+still ends the stream, so the verifiers finish instead of parking on a channel nobody will
+send to. The verifiers are fresh and named per fact rather than pooled, because the facts are
+independent and a revised run should miss the cache for one changed fact, not for the whole
+pool. The `checks` array is the part people forget: the verify stage is done when its
+verifiers are, not when the channel closes, and the deadlock detector cannot catch a stage that
+returns early with work still in flight.
+
+---
+
+## 7. Repository guide grown step by step through tail holes
+
+The task — "write a guide to this repository" — has no workflow until the repository has
+been looked at. So the script does the one thing it can plan, the survey, and ends in a tail
+hole. Two fills later the run has six chapter writers, an independent reader, a reviser and a
+published guide, none of which the seed script named. (`SKILL.md` §15.)
+
+The seed script, submitted with `CreateWorkflow`:
+
+<!-- compile -->
+```ts
+interface Dir {
+  /** Workspace-relative path of a top-level entry. */
+  path: string;
+  /** One sentence: what it is for. */
+  purpose: string;
+}
+interface Survey {
+  dirs: Dir[];
+}
+interface Chapter {
+  title: string;
+  /** Paths the chapter actually covers. */
+  covers: string[];
+  /** Body, Markdown, for a first-time reader. */
+  body: string;
+}
+interface Guide {
+  title: string;
+  chapters: Chapter[];
+  notCovered: string[];
+}
+
+phase("盘点仓库顶层目录");
+const surveyor = agent("勘察员", "你快速摸清一个仓库的结构：实际查看目录和关键文件，如实汇报。");
+const survey = await surveyor.ask<Survey>("列出顶层目录（跳过 .venv、.zcode 等产物），各用一句话说明作用。");
+log(`盘点完成：${survey.dirs.length} 个条目`);
+
+return await hole<Guide>(
+  "第1步：决定导览结构",
+  `盘点：\n${survey.dirs.map((d) => `- ${d.path}：${d.purpose}`).join("\n")}`,
+);
+```
+
+The run reaches the hole and the notification carries the survey in the prompt. The first
+fill (the statements only, sent as `script`) decides the chapters, fans out a writer per
+directory and leaves the next hole:
+
+```ts
+phase("分章并行撰写初稿");
+// The critic in the next step reads every chapter at once, so this join waits for all.
+const drafts = await Promise.all(
+  survey.dirs.map((d) =>
+    agent(`写手·${d.path}`, "你只写自己打开核实过的内容。").ask<Chapter>(
+      `写《仓库导览》的「${d.path}」一章（200–400 字 Markdown）：${d.purpose}。covers 如实填写。`,
+    ),
+  ),
+);
+log(`${drafts.length} 章初稿完成`);
+return await hole<Guide>(
+  "第2步：审读与交付",
+  `${drafts.length} 章初稿已就绪：${drafts.map((d) => d.title).join("、")}`,
+);
+```
+
+The second fill reads `drafts` from the enclosing scope, adds an independent read and a
+revision, publishes the guide and returns it, which closes the chain:
+
+```ts
+phase("独立审读初稿");
+const critique = await agent("审读员", "你只依据文本挑毛病，不读仓库，不夸奖。").ask<string>(
+  `逐章挑毛病：\n${drafts.map((d) => `## ${d.title}\n${d.body}`).join("\n\n")}`,
+);
+phase("按审读意见修订并交付");
+const chapters = await agent("修订编辑").ask<Chapter[]>(
+  `按意见修订，保持章序：${critique}\n\n${JSON.stringify(drafts)}`,
+);
+const guide: Guide = { title: "仓库导览", chapters, notCovered: [".venv、.zcode 等产物目录未纳入"] };
+await artifact.markdown("guide", chapters.map((c) => `## ${c.title}\n\n${c.body}`).join("\n\n"), {
+  title: guide.title,
+  description: "按目录分章的仓库导览。",
+  primary: true,
+});
+return guide;
+```
+
+After both fills the run's draft holds the effective script — the seed with each body spliced
+in as the last argument of its hole — which is what a resume replays and an amend revises:
+
+<!-- compile -->
+```ts
+interface Dir {
+  /** Workspace-relative path of a top-level entry. */
+  path: string;
+  /** One sentence: what it is for. */
+  purpose: string;
+}
+interface Survey {
+  dirs: Dir[];
+}
+interface Chapter {
+  title: string;
+  /** Paths the chapter actually covers. */
+  covers: string[];
+  /** Body, Markdown, for a first-time reader. */
+  body: string;
+}
+interface Guide {
+  title: string;
+  chapters: Chapter[];
+  notCovered: string[];
+}
+
+phase("盘点仓库顶层目录");
+const surveyor = agent("勘察员", "你快速摸清一个仓库的结构：实际查看目录和关键文件，如实汇报。");
+const survey = await surveyor.ask<Survey>("列出顶层目录（跳过 .venv、.zcode 等产物），各用一句话说明作用。");
+log(`盘点完成：${survey.dirs.length} 个条目`);
+
+return await hole<Guide>(
+  "第1步：决定导览结构",
+  `盘点：\n${survey.dirs.map((d) => `- ${d.path}：${d.purpose}`).join("\n")}`, async () => {
+  phase("分章并行撰写初稿");
+  // The critic in the next step reads every chapter at once, so this join waits for all.
+  const drafts = await Promise.all(
+    survey.dirs.map((d) =>
+      agent(`写手·${d.path}`, "你只写自己打开核实过的内容。").ask<Chapter>(
+        `写《仓库导览》的「${d.path}」一章（200–400 字 Markdown）：${d.purpose}。covers 如实填写。`,
+      ),
+    ),
+  );
+  log(`${drafts.length} 章初稿完成`);
+  return await hole<Guide>(
+    "第2步：审读与交付",
+    `${drafts.length} 章初稿已就绪：${drafts.map((d) => d.title).join("、")}`, async () => {
+    phase("独立审读初稿");
+    const critique = await agent("审读员", "你只依据文本挑毛病，不读仓库，不夸奖。").ask<string>(
+      `逐章挑毛病：\n${drafts.map((d) => `## ${d.title}\n${d.body}`).join("\n\n")}`,
+    );
+    phase("按审读意见修订并交付");
+    const chapters = await agent("修订编辑").ask<Chapter[]>(
+      `按意见修订，保持章序：${critique}\n\n${JSON.stringify(drafts)}`,
+    );
+    const guide: Guide = { title: "仓库导览", chapters, notCovered: [".venv、.zcode 等产物目录未纳入"] };
+    await artifact.markdown("guide", chapters.map((c) => `## ${c.title}\n\n${c.body}`).join("\n\n"), {
+      title: guide.title,
+      description: "按目录分章的仓库导览。",
+      primary: true,
+    });
+    return guide;
+  },
+  );
+},
+);
+```
+
+What to notice: each step's hole has its own name, because a hole is a phase and two holes
+with one name would be one phase; the prompts carry only what the next author needs, since
+the bindings carry the data; and the chain closed at step two because the author decided it
+was done, not because anything ran out. The writers are named per directory inside the
+`map`, so a revised run that changes one directory's chapter misses the cache for that one
+writer only.

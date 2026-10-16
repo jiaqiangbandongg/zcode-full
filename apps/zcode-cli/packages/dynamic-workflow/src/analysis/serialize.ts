@@ -192,6 +192,7 @@ function renderPhase(phase: Phase): string {
   let line = `phase ${phase.id}`;
   if (phase.name !== undefined) line += ` "${phase.name}"`;
   if (phase.loc !== undefined) line += ` @${phase.loc.line}:${phase.loc.column}`;
+  if (phase.fill !== undefined) line += ` fill=${phase.fill}`;
   return line;
 }
 
@@ -238,6 +239,7 @@ function renderStep(step: Step): string {
   if (step.phase !== undefined) line += ` phase=${step.phase}`;
   line += ` region=${step.region} ${step.certainty}`;
   if (step.repeat !== undefined) line += ` ${step.repeat}`;
+  if (step.fill !== undefined) line += ` fill=${step.fill}`;
   return line;
 }
 
@@ -253,6 +255,8 @@ function renderOrderEdge(edge: OrderEdge): string {
  *
  *   phase phase#1 "preflight"
  *   phase phase#2 "review" alongside=phase#1
+ *   phase hole#21b40fca "决定分组"
+ *   hole hole#cd7e8315 "评判" type="Verdict" phase=phase#2 tail
  *   node ask#1@1 issue site=ask#1 phase=phase#2
  *   node phase#6@1 mark phase=phase#6 alongside=phase#1,phase#2
  *   node ask#9@1 issue site=ask#9 phase=unphased detached
@@ -265,7 +269,9 @@ function renderOrderEdge(edge: OrderEdge): string {
  * terminals last). `phase` and `phase-edge` lines appear only when the script declares a
  * marker — the same all-or-nothing contract as the causality serializer's phase vocabulary.
  * `alongside` (a mark's, and its phase's union) names the phases whose strands were still
- * running when the marker was entered; it is a node fact, never an edge.
+ * running when the marker was entered; it is a node fact, never an edge. `fill=` on a phase
+ * names the filled hole whose body wrote it; a `hole` line is an OPEN hole with the phase it
+ * stands in and `tail` when it is the script's open end (docs/analysis.md「Sites」).
  */
 export function serializeControlFlow(flow: ControlFlowGraph): string {
   const edgeLine = (head: string, edge: FlowEdge): string =>
@@ -274,7 +280,14 @@ export function serializeControlFlow(flow: ControlFlowGraph): string {
     ...(flow.phases ?? []).map(
       (phase) =>
         `phase ${phase.id}${phase.name === undefined ? "" : ` ${quoteType(phase.name)}`}` +
-        (phase.alongside === undefined ? "" : ` alongside=${phase.alongside.join(",")}`),
+        (phase.alongside === undefined ? "" : ` alongside=${phase.alongside.join(",")}`) +
+        (phase.fill === undefined ? "" : ` fill=${phase.fill}`),
+    ),
+    ...(flow.holes ?? []).map(
+      (hole) =>
+        `hole ${hole.siteId} ${quoteType(hole.name)} type=${quoteType(hole.type)}` +
+        (hole.phase === undefined ? "" : ` phase=${hole.phase}`) +
+        (hole.tail ? " tail" : ""),
     ),
     ...flow.nodes.map(
       (node) =>

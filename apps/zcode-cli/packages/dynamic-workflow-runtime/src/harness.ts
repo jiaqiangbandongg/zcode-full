@@ -52,16 +52,24 @@ export type DriverFactory = (sink: WorkflowReportSink) => WorkflowDriver;
 
 /**
  * run 的**活体控制面**：harness 在引擎构造好之后把这一世的引擎交给它，于是持有句柄的那一侧
- * （run service）能够到活着的引擎。今日只有一条命令——就地改本 run 的并发上界。
+ * （run service）能够到活着的引擎。两条命令——就地改本 run 的并发上界
+ * （docs/dynamic-workflow/concurrency.md「Two bounds on a run」）与补全一处留白
+ * （docs/execution-engine.md「Holes」）。
  *
- * 收窄成 `Pick<…, "setMaxConcurrency">` 而不是整个引擎：控制面是一条**命令**通道，不是让
+ * 外加两个只读面 `openHoles` / `filledHoles`：run 快照里 `holes[].state === "waiting"` 必须从引擎的
+ * 停驻表投影（docs/execution-engine.md「The run snapshot」——进程死过之后没有 promise 在等，光看
+ * 事件会把没人问的留白报成在等），而这条绑定是 run service 够到活引擎的唯一接缝。
+ *
+ * 收窄成 `Pick<…>` 而不是整个引擎：控制面是一条**命令**通道，不是让
  * 宿主绕过 harness 去驱动 run 生命周期的后门（结算仍然只经 complete/stop/fail 那三条路）。
  *
  * 与 `signal` 同规：harness 只做接线，不解释、不校验、不兜底；命令的存活判定与 no-op 语义
  * 全在引擎里（`setMaxConcurrency` 返回 false 即这次什么也没发生）。
  */
 export interface RunControlBinding {
-  bind(engine: Pick<WorkflowEngine, "setMaxConcurrency">): void;
+  bind(
+    engine: Pick<WorkflowEngine, "setMaxConcurrency" | "fillHole" | "openHoles" | "filledHoles">,
+  ): void;
 }
 
 /**
@@ -94,6 +102,11 @@ export interface RunWorkflowOptions {
   caps: Caps;
   /** 每 ask 站点的静态规格。**必须覆盖脚本里的每个 ask 站点**——引擎把缺席当接线错误硬失败。 */
   askSpecs: ReadonlyMap<string, AskSpec>;
+  /**
+   * 站点 → 词法出生阶段名（`collectSitePhases`）；verbatim 转交 `EngineConfig.sitePhases`。
+   * 缺席即空表：引擎对每个站点都退回动态当前阶段（老编译产物、snippet、直接投喂 lowered 体）。
+   */
+  sitePhases?: ReadonlyMap<string, string>;
   /** 注入的 schema 校验器（引擎不 import schema 实现）。 */
   validate: ValidateFn;
   /** 外部取消信号：中止在飞 ask 并 kill 子进程，run 结算 cancelled。 */
@@ -101,7 +114,7 @@ export interface RunWorkflowOptions {
   /**
    * 活体控制面的绑定口（见 {@link RunControlBinding}）。与 `signal` 同一条缝递进来：
    * 那个是「停下这个 run」的通道，这个是「改这个 run 的一项设置」的通道。缺席即本次启动
-   * 没有控制面（如 snippet 执行）。
+   * 没有控制面（集成测试、snippet 执行）。
    */
   control?: RunControlBinding;
   /** 墙钟超时（ms）：到点 kill 子进程，run 结算 failed。缺省不限。 */
@@ -169,7 +182,11 @@ export interface RunWorkflowOptions {
     inputId: string;
     phaseNames?: string[];
     subagentModel?: string;
+    /** 脚本点名的模型 → 规范串（docs/dynamic-workflow/launch.md「Models the script names」），同车同规。 */
+    modelBindings?: Record<string, string>;
     phaseAlongside?: number[][];
+    /** `phaseNames` 里未补全留白的下标（docs/execution-engine.md「Holes」），同车同规。 */
+    holes?: number[];
   };
   importedCache?: ImportedRunCache;
   /**
@@ -218,6 +235,7 @@ export async function runWorkflowScript(options: RunWorkflowOptions): Promise<Ru
     caps: options.caps,
     askSpecs: options.askSpecs,
     validate: options.validate,
+    ...(options.sitePhases === undefined ? {} : { sitePhases: options.sitePhases }),
     // 元数据 verbatim 转交，缺省保持缺席（不落成 undefined 键）。cwd 与子进程实际使用的
     // 是同一个值，所以这里也记 process.cwd() 的兜底——落库的 cwd 就是 run 真正跑的目录。
     ...(options.scriptText === undefined ? {} : { scriptText: options.scriptText }),
@@ -517,7 +535,7 @@ function handleChildMessage(message: ChildMessage, deps: MessageDeps): void {
   }
 }
 
-/** 桥接一次需应答的 host 调用（ask / world-read）到引擎，settle 后回 response。 */
+/** 桥接一次需应答的 host 调用（ask / world-read / publish-artifact / hole）到引擎，settle 后回 response。 */
 function handleRequest(
   message: Extract<ChildMessage, { kind: "request" }>,
   deps: MessageDeps,
@@ -566,6 +584,10 @@ function handleRequest(
       return;
     }
     promise = engine.publishArtifact(message.siteId, op, message.args ?? []);
+  } else if (message.type === "hole") {
+    // 留白：引擎把 promise 停在站点下，主代理经控制面 fillHole 放行后才有 `{code}` 可答；
+    // 在此之前它就是一条在飞请求（docs/execution-engine.md「The vm cell」）。
+    promise = engine.hole(message.siteId, message.name ?? "", message.prompt);
   } else {
     // op/args 原样转交引擎：本层不看 op、不校验元数（那是 driver 的职责）。缺失 args 归一为空数组，
     // 让 driver 的实参校验大声拒绝，而不是在这里悄悄编一个默认值。

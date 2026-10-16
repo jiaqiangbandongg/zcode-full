@@ -1,6 +1,6 @@
 import { PROVIDER_MODEL_SELECTION_MIGRATION_SQL } from "./migrations/0020-provider-model-selection.js";
 
-interface SqliteMigration {
+export interface SqliteMigration {
   appVersion: string;
   id: string;
   sql: string;

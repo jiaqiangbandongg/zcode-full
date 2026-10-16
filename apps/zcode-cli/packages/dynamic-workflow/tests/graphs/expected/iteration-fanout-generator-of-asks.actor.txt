@@ -1,0 +1,10 @@
+actor-node workspace
+actor-node actor#1 "a" @8:9
+actor-node actor#2 "b" @9:9
+actor-node actor#3 "c" @16:8
+actor-node sink
+actor-edge workspace -> actor#1 exact count=1 types="string"
+actor-edge workspace -> actor#2 exact count=1 types="string"
+actor-edge actor#1 -> actor#3 exact count=1 types="string"
+actor-edge actor#2 -> actor#3 exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

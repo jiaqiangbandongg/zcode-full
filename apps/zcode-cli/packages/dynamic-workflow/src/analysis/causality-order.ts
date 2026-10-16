@@ -104,7 +104,11 @@ export function traceOrder(
   // reached dynamically, dead code) still needs a position and a region. Walk the
   // narrowest un-walked enclosing function, in site order, to a fixpoint. The region
   // is `branch` because we cannot show the body runs at all.
-  const stepSites = [...table.asks, ...table.worldReads].sort((a, b) => a.order - b.order);
+  const stepSites = [
+    ...table.asks,
+    ...table.worldReads,
+    ...table.holes.filter((site) => site.body === undefined),
+  ].sort((a, b) => a.order - b.order);
   let progress = true;
   while (progress) {
     progress = false;

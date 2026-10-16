@@ -25,10 +25,7 @@ function resolveExistingPath(candidates: Array<string | null | undefined>): stri
   return null;
 }
 
-function resolveCommandOnPath(
-  command: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string | null {
+function resolveCommandOnPath(command: string, env: NodeJS.ProcessEnv = process.env): string | null {
   const pathEnv = env.PATH;
   if (!pathEnv) {
     return null;
@@ -38,7 +35,10 @@ function resolveCommandOnPath(
     process.platform === "win32"
       ? (env.PATHEXT?.split(";").filter(Boolean) ?? [".EXE", ".CMD", ".BAT", ".COM"])
       : [""];
-  const extensions = process.platform === "win32" && !command.includes(".") ? windowsPathExt : [""];
+  const extensions =
+    process.platform === "win32" && !command.includes(".")
+      ? windowsPathExt
+      : [""];
 
   for (const pathEntry of pathEnv.split(delimiter)) {
     if (!pathEntry) {
@@ -62,9 +62,7 @@ function resolvePlatformScopedBundledToolRoots(moduleDir?: string): Array<string
     resolvePath(process.cwd(), "bundled-tools", platformKey),
     resolvePath(process.cwd(), "packages", "desktop", "bundled-tools", platformKey),
     resolvePath(process.cwd(), "..", "desktop", "bundled-tools", platformKey),
-    moduleDir
-      ? resolvePath(moduleDir, "..", "..", "..", "desktop", "bundled-tools", platformKey)
-      : null,
+    moduleDir ? resolvePath(moduleDir, "..", "..", "..", "desktop", "bundled-tools", platformKey) : null,
     moduleDir ? resolvePath(moduleDir, "..", "..", "desktop", "bundled-tools", platformKey) : null,
   ];
 }
@@ -100,7 +98,7 @@ function joinUniquePathEntries(entries: readonly string[]): string {
   return nextEntries.join(delimiter);
 }
 
-function findRuntimeToolBinary(
+export function findRuntimeToolBinary(
   toolId: RuntimeToolId,
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
@@ -118,12 +116,8 @@ function findRuntimeToolBinary(
   const runtimeRoot = env.ZCODE_SERVER_RUNTIME_ROOT?.trim();
   const moduleDir: string | undefined = import.meta.dirname;
   const candidate = resolveExistingPath([
-    runtimeRoot
-      ? resolvePath(runtimeRoot, "tools", runtime.bundledResourceDir, ...entrySegments)
-      : null,
-    resourcesPath
-      ? resolvePath(resourcesPath, "tools", runtime.bundledResourceDir, ...entrySegments)
-      : null,
+    runtimeRoot ? resolvePath(runtimeRoot, "tools", runtime.bundledResourceDir, ...entrySegments) : null,
+    resourcesPath ? resolvePath(resourcesPath, "tools", runtime.bundledResourceDir, ...entrySegments) : null,
     ...resolvePlatformScopedBundledToolRoots(moduleDir).map((root) =>
       root ? resolvePath(root, runtime.bundledResourceDir, ...entrySegments) : null,
     ),

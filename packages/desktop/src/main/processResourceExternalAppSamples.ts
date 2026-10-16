@@ -19,16 +19,16 @@ import {
 } from "./processResourceAppTotals.js";
 
 /** 未自报采样周期时的默认周期（CLI 自采节拍）。 */
-const EXTERNAL_APP_RESOURCE_SAMPLE_DEFAULT_INTERVAL_MS = 60_000;
+export const EXTERNAL_APP_RESOURCE_SAMPLE_DEFAULT_INTERVAL_MS = 60_000;
 
 /**
  * 来源条目上限（内存有界）。
  * CLI 改为按最多 64 个实例保存后，预算增加这 64 项，保留原有 MCP 来源空间。
  * 只提高内存上限，不新增队列或定时器；超出后新来源直接丢弃。
  */
-const PROCESS_RESOURCE_MAX_EXTERNAL_SAMPLE_SOURCES = 128;
+export const PROCESS_RESOURCE_MAX_EXTERNAL_SAMPLE_SOURCES = 128;
 
-interface ExternalAppResourceSample extends AppResourceTotals {
+export interface ExternalAppResourceSample extends AppResourceTotals {
   /**
    * 来源的稳定 key（如 CLI 实例、MCP 来源组）：只用于覆盖旧样本与判定过期，
    * 不进入任何 ARMS 属性，因此不得放 pid、路径或 workspace 标识。

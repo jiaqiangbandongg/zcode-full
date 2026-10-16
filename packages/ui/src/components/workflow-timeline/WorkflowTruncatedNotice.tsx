@@ -3,7 +3,8 @@ import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
 /**
- * 「仅展示 {shown}/{total} 步的详情」：run 撞过 `WORKFLOW_RUNS_LIMITS.maxNodes` 之后，实例表停在界上，而它
+ * 「仅展示 {shown}/{total} 步的详情」（docs/dynamic-workflow/presentation.md「The run card」
+ * 与「The run pane」）：run 撞过 `WORKFLOW_RUNS_LIMITS.maxNodes` 之后，实例表停在界上，而它
  * 上面那些数（步数、结算数）已经把表外的算进来了。这一行说的正是这个差额——**没停的是 run，
  * 停的是每一步的详情**。
  *

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-inherited",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-inherited.test.ts",
+  "fixtures": [
+    {
+      "id": "workspace-inherited-tool-call",
+      "description": "Workspace 缺 enabled key，继承 User 后调用 namespaced MCP tool。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定 tool_use，证明继承路径仍注册 Plugin MCP。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED"],
+        "bodyIncludes": ["E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_mcp_ping_workspace_inherited",
+          "name": "mcp__plugin_e2e-plugin-mcp-ping_ping__ping",
+          "input": { "message": "ping-workspace-inherited" }
+        }
+      }
+    },
+    {
+      "id": "workspace-inherited-final",
+      "description": "继承 User enabled 的 MCP 最终响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定最终文本，闭合 inherited runtime。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED", "toolu_e2e_plugin_mcp_ping_workspace_inherited"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

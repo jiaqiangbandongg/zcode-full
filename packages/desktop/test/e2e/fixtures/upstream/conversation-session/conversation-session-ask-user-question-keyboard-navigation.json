@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-keyboard-navigation",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-keyboard-navigation.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-keyboard-navigation-call",
+      "description": "AskUserQuestion keyboard navigation: 首轮返回三题问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 AskUserQuestion 多题等待态，避免真实模型是否提问和题目结构漂移影响键盘导航复现。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_KEYBOARD_NAV"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_KEYBOARD_NAV",
+          "E2E_ASK_USER_QUESTION_KEYBOARD_NAV_TOOL"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_ask_user_question_keyboard_navigation",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_AQK_Q1_CUSTOM_ENTER",
+                "header": "E2E keyboard 1",
+                "options": [
+                  {
+                    "label": "E2E_AQK_Q1_OPTION_A",
+                    "description": "Unused preset option for custom Enter navigation."
+                  },
+                  {
+                    "label": "E2E_AQK_Q1_OPTION_B",
+                    "description": "Unused preset option for custom Enter navigation."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQK_Q2_OPTION_SPACE",
+                "header": "E2E keyboard 2",
+                "options": [
+                  {
+                    "label": "E2E_AQK_Q2_OPTION_A",
+                    "description": "First option should be preselected by default."
+                  },
+                  {
+                    "label": "E2E_AQK_Q2_OPTION_B",
+                    "description": "ArrowDown then Space should select this option."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQK_Q3_OPTION_ENTER",
+                "header": "E2E keyboard 3",
+                "options": [
+                  {
+                    "label": "E2E_AQK_Q3_OPTION_A",
+                    "description": "ArrowDown then ArrowUp then Enter should submit this option."
+                  },
+                  {
+                    "label": "E2E_AQK_Q3_OPTION_B",
+                    "description": "Intermediate option used to prove ArrowUp moves preselection back."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-keyboard-navigation-final",
+      "description": "AskUserQuestion keyboard navigation: 键盘回答进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明多题键盘选择结果已被 agent 消费，核心断言在 UI 键盘路径。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_KEYBOARD_CUSTOM",
+          "E2E_AQK_Q2_OPTION_B",
+          "E2E_AQK_Q3_OPTION_A",
+          "E2E_ASK_USER_QUESTION_KEYBOARD_NAV_TOOL",
+          "toolu_e2e_ask_user_question_keyboard_navigation"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

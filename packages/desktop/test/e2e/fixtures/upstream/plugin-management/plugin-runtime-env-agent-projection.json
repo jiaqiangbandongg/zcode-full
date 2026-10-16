@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "caseName": "plugin-runtime-env-agent-projection",
+  "spec": "./test/e2e/plugins/plugin-runtime-env-agent-projection.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-runtime-env-tool-call",
+      "description": "PLM-LC-010 advertises and calls the installed plugin secret-env verifier.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_SECRET_ENV_CASE_"],
+        "bodyIncludes": ["E2E_PLUGIN_SECRET_ENV_CASE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_secret_env",
+          "name": "mcp__plugin_e2e-plugin-secret-agent_secret-verifier__verify_secret_env",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-runtime-env-final",
+      "description": "PLM-LC-010 final response after the MCP confirms the secret env was resolved.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_SECRET_ENV_CASE_",
+          "toolu_e2e_plugin_secret_env",
+          "E2E_PLUGIN_RUNTIME_SECRET_RESOLVED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

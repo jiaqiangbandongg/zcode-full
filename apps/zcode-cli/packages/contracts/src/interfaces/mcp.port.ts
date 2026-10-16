@@ -1,8 +1,9 @@
 // MCP Port - Model Context Protocol adapter boundary
 
+import type { McpServerFailureKind, OfficialMcpAuthPortFailureReason } from "@zcode/shared";
+import type { McpAppsToolVisibility, McpToolUiDescriptor } from "@zcode/shared/mcp-apps";
 import type { JsonSchema } from "../model/index.js";
 import type { TraceContext } from "../tracing/tracer.js";
-import type { McpServerFailureKind, OfficialMcpAuthPortFailureReason } from "@zcode/shared";
 
 export type McpServerTransportType = "stdio" | "http" | "sse";
 export type McpProtocolVersion = "legacy" | "auto" | "2026-07-28";
@@ -182,6 +183,24 @@ export interface McpToolDescriptor {
    * `isOfficialMcpOriginTrusted`。
    */
   official?: boolean;
+  /**
+   * 工具对谁开放（`_meta.ui.visibility`，缺省 `["model", "app"]`），与是否带 UI 资源无关。
+   * 不含 "model" 的工具不进 provider contracts；不含 "app" 的工具拒绝 `mcp/uiCallTool`。
+   * 由 adapter 归一化写入；缺省（旧 descriptor）时以 `ui.visibility` 兜底，再缺省视为两者都可见。
+   */
+  visibility?: McpAppsToolVisibility[];
+  /**
+   * 工具 `_meta` 归一化后的插件 UI 呈现描述。
+   * 只有声明了合法 `ui://` resourceUri 的工具才有；其中的 visibility 与上面的字段同源。
+   */
+  ui?: McpToolUiDescriptor;
+}
+
+/** 可见性判定的唯一实现：descriptor.visibility → ui.visibility → 两者都可见。 */
+export function resolveMcpToolVisibility(
+  descriptor: Pick<McpToolDescriptor, "visibility" | "ui">,
+): McpAppsToolVisibility[] {
+  return descriptor.visibility ?? descriptor.ui?.visibility ?? ["model", "app"];
 }
 
 export type McpContentBlock = Record<string, unknown>;
@@ -191,6 +210,83 @@ export interface McpToolCallResult {
   structuredContent?: unknown;
   isError?: boolean;
   _meta?: Record<string, unknown>;
+}
+
+export interface McpReadResourceRequest {
+  serverName: string;
+  uri: string;
+  trace?: TraceContext;
+}
+
+export interface McpResourceContent {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+  _meta?: Record<string, unknown>;
+}
+
+export interface McpReadResourceResult {
+  contents: McpResourceContent[];
+}
+
+/** `resources/list` / `resources/templates/list`（分页游标原样透传）。 */
+export interface McpListResourcesRequest {
+  serverName: string;
+  cursor?: string;
+  trace?: TraceContext;
+}
+export interface McpResourceDescriptor {
+  uri: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  _meta?: Record<string, unknown>;
+}
+export interface McpListResourcesResult {
+  resources: McpResourceDescriptor[];
+  nextCursor?: string;
+}
+export interface McpResourceTemplateDescriptor {
+  uriTemplate: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  _meta?: Record<string, unknown>;
+}
+export interface McpListResourceTemplatesResult {
+  resourceTemplates: McpResourceTemplateDescriptor[];
+  nextCursor?: string;
+}
+/**
+ * 资源订阅。`subscriberKey` 由调用方给出（bootstrap 用 sessionId|scopeId|generation），
+ * 登记表在连接层按 (serverName, uri) 计数：0→1 才真调 SDK subscribe，1→0 才 unsubscribe；断连重连后按登记表重放。
+ */
+export interface McpResourceSubscriptionRequest {
+  serverName: string;
+  uri: string;
+  subscriberKey: string;
+  trace?: TraceContext;
+}
+/** server 没有声明 `capabilities.resources.subscribe` 时抛出（协议层映射为 -32001 not_supported）。 */
+export class McpResourceSubscribeUnsupportedError extends Error {
+  readonly code = "not_supported" as const;
+  constructor(readonly serverName: string) {
+    super(`MCP server ${serverName} does not support resource subscriptions`);
+    this.name = "McpResourceSubscribeUnsupportedError";
+  }
+}
+
+/** server → client 通知，adapter 转成宿主可消费的形状；订阅类通知带当前登记的 subscriberKey。 */
+export type McpServerNotification =
+  | { kind: "resourceUpdated"; serverName: string; uri: string; subscribers: string[] }
+  | { kind: "resourceListChanged"; serverName: string; subscribers: string[] }
+  | { kind: "toolListChanged"; serverName: string }
+  | { kind: "loggingMessage"; serverName: string; level: string; logger?: string; data: unknown };
+export interface McpNotificationPort {
+  onNotification(notification: McpServerNotification): void;
 }
 
 export interface McpConnectionSnapshot {
@@ -234,10 +330,25 @@ export interface McpCallToolRequest {
   turnId?: string;
 }
 
+/** MCP `notifications/progress`（A8）：progress 单调递增，total 可缺省；adapter 原样转发，不做节流。 */
+export interface McpToolCallProgress {
+  progress: number;
+  total?: number;
+  message?: string;
+}
+
 export interface McpCallToolOptions {
+  /** 页面写操作固定此连接；禁止恢复或重新授权后自动重放。 */
+  appConnection?: { identity: string; generation: number };
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** 收到服务端进度通知时回调；SDK 侧同时以 resetTimeoutOnProgress 让每次进度重置超时。 */
+  onProgress?: (progress: McpToolCallProgress) => void;
 }
+
+/** 工具级 `_meta.timeoutMs` 的允许区间：低于下限视为非法丢弃，高于上限截到上限。 */
+export const MCP_TOOL_META_TIMEOUT_MIN_MS = 1_000;
+export const MCP_TOOL_META_TIMEOUT_MAX_MS = 30 * 60 * 1_000;
 
 /**
  * 端口层失败分类（"不发任何请求"的几类）。
@@ -287,7 +398,36 @@ export interface OfficialMcpTrustedOriginRegistry {
   }>;
 }
 
+/** MCP elicitation（server → client `elicitation/create`）交给宿主提问的端口。 */
+export interface McpElicitationTrace {
+  sessionId?: string;
+  turnId?: string;
+  toolCallId?: string;
+  traceId?: string;
+}
+export interface McpElicitationRequest {
+  serverName: string;
+  message: string;
+  requestedSchema: unknown;
+  /** 发起 elicitation 时该 server 正在执行的工具调用；没有则无法归属会话，端口应拒绝。 */
+  trace?: McpElicitationTrace;
+}
+export interface McpElicitationResult {
+  action: "accept" | "decline" | "cancel";
+  content?: Record<string, unknown>;
+}
+export interface McpElicitationPort {
+  requestElicitation(
+    request: McpElicitationRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpElicitationResult>;
+}
+
 export interface McpPort {
+  /** 可信配置派生的稳定来源与现有连接代际。断线时不签发新页面凭证。 */
+  onAppConnectionInvalidated?(serverName: string, listener: () => void): () => void;
+  appConnectionSnapshot?(serverName: string): { identity: string; generation: number } | null;
+
   connectConfiguredServers(
     servers: Record<string, McpServerConfig>,
     options?: McpConnectOptions,
@@ -306,6 +446,38 @@ export interface McpPort {
   pingServer?(name: string, options?: { timeoutMs?: number }): Promise<boolean>;
   status(): Promise<Record<string, McpServerStatus>>;
   listTools(): Promise<McpToolDescriptor[]>;
+  /**
+   * 自端口创建以来收到 `notifications/tools/list_changed` 的累计次数。
+   * runtime 在回合开始前比较该值，变了才重新 listTools 并重注册；未实现表示端口不会主动变化。
+   */
+  toolListRevision?(): number;
   callTool(request: McpCallToolRequest, options?: McpCallToolOptions): Promise<McpToolCallResult>;
+  /**
+   * 读取 MCP 资源（插件 UI 的 `ui://` HTML）。与 pingServer 同样可选：mock port 不必实现，
+   * 调用方缺失时按"不支持资源"处理。实现必须与 callTool 共用同一连接与重连路径。
+   */
+  readResource?(
+    request: McpReadResourceRequest,
+    options?: McpCallToolOptions,
+  ): Promise<McpReadResourceResult>;
+  /** 资源列表与订阅；缺省表示该端口不支持（协议层回 -32001）。 */
+  listResources?(
+    request: McpListResourcesRequest,
+    options?: McpCallToolOptions,
+  ): Promise<McpListResourcesResult>;
+  listResourceTemplates?(
+    request: McpListResourcesRequest,
+    options?: McpCallToolOptions,
+  ): Promise<McpListResourceTemplatesResult>;
+  subscribeResource?(
+    request: McpResourceSubscriptionRequest,
+    options?: McpCallToolOptions,
+  ): Promise<void>;
+  unsubscribeResource?(
+    request: McpResourceSubscriptionRequest,
+    options?: McpCallToolOptions,
+  ): Promise<void>;
+  /** 删除 subscriberKey 以 prefix 开头的全部登记（会话关闭）；返回真正向 server 退订的 uri 数。 */
+  unsubscribeResourcesBySubscriber?(subscriberKeyPrefix: string): Promise<number>;
   close(): Promise<void>;
 }

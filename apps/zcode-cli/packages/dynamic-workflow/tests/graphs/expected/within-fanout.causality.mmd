@@ -1,0 +1,18 @@
+flowchart LR
+  subgraph workspace["workspace"]
+    world_read_1[/"glob *.log<br/>world-read#1"/]
+  end
+  subgraph actor_1["judgeA (actor#1)  ×N"]
+    ask_1["judgeA<br/>ask#1<br/>×N"]
+  end
+  subgraph actor_2["judgeB (actor#2)"]
+    ask_2["judgeB<br/>ask#2"]
+  end
+  sink(["sink"])
+  world_read_1 --> ask_1
+  world_read_1 --> ask_2
+  ask_2 --> ask_2
+  ask_1 --> sink
+  ask_2 --> sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

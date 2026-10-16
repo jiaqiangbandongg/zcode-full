@@ -1,0 +1,11 @@
+lane actor#1 "a" @4:11
+lane actor#2 "b" @5:11
+lane actor#3 "fallback" @6:49
+region seq#1 seq
+region branch#1 branch parent=seq#1 @6:43
+step ask#1 ask "a" @4:22 lane=actor#1 region=seq#1 always
+step ask#2 ask "b" @5:22 lane=actor#2 region=seq#1 always
+step ask#3 ask "fallback" @6:67 lane=actor#3 region=branch#1 maybe
+edge ask#1 -> ask#3 seq maybe
+edge ask#2 -> ask#3 seq maybe
+sink ask#1,ask#2,ask#3

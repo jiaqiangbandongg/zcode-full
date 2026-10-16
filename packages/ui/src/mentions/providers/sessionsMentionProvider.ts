@@ -7,7 +7,10 @@ import type { IServiceAccessor } from "@zcode/services";
 import type { ZCodeProvider, ZCodeTaskMeta } from "@zcode/shared";
 import { buildSessionMentionMarkdown } from "@/mentions/mentionMarkdown.js";
 import { filterMentionItemsWithOptions } from "@/mentions/mentionSearch.js";
-import type { MentionCategoryResult, MentionItem } from "@/mentions/mentionTypes.js";
+import type {
+  MentionCategoryResult,
+  MentionItem,
+} from "@/mentions/mentionTypes.js";
 import type { SessionMentionWorkspaceScope } from "@/mentions/mentionPanelRouting.js";
 import { buildTaskWorkspaceKey } from "@/lib/taskQueryCache.js";
 import {
@@ -40,13 +43,17 @@ function compareSessionTasks(
 ) {
   if (currentWorkspaceKey) {
     const leftCurrent =
-      buildTaskWorkspaceKey(left.workspacePath, left.workspaceIdentity) === currentWorkspaceKey;
+      buildTaskWorkspaceKey(left.workspacePath, left.workspaceIdentity) ===
+      currentWorkspaceKey;
     const rightCurrent =
-      buildTaskWorkspaceKey(right.workspacePath, right.workspaceIdentity) === currentWorkspaceKey;
+      buildTaskWorkspaceKey(right.workspacePath, right.workspaceIdentity) ===
+      currentWorkspaceKey;
     if (leftCurrent !== rightCurrent) return leftCurrent ? -1 : 1;
   }
-  if (right.updatedAt !== left.updatedAt) return right.updatedAt - left.updatedAt;
-  if (right.createdAt !== left.createdAt) return right.createdAt - left.createdAt;
+  if (right.updatedAt !== left.updatedAt)
+    return right.updatedAt - left.updatedAt;
+  if (right.createdAt !== left.createdAt)
+    return right.createdAt - left.createdAt;
   return left.title.localeCompare(right.title);
 }
 
@@ -60,7 +67,10 @@ function getWorkspaceLabel(task: ZCodeTaskMeta): string {
   return raw.split(/[\\/]/).filter(Boolean).at(-1) ?? raw;
 }
 
-function mapTaskToMentionItem(task: ZCodeTaskMeta, provider: ZCodeProvider): SessionMentionItem {
+function mapTaskToMentionItem(
+  task: ZCodeTaskMeta,
+  provider: ZCodeProvider,
+): SessionMentionItem {
   const sessionId = task.taskId;
   const itemProvider = task.provider ?? provider;
   return {
@@ -78,11 +88,14 @@ function mapTaskToMentionItem(task: ZCodeTaskMeta, provider: ZCodeProvider): Ses
       task.model ?? "",
       itemProvider,
     ],
-    workspaceKey: buildTaskWorkspaceKey(task.workspacePath, task.workspaceIdentity),
+    workspaceKey: buildTaskWorkspaceKey(
+      task.workspacePath,
+      task.workspaceIdentity,
+    ),
   };
 }
 
-function collectSessionMentionItems(
+export function collectSessionMentionItems(
   tasks: ZCodeTaskMeta[],
   provider: ZCodeProvider,
   options: {
@@ -106,11 +119,15 @@ function collectSessionMentionItems(
   }
 
   return [...taskBySessionId.values()]
-    .sort((left, right) => compareSessionTasks(left, right, currentWorkspaceKey))
+    .sort((left, right) =>
+      compareSessionTasks(left, right, currentWorkspaceKey),
+    )
     .map((task) => mapTaskToMentionItem(task, provider));
 }
 
-function limitSessionMentionItemsPerWorkspace(items: SessionMentionItem[]): SessionMentionItem[] {
+function limitSessionMentionItemsPerWorkspace(
+  items: SessionMentionItem[],
+): SessionMentionItem[] {
   const itemCountByWorkspaceKey = new Map<string, number>();
   return items.filter((item) => {
     const itemCount = itemCountByWorkspaceKey.get(item.workspaceKey) ?? 0;
@@ -148,7 +165,9 @@ function buildSessionMentionScopes(params: {
       ...(params.currentWorkspaceIdentity
         ? { workspaceIdentity: params.currentWorkspaceIdentity }
         : {}),
-      ...(params.currentRemoteSessionId ? { remoteSessionId: params.currentRemoteSessionId } : {}),
+      ...(params.currentRemoteSessionId
+        ? { remoteSessionId: params.currentRemoteSessionId }
+        : {}),
     },
     ...params.workspaceTabs,
   ];
@@ -170,15 +189,22 @@ function buildSessionMentionScopes(params: {
     // 功能边界：# 引用最终由当前 Agent Host 的 SQLite session store 按 session id 读取。
     // 这里只聚合同一 agent service authority，避免把另一个远端 Host 的会话做成可选但不可读的引用；
     // 未连接 remote 也会在 resolver 处返回 null，不能回退到本地 base service。
-    if (!resolved || resolved.services.zcodeAgentService !== currentAgentService) {
+    if (
+      !resolved ||
+      resolved.services.zcodeAgentService !== currentAgentService
+    ) {
       continue;
     }
 
     seenWorkspaceKeys.add(workspaceKey);
     scopes.push({
       workspacePath: candidate.workspacePath,
-      ...(candidate.workspaceIdentity ? { workspaceIdentity: candidate.workspaceIdentity } : {}),
-      ...(resolved.remoteSessionId ? { endpointKey: resolved.remoteSessionId } : {}),
+      ...(candidate.workspaceIdentity
+        ? { workspaceIdentity: candidate.workspaceIdentity }
+        : {}),
+      ...(resolved.remoteSessionId
+        ? { endpointKey: resolved.remoteSessionId }
+        : {}),
       agentService: resolved.services.zcodeAgentService,
     });
   }
@@ -199,7 +225,9 @@ export function useSessionsMentionProvider(
   const baseServices = useBaseWorkspaceServices();
   const tabs = useTabStore((state) => state.tabs);
   const workspaceTabs = useMemo(() => tabs.filter(isWorkspaceTab), [tabs]);
-  const sessionsById = useRemoteWorkspaceSessionStore((state) => state.sessionsById);
+  const sessionsById = useRemoteWorkspaceSessionStore(
+    (state) => state.sessionsById,
+  );
   const sessionIdByWorkspaceIdentity = useRemoteWorkspaceSessionStore(
     (state) => state.sessionIdByWorkspaceIdentity,
   );
@@ -218,7 +246,11 @@ export function useSessionsMentionProvider(
     services: workspaceServices,
     remoteSessionId,
     isRemoteTarget,
-  } = useWorkspaceServicesResolution(workspacePath, undefined, workspaceIdentity);
+  } = useWorkspaceServicesResolution(
+    workspacePath,
+    undefined,
+    workspaceIdentity,
+  );
   // `@` 与 `#` 复用 provider，但只有 `#` 能扩展到同 authority 的 workspace。
   // sessions-index registry 仍按 endpoint+workspaceKey 引用计数复用，不额外建立连接。
   const scopes = useMemo<WorkspaceSessionsIndexScope[]>(() => {
@@ -258,7 +290,8 @@ export function useSessionsMentionProvider(
     workspaceServices,
     workspaceTabs,
   ]);
-  const { items: indexMetas, hydratingEndpointKeys } = useWorkspaceSessionsIndexItems(scopes);
+  const { items: indexMetas, hydratingEndpointKeys } =
+    useWorkspaceSessionsIndexItems(scopes);
 
   const allItems = useMemo(
     () =>

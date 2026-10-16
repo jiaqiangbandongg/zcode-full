@@ -11,6 +11,52 @@ import {
   hasKnownBashWriteOption,
   isSedInPlaceOption,
 } from "./bash-readonly-policy.js";
+
+export interface BashCommandClassification {
+  isSearch: boolean;
+  isRead: boolean;
+  isList: boolean;
+}
+
+export type BashPermissionMatcher = (pattern: string) => boolean;
+
+const EMPTY_CLASSIFICATION: BashCommandClassification = {
+  isList: false,
+  isRead: false,
+  isSearch: false,
+};
+
+const BASH_SEARCH_COMMANDS = new Set([
+  "ag",
+  "ack",
+  "egrep",
+  "fgrep",
+  "grep",
+  "locate",
+  "rg",
+  "which",
+  "whereis",
+]);
+const BASH_READ_COMMANDS = new Set([
+  "awk",
+  "cat",
+  "cut",
+  "file",
+  "head",
+  "jq",
+  "less",
+  "more",
+  "sed",
+  "sort",
+  "stat",
+  "strings",
+  "tail",
+  "tr",
+  "uniq",
+  "wc",
+  "yq",
+]);
+const BASH_LIST_COMMANDS = new Set(["du", "find", "ls", "tree"]);
 const BASH_SEMANTIC_NEUTRAL_COMMANDS = new Set(["", ":", "echo", "false", "printf", "true"]);
 const BASH_SILENT_COMMANDS = new Set([
   "cd",
@@ -35,6 +81,53 @@ const SEMANTIC_NON_ERROR_MESSAGES = new Set([
   "Some directories were inaccessible",
 ]);
 const SEMANTIC_NO_MATCH_COMMANDS = new Set(["egrep", "fgrep", "grep", "rg"]);
+const CLAUDE_CODE_HINT_LINE_RE = /^[ \t]*<claude-code-hint\s+([^>]*?)\s*\/>[ \t]*$/gm;
+
+export function isSearchOrReadBashCommand(command: string): BashCommandClassification {
+  const analysis = analyzeBashCommand(command);
+  if (analysis.hasParseErrors || analysis.hasUnsupportedSyntax || analysis.hasDynamicWords) {
+    return { ...EMPTY_CLASSIFICATION };
+  }
+  if (analysis.commands.length === 0) return { ...EMPTY_CLASSIFICATION };
+
+  let hasList = false;
+  let hasNonNeutralCommand = false;
+  let hasRead = false;
+  let hasSearch = false;
+
+  for (const commandPart of analysis.commands) {
+    if (commandPart.hasAssignmentPrefix) return { ...EMPTY_CLASSIFICATION };
+    if (hasKnownBashWriteOption(commandPart)) return { ...EMPTY_CLASSIFICATION };
+
+    const commandName = commandPart.name;
+    if (BASH_SEMANTIC_NEUTRAL_COMMANDS.has(commandName)) continue;
+
+    hasNonNeutralCommand = true;
+    const isSearch = BASH_SEARCH_COMMANDS.has(commandName);
+    const isRead = BASH_READ_COMMANDS.has(commandName);
+    const isList = BASH_LIST_COMMANDS.has(commandName);
+    if (!isSearch && !isRead && !isList) return { ...EMPTY_CLASSIFICATION };
+
+    hasSearch ||= isSearch;
+    hasRead ||= isRead;
+    hasList ||= isList;
+  }
+
+  if (!hasNonNeutralCommand) return { ...EMPTY_CLASSIFICATION };
+  return { isList: hasList, isRead: hasRead, isSearch: hasSearch };
+}
+
+export function isBashReadOnlyCommand(command: string): boolean {
+  return isRuntimeReadOnlyBashCommand(command);
+}
+
+export function isSimpleReadOnlyBashCommand(command: string): boolean {
+  const analysis = analyzeBashCommand(command);
+  if (!isBashCommandPermissionSafe(analysis)) return false;
+  if (analysis.commands.length !== 1) return false;
+  const commandPart = analysis.commands[0]!;
+  return commandPart.argv.length > 0 && evaluateBashReadonlyPolicy(commandPart) === true;
+}
 
 export function isRuntimeReadOnlyBashCommand(
   command: string,
@@ -63,6 +156,31 @@ export function isRuntimeReadOnlyBashCommand(
   }
 
   return hasReadOnlyCommand;
+}
+
+export function prepareBashPermissionMatcherForCommand(
+  command: string,
+): BashPermissionMatcher | undefined {
+  const trimmed = command.trim();
+  if (trimmed.length === 0) return () => false;
+
+  const analysis = analyzeBashCommand(command);
+  if (!isBashCommandPermissionSafe(analysis) || analysis.commands.length !== 1) {
+    return () => true;
+  }
+
+  const commandPart = analysis.commands[0]!;
+  if (commandPart.hasAssignmentPrefix || commandPart.hasRedirects) return () => true;
+
+  const normalizedCommand = commandPart.argv.join(" ");
+  if (normalizedCommand.length === 0) return () => false;
+  return (pattern) => matchesBashPermissionPattern(pattern, normalizedCommand);
+}
+
+export function hasBestEffortWritePattern(command: string): boolean {
+  const analysis = analyzeBashCommand(command);
+  if (analysis.hasParseErrors) return false;
+  return analysis.commands.some(hasKnownBashWriteOption);
 }
 
 export function isSedInPlaceBashCommand(command: string): boolean {
@@ -95,6 +213,23 @@ export function isSilentBashCommand(command: string): boolean {
   return hasNonFallbackCommand;
 }
 
+export function extractBashSearchText(output: { stderr?: string; stdout?: string }): string {
+  const stdout = output.stdout ?? "";
+  const stderr = output.stderr ?? "";
+  return stderr ? `${stdout}\n${stderr}` : stdout;
+}
+
+export function isBashResultTruncated(output: { stderr?: string; stdout?: string }): boolean {
+  return lineCount(output.stdout ?? "") > 4 || lineCount(output.stderr ?? "") > 4;
+}
+
+export function stripClaudeCodeHintLines(stdout: string): string {
+  if (!stdout.includes("<claude-code-hint")) return stdout;
+  // 修复原因：成功路径上先剥离内部 claude-code-hint 行，再继续 image/persisted mapping；
+  // 这些内部 hint 不应成为 provider-visible Bash stdout。
+  return stdout.replace(CLAUDE_CODE_HINT_LINE_RE, "").replace(/\n{3,}/g, "\n\n");
+}
+
 export function interpretBashReturnCode(
   command: string,
   result: Pick<ExecutionResult, "error" | "exitCode" | "signal" | "status">,
@@ -113,7 +248,7 @@ export function interpretBashReturnCode(
   return undefined;
 }
 
-function isSemanticNonErrorInterpretation(message: string | undefined): boolean {
+export function isSemanticNonErrorInterpretation(message: string | undefined): boolean {
   return message !== undefined && SEMANTIC_NON_ERROR_MESSAGES.has(message);
 }
 
@@ -171,4 +306,24 @@ function gitSemanticSubcommandName(argv: readonly string[]): string | undefined 
     return arg;
   }
   return undefined;
+}
+
+function matchesBashPermissionPattern(pattern: string, command: string): boolean {
+  const prefix = permissionPatternPrefix(pattern);
+  if (prefix !== null) return command === prefix || command.startsWith(`${prefix} `);
+  return wildcardToRegExp(pattern).test(command);
+}
+
+function permissionPatternPrefix(pattern: string): string | null {
+  return pattern.endsWith(":*") ? pattern.slice(0, -2) : null;
+}
+
+function wildcardToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`);
+}
+
+function lineCount(value: string): number {
+  if (value.length === 0) return 0;
+  return value.split("\n").length;
 }

@@ -1,0 +1,7 @@
+phase unphased
+participant unphased:workspace steps=world-read#1
+participant unphased:actor#1 steps=ask#1
+participant unphased:main steps=hole#2e33cec5
+handoff unphased:workspace -> unphased:actor#1 types="string[]"
+handoff unphased:actor#1 -> unphased:main types="string"
+handoff unphased:main -> unphased:actor#1 back

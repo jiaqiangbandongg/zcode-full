@@ -1,8 +1,10 @@
 /**
- * 实例出生阶段的读取与标记。
- * 两类读取共用 `instancePhases`（实例 `siteId@ordinal` → 出生时的阶段名）：
- * 为事件补充阶段，以及为 `ProviderStop` 明细补充阶段。
- * 表由引擎拥有并在实例创建时写入；本模块只读取。
+ * 出生阶段坐标的两个打戳函数（docs/dynamic-workflow/presentation.md 追记 2026-09-09）。
+ *
+ * 拆分原因：engine.ts 顶到 oxlint max-lines 上限（400 行）。选中这两个而不是别的，是因为它们
+ * 高度同族——同一张 `instancePhases` 表（实例 `siteId@ordinal` → 它**出生时**的阶段名）的仅有
+ * 两个读者，一个给事件打戳、一个给 `ProviderStop` 明细补阶段，且都是纯函数：表由调用方（引擎）
+ * 拥有并在铸造点写入，这里只读。公开面仍只有 engine.ts 在用。
  */
 
 import type { RunEvent } from "./types.js";
@@ -48,11 +50,18 @@ export function stampBirthPhase(event: RunEvent, instancePhases: InstancePhases)
     const phaseName = instancePhases.get(refToString(event.instance));
     return phaseName === undefined ? event : { ...event, phaseName };
   }
+  // 留白的到达也是一次出生（docs/execution-engine.md「Holes」）：序号与节点同族铸造，出生
+  // 阶段同一张表——没有行，事件是它唯一的坐标。
+  if (event.type === "hole-reached") {
+    const phaseName = instancePhases.get(refToString(event.instance));
+    return phaseName === undefined ? event : { ...event, phaseName };
+  }
   return event;
 }
 
 /**
- * 给 `ProviderStop` 补上触发停止的子代理的**出生阶段**：driver 只知道 actor ref，阶段只有引擎知道（与事件流上 `phaseName`
+ * 给 `ProviderStop` 补上触发停止的子代理的**出生阶段**（docs/execution-engine.md
+ * 「通知文案」的 `phase=`）：driver 只知道 actor ref，阶段只有引擎知道（与事件流上 `phaseName`
  * 的同一张表）。没有 providerStop、没有 subagent、已带阶段、或该 ref 出生在任何 `phase()`
  * 标记之前 → 原样返回。
  */

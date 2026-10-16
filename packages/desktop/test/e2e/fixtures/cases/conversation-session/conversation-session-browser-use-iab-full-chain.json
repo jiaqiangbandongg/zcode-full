@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-use-iab-full-chain",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-use-iab-full-chain.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-browser-use-iab-full-chain.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-browser-use-iab-title",
+      "description": "Browser Use case 内固定标题响应，避免异步标题请求污染主链 matcher。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是本用例产品语义，只需稳定返回并与 Browser tool continuation 隔离。"
+    },
+    {
+      "id": "upstream-browser-use-iab-bootstrap",
+      "description": "在 fresh kernel 初始化 Browser client、创建真实 IAB tab，并把 stable id 与 snapshot 返回模型。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定驱动真实 BrowserControl 链路，并让下一次模型响应只能从真实 tool result 恢复 stable tab id。"
+    },
+    {
+      "id": "upstream-browser-use-iab-action",
+      "description": "在新 fresh kernel 重新初始化 Browser client，用上一条 tool result 的动态 stable id 恢复 tab，再覆盖 locator、CUA、click 与截图。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证不依赖跨 cell binding 的 tab/page 连续性，并稳定覆盖 actionability、trusted input、页面副作用、同一结果多图画廊与 viewport 回读。"
+    },
+    {
+      "id": "upstream-browser-use-iab-final",
+      "description": "正常完成 turn，触发独立轮尾自动截图。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定验证显式 emitImage 与 Browser turn-end screenshot 同时保留。"
+    }
+  ]
+}

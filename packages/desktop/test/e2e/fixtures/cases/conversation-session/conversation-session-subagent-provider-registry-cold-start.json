@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-provider-registry-cold-start",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-provider-registry-cold-start.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-provider-registry-cold-start.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "subagent-provider-registry-cold-start-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 child subagent provider registry 是否存在；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+    },
+    {
+      "id": "subagent-provider-registry-cold-start-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+    }
+  ]
+}

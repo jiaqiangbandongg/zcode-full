@@ -14,7 +14,11 @@
   {
     "package": "unsafe-pointer@0.2.0",
     "repo": "justjake/node-unsafe-pointer",
-    "refs": ["v0.2.0", "unsafe-pointer@0.2.0", "0.2.0"],
+    "refs": [
+      "v0.2.0",
+      "unsafe-pointer@0.2.0",
+      "0.2.0"
+    ],
     "file": "third-party/upstream/0ab717053f3e24736cd404a0801407fb305db75d1b58f7e6487d14feee30d28a.txt",
     "sha256": "0ab717053f3e24736cd404a0801407fb305db75d1b58f7e6487d14feee30d28a",
     "source": "https://registry.npmjs.org/unsafe-pointer/0.2.0",
@@ -32,7 +36,9 @@
   {
     "package": "react-remove-scroll-bar@2.3.8",
     "repo": "theKashey/react-remove-scroll-bar",
-    "refs": ["b3b1287aad81def2e2ae707274b74531b61ddbaf"],
+    "refs": [
+      "b3b1287aad81def2e2ae707274b74531b61ddbaf"
+    ],
     "file": "third-party/upstream/f158b3bd10b867740fdbf81447216f1f8685473acf61e6a105ef91ba9fe8ebc3.txt",
     "sha256": "f158b3bd10b867740fdbf81447216f1f8685473acf61e6a105ef91ba9fe8ebc3",
     "source": "https://registry.npmjs.org/react-remove-scroll-bar/2.3.8",
@@ -47,7 +53,11 @@
   {
     "package": "quickjs-wasi@2.2.0",
     "repo": "vercel-labs/quickjs-wasi",
-    "refs": ["v2.2.0", "quickjs-wasi@2.2.0", "2.2.0"],
+    "refs": [
+      "v2.2.0",
+      "quickjs-wasi@2.2.0",
+      "2.2.0"
+    ],
     "file": "third-party/upstream/f29b60ea39a2132e3baa98927c2d473b349a54143da44a0c6762b243e6459452.txt",
     "sha256": "f29b60ea39a2132e3baa98927c2d473b349a54143da44a0c6762b243e6459452",
     "source": "https://registry.npmjs.org/quickjs-wasi/2.2.0",
@@ -116,7 +126,9 @@
   {
     "package": "@hono/node-ws@1.3.0",
     "repo": "honojs/middleware",
-    "refs": ["2c026b9d5bfff006dc9abdc1b33c53856d2d784f"],
+    "refs": [
+      "2c026b9d5bfff006dc9abdc1b33c53856d2d784f"
+    ],
     "file": "third-party/upstream/c681d64256e752c1435814cf045f4467720a8473e425ea54103a0f5128bfc817.txt",
     "sha256": "c681d64256e752c1435814cf045f4467720a8473e425ea54103a0f5128bfc817",
     "source": "https://registry.npmjs.org/@hono%2fnode-ws/1.3.0",
@@ -134,7 +146,11 @@
   {
     "package": "strict-event-emitter@0.5.1",
     "repo": "open-draft/strict-event-emitter",
-    "refs": ["v0.5.1", "strict-event-emitter@0.5.1", "0.5.1"],
+    "refs": [
+      "v0.5.1",
+      "strict-event-emitter@0.5.1",
+      "0.5.1"
+    ],
     "file": "third-party/upstream/93f24a47f95aea2be1b0dad78de98dc6d3de01ce22c0b72dc73e453c7917b955.txt",
     "sha256": "93f24a47f95aea2be1b0dad78de98dc6d3de01ce22c0b72dc73e453c7917b955",
     "source": "https://registry.npmjs.org/strict-event-emitter/0.5.1",
@@ -224,7 +240,9 @@
   {
     "package": "lazy-val@1.0.5",
     "repo": "develar/lazy-val",
-    "refs": ["b69ad4119f1b19bdab13c61ee2fcc88d46b89071"],
+    "refs": [
+      "b69ad4119f1b19bdab13c61ee2fcc88d46b89071"
+    ],
     "file": "third-party/upstream/f18c12b8e7daf98d572518b7db133b2dc66a713921dac4825410dd656e0c1a1a.txt",
     "sha256": "f18c12b8e7daf98d572518b7db133b2dc66a713921dac4825410dd656e0c1a1a",
     "source": "https://registry.npmjs.org/lazy-val/1.0.5",
@@ -242,7 +260,9 @@
   {
     "package": "semaphore@1.1.0",
     "repo": "abrkn/semaphore.js",
-    "refs": ["88a33875b168cc7b5943d7fe987c36d08321d252"],
+    "refs": [
+      "88a33875b168cc7b5943d7fe987c36d08321d252"
+    ],
     "file": "third-party/upstream/1b8910ad1a22011c632f7ff544708be6cf08818ef80e8d4b45b6808ee8b05c17.txt",
     "sha256": "1b8910ad1a22011c632f7ff544708be6cf08818ef80e8d4b45b6808ee8b05c17",
     "source": "https://registry.npmjs.org/semaphore/1.1.0",
@@ -266,7 +286,11 @@
   {
     "package": "boolbase@1.0.0",
     "repo": "fb55/boolbase",
-    "refs": ["v1.0.0", "boolbase@1.0.0", "1.0.0"],
+    "refs": [
+      "v1.0.0",
+      "boolbase@1.0.0",
+      "1.0.0"
+    ],
     "file": "third-party/upstream/2d2349188616c4b64ceeae33e1386bb546b0658864b4f7f8c9785757cb065b5d.txt",
     "sha256": "2d2349188616c4b64ceeae33e1386bb546b0658864b4f7f8c9785757cb065b5d",
     "source": "https://registry.npmjs.org/boolbase/1.0.0",
@@ -281,7 +305,9 @@
   {
     "package": "@open-draft/deferred-promise@2.2.0",
     "repo": "open-draft/deferred-promise",
-    "refs": ["b30f1b683311030e92fcdd08d2bd6574d652b77f"],
+    "refs": [
+      "b30f1b683311030e92fcdd08d2bd6574d652b77f"
+    ],
     "file": "third-party/upstream/b1688598c3e32605b3973902a546225e0159349c05a0f74db67f76e08e116e65.txt",
     "sha256": "b1688598c3e32605b3973902a546225e0159349c05a0f74db67f76e08e116e65",
     "source": "https://registry.npmjs.org/@open-draft%2fdeferred-promise/2.2.0",
@@ -389,7 +415,11 @@
   {
     "package": "is-node-process@1.2.0",
     "repo": "mswjs/is-node-process",
-    "refs": ["v1.2.0", "is-node-process@1.2.0", "1.2.0"],
+    "refs": [
+      "v1.2.0",
+      "is-node-process@1.2.0",
+      "1.2.0"
+    ],
     "file": "third-party/upstream/000ffa2d773c511f4459fb31d89f841806f93bf5caf2050468ab2097c081b443.txt",
     "sha256": "000ffa2d773c511f4459fb31d89f841806f93bf5caf2050468ab2097c081b443",
     "source": "https://registry.npmjs.org/is-node-process/1.2.0",
@@ -415,7 +445,9 @@
   {
     "package": "ansi-to-react@6.2.6",
     "repo": "nteract/ansi-to-react",
-    "refs": ["145140971e9d83ccac32265f24b1c55dea437896"],
+    "refs": [
+      "145140971e9d83ccac32265f24b1c55dea437896"
+    ],
     "file": "third-party/upstream/2c88816684a40c718113a10062a8335b665cec00d3c7b32e2b3fe9c620a3e03e.txt",
     "sha256": "2c88816684a40c718113a10062a8335b665cec00d3c7b32e2b3fe9c620a3e03e",
     "source": "https://registry.npmjs.org/ansi-to-react/6.2.6",
@@ -445,36 +477,6 @@
     "package": "khroma@2.1.0",
     "license": "MIT",
     "evidence": "The package does not declare a license field; its license contains the MIT grant and copyright notice."
-  },
-  {
-    "package": "@rrweb/types@2.1.6",
-    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
-    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
-    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.1.6/LICENSE"
-  },
-  {
-    "package": "@rrweb/utils@2.1.6",
-    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
-    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
-    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.1.6/LICENSE"
-  },
-  {
-    "package": "rrdom@2.1.6",
-    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
-    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
-    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.1.6/LICENSE"
-  },
-  {
-    "package": "rrweb-snapshot@2.1.6",
-    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
-    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
-    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.1.6/LICENSE"
-  },
-  {
-    "package": "rrweb@2.1.6",
-    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
-    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
-    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.1.6/LICENSE"
   },
   {
     "package": "keyv@4.5.4",
@@ -507,5 +509,35 @@
     "source": "https://registry.npmjs.org/%40arms%2frum-electron%400.0.3",
     "evidenceKind": "publisher-license-identifier-and-standard-terms",
     "license": "MIT"
+  },
+  {
+    "package": "rrweb@2.0.0",
+    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
+    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb%402.0.0/LICENSE"
+  },
+  {
+    "package": "rrweb-snapshot@2.0.0",
+    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
+    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrweb-snapshot%402.0.0/LICENSE"
+  },
+  {
+    "package": "rrdom@2.0.0",
+    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
+    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/rrdom%402.0.0/LICENSE"
+  },
+  {
+    "package": "@rrweb/types@2.0.0",
+    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
+    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/%40rrweb%2Ftypes%402.0.0/LICENSE"
+  },
+  {
+    "package": "@rrweb/utils@2.0.0",
+    "file": "third-party/upstream/e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c.txt",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c",
+    "source": "https://raw.githubusercontent.com/rrweb-io/rrweb/%40rrweb%2Futils%402.0.0/LICENSE"
   }
 ]

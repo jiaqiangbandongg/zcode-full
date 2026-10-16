@@ -370,7 +370,7 @@ function resolvePresetFamilyStatusProvider({
   );
 }
 
-function resolveFallbackModelProviderNodeKey({
+export function resolveFallbackModelProviderNodeKey({
   selectedNodeKey,
   selectableNavigationItems,
 }: {
@@ -517,6 +517,40 @@ function pickFamilyModeNavigationItem(
       connectionSelectionMatchesNavigationItem(familyId, selection, item),
     ) ?? null
   );
+}
+
+export function resolveSelectedFamilyModeNodeKey({
+  selectedNavItem,
+  selectableNavigationItems,
+  connectionSelections = {},
+  pendingConnectionSelections = {},
+}: {
+  selectedNavItem: Exclude<
+    ModelProviderNavGroup["items"][number],
+    { type: "codingPlanLoading" }
+  > | null;
+  selectableNavigationItems: Array<
+    Exclude<ModelProviderNavGroup["items"][number], { type: "codingPlanLoading" }>
+  >;
+  connectionSelections?: ProviderFamilyConnectionSelectionSettings;
+  pendingConnectionSelections?: ProviderFamilyConnectionSelectionSettings;
+}): string | null {
+  if (
+    selectedNavItem?.type !== "preset" &&
+    selectedNavItem?.type !== "codingPlan" &&
+    selectedNavItem?.type !== "teamPlan"
+  ) {
+    return null;
+  }
+  const familySpec = resolveModelProviderFamilySpecByProviderId(selectedNavItem.presetId);
+  if (!familySpec) {
+    return null;
+  }
+  const savedItem = pickFamilyModeNavigationItem(selectableNavigationItems, familySpec.id, {
+    ...connectionSelections,
+    ...pendingConnectionSelections,
+  });
+  return savedItem && savedItem.key !== selectedNavItem.key ? savedItem.key : null;
 }
 
 export function connectionSelectionMatchesNavigationItem(

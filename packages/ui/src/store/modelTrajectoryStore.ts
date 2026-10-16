@@ -8,7 +8,7 @@ import { create } from "zustand";
  * 这里用一个轻量单例 store 作为桥：菜单写入 pending 请求，目标 workspace 的
  * useAppPanels 订阅并消费（按 workspaceKey 匹配，避免多 workspace 实例串开）。
  */
-interface ModelTrajectoryOpenRequest {
+export interface ModelTrajectoryOpenRequest {
   /** 唯一请求 id，保证同一 task 连续点击也能触发消费。 */
   requestId: string;
   taskId: string;

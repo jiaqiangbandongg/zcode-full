@@ -54,7 +54,7 @@ function matchesRequest(
   );
 }
 
-function findScreenshotSurfaceTab(
+export function findScreenshotSurfaceTab(
   tabs: readonly WorkspaceSidePaneTab[],
   payload: BrowserViewScreenshotSurfacePreparePayload,
 ): BrowserUseSidePaneTab | undefined {
@@ -84,7 +84,7 @@ export function findScreenshotSurfaceTabForRender(
  * prepare 接收匹配：严格 scope 命中优先；跨进程恢复的 tab 其 registry scope 元数据
  * 停留在旧进程值（见 matchesTabLoose 注释），必须降级匹配才能收到 prepare。
  */
-function findScreenshotSurfaceTabForPrepare(
+export function findScreenshotSurfaceTabForPrepare(
   tabs: readonly WorkspaceSidePaneTab[],
   payload: BrowserViewScreenshotSurfacePreparePayload,
 ): BrowserUseSidePaneTab | undefined {

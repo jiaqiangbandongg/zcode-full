@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-missing-package-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-missing-package-workspace.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-missing-package-workspace-tool-call",
+      "description": "WPL-006 advertises the explicitly installed Workspace Plugin MCP tool.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0"],
+        "bodyIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_missing_package_workspace",
+          "name": "mcp__plugin_e2e-plugin-lifecycle_lifecycle__version_marker",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-missing-package-workspace-final",
+      "description": "WPL-006 closes the explicit-install runtime turn.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0",
+          "toolu_e2e_plugin_missing_package_workspace"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

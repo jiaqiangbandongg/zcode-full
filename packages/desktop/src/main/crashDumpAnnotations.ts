@@ -16,7 +16,7 @@ const ANNOTATION_KEY_PREFIXES = [
 const MAX_ANNOTATION_KEY_LENGTH = 64;
 const MAX_ANNOTATION_VALUE_LENGTH = 64 * 1024;
 /** 超过这个大小的 dump 不在主进程同步读取解析。 */
-const CRASH_DUMP_ANNOTATION_MAX_BYTES = 64 * 1024 * 1024;
+export const CRASH_DUMP_ANNOTATION_MAX_BYTES = 64 * 1024 * 1024;
 
 const CODE_CAGE_EXHAUSTED_THRESHOLD_BYTES = 4 * 1024 * 1024;
 const JS_HEAP_EXHAUSTED_THRESHOLD_BYTES = 1024 * 1024 * 1024;
@@ -30,7 +30,7 @@ const SIZE_UNITS: Record<string, number> = {
   GB: 1024 * 1024 * 1024,
 };
 
-type CrashDumpAnnotations = Record<string, string>;
+export type CrashDumpAnnotations = Record<string, string>;
 
 export type CrashDumpOomKind = "code_space_exhausted" | "js_heap_exhausted" | "unknown";
 
@@ -122,7 +122,7 @@ function readAnnotationAt(buffer: Buffer, index: number): { key: string; value: 
  * key/value 也是同样的 UTF8String 布局。这里不解析完整 minidump 目录，只按已知键名定位并
  * 校验长度前缀，格式对不上就跳过，绝不抛出。同一个键只取第一次出现的值。
  */
-function extractCrashDumpAnnotations(dump: Uint8Array): CrashDumpAnnotations {
+export function extractCrashDumpAnnotations(dump: Uint8Array): CrashDumpAnnotations {
   const buffer = Buffer.isBuffer(dump)
     ? dump
     : Buffer.from(dump.buffer, dump.byteOffset, dump.byteLength);
@@ -164,7 +164,7 @@ export function readCrashDumpAnnotationsFromFile(
 }
 
 /** 解析 V8 注解里的 "284.93MB" / "0B" / "1023.94KB" 这类大小文本，单位按 1024 进位。 */
-function parseV8SizeAnnotation(value: string | undefined): number | null {
+export function parseV8SizeAnnotation(value: string | undefined): number | null {
   if (!value) {
     return null;
   }

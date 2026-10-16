@@ -19,6 +19,7 @@ export function TaskActionMenuContent({
   taskSessionFile,
   activeSessionId,
   taskNativeSessionLogFile,
+  providerConfigFile,
   disableTaskActions = false,
   disableTaskTargetActions = false,
   disablePinTaskAction = false,
@@ -39,9 +40,13 @@ export function TaskActionMenuContent({
   onCopyTaskLogPath,
   onCopySessionId,
   onViewModelTrajectory,
+  onOpenProviderConfig,
 }: {
   intl: {
-    formatMessage: (desc: { id: string }, values?: Record<string, string>) => string;
+    formatMessage: (
+      desc: { id: string },
+      values?: Record<string, string>,
+    ) => string;
   };
   isPinned: boolean;
   fileManagerLabel: string;
@@ -52,6 +57,7 @@ export function TaskActionMenuContent({
     path: string | null;
     exists: boolean;
   };
+  providerConfigFile: { loading: boolean; path: string | null; exists: boolean };
   disableTaskActions?: boolean;
   disableTaskTargetActions?: boolean;
   disablePinTaskAction?: boolean;
@@ -74,8 +80,10 @@ export function TaskActionMenuContent({
   onCopyTaskLogPath: () => void;
   onCopySessionId?: () => void;
   onViewModelTrajectory?: () => void;
+  onOpenProviderConfig: () => void;
 }) {
-  const taskTargetActionsDisabled = disableTaskActions || disableTaskTargetActions;
+  const taskTargetActionsDisabled =
+    disableTaskActions || disableTaskTargetActions;
 
   return (
     <>
@@ -154,7 +162,11 @@ export function TaskActionMenuContent({
         {intl.formatMessage({ id: "appHeader.copyPath" })}
       </Item>
       <Item
-        disabled={taskTargetActionsDisabled || taskSessionFile.loading || !taskSessionFile.path}
+        disabled={
+          taskTargetActionsDisabled ||
+          taskSessionFile.loading ||
+          !taskSessionFile.path
+        }
         title={taskTargetActionsDisabled ? disabledReason : undefined}
         onSelect={onCopyTaskPath}
       >
@@ -169,7 +181,7 @@ export function TaskActionMenuContent({
         title={taskTargetActionsDisabled ? disabledReason : undefined}
         onSelect={onCopyTaskLogPath}
       >
-        {/* ZCode Agent 的日志路径可能先按运行时约定得出，当前日期文件尚未落盘。
+        {/* Bugfix: ZCode Agent 的日志路径可能先按运行时约定得出，当前日期文件尚未落盘。
             复制动作只依赖路径字符串，不能把 exists=false 当成不可复制，否则菜单会表现成“不能点”。 */}
         {intl.formatMessage({ id: "appHeader.copyLogPath" })}
       </Item>
@@ -180,6 +192,27 @@ export function TaskActionMenuContent({
           onSelect={onCopySessionId}
         >
           {intl.formatMessage({ id: "appHeader.copySessionId" })}
+        </Item>
+      ) : null}
+      {!hideMobileUnsupportedActions ? (
+        /* Bugfix: 手机远控运行在浏览器里，无法可靠打开桌面端 provider 配置文件。
+           这里只在远控移动端隐藏入口，桌面端仍沿用“路径已知即可前往配置”的能力。 */
+        <Item
+          disabled={
+            disableTaskActions ||
+            providerConfigFile.loading ||
+            !providerConfigFile.path
+          }
+          title={disableTaskActions ? disabledReason : undefined}
+          onSelect={() => {
+            if (!disableTaskActions) {
+              onOpenProviderConfig();
+            }
+          }}
+        >
+          <span className="truncate">
+            {intl.formatMessage({ id: "appHeader.goToProviderConfig" })}
+          </span>
         </Item>
       ) : null}
       {onViewModelTrajectory ? (
@@ -200,7 +233,7 @@ export function TaskActionMenuContent({
         <>
           <Separator />
           <Item disabled={taskTargetActionsDisabled} onSelect={onOpenTaskFeedback}>
-            {/* 任务菜单之前只有复制日志/路径，用户遇到任务问题时还要手动回到反馈中心。
+            {/* Bugfix: 任务菜单之前只有复制日志/路径，用户遇到任务问题时还要手动回到反馈中心。
                 “反馈问题”不是任务管理动作，单独放在菜单底部更符合兜底求助入口的层级。 */}
             {intl.formatMessage({ id: "taskList.feedback" })}
           </Item>

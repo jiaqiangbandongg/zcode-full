@@ -22,7 +22,9 @@ export function buildModelConfigMissingUiError(): ModelConfigMissingUiError {
 }
 
 export function isProviderNotReadyError(error: unknown): boolean {
-  return normalizeUnknownError(error).code === ZCODE_AGENT_PROVIDER_NOT_READY_CODE;
+  return (
+    normalizeUnknownError(error).code === ZCODE_AGENT_PROVIDER_NOT_READY_CODE
+  );
 }
 
 interface WorkspacePrepareErrorContext {
@@ -41,7 +43,9 @@ interface WorkspacePrepareErrorContext {
   displayMessage?: string;
 }
 
-function buildWorkspacePrepareDetail(context: WorkspacePrepareErrorContext): string {
+function buildWorkspacePrepareDetail(
+  context: WorkspacePrepareErrorContext,
+): string {
   return (
     `workspace=${context.workspacePath} ` +
     `provider=${context.provider} ` +
@@ -60,7 +64,11 @@ function stringifyUnknownValue(value: unknown): string {
   if (value === undefined) {
     return "undefined";
   }
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
     return String(value);
   }
 
@@ -92,12 +100,16 @@ export function getChatErrorMessage(err: unknown): string {
   return stringifyUnknownValue(err);
 }
 
-function buildDisplayErrorInput(err: unknown, displayMessage: string | undefined): unknown {
+function buildDisplayErrorInput(
+  err: unknown,
+  displayMessage: string | undefined,
+): unknown {
   if (!displayMessage) {
     return err;
   }
 
-  const displayError = new Error(displayMessage) as Error & Record<string, unknown>;
+  const displayError = new Error(displayMessage) as Error &
+    Record<string, unknown>;
   if (err instanceof Error) {
     displayError.name = err.name;
     displayError.stack = err.stack;
@@ -144,4 +156,23 @@ export function buildWorkspacePrepareUiError(
     ...normalizedError,
     detail: buildWorkspacePrepareDetail(context),
   };
+}
+
+export function buildCachedWorkspacePrepareUiError(
+  message: string,
+  cachedError: (ZCodeError & { detail?: string }) | null | undefined,
+  context: WorkspacePrepareErrorContext,
+): ZCodeError & { detail?: string } {
+  if (cachedError?.message === message) {
+    // Bugfix: workspaceInit 目前只缓存纯 message；页面返回命中 failed 短路时，
+    // 必须复用上一轮 prepare 的结构化 code，否则模型配置缺失会重新显示 CLI 原文。
+    return cachedError.detail
+      ? cachedError
+      : {
+          ...cachedError,
+          detail: buildWorkspacePrepareDetail(context),
+        };
+  }
+
+  return buildWorkspacePrepareUiError(new Error(message), context);
 }

@@ -4,6 +4,7 @@ import type {
   AppUsageSnapshot,
   CodingPlanUsageRequest,
   CodingPlanUsageSnapshot,
+  CodingPlanRegularTpsRequest,
   CodingPlanResetOpportunityRequest,
   CodingPlanResetOpportunityResult,
   CodingPlanResetScopeRequest,
@@ -47,6 +48,8 @@ interface UsageStatsServiceDependencies {
   officialMcpCredentialSource?: OfficialMcpCredentialSource;
 }
 
+const CODING_PLAN_REGULAR_TPS_CACHE_MS = 5 * 60_000;
+
 function isCodingPlanProviderId(providerId: string | undefined): boolean {
   return Boolean(providerId && isCodingPlanModelProviderId(providerId));
 }
@@ -64,6 +67,21 @@ export function createUsageStatsService(
       ? { officialMcpCredentialSource: dependencies.officialMcpCredentialSource }
       : {}),
   });
+  const regularTpsCache = new Map<
+    string,
+    { expiresAt: number; value: number | undefined }
+  >();
+  const regularTpsInFlight = new Map<string, Promise<number | undefined>>();
+
+  function regularTpsCacheKey(request: CodingPlanRegularTpsRequest): string {
+    return JSON.stringify([
+      request.preferredProviderId,
+      // Team scope（organizationId/projectId）已内含在 accountAccess 里，整体入 key，
+      // 避免同一 provider 下不同账号或不同团队项目共用同一条 TPS 缓存。
+      request.accountAccess,
+      request.timeZone ?? null,
+    ]);
+  }
 
   return {
     async getAppUsageSnapshot(request: AppUsageRequest): Promise<AppUsageSnapshot> {
@@ -83,6 +101,33 @@ export function createUsageStatsService(
         throw new Error("no_bigmodel_api_key");
       }
       return quotaProvider.getCodingPlanUsageSnapshot(request);
+    },
+    async getCodingPlanRegularTps(
+      request: CodingPlanRegularTpsRequest,
+    ): Promise<number | undefined> {
+      if (!isCodingPlanProviderId(request.preferredProviderId)) {
+        throw new Error("no_bigmodel_api_key");
+      }
+      const key = regularTpsCacheKey(request);
+      const cached = regularTpsCache.get(key);
+      if (cached && cached.expiresAt > Date.now()) return cached.value;
+      const existing = regularTpsInFlight.get(key);
+      if (existing) return existing;
+
+      const requestPromise = quotaProvider
+        .getCodingPlanRegularTps(request)
+        .then((value) => {
+          regularTpsCache.set(key, {
+            expiresAt: Date.now() + CODING_PLAN_REGULAR_TPS_CACHE_MS,
+            value,
+          });
+          return value;
+        })
+        .finally(() => {
+          regularTpsInFlight.delete(key);
+        });
+      regularTpsInFlight.set(key, requestPromise);
+      return requestPromise;
     },
     async getCodingPlanResetStatus(
       request: CodingPlanResetScopeRequest,

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-run-title-stable",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-run-title-stable.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-automation-run-title-stable.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-automation-run-title-stable-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定命中编辑页当前 prompt 并回复一个不同实体，稳定验证 Run now 先保存当前表单，且执行会话不会根据回复内容二次生成标题。"
+    }
+  ]
+}

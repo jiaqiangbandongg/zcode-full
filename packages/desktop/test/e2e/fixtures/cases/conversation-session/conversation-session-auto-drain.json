@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-auto-drain",
+  "spec": "./test/e2e/conversation-session/conversation-session-auto-drain.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-auto-drain.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-auto-drain-running-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "C02 只验证当前轮自然完成后自动消费队首文本；真实 provider 过快完成会让第二条输入绕过 queue。"
+    },
+    {
+      "id": "upstream-auto-drain-queued-fast-text",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 queued prompt 自动发起下一次 provider 请求并清空 queue；响应内容只需稳定完成。"
+    }
+  ]
+}

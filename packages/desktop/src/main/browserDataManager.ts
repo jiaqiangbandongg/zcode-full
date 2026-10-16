@@ -1,4 +1,6 @@
 import { stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { session as electronSession } from "electron";
 import type {
   ChromeBrowserDataImportError,
@@ -26,6 +28,7 @@ import {
 } from "./chromeProfileDiscovery.js";
 import type { LinuxChromePasswordStore } from "./chromeInstallationCandidates.js";
 import type { WindowsChromeAppBoundKeyReader } from "./windowsChromeAppBoundKey.js";
+import { clearEmbeddedBrowserSitePermissions } from "./embeddedBrowserSitePermissions.js";
 
 export const EMBEDDED_BROWSER_PARTITION = "persist:zcode-embedded-browser";
 const CACHE_STORAGE_TYPES: Electron.ClearStorageDataOptions["storages"] = [
@@ -59,6 +62,31 @@ function pathExists(path: string): Promise<boolean> {
     () => true,
     () => false,
   );
+}
+
+/** 兼容旧调用；实际导入使用 discoverChromeProfile 自动选择最近使用的 Profile。 */
+export function resolveChromeDefaultProfilePath(
+  options: {
+    platform?: NodeJS.Platform;
+    homeDir?: string;
+    localAppData?: string;
+  } = {},
+): string {
+  const platform = options.platform ?? process.platform;
+  const homeDir = options.homeDir ?? homedir();
+  if (platform === "darwin") {
+    return join(homeDir, "Library", "Application Support", "Google", "Chrome", "Default");
+  }
+  if (platform === "win32") {
+    return join(
+      options.localAppData ?? process.env.LOCALAPPDATA ?? join(homeDir, "AppData", "Local"),
+      "Google",
+      "Chrome",
+      "User Data",
+      "Default",
+    );
+  }
+  return join(homeDir, ".config", "google-chrome", "Default");
 }
 
 function emptyImportResult(error?: ChromeBrowserDataImportError): ChromeBrowserDataImportResult {
@@ -96,9 +124,8 @@ export async function importChromeBrowserData(options: {
   let detectedChromeExecutablePath = options.chromeExecutablePath;
   if (platform !== "win32" && !options.profilePath && !detectedChromeExecutablePath) {
     detectedChromeExecutablePath =
-      (await (
-        options.chromeExecutableDiscovery ?? (() => resolveChromeExecutablePath({ platform }))
-      )()) ?? undefined;
+      (await (options.chromeExecutableDiscovery ??
+        (() => resolveChromeExecutablePath({ platform })))()) ?? undefined;
     if (!detectedChromeExecutablePath) {
       // 过去会先扫描默认 Profile，导致“Chrome 未安装”被误报为 Profile 缺失，
       // 也无法识别注册在非默认目录的浏览器。先完成可执行文件发现，失败时不访问源数据。
@@ -218,6 +245,8 @@ export async function clearEmbeddedBrowserData(options: {
     await targetSession.clearCache();
     if (options.mode === "all") {
       await targetSession.clearStorageData();
+      // 「全部清除」连站点权限同意记录一起清：登录态与权限授权同属用户可预期的清理范围。
+      await clearEmbeddedBrowserSitePermissions();
     } else {
       // 普通缓存清理不能删除承载登录态的 LocalStorage/IndexedDB。
       await targetSession.clearStorageData({ storages: CACHE_STORAGE_TYPES });

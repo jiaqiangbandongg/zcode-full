@@ -1,0 +1,20 @@
+lane actor#1 name-head="研究员" @25:24 families=fanout#1
+lane actor#2 name-tail="-worker" @28:17
+lane actor#3 name-head="a" name-tail="b" @29:17
+lane actor#4 name-head="pre" name-tail="post" @30:17
+lane actor#5 @31:17
+lane actor#6 @32:17
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @25:3 label="map"
+step ask#1 ask "ask" label-head="研究员" @25:45 lane=actor#1 region=fanout#1 maybe stack
+step ask#2 ask "ask" label-tail="-worker" @28:41 lane=actor#2 region=seq#1 always
+step ask#3 ask "ask" label-head="a" label-tail="b" @29:33 lane=actor#3 region=seq#1 always
+step ask#4 ask "ask" label-head="pre" label-tail="post" @30:45 lane=actor#4 region=seq#1 always
+step ask#5 ask "ask" @31:34 lane=actor#5 region=seq#1 always
+step ask#6 ask "ask" @32:32 lane=actor#6 region=seq#1 always
+edge ask#1 -> ask#2 data maybe exact
+edge ask#2 -> ask#3 data always exact
+edge ask#3 -> ask#4 data always exact
+edge ask#4 -> ask#5 data always exact
+edge ask#5 -> ask#6 data always exact
+sink ask#6

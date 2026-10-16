@@ -12,6 +12,7 @@ import {
   type ProjectId,
 } from "@zcode/contracts";
 import type { ModelSelection } from "@zcode/provider";
+import { isHighspeedProviderId } from "@zcode/shared";
 import { StartupTimer } from "../startup-logging.js";
 
 export function isClosableSessionStore(
@@ -57,14 +58,29 @@ export async function readSessionModelSelection(
   });
   const data = entries.at(-1)?.data;
   const complete = parseModelSelectionValue(data);
-  if (complete) return complete;
+  if (complete) return residentModelSelection(complete);
   // reasoning 的错误类型不能抹掉可恢复的当前模型身份；这里只读取新字段，
   // 不借旧 thoughtLevel/消息/default 补值。执行前仍由 Registry 严格校验。
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const current = data as Record<string, unknown>;
-    return parseModelSelectionValue({ providerId: current.providerId, modelId: current.modelId });
+    return residentModelSelection(
+      parseModelSelectionValue({ providerId: current.providerId, modelId: current.modelId }),
+    );
   }
   return undefined;
+}
+
+/**
+ * 加速卡 Provider 是 `selectionScope=execution` 的单轮执行身份，永远不能当作会话常驻选型
+ * （highspeed-card-spec §5.1）。旧版本分叉会把分叉点消息上的加速选型写进 child 的
+ * model_selection entry，这类会话恢复后常驻在一个无凭据、且不在模型列表里的隐藏 Provider 上，
+ * 还会经 restoredModelSelection 投影成界面选中态与 contextWindow。读取时直接丢弃，
+ * 会话回到「未绑定」而不是借默认模型补齐（恢复语义见 runtime-config 的 initialModelSelection），
+ * 由用户重新选一次模型，避免隐藏身份继续在存储与投影里传播。
+ */
+function residentModelSelection(selection: ModelSelection | undefined): ModelSelection | undefined {
+  if (!selection) return undefined;
+  return isHighspeedProviderId(selection.providerId) ? undefined : selection;
 }
 
 export function closeSessionStore(store: SqliteSessionStore): void {

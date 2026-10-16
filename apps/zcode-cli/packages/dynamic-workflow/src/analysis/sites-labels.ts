@@ -41,11 +41,37 @@ export function literalText(expr: ts.Expression | undefined): string | undefined
   return expr !== undefined && ts.isStringLiteralLike(expr) ? expr.text : undefined;
 }
 
-export class Counter {
-  private value = 0;
-  next(): number {
-    this.value += 1;
-    return this.value;
+/**
+ * 一套 per-kind 站点计数器（`ask#N` / `actor#N` / …），外加 id 前缀。
+ *
+ * 前缀是留白的事（docs/analysis.md「Sites」的 Hole sites 段）：走查进入一个留白的函数体时
+ * **开一套全新的计数器**，体内铸出的每个 id 都带 `<holeId>/`（`hole#a91f3c07/ask#1`），外层
+ * 计数器从不看见体内的站点。于是补全一个留白（在脚本中间插入代码）不改动任何已有的 `ask#N` /
+ * `actor#N` / …——这是站点 id 稳定性规则从「加标记」到「加函数体」的延伸；活 run 的 journal
+ * 键、ask spec、站点阶段表都靠它在补全后幸存。前缀只有**一层**：留白自己的 id 是名字键
+ * （hole-id.ts），不带外层前缀，体内再留的留白因此不会让 id 随深度增长；`holeId` 记着
+ * 这套计数器属于哪个留白，让体内的留白站点把包着它的留白写进 `fill`。
+ * 全局 `order` 不在这里：它是文本输出的归并键，穿过函数体连续计数。
+ */
+export class SiteCounters {
+  private readonly counts = new Map<string, number>();
+
+  constructor(
+    private readonly prefix = "",
+    /** 这套计数器所在的留白函数体（顶层没有）。 */
+    readonly holeId?: string,
+  ) {}
+
+  /** 铸下一个 `<prefix><kind>#<n>`。 */
+  next(kind: string): string {
+    const n = (this.counts.get(kind) ?? 0) + 1;
+    this.counts.set(kind, n);
+    return `${this.prefix}${kind}#${n}`;
+  }
+
+  /** 进入留白 `holeId` 的函数体：全新一套计数器，前缀就是这个留白的 id（不叠加外层的）。 */
+  child(holeId: string): SiteCounters {
+    return new SiteCounters(`${holeId}/`, holeId);
   }
 }
 

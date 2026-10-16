@@ -74,7 +74,7 @@ const CREDENTIAL_RESOLVED_LOG_BUCKET_SECONDS = 3600;
  * resolver 只合并正在执行的请求，没有时间缓存；因此按小时分桶去重，避免每次
  * MCP 调用都产生 info 日志。凭据有效期跨桶、进入 expired 或切换套餐类型时重新记录。
  */
-function createCredentialResolvedLogKey(input: {
+export function createCredentialResolvedLogKey(input: {
   providerFamily: "zai" | "bigmodel";
   planTargetType: string | null;
   maasJwtExpiresInSeconds: number | undefined;
@@ -91,7 +91,7 @@ function createCredentialResolvedLogKey(input: {
 
 let lastCredentialResolvedLogKey: string | undefined;
 
-interface OfficialMcpCredentialResolverDeps {
+export interface OfficialMcpCredentialResolverDeps {
   accountRequestAuthService: {
     resolveAccessCurrent(access: ZCodeProviderAccountAccess): Promise<ZCodeAccountAccess | null>;
   };
@@ -417,14 +417,14 @@ export function buildOfficialMcpAuthHeaders(
 }
 
 /** host handler 透传的请求上下文；不参与凭证选择。 */
-interface OfficialMcpAuthHeadersRequestContext {
+export interface OfficialMcpAuthHeadersRequestContext {
   mcpKey: string;
   pluginId: string;
   targetOrigin: string;
   workspace: { workspaceIdentity?: string; workspaceKey: string; workspacePath: string };
 }
 
-type OfficialMcpAuthHeadersOutcome =
+export type OfficialMcpAuthHeadersOutcome =
   | { ok: true; headers: Record<string, string> }
   | { ok: false; reason: OfficialMcpAuthFailureReason };
 

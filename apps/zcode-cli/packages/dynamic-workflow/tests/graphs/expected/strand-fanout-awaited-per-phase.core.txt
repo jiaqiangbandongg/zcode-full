@@ -1,0 +1,59 @@
+fan-out fan-out#1 "fan-out" @17:15 order=0 count=3 type="string[]"
+ask ask#1 "ask" head="a-" @18:35 order=1 within=fan-out#1 type="string"
+actor actor#1 head="a-" @18:19 order=2 within=fan-out#1
+join join#1 "join" @21:25 order=3 type="string[]"
+fan-out fan-out#2 "fan-out" @24:15 order=4 count=3 type="string[]"
+ask ask#2 "ask" head="b-" @25:35 order=5 within=fan-out#2 type="string"
+actor actor#2 head="b-" @25:19 order=6 within=fan-out#2
+join join#2 "join" @28:25 order=7 type="string[]"
+join join#3 "join" @31:30 order=8 type="string[]"
+fan-out fan-out#3 "fan-out" @32:3 order=9 count=3 type="string[]"
+ask ask#3 "ask" head="c-" @33:37 order=10 within=fan-out#3 type="string"
+actor actor#3 head="c-" @33:21 order=11 within=fan-out#3
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-data ask#2 <- fan-out#2 exact
+fact ask-data ask#3 <- ask#1 exact
+fact ask-data ask#3 <- join#1 exact
+fact ask-data ask#3 <- ask#2 exact
+fact ask-data ask#3 <- join#2 exact
+fact ask-data ask#3 <- fan-out#1 exact
+fact ask-data ask#3 <- fan-out#2 exact
+fact ask-data ask#3 <- fan-out#3 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact join-in join#1 <- ask#1 exact
+fact join-in join#1 <- fan-out#1 exact
+fact join-in join#2 <- ask#2 exact
+fact join-in join#2 <- fan-out#2 exact
+fact join-in join#3 <- ask#3 exact
+fact join-in join#3 <- fan-out#3 exact
+fact return <- ask#3 exact
+fact return <- join#3 exact
+fact return <- fan-out#3 exact
+region seq#1 seq entered
+region fanout#1 fanout parent=seq#1 @17:15 label="map" strand
+region fanout#2 fanout parent=seq#1 @24:15 label="map" strand
+region fanout#3 fanout parent=seq#1 @32:3 label="map" strand
+mark phase#1 in=seq#1
+spawn actor#1 in=seq#1>fanout#1
+issue ask#1 in=seq#1>fanout#1 phase=phase#1
+settle ask#1 in=seq#1>fanout#1
+jump return fanout#1 in=seq#1>fanout#1 phase=phase#1
+settle ask#1 in=seq#1 joins=fanout#1
+mark phase#2 in=seq#1
+spawn actor#2 in=seq#1>fanout#2
+issue ask#2 in=seq#1>fanout#2 phase=phase#2
+settle ask#2 in=seq#1>fanout#2
+jump return fanout#2 in=seq#1>fanout#2 phase=phase#2
+settle ask#2 in=seq#1 joins=fanout#2
+mark phase#3 in=seq#1
+spawn actor#3 in=seq#1>fanout#3
+issue ask#3 in=seq#1>fanout#3 phase=phase#3
+settle ask#3 in=seq#1>fanout#3
+jump return fanout#3 in=seq#1>fanout#3 phase=phase#3
+settle ask#3 in=seq#1 joins=fanout#3
+jump return seq#1 in=seq#1 phase=phase#3
+phase phase#1 "A" @16:1
+phase phase#2 "B" @23:1
+phase phase#3 "C" @30:1

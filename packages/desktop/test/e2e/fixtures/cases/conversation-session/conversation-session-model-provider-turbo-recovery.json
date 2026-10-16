@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-turbo-recovery",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-turbo-recovery.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-turbo-recovery.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-provider-turbo-recovery-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 Turbo 重启恢复语义。"
+    },
+    {
+      "id": "model-provider-turbo-recovery-t02",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是首发请求使用 Turbo + enabled，固定响应只用于稳定收口。"
+    }
+  ]
+}

@@ -5,7 +5,13 @@
  * Manages MCP server configuration in the settings page.
  * Supports the unified ZCode Agent MCP source backed by settings directories.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   convertToZCodeAgentMcpServer,
   TID_MCP_OPEN_AUTHORIZATION_BUTTON,
@@ -21,7 +27,10 @@ import type {
   ZCodeMcpServerStatusSnapshot,
   ZCodePluginInfo,
 } from "@zcode/shared";
-import { isZCodeAgentMcpStatusModeUnsupportedError, type IMcpSyncService } from "@zcode/services";
+import {
+  isZCodeAgentMcpStatusModeUnsupportedError,
+  type IMcpSyncService,
+} from "@zcode/services";
 import { Button } from "@/components/ui/button.js";
 import { toast } from "@/components/ui/toast.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
@@ -60,11 +69,17 @@ import {
   SettingsResourceList,
 } from "@/settings/SettingsResourceGroup.js";
 import { McpServersImportDialog } from "@/settings/ExternalAgentImportDialog.js";
-import { RemoteSyncDialogs, shouldShowRemoteSyncActions } from "@/settings/RemoteSyncActions.js";
+import {
+  RemoteSyncDialogs,
+  shouldShowRemoteSyncActions,
+} from "@/settings/RemoteSyncActions.js";
 import { useMcpStore } from "@/store/mcpStore.js";
 import { usePluginManagementStore } from "@/store/pluginManagementStore.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
-import { useBaseWorkspaceServices, useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
+import {
+  useBaseWorkspaceServices,
+  useWorkspaceServices,
+} from "@/hooks/useWorkspaceServices.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
 import type { WorkspaceTabState } from "@/store/tabStore.js";
 import { getPluginWorkspaceKey } from "@/settings/PluginScopeMenu.js";
@@ -78,23 +93,25 @@ const MCP_OAUTH_AUTHORIZATION_STATUS_REFRESH_MS = 1_000;
 const MCP_OAUTH_AUTHORIZATION_STATUS_REFRESH_DURATION_MS = 5 * 60_000;
 const MCP_OAUTH_AUTHORIZATION_FOLLOWUP_REFRESH_ATTEMPTS = 10;
 
-function createMcpOAuthAuthorizationStatusRefreshDeadline(now: () => number = Date.now): number {
+export function createMcpOAuthAuthorizationStatusRefreshDeadline(
+  now: () => number = Date.now,
+): number {
   return now() + MCP_OAUTH_AUTHORIZATION_STATUS_REFRESH_DURATION_MS;
 }
 
-function isMcpOAuthAuthorizationStatusRefreshExpired(
+export function isMcpOAuthAuthorizationStatusRefreshExpired(
   deadline: number,
   now: () => number = Date.now,
 ): boolean {
   return now() >= deadline;
 }
 
-type McpServerStatusListRefreshOutcome =
+export type McpServerStatusListRefreshOutcome =
   | "refreshed"
   | "stale-workspace"
   | "status-mode-unsupported";
 
-async function refreshMcpServerStatusList({
+export async function refreshMcpServerStatusList({
   beginServerStatusListRefresh,
   markServerStatusListRefreshFailed,
   mergeServerStatusSnapshots,
@@ -126,7 +143,10 @@ async function refreshMcpServerStatusList({
   // mcp/list 收敛到 IMcpSyncService——UI 不直接触达 zcodeAgentService。
   mcpSyncService: Pick<IMcpSyncService, "listWorkspaceMcpServerStatuses">;
 }): Promise<McpServerStatusListRefreshOutcome> {
-  if (!requestedWorkspaceKey || getCurrentWorkspaceKey() !== requestedWorkspaceKey) {
+  if (
+    !requestedWorkspaceKey ||
+    getCurrentWorkspaceKey() !== requestedWorkspaceKey
+  ) {
     return "stale-workspace";
   }
   const refreshMode = mode ?? "connect";
@@ -147,7 +167,10 @@ async function refreshMcpServerStatusList({
     if (getCurrentWorkspaceKey() !== requestedWorkspaceKey) {
       return "stale-workspace";
     }
-    if (refreshMode === "status" && isZCodeAgentMcpStatusModeUnsupportedError(error)) {
+    if (
+      refreshMode === "status" &&
+      isZCodeAgentMcpStatusModeUnsupportedError(error)
+    ) {
       return "status-mode-unsupported";
     }
     markServerStatusListRefreshFailed?.(
@@ -159,13 +182,13 @@ async function refreshMcpServerStatusList({
   }
 }
 
-interface McpOAuthAuthorizationPendingRefresh {
+export interface McpOAuthAuthorizationPendingRefresh {
   mcpServers: ZCodeAgentMcpServer[];
   pendingKey: string;
   workspaceKey: string;
 }
 
-function transitionMcpAutoStatusListRefreshKey(
+export function transitionMcpAutoStatusListRefreshKey(
   previousKey: string,
   nextKey: string,
 ): { lastRefreshKey: string; shouldRefresh: boolean } {
@@ -180,13 +203,13 @@ function transitionMcpAutoStatusListRefreshKey(
   };
 }
 
-interface McpOAuthAuthorizationFollowupRefresh {
+export interface McpOAuthAuthorizationFollowupRefresh {
   mcpServers: ZCodeAgentMcpServer[];
   refreshKey: string;
   workspaceKey: string;
 }
 
-function transitionMcpOAuthAuthorizationPendingRefresh({
+export function transitionMcpOAuthAuthorizationPendingRefresh({
   activeWorkspaceKey,
   existingFollowup = null,
   mcpServers,
@@ -240,9 +263,9 @@ interface McpStatusListRefreshQueue {
 }
 
 /** 刷新来源：manual 是用户点了刷新按钮，auto 是列表/配置变化驱动的自动刷新。 */
-type McpStatusListRefreshTrigger = "auto" | "manual";
+export type McpStatusListRefreshTrigger = "auto" | "manual";
 
-interface McpStatusListRefreshInput {
+export interface McpStatusListRefreshInput {
   activeWorkspaceKey: string;
   activeWorkspacePath?: string;
   configReadyWorkspaceKey: string;
@@ -251,7 +274,7 @@ interface McpStatusListRefreshInput {
   storeWorkspaceKey: string;
 }
 
-function resolveMcpStatusListRefreshSkipReason({
+export function resolveMcpStatusListRefreshSkipReason({
   input,
   requestedWorkspaceKey,
   trigger,
@@ -280,7 +303,7 @@ function resolveMcpStatusListRefreshSkipReason({
   return undefined;
 }
 
-function createMcpStatusListRefreshQueue(): McpStatusListRefreshQueue {
+export function createMcpStatusListRefreshQueue(): McpStatusListRefreshQueue {
   let inFlight: Promise<void> | null = null;
   let latestRun: (() => Promise<void>) | null = null;
   let rerunAfterCurrent = false;
@@ -312,13 +335,15 @@ function createMcpStatusListRefreshQueue(): McpStatusListRefreshQueue {
   };
 }
 
-function buildMcpOAuthAuthorizationStatusRefreshServers(
+export function buildMcpOAuthAuthorizationStatusRefreshServers(
   servers: ZCodeMcpServer[],
   statusSnapshots: Record<string, ZCodeMcpServerStatusSnapshot> = {},
 ): ZCodeAgentMcpServer[] {
   const pendingSnapshotNames = new Set(
     Object.entries(statusSnapshots)
-      .filter(([, snapshot]) => Boolean(snapshot.authorization?.authorizationUrl))
+      .filter(([, snapshot]) =>
+        Boolean(snapshot.authorization?.authorizationUrl),
+      )
       .map(([serverName]) => serverName),
   );
   const result: ZCodeAgentMcpServer[] = [];
@@ -329,11 +354,15 @@ function buildMcpOAuthAuthorizationStatusRefreshServers(
       continue;
     }
     const hasPendingAuthorization =
-      Boolean(server.authorization?.authorizationUrl) || pendingSnapshotNames.has(server.name);
+      Boolean(server.authorization?.authorizationUrl) ||
+      pendingSnapshotNames.has(server.name);
     if (!hasPendingAuthorization || seenNames.has(server.name)) {
       continue;
     }
-    const zcodeAgentServer = convertToZCodeAgentMcpServer(server.name, server.config);
+    const zcodeAgentServer = convertToZCodeAgentMcpServer(
+      server.name,
+      server.config,
+    );
     if (!zcodeAgentServer) {
       continue;
     }
@@ -344,7 +373,9 @@ function buildMcpOAuthAuthorizationStatusRefreshServers(
   return result;
 }
 
-function buildMcpOAuthAuthorizationStatusRefreshOptions(mcpServers: ZCodeAgentMcpServer[]): {
+export function buildMcpOAuthAuthorizationStatusRefreshOptions(
+  mcpServers: ZCodeAgentMcpServer[],
+): {
   mode: "status";
   mcpServers: ZCodeAgentMcpServer[];
 } {
@@ -355,7 +386,7 @@ function buildMcpOAuthAuthorizationStatusRefreshOptions(mcpServers: ZCodeAgentMc
   };
 }
 
-function buildMcpServerStatusListKey(servers: ZCodeMcpServer[]): string {
+export function buildMcpServerStatusListKey(servers: ZCodeMcpServer[]): string {
   return servers
     .filter((server) => server.source === "zcodeagentmcp")
     .map((server) => {
@@ -365,7 +396,9 @@ function buildMcpServerStatusListKey(servers: ZCodeMcpServer[]): string {
     .join("|");
 }
 
-function buildPluginMcpServerStatusListKey(plugins: ZCodePluginInfo[]): string {
+export function buildPluginMcpServerStatusListKey(
+  plugins: ZCodePluginInfo[],
+): string {
   return plugins
     .map((plugin) => {
       const declaredNames = plugin.declaredMcpServerNames ?? [];
@@ -373,7 +406,9 @@ function buildPluginMcpServerStatusListKey(plugins: ZCodePluginInfo[]): string {
       const hostNames = plugin.hostMcpServerNames ?? [];
       if (
         (!plugin.enabled && hostNames.length === 0) ||
-        (declaredNames.length === 0 && runtimeNames.length === 0 && hostNames.length === 0)
+        (declaredNames.length === 0 &&
+          runtimeNames.length === 0 &&
+          hostNames.length === 0)
       ) {
         return "";
       }
@@ -390,11 +425,13 @@ function buildPluginMcpServerStatusListKey(plugins: ZCodePluginInfo[]): string {
     .join("|");
 }
 
-function shouldShowPluginMcpServersInMcpSettings(isRemoteSyncContext: boolean): boolean {
+export function shouldShowPluginMcpServersInMcpSettings(
+  isRemoteSyncContext: boolean,
+): boolean {
   return !isRemoteSyncContext;
 }
 
-function buildPendingMcpOAuthAuthorizationRefreshKey(
+export function buildPendingMcpOAuthAuthorizationRefreshKey(
   servers: ZCodeMcpServer[],
   statusSnapshots: Record<string, ZCodeMcpServerStatusSnapshot> = {},
 ): string {
@@ -408,8 +445,13 @@ function buildPendingMcpOAuthAuthorizationRefreshKey(
     .map((server) => `${server.id}:${server.authorization?.startedAt ?? ""}`);
   const runtimePendingKeys = Object.entries(statusSnapshots)
     .filter(([, snapshot]) => Boolean(snapshot.authorization?.authorizationUrl))
-    .map(([serverName, snapshot]) => `${serverName}:${snapshot.authorization?.startedAt ?? ""}`);
-  return Array.from(new Set([...localPendingKeys, ...runtimePendingKeys])).join("|");
+    .map(
+      ([serverName, snapshot]) =>
+        `${serverName}:${snapshot.authorization?.startedAt ?? ""}`,
+    );
+  return Array.from(new Set([...localPendingKeys, ...runtimePendingKeys])).join(
+    "|",
+  );
 }
 
 function PluginMcpServerList({
@@ -418,7 +460,10 @@ function PluginMcpServerList({
   onOpenAuthorization,
 }: {
   items: PluginMcpServerItem[];
-  pluginListingById: ReadonlyMap<string, ZCodeAvailablePluginSummary["listing"]>;
+  pluginListingById: ReadonlyMap<
+    string,
+    ZCodeAvailablePluginSummary["listing"]
+  >;
   onOpenAuthorization?: (item: PluginMcpServerItem) => void;
 }) {
   const { intl } = useZCodeIntl();
@@ -477,56 +522,72 @@ function PluginMcpServerList({
       renderItem={(item) => {
         const statusDescription = resolveStatusDescription(item);
         return (
+        <div
+          className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-hover"
+          data-mcp-status={item.status ?? ""}
+          data-mcp-tool-count={item.toolCount}
+          data-testid={testId(
+            TID_PLUGIN_MCP_SERVER_ROW,
+            item.runtimeServerName,
+          )}
+        >
           <div
-            className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-hover"
-            data-mcp-status={item.status ?? ""}
-            data-mcp-tool-count={item.toolCount}
-            data-testid={testId(TID_PLUGIN_MCP_SERVER_ROW, item.runtimeServerName)}
+            className="relative size-9 shrink-0"
+            data-mcp-status-dot-placement="icon-corner"
           >
-            <div className="relative size-9 shrink-0" data-mcp-status-dot-placement="icon-corner">
-              <PluginStoreAvatar
-                item={{
-                  name: item.pluginName,
-                  listing: pluginListingById.get(item.pluginId),
-                }}
-                className="size-9 bg-background"
+            <PluginStoreAvatar
+              item={{
+                name: item.pluginName,
+                listing: pluginListingById.get(item.pluginId),
+              }}
+              className="size-9 bg-background"
+            />
+            <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-background">
+              <McpStatusDot
+                status={item.status}
+                attention={Boolean(item.authorization?.authorizationUrl)}
+                disabled={!item.pluginEnabled}
+                reason={statusDescription}
               />
-              <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-background">
-                <McpStatusDot
-                  status={item.status}
-                  attention={Boolean(item.authorization?.authorizationUrl)}
-                  disabled={!item.pluginEnabled}
-                  reason={statusDescription}
-                />
-              </span>
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-ui-base font-medium text-foreground">{item.name}</div>
-              {item.status === "error" ? (
-                <McpFailurePresentation error={item.error} failureKind={item.failureKind} />
-              ) : (
-                <div className="mt-0.5 truncate text-ui-sm text-foreground-subtle">
-                  {statusDescription}
-                </div>
-              )}
-            </div>
-            {item.authorization?.authorizationUrl ? (
-              <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
-                  aria-label={openAuthorizationLabel}
-                  data-testid={testId(TID_MCP_OPEN_AUTHORIZATION_BUTTON, item.runtimeServerName)}
-                  title={openAuthorizationLabel}
-                  onClick={() => onOpenAuthorization?.(item)}
-                >
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">{openAuthorizationLabel}</span>
-                </Button>
-              </div>
-            ) : null}
+            </span>
           </div>
+          <div className="min-w-0">
+            <div className="truncate text-ui-base font-medium text-foreground">
+              {item.name}
+            </div>
+            {item.status === "error" ? (
+              <McpFailurePresentation
+                error={item.error}
+                failureKind={item.failureKind}
+              />
+            ) : (
+              <div className="mt-0.5 truncate text-ui-sm text-foreground-subtle">
+                {statusDescription}
+              </div>
+            )}
+          </div>
+          {item.authorization?.authorizationUrl ? (
+            <div className="flex min-w-0 max-w-full shrink-0 items-center gap-2">
+              <Button
+                variant="link"
+                size="sm"
+                className="text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
+                aria-label={openAuthorizationLabel}
+                data-testid={testId(
+                  TID_MCP_OPEN_AUTHORIZATION_BUTTON,
+                  item.runtimeServerName,
+                )}
+                title={openAuthorizationLabel}
+                onClick={() => onOpenAuthorization?.(item)}
+              >
+                <ExternalLink className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">
+                  {openAuthorizationLabel}
+                </span>
+              </Button>
+            </div>
+          ) : null}
+        </div>
         );
       }}
     />
@@ -539,6 +600,7 @@ interface McpSettingsSectionProps {
   remoteSessionId?: string;
   remoteTarget?: RemoteTarget;
   localWorkspacePath?: string;
+  isWebRemoteControl?: boolean;
   scopeFilter: "user" | "workspace";
   parentScopeKey: string;
   workspaceTabs: WorkspaceTabState[];
@@ -556,6 +618,7 @@ export function McpSettingsSection({
   remoteSessionId,
   remoteTarget,
   localWorkspacePath,
+  isWebRemoteControl = false,
   scopeFilter,
   parentScopeKey,
   workspaceTabs,
@@ -580,49 +643,87 @@ export function McpSettingsSection({
   const storedServers = useMcpStore((s) => s.servers);
   const storedStatusSnapshots = useMcpStore((s) => s.statusSnapshots);
   const plugins = usePluginManagementStore((state) => state.plugins);
-  const availablePlugins = usePluginManagementStore((state) => state.availablePlugins);
-  const installedPlugins = usePluginManagementStore((state) => state.installedPlugins);
-  const pluginStoreWorkspacePath = usePluginManagementStore((state) => state.workspacePath);
-  const pluginStoreWorkspaceIdentity = usePluginManagementStore((state) => state.workspaceIdentity);
-  const pluginConfigScope = usePluginManagementStore((state) => state.configScope);
-  const initializePlugins = usePluginManagementStore((state) => state.initialize);
+  const availablePlugins = usePluginManagementStore(
+    (state) => state.availablePlugins,
+  );
+  const installedPlugins = usePluginManagementStore(
+    (state) => state.installedPlugins,
+  );
+  const pluginStoreWorkspacePath = usePluginManagementStore(
+    (state) => state.workspacePath,
+  );
+  const pluginStoreWorkspaceIdentity = usePluginManagementStore(
+    (state) => state.workspaceIdentity,
+  );
+  const pluginConfigScope = usePluginManagementStore(
+    (state) => state.configScope,
+  );
+  const initializePlugins = usePluginManagementStore(
+    (state) => state.initialize,
+  );
   const currentProjectPath = useMcpStore((s) => s.currentProjectPath);
-  const currentWorkspaceIdentity = useMcpStore((s) => s.currentWorkspaceIdentity);
+  const currentWorkspaceIdentity = useMcpStore(
+    (s) => s.currentWorkspaceIdentity,
+  );
   const storeActiveWorkspacePath = useTabStore((s) => s.activeWorkspacePath);
-  const storeActiveWorkspaceIdentity = useTabStore((s) => s.activeWorkspaceIdentity ?? undefined);
+  const storeActiveWorkspaceIdentity = useTabStore(
+    (s) => s.activeWorkspaceIdentity ?? undefined,
+  );
   const activeWorkspacePath = workspacePath ?? storeActiveWorkspacePath;
-  const activeWorkspaceIdentity = workspaceIdentity ?? storeActiveWorkspaceIdentity;
-  const activeWorkspaceKey = activeWorkspaceIdentity?.trim() || activeWorkspacePath || "";
-  const currentMcpStoreWorkspaceKey = currentWorkspaceIdentity?.trim() || currentProjectPath;
-  // active tab 会先于异步 MCP 目录加载切换；过渡帧不能把 A 的配置和
+  const activeWorkspaceIdentity =
+    workspaceIdentity ?? storeActiveWorkspaceIdentity;
+  const activeWorkspaceKey =
+    activeWorkspaceIdentity?.trim() || activeWorkspacePath || "";
+  const currentMcpStoreWorkspaceKey =
+    currentWorkspaceIdentity?.trim() || currentProjectPath;
+  // 修复原因：active tab 会先于异步 MCP 目录加载切换；过渡帧不能把 A 的配置和
   // snapshot 投影到 B，更不能让后续 effect 把这些敏感配置发送给 B 的 Agent。
   const mcpStoreMatchesActiveWorkspace =
-    Boolean(activeWorkspaceKey) && currentMcpStoreWorkspaceKey === activeWorkspaceKey;
+    Boolean(activeWorkspaceKey) &&
+    currentMcpStoreWorkspaceKey === activeWorkspaceKey;
   const servers = mcpStoreMatchesActiveWorkspace ? storedServers : [];
-  const statusSnapshots = mcpStoreMatchesActiveWorkspace ? storedStatusSnapshots : {};
+  const statusSnapshots = mcpStoreMatchesActiveWorkspace
+    ? storedStatusSnapshots
+    : {};
   const isConfigLoaded = useMcpStore((s) => s.isConfigLoaded);
-  const ensureLoadedForWorkspace = useMcpStore((s) => s.ensureLoadedForWorkspace);
-  const loadMcpFromUserDirectory = useMcpStore((s) => s.loadMcpFromUserDirectory);
+  const ensureLoadedForWorkspace = useMcpStore(
+    (s) => s.ensureLoadedForWorkspace,
+  );
+  const loadMcpFromUserDirectory = useMcpStore(
+    (s) => s.loadMcpFromUserDirectory,
+  );
   const toggleServer = useMcpStore((s) => s.toggleServer);
   const addScopedMcpServer = useMcpStore((s) => s.addScopedMcpServer);
   const updateScopedMcpServer = useMcpStore((s) => s.updateScopedMcpServer);
   const deleteScopedMcpServer = useMcpStore((s) => s.deleteScopedMcpServer);
   const updateServerStatus = useMcpStore((s) => s.updateServerStatus);
-  const beginServerStatusListRefresh = useMcpStore((s) => s.beginServerStatusListRefresh);
-  const markServerStatusListRefreshFailed = useMcpStore((s) => s.markServerStatusListRefreshFailed);
-  const mergeServerStatusSnapshots = useMcpStore((s) => s.mergeServerStatusSnapshots);
+  const beginServerStatusListRefresh = useMcpStore(
+    (s) => s.beginServerStatusListRefresh,
+  );
+  const markServerStatusListRefreshFailed = useMcpStore(
+    (s) => s.markServerStatusListRefreshFailed,
+  );
+  const mergeServerStatusSnapshots = useMcpStore(
+    (s) => s.mergeServerStatusSnapshots,
+  );
 
   const [showForm, setShowForm] = useState(false);
   const [formScopeKey, setFormScopeKey] = useState(parentScopeKey);
-  const [editingServer, setEditingServer] = useState<ZCodeMcpServer | null>(null);
+  const [editingServer, setEditingServer] = useState<ZCodeMcpServer | null>(
+    null,
+  );
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [remoteMcpSyncOpen, setRemoteMcpSyncOpen] = useState(false);
   const query = searchQuery;
   const [editorMode, setEditorMode] = useState<McpEditorMode>("form");
-  const [mcpConfigReadyWorkspaceKey, setMcpConfigReadyWorkspaceKey] = useState("");
-  const [mcpOAuthAuthorizationFollowupRefresh, setMcpOAuthAuthorizationFollowupRefresh] =
-    useState<McpOAuthAuthorizationFollowupRefresh | null>(null);
-  const [mcpStatusOnlyUnsupported, setMcpStatusOnlyUnsupported] = useState(false);
+  const [mcpConfigReadyWorkspaceKey, setMcpConfigReadyWorkspaceKey] =
+    useState("");
+  const [
+    mcpOAuthAuthorizationFollowupRefresh,
+    setMcpOAuthAuthorizationFollowupRefresh,
+  ] = useState<McpOAuthAuthorizationFollowupRefresh | null>(null);
+  const [mcpStatusOnlyUnsupported, setMcpStatusOnlyUnsupported] =
+    useState(false);
   const mcpStatusOnlyUnsupportedRef = useRef(false);
   const isFormView = showForm || editingServer !== null;
   useEffect(() => {
@@ -636,12 +737,17 @@ export function McpSettingsSection({
   );
   const serverStatusListKey = useMemo(
     () =>
-      [buildMcpServerStatusListKey(servers), buildPluginMcpServerStatusListKey(plugins)]
+      [
+        buildMcpServerStatusListKey(servers),
+        buildPluginMcpServerStatusListKey(plugins),
+      ]
         .filter(Boolean)
         .join("|"),
     [plugins, servers],
   );
-  const statusListRefreshQueueRef = useRef<McpStatusListRefreshQueue | null>(null);
+  const statusListRefreshQueueRef = useRef<McpStatusListRefreshQueue | null>(
+    null,
+  );
   if (!statusListRefreshQueueRef.current) {
     statusListRefreshQueueRef.current = createMcpStatusListRefreshQueue();
   }
@@ -681,7 +787,11 @@ export function McpSettingsSection({
     ) {
       return "";
     }
-    return [activeWorkspaceIdentity ?? "", activeWorkspacePath, serverStatusListKey].join("\n");
+    return [
+      activeWorkspaceIdentity ?? "",
+      activeWorkspacePath,
+      serverStatusListKey,
+    ].join("\n");
   }, [
     activeWorkspaceIdentity,
     activeWorkspaceKey,
@@ -695,7 +805,8 @@ export function McpSettingsSection({
     [servers, statusSnapshots],
   );
   const pendingMcpOAuthAuthorizationRefreshServers = useMemo(
-    () => buildMcpOAuthAuthorizationStatusRefreshServers(servers, statusSnapshots),
+    () =>
+      buildMcpOAuthAuthorizationStatusRefreshServers(servers, statusSnapshots),
     [servers, statusSnapshots],
   );
   const pendingMcpOAuthAuthorizationRefreshDeadline = useMemo(
@@ -728,7 +839,8 @@ export function McpSettingsSection({
           ? latest.activeWorkspaceKey
           : "";
       };
-      const isRequestCurrent = () => getCurrentRefreshWorkspaceKey() === requestedWorkspaceKey;
+      const isRequestCurrent = () =>
+        getCurrentRefreshWorkspaceKey() === requestedWorkspaceKey;
       const skipReason = resolveMcpStatusListRefreshSkipReason({
         input: requestedInput,
         requestedWorkspaceKey,
@@ -752,7 +864,8 @@ export function McpSettingsSection({
       // skipReason 已经覆盖了这个分支，这里只为类型收窄。
       if (!requestedWorkspacePath) return;
       const requestedMcpServers =
-        options?.mcpServers ?? useMcpStore.getState().getEnabledMcpServersForZCode("zcode");
+        options?.mcpServers ??
+        useMcpStore.getState().getEnabledMcpServersForZCode("zcode");
       await statusListRefreshQueueRef.current?.request(async () => {
         if (!isRequestCurrent()) {
           return;
@@ -780,11 +893,16 @@ export function McpSettingsSection({
             workspacePath: requestedWorkspacePath,
           });
           if (trigger === "manual") {
-            // 手动刷新失败过去只进日志，用户看到的仍是旧状态且毫无提示。
-            const message = error instanceof Error ? error.message : String(error);
-            toast(intl.formatMessage({ id: "settings.mcp.refreshFailed" }, { error: message }), {
-              durationMs: 8_000,
-            });
+            // Bugfix：手动刷新失败过去只进日志，用户看到的仍是旧状态且毫无提示。
+            const message =
+              error instanceof Error ? error.message : String(error);
+            toast(
+              intl.formatMessage(
+                { id: "settings.mcp.refreshFailed" },
+                { error: message },
+              ),
+              { durationMs: 8_000 },
+            );
           }
           return "failed" as const;
         });
@@ -798,12 +916,18 @@ export function McpSettingsSection({
           lastPendingMcpOAuthAuthorizationRefreshRef.current = null;
           setMcpOAuthAuthorizationFollowupRefresh(null);
           setMcpStatusOnlyUnsupported(true);
-          logger.warn("[mcp] status-only refresh unsupported; stop OAuth status polling", {
-            workspacePath: requestedWorkspacePath,
-          });
-          toast(intl.formatMessage({ id: "settings.mcp.statusOnlyUnsupported" }), {
-            durationMs: 8_000,
-          });
+          logger.warn(
+            "[mcp] status-only refresh unsupported; stop OAuth status polling",
+            {
+              workspacePath: requestedWorkspacePath,
+            },
+          );
+          toast(
+            intl.formatMessage({ id: "settings.mcp.statusOnlyUnsupported" }),
+            {
+              durationMs: 8_000,
+            },
+          );
         } else if (outcome === "refreshed" && options?.mode !== "status") {
           mcpStatusOnlyUnsupportedRef.current = false;
           setMcpStatusOnlyUnsupported(false);
@@ -827,7 +951,10 @@ export function McpSettingsSection({
     if (refreshingStatusList) return;
     setRefreshingStatusList(true);
     try {
-      await loadMcpFromUserDirectory(services.mcpSyncService, activeWorkspaceIdentity);
+      await loadMcpFromUserDirectory(
+        services.mcpSyncService,
+        activeWorkspaceIdentity,
+      );
       if (activeWorkspacePath && !mcpConfigReadyWorkspaceKey) {
         const loaded = await ensureLoadedForWorkspace(
           activeWorkspacePath,
@@ -894,10 +1021,13 @@ export function McpSettingsSection({
         }
       })
       .catch((error) => {
-        logger.warn("[mcp] load workspace config before status refresh failed", {
-          error: error instanceof Error ? error.message : String(error),
-          workspacePath: activeWorkspacePath,
-        });
+        logger.warn(
+          "[mcp] load workspace config before status refresh failed",
+          {
+            error: error instanceof Error ? error.message : String(error),
+            workspacePath: activeWorkspacePath,
+          },
+        );
       });
 
     return () => {
@@ -942,7 +1072,10 @@ export function McpSettingsSection({
   }, [autoStatusListRefreshKey, requestMcpServerStatusList]);
 
   useEffect(() => {
-    if (!activeWorkspaceKey || mcpConfigReadyWorkspaceKey !== activeWorkspaceKey) {
+    if (
+      !activeWorkspaceKey ||
+      mcpConfigReadyWorkspaceKey !== activeWorkspaceKey
+    ) {
       lastPendingMcpOAuthAuthorizationRefreshRef.current = null;
       setMcpOAuthAuthorizationFollowupRefresh(null);
       return;
@@ -986,17 +1119,23 @@ export function McpSettingsSection({
         return;
       }
       timeoutId = window.setTimeout(() => {
-        if (cancelled || isMcpOAuthAuthorizationStatusRefreshExpired(deadline)) {
+        if (
+          cancelled ||
+          isMcpOAuthAuthorizationStatusRefreshExpired(deadline)
+        ) {
           return;
         }
         attempts += 1;
-        logger.debug("[mcp] refresh status while OAuth authorization is pending", {
-          attempt: attempts,
-          deadline,
-          pendingKey: pendingMcpOAuthAuthorizationRefreshKey,
-          workspacePath: activeWorkspacePath,
-        });
-        // mcp/list 为了尽快返回 authorizationUrl 会让 agent 在后台等待 OAuth
+        logger.debug(
+          "[mcp] refresh status while OAuth authorization is pending",
+          {
+            attempt: attempts,
+            deadline,
+            pendingKey: pendingMcpOAuthAuthorizationRefreshKey,
+            workspacePath: activeWorkspacePath,
+          },
+        );
+        // 修复原因：mcp/list 为了尽快返回 authorizationUrl 会让 agent 在后台等待 OAuth
         // 回调并重连；如果当前设置页不继续拉取 snapshot，UI 会停留在 connecting，直到切 tab 重挂载。
         // OAuth 轮询是高频请求，只能走 status-only，避免 pending 子集触发 replace 语义断开无关 MCP。
         void requestMcpServerStatusList(
@@ -1029,7 +1168,8 @@ export function McpSettingsSection({
   useEffect(() => {
     if (
       !mcpOAuthAuthorizationFollowupRefresh ||
-      mcpOAuthAuthorizationFollowupRefresh.workspaceKey !== activeWorkspaceKey ||
+      mcpOAuthAuthorizationFollowupRefresh.workspaceKey !==
+        activeWorkspaceKey ||
       mcpConfigReadyWorkspaceKey !== activeWorkspaceKey ||
       mcpStatusOnlyUnsupported
     ) {
@@ -1046,17 +1186,23 @@ export function McpSettingsSection({
       }
       if (attempts >= MCP_OAUTH_AUTHORIZATION_FOLLOWUP_REFRESH_ATTEMPTS) {
         setMcpOAuthAuthorizationFollowupRefresh((current) =>
-          current?.refreshKey === mcpOAuthAuthorizationFollowupRefresh.refreshKey ? null : current,
+          current?.refreshKey ===
+          mcpOAuthAuthorizationFollowupRefresh.refreshKey
+            ? null
+            : current,
         );
         return;
       }
       timeoutId = window.setTimeout(() => {
         attempts += 1;
-        logger.debug("[mcp] refresh status after OAuth authorization state changed", {
-          attempt: attempts,
-          followupKey: mcpOAuthAuthorizationFollowupRefresh.refreshKey,
-          workspacePath: activeWorkspacePath,
-        });
+        logger.debug(
+          "[mcp] refresh status after OAuth authorization state changed",
+          {
+            attempt: attempts,
+            followupKey: mcpOAuthAuthorizationFollowupRefresh.refreshKey,
+            workspacePath: activeWorkspacePath,
+          },
+        );
         void requestMcpServerStatusList(
           buildMcpOAuthAuthorizationStatusRefreshOptions(
             mcpOAuthAuthorizationFollowupRefresh.mcpServers,
@@ -1102,7 +1248,9 @@ export function McpSettingsSection({
         workspacePath: activeWorkspacePath,
       });
       void requestMcpServerStatusList(
-        buildMcpOAuthAuthorizationStatusRefreshOptions(pendingMcpOAuthAuthorizationRefreshServers),
+        buildMcpOAuthAuthorizationStatusRefreshOptions(
+          pendingMcpOAuthAuthorizationRefreshServers,
+        ),
       );
     };
     const handleVisibilityChange = () => {
@@ -1132,7 +1280,8 @@ export function McpSettingsSection({
     () =>
       servers.filter(
         (server) =>
-          server.scope === scopeFilter || (scopeFilter === "user" && server.scope === "common"),
+          server.scope === scopeFilter ||
+          (scopeFilter === "user" && server.scope === "common"),
       ),
     [scopeFilter, servers],
   );
@@ -1144,7 +1293,9 @@ export function McpSettingsSection({
     shouldShowRemoteSyncActions({
       remoteSessionId,
       remoteTarget,
-      clientMode: "desktop-continuous" as const,
+      clientMode: isWebRemoteControl
+        ? "web-remote-replayable"
+        : "desktop-continuous",
       hasLocalSourceService: Boolean(baseServices.mcpSyncService),
     }) && activeWorkspacePath
       ? remoteTarget
@@ -1157,14 +1308,17 @@ export function McpSettingsSection({
       return [];
     }
     const pluginStoreMatchesTarget =
-      (pluginStoreWorkspaceIdentity?.trim() || pluginStoreWorkspacePath || "") ===
-        activeWorkspaceKey && pluginConfigScope === scopeFilter;
+      (pluginStoreWorkspaceIdentity?.trim() ||
+        pluginStoreWorkspacePath ||
+        "") === activeWorkspaceKey && pluginConfigScope === scopeFilter;
     if (!pluginStoreMatchesTarget) {
       return [];
     }
-    const scopedPlugins = selectPluginsForScope(plugins, installedPlugins, scopeFilter).filter(
-      (plugin) => plugin.enabled,
-    );
+    const scopedPlugins = selectPluginsForScope(
+      plugins,
+      installedPlugins,
+      scopeFilter,
+    ).filter((plugin) => plugin.enabled);
     return buildPluginMcpServerItems(scopedPlugins, query, statusSnapshots);
   }, [
     installedPlugins,
@@ -1179,7 +1333,8 @@ export function McpSettingsSection({
     statusSnapshots,
   ]);
   const pluginListingById = useMemo(
-    () => new Map(availablePlugins.map((plugin) => [plugin.id, plugin.listing])),
+    () =>
+      new Map(availablePlugins.map((plugin) => [plugin.id, plugin.listing])),
     [availablePlugins],
   );
   const filteredMcpCount = filteredServers.length + pluginMcpServers.length;
@@ -1189,7 +1344,8 @@ export function McpSettingsSection({
   );
   const mcpProjectionReady =
     !activeWorkspacePath ||
-    (mcpStoreMatchesActiveWorkspace && mcpConfigReadyWorkspaceKey === activeWorkspaceKey);
+    (mcpStoreMatchesActiveWorkspace &&
+      mcpConfigReadyWorkspaceKey === activeWorkspaceKey);
   const hasEmptySearchResult = Boolean(query.trim()) && filteredMcpCount === 0;
   const installedServers = useMemo(
     () =>
@@ -1197,22 +1353,31 @@ export function McpSettingsSection({
         .map((server, index) => ({ index, server }))
         .toSorted((left, right) => {
           const leftAttention = Boolean(
-            left.server.authorization?.authorizationUrl || left.server.status === "error",
+            left.server.authorization?.authorizationUrl ||
+              left.server.status === "error",
           );
           const rightAttention = Boolean(
-            right.server.authorization?.authorizationUrl || right.server.status === "error",
+            right.server.authorization?.authorizationUrl ||
+              right.server.status === "error",
           );
-          return Number(rightAttention) - Number(leftAttention) || left.index - right.index;
+          return (
+            Number(rightAttention) - Number(leftAttention) ||
+            left.index - right.index
+          );
         })
         .map(({ server }) => server),
     [filteredServers],
   );
-  const hideInstalledGroup = Boolean(query.trim()) && installedServers.length === 0;
+  const hideInstalledGroup =
+    Boolean(query.trim()) && installedServers.length === 0;
   useEffect(() => {
     onVisibleCountChange?.(filteredMcpCount);
   }, [filteredMcpCount, onVisibleCountChange]);
   const remoteMcpSyncTargetLabel = connectedRemoteSyncTarget
-    ? formatRemoteSkillSyncTarget(connectedRemoteSyncTarget, activeWorkspacePath ?? "")
+    ? formatRemoteSkillSyncTarget(
+        connectedRemoteSyncTarget,
+        activeWorkspacePath ?? "",
+      )
     : "";
 
   async function handleToggle(id: string, enabled: boolean) {
@@ -1260,12 +1425,23 @@ export function McpSettingsSection({
     };
     // 表单 Scope 可以独立于父页面切换，不能继续读取可能仍属于旧目标的
     // currentProjectPath；保存目标必须使用表单已解析并完成加载的 workspace props。
-    const projectPath = formScopeKey === "user" ? undefined : activeWorkspacePath;
+    const projectPath =
+      formScopeKey === "user" ? undefined : activeWorkspacePath;
 
     if (prev) {
-      await updateScopedMcpServer(DEFAULT_MCP_SOURCE, prev.name, config, projectPath);
+      await updateScopedMcpServer(
+        DEFAULT_MCP_SOURCE,
+        prev.name,
+        config,
+        projectPath,
+      );
     } else {
-      await addScopedMcpServer(DEFAULT_MCP_SOURCE, form.name, config, projectPath);
+      await addScopedMcpServer(
+        DEFAULT_MCP_SOURCE,
+        form.name,
+        config,
+        projectPath,
+      );
     }
 
     setShowForm(false);
@@ -1275,7 +1451,10 @@ export function McpSettingsSection({
 
   async function handleDelete(server: ZCodeMcpServer) {
     const confirmed = await confirmDialog({
-      title: intl.formatMessage({ id: "settings.mcp.deleteConfirmTitle" }, { name: server.name }),
+      title: intl.formatMessage(
+        { id: "settings.mcp.deleteConfirmTitle" },
+        { name: server.name },
+      ),
       description: intl.formatMessage({
         id: "settings.mcp.deleteConfirmDescription",
       }),
@@ -1297,7 +1476,9 @@ export function McpSettingsSection({
   }
 
   function handleEdit(server: ZCodeMcpServer) {
-    const ownerWorkspace = workspaceTabs.find((tab) => tab.workspacePath === server.projectPath);
+    const ownerWorkspace = workspaceTabs.find(
+      (tab) => tab.workspacePath === server.projectPath,
+    );
     const ownedScopeKey =
       server.scope === "workspace"
         ? ownerWorkspace
@@ -1357,7 +1538,9 @@ export function McpSettingsSection({
               : [{ label: formBreadcrumbLabel }]
           }
           onSectionSelect={
-            showMarketplaceBreadcrumb && onOpenPluginStore ? onOpenPluginStore : closeFormView
+            showMarketplaceBreadcrumb && onOpenPluginStore
+              ? onOpenPluginStore
+              : closeFormView
           }
         />
         <div className="space-y-4">
@@ -1420,7 +1603,9 @@ export function McpSettingsSection({
     <div className="space-y-4">
       {connectedRemoteSyncTarget ? (
         <div className="flex justify-end">
-          <ControlHintTooltip title={intl.formatMessage({ id: "settings.mcp.remoteSync.open" })}>
+          <ControlHintTooltip
+            title={intl.formatMessage({ id: "settings.mcp.remoteSync.open" })}
+          >
             <Button
               type="button"
               variant="outline"
@@ -1446,7 +1631,9 @@ export function McpSettingsSection({
       ) : null}
 
       {!mcpProjectionReady ? (
-        <PluginLoadingState label={intl.formatMessage({ id: "common.loading" })} />
+        <PluginLoadingState
+          label={intl.formatMessage({ id: "common.loading" })}
+        />
       ) : hasEmptySearchResult ? (
         <PluginSearchEmptyState
           label={intl.formatMessage({
@@ -1563,7 +1750,10 @@ export function McpSettingsSection({
         settingsSyncService={services.settingsSyncService}
         onOpenChange={setImportDialogOpen}
         onImported={async () => {
-          await loadMcpFromUserDirectory(services.mcpSyncService, activeWorkspaceIdentity);
+          await loadMcpFromUserDirectory(
+            services.mcpSyncService,
+            activeWorkspaceIdentity,
+          );
         }}
       />
       <RemoteSyncDialogs

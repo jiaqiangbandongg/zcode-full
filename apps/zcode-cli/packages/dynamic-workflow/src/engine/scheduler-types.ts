@@ -7,7 +7,6 @@
  * 从这里导入，两侧都不必反向 import 调度器本体。
  */
 
-import { INSTRUCTIONS_HEAD_MAX_CHARS, refToString, WorkflowError } from "./types.js";
 import type { ImportedActorState } from "./imported-cache.js";
 import type {
   ActorId,
@@ -21,6 +20,7 @@ import type {
   SessionRef,
   ValidateFn,
   WorkflowDriver,
+  WorkflowError,
 } from "./types.js";
 
 /** 一个可外部结算的 promise。 */
@@ -45,7 +45,7 @@ export interface SchedulerHost {
   readonly runId: string;
   /**
    * 本 run 的并发上界。**每次派发前现读**，不是构造时抄下的一份：`setMaxConcurrency` 会整份
-   * 换掉引擎持有的 caps，
+   * 换掉引擎持有的 caps（docs/dynamic-workflow/concurrency.md「Two bounds on a run」），
    * 而调度器的派发判据必须看见新值。引擎侧因此以 getter 实现这个属性。
    */
   readonly caps: Caps;
@@ -54,7 +54,7 @@ export interface SchedulerHost {
   /** 分配某站点的下一个执行序号（与 world-read/actor 共用一套计数器）。 */
   nextOrdinal(siteId: string): number;
   /**
-   * 受 replay 结算次序约束地释放一次命中。
+   * 受 replay 结算次序约束地释放一次命中（docs/execution-engine.md「Replaying the settle order」）。
    * 非 resume、或次序表里没有这个实例时立即执行 `release`。
    */
   holdForReplay(instance: InstanceRef, release: () => void): void;
@@ -128,58 +128,4 @@ export interface Actor {
    * imported-cache.ts 的 `matchImportedActor`）。缺席即该 actor 全新重跑。
    */
   imported?: ImportedActorState;
-}
-
-// 合入后按当前格式化规则展开会超过调度器的 400 行限制；纯辅助函数与现有 defer 一起收在此处，行为不变。
-/** replay 命中但 inputHash 不一致——纯度契约被破坏，run 大声失败。 */
-export function hashMismatch(instance: InstanceRef, expected: string, got: string): WorkflowError {
-  return new WorkflowError(
-    "InputHashMismatch",
-    `Replay hit at ${refToString(instance)} but inputHash differs (expected ${expected}, got ` +
-      `${got}): the script is not deterministic, so the journal cannot be replayed.`,
-    // 结构化 mismatch 与 ScriptHashMismatch 对齐：两个哈希不一致错误共用同一个字段，
-    // 读端不必再从 message 文本里抠哈希。
-    { mismatch: { expected, got } },
-  );
-}
-
-/** cause → 一行有界文本（Error 取 message，其余 String()；空则给占位）。 */
-export function describeCause(cause: unknown): string {
-  const text = cause instanceof Error ? cause.message : String(cause);
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return "unknown error";
-  return trimmed.length > 300 ? `${trimmed.slice(0, 300)}…` : trimmed;
-}
-
-/**
- * 作者指令的开头（{@link INSTRUCTIONS_HEAD_MAX_CHARS} 个字符，去两端空白，**不加省略号**）。
- * 空指令返回 undefined：缺席的键比一个空串诚实——读面据此退回「不知道它被交代了什么」。
- */
-export function headOfInstructions(instructions: string): string | undefined {
-  const trimmed = instructions.trim();
-  if (trimmed.length === 0) return undefined;
-  return trimmed.length <= INSTRUCTIONS_HEAD_MAX_CHARS
-    ? trimmed
-    : trimmed.slice(0, INSTRUCTIONS_HEAD_MAX_CHARS);
-}
-
-/** 按原有准入顺序清空 actor 队列；派发仍由调度器唯一负责。 */
-export function drainActorAdmission(actor: Actor): void {
-  let progressed = true;
-  while (progressed) {
-    progressed = false;
-    const release = actor.pendingRecorded.get(actor.nextAdmitSeq);
-    if (release !== undefined) {
-      actor.pendingRecorded.delete(actor.nextAdmitSeq);
-      actor.nextAdmitSeq++;
-      release();
-      progressed = true;
-      continue;
-    }
-    if (actor.nextAdmitSeq >= actor.recordedCount && actor.pendingLive.length > 0) {
-      const admit = actor.pendingLive.shift()!;
-      admit();
-      progressed = true;
-    }
-  }
 }

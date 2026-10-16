@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-remote-kind-double-click",
+  "spec": "./test/e2e/conversation-session/conversation-session-remote-kind-double-click.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-remote-kind-double-click.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "CWP13 仅验证连接类型卡片的单击、双击、下一步与返回，不连接远端或发送模型请求。",
+  "requests": []
+}

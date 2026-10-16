@@ -21,7 +21,7 @@ export const PROCESS_RESOURCE_MAX_SAMPLES_PER_WINDOW = 32;
  */
 const PROCESS_RESOURCE_MAX_WINDOWS = 64;
 
-type ProcessResourceScene = "foreground" | "background";
+export type ProcessResourceScene = "foreground" | "background";
 
 /** 该角色实际运行的机器；缺省时由出口补桌面机的值。 */
 export interface ProcessResourceHardware {

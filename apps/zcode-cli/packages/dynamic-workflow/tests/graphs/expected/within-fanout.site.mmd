@@ -1,0 +1,30 @@
+flowchart TD
+  subgraph actor_1["judgeA (actor#1)  ×N per fan-out#1"]
+    ask_1["judgeA<br/>ask#1"]
+  end
+  subgraph actor_2["judgeB (actor#2)"]
+    ask_2["judgeB<br/>ask#2<br/>per fan-out#2"]
+  end
+  source(["source"])
+  world_read_1[/"glob *.log<br/>world-read#1"/]
+  fan_out_1{{"fan-out#1"}}
+  fan_out_2{{"fan-out#2"}}
+  sink(["sink"])
+  world_read_1 -->|"string[]"| ask_1
+  fan_out_1 -->|"string[]"| ask_1
+  world_read_1 -->|"string[]"| ask_2
+  fan_out_2 -->|"string[]"| ask_2
+  world_read_1 -->|"string[]"| fan_out_1
+  world_read_1 -->|"string[]"| fan_out_2
+  ask_1 -->|"string"| sink
+  world_read_1 -->|"string[]"| sink
+  ask_2 -->|"string"| sink
+  fan_out_1 -->|"string[]"| sink
+  fan_out_2 -->|"string[]"| sink
+  source --> world_read_1
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  classDef relay fill:#fff2cc,stroke:#d6b656;
+  class source,sink endpoint;
+  class world_read_1 world;
+  class fan_out_1,fan_out_2 relay;

@@ -1,0 +1,10 @@
+actor-node source
+actor-node actor#1 "alpha" @6:11
+actor-node actor#2 "beta" @7:11
+actor-node actor#3 "seed" @8:20
+actor-node sink
+actor-edge source -> actor#3 exact count=1
+actor-edge actor#1 -> sink exact count=2 types="string"
+actor-edge actor#2 -> sink inexact count=1 types="string"
+actor-edge actor#3 -> actor#1 exact count=2 types="string"
+actor-edge actor#3 -> actor#2 inexact count=1 types="string"

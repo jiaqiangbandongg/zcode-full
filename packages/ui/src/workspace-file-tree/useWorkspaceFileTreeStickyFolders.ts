@@ -4,7 +4,7 @@ import { WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX } from "@/workspace-file-tree
 import type { WorkspaceFileTreeRow } from "@/workspace-file-tree/model.js";
 import type { WorkspaceFileTreeStickyFolderItem } from "@/workspace-file-tree/types.js";
 
-function getWorkspaceFileTreeStickyFolders({
+export function getWorkspaceFileTreeStickyFolders({
   rows,
   virtualItems,
   scrollOffset,
@@ -26,7 +26,8 @@ function getWorkspaceFileTreeStickyFolders({
   let stickyItems: WorkspaceFileTreeStickyFolderItem[] = [];
   for (let iteration = 0; iteration <= rows.length; iteration += 1) {
     const probeOffset =
-      scrollOffset + stickyItems.length * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
+      scrollOffset +
+      stickyItems.length * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
     const probeIndex = Math.min(
       rows.length - 1,
       Math.floor(probeOffset / WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX),
@@ -37,7 +38,8 @@ function getWorkspaceFileTreeStickyFolders({
     }
 
     const ancestorItems: WorkspaceFileTreeStickyFolderItem[] = [];
-    const canStickProbeRow = probeRow.type === "directory" && probeRow.expanded;
+    const canStickProbeRow =
+      probeRow.type === "directory" && probeRow.expanded;
     let stickyDepth = canStickProbeRow ? probeRow.depth : probeRow.depth - 1;
     for (
       let index = canStickProbeRow ? probeIndex : probeIndex - 1;
@@ -56,8 +58,11 @@ function getWorkspaceFileTreeStickyFolders({
     ancestorItems.reverse();
 
     const nextStickyItems = ancestorItems.filter((item, stickyIndex) => {
-      const rowStart = item.index * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
-      const stickyBoundary = scrollOffset + stickyIndex * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
+      const rowStart =
+        item.index * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
+      const stickyBoundary =
+        scrollOffset +
+        stickyIndex * WORKSPACE_FILE_TREE_VIRTUAL_ROW_HEIGHT_PX;
       return rowStart <= stickyBoundary + 0.5;
     });
     if (nextStickyItems.length === stickyItems.length) {

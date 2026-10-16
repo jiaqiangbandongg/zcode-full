@@ -1,4 +1,5 @@
 import { KIND_RANK } from "./causality-reduce.js";
+import { holePrefixOf } from "./hole-id.js";
 import {
   UNKNOWN_LANE,
   WORKSPACE_LANE,
@@ -158,4 +159,13 @@ export function dedupeFacts(facts: readonly Fact[]): Fact[] {
 
 export function weakest(values: readonly Certainty[]): Certainty {
   return values.includes("maybe") ? "maybe" : "always";
+}
+
+/**
+ * 写下这个站点的那次补全：站点 id 的 `hole#<hash>/` 前缀（只有一层，hole-id.ts）；体外的站点
+ * 没有。留白自己的 id 不带前缀——它属于哪个留白记在站点表的 `fill` 上，调用方自己查
+ * （docs/analysis.md「Sites」）。
+ */
+export function fillOf(siteId: string): string | undefined {
+  return holePrefixOf(siteId);
 }

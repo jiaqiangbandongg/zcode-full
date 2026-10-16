@@ -1,0 +1,556 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-hooks-lifecycle",
+  "spec": "./test/e2e/conversation-session/conversation-session-hooks-lifecycle.test.ts",
+  "fixtures": [
+    {
+      "id": "hooks-full-chain-title",
+      "description": "Full-chain Hooks case title response.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_FULL_CHAIN"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-full-chain-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Full Chain\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-full-chain-write",
+      "description": "Initial request receives lifecycle context and asks for a Write whose input Hooks modify twice.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "A deterministic Write proves PreToolUse and PermissionRequest input effects."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HOOKS_FULL_CHAIN"],
+        "bodyIncludes": [
+          "E2E_HOOKS_FULL_CHAIN",
+          "HOOK_SESSION_CONTEXT",
+          "HOOK_PROMPT_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "HOOK_ASYNC_CONTEXT_MUST_BE_IGNORED",
+          "toolu_e2e_hooks_full_write"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_hooks_full_write",
+          "messageId": "msg_e2e_hooks_full_write",
+          "name": "Write",
+          "input": {
+            "file_path": "hooks-full-e2e/original.txt",
+            "content": "provider original content\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "hooks-full-chain-read",
+      "description": "Modified Write continuation receives pre/post context and asks for a failing Read.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The missing Read deterministically exercises PostToolUseFailure."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOKS_FULL_CHAIN",
+          "toolu_e2e_hooks_full_write",
+          "hooks-full-e2e/final.txt",
+          "HOOK_PRE_MODIFY_CONTEXT",
+          "HOOK_POST_SUCCESS_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "HOOK_ASYNC_CONTEXT_MUST_BE_IGNORED",
+          "toolu_e2e_hooks_full_read_missing"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_hooks_full_read_missing",
+          "messageId": "msg_e2e_hooks_full_read_missing",
+          "name": "Read",
+          "input": {
+            "file_path": "hooks-full-e2e/missing.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "hooks-full-chain-final",
+      "description": "Failed Read continuation receives recovery context and completes the full-chain case.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The final marker proves failure recovery context reached the model."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOKS_FULL_CHAIN",
+          "toolu_e2e_hooks_full_read_missing",
+          "HOOK_PRE_READ_CONTEXT",
+          "HOOK_POST_FAILURE_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "HOOK_ASYNC_CONTEXT_MUST_BE_IGNORED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-full-chain-final",
+          "inputTokens": 220,
+          "outputTokens": 12,
+          "text": "E2E_HOOKS_FULL_CHAIN_OK"
+        }
+      }
+    },
+    {
+      "id": "hooks-early-failures-title",
+      "description": "Early-failure Hooks case title response.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_EARLY_FAILURES"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-early-failures-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Early Failures\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-early-pre-deny",
+      "description": "Initial early-failure request asks for a PreToolUse-denied Write.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "A deterministic path selects the PreToolUse deny branch."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HOOKS_EARLY_FAILURES"],
+        "bodyIncludes": [
+          "E2E_HOOKS_EARLY_FAILURES",
+          "HOOK_SESSION_CONTEXT",
+          "HOOK_PROMPT_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_e2e_hooks_early_pre_deny"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_hooks_early_pre_deny",
+          "messageId": "msg_e2e_hooks_early_pre_deny",
+          "name": "Write",
+          "input": {
+            "file_path": "hooks-full-e2e/pre-deny.txt",
+            "content": "must not be written\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "hooks-early-invalid-update",
+      "description": "PreToolUse-denied continuation sees context and asks for an invalid Hook update.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "A deterministic path selects the invalid updatedInput branch."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOKS_EARLY_FAILURES",
+          "toolu_e2e_hooks_early_pre_deny",
+          "HOOK_PRE_DENY_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_e2e_hooks_early_invalid"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_hooks_early_invalid",
+          "messageId": "msg_e2e_hooks_early_invalid",
+          "name": "Write",
+          "input": {
+            "file_path": "hooks-full-e2e/invalid-update.txt",
+            "content": "must not be written\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "hooks-early-permission-deny",
+      "description": "Invalid-updatedInput continuation sees context and asks for a permission-denied Write.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "A deterministic path selects the PermissionRequest deny branch."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOKS_EARLY_FAILURES",
+          "toolu_e2e_hooks_early_invalid",
+          "HOOK_PRE_INVALID_UPDATE_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_e2e_hooks_early_permission_deny"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_hooks_early_permission_deny",
+          "messageId": "msg_e2e_hooks_early_permission_deny",
+          "name": "Write",
+          "input": {
+            "file_path": "hooks-full-e2e/permission-deny.txt",
+            "content": "must not be written\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "hooks-early-final",
+      "description": "Permission-denied continuation sees context and completes the early-failure case.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The final marker proves all early-return context reached the model."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOKS_EARLY_FAILURES",
+          "toolu_e2e_hooks_early_permission_deny",
+          "HOOK_PRE_PERMISSION_DENY_CONTEXT",
+          "HOOK_PERMISSION_DENY_REASON"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-early-final",
+          "inputTokens": 260,
+          "outputTokens": 12,
+          "text": "E2E_HOOKS_EARLY_FAILURES_OK"
+        }
+      }
+    },
+    {
+      "id": "hooks-stop-cap-title",
+      "description": "Stop continuation cap case title response.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_STOP_CAP"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-stop-cap-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Stop Cap\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-stop-step-0",
+      "description": "Initial Stop-cap request returns the first assistant draft.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HOOKS_STOP_CAP"],
+        "bodyIncludes": [
+          "E2E_HOOKS_STOP_CAP",
+          "HOOK_PROMPT_CONTEXT"
+        ],
+        "bodyExcludes": ["Generate a concise title", "HOOK_STOP_CONTEXT_1"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-stop-step-0",
+          "inputTokens": 100,
+          "outputTokens": 8,
+          "text": "E2E_HOOKS_STOP_CAP_STEP_0"
+        }
+      }
+    },
+    {
+      "id": "hooks-stop-step-1",
+      "description": "First Stop continuation consumes context 1.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOOKS_STOP_CAP", "HOOK_STOP_CONTEXT_1"],
+        "bodyExcludes": ["Generate a concise title", "HOOK_STOP_CONTEXT_2"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-stop-step-1",
+          "inputTokens": 120,
+          "outputTokens": 8,
+          "text": "E2E_HOOKS_STOP_CAP_STEP_1"
+        }
+      }
+    },
+    {
+      "id": "hooks-stop-step-2",
+      "description": "Second Stop continuation consumes context 2.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOOKS_STOP_CAP", "HOOK_STOP_CONTEXT_2"],
+        "bodyExcludes": ["Generate a concise title", "HOOK_STOP_CONTEXT_3"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-stop-step-2",
+          "inputTokens": 140,
+          "outputTokens": 8,
+          "text": "E2E_HOOKS_STOP_CAP_STEP_2"
+        }
+      }
+    },
+    {
+      "id": "hooks-stop-step-3",
+      "description": "Third and final allowed Stop continuation consumes context 3.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOOKS_STOP_CAP", "HOOK_STOP_CONTEXT_3"],
+        "bodyExcludes": ["Generate a concise title", "HOOK_STOP_CONTEXT_4"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hooks-stop-step-3",
+          "inputTokens": 160,
+          "outputTokens": 8,
+          "text": "E2E_HOOKS_STOP_CAP_STEP_3"
+        }
+      }
+    },
+    {
+      "id": "hooks-prompt-block-title",
+      "description": "Prompt-block Hooks case title response when title generation runs.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_PROMPT_BLOCK"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-prompt-block-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Prompt Block\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-prompt-error-title",
+      "description": "Prompt-error Hooks case title response when title generation runs.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_PROMPT_ERROR"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-prompt-error-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Prompt Error\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-prompt-error-main",
+      "description": "Main response proves a failed UserPromptSubmit hook does not block the model.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The provider response isolates hook process failure from model transport."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOOKS_PROMPT_ERROR"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "hooks-prompt-error-main",
+          "inputTokens": 100,
+          "outputTokens": 8,
+          "text": "HOOK_PROCESS_FAILURE_REACHED_MODEL"
+        }
+      }
+    },
+    {
+      "id": "hooks-compact-first-title",
+      "description": "Compact-first Hooks case title response when title generation runs.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Title generation is outside the Hooks runtime contract."
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HOOKS_COMPACT_FIRST_FOLLOW_UP"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"hooks-compact-first-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Hooks Compact First\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":12}}"
+      }
+    },
+    {
+      "id": "hooks-compact-first-follow-up",
+      "description": "Follow-up prompt after a first-action /compact: the SessionStart summary must anchor to this real turn, not the compact maintenance turn (HK17).",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Deterministic final text proves the SessionStart summary lands on the next real turn after /compact."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HOOKS_COMPACT_FIRST_FOLLOW_UP"],
+        "bodyIncludes": ["E2E_HOOKS_COMPACT_FIRST_FOLLOW_UP", "HOOK_SESSION_CONTEXT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"hooks-compact-first-follow-up\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"E2E_HOOKS_COMPACT_FIRST_FOLLOW_UP_OK\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":96,\"output_tokens\":8,\"service_tier\":\"standard\"}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

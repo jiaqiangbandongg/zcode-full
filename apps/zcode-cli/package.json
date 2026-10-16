@@ -7,11 +7,12 @@
   "scripts": {
     "build": "turbo run build",
     "build:sea": "pnpm --filter @zcode/cli build:sea",
-    "check": "pnpm registry:check && turbo run typecheck",
+    "check": "pnpm registry:check && turbo run typecheck && pnpm test",
     "clean": "turbo run clean",
     "cli:build": "pnpm --filter @zcode/cli build",
     "cli:dev": "pnpm --filter @zcode/cli dev",
     "cli:upload-sea": "pnpm --filter @zcode/cli upload:sea",
+    "coverage": "turbo run coverage",
     "dev": "pnpm --filter @zcode/cli dev",
     "format": "oxfmt --write package.json \"packages/**/*.json\" \"packages/**/*.ts\" \"packages/**/*.mjs\"",
     "format:check": "oxfmt --check package.json \"packages/**/*.json\" \"packages/**/*.ts\" \"packages/**/*.mjs\"",
@@ -20,11 +21,16 @@
     "lint:fix": "turbo run lint:fix",
     "prompt-trajectory:model-io": "pnpm --filter @zcode/prompt-trajectory model-io --",
     "prompt-trajectory:prompt": "pnpm --filter @zcode/prompt-trajectory record:prompt --",
+    "prompt-trajectory:testcases": "pnpm --filter @zcode/prompt-trajectory run:testcases --",
     "registry:check": "node scripts/generate-bash-command-registry.mjs --check",
     "registry:generate": "node scripts/generate-bash-command-registry.mjs",
     "release": "node ../../node_modules/release-it/bin/release-it.js --config .release-it.json",
     "release:dry": "pnpm run release --release-version",
     "sea": "pnpm --filter @zcode/cli sea",
+    "test": "turbo run test",
+    "test:e2e:memory": "pnpm --dir e2e/memory run e2e:build",
+    "test:browser-headless": "pnpm --filter @zcode/browser-use-plugin... build && pnpm --filter @zcode/browser-use-plugin exec vitest run test/headless-browser.e2e.test.ts",
+    "test:browser-headless:linux": "docker build --progress=plain -f packages/browser-use-plugin/e2e/headless-linux.Dockerfile ../..",
     "typecheck": "turbo run typecheck"
   },
   "dependencies": {
@@ -34,6 +40,7 @@
   "devDependencies": {
     "@withfig/autocomplete": "2.692.3",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
     "c8": "^11.0.0",
     "esbuild": "^0.25.0",
     "oxfmt": "^0.47.0",
@@ -41,7 +48,8 @@
     "postject": "^1.0.0-alpha.6",
     "tsx": "^4.20.0",
     "turbo": "^2.4.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": "24.14.0"

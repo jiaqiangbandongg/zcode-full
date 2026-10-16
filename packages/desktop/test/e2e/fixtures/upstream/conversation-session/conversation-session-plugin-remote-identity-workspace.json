@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-remote-identity-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-remote-identity-workspace.test.ts",
+  "fixtures": [
+    {
+      "id": "wpl-010-title",
+      "description": "WPL-010 两个 remote task 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 remote Plugin identity 合同，只需保持 task row 稳定。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_WPL_010_REMOTE_IDENTITY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-010-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"WPL 010 Remote Identity\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-010-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "wpl-010-target-a",
+      "description": "相同 /workspace 路径下 target A 的新 Session 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定建立 target A 的 session-owned Plugin catalog。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_WPL_010_REMOTE_IDENTITY_A_FIRST_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-010-a\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"WPL_010_REMOTE_IDENTITY_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-010-a\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "wpl-010-target-b",
+      "description": "相同 /workspace 路径下 target B 的新 Session 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定建立 target B 的 session-owned Plugin catalog。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_WPL_010_REMOTE_IDENTITY_B_FIRST_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-wpl-010-b\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"WPL_010_REMOTE_IDENTITY_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-wpl-010-b\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

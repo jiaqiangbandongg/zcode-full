@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-session-switch-restore",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-session-switch-restore.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plan-session-switch-restore.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-plan-session-switch-enter",
+      "description": "首轮请求返回 EnterPlanMode，进入计划模式。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定进入 plan mode，避免依赖真实模型是否选择 EnterPlanMode。"
+    },
+    {
+      "id": "upstream-conversation-plan-session-switch-exit-controlled-stream",
+      "description": "受控流先产生 ExitPlanMode 空预览，切走后再完成完整 plan 参数。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定制造用户在 ExitPlanMode 参数生成期间切走、完整 tool call 在后台到达的恢复窗口。"
+    }
+  ]
+}

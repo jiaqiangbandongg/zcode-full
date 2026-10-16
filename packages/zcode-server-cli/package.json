@@ -12,7 +12,8 @@
   "scripts": {
     "build": "tsup",
     "stage": "pnpm run build && tsx src/packaging/stageCli.ts",
-    "lint": "oxlint src"
+    "test": "vitest run",
+    "lint": "oxlint src test"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
@@ -31,6 +32,7 @@
     "@types/yauzl": "^2.10.3",
     "tsup": "^8.4.0",
     "tsx": "^4.19.4",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
   }
 }

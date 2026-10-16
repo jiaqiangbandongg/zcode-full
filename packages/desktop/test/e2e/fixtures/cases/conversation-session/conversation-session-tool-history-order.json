@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-history-order",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-history-order.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-tool-history-order.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "d19-title",
+      "description": "D19 工具历史顺序：d19-title。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+    },
+    {
+      "id": "d19-tools",
+      "description": "D19 工具历史顺序：d19-tools。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+    },
+    {
+      "id": "d19-followup",
+      "description": "D19 工具历史顺序：d19-followup。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+    },
+    {
+      "id": "d19-later",
+      "description": "D19 工具历史顺序：d19-later。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+    },
+    {
+      "id": "d19-edited",
+      "description": "D19 工具历史顺序：d19-edited。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash→Read 声明，比较 live 与 latest-user edit 后的 provider tool_use/tool_result 顺序和内容。"
+    }
+  ]
+}

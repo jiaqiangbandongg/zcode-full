@@ -1,0 +1,22 @@
+node source
+node ask#1 "producer" @6:39 actors=actor#1 type="string[]"
+node fan-out#1 "fan-out" @7:15 type="string[]"
+node ask#2 "mid" @7:46 actors=actor#2 within=fan-out#1 type="string"
+node join#1 "join" @8:30 type="string[]"
+node ask#3 "consumer" @9:37 actors=actor#3 type="string"
+node sink
+actor actor#1 "producer" @6:21
+actor actor#2 "mid" @7:33 within=fan-out#1
+actor actor#3 "consumer" @9:19
+edge source -> ask#1 data exact
+edge ask#1 -> fan-out#1 data exact type="string[]"
+edge ask#1 -> ask#2 data exact type="string[]"
+edge ask#1 -> join#1 data exact type="string[]"
+edge ask#1 -> ask#3 data exact type="string[]"
+edge fan-out#1 -> ask#2 data exact type="string[]"
+edge fan-out#1 -> join#1 data exact type="string[]"
+edge fan-out#1 -> ask#3 data exact type="string[]"
+edge ask#2 -> join#1 data exact type="string"
+edge ask#2 -> ask#3 data exact type="string"
+edge join#1 -> ask#3 data exact type="string[]"
+edge ask#3 -> sink data exact type="string"

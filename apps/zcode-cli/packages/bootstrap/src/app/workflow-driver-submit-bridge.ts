@@ -46,8 +46,12 @@ export function makeSessionSubmitPort(
         // 无在飞 ask 却收到 submit：不路由到引擎，直接拒绝（避免悬挂）。
         return Promise.resolve(rejectWith("no active ask is awaiting a submitted result"));
       }
-      // 未声明结果类型的 ask 可能仍注册了 submit_result；这里立即拒绝提交并提示使用普通回复。
-      // 不能把它交给引擎后等待裁决：引擎对 untyped ask 不处理 submit，等待中的 deferred 将无法结束。
+      // Untyped ask 守卫（phase 1.5 偏离说明）：spec 要求「全 untyped 的 actor 不注册 submit_result」，
+      // 但 driver 在 createActorSession 时拿不到 actor 的聚合 typed 信息（需 site graph，未透传），故
+      // 一律注册。为不依赖引擎「submitAttempted 对 untyped 早退」的行为（那会让 deferred 永久悬挂），
+      // 这里在 driver 内部直接拦截：untyped ask 收到 submit 时立即回一条合成 rejection 让模型改用纯文本，
+      // 绝不上报 askSubmitAttempted。phase 2 应据 actor-graph 投影把 per-actor typed 信息透传进来，
+      // 真正在 untyped-only actor 上跳过注册（关系到 prompt-cache 的 frozen-tools 不变式）。
       if (!state.currentTyped) {
         return Promise.resolve(
           rejectWith(
@@ -55,7 +59,7 @@ export function makeSessionSubmitPort(
           ),
         );
       }
-      // 当前实例不变式：至多一个挂起 deferred。若已有（不应发生），先拒旧的避免泄漏。
+      // 单前实例不变式：至多一个挂起 deferred。若已有（不应发生），先拒旧的避免泄漏。
       state.pendingSubmit?.reject(
         new WorkflowError("DriverError", "This submit was superseded by a newer submit."),
       );

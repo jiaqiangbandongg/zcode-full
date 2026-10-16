@@ -6,13 +6,15 @@ import { recordPromptTrajectory, recordPromptTrajectoryFromFixture } from "./rec
 import {
   createTimestampedPromptDirectory,
   promptFixtureFromText,
+  runPromptTrajectoryCases,
   type SharedModelOptions,
-} from "./prompt.js";
+} from "./testcases.js";
 
 interface CliOptions {
   apiKey?: string;
   apiKeyEnv?: string;
-  referenceRequestPath?: string;
+  casesDir?: string;
+  ccRequestPath?: string;
   fixturePath?: string;
   inputPath?: string;
   modelId?: string;
@@ -32,7 +34,7 @@ try {
     requireOption(options.fixturePath, "--fixture");
     requireOption(options.outDir, "--out");
     await recordPromptTrajectory({
-      referenceRequestPath: options.referenceRequestPath,
+      ccRequestPath: options.ccRequestPath,
       fixturePath: options.fixturePath,
       outDir: options.outDir,
     });
@@ -41,7 +43,7 @@ try {
     const outDir =
       options.outDir ?? (await createTimestampedPromptDirectory(options.outRoot ?? "out"));
     await recordPromptTrajectoryFromFixture({
-      referenceRequestPath: options.referenceRequestPath,
+      ccRequestPath: options.ccRequestPath,
       fixture: promptFixtureFromText({
         modelOptions: readModelOptions(options),
         name: "command-line-prompt",
@@ -50,10 +52,17 @@ try {
       outDir,
     });
     console.log(`Recorded prompt trajectory into ${outDir}`);
+  } else if (command === "run-testcases") {
+    const result = await runPromptTrajectoryCases({
+      casesDir: options.casesDir ?? "testcases",
+      modelOptions: readModelOptions(options),
+      outRoot: options.outRoot ?? "out",
+    });
+    console.log(`Recorded ${result.caseCount} prompt trajectory case(s) into ${result.runDir}`);
   } else if (command === "derive") {
     requireOption(options.outDir, "--out");
     await writeDerivedTrajectories({
-      referenceRequestPath: options.referenceRequestPath,
+      ccRequestPath: options.ccRequestPath,
       inputPath: options.inputPath ?? join(options.outDir, "trajectory.jsonl"),
       outDir: options.outDir,
     });
@@ -91,14 +100,16 @@ function parseOptions(args: readonly string[]): CliOptions {
       options.prompt = readValue();
     } else if (arg === "--prompt-file") {
       options.promptFile = readValue();
+    } else if (arg === "--cases") {
+      options.casesDir = readValue();
     } else if (arg === "--out") {
       options.outDir = readValue();
     } else if (arg === "--out-root") {
       options.outRoot = readValue();
     } else if (arg === "--input") {
       options.inputPath = readValue();
-    } else if (arg === "--reference-request") {
-      options.referenceRequestPath = readValue();
+    } else if (arg === "--cc-request") {
+      options.ccRequestPath = readValue();
     } else if (arg === "--query-source") {
       options.querySource = readValue();
     } else if (arg === "--model") {
@@ -150,9 +161,10 @@ function readModelOptions(options: CliOptions): SharedModelOptions {
 
 function printUsageAndExit(): never {
   console.error(`Usage:
-  pnpm --filter @zcode/prompt-trajectory record -- --fixture <fixture.json> --out <dir> [--reference-request <path>]
+  pnpm --filter @zcode/prompt-trajectory record -- --fixture <fixture.json> --out <dir> [--cc-request <path>]
   pnpm --filter @zcode/prompt-trajectory record:prompt -- --prompt <text> --model <provider/model> --upstream-base-url <url> [--out <dir>] [--api-key-env <env>]
-  pnpm --filter @zcode/prompt-trajectory derive -- --out <dir> [--input <trajectory.jsonl>] [--reference-request <path>]
+  pnpm --filter @zcode/prompt-trajectory run:testcases -- [--cases <dir>] [--out-root out] --model <provider/model> --upstream-base-url <url> [--api-key-env <env>]
+  pnpm --filter @zcode/prompt-trajectory derive -- --out <dir> [--input <trajectory.jsonl>] [--cc-request <path>]
   pnpm --filter @zcode/prompt-trajectory model-io -- --input <model-io.jsonl> --out <dir> [--query-source main_turn]`);
   process.exit(1);
 }

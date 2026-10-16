@@ -1,14 +1,14 @@
 const RADIX_MIN_THUMB_SIZE = 18;
 const CONVERSATION_SHARE_VISUAL_THUMB_SCALE = 0.5;
 
-interface ConversationShareScrollbarMetricsInput {
+export interface ConversationShareScrollbarMetricsInput {
   trackSize: number;
   viewportSize: number;
   contentSize: number;
   scrollOffset: number;
 }
 
-interface ConversationShareScrollbarIndicatorMetrics {
+export interface ConversationShareScrollbarIndicatorMetrics {
   visible: boolean;
   size: number;
   offset: number;

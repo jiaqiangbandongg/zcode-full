@@ -1,0 +1,6 @@
+phase unphased
+participant unphased:actor#2 "t" steps=ask#2
+participant unphased:actor#3 "e" steps=ask#3
+participant unphased:actor#1 "judge" steps=ask#1
+handoff unphased:actor#2 -> unphased:actor#3
+handoff unphased:actor#3 -> unphased:actor#1 types="string"

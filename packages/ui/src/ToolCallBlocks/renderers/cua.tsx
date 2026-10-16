@@ -97,7 +97,7 @@ function readBundleId(input: unknown): string | null {
   return null;
 }
 
-function readCuaApplicationIconRequest(
+export function readCuaApplicationIconRequest(
   toolCall: ToolCallBlockRenderContext["toolCallNode"]["toolCall"],
 ): ApplicationIconRequest | string | null {
   const display = readToolResultDisplay(toolCall.raw);
@@ -335,7 +335,7 @@ export function isCuaToolCall(
   return collectToolNames(toolCall).some(isZCodeCuaToolName);
 }
 
-interface CuaSummaryPresentation {
+export interface CuaSummaryPresentation {
   toolName: string | null;
   icon: ReactNode;
   appName: string;

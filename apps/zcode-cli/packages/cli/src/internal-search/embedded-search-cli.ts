@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
-type EmbeddedSearchCommand = "find" | "grep";
+export type EmbeddedSearchCommand = "find" | "grep";
 
 type EmbeddedSearchWritable = {
   destroyed?: boolean;
@@ -52,7 +52,7 @@ interface EmbeddedSearchAbortReason {
   signal?: NodeJS.Signals;
 }
 
-interface EmbeddedSearchIo {
+export interface EmbeddedSearchIo {
   cwd: string;
   signal?: AbortSignal;
   stderr: EmbeddedSearchWritable;
@@ -78,7 +78,7 @@ export async function runEmbeddedSearchCli(
   }
 }
 
-function resolveNativeSearchArgs(
+export function resolveNativeSearchArgs(
   command: EmbeddedSearchCommand,
   args: readonly string[],
 ): string[] {
@@ -205,7 +205,7 @@ function runNativeSearchCommand(
       if (forceKillTimer) {
         clearTimeout(forceKillTimer);
       }
-      settle(signal.aborted ? exitCodeForAbortSignal(signal) : (code ?? (childSignal ? 128 : 1)));
+      settle(signal.aborted ? exitCodeForAbortSignal(signal) : code ?? (childSignal ? 128 : 1));
     });
 
     if (io.stdin) {

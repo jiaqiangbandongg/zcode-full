@@ -9,7 +9,22 @@ import type { CliMcpSource, McpFileFormat } from "@zcode/shared";
  * - mcpServers: 通用 JSON 目录格式（.agents/mcp.json）
  * - mcp.servers: zcode CLI config.json 格式
  */
-export type McpConfigKeyName = "mcpServers" | "mcp.servers";
+export type McpConfigKeyName = "mcpServers" | "mcp" | "mcp_servers" | "mcp.servers";
+
+/**
+ * OpenCode MCP 配置格式
+ * OpenCode 使用特殊的配置格式：
+ * - 键名是 "mcp" 而不是 "mcpServers"
+ * - command 是数组格式 ["npx", "-y", "server"] 而不是分开的 command + args
+ * - 必须有 type 字段 ("local" 或 "remote")
+ */
+export interface OpenCodeMcpServerConfig {
+  type: "local" | "remote";
+  command?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+}
 
 export interface McpSourceDescriptor {
   source: CliMcpSource;

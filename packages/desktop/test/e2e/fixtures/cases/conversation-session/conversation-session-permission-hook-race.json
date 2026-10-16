@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-hook-race",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-hook-race.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-permission-hook-race.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-permission-hook-race/write-output.txt",
+      "source": "created-by-provider-tool",
+      "description": "spec 创建父目录，fixture 驱动 Write 工具在用户批准胜出后创建目标文件。"
+    },
+    {
+      "path": ".zcode/permission-hook-race-blocker.mjs",
+      "source": "created-by-helper",
+      "description": "阻塞型 PermissionRequest hook 脚本：记录 started 后睡眠 120s、不产出决定；由 user config（隔离 E2E HOME 的 .zcode/cli/config.json）以绝对路径引用。"
+    },
+    {
+      "path": ".zcode/permission-hook-race-trace.jsonl",
+      "source": "created-by-helper",
+      "description": "hook 生命周期 trace：由 helper 安装的阻塞 hook 在运行时追加；spec 用 started 记录证明竞速真实成立，用缺失 settled-without-decision 证明 hook 未参与决定。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "permission-hook-race-title",
+      "description": "E2E_PERMISSION_HOOK_RACE 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_PERMISSION_HOOK_RACE 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "permission-hook-race-write-call",
+      "description": "HK16 竞速回归：Write tool_use，默认模式触发权限弹窗，同时启动阻塞 PermissionRequest hook。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Write 是需要审批的破坏性工具；确认窗与阻塞 hook 并发出现后由 spec 在 UI 侧批准，验证 permission-responder-race 先到者胜。"
+    },
+    {
+      "id": "permission-hook-race-final",
+      "description": "HK16 竞速回归：用户批准胜出后 tool_result 回灌 → 最终文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "broker 应答胜出、hook 仍阻塞时工具立即执行成功，模型据 tool_result 给出终态文本，证明 turn 不再等 hook 收尾。"
+    }
+  ]
+}

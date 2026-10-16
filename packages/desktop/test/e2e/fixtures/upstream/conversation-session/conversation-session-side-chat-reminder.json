@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-chat-reminder",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-chat-reminder.test.ts",
+  "fixtures": [
+    {
+      "id": "ssc-reminder-title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSC_REMINDER_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "{\"title\":\"Side chat reminder\"}",
+          "inputTokens": 128,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "ssc-reminder-seed-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SSC_REMINDER_SEED", "E2E_READONLY_TOOL_FILE_CONTENT"],
+        "bodyExcludes": ["Generate a concise title", "E2E_SSC_REMINDER_QUERY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "upstream-e2e-ok",
+          "inputTokens": 128,
+          "outputTokens": 16
+        }
+      }
+    },
+    {
+      "id": "ssc-reminder-query",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定响应仅用于收口；验证 side chat 的落盘与 provider-visible Attachment 形态，不把响应内容当作模型身份感知证据。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_READONLY_TOOL_FILE_CONTENT",
+          "The preceding conversation was inherited from the parent task for reference only."
+        ],
+        "bodyExcludes": ["Generate a concise title"],
+        "lastUserMessageIncludes": ["E2E_SSC_REMINDER_QUERY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "side-chat-ok",
+          "inputTokens": 128,
+          "outputTokens": 16
+        }
+      }
+    }
+  ]
+}

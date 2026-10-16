@@ -1,0 +1,7 @@
+phase unphased
+participant unphased:actor#1 "勘察员" steps=ask#1
+participant unphased:actor#2 "执行者" steps=ask#2
+phase hole#21b40fca
+participant hole#21b40fca:hole#21b40fca/actor#1 "分组员" steps=hole#21b40fca/ask#1
+participant hole#21b40fca:main steps=hole#7c7fc07b
+handoff hole#21b40fca:hole#21b40fca/actor#1 -> hole#21b40fca:main types="Plan"

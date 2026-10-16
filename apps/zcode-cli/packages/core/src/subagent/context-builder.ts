@@ -48,14 +48,19 @@ export class SubagentContextBuilder extends ContextBuilder {
     const orderedSections = orderSubagentSections(sections);
     const totalChars = orderedSections.reduce((sum, section) => sum + section.chars, 0);
     const totalTokens = orderedSections.reduce((sum, section) => sum + section.tokens, 0);
-    const systemMessages = orderedSections
-      .filter((section) => section.injectionTarget === "system")
+    const systemSections = orderedSections.filter(
+      (section) => section.injectionTarget === "system",
+    );
+    // 逐段标记会耗尽缓存断点额度，导致对话末尾标记被丢弃；正文合并时保留各段自带的换行。
+    const systemMessages = [
+      systemSections.filter((section) => section.source === "cli_prefix"),
+      systemSections.filter((section) => section.source !== "cli_prefix"),
+    ]
+      .filter((group) => group.length > 0)
       .map(
-        (section): ModelInputMessage => ({
+        (group): ModelInputMessage => ({
           role: "system",
-          content: section.content,
-          // subagent context builder 不走 main ContextBuilder 的 system 组装，
-          // 仍需在每段稳定 child system prompt 上保留 provider cache breakpoint。
+          content: group.map((section) => section.content).join(""),
           cacheControl: EPHEMERAL_CACHE_CONTROL,
         }),
       );

@@ -1193,7 +1193,7 @@ function buildDeveloperRequests(
       reason: "结构化日志更像诊断索引；Session events 才是还原 trace 的事实来源。",
       schema: [
         "append-only JSONL through SessionEventSink",
-        "same envelope fields as existing structured log sinks",
+        "same envelope fields as docs/design/v2/logging.md",
         "redacted artifact refs for large payloads",
       ],
     });

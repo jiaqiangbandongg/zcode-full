@@ -6,7 +6,7 @@
 //   2. 相邻 state.updated → patch 键浅合并（键内整体替换，安全）；
 //   3. row.delta 后随同 rowId 的 row.upserted → 前者丢弃（整行替换蕴含所有追加）；
 //   4. row.removed 是屏障，任何规则不得跨越；
-//   5. 帧超限切分不在本函数（由通道层打帧）；
+//   5. 帧超限切分不在本函数（属通道层打帧，§3.2）；
 //   6. 同 runId 的 workflowRun.updated 向**最早**的那条合并（详见下面 mergeWorkflowRunUpdate）。
 import type { ConversationDelta, WorkflowRunUpdatedDelta } from "./delta.js";
 import {
@@ -75,7 +75,9 @@ function mergeWorkflowRunUpdate(
 /**
  * 对一个 flush 窗口内的 delta 序列做语义保持合并。
  * 输入输出均按权威日志序；纯函数，不修改入参。
- * `bounds` 默认使用协议容量上限；合并后的状态必须与逐条应用时相同。
+ *
+ * `bounds` 只为测试留的注入口（默认就是真界）：规则 6 拒绝合并那一支在 1024 的界下要几千条
+ * 事件才走得到，而它恰好是**合并等于顺序施加**这条定律最容易破的地方。
  */
 export function coalesceConversationDeltas(
   deltas: readonly ConversationDelta[],
@@ -164,7 +166,10 @@ export function coalesceConversationDeltas(
  * conflation 辅助（sessions-index 等最新态 topic 通用）：按 key 只保留每个对象的最后一次更新。
  * 保序：保留项按其「最后一次出现」的相对顺序输出。
  */
-export function conflateByKey<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
+export function conflateByKey<T>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+): T[] {
   const lastIndexByKey = new Map<string, number>();
   items.forEach((item, index) => {
     lastIndexByKey.set(keyOf(item), index);

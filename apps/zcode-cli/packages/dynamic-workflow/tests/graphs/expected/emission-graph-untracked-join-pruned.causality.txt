@@ -1,0 +1,4 @@
+lane actor#1 "solo" @5:8
+region seq#1 seq
+step ask#1 ask "solo" @5:22 lane=actor#1 region=seq#1 always
+sink ask#1

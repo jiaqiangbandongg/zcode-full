@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-markdown-content-types",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-markdown-content-types.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-output-limit-continue-markdown-content-types.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/continue-markdown-otc10/one.svg",
+      "source": "created-by-spec",
+      "description": "OTC10 single-image 与 image-gallery 使用的第一张固定本地 SVG。"
+    },
+    {
+      "path": ".zcode-e2e/continue-markdown-otc10/two.svg",
+      "source": "created-by-spec",
+      "description": "OTC10 image-gallery 使用的第二张固定本地 SVG。"
+    },
+    {
+      "path": ".zcode-e2e/continue-markdown-otc10/link-target.md",
+      "source": "created-by-spec",
+      "description": "OTC10 workspace-file-link 的固定存在文件。"
+    },
+    {
+      "path": ".zcode-e2e/continue-markdown-otc10/citation.txt",
+      "source": "created-by-spec",
+      "description": "OTC10 zcode-file-citation 的固定目标文件。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "otc10-title",
+      "description": "OTC10 各独立任务共用的标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 Continue Markdown 类型语义；固定响应避免干扰每个子用例的两次主请求。"
+    },
+    {
+      "id": "otc10-paragraph-partial",
+      "description": "OTC10/paragraph 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/paragraph 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-paragraph-final",
+      "description": "OTC10/paragraph 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/paragraph 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-newline-after-partial-partial",
+      "description": "OTC10/newline-after-partial 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/newline-after-partial 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-newline-after-partial-final",
+      "description": "OTC10/newline-after-partial 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/newline-after-partial 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-soft-break-at-continue-start-partial",
+      "description": "OTC10/soft-break-at-continue-start 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/soft-break-at-continue-start 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-soft-break-at-continue-start-final",
+      "description": "OTC10/soft-break-at-continue-start 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/soft-break-at-continue-start 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-hard-break-partial",
+      "description": "OTC10/hard-break 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/hard-break 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-hard-break-final",
+      "description": "OTC10/hard-break 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/hard-break 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-heading-partial",
+      "description": "OTC10/heading 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/heading 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-heading-final",
+      "description": "OTC10/heading 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/heading 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-blockquote-partial",
+      "description": "OTC10/blockquote 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/blockquote 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-blockquote-final",
+      "description": "OTC10/blockquote 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/blockquote 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-unordered-list-partial",
+      "description": "OTC10/unordered-list 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/unordered-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-unordered-list-final",
+      "description": "OTC10/unordered-list 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/unordered-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-ordered-list-partial",
+      "description": "OTC10/ordered-list 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/ordered-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-ordered-list-final",
+      "description": "OTC10/ordered-list 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/ordered-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-task-list-partial",
+      "description": "OTC10/task-list 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/task-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-task-list-final",
+      "description": "OTC10/task-list 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/task-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-nested-list-partial",
+      "description": "OTC10/nested-list 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/nested-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-nested-list-final",
+      "description": "OTC10/nested-list 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/nested-list 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-thematic-break-partial",
+      "description": "OTC10/thematic-break 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/thematic-break 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-thematic-break-final",
+      "description": "OTC10/thematic-break 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/thematic-break 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-fenced-code-partial",
+      "description": "OTC10/fenced-code 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/fenced-code 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-fenced-code-final",
+      "description": "OTC10/fenced-code 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/fenced-code 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-table-partial",
+      "description": "OTC10/table 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/table 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-table-final",
+      "description": "OTC10/table 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/table 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-emphasis-partial",
+      "description": "OTC10/emphasis 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/emphasis 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-emphasis-final",
+      "description": "OTC10/emphasis 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/emphasis 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-strong-partial",
+      "description": "OTC10/strong 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/strong 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-strong-final",
+      "description": "OTC10/strong 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/strong 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-strikethrough-partial",
+      "description": "OTC10/strikethrough 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/strikethrough 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-strikethrough-final",
+      "description": "OTC10/strikethrough 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/strikethrough 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-inline-code-partial",
+      "description": "OTC10/inline-code 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/inline-code 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-inline-code-final",
+      "description": "OTC10/inline-code 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/inline-code 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-external-link-partial",
+      "description": "OTC10/external-link 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/external-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-external-link-final",
+      "description": "OTC10/external-link 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/external-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-workspace-file-link-partial",
+      "description": "OTC10/workspace-file-link 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/workspace-file-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-workspace-file-link-final",
+      "description": "OTC10/workspace-file-link 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/workspace-file-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-reference-link-partial",
+      "description": "OTC10/reference-link 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/reference-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-reference-link-final",
+      "description": "OTC10/reference-link 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/reference-link 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-autolink-partial",
+      "description": "OTC10/autolink 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/autolink 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-autolink-final",
+      "description": "OTC10/autolink 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/autolink 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-single-image-partial",
+      "description": "OTC10/single-image 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/single-image 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-single-image-final",
+      "description": "OTC10/single-image 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/single-image 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-image-gallery-partial",
+      "description": "OTC10/image-gallery 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/image-gallery 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-image-gallery-final",
+      "description": "OTC10/image-gallery 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/image-gallery 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-inline-math-partial",
+      "description": "OTC10/inline-math 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/inline-math 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-inline-math-final",
+      "description": "OTC10/inline-math 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/inline-math 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-display-math-partial",
+      "description": "OTC10/display-math 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/display-math 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-display-math-final",
+      "description": "OTC10/display-math 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/display-math 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-mermaid-partial",
+      "description": "OTC10/mermaid 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/mermaid 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-mermaid-final",
+      "description": "OTC10/mermaid 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/mermaid 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-zcode-file-citation-partial",
+      "description": "OTC10/zcode-file-citation 首段在本类型 token 内以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/zcode-file-citation 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    },
+    {
+      "id": "otc10-zcode-file-citation-final",
+      "description": "OTC10/zcode-file-citation 续段闭合本类型并正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 OTC10/zcode-file-citation 自己的 Continue 拼接缝，不依赖其他 Markdown 类型。"
+    }
+  ]
+}

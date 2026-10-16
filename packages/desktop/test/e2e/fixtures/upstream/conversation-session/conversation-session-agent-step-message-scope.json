@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-agent-step-message-scope",
+  "spec": "./test/e2e/conversation-session/conversation-session-agent-step-message-scope.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-agent-step-message-scope-first",
+      "description": "Agent step message scope 首轮纯文本响应，每轮固定只产生一个 generation step。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定为单一纯文本 content block，以便端到端精确对账每轮 generation step 数量，不依赖真实模型的 reasoning 或工具选择。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AGENT_STEP_MESSAGE_SCOPE_FIRST_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-agent-step-message-scope-first",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "agent-step-scope-first-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-agent-step-message-scope-second",
+      "description": "Agent step message scope 第二轮纯文本响应，用于验证 completion 不累计首轮 step。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定为单一纯文本 content block，以便第二轮 completion 与同 messageId 的唯一 generation step 做确定性对账。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AGENT_STEP_MESSAGE_SCOPE_SECOND_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-agent-step-message-scope-second",
+          "inputTokens": 112,
+          "outputTokens": 8,
+          "text": "agent-step-scope-second-ok"
+        }
+      }
+    }
+  ]
+}

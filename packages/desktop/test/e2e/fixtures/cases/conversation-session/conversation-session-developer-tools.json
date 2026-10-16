@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-developer-tools",
+  "spec": "./test/e2e/conversation-session/conversation-session-developer-tools.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-developer-tools.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "developer-tools-main",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出前等待与输出阶段，验证 TPS 排除 TTFT。"
+    }
+  ]
+}

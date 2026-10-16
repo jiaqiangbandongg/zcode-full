@@ -6,7 +6,7 @@ import type {
 } from "@zcode/services";
 import type { ConversationTelemetryFact } from "@zcode/shared/zcode-protocol-v4";
 
-interface TaskActivityTracker extends IDisposable {
+export interface TaskActivityTracker extends IDisposable {
   readonly onDidChangeRunningTaskCount: Event<number>;
   readRunningTaskCount(): number;
 }
@@ -74,9 +74,7 @@ export function createTaskActivityTracker(
     }
     removeWorkspace(key);
     const activeSessionIds = new Set<string>();
-    const telemetry = source?.onDynamicConversationTelemetryFact(event)((fact) =>
-      acceptFact(key, fact),
-    );
+    const telemetry = source?.onDynamicConversationTelemetryFact(event)((fact) => acceptFact(key, fact));
     if (!telemetry) return;
     workspaces.set(key, {
       activeSessionIds,

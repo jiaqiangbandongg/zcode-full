@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-keyboard-navigation",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-keyboard-navigation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-keyboard-navigation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-user-question-keyboard-navigation-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 多题等待态，避免真实模型是否提问和题目结构漂移影响键盘导航复现。"
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-keyboard-navigation-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明多题键盘选择结果已被 agent 消费，核心断言在 UI 键盘路径。"
+    }
+  ]
+}

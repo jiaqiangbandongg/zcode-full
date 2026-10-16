@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-readstate-model-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-readstate-model-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "readstate-model-isolation-title",
+      "description": "readState 模型隔离 case 内的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-readstate-model-isolation-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-pro\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"ReadState Model Isolation\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "readstate-model-isolation-first",
+      "description": "I67 历史 session 使用 secondary / provider 非首项模型完成首轮普通发送。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在历史 session 首轮请求使用 provider 下非首个模型；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_READSTATE_MODEL_ISOLATION_FIRST"],
+        "bodyIncludes": ["E2E_READSTATE_MODEL_ISOLATION_FIRST", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_READSTATE_MODEL_ISOLATION_FOLLOW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-readstate-model-isolation-first",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "readstate-model-isolation-follow",
+      "description": "I67 新建草稿触发 readState 后切回旧 session，follow-up 仍使用 secondary / provider 非首项模型。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在新建草稿 readState 水合并切回旧 session 后，follow-up 请求仍使用旧 session 的非首个模型。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_READSTATE_MODEL_ISOLATION_FOLLOW"],
+        "bodyIncludes": ["E2E_READSTATE_MODEL_ISOLATION_FOLLOW", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-readstate-model-isolation-follow",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

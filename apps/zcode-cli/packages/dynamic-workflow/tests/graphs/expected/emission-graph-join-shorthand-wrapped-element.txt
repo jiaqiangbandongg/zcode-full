@@ -1,0 +1,16 @@
+node source
+node join#1 "join" @9:28 type="{ critique: string; }[]"
+node fan-out#1 "fan-out" @10:3 type="{ critique: string; }[]"
+node ask#1 "critic" @12:35 actors=actor#1 within=fan-out#1 type="string"
+node ask#2 "final" @17:23 actors=actor#2 type="string"
+node sink
+actor actor#1 "critic" @11:20 within=fan-out#1
+actor actor#2 "final" @17:8
+edge source -> fan-out#1 data exact
+edge join#1 -> ask#2 data exact type="{ critique: string; }[]"
+edge fan-out#1 -> join#1 data exact type="{ critique: string; }[]"
+edge fan-out#1 -> ask#1 data exact type="{ critique: string; }[]"
+edge fan-out#1 -> ask#2 data exact type="{ critique: string; }[]"
+edge ask#1 -> join#1 data exact type="string"
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

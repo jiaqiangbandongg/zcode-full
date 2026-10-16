@@ -1,0 +1,23 @@
+flowchart LR
+  subgraph actor_1["scanner (actor#1)"]
+    ask_1["scanner<br/>ask#1"]
+  end
+  subgraph actor_2["planner (actor#2)"]
+    ask_2["planner<br/>ask#2"]
+  end
+  subgraph actor_3["reviewer (actor#3)"]
+    ask_3["reviewer<br/>ask#3"]
+  end
+  subgraph actor_4["judge (actor#4)  ×N"]
+    ask_4["judge<br/>ask#4<br/>×N"]
+  end
+  sink(["sink"])
+  ask_1 --> ask_2
+  ask_1 --> ask_4
+  ask_2 --> ask_3
+  ask_3 --> ask_2
+  ask_3 --> ask_4
+  ask_2 --> sink
+  ask_4 --> sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

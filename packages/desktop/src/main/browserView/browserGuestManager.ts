@@ -271,7 +271,7 @@ type BrowserTabRecoveryStorePort = Pick<
 > &
   Partial<Pick<BrowserTabRecoveryStore, "whenIdle">>;
 
-interface BrowserGuestManagerResidencyOptions {
+export interface BrowserGuestManagerResidencyOptions {
   tabLimit?: number;
   suspendAckTimeoutMs?: number;
   now?: () => number;
@@ -325,6 +325,19 @@ function scopeKey(context: InternalExecutionContext): string {
     context.sessionId,
     context.clientMode,
   ].join("\u0000");
+}
+
+/** tab 归属的 session 身份：不含 browserId / generation，释放回 user-tab 集合的 tab 仍然匹配。 */
+function ownedBySession(
+  owner: InternalExecutionContext,
+  context: InternalExecutionContext,
+): boolean {
+  return (
+    owner.windowId === context.windowId &&
+    owner.workspaceKey === context.workspaceKey &&
+    (owner.remoteSessionId ?? "") === (context.remoteSessionId ?? "") &&
+    owner.sessionId === context.sessionId
+  );
 }
 
 function sameScope(left: InternalExecutionContext, right: InternalExecutionContext): boolean {
@@ -996,6 +1009,7 @@ export class BrowserGuestManager {
     }
     if (command.method === "closeSession") {
       this.closeSession(context);
+      if (command.closeTabs === true) await this.closeSessionTabs(context);
       return this.withMeta({ ok: true, elapsedMs: 0 }, context);
     }
 
@@ -2646,10 +2660,7 @@ export class BrowserGuestManager {
       tab.origin === "user" &&
       tab.claimable &&
       tab.lifecycle !== "closed" &&
-      tab.owner.windowId === context.windowId &&
-      tab.owner.workspaceKey === context.workspaceKey &&
-      (tab.owner.remoteSessionId ?? "") === (context.remoteSessionId ?? "") &&
-      tab.owner.sessionId === context.sessionId
+      ownedBySession(tab.owner, context)
     );
   }
 
@@ -3041,6 +3052,20 @@ export class BrowserGuestManager {
     this.defaultTabByScope.delete(scopeKey(context));
     this.sessionNames.delete(scopeKey(context));
     this.visibilityByScope.delete(scopeKey(context));
+  }
+
+  /**
+   * `closeSession({ closeTabs: true })`：真正关闭该 session 名下的全部 tab。按 session 归属而非完整
+   * browser scope 匹配——finalize / deliverable 已释放回该 session 的 tab 换到了 `unclaimed-iab` scope，
+   * 仍归它。只给永不回来认领的 session 用（dwf 子代理，
+   * docs/browser-use/2026-07-14-browser-tab-conversation-isolation-spec.md §2.3）：它的 sessionId 不是任何
+   * 对话，closeSession 保留的 view 无人可见、无人可认领，只会一直挂着 guest。
+   */
+  private async closeSessionTabs(context: InternalExecutionContext): Promise<void> {
+    const owned = [...this.tabs.values()].filter(
+      (tab) => tab.lifecycle !== "closed" && ownedBySession(tab.owner, context),
+    );
+    for (const tab of owned) await this.closeTabDurably(tab);
   }
 
   closeWindow(windowId: number): void {
@@ -4622,7 +4647,7 @@ function normalizeDialogType(type: string | undefined): BrowserDialog["type"] {
 }
 
 /** Browser response meta 会进入模型轨迹和调试日志；只保留 origin/path，绝不携带 credential/query/hash。 */
-function sanitizeBrowserMetaUrl(value: string): string | undefined {
+export function sanitizeBrowserMetaUrl(value: string): string | undefined {
   if (!value) return undefined;
   try {
     const url = new URL(value);

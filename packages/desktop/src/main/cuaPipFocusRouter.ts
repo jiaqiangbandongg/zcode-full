@@ -2,7 +2,7 @@ import type { PipSessionEvent } from "@zcode/zcode-cua/pip-session";
 
 type FocusEvent = Extract<PipSessionEvent, { kind: "focus-changed" }>;
 
-interface CuaPipFocusRouter {
+export interface CuaPipFocusRouter {
   updateActiveSession(windowId: number, sessionId: string | null): void;
   focusWindow(windowId: number): void;
   blurWindow(windowId: number): void;
@@ -10,7 +10,9 @@ interface CuaPipFocusRouter {
   removeWindow(windowId: number): void;
 }
 
-export function resolveCuaPipWindowKey(window: { webContents: { id: number } }): number {
+export function resolveCuaPipWindowKey(window: {
+  webContents: { id: number };
+}): number {
   return window.webContents.id;
 }
 

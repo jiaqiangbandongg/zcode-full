@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-same-model-draft-provider-identity",
+  "spec": "./test/e2e/conversation-session/conversation-session-same-model-draft-provider-identity.test.ts",
+  "fixtures": [
+    {
+      "id": "same-model-provider-identity-title",
+      "description": "同名模型跨 provider 身份 case 内的标题生成固定响应，避免严格 case-local replay 依赖其他 case。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-same-model-provider-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-provider-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Provider Identity\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-provider-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":64,\"completion_tokens\":8,\"total_tokens\":72}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "same-model-provider-identity-glm52-primary-main",
+      "description": "I22 先用 primary provider 下 glm-5.2 建立 active session，为后续空草稿切 alternate provider 的 workspace default 回包竞态提供前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 GLM-5.2 primary active session 存在后，workspace default 回包和后续请求不能把同名模型拉回旧 provider；seed 响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_GLM52_PROVIDER_IDENTITY_PRIMARY"],
+        "bodyIncludes": [
+          "E2E_GLM52_PROVIDER_IDENTITY_PRIMARY",
+          "upstream-e2e-ok",
+          "glm-5.2"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-same-model-glm52-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-glm52-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-glm52-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "same-model-provider-identity-glm52-alternate-main",
+      "description": "I22 切到 alternate provider 下同名 glm-5.2 后发送，验证真实请求 URL 命中 alternate provider Base URL。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "GLM-5.2 alternate 发送用于验证真实请求 URL 命中 alternate provider Base URL；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_GLM52_PROVIDER_IDENTITY_ALTERNATE"],
+        "bodyIncludes": [
+          "E2E_GLM52_PROVIDER_IDENTITY_ALTERNATE",
+          "upstream-e2e-ok",
+          "glm-5.2"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-same-model-glm52-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-glm52-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-glm52-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"glm-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "same-model-provider-identity-upstream-flash-primary-main",
+      "description": "I22 先用 primary provider 下 deepseek-v4-flash 建立 active session，为后续空草稿切 alternate provider 的 workspace default 回包竞态提供非 GLM 前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 deepseek-v4-flash primary active session 存在后，workspace default 回包和后续请求不能把同名模型拉回旧 provider；seed 响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UPSTREAM_FLASH_PROVIDER_IDENTITY_PRIMARY"],
+        "bodyIncludes": [
+          "E2E_UPSTREAM_FLASH_PROVIDER_IDENTITY_PRIMARY",
+          "upstream-e2e-ok",
+          "deepseek-v4-flash"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-same-model-upstream-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-upstream-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-upstream-primary\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "same-model-provider-identity-upstream-flash-alternate-main",
+      "description": "I22 切到 alternate provider 下同名 deepseek-v4-flash 后发送，验证真实请求 URL 命中 alternate provider Base URL。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "deepseek-v4-flash alternate 发送用于验证真实请求 URL 命中 alternate provider Base URL；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_UPSTREAM_FLASH_PROVIDER_IDENTITY_ALTERNATE"],
+        "bodyIncludes": [
+          "E2E_UPSTREAM_FLASH_PROVIDER_IDENTITY_ALTERNATE",
+          "upstream-e2e-ok",
+          "deepseek-v4-flash"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-same-model-upstream-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-upstream-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-same-model-upstream-alternate\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

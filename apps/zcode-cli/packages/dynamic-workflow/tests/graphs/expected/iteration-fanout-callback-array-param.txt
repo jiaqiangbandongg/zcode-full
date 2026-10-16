@@ -1,0 +1,14 @@
+node source
+node ask#1 "planner" @5:34 actors=actor#1 type="string"
+node fan-out#1 "fan-out" @7:14 type="string[]"
+node ask#2 "judge" @7:59 actors=actor#2 within=fan-out#1 type="string"
+node sink
+actor actor#1 "planner" @5:17
+actor actor#2 "judge" @7:44 within=fan-out#1
+edge source -> ask#1 data exact
+edge ask#1 -> fan-out#1 data exact type="string"
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#1 -> sink data exact type="string"
+edge fan-out#1 -> ask#2 data exact type="string[]"
+edge fan-out#1 -> sink data exact type="string[]"
+edge ask#2 -> sink data exact type="string"

@@ -22,7 +22,7 @@ export type ConversationShareSelectionPreflightState =
 // memo 组件的默认对象每次创建会破坏引用稳定性；idle 默认值仅供读取。
 const DEFAULT_PREFLIGHT: ConversationShareSelectionPreflightState = { status: "idle" };
 
-interface ConversationShareSelectionDockProps {
+export interface ConversationShareSelectionDockProps {
   selectedCount: number;
   totalCount: number;
   onCancel: () => void;

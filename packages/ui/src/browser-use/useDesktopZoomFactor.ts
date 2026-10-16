@@ -5,7 +5,7 @@ const DESKTOP_ZOOM_FACTOR_STEP = 1.1;
 const DESKTOP_ZOOM_MIN_LEVEL = -3;
 const DESKTOP_ZOOM_MAX_LEVEL = 5;
 
-function resolveDesktopZoomFactor(zoomLevel: number): number {
+export function resolveDesktopZoomFactor(zoomLevel: number): number {
   if (!Number.isFinite(zoomLevel)) return 1;
   const clampedLevel = Math.min(
     DESKTOP_ZOOM_MAX_LEVEL,

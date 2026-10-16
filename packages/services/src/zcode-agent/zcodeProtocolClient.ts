@@ -12,15 +12,15 @@ import type { V4Method } from "@zcode/shared/zcode-protocol-v4";
 import type { z } from "zod";
 import type { ZCodeProtocolTransport } from "./zcodeProtocolTransport.js";
 
-/** 客户端可发的方法名：旧 zcodeProtocolMethods + v4/*（并存，收敛为 v4）。 */
-type ZCodeProtocolClientMethod = ZCodeProtocolMethod | V4Method;
+/** 客户端可发的方法名：旧 zcodeProtocolMethods + v4/*（M3 起并存，M5 波次 2 收敛为 v4）。 */
+export type ZCodeProtocolClientMethod = ZCodeProtocolMethod | V4Method;
 
 interface ZCodeProtocolClientOptions {
   requireStorageStartup?: boolean;
   requestTimeoutMs?: number;
 }
 
-interface ZCodeProtocolRequestTimeoutEvent {
+export interface ZCodeProtocolRequestTimeoutEvent {
   method: ZCodeProtocolClientMethod;
   requestId: ZCodeProtocolRequestId;
   timeoutMs: number;
@@ -33,6 +33,8 @@ interface PendingRequest<T> {
   resumeTimeout: () => void;
   resolve: (value: T) => void;
   reject: (error: Error) => void;
+  /** dispose 批量拒绝时在此处挂 no-op catch，防止"取消即 unhandled"（见 rejectAll）。 */
+  promise?: Promise<T>;
   resultSchema?: z.ZodType<T>;
   cleanupAbort?: () => void;
 }
@@ -45,7 +47,7 @@ interface ZCodeProtocolClientRequestOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_ZCODE_PROTOCOL_REQUEST_TIMEOUT_MS = 3 * 60_000;
+export const DEFAULT_ZCODE_PROTOCOL_REQUEST_TIMEOUT_MS = 3 * 60_000;
 
 class ZCodeProtocolClientError extends Error {
   constructor(
@@ -131,7 +133,26 @@ export class ZCodeProtocolClient implements IDisposable {
     return this.transport.kind;
   }
 
-  async request<T = unknown>(
+  /**
+   * 非 async 包装（CR 意见）：调用方持有的是本方法返回的 Promise，而 async 实现内部的
+   * resultPromise 经 return 传播拒绝时，外层 Promise 独立参与 unhandledRejection 判定。
+   * no-op catch 必须挂在最终返回对象创建点，才能覆盖 dispose/transport close 的批量拒绝
+   * 与调用方挂靠 .catch() 之间的时序窗口。该 handler 只影响 unhandled 判定，不改变
+   * rejection 向真实 awaiter 的传播；代价是调用方 fire-and-forget 忘挂 catch 时不再有
+   * unhandled 噪声暴露，属可接受取舍（仓库内 void 调用点均自带 catch）。
+   */
+  request<T = unknown>(
+    method: ZCodeProtocolClientMethod,
+    params?: unknown,
+    resultSchema?: z.ZodType<T>,
+    options?: ZCodeProtocolClientRequestOptions,
+  ): Promise<T> {
+    const requestPromise = this.requestImpl(method, params, resultSchema, options);
+    void requestPromise.catch(() => undefined);
+    return requestPromise;
+  }
+
+  private async requestImpl<T = unknown>(
     method: ZCodeProtocolClientMethod,
     params?: unknown,
     resultSchema?: z.ZodType<T>,
@@ -184,6 +205,9 @@ export class ZCodeProtocolClient implements IDisposable {
         },
         resolve: resolve as (value: unknown) => void,
         reject,
+        // Bug 复盘：这里曾在 executor 内直接引用外层 resultPromise，触发 TDZ
+        // ReferenceError（executor 同步运行于 const 赋值完成之前），每次 request 即抛。
+        // promise 绑定延后到 new Promise 返回之后完成。
         resultSchema,
         cleanupAbort: () => options?.signal?.removeEventListener("abort", abortHandler),
       };
@@ -194,6 +218,14 @@ export class ZCodeProtocolClient implements IDisposable {
         options?.signal?.addEventListener("abort", abortHandler, { once: true });
       }
     });
+
+    // executor 内 pending.set 已同步完成；此处 resultPromise 已就绪，补绑给
+    // rejectAll 做 dispose 批量拒绝的 no-op catch。同步 abort 场景 pending 已
+    // 删除，get 返回 undefined，安全跳过。
+    const registeredPending = this.pending.get(requestKey);
+    if (registeredPending) {
+      registeredPending.promise = resultPromise;
+    }
 
     // 已在发送前取消的请求不能继续写入 transport；否则服务端会执行一个客户端已经
     // 放弃、也无法接收响应的模型任务。
@@ -357,6 +389,11 @@ export class ZCodeProtocolClient implements IDisposable {
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timeout);
       pending.cleanupAbort?.();
+      // Bug 原因：dispose 批量拒绝发生在调用方 await 之外（如 dispose 与在飞观测长轮询
+      // 竞态），拒绝先于调用方任何处置被判 unhandledRejection（vitest 运行级失败，生产
+      // 等价未处理拒绝崩溃）。dispose 引发的拒绝语义是"取消"，这里先挂 no-op catch；
+      // 真实 awaiter 仍照常收到该 rejection，超时/abort 路径不受影响、照常上报。
+      void pending.promise?.catch(() => undefined);
       pending.reject(error);
     }
     this.pending.clear();

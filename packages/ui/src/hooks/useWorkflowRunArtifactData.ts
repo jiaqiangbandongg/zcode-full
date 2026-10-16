@@ -23,12 +23,6 @@ import { useV4Conversation } from "@/v4/V4ConversationContext.js";
  */
 
 /**
- * 一次「翻到排空」最多翻几页。`REPORT_CAPS` 是 256 条 / run，页大小 200，所以正常情形至多
- * 两页；这个上界只是防一个不肯给 `hasMore: false` 的实现把渲染线程锁死。
- */
-const MAX_PAGES_PER_DRAIN = 16;
-
-/**
  * 一次拉取途中 `itemCount` 又抬升时，收尾前最多补拉几轮（见 `pendingRef`）。
  * 每一轮都是一次「从本地末尾续上」的增量读，正常情形一轮就排空。
  */
@@ -41,6 +35,24 @@ interface WorkflowRunArtifactDataState {
   unavailable: boolean;
   error: string | null;
 }
+
+/**
+ * 老 CLI 不认 `fields`：它的 strict schema 把整条请求拒掉，错误跨 JSON-RPC 之后只剩 zod 的
+ * message（`unrecognized_keys` 与键名）。认出它就退回取整条 item 重试。
+ */
+function isFieldsParamUnsupported(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("unrecognized_keys") && message.includes("fields");
+}
+
+/**
+ * 已知不认 `fields` 的会话（远程 workspace 的 CLI 可能比桌面旧）。记在模块级：同一会话的每块
+ * 看板、每次取数都不必再撞一次拒绝。以 sessionId 为键——一个会话对应一个 CLI。
+ */
+const sessionsWithoutFieldReads = new Set<string>();
+
+/** 字段路径列表的稳定键：调用方每次渲染给一个新数组时，不因此重取。 */
+const FIELD_KEY_SEPARATOR = "\u0000";
 
 /** 能力缺席的判据同 `useWorkflowRunArtifacts`：跨 JSON-RPC 之后只剩 message 可靠。 */
 function isWorkflowRunArtifactDataCapabilityMissing(error: unknown): boolean {
@@ -63,6 +75,11 @@ export function useWorkflowRunArtifactData(options: {
    */
   itemCount?: number;
   enabled?: boolean;
+  /**
+   * 看板会读到的字段路径（`artifactPresetFieldPaths`）。给了它就只让 CLI 取这些字段，一条 1 MiB
+   * 的 item 不会整条进渲染器；缺省取整条 item。
+   */
+  fields?: readonly string[];
 }): WorkflowRunArtifactDataState {
   const { workflowRunArtifactData } = useV4Conversation();
   const [state, setState] = useState<WorkflowRunArtifactDataState>(emptyState);
@@ -86,6 +103,8 @@ export function useWorkflowRunArtifactData(options: {
   const lastDrainedCountRef = useRef<number | undefined>(undefined);
 
   const { artifactId, runId, sessionId } = options;
+  const fieldsKey = options.fields?.join(FIELD_KEY_SEPARATOR);
+  const fields = useMemo(() => fieldsKey?.split(FIELD_KEY_SEPARATOR), [fieldsKey]);
   const enabled =
     options.enabled !== false && sessionId.length > 0 && runId.length > 0 && artifactId.length > 0;
 
@@ -114,19 +133,35 @@ export function useWorkflowRunArtifactData(options: {
           pendingRef.current = false;
           const collected: ArtifactItem[] = [];
           let cursor = currentMode === "append" ? cursorRef.current : undefined;
-          for (let page = 0; page < MAX_PAGES_PER_DRAIN; page += 1) {
-            const result = await workflowRunArtifactData({
+          // 一直翻到存储层说没有了为止。修复前这里最多翻 16 页（3,200 条）：report 上限还是
+          // 256 条时那是一道防死循环的保险，上限提到 65,536 之后它成了静默截断——一个已结束、
+          // 打了 5,000 条标签的 run，看板永远只画出前 3,200 条，而之后不会再有 itemCount 变化
+          // 来触发续拉。防死循环改由「游标必须前进」来保证：一页没有让游标变大就停。
+          for (;;) {
+            const request = {
               sessionId,
               runId,
               artifactId,
               ...(cursor === undefined ? {} : { afterSequence: cursor }),
               limit: WORKFLOW_ARTIFACT_LIMITS.defaultItemsPerPage,
-            });
+            };
+            const withFields = fields !== undefined && !sessionsWithoutFieldReads.has(sessionId);
+            let result;
+            try {
+              result = await workflowRunArtifactData(withFields ? { ...request, fields } : request);
+            } catch (caught) {
+              if (!withFields || !isFieldsParamUnsupported(caught)) throw caught;
+              sessionsWithoutFieldReads.add(sessionId);
+              logger.info("[workflow-artifacts] CLI 不支持只取字段，退回取整条条目", { sessionId });
+              result = await workflowRunArtifactData(request);
+            }
             if (requestVersion !== requestVersionRef.current) return;
             collected.push(...result.items);
             const lastSequence = result.items.at(-1)?.sequence;
+            const advanced =
+              lastSequence !== undefined && (cursor === undefined || lastSequence > cursor);
             if (lastSequence !== undefined) cursor = lastSequence;
-            if (!result.hasMore || result.items.length === 0) break;
+            if (!result.hasMore || !advanced) break;
           }
           if (requestVersion !== requestVersionRef.current) return;
           cursorRef.current = cursor;
@@ -165,7 +200,7 @@ export function useWorkflowRunArtifactData(options: {
         pendingRef.current = false;
       }
     },
-    [artifactId, enabled, runId, sessionId, workflowRunArtifactData],
+    [artifactId, enabled, fields, runId, sessionId, workflowRunArtifactData],
   );
 
   // 切产物 / 切 run / 从关到开：先清空再整份重取。别的看板的点绝不能留在这块画布上。

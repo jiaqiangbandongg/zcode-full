@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-input-validation-provider-content",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-input-validation-provider-content.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-tool-input-validation-provider-content.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "tool-input-validation-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成与 tool input validation 无关，但必须独立收口，避免抢占或阻塞主链路 fixture。"
+    },
+    {
+      "id": "tool-input-validation-malformed-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "常规 toolUse fixture 会 JSON.stringify input；必须使用 raw SSE 才能稳定覆盖 final tool-call malformed arguments。"
+    },
+    {
+      "id": "tool-input-validation-live-continuation",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应正文只用于稳定结束首轮；核心证据是请求中的归一化 tool_use 和精确 error tool_result。"
+    },
+    {
+      "id": "tool-input-validation-cold-followup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应正文只用于稳定结束 cold follow-up；核心证据是历史 tool_result content 与 live continuation 字节一致。"
+    }
+  ]
+}

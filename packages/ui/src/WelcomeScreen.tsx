@@ -25,6 +25,7 @@ import { LoginApiKeyForm } from "./login/LoginApiKeyForm.js";
 import { renderOAuthProviderIcon } from "./lib/oauthProviderIcon.js";
 import { ThemeHeroVisual } from "./openWorkspacePageThemeHero.js";
 import { useZCodeStore } from "./store/StoreProvider.js";
+import { DesktopOverlayWindowControls } from "@/DesktopOverlayWindowControls.js";
 
 interface WelcomeScreenProps {
   onComplete: (reason: LoginCompleteReason) => void | Promise<void>;
@@ -36,7 +37,9 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
   return (
     <main className="relative flex h-full min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-6 text-foreground sm:px-6">
       <ThemeHeroVisual className="absolute inset-0" />
-      <div className="pointer-events-none absolute left-0 top-0 right-0 z-10 flex h-12 w-full items-center [app-region:drag]" />
+      {/* 原生拖拽命中不受 pointer-events/z-index 约束；拖拽层必须避开窗控，且先于 no-drag 区声明。 */}
+      <div className="pointer-events-none absolute left-0 top-0 right-0 z-10 flex h-12 items-center [app-region:drag] platform-windows-desktop:right-[134px] platform-linux-desktop:right-[134px]" />
+      <DesktopOverlayWindowControls />
       <section className="relative z-10 w-full flex flex-col gap-10 max-w-sm rounded-2xl border border-popover-border bg-background p-8 text-ui-base/relaxed shadow-md sm:p-10">
         <LoginPanel active onComplete={onComplete} />
       </section>
@@ -54,21 +57,21 @@ interface ActiveLoginEntryAttempt {
   providerId: OAuthProviderMeta["id"];
 }
 
-function shouldCompleteProviderLoginAttempt(params: {
+export function shouldCompleteProviderLoginAttempt(params: {
   attempt: ActiveLoginEntryAttempt | null;
   successProvider: OAuthProviderMeta["id"] | null;
 }): boolean {
   return !params.attempt || params.successProvider === params.attempt.providerId;
 }
 
-function shouldCompleteLoginFromExistingUser(params: {
+export function shouldCompleteLoginFromExistingUser(params: {
   hasUser: boolean;
   attempt: ActiveLoginEntryAttempt | null;
 }): boolean {
   return params.hasUser && !params.attempt;
 }
 
-function LoginPanel({ active, onComplete }: LoginPanelProps) {
+export function LoginPanel({ active, onComplete }: LoginPanelProps) {
   const { intl } = useZCodeIntl();
   const {
     startLogin,
@@ -288,7 +291,7 @@ function LoginPanel({ active, onComplete }: LoginPanelProps) {
       </LoginPanelHeader>
 
       <div className="space-y-6">
-        {/* Root 层写入 oauthError（轮询/回调失败）后 effect 会把 useOAuth reset 回 idle，
+        {/* Bugfix: Root 层写入 oauthError（轮询/回调失败）后 effect 会把 useOAuth reset 回 idle，
             若只判断 status==="idle" 会让失败块和渠道按钮列表同屏、状态纠缠。
             失败期间统一由下方失败块接管（重新登录/取消），渠道列表等错误清掉后再回来。 */}
         {status === "idle" && !oauthError && loginMode === "providers" && (
@@ -403,7 +406,7 @@ function LoginPanel({ active, onComplete }: LoginPanelProps) {
             >
               <TriangleAlertIcon className="size-4" />
               <AlertDescription className="text-center">
-                {/* 登录失败通常是可重试/可切换提供方的状态，不能用 destructive 红色误导为破坏性错误。
+                {/* Bugfix: 登录失败通常是可重试/可切换提供方的状态，不能用 destructive 红色误导为破坏性错误。
                     这里统一用 warning 语义，并居中文案以匹配登录面板的居中视觉节奏。 */}
                 {oauthError || error}
               </AlertDescription>
@@ -536,15 +539,15 @@ function getProviderPriority(provider: OAuthProviderMeta): number {
   }
 }
 
-function resolveVisibleLoginProviders(providers: OAuthProviderMeta[]): OAuthProviderMeta[] {
-  // ZAI / BigModel 现在共享 App 登录事实源，未登录时登录入口必须同时展示两个入口。
-  // 不能临时隐藏 BigModel，否则用户无法主动选择 BigModel 作为 active provider。
+export function resolveVisibleLoginProviders(providers: OAuthProviderMeta[]): OAuthProviderMeta[] {
+  // Bugfix: ZAI / BigModel 现在共享 App 登录事实源，未登录时登录入口必须同时展示两个入口。
+  // 旧逻辑曾临时隐藏 BigModel，导致用户无法主动选择 BigModel 作为 active provider。
   return [...providers].sort((left, right) => {
     return getProviderPriority(left) - getProviderPriority(right);
   });
 }
 
-function resolveLoginRetryProvider({
+export function resolveLoginRetryProvider({
   pendingProvider,
   lastAttemptProvider,
   providers,

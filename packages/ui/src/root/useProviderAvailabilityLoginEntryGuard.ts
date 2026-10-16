@@ -4,7 +4,7 @@ import type { ModelSelectionView } from "@zcode/services";
 import { resolveProviderAvailabilityState } from "@/lib/modelProviderAvailability.js";
 import { logger } from "@/logger.js";
 
-interface ProviderAvailabilityLoginEntryGuardResult {
+export interface ProviderAvailabilityLoginEntryGuardResult {
   hasUsableProvider: boolean;
   providerCount: number;
   shouldOpenLoginEntry: boolean;

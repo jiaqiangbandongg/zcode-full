@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-sendnow",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-sendnow.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-sendnow.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-sendnow-title",
+      "description": "E2E_V4_SENDNOW_SLOW 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_SENDNOW_SLOW 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-sendnow-slow-turn",
+      "description": "M4 sendQueuedNow 门禁：可控慢流首轮，保持 running 以便入队 + send now。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "sendQueuedNow 需 running 窗口入队，再 stop 当前 + 消费该项。"
+    },
+    {
+      "id": "v4-sendnow-item-reply",
+      "description": "M4 sendQueuedNow 门禁：被立即发送的队列项的回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "sendQueuedNow stop 当前后以原文重发该队列项，模型给出回复。"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+actor-node workspace
+actor-node actor#1 "optimizer" @33:19
+actor-node actor#2 "consultant" @34:20
+actor-edge workspace -> actor#1 exact count=2 types="WorldRunResult"
+actor-edge workspace -> actor#2 exact count=2 types="WorldRunResult"
+actor-edge actor#1 -> workspace exact count=1 types="Attempt"
+actor-edge actor#1 -> actor#1 exact count=1 types="Attempt"
+actor-edge actor#1 -> actor#2 exact count=1 types="Attempt"
+actor-edge actor#2 -> actor#1 exact count=1 types="Advice"
+actor-edge actor#2 -> actor#2 exact count=1 types="Advice"

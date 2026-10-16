@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-openrouter-model-id-colon",
+  "spec": "./test/e2e/conversation-session/conversation-session-openrouter-model-id-colon.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-openrouter-model-id-colon.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "openrouter-model-id-colon-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于含冒号 modelId 的产品语义。"
+    },
+    {
+      "id": "openrouter-model-id-colon-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是完整 OpenRouter modelId 的 UI、V4 配置和请求传递，响应仅用于稳定收口。"
+    }
+  ]
+}

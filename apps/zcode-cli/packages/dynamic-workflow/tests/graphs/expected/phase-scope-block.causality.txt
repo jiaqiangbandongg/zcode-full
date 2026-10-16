@@ -1,0 +1,22 @@
+phase phase#1 "survey" @5:1
+phase phase#2 "audit" @11:3
+phase phase#4 "wrap" @24:1
+lane workspace
+lane actor#1 "auditor" @7:17
+lane actor#2 "scribe" @8:16
+region seq#1 seq
+region branch#1 branch parent=seq#1 @10:23
+step world-read#1 world-read "glob src/**/*.ts" @6:27 lane=workspace phase=phase#1 region=seq#1 always
+step world-read#2 world-read "read" @12:28 lane=workspace phase=phase#2 region=branch#1 maybe
+step ask#1 ask "auditor" @13:33 lane=actor#1 phase=phase#2 region=branch#1 maybe
+step world-read#3 world-read "read README.md" @22:28 lane=workspace phase=phase#1 region=seq#1 always
+step ask#2 ask "scribe" @25:30 lane=actor#2 phase=phase#4 region=seq#1 always
+edge world-read#1 -> world-read#2 control maybe
+edge world-read#1 -> ask#2 data always exact
+edge world-read#2 -> ask#1 data maybe exact
+edge ask#1 -> world-read#3 seq maybe
+edge world-read#3 -> ask#2 data always exact
+phase-edge phase#1 -> phase#2 control maybe
+phase-edge phase#1 -> phase#4 data always
+phase-edge phase#2 -> phase#1 seq maybe
+sink ask#2

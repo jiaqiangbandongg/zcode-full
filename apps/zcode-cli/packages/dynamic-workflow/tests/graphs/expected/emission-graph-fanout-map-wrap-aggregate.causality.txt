@@ -1,0 +1,13 @@
+lane actor#1 name-head="inventor-" @11:23 families=fanout#1
+lane actor#2 "critic" @15:20 families=fanout#2
+lane actor#3 "judge" @20:23
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @11:3 label="map"
+region fanout#2 fanout parent=seq#1 @14:3 label="map"
+step ask#1 ask "ask" label-head="inventor-" @11:46 lane=actor#1 region=fanout#1 maybe stack
+step ask#2 ask "critic" @16:35 lane=actor#2 region=fanout#2 maybe serial
+step ask#3 ask "judge" @20:38 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#2 data maybe exact
+edge ask#2 -> ask#2 carry maybe
+edge ask#2 -> ask#3 data maybe exact
+sink ask#3

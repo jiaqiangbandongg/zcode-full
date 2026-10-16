@@ -1,0 +1,4 @@
+phase unphased
+participant unphased:actor#1 "planner" steps=ask#1,ask#2
+participant unphased:actor#2 "act" steps=ask#3
+handoff unphased:actor#1 -> unphased:actor#2 types="string"

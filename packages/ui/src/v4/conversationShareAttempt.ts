@@ -2,7 +2,7 @@ import type { ConversationShareAttempt } from "@/store/conversationShareSelectio
 
 export type { ConversationShareAttempt } from "@/store/conversationShareSelectionStore.js";
 
-interface ConversationShareAttemptIdFactory {
+export interface ConversationShareAttemptIdFactory {
   now?: () => number;
   randomUUID?: () => string | undefined;
 }

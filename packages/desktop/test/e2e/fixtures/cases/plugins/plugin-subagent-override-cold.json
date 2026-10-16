@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "plugin-subagent-override-cold",
+  "spec": "./test/e2e/plugins/plugin-subagent-override-cold.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/plugin-management/plugin-subagent-override-cold.json"
+  ],
+  "fileFixtures": [
+    {
+      "kind": "app-config",
+      "path": "~/.zcode/v2/agents-state.json",
+      "description": "SE-04 已验证的结构化插件覆盖，测试副本中为 judge 指定 alternate/high；冷启动后不改写插件 Markdown。",
+      "source": "created-by-helper"
+    }
+  ],
+  "requests": [
+    {
+      "id": "plugin-override-cold-parent",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "确定性触发插件 child，模型与档位以实际请求为证据。"
+    },
+    {
+      "id": "plugin-override-cold-child",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "检查 child 的真实模型和 high 参数，不依赖模型输出随机性。"
+    },
+    {
+      "id": "plugin-override-cold-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "验证子结果回到父执行，父 continuation 不继承 child 模型或档位。"
+    }
+  ]
+}

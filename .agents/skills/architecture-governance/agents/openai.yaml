@@ -1,4 +1,4 @@
 interface:
   display_name: Architecture Governance
   short_description: Check module boundaries and prepare a bounded code context
-  default_prompt: Use $architecture-governance before editing code to inspect the affected module, generate its context package, and run the architecture checks before and after the change.
+  default_prompt: Use $architecture-governance to check affected module boundaries. Generate context for cross-module, ownership, or unclear-contract changes, and run the architecture checks before and after code changes.

@@ -22,6 +22,7 @@ export interface ChatMediaAttachmentPreviewTarget {
   mediaType: string;
   url?: string;
   pdfSource?: PdfViewerSource;
+  textContent?: string;
 }
 
 export function ChatMediaAttachmentPreviewDialog({
@@ -87,7 +88,14 @@ export function ChatMediaAttachmentPreviewDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex max-h-[72vh] min-h-64 items-center justify-center bg-background-alt p-4">
-          {attachment?.pdfSource || attachment?.url ? (
+          {attachment?.textContent !== undefined ? (
+            <pre
+              data-text-attachment-preview="true"
+              className="max-h-[calc(72vh-2rem)] w-full overflow-auto whitespace-pre-wrap break-words p-4 font-sans text-ui-base text-foreground"
+            >
+              {attachment.textContent}
+            </pre>
+          ) : attachment?.pdfSource || attachment?.url ? (
             isPdf ? (
               <Suspense
                 fallback={

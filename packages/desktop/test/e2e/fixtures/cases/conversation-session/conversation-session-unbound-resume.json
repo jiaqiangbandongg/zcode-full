@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-unbound-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-unbound-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-unbound-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "unbound-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    },
+    {
+      "id": "unbound-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    },
+    {
+      "id": "unbound-continue_0",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    },
+    {
+      "id": "unbound-continue_1",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    },
+    {
+      "id": "unbound-continue_2",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    },
+    {
+      "id": "unbound-continue_3",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证历史恢复与重新选模后继续发送，不依赖模型生成质量，使用固定快速回复。"
+    }
+  ]
+}

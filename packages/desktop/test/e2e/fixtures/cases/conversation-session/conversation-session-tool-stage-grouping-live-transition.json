@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-stage-grouping-live-transition",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-stage-grouping-live-transition.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-tool-stage-grouping-live-transition.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-tool-stage-grouping-live-transition",
+      "source": "created-by-spec",
+      "description": "TGE01 Read/Write/Edit 使用的 case-owned workspace fixture。"
+    }
+  ],
+  "requests": [
+    { "id": "tge01-read", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定工具顺序，稳定验证 Explore、Terminal、Changes 的阶段边界。" },
+    { "id": "tge01-readonly-shell", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定只读 command，证明 Shell 分类后只进入 Explore。" },
+    { "id": "tge01-execute-a", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "本地慢命令提供稳定 running window，用于断言 Terminal summary。" },
+    { "id": "tge01-execute-b", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "第二条 command 稳定验证父 identity 与滚动摘要。" },
+    { "id": "tge01-write", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定 Write 作为 Terminal 后的可见阶段边界。" },
+    { "id": "tge01-edit", "kind": "main", "source": "synthetic", "timingPolicy": "tool-use", "syntheticReason": "固定 Edit 验证 Changes identity 与最新文件摘要。" },
+    { "id": "tge01-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "固定终态文本，稳定结束 Changes 阶段。" }
+  ]
+}

@@ -1,0 +1,8 @@
+phase unphased
+participant unphased:actor#1 "scanner" steps=ask#1
+participant unphased:actor#2 "planner" steps=ask#2
+participant unphased:workspace steps=world-read#1,world-read#2
+participant unphased:actor#3 "consumer" steps=ask#3
+handoff unphased:actor#1 -> unphased:actor#2
+handoff unphased:actor#2 -> unphased:workspace
+handoff unphased:workspace -> unphased:actor#3 types="string[],string"

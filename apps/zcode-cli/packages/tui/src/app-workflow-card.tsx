@@ -18,7 +18,7 @@ const CARD_LOG_INDENT = "    ";
 export const MAX_ACTOR_ROWS = 6;
 const MAX_RESULT_PREVIEW_WIDTH = 200;
 
-/** 六行位置按状态分桶：跑着的排前面。 */
+/** 六行位置按状态分桶（docs/dynamic-workflow/launch.md「The inline card」）：跑着的排前面。 */
 const ACTOR_ROW_RANK: Record<WorkflowRunActor["status"], number> = {
   running: 0,
   waiting: 1,

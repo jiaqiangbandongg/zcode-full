@@ -438,7 +438,7 @@ export interface WorkflowActorInstance {
 type WorkflowActorStartState = "notStarted" | "started" | "unknown";
 
 /** actor transcript tab 交给门的身份：槽位 + 打开时已知的会话 id（可缺席）。 */
-interface WorkflowActorSlotRef {
+export interface WorkflowActorSlotRef {
   runId: string;
   siteId: string;
   ordinal: number;
@@ -474,9 +474,11 @@ interface WorkflowActorGate {
  * - actor 在、一个非 `queued` 节点都没有 → `notStarted`；有 → `started`，订阅目标取投影里的
  *   会话 id，tab 打开时带的作兜底。门读的就是实时投影，首个节点派发即自愈。
  *
- * 记录在案的例外：resume 的完结命中短路直接发 `node-settled`，不经 `ensureSession`，那条
- * actor 会话可能真的不存在。settled 会把门打开、订阅失败，落回既有 error+retry 面板——
- * 那确实是「会话不存在」，既有兜底就是正确答案。
+ * 缓存命中是另一条开门的路：它直接发 `node-settled`，不经 `ensureSession`，这一世没建会话。
+ * 门照样打开，因为投影里 actor 的 `sessionId` 就是**持有转录的那条**（shared 的
+ * workflow-runs-actor-session.ts）：普通 resume 的命中指回本 run 早先建好的会话，修订 run 的
+ * 导入命中指向前驱里被读取的会话。只有更早的 journal（命中不点名子代理）归属不上，门停在
+ * notStarted——那条命中本来也证明不了任何会话。
  */
 export function workflowActorStartState(
   runs: readonly WorkflowRunState[] | undefined,

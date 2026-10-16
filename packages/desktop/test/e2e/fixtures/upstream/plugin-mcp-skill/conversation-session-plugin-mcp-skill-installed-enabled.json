@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "upstream-plugin-mcp-skill-installed-enabled-call",
+      "description": "Plugin MCP skill installed+enabled: agent advertises mcp__plugin_e2e-plugin-mcp-ping_ping__ping as a tool, model uses it once.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED"],
+        "bodyIncludes": ["E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "replay": {
+        "consumeOnce": true
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_mcp_ping_installed_enabled",
+          "name": "mcp__plugin_e2e-plugin-mcp-ping_ping__ping",
+          "input": {
+            "message": "ping-installed-enabled"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-mcp-skill-installed-enabled-final",
+      "description": "Plugin MCP skill installed+enabled: final assistant text after the plugin MCP tool_result.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_MCP_PING_INSTALLED_ENABLED",
+          "toolu_e2e_plugin_mcp_ping_installed_enabled"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

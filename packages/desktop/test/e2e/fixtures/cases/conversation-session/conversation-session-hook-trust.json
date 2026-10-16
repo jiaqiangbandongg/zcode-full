@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-hook-trust",
+  "spec": "./test/e2e/conversation-session/conversation-session-hook-trust.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-hook-trust.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode/config.json",
+      "source": "created-by-spec",
+      "description": "Workspace Hook declarations installed by wdio.conf.ts resetE2EHome before the first agent cold start."
+    },
+    {
+      "path": ".zcode/hook-trust-e2e-recorder.mjs",
+      "source": "created-by-spec",
+      "description": "Harmless recorder appending executions.jsonl evidence lines."
+    }
+  ],
+  "requests": [
+    {
+      "id": "hook-trust-first",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The turn only proves the soft gate does not block; hook behavior is asserted from executions.jsonl on disk."
+    },
+    {
+      "id": "hook-trust-second",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Execution evidence lives in executions.jsonl; the model reply only needs to complete the turn."
+    },
+    {
+      "id": "hook-trust-new-task",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "New-task cold start loads persisted Trust; SessionStart evidence is asserted from executions.jsonl."
+    }
+  ]
+}

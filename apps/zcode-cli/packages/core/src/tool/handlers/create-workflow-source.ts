@@ -25,8 +25,8 @@ import {
 import { writeWorkflowDraft } from "./workflow-drafts.js";
 import { readWorkflowScriptFile } from "./workflow-path-source.js";
 
-/** 业务失败的错误码，与既有 handler failure 惯例同一形状。 */
-const CREATE_WORKFLOW_FAILURE_CODE = 400;
+/** 业务失败的错误码，与既有 handler failure 惯例同一形状（确认窗调整的失败也用它）。 */
+export const CREATE_WORKFLOW_FAILURE_CODE = 400;
 
 function failure(message: string): ToolHandlerFailure {
   return { result: false, errorCode: CREATE_WORKFLOW_FAILURE_CODE, message };
@@ -57,20 +57,17 @@ export function validateCreateWorkflowSource(
 }
 
 /**
- * 并发上界的钳制：`[1, 天花板]`。
- * 超天花板的值**被压低而不是被拒**——模型说「至多 32 个」时用户要的是一个上界，不是一次报错。
+ * 并发上界的归一（docs/dynamic-workflow/concurrency.md「Two bounds on a run」）：向下取整、至少 1，
+ * **没有上限**。默认并发 D 是起点不是天花板——用户要 40 个就是 40 个，高于 D 与低于 D 一样作数；
+ * 真正替 provider 把关的是进程级治理器的 429 反馈，而不是机器核数。
  *
- * 天花板未知（端口缺席，或宿主的端口没有 `concurrencyCeiling`）时原样放行：端口实现自己还会
- * 钳一次，这里少钳一次只会让确认窗显示一个偏大的数，而拒绝执行会让整条路径塌掉。
- *
- * `CreateWorkflow` 与 `AmendWorkflow` 共用本函数：同一个数在两个工具上钳出不同结果，是那种
- * 只会在用户改一次并发时才被发现的不一致。
+ * `CreateWorkflow`、`AmendWorkflow`、确认窗调整与 GUI 设置共用本函数：同一个数在几条路上归一出
+ * 不同结果，是那种只会在用户改一次并发时才被发现的不一致。
  */
-export function clampWorkflowMaxConcurrency(value: number, ceiling: number | undefined): number {
-  // 值已过 schema（正整数），下界仍然写出来：这个 helper 是两个工具的共用入口，schema 换了
-  // 也不该让 0 或负数穿过去。
-  const atLeastOne = Math.max(1, value);
-  return ceiling === undefined ? atLeastOne : Math.min(atLeastOne, Math.max(1, ceiling));
+export function normalizeWorkflowMaxConcurrency(value: number): number {
+  // 值已过 schema（正整数），下界仍然写出来：这个 helper 是几条路的共用入口，schema 换了
+  // 也不该让 0、负数或小数穿过去（要「3.7 个在飞的 ask」没有意义，向上取整会偷偷越过用户说的数）。
+  return Math.max(1, Math.floor(value));
 }
 
 /**
@@ -114,14 +111,12 @@ export const SUBAGENT_MODEL_UNAVAILABLE =
  * 来源是同一段代码。`saved` / `path` 此后只是**来龙去脉**：run 标签的兜底、实参的持久化与
  * 脚本文件的记录读它们，执行一个字节都不读它们。
  *
- * `ceiling` 是本机的并发天花板（`port.concurrencyCeiling?.()`，缺席即不钳）；`catalog` 是本机
- * 的模型目录（`context.modelCatalogPort`，缺席即不能选模型）。`max_concurrency` 与
+ * `catalog` 是本机的模型目录（`context.modelCatalogPort`，缺席即不能选模型）。`max_concurrency` 与
  * `subagent_model` 都是顶层字段，三条来源同样处理。
  */
 export async function resolveCreateWorkflowInput(
   input: unknown,
   cwd: string,
-  ceiling?: number,
   catalog?: ModelCatalogPort,
 ): Promise<ToolInputResolutionResult> {
   const parsed = CreateWorkflowInputSchema.safeParse(input);
@@ -134,35 +129,33 @@ export async function resolveCreateWorkflowInput(
   if (!subagentModel.result) return subagentModel;
   const subagentModelField =
     subagentModel.canonical === undefined ? {} : { subagent_model: subagentModel.canonical };
-  const clampedField =
-    requested === undefined
-      ? {}
-      : { max_concurrency: clampWorkflowMaxConcurrency(requested, ceiling) };
+  const boundField =
+    requested === undefined ? {} : { max_concurrency: normalizeWorkflowMaxConcurrency(requested) };
 
   if (model.path !== undefined) {
     return resolvePathSource(model, model.path, cwd, {
-      ...clampedField,
+      ...boundField,
       ...subagentModelField,
     });
   }
 
   // 内联：恒等。内联路径必须一次盘都不碰——那是「零回归」的可测形式。
   if (model.saved === undefined) {
-    // 两个例外都是「改写它不读盘，不改写则确认窗显示的不是将要生效的东西」：钳过头的并发
+    // 两个例外都是「改写它不读盘，不改写则确认窗显示的不是将要生效的东西」：需要取整的并发
     // 上界，和还没归一成规范形的模型名。两者都没动时仍然逐字节恒等。
-    const clamped =
-      requested === undefined ? undefined : clampWorkflowMaxConcurrency(requested, ceiling);
+    const normalized =
+      requested === undefined ? undefined : normalizeWorkflowMaxConcurrency(requested);
     // 模型名比的是**原始**入参而不是 `model.subagent_model`：schema 带 `.trim()`，所以两端有
     // 空白的字符串解析出来与规范形相等，而恒等放行会让确认窗显示那串空白。
     const rawSubagentModel = (input as { subagent_model?: unknown } | null)?.subagent_model;
-    if (clamped === requested && subagentModel.canonical === rawSubagentModel) {
+    if (normalized === requested && subagentModel.canonical === rawSubagentModel) {
       return { result: true, input };
     }
     return {
       result: true,
       input: {
         ...model,
-        ...(clamped === undefined ? {} : { max_concurrency: clamped }),
+        ...(normalized === undefined ? {} : { max_concurrency: normalized }),
         ...subagentModelField,
       } satisfies CreateWorkflowInput,
     };
@@ -210,9 +203,7 @@ export async function resolveCreateWorkflowInput(
       },
       // 拷贝逐字节带着元数据块，所以诊断的文件行要跳过块的那几行。
       ...(found.bodyLineOffset === 0 ? {} : { script_line_offset: found.bodyLineOffset }),
-      ...(requested === undefined
-        ? {}
-        : { max_concurrency: clampWorkflowMaxConcurrency(requested, ceiling) }),
+      ...boundField,
       // saved 分支是从零拼一份新入参的，所以每个顶层字段都要在这里被点名一次，否则它会被
       // 静默丢掉——而「只在 saved 路径上丢」是最难被发现的那种失效。
       ...subagentModelField,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#161616" />
     <meta name="color-scheme" content="dark" />
-    <!-- Chrome dev 下可能不发 favicon 网络请求；内嵌小尺寸 App 图标，避免标签页回退到默认图标。-->
+    <!-- Bugfix: Chrome dev 下可能不发 favicon 网络请求；内嵌小尺寸 App 图标，避免标签页回退到默认图标。 -->
     <link
       rel="icon"
       type="image/png"
@@ -15,13 +15,15 @@
     <title>ZCode</title>
     <script>
       (() => {
-        // JS bundle 执行前先按本地主题偏好决定首屏底色，避免 dark 用户在这一帧看到白底闪烁。
+        // Bugfix: Web 远控跨 workspace 跳转时，JS bundle 还没执行前就会先渲染启动壳。
+        // 这里提前按本地主题偏好决定首屏底色，避免 dark 用户在这一帧看到白底闪烁。
         const STORAGE_KEY = "zcode-theme";
         const DEFAULT_THEME = "zai-dark";
         const BROWSER_THEME_COLORS = {
           dark: "#161616",
           light: "#f8f8f8",
         };
+        const BOOTSTRAP_SNAPSHOT_KEY = "zcode:web-remote-control:bootstrap-shell";
 
         const normalizeResolvedTheme = (theme) => {
           if (theme === "dark") return "dark";
@@ -41,6 +43,49 @@
         };
 
         try {
+          let bootstrapTheme = null;
+          const bootstrapSnapshotRaw = window.sessionStorage.getItem(BOOTSTRAP_SNAPSHOT_KEY);
+          if (bootstrapSnapshotRaw) {
+            window.sessionStorage.removeItem(BOOTSTRAP_SNAPSHOT_KEY);
+            try {
+              const snapshot = JSON.parse(bootstrapSnapshotRaw);
+              if (snapshot && typeof snapshot === "object") {
+                const normalizedTheme = snapshot.theme === "dark" ? "dark" : "light";
+                bootstrapTheme = normalizedTheme;
+                document.documentElement.style.setProperty(
+                  "--zcode-bootstrap-bg",
+                  typeof snapshot.background === "string"
+                    ? snapshot.background
+                    : normalizedTheme === "dark"
+                      ? "#0f172a"
+                      : "#f8fafc",
+                );
+                document.documentElement.style.setProperty(
+                  "--zcode-bootstrap-fg",
+                  typeof snapshot.foreground === "string"
+                    ? snapshot.foreground
+                    : normalizedTheme === "dark"
+                      ? "#e2e8f0"
+                      : "#334155",
+                );
+                if (typeof snapshot.border === "string") {
+                  document.documentElement.style.setProperty(
+                    "--zcode-bootstrap-border",
+                    snapshot.border,
+                  );
+                }
+                if (typeof snapshot.card === "string") {
+                  document.documentElement.style.setProperty(
+                    "--zcode-bootstrap-card",
+                    snapshot.card,
+                  );
+                }
+              }
+            } catch {
+              // ignore invalid snapshot
+            }
+          }
+
           const saved = localStorage.getItem(STORAGE_KEY) || DEFAULT_THEME;
           const resolved =
             saved === "system"
@@ -48,7 +93,8 @@
                 ? "dark"
                 : "light"
               : normalizeResolvedTheme(saved);
-          const finalTheme = resolved === "dark" ? "dark" : "light";
+          const fallbackTheme = resolved === "dark" ? "dark" : "light";
+          const finalTheme = bootstrapTheme ?? fallbackTheme;
           document.documentElement.setAttribute("data-zcode-bootstrap-theme", finalTheme);
           syncBrowserThemeSurface(finalTheme);
           if (finalTheme === "dark") {
@@ -89,7 +135,7 @@
       html[data-zcode-browser-theme-surface],
       html[data-zcode-browser-theme-surface] body,
       html[data-zcode-browser-theme-surface] #root {
-        /* 共享 UI 样式为 Electron vibrancy 强制透明根背景；浏览器入口必须用语义背景
+        /* 修复原因：共享 UI 样式为 Electron vibrancy 强制透明根背景；浏览器入口必须用语义背景
            覆盖该桌面专属行为，否则浏览器工具栏、overscroll 和页面画布会回退为系统白色。 */
         background: var(--color-background, var(--zcode-bootstrap-bg, #161616)) !important;
       }
@@ -106,7 +152,7 @@
         justify-content: center;
         width: 100%;
         height: 100%;
-        /* UI 全局样式会把 body/#root 置为透明，预渲染壳必须自己承接主题背景，否则深色主题会露出浏览器白底。*/
+        /* Bugfix: UI 全局样式会把 body/#root 置为透明，预渲染壳必须自己承接主题背景，否则深色主题会露出浏览器白底。 */
         background: var(--zcode-bootstrap-bg, var(--color-background, #0f172a));
         color: var(--zcode-bootstrap-fg, var(--color-foreground, #e2e8f0));
       }
@@ -135,7 +181,7 @@
         inset: 0;
         pointer-events: none;
         content: "";
-        /* 启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重。*/
+        /* 修复原因：启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重。 */
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: inherit;
       }
@@ -149,7 +195,7 @@
   </head>
   <body>
     <div id="root">
-      <!-- 远程控制跨 workspace 时会整页跳转；在 JS 入口执行前先给出 loading 壳，避免出现白屏空档。-->
+      <!-- Bugfix: 远程控制跨 workspace 时会整页跳转；在 JS 入口执行前先给出 loading 壳，避免出现白屏空档。 -->
       <div
         class="zcode-boot-loading"
         role="status"

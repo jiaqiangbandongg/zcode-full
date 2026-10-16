@@ -6,7 +6,7 @@ export function wildcardToRegExp(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function domainRuleSubject(url: string): string | undefined {
+export function domainRuleSubject(url: string): string | undefined {
   try {
     const parsed = new URL(url.trim());
     const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");

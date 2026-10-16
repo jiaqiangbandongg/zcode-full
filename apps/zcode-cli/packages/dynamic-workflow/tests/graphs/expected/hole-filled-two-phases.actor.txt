@@ -1,0 +1,11 @@
+actor-node source
+actor-node actor#1 "勘察员" @15:22
+actor-node hole#21b40fca/actor#1 "烟测员" @18:23
+actor-node hole#21b40fca/actor#2 "分组员" @20:16
+actor-node actor#2 "执行者" @23:8
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge actor#1 -> hole#21b40fca/actor#1 exact count=1 types="Survey"
+actor-edge hole#21b40fca/actor#1 -> hole#21b40fca/actor#2 exact count=1 types="Smoke"
+actor-edge hole#21b40fca/actor#2 -> actor#2 exact count=1 types="Plan"
+actor-edge actor#2 -> sink exact count=1 types="string"

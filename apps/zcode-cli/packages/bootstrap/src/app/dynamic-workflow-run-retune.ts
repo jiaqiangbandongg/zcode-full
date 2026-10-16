@@ -1,7 +1,8 @@
 // ============================================================
 // Dynamic Workflow Run Service：就地改一个在飞 run 的并发上界
 // ============================================================
-// 这是 `DynamicWorkflowRunPort.retuneConcurrency` 的实现体，与三条启动入口（dynamic-workflow-run-submit.ts）刻意分居：那三条
+// docs/dynamic-workflow/concurrency.md「Retuning a live run」。这是 `DynamicWorkflowRunPort.
+// retuneConcurrency` 的实现体，与三条启动入口（dynamic-workflow-run-submit.ts）刻意分居：那三条
 // 都会**铸一个 run**，这一条一个 run 都不铸——它只对着已经在飞的那个发一条命令。
 //
 // 两种拒绝在**不同的地方**判定，这正是让它们分得开的原因：
@@ -18,24 +19,24 @@ import type {
 } from "@zcode/contracts";
 import type { JournalStorePort } from "@zcode/dynamic-workflow";
 import type { RunRegistryEntry } from "./dynamic-workflow-run-observation.js";
-import { clampRunConcurrency } from "./workflow-concurrency-ceiling.js";
+import { normalizeRunConcurrency } from "./workflow-default-concurrency.js";
 
 /** 本模块借用的 service 内部状态；全是引用，本文件不持有任何自己的状态。 */
 export interface DynamicWorkflowRunRetuneContext {
   runs: Map<string, RunRegistryEntry>;
   journal: JournalStorePort;
-  /** 与 caps 起点、两条读面判据同一个函数（见 run service 的 `concurrencyCeiling`）。 */
-  concurrencyCeiling: () => number;
+  /** 与 caps 缺省、两条读面判据同一个函数（见 run service 的 `defaultConcurrency`）。 */
+  defaultConcurrency: () => number;
 }
 
 export function retuneRunConcurrency(
   ctx: DynamicWorkflowRunRetuneContext,
   request: DynamicWorkflowRunRetuneRequest,
 ): DynamicWorkflowRunRetuneResult {
-  const ceiling = ctx.concurrencyCeiling();
-  // `null` = 天花板 = 解除本 run 自己的限制。与提交时**同一条**钳制（工具层已经钳过一次是为了让
-  // 确认窗显示将要生效的值；端口再钳是端口自己的契约，两次必然同值）。
-  const next = clampRunConcurrency(request.maxConcurrency ?? undefined, ceiling);
+  const defaultConcurrency = ctx.defaultConcurrency();
+  // `null` = 默认并发 = 解除本 run 自己的界。与提交时**同一条**规则（向下取整、至少 1、没有上限；
+  // 工具层已经取整过一次是为了让回话说出将要生效的值，端口再做一次是端口自己的契约，两次必然同值）。
+  const next = normalizeRunConcurrency(request.maxConcurrency ?? undefined, defaultConcurrency);
 
   const entry = ctx.runs.get(request.runId);
   if (entry === undefined || entry.terminal !== undefined || entry.control === undefined) {
@@ -45,9 +46,11 @@ export function retuneRunConcurrency(
   }
 
   // 此刻生效的上界：**有条目就读条目**（三条建条目的路都落值），冷行才回退到 journal。
-  // 两者都没有只可能是 submit → createRun 之间那几个微任务里的接线异常，按「跑在天花板上」读。
+  // 两者都没有只可能是 submit → createRun 之间那几个微任务里的接线异常，按「跑在默认并发上」读。
   const current =
-    entry.maxConcurrency ?? ctx.journal.getRun(request.runId)?.caps.maxConcurrency ?? ceiling;
+    entry.maxConcurrency ??
+    ctx.journal.getRun(request.runId)?.caps.maxConcurrency ??
+    defaultConcurrency;
   if (current === next) return { ok: false, reason: "unchanged", current };
 
   if (!entry.control.setMaxConcurrency(next)) {
@@ -58,5 +61,5 @@ export function retuneRunConcurrency(
   // 内存副本一并挪动：快照读的是 `entry.maxConcurrency ?? 行`，条目优先——不挪就会在 retune
   // 之后继续报提交时那个数，而 `AmendWorkflow` 的 resolveInput 正是读这张快照判「沿用什么」。
   entry.maxConcurrency = next;
-  return { ok: true, maxConcurrency: next, previous: current, ceiling };
+  return { ok: true, maxConcurrency: next, previous: current, defaultConcurrency };
 }

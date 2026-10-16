@@ -21,7 +21,7 @@ npx ai-elements@latest add task
 
 ## Usage with AI SDK
 
-Build a mock async programming agent using `experimental_generateObject`.
+Build a mock async programming agent using [`experimental_generateObject`](/docs/reference/ai-sdk-ui/use-object).
 
 Add the following component to your frontend:
 
@@ -77,7 +77,10 @@ const TaskDemo = () => {
           <span className="inline-flex items-center gap-1" key={index}>
             {item.text}
             <TaskItemFile>
-              <IconComponent color={item.file.color || iconInfo.color} className="size-4" />
+              <IconComponent
+                color={item.file.color || iconInfo.color}
+                className="size-4"
+              />
               <span>{item.file.name}</span>
             </TaskItemFile>
           </span>
@@ -101,14 +104,18 @@ const TaskDemo = () => {
         </div>
 
         <div className="flex-1 overflow-auto space-y-4">
-          {isLoading && !object && <div className="text-muted-foreground">Generating tasks...</div>}
+          {isLoading && !object && (
+            <div className="text-muted-foreground">Generating tasks...</div>
+          )}
 
           {object?.tasks?.map((task: any, taskIndex: number) => (
             <Task key={taskIndex} defaultOpen={taskIndex === 0}>
               <TaskTrigger title={task.title || "Loading..."} />
               <TaskContent>
                 {task.items?.map((item: any, itemIndex: number) => (
-                  <TaskItem key={itemIndex}>{renderTaskItem(item, itemIndex)}</TaskItem>
+                  <TaskItem key={itemIndex}>
+                    {renderTaskItem(item, itemIndex)}
+                  </TaskItem>
                 ))}
               </TaskContent>
             </Task>
@@ -191,32 +198,32 @@ export async function POST(req: Request) {
 
 ### `<Task />`
 
-| Prop          | Type                                       | Default | Description                                                   |
-| ------------- | ------------------------------------------ | ------- | ------------------------------------------------------------- |
-| `defaultOpen` | `boolean`                                  | `true`  | Whether the task is open by default.                          |
-| `...props`    | `React.ComponentProps<typeof Collapsible>` | -       | Any other props are spread to the root Collapsible component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `defaultOpen` | `boolean` | `true` | Whether the task is open by default. |
+| `...props` | `React.ComponentProps<typeof Collapsible>` | - | Any other props are spread to the root Collapsible component. |
 
 ### `<TaskTrigger />`
 
-| Prop       | Type                                              | Default  | Description                                                     |
-| ---------- | ------------------------------------------------- | -------- | --------------------------------------------------------------- |
-| `title`    | `string`                                          | Required | The title of the task that will be displayed in the trigger.    |
-| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | -        | Any other props are spread to the CollapsibleTrigger component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `title` | `string` | Required | The title of the task that will be displayed in the trigger. |
+| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | - | Any other props are spread to the CollapsibleTrigger component. |
 
 ### `<TaskContent />`
 
-| Prop       | Type                                              | Default | Description                                                     |
-| ---------- | ------------------------------------------------- | ------- | --------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CollapsibleContent>` | -       | Any other props are spread to the CollapsibleContent component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CollapsibleContent>` | - | Any other props are spread to the CollapsibleContent component. |
 
 ### `<TaskItem />`
 
-| Prop       | Type                    | Default | Description                                       |
-| ---------- | ----------------------- | ------- | ------------------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the underlying div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div. |
 
 ### `<TaskItemFile />`
 
-| Prop       | Type                    | Default | Description                                       |
-| ---------- | ----------------------- | ------- | ------------------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the underlying div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div. |

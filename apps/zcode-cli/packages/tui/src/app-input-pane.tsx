@@ -12,26 +12,26 @@ const h = React.createElement as (
   ...children: React.ReactNode[]
 ) => React.ReactElement;
 
-const INPUT_DEFAULT_EDITOR_ROWS = 2;
-const INPUT_MIN_EDITOR_ROWS = INPUT_DEFAULT_EDITOR_ROWS;
-const INPUT_MAX_EDITOR_ROWS = 6;
+export const INPUT_DEFAULT_EDITOR_ROWS = 2;
+export const INPUT_MIN_EDITOR_ROWS = INPUT_DEFAULT_EDITOR_ROWS;
+export const INPUT_MAX_EDITOR_ROWS = 6;
 const INPUT_FRAME_CHROME_ROWS = 3;
-const INPUT_PANE_STATUS_ROWS = 1;
+export const INPUT_PANE_STATUS_ROWS = 1;
 const INPUT_CHROME_ROWS = INPUT_FRAME_CHROME_ROWS + INPUT_PANE_STATUS_ROWS;
 const INPUT_CONTENT_FALLBACK_WIDTH = 80;
 const INPUT_MIN_CONTENT_WIDTH = 8;
 const INPUT_PANE_HORIZONTAL_CHROME_WIDTH = 4;
 
-const INPUT_PANE_MIN_HEIGHT = INPUT_MIN_EDITOR_ROWS + INPUT_CHROME_ROWS;
-const INPUT_PANE_MAX_HEIGHT = INPUT_MAX_EDITOR_ROWS + INPUT_CHROME_ROWS;
-const INPUT_PANE_BORDER = true;
-const INPUT_PANE_BORDER_STYLE = "rounded";
-const INPUT_PANE_STATUS_SPACER_STYLE = {
+export const INPUT_PANE_MIN_HEIGHT = INPUT_MIN_EDITOR_ROWS + INPUT_CHROME_ROWS;
+export const INPUT_PANE_MAX_HEIGHT = INPUT_MAX_EDITOR_ROWS + INPUT_CHROME_ROWS;
+export const INPUT_PANE_BORDER = true;
+export const INPUT_PANE_BORDER_STYLE = "rounded";
+export const INPUT_PANE_STATUS_SPACER_STYLE = {
   flexGrow: 1,
   minHeight: 0,
 } as const;
 
-const PROMPT_TEXTAREA_KEY_BINDINGS = [
+export const PROMPT_TEXTAREA_KEY_BINDINGS = [
   { name: "return", action: "submit" },
   { name: "linefeed", action: "submit" },
   { name: "return", shift: true, action: "newline" },
@@ -165,25 +165,25 @@ export function InputPane({
   );
 }
 
-function inputPaneTitle(copy: TuiCopy, mode?: string): string {
+export function inputPaneTitle(copy: TuiCopy, mode?: string): string {
   const title = mode ? formatInputModeLabel(mode) : copy.input.title;
   return ` ${title} `;
 }
 
-function inputPanePlaceholder(copy: TuiCopy, busy: boolean): string {
+export function inputPanePlaceholder(copy: TuiCopy, busy: boolean): string {
   return busy ? copy.input.busyPlaceholder : copy.input.placeholder;
 }
 
-function inputPaneEditorRows(value: string, contentWidth?: number): number {
+export function inputPaneEditorRows(value: string, contentWidth?: number): number {
   const contentRows = wordWrappedLineCount(value, normalizeInputContentWidth(contentWidth));
   return normalizeEditorRows(contentRows);
 }
 
-function inputPaneHeight(editorRows: number): number {
+export function inputPaneHeight(editorRows: number): number {
   return normalizeEditorRows(editorRows) + INPUT_CHROME_ROWS;
 }
 
-function inputPaneContainerStyle(
+export function inputPaneContainerStyle(
   focused: boolean,
   editorRows = INPUT_MIN_EDITOR_ROWS,
 ): Record<string, unknown> {
@@ -202,7 +202,7 @@ function inputPaneContainerStyle(
   };
 }
 
-function inputPaneTextareaStyle(editorRows: number): Record<string, unknown> {
+export function inputPaneTextareaStyle(editorRows: number): Record<string, unknown> {
   return {
     focusedBackgroundColor: palette.panel,
     focusedTextColor: palette.text,
@@ -216,18 +216,18 @@ function inputPaneTextareaStyle(editorRows: number): Record<string, unknown> {
   };
 }
 
-function syncTextareaValue(textarea: DraftTextarea, value: string): boolean {
+export function syncTextareaValue(textarea: DraftTextarea, value: string): boolean {
   if (textarea.plainText === value) return false;
   textarea.setText(value);
   moveInputCursorToEnd(textarea);
   return true;
 }
 
-function shouldEmitTextareaInput(controlledValue: string, editorValue: string): boolean {
+export function shouldEmitTextareaInput(controlledValue: string, editorValue: string): boolean {
   return editorValue !== controlledValue;
 }
 
-function moveInputCursorToEnd(input: Pick<TextareaRenderable, "gotoBufferEnd">): void {
+export function moveInputCursorToEnd(input: Pick<TextareaRenderable, "gotoBufferEnd">): void {
   // OpenTUI controlled value updates can leave the previous cursor viewport in
   // place after history recall; gotoBufferEnd refreshes both cursor and scroll.
   input.gotoBufferEnd();

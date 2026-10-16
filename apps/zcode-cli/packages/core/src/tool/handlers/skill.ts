@@ -9,13 +9,32 @@ import {
   SkillOutputJsonSchema,
   SkillOutputSchema,
   createCoreError,
+  DYNAMIC_WORKFLOW_SKILL_NAME,
   type SkillRuntimeInput,
 } from "@zcode/contracts";
 import type { ToolEntry, ToolHandler } from "../types.js";
 
-const MAX_SKILL_BYTES = 100_000;
+/** 技能正文的默认字节上限；超出部分由 adapter 从尾部截掉。 */
+export const MAX_SKILL_BYTES = 100_000;
 
-const skillHandler: ToolHandler = async (input, context) => {
+/**
+ * `dynamic-workflows` 技能的字节上限（docs/dynamic-workflow/authoring.md「The skill」）。
+ * 2026-09-30 放宽：这份技能从 09-22 起一直贴在 100 000 上，每加一个功能都得先删掉已有的指导。
+ * 判据是请求里的名字，与技能门认的是同一个（workflow-skill-gate.ts）。
+ */
+export const WORKFLOW_SKILL_MAX_BYTES = 200_000;
+
+/** 结果外壳（`<skill_content>` 标签、标题、Base directory 行）的余量；工具级预算要装得下它。 */
+export const SKILL_RESULT_WRAPPER_BYTES = 4_096;
+
+/** 工具级结果预算是静态的，所以取最大的正文上限再加外壳。 */
+const MAX_SKILL_RESULT_BYTES = WORKFLOW_SKILL_MAX_BYTES + SKILL_RESULT_WRAPPER_BYTES;
+
+function skillMaxBytes(skill: string): number {
+  return skill === DYNAMIC_WORKFLOW_SKILL_NAME ? WORKFLOW_SKILL_MAX_BYTES : MAX_SKILL_BYTES;
+}
+
+export const skillHandler: ToolHandler = async (input, context) => {
   const { skill } = SkillInputSchema.parse(input) as SkillRuntimeInput;
   const skillPort = context.skillPort;
 
@@ -37,7 +56,7 @@ const skillHandler: ToolHandler = async (input, context) => {
     {
       name: skill,
       workingDirectory: context.workingDirectory,
-      maxBytes: MAX_SKILL_BYTES,
+      maxBytes: skillMaxBytes(skill),
       trace: {
         traceId: context.traceId,
         spanId: context.spanId,
@@ -102,7 +121,7 @@ Important:
     destructive: false,
     concurrentSafe: true,
     timeoutMs: 30000,
-    maxOutputBytes: MAX_SKILL_BYTES,
+    maxOutputBytes: MAX_SKILL_RESULT_BYTES,
     sideEffectScope: "session",
     riskLevel: "low",
     needsApproval: false,
@@ -123,11 +142,11 @@ Important:
     denyPriority: "beforeAsk",
   },
   resultBudget: {
-    maxInlineBytes: MAX_SKILL_BYTES,
-    maxModelBytes: MAX_SKILL_BYTES,
+    maxInlineBytes: MAX_SKILL_RESULT_BYTES,
+    maxModelBytes: MAX_SKILL_RESULT_BYTES,
     strategy: "truncate",
     preview: {
-      maxBytes: MAX_SKILL_BYTES,
+      maxBytes: MAX_SKILL_RESULT_BYTES,
       direction: "head",
     },
   },

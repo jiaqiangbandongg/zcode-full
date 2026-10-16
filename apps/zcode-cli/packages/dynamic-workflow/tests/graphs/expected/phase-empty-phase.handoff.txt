@@ -1,0 +1,4 @@
+phase phase#1
+participant phase#1:actor#1 "scanner" steps=ask#1
+phase phase#3
+participant phase#3:actor#2 "actor" steps=ask#2

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-inherited",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-inherited.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-mcp-skill-workspace-inherited.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "workspace-inherited-tool-call",
+      "description": "Workspace 缺 key 时继承 User enabled 的 MCP tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定工具调用，证明 User inheritance 在新 Session runtime 生效。"
+    },
+    {
+      "id": "workspace-inherited-final",
+      "description": "继承 User enabled 后的最终响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终响应，闭合 inherited runtime。"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-subagent-model-inheritance",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-subagent-model-inheritance.test.ts",
+  "fixtures": [
+    {
+      "id": "offpeak-subagents-ordinary-prompt",
+      "description": "OP10 闲时 turn 完成后，同一 session 的普通 prompt 必须恢复用户 上游 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "闲时 mock gateway 独立承载 execution-scoped Active Model；本响应只稳定证明下一条普通 prompt 已回到用户 provider。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_OFFPEAK_SUBAGENTS_ORDINARY_PROMPT"],
+        "bodyIncludes": ["E2E_OFFPEAK_SUBAGENTS_ORDINARY_PROMPT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-offpeak-subagents-ordinary",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "E2E_OFFPEAK_SUBAGENTS_ORDINARY_OK"
+        }
+      }
+    }
+  ]
+}

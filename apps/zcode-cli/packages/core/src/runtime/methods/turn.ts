@@ -1,5 +1,7 @@
 import { beginLocalTurnPreparation, type LocalTtftDetail } from "@zcode/contracts";
 import { runtimeInputMetadata } from "../../agent/runtime-input-presentation.js";
+import { withConversationQuotes } from "../helpers/conversation-quotes.js";
+import { ensureGroupTaskPermissionScope } from "./input-intent-persistence.js";
 import {
   CoreErrorType,
   HookEventName,
@@ -59,10 +61,19 @@ import {
   closeGoalStateChangeReminderDeferral,
   openGoalStateChangeReminderDeferral,
 } from "./goal-state-reminder.js";
+import {
+  disposeProjectMemoryRecallPrefetch,
+  startProjectMemoryRecallPrefetch,
+} from "../helpers/project-memory-recall.js";
+import { ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH } from "../../memory/project-memory-retrieval-branch.js";
 import { scheduleProjectMemoryExtraction } from "../helpers/project-memory-extraction.js";
 import { appendBrowserTurnScreenshot } from "./browser-turn-screenshot.js";
 import { clearBrowserTurnState } from "../../repl/browser-turn-state.js";
-import { applySubmissionExecutionState, createTurnModel } from "./turn-model.js";
+import {
+  applySubmissionExecutionState,
+  createTurnModel,
+  resolveExecutionModelRetryBudget,
+} from "./turn-model.js";
 import { rebuildContextPrefix } from "./context-refresh.js";
 
 const TARGET_RUN_HEARTBEAT_MS = 15_000;
@@ -192,6 +203,11 @@ export async function executeTurnCommand(
             ? createTurnModel(this, {
                 requestDependencies: options?.modelExecution?.requestDependencies,
                 selection: admittedModelSelection,
+                // 带退回声明的执行句柄 0 次重试：失败立刻交给 turn step 退回会话模型。
+                retryBudget: resolveExecutionModelRetryBudget({
+                  selection: admittedModelSelection,
+                  selectionFallback: options?.modelExecution?.selectionFallback,
+                }),
               })
             : undefined;
       } catch (error) {
@@ -279,6 +295,7 @@ export async function executeTurnCommand(
       turnMachine = new TurnMachineImpl(turnMachine.start());
       phaseStartedAt = startTurnPhase("session_persistence");
       await this.ensureSessionPersisted(displayInput, turnTraceContext);
+      await ensureGroupTaskPermissionScope(this.sessionStore, this.sessionId, options?.intent);
       // execution-scoped 临时 Provider（例如闲时任务）拥有本轮自己的模型，不改写
       // Session Selection；普通 Submission 才在真正开跑时应用其原子选择。
       const submissionModel = await applySubmissionExecutionState(
@@ -422,6 +439,7 @@ export async function executeTurnCommand(
           userPromptHookResult.additionalContexts,
         );
         injectReferencedSessionContextReminderIntoMessageHistory.call(this, input, options);
+        // 话题原文由标准文本附件按需读取，可信来源归档不能再次生成隐藏上下文。
         injectDateChangeReminderIntoMessageHistory.call(this);
         const resolvedAttachments = await resolveTurnAttachments(attachments, {
           abortSignal: turnAbortSignal,
@@ -502,9 +520,17 @@ export async function executeTurnCommand(
           });
         } else if (options?.skipInputRecord !== true) {
           this.messageHistory.addEntries(
-            buildRuntimeUserEntriesFromTurn(input, resolvedAttachments, {
-              browserAmbientContext: options?.browserAmbientContext,
-            }).map((entry) => {
+            buildRuntimeUserEntriesFromTurn(
+              withConversationQuotes(
+                input,
+                options?.intent?.conversationQuotes,
+                options?.intent?.botGroupSource,
+              ),
+              resolvedAttachments,
+              {
+                browserAmbientContext: options?.browserAmbientContext,
+              },
+            ).map((entry) => {
               const metadata = runtimeInputMetadata(options?.inputPresentation);
               return entry.kind !== "attachment" && metadata ? { ...entry, metadata } : entry;
             }),
@@ -527,7 +553,16 @@ export async function executeTurnCommand(
                 : { epilogueStart: options.epilogueStart }),
             },
           );
-          // 标题生成以前等主 turn 成功后才启动，用户 stop/cancel 首轮请求时
+        }
+        // 配置读取曾早于输入展示/持久化，失败会让已发送消息从界面消失。
+        // 在原有输入记录后固定本轮定义，错误/取消复用本层收尾，且不启动标题或模型请求。
+        await this.prepareAgentDefinitions({
+          signal: turnAbortSignal,
+          traceContext: turnTraceContext,
+        });
+        throwIfTurnAborted(turnAbortSignal);
+        if (options?.skipInputRecord !== true && options?.inputVisibility !== "model-only") {
+          // 修复原因：标题生成以前等主 turn 成功后才启动，用户 stop/cancel 首轮请求时
           // generated title 永远没有机会发起。首条 query 持久化后即可异步生成，避免被主链路取消拖死。
           const titleGenerationStarted = maybeStartSessionTitleGeneration.call(
             this,
@@ -558,6 +593,15 @@ export async function executeTurnCommand(
         if (!loopModel) {
           throw new Error("Turn model was not created before execution");
         }
+        startProjectMemoryRecallPrefetch(
+          this,
+          {
+            model: loopModel,
+            traceContext: turnTraceContext,
+            turnAbortSignal,
+          },
+          ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH,
+        );
         loopState = {
           activeTurn,
           ...(options?.automationId ? { automationId: options.automationId } : {}),
@@ -566,13 +610,19 @@ export async function executeTurnCommand(
           anomalyWarningsInjected: 0,
           backgroundSubagentResultConsumed: options?.backgroundSubagentResultConsumed === true,
           workflowResultConsumed: options?.workflowResultConsumed === true,
+          completedRealToolResultBatch: false,
           currentUserMessageId: userMessageId,
           events,
           input,
+          ...(options?.inputId ? { inputId: options.inputId } : {}),
           modelResponse: "",
           model: loopModel,
           ...(options?.modelExecution?.selectionScope === "execution"
             ? { modelSelectionScope: "execution" as const }
+            : {}),
+          // 加速卡在工具执行期间过期时，本轮不整体失败，改为退回 Session Selection 跑完。
+          ...(options?.modelExecution?.selectionFallback
+            ? { selectionFallback: options.modelExecution.selectionFallback }
             : {}),
           ...(options?.modelExecution?.subagents && options.intent?.modelSelection
             ? {
@@ -821,6 +871,7 @@ export async function executeTurnCommand(
     );
 
   return turnTelemetry.run(execute).finally(async () => {
+    disposeProjectMemoryRecallPrefetch(this);
     if (targetRunHeartbeat) {
       clearInterval(targetRunHeartbeat);
     }

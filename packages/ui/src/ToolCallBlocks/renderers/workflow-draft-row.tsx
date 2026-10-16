@@ -146,7 +146,7 @@ export function WorkflowFeedbackContent({
  * 细节槽里要不要写稿号：编不过的行总是写（宿主给了位置时）；在途行从第 2 稿起写。
  * 运行卡、启动摘要与确认窗不走这里，永远不带稿号。
  */
-function workflowDraftOrdinalShown(
+export function workflowDraftOrdinalShown(
   draft: WorkflowDraftPosition | undefined,
   phase: { compileErrors: boolean; inFlight: boolean },
 ): number | undefined {
@@ -155,7 +155,7 @@ function workflowDraftOrdinalShown(
   return phase.inFlight && draft.ordinal >= 2 ? draft.ordinal : undefined;
 }
 
-function WorkflowDraftOrdinal({ ordinal }: { ordinal: number }) {
+export function WorkflowDraftOrdinal({ ordinal }: { ordinal: number }) {
   const { intl } = useZCodeIntl();
   return (
     <span className="shrink-0 whitespace-nowrap tabular-nums" data-testid="workflow-draft-ordinal">
@@ -171,7 +171,7 @@ function WorkflowDraftOrdinal({ ordinal }: { ordinal: number }) {
  * 空环灯：形状说「什么都没跑」，颜色说注意力是否还悬着（最新一稿警示色，有更新的一稿后褪成中性）。
  * `wf-lamp` 让颜色的变化走过渡，而不是一跳。
  */
-function WorkflowDraftLamp({ superseded }: { superseded: boolean }) {
+export function WorkflowDraftLamp({ superseded }: { superseded: boolean }) {
   return (
     <span
       aria-hidden

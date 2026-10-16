@@ -1,10 +1,10 @@
 import { hostIncomingMessageSchema } from "@zcode/shared";
 
-interface CloseableTransferredPort {
+export interface CloseableTransferredPort {
   close(): void;
 }
 
-interface HostIncomingMessageEventLike {
+export interface HostIncomingMessageEventLike {
   data: unknown;
   ports: readonly CloseableTransferredPort[];
 }

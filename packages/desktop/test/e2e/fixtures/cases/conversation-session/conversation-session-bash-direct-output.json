@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bash-direct-output",
+  "spec": "./test/e2e/conversation-session/conversation-session-bash-direct-output.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-bash-direct-output.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/bash-direct-output/中文 空格/writer.cjs",
+      "source": "created-by-spec",
+      "description": "从 case-local fs fixture 复制真实 Node producer，用文件 barrier 控制输出。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "bdo-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_small-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_small-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_large-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_large-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_progress-a-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_progress-b-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_progress-a-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_progress-b-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "bdo-query-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_first-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_first-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_second-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_second-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_final-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_query_final-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_limit_foreground-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_limit_foreground-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "bdo-limit-background-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_limit_background-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_limit_background-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_read_failure-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_read_failure-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_open_failure-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_open_failure-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_recovery-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_recovery-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具参数与 continuation，实际 Bash、文件、进度和停止走完整 Desktop 到 CLI 链路。"
+    },
+    {
+      "id": "e2e_bdo_realtime-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定单个前台 Bash；真实 producer 由文件 barrier 分五段写 stdout/stderr，验证退出前刷新、最多五行且短输出自适应、默认吸底、上滚暂停和滚回底部恢复及终态阅读位置。"
+    },
+    {
+      "id": "e2e_bdo_realtime-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定单个前台 Bash；真实 producer 由文件 barrier 分五段写 stdout/stderr，验证退出前刷新、最多五行且短输出自适应、默认吸底、上滚暂停和滚回底部恢复及终态阅读位置。"
+    }
+  ]
+}

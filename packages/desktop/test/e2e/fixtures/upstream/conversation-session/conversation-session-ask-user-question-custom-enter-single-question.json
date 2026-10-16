@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-single-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-single-question.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-single-question-call",
+      "description": "AskUserQuestion custom Enter single-question probe: 首轮返回单题问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 AskUserQuestion 单题等待态，对照 custom input Enter 在单题场景是否直接提交。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_CUSTOM_ENTER_SINGLE"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_CUSTOM_ENTER_SINGLE",
+          "E2E_ASK_USER_QUESTION_ENTER_SINGLE_QUESTION",
+          "E2E_ASK_USER_QUESTION_ENTER_SINGLE_TOOL"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_ask_user_question_custom_enter_single",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_ASK_USER_QUESTION_ENTER_SINGLE_QUESTION: choose the single answer?",
+                "header": "E2E",
+                "options": [
+                  {
+                    "label": "Use single default",
+                    "description": "Continue the e2e run with the single default answer."
+                  },
+                  {
+                    "label": "Use single fallback",
+                    "description": "Continue the e2e run with the single fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-single-question-final",
+      "description": "AskUserQuestion custom Enter single-question probe: 单题回答进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明单题 custom input Enter 已提交给 agent，并允许 UI 断言已回答记录。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_ENTER_SINGLE_ANSWER",
+          "E2E_ASK_USER_QUESTION_ENTER_SINGLE_TOOL",
+          "toolu_e2e_ask_user_question_custom_enter_single"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

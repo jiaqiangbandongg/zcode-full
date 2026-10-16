@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-side-pane-empty-state",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-side-pane-empty-state.test.ts",
+  "fixtures": [
+    {
+      "id": "fork-side-pane-empty-state-title",
+      "description": "SSC22 parent 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是本 case 的产品语义；固定响应避免严格 case-local replay 依赖共享 fallback。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_SSC_FORK_SIDE_PANE_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-fork-side-pane-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-pro\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Fork Side Pane E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "fork-side-pane-empty-state-parent-turn",
+      "description": "SSC22 parent completed assistant，提供稳定 fork target。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 fork task 切换后的 Side Pane 可见性；provider 只需稳定形成 completed assistant。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSC_FORK_SIDE_PANE_PARENT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-fork-side-pane-parent",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "SSC_FORK_SIDE_PANE_REPLY"
+        }
+      }
+    }
+  ]
+}

@@ -9,9 +9,9 @@ const MODE_COMMAND_WITH_SPACE = `${MODE_COMMAND_NAME} `;
 
 const MODE_DESCRIPTIONS: Record<TuiSwitchableMode, string> = {
   build: "Ask before each file changes.",
-  edit: "Edit selected files or relevant workspace files automatically.",
   plan: "Inspect the code and present a plan before editing.",
   yolo: "Edit and run commands with fewer confirmations.",
+  guarded: "Full access with single-use confirmation for explicit dangerous commands.",
 };
 
 const TUI_MODE_OPTIONS: readonly TuiModeOption[] = TUI_SWITCHABLE_MODES.map((mode) => ({
@@ -20,7 +20,7 @@ const TUI_MODE_OPTIONS: readonly TuiModeOption[] = TUI_SWITCHABLE_MODES.map((mod
   label: formatModeLabel(mode),
 }));
 
-function modeCommandQuery(draft: string): string | undefined {
+export function modeCommandQuery(draft: string): string | undefined {
   if (draft === MODE_COMMAND_NAME) return "";
   if (draft.startsWith(MODE_COMMAND_WITH_SPACE)) {
     return draft.slice(MODE_COMMAND_WITH_SPACE.length);
@@ -32,7 +32,7 @@ function modeCommandQuery(draft: string): string | undefined {
   return undefined;
 }
 
-function filterModeOptions(draft: string): readonly TuiModeOption[] {
+export function filterModeOptions(draft: string): readonly TuiModeOption[] {
   const query = modeCommandQuery(draft);
   if (query === undefined) return [];
   return TUI_MODE_OPTIONS.filter((mode) =>
@@ -49,7 +49,7 @@ function reconcileModeCommandSelection(draft: string): ModeCommandSelectionState
   return modeCommandQuery(draft) !== undefined ? { selectedIndex: 0 } : undefined;
 }
 
-function selectedModeOption(
+export function selectedModeOption(
   submittedValue: string,
   modeSelection: ModeCommandSelectionState | undefined,
   modes: readonly TuiModeOption[],

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-team-scope",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-team-scope.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-team-scope-parent-agent",
+      "description": "父请求触发 Team scope 缺失的 custom Agent。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "父 tool_use 由真实 runtime 处理 child provider 资格校验。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_TEAM_SCOPE_PARENT", "e2e-team-scope-reviewer", "E2E_SUBAGENT_TEAM_SCOPE_CHILD"], "bodyExcludes": ["E2E_SUBAGENT_TEAM_SCOPE_PARENT_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_e2e_subagent_team_scope", "name": "Agent", "input": { "description": "Run Team scope child", "prompt": "E2E_SUBAGENT_TEAM_SCOPE_CHILD: inspect the workspace.", "subagent_type": "e2e-team-scope-reviewer" } } }
+    },
+    {
+      "id": "subagent-team-scope-parent-final",
+      "description": "父会话消费失败 tool_result 后继续完成。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "验证 child 失败不拖垮父会话。" },
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_TEAM_SCOPE_PARENT", "E2E_SUBAGENT_TEAM_SCOPE_PARENT_DONE"], "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "text": { "id": "subagent-team-scope-parent-final", "inputTokens": 48, "outputTokens": 8, "text": "E2E_SUBAGENT_TEAM_SCOPE_PARENT_DONE" } }
+    }
+  ]
+}

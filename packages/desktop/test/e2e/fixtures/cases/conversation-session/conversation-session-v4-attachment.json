@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-attachment",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-attachment.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-attachment.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-attachment-only-send",
+      "description": "T06：空正文、两个附件的首发请求。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "两个文件名 placeholder 同时出现，证明 attachment-only 首发没有被空正文校验拦截。"
+    },
+    {
+      "id": "v4-attachment-edit-one",
+      "description": "D12：删除第一个附件后，仅剩第二个附件的 branch-cut 请求。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "bodyIncludes kept placeholder 且 bodyExcludes removed placeholder，直接约束 branch-cut 后 provider-visible attachments。"
+    }
+  ]
+}

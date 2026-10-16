@@ -1,6 +1,9 @@
-// GUI 配置变更的会话记录。
-// 将设置轮排入运行时队列，记录两项设置的 from/to，并区分修订产生新 run 与并发调整就地生效。
-// 变更决策和副作用顺序由 dynamic-workflow-run-settings.ts 负责。
+// ============================================================
+// GUI「配置」的设置轮：怎么记、记成什么话
+// ============================================================
+// docs/dynamic-workflow/launch.md「The settings turn」。从 dynamic-workflow-run-settings.ts 拆出
+// （400 行纪律）：那边是决策与副作用的顺序，这里是「这件事怎么讲给模型和会话听」——入队、
+// 两项设置的 from/to、以及两条规范句（修订出了新 run / 就地生效还是同一个 run）。
 
 import type { TraceContext, WorkflowSettingsAmendMeta } from "@zcode/contracts";
 import type { DynamicWorkflowRunSnapshot } from "@zcode/contracts";
@@ -9,7 +12,7 @@ import { createRuntimeCommandId } from "../command-queue.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { boundWorkflowLaunchMeta } from "@zcode/contracts";
 
-/** 本 run 的两项设置的归一形：缺席即默认（会话模型 / 本机上限）。 */
+/** 本 run 的两项设置的归一形：缺席即默认（会话模型 / 默认并发）。 */
 export interface RunSettings {
   subagentModel?: string;
   maxConcurrency?: number;
@@ -17,7 +20,8 @@ export interface RunSettings {
 
 /**
  * 设置轮不在命令处理里直接落：主代理可能正在一轮里，user 消息插不进去。排进运行时队列，空闲时
- * 立即跑、忙时等当前轮结束；与通知同优先级，因而先于新 run 的任何通知。
+ * 立即跑、忙时等当前轮结束；与通知同优先级，因而先于新 run 的任何通知（docs/dynamic-workflow/
+ * launch.md「The settings turn」）。
  */
 export function enqueueSettingsTurn(
   this: AgentRuntimeInternal,
@@ -98,7 +102,7 @@ function settingsChangeClauses(amend: WorkflowSettingsAmendMeta, inPlace: boolea
   if (bound !== undefined) {
     changes.push(
       bound.to === undefined
-        ? "the limit on subagents at once is removed"
+        ? "the limit on subagents at once is back to the default"
         : inPlace
           ? `at most ${bound.to} of its subagents run at once`
           : `at most ${bound.to} of them run at once`,
@@ -108,7 +112,7 @@ function settingsChangeClauses(amend: WorkflowSettingsAmendMeta, inPlace: boolea
 }
 
 /**
- * 快照上的两项设置。两者都「无则缺席」：没指定过模型 = 会话模型，界不低于天花板 = 没有自己的界，
+ * 快照上的两项设置。两者都「无则缺席」：没指定过模型 = 会话模型，界等于默认并发 = 没有自己的界，
  * 所以缺席就是默认，与 {@link RunSettings} 同一个读法。
  */
 export function runSettingsOfSnapshot(snapshot: DynamicWorkflowRunSnapshot): RunSettings {

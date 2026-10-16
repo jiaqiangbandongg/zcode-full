@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-worker-effective-selection",
+  "spec": "./test/e2e/conversation-session/conversation-session-worker-effective-selection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-worker-effective-selection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "w99-explicit-parent-tool",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "确定性触发子执行；验证真实 Worker 解析和请求，不测试模型自主决策。"
+    },
+    {
+      "id": "w99-explicit-parent-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "Account 子请求由既有隔离 Coding Plan 数据面返回固定文本；父结果仅证明工具完成。"
+    }
+  ]
+}

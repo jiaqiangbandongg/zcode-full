@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-stop-held-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-stop-held-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-stop-held-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-stop-held-queue-first-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "held queue 的产品语义是保留队列且不自动消费；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-stop-held-running-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "held queue 需要当前轮保持 running；真实 provider 过快完成会让后续输入变成普通新轮。"
+    },
+    {
+      "id": "upstream-stop-held-queue-second-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "held queue 的产品语义是保留队列且不自动消费；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-stop-held-queue-third-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "held queue 的产品语义是保留队列且不自动消费；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-stop-held-queue-append-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "已 held 的 queue 下追加普通文本仍应进入队列；fixture 只覆盖 marker 合同。"
+    }
+  ]
+}

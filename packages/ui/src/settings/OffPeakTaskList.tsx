@@ -1,7 +1,7 @@
-/* 闲时任务列表：
-   2 列卡片网格，卡片结构与定时任务卡同源：标题 + 指令描述 +
-   底部（moon + #N in queue 位次徽章）。按创建时间倒序；hover 菜单按状态收敛。
-   位次无 Est.。 */
+/* 闲时任务列表（Figma「Automations - Task list Idle-time task」/ node 4866-1735）：
+   2 列卡片网格，卡片结构与定时任务卡同源（MR 1622 设计）：标题 + 指令描述 +
+   底部（moon + #N in queue 位次徽章）。按创建时间倒序；hover 菜单按状态收敛（D29/D30）。
+   位次无 Est.（D30-1）。 */
 import {
   useCallback,
   useEffect,
@@ -62,19 +62,21 @@ interface OffPeakTaskListProps {
 
 // 按状态分组会让任务在运行和终态切换时跳位，破坏用户对已有卡片位置的预期；
 // 列表只按不可变的创建时间倒序，状态变化不再影响顺序。
-function sortOffPeakTasksByCreatedAt(tasks: readonly ZCodeOffPeakTask[]): ZCodeOffPeakTask[] {
+export function sortOffPeakTasksByCreatedAt(
+  tasks: readonly ZCodeOffPeakTask[],
+): ZCodeOffPeakTask[] {
   return [...tasks].sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** 与 AutomationsSection 定时任务列表相同的滚动阈值（设计规范最多露出 8 张卡片）。 */
-const OFFPEAK_LIST_SCROLL_THRESHOLD = 8;
+/** 与 AutomationsSection 定时任务列表相同的滚动阈值（Figma 规范最多露出 8 张卡片）。 */
+export const OFFPEAK_LIST_SCROLL_THRESHOLD = 8;
 
 const OFFPEAK_MENU_HINT_MAX_WIDTH = 320;
 const OFFPEAK_MENU_HINT_RIGHT_OFFSET = 16;
 
 type OffPeakMenuHintSide = "right" | "top";
 
-function resolveOffPeakMenuHintSide(
+export function resolveOffPeakMenuHintSide(
   triggerRect: Pick<DOMRect, "right"> | null,
   viewportWidth: number,
 ): OffPeakMenuHintSide {
@@ -212,12 +214,12 @@ export function OffPeakTaskList({
               <span className="block truncate pr-14 text-ui-base font-medium leading-5 text-foreground">
                 {task.title || task.prompt}
               </span>
-              {/* 任务卡正文与状态字号可缩放，固定 18px 行高会在大字号下挤压或裁切文字。*/}
+              {/* 修复原因：任务卡正文与状态字号可缩放，固定 18px 行高会在大字号下挤压或裁切文字。 */}
               <p className="line-clamp-2 h-9 text-ui-base font-normal leading-snug text-foreground-subtle">
                 {task.prompt}
               </p>
               <div className="mt-auto flex h-6 min-w-0 items-center gap-[10px] text-ui-base leading-snug">
-                {/* 状态徽章与右侧「运行会话：…」都允许收缩，长会话标题会把状态文字压到只剩一个字。
+                {/* Bug 原因：状态徽章与右侧「运行会话：…」都允许收缩，长会话标题会把状态文字压到只剩一个字。
                    状态是脚注的主信息，改为 shrink-0 不可压缩，只让会话标题那一段 truncate。 */}
                 <div
                   className={cn(
@@ -327,14 +329,14 @@ export function OffPeakTaskList({
                       <span className="flex-1">
                         {intl.formatMessage({ id: "offPeak.action.pause" })}
                       </span>
-                      {/* 暂停已改为立即执行，不再弹二次确认；保留信息入口承载
+                      {/* 修复原因：暂停已改为立即执行，不再弹二次确认；保留信息入口承载
                          排队等待时间与重新入队的产品提示，避免用户无从了解操作后果。 */}
                       <OffPeakMenuHint
                         title={intl.formatMessage({
                           id: "offPeak.action.pauseHint",
                         })}
                       >
-                        {/* 提示入口嵌在可选择菜单项内，click 冒泡会直接执行
+                        {/* 修复原因：提示入口嵌在可选择菜单项内，click 冒泡会直接执行
                            Pause / Continue；只隔离 click，避免 pointerdown 干扰 Radix 选中时序。 */}
                         <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
                           <AutomationInfoIcon
@@ -375,7 +377,7 @@ export function OffPeakTaskList({
                   ) : null}
                   {task.status === "running" ? (
                     <DropdownMenuItem className="gap-1" onSelect={() => onCancel(task)}>
-                      {/* 细描边 X 比相邻操作图标轻，且与首页 Chat 的暂停生成语义不一致。*/}
+                      {/* 修复原因：细描边 X 比相邻操作图标轻，且与首页 Chat 的暂停生成语义不一致。 */}
                       <span className="flex size-5 items-center justify-center">
                         <AutomationCancelActionIcon
                           className="size-4 fill-current"
@@ -385,7 +387,7 @@ export function OffPeakTaskList({
                       {intl.formatMessage({ id: "offPeak.action.cancel" })}
                     </DropdownMenuItem>
                   ) : null}
-                  {/* 终态菜单只有删除一项时，固定分割线会变成没有分组语义的顶线。*/}
+                  {/* 修复原因：终态菜单只有删除一项时，固定分割线会变成没有分组语义的顶线。 */}
                   {hasPrimaryMenuAction ? <DropdownMenuSeparator /> : null}
                   <DropdownMenuItem
                     className="gap-1 !text-destructive data-[highlighted]:!bg-menu-hover data-[highlighted]:!text-destructive focus:!text-destructive [&_svg]:!text-destructive"

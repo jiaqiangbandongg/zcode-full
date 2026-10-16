@@ -1,7 +1,11 @@
-// CreateWorkflow 的常驻描述。
-// 工具描述保留用途、调用条件和技能加载要求；facade 声明、写作规则、阶段与命名规则、
-// 字段语义由 `dynamic-workflows` 技能提供。resolveInput 的技能门保证提交脚本前已加载技能。
-// 调用条件必须保留在工具描述里，让模型在加载技能前就能判断是否应使用该工具。
+// CreateWorkflow 的常驻描述（docs/dynamic-workflow/authoring.md「The authoring surface」）。
+//
+// 2026-09-21 起刻意收短：facade 声明、写作规则、阶段与命名规则、字段的完整语义都搬进了
+// `dynamic-workflows` 技能的「Tool reference」一节，由 resolveInput 上的技能门
+// （handlers/workflow-skill-gate.ts）保证模型在写脚本之前一定读过。此前这段描述连同 facade
+// 约 8k token，随每一次模型请求重发；现在只留三件必须常驻的事——它是什么、何时（不）用、
+// 先读技能。路由规则留在这里而不是技能里，因为它决定的是「要不要调这个工具」，在技能加载之前
+// 就得被读到。
 
 import { DYNAMIC_WORKFLOW_SKILL_NAME } from "@zcode/contracts";
 
@@ -9,7 +13,8 @@ const INTRO =
   "Create and run a dynamic workflow: a TypeScript script that orchestrates multiple model-driven subagents with plain control flow (loops, conditionals, fan-out) and typed intermediate results. The script is typechecked, the user is asked to confirm it, and the run starts in the background; you are notified with its final result when it settles. Compilation errors come back as diagnostics.";
 
 /**
- * 只按「用户是否点名」路由：工作流只能由 `/workflow` 或明确请求发起，模型不得自行决定开一条。
+ * 只按「用户是否点名」路由（用户裁决 2026-09-16，docs/dynamic-workflow/launch.md「When the
+ * model may call it」）：工作流只能由 `/workflow` 或明确请求发起，模型不得自行决定开一条。
  */
 const WHEN_TO_USE = [
   "When to use:",

@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-highspeed-card",
+  "spec": "./test/e2e/conversation-session/conversation-session-highspeed-card.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-highspeed-card.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "highspeed-card-hit",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只需固定响应让 E2E 收口，核心断言是抽卡结果对输入框与 Highspeed 标识的影响；经 Coding Plan 数据面代理回放，不调用真实套餐。"
+    }
+  ]
+}

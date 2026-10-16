@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-openai-compatible-thinking-toggle-request-shape",
+  "spec": "./test/e2e/conversation-session/conversation-session-openai-compatible-thinking-toggle-request-shape.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-openai-compatible-thinking-toggle-request-shape.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "openai-compatible-thinking-toggle-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需避免误命中四条 toggle fixture。"
+    },
+    {
+      "id": "qwen-thinking-enabled-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+    },
+    {
+      "id": "qwen-thinking-disabled-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+    },
+    {
+      "id": "kimi-thinking-enabled-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+    },
+    {
+      "id": "kimi-thinking-disabled-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+    }
+  ]
+}

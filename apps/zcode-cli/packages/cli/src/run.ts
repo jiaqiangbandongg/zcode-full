@@ -25,6 +25,11 @@ import { runPrompt } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
+import {
+  DEFAULT_CLI_WORKFLOW_MODE,
+  normalizeWorkflowModeOption,
+  WORKFLOW_MODE_SCOPE_ERROR,
+} from "./workflow-mode.js";
 import type {
   CliPermissionMode,
   CliResumeRequest,
@@ -51,8 +56,6 @@ const BROWSER_USE_SCOPE_ERROR =
 const SURFACE_SCOPE_ERROR =
   "--surface can only be used with --prompt, --target, app-server, or agent-server.";
 const MEMORY_BENCH_SCOPE_ERROR = "--memory-bench can only be used with -p/--prompt.";
-const ENABLE_WORKFLOW_SCOPE_ERROR =
-  "--enable-workflow can only be used with -p/--prompt or --target.";
 
 const pluginsCommandFlags = (
   values: ReturnType<typeof parseGlobalArgs>["values"],
@@ -101,7 +104,6 @@ const globalOptions = (
     browserExecutable,
     browserUse,
     detectedLocale,
-    ...(values["enable-workflow"] === true ? { enableWorkflow: true } : {}),
     force: values.force === true,
     json: values.json === true,
     locale,
@@ -136,8 +138,17 @@ const normalizeLocaleOption = (value: string | undefined): UiLocale | undefined 
 const normalizePromptMode = (value: string | undefined): CliPermissionMode | undefined => {
   if (value === undefined) return undefined;
   const mode = value.toLowerCase();
-  if (mode === "build" || mode === "plan" || mode === "edit" || mode === "yolo") return mode;
-  throw new Error(`Unsupported --mode value: ${value}. Supported modes: build, edit, plan, yolo.`);
+  if (
+    mode === "build" ||
+    mode === "plan" ||
+    mode === "edit" ||
+    mode === "yolo" ||
+    mode === "guarded"
+  )
+    return mode;
+  throw new Error(
+    `Unsupported --mode value: ${value}. Supported modes: build, edit, plan, yolo, guarded.`,
+  );
 };
 
 const normalizeBrowserUse = (value: string | undefined): GlobalOptions["browserUse"] => {
@@ -334,10 +345,14 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
   }
 
   let mode: CliPermissionMode | undefined;
+  let workflowModeOption: ReturnType<typeof normalizeWorkflowModeOption>;
   let browserUse: GlobalOptions["browserUse"];
   let presentationSurface: PresentationSurface;
   try {
     mode = normalizePromptMode(parsed.values.mode as string | undefined);
+    workflowModeOption = normalizeWorkflowModeOption(
+      parsed.values["workflow-mode"] as string | undefined,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     ctx.stderr.write(`${message}\n`);
@@ -429,15 +444,6 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
   }
 
   if (
-    options.enableWorkflow &&
-    (parsed.positionals.length > 0 ||
-      (typeof parsed.values.prompt !== "string" && targetRequest === undefined))
-  ) {
-    ctx.stderr.write(`${ENABLE_WORKFLOW_SCOPE_ERROR}\n`);
-    return 1;
-  }
-
-  if (
     options.memoryBench &&
     (typeof parsed.values.prompt !== "string" || parsed.positionals.length > 0)
   ) {
@@ -456,6 +462,21 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write(`${BROWSER_USE_SCOPE_ERROR}\n`);
     return 1;
   }
+
+  // app-server 的 mode 归 Host 决定（launch.md「The standalone CLI: `--workflow-mode`」），
+  // 其余子命令不建会话；作用域与 --force-mcs 相同：只有 --prompt、--target 与 TUI。
+  if (
+    workflowModeOption !== undefined &&
+    !isForceMcsSupportedInvocation({
+      positionals: parsed.positionals,
+      prompt: parsed.values.prompt as string | undefined,
+      targetRequest,
+    })
+  ) {
+    ctx.stderr.write(`${WORKFLOW_MODE_SCOPE_ERROR}\n`);
+    return 1;
+  }
+  const workflowMode = workflowModeOption ?? DEFAULT_CLI_WORKFLOW_MODE;
 
   if (
     forceMcs &&
@@ -508,6 +529,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolDisallowlist,
       forceMcs,
       presentationSurface,
+      workflowMode,
     );
   }
 
@@ -524,6 +546,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolDisallowlist,
       forceMcs,
       presentationSurface,
+      workflowMode,
     );
   }
 
@@ -578,6 +601,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         resumeRequest,
         toolDisallowlist,
         forceMcs,
+        workflowMode,
       );
     default:
       ctx.stderr.write(`Unknown command: ${commandName(parsed.positionals)}\n\n`);

@@ -1,0 +1,13 @@
+actor-node actor#1 @25:24 family=fan-out#1
+actor-node actor#2 @28:17
+actor-node actor#3 @29:17
+actor-node actor#4 @30:17
+actor-node actor#5 @31:17
+actor-node actor#6 @32:17
+actor-node sink
+actor-edge actor#1 -> actor#2 exact count=1 types="string"
+actor-edge actor#2 -> actor#3 exact count=1 types="string"
+actor-edge actor#3 -> actor#4 exact count=1 types="string"
+actor-edge actor#4 -> actor#5 exact count=1 types="string"
+actor-edge actor#5 -> actor#6 exact count=1 types="string"
+actor-edge actor#6 -> sink exact count=1 types="string"

@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-resume-stale-target",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-resume-stale-target.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-goal-resume-stale-seed-final",
+      "description": "M07k stale target 恢复前 seed task 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "seed 只需要形成 completed task，后续通过 sqlite 注入 stale target 状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_GOAL_RESUME_STALE_SEED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_GOAL_RESUME_STALE_SEED"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-goal-resume-stale-seed-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-goal-resume-stale-send-now-final",
+      "description": "M07k stale active meta 下队列 item 点立即发送后的固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 queued item 能出队并发起新一轮请求，响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_GOAL_RESUME_STALE_SEND_NOW"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_GOAL_RESUME_STALE_SEND_NOW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-goal-resume-stale-send-now-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-goal-resume-stale-objective-contract",
+      "description": "M07k stale target objective 合同占位；objective 通过 sqlite/renderer 注入，不直接请求 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 marker 表示被注入的 stale objective，本身不应作为 provider 用户输入发送。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_GOAL_RESUME_STALE_OBJECTIVE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_GOAL_RESUME_STALE_OBJECTIVE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-goal-resume-stale-objective-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

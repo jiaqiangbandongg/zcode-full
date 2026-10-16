@@ -3,6 +3,9 @@ import type {
   CodingPlanResetType,
   UsageQuotaLimit,
 } from "@zcode/shared";
+
+// 进度条从当前占用恢复到 100% 的动画时长，沿用现有 500ms ease-out。
+export const CODING_PLAN_QUOTA_RESET_PROGRESS_DURATION_MS = 500;
 // 完成后“额度已重置”提示的停留时长，随后自动收起提示（额度条保持 100%）。
 export const CODING_PLAN_QUOTA_RESET_DONE_DISPLAY_MS = 2_600;
 // 自动/运营重置在 Composer 触发器上先合成一小段“正在重置”的时长，随后切换为“已重置”。
@@ -12,7 +15,7 @@ const FIVE_HOURS_MS = 5 * 60 * 60 * 1_000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
 
 // 完成后乐观改写“下一次重置时间”的周期：五小时额度按 5 小时，周额度按 7 天。
-function resolveCodingPlanQuotaResetDurationMs(resetType: CodingPlanResetType): number {
+export function resolveCodingPlanQuotaResetDurationMs(resetType: CodingPlanResetType): number {
   return resetType === "WEEK" ? WEEK_MS : FIVE_HOURS_MS;
 }
 
@@ -23,9 +26,9 @@ export type CodingPlanQuotaResetUiStatus = "available" | "processing" | "complet
 
 export interface CodingPlanQuotaResetUiEntry {
   status: CodingPlanQuotaResetUiStatus;
-  /** 剩余重置机会次数；processing/completed 归零。 */
+  /** 剩余重置机会次数；completed 携带同一 status 快照余下的有效机会，processing 保留点击前快照。 */
   opportunityCount: number;
-  /** 最早的重置机会到期时刻；仅 available 有效。 */
+  /** 最早的重置机会到期时刻；无余下机会时为 null。 */
   opportunityExpiresAt: number | null;
   /** 本地手动核销开始时刻；自动/运营重置为 null。 */
   startedAt: number | null;
@@ -117,13 +120,19 @@ function createCompletedEntry(
   observedAt: number,
   manualStartedAt: number | null,
   nextResetMs: number,
+  remainingOpportunities: ReadonlyArray<{ expireAt: number }>,
 ): CodingPlanQuotaResetUiEntry {
   const isSameCompletion = previous?.status === "completed" && previous.completedAt === completedAt;
   return {
     status: "completed",
-    opportunityCount: 0,
-    opportunityExpiresAt: null,
-    // 手动点击和完成历史可能由不同入口观察。只依赖当前 source 的 processing
+    // Bugfix：完成态曾把机会张数/到期清零。同类型持有多张机会时，核销一张后余下的卡要等
+    // 下一次 status 让位回 available 才恢复：期间弹框行把空到期渲染成「0 分 0 秒后过期」，
+    // 再次点击被 reset() 静默忽略，只能重开弹框触发立即校正。完成与机会余额是同一份
+    // status 快照的两个正交维度，这里如实保留余下的有效机会（调用方已按到期升序），
+    // 是否可再次核销统一由 hasUsableCodingPlanQuotaResetOpportunity 判定。
+    opportunityCount: remainingOpportunities.length,
+    opportunityExpiresAt: remainingOpportunities[0]?.expireAt ?? null,
+    // Bugfix：手动点击和完成历史可能由不同入口观察。只依赖当前 source 的 processing
     // 会让 Composer 把设置页发起的手动重置误判成自动重置，重复显示 Tooltip 和烟花。
     // 同一完成历史重复对账时也必须保留原分类，不能在下一次轮询时退化为自动完成。
     startedAt: isSameCompletion
@@ -185,13 +194,20 @@ export function applyCodingPlanQuotaResetStatus(
   // 与额度校正先播，history/read 后的下一轮再让位；processing 对账也不受影响：机会
   // 余额 >0 时手动 /use 确认循环仍必须看到 completed。
   const hasValidOpportunity = validOpportunities.length > 0;
+  // Bugfix：processing 曾以「used_at 非空」即确认成功。从 COMPLETED（余下 N 张）再次核销时，
+  // 点击前基线就是上一张的 used_at；/use 后 status 读数滞后（仍是上一张 used_at，unread 也可能
+  // 未清）会被当成第二次成功：弹框提前播放成功反馈、余量仍显示旧值，且共享轨迹停在
+  // completedAt=null，下一次点击被跨入口防双核销静默拦下。processing 只认手动轨迹给出的
+  // manualStartedAt（hook 仅在 used_at 不同于点击前基线时返回），读到基线则继续等待，
+  // 4 次对账都未见新 used_at 由 hook 走失败恢复。
   const shouldComplete = Boolean(
     latestUsedAt !== null &&
-    (ownsUnread ||
-      previous?.status === "processing" ||
-      ((manualStartedAt !== null ||
-        (previous?.status === "completed" && previous.completedAt === latestUsedAt)) &&
-        !hasValidOpportunity)),
+    (previous?.status === "processing"
+      ? manualStartedAt !== null
+      : ownsUnread ||
+        ((manualStartedAt !== null ||
+          (previous?.status === "completed" && previous.completedAt === latestUsedAt)) &&
+          !hasValidOpportunity)),
   );
   if (shouldComplete && latestUsedAt !== null) {
     return createCompletedEntry(
@@ -200,11 +216,12 @@ export function applyCodingPlanQuotaResetStatus(
       now,
       manualStartedAt,
       resolveCodingPlanQuotaResetDurationMs(resetType),
+      validOpportunities,
     );
   }
 
-  // 手动 use 期间 status 轮询可能仍读到消费前快照。此时保持 processing，
-  // 只有服务端 used_at 才能确认成功，不能被旧 opportunity 回退成可再次点击。
+  // 手动 use 期间 status 轮询可能仍读到消费前快照（used_at 为空或仍是点击前基线）。此时保持
+  // processing，只有不同于基线的新 used_at 才能确认成功，不能被旧 opportunity 回退成可再次点击。
   if (previous?.status === "processing") {
     return previous;
   }
@@ -221,12 +238,45 @@ export function applyCodingPlanQuotaResetStatus(
   return null;
 }
 
+/**
+ * 「是否仍可核销」的唯一判定：非 processing、张数 > 0 且最早机会晚于 now 到期。
+ * available 与携带余下机会的 completed 同样适用；徽标、标题旁「重置」、弹框行与
+ * reset() 放行都以此为准，不再各自按 status === "available" 判断。
+ */
+export function hasUsableCodingPlanQuotaResetOpportunity(
+  entry: CodingPlanQuotaResetUiEntry | null,
+  now: number,
+): boolean {
+  return Boolean(
+    entry &&
+    entry.status !== "processing" &&
+    entry.opportunityCount > 0 &&
+    entry.opportunityExpiresAt !== null &&
+    entry.opportunityExpiresAt > now,
+  );
+}
+
+/**
+ * 额度标题旁操作的完成时刻：仍有可核销机会时返回 null（展示可点击「重置」打开弹框），
+ * 否则返回 completedAt（completed 展示「已重置」）。
+ * Bugfix：completed 携带余下机会后，若仍直接传 entry.completedAt，同类型还有卡时标题
+ * 也会显示「已重置」，用户无法从标题再次打开弹框核销余下的卡。
+ */
+export function resolveCodingPlanQuotaResetActionCompletedAt(controller: {
+  entry: CodingPlanQuotaResetUiEntry | null;
+  opportunityVisible: boolean;
+}): number | null {
+  return controller.opportunityVisible ? null : (controller.entry?.completedAt ?? null);
+}
+
 export function startCodingPlanQuotaResetManualUse(
   entry: CodingPlanQuotaResetUiEntry | null,
   idempotencyKey: string,
   now: number,
 ): CodingPlanQuotaResetUiEntry | null {
-  if (!entry || entry.status !== "available") {
+  // completed 携带的余下机会同样可直接核销（completed → processing）；其 idempotencyKey
+  // 已在完成时清空，下方会换用本次的新 key，不会复用上一张的 key。
+  if (!entry || !hasUsableCodingPlanQuotaResetOpportunity(entry, now)) {
     return entry;
   }
 
@@ -268,6 +318,13 @@ export function failCodingPlanQuotaResetManualUse(
     nextResetAt: null,
     error,
   };
+}
+
+export function resolveCodingPlanQuotaResetRemainingPercentage(
+  remainingPercentage: number | null,
+  entry: CodingPlanQuotaResetUiEntry | null,
+): number | null {
+  return entry?.status === "completed" && entry.quotaOverridePending ? 100 : remainingPercentage;
 }
 
 /**

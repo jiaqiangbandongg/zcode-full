@@ -4,12 +4,7 @@ import {
   createCoreError,
   formatCompactSummary,
 } from "../deps.js";
-import type {
-  CompactTimelinePayload,
-  SessionEvent,
-  SessionEventType,
-  TraceContext,
-} from "../deps.js";
+import type { CompactTimelinePayload, SessionEvent, SessionEventType, TraceContext } from "../deps.js";
 import {
   buildProviderRequestMessages,
   createModelContextExceededFinishError,
@@ -20,25 +15,30 @@ import type { RuntimeModelTextResult, RunModelTextRequestOptions } from "../type
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
 
-const COMPACT_TOOL_USE_DENIAL_MESSAGE = "Tool use is not allowed during compaction";
-const COMPACT_TOOL_USE_DENIAL_REASON = "compaction agent should only produce text summary";
+export const COMPACT_TOOL_USE_DENIAL_MESSAGE = "Tool use is not allowed during compaction";
+export const COMPACT_TOOL_USE_DENIAL_REASON =
+  "compaction agent should only produce text summary";
 
 export function createCompactPromptTooLongError(options: {
   attempt: number;
   cause?: unknown;
   preCompactTokenCount: number;
 }): Error {
-  return createCoreError(CoreErrorType.ModelContextExceeded, COMPACT_PROMPT_TOO_LONG_USER_MESSAGE, {
-    cause: options.cause instanceof Error ? options.cause : undefined,
-    context: {
-      compactPromptTooLongAttempts: options.attempt,
-      preCompactTokenCount: options.preCompactTokenCount,
+  return createCoreError(
+    CoreErrorType.ModelContextExceeded,
+    COMPACT_PROMPT_TOO_LONG_USER_MESSAGE,
+    {
+      cause: options.cause instanceof Error ? options.cause : undefined,
+      context: {
+        compactPromptTooLongAttempts: options.attempt,
+        preCompactTokenCount: options.preCompactTokenCount,
+      },
+      recoverable: true,
+      // 修复原因：compact 内部已经完成最多 3 次旧轮次截断重试；
+      // 最终仍超窗时不能再被 auto compact 外层重试放大成 3x3。
+      retryable: false,
     },
-    recoverable: true,
-    // compact 内部已经完成最多 3 次旧轮次截断重试；
-    // 最终仍超窗时不能再被 auto compact 外层重试放大成 3x3。
-    retryable: false,
-  });
+  );
 }
 
 export function createCompactContextExceededFinishError(
@@ -83,7 +83,10 @@ export function buildCompactSummaryRequestMessages(
   options: { useMidConversationSystem?: boolean } = {},
 ): RunModelTextRequestOptions["messages"] {
   return buildProviderRequestMessages({
-    entries: [...entriesForSummary, { message: { role: "user" as const, content: compactPrompt } }],
+    entries: [
+      ...entriesForSummary,
+      { message: { role: "user" as const, content: compactPrompt } },
+    ],
     applyCacheControl: true,
     skipCacheWrite: true,
     useMidConversationSystem: options.useMidConversationSystem,

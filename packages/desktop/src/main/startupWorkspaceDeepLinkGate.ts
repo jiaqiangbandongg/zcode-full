@@ -17,7 +17,7 @@ export interface ExplicitStartupWorkspaceRequest {
   source: ExplicitStartupWorkspaceSource;
 }
 
-interface StartupDeepLinkConsumptionGate {
+export interface StartupDeepLinkConsumptionGate {
   markStartupRequestConsumed: (request: ExplicitStartupWorkspaceRequest) => void;
   shouldHandleReadyProtocolUrl: (protocolUrl: string | null) => boolean;
 }

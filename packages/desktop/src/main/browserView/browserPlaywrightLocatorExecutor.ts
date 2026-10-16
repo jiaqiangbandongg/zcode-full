@@ -1,7 +1,14 @@
 /* eslint-disable max-lines -- Playwright isolated-world selector、frame target 与 CDP trusted input 必须共享同一会话状态。 */
-import type { BrowserPlaywrightAction, BrowserPlaywrightModifier } from "@zcode/shared";
+import type {
+  BrowserPlaywrightAction,
+  BrowserPlaywrightModifier,
+} from "@zcode/shared";
 import { logger } from "../logger.js";
-import { dispatchClickAt, dispatchKey, modifiersBitmask } from "./browserCommandInput.js";
+import {
+  dispatchClickAt,
+  dispatchKey,
+  modifiersBitmask,
+} from "./browserCommandInput.js";
 import type { ControlledView } from "./browserCommandTypes.js";
 import {
   assertFocusedInputTarget,
@@ -93,7 +100,13 @@ interface ActionProbe {
   count: number;
   actionable: boolean;
   checked?: boolean;
-  reason?: "disabled" | "hidden" | "not-editable" | "not-stable" | "outside-viewport" | "covered";
+  reason?:
+    | "disabled"
+    | "hidden"
+    | "not-editable"
+    | "not-stable"
+    | "outside-viewport"
+    | "covered";
   obstruction?: string;
   x?: number;
   y?: number;
@@ -116,7 +129,7 @@ type ActionProbeExecution =
   | { kind: "timeout" }
   | { kind: "cancelled" };
 
-type IabLocatorExecution =
+export type IabLocatorExecution =
   | { kind: "done"; value?: unknown }
   | { kind: "timeout"; reason: string }
   | { kind: "cancelled" };
@@ -130,7 +143,9 @@ function runtimeError(response: RuntimeResponse): string | undefined {
   if (!exception) return undefined;
   return (
     exception.exception?.description ??
-    (exception.exception?.value == null ? undefined : String(exception.exception.value)) ??
+    (exception.exception?.value == null
+      ? undefined
+      : String(exception.exception.value)) ??
     exception.text ??
     "Playwright locator evaluation failed"
   );
@@ -187,14 +202,16 @@ function frameSegments(selector: string): string[] {
   let current: string[] = [];
   for (const token of splitSelectorTokens(selector)) {
     if (token === "internal:control=enter-frame") {
-      if (current.length === 0) throw new Error("frame locator is missing a frame selector");
+      if (current.length === 0)
+        throw new Error("frame locator is missing a frame selector");
       segments.push(current.join(" >> "));
       current = [];
       continue;
     }
     current.push(token);
   }
-  if (current.length === 0) throw new Error("frame locator is missing a child selector");
+  if (current.length === 0)
+    throw new Error("frame locator is missing a child selector");
   segments.push(current.join(" >> "));
   return segments;
 }
@@ -251,7 +268,10 @@ class IabPlaywrightLocatorSession {
     if (action.operation === "allTextContents") {
       return {
         kind: "done",
-        value: await this.queryValue(target, "elements.map(element => element.textContent ?? '')"),
+        value: await this.queryValue(
+          target,
+          "elements.map(element => element.textContent ?? '')",
+        ),
       };
     }
     if (action.operation === "isVisible") {
@@ -272,8 +292,13 @@ class IabPlaywrightLocatorSession {
         ),
       };
     }
-    if (action.operation === "waitFor") return this.waitForState(target, action);
-    if (["textContent", "innerText", "getAttribute", "evaluate"].includes(action.operation)) {
+    if (action.operation === "waitFor")
+      return this.waitForState(target, action);
+    if (
+      ["textContent", "innerText", "getAttribute", "evaluate"].includes(
+        action.operation,
+      )
+    ) {
       const unique = await this.waitForUnique(target, action.selector);
       if (unique.kind !== "done") return unique;
       return {
@@ -293,7 +318,9 @@ class IabPlaywrightLocatorSession {
       const remaining = deadline - Date.now();
       if (remaining <= 0) return { kind: "timeout", reason: lastReason };
       const needsEditable = action.operation === "fill";
-      const needsPointer = ["click", "dblclick", "setChecked"].includes(action.operation);
+      const needsPointer = ["click", "dblclick", "setChecked"].includes(
+        action.operation,
+      );
       const needsEnabled = [
         "click",
         "dblclick",
@@ -319,7 +346,9 @@ class IabPlaywrightLocatorSession {
             scrollAlignment:
               action.force === true
                 ? POINTER_SCROLL_ALIGNMENTS[0]
-                : POINTER_SCROLL_ALIGNMENTS[pointerAttempt % POINTER_SCROLL_ALIGNMENTS.length],
+                : POINTER_SCROLL_ALIGNMENTS[
+                    pointerAttempt % POINTER_SCROLL_ALIGNMENTS.length
+                  ],
           },
           remaining,
         );
@@ -336,12 +365,18 @@ class IabPlaywrightLocatorSession {
         continue;
       }
       if (probeExecution.kind === "cancelled") return { kind: "cancelled" };
-      if (probeExecution.kind === "timeout") return { kind: "timeout", reason: lastReason };
+      if (probeExecution.kind === "timeout")
+        return { kind: "timeout", reason: lastReason };
       const probe = probeExecution.value;
       if (probe.count === 1 && probe.actionable) {
-        const pointerPoints = needsPointer ? this.pointerFramePoints(target, probe) : undefined;
+        const pointerPoints = needsPointer
+          ? this.pointerFramePoints(target, probe)
+          : undefined;
         if (needsPointer && action.force !== true) {
-          const obstruction = await this.frameObstruction(target, pointerPoints!);
+          const obstruction = await this.frameObstruction(
+            target,
+            pointerPoints!,
+          );
           if (obstruction) {
             lastReason = `${action.operation} actionability (covered by ${obstruction}) for selector ${action.selector}`;
             pointerAttempt += 1;
@@ -353,7 +388,9 @@ class IabPlaywrightLocatorSession {
           value: await this.perform(
             target,
             action,
-            pointerPoints ? { ...probe, x: pointerPoints.top.x, y: pointerPoints.top.y } : probe,
+            pointerPoints
+              ? { ...probe, x: pointerPoints.top.x, y: pointerPoints.top.y }
+              : probe,
           ),
         };
       }
@@ -415,7 +452,8 @@ class IabPlaywrightLocatorSession {
             })()`,
           );
           if (result === "done") return null;
-          if (result !== "needsinput") throw new Error(`locator.fill failed: ${String(result)}`);
+          if (result !== "needsinput")
+            throw new Error(`locator.fill failed: ${String(result)}`);
         } else {
           await this.focusForInput(target, inputTargetToken);
         }
@@ -447,9 +485,17 @@ class IabPlaywrightLocatorSession {
       }
       case "setChecked": {
         if (probe.checked !== action.checked) {
-          await dispatchClickAt(this.view, { cx: probe.x!, cy: probe.y! }, "left", false);
+          await dispatchClickAt(
+            this.view,
+            { cx: probe.x!, cy: probe.y! },
+            "left",
+            false,
+          );
         }
-        const checked = await this.querySingleValue(target, "Boolean(elements[0].checked)");
+        const checked = await this.querySingleValue(
+          target,
+          "Boolean(elements[0].checked)",
+        );
         if (checked !== action.checked) {
           throw new Error(
             `locator.setChecked(${String(action.checked)}) did not change the element state`,
@@ -515,8 +561,10 @@ class IabPlaywrightLocatorSession {
               : !value.visible;
       if (matched) return { kind: "done" };
       const remaining = deadline - Date.now();
-      if (remaining <= 0) return { kind: "timeout", reason: `${action.selector} to be ${state}` };
-      if (!(await this.delay(Math.min(POLL_INTERVAL_MS, remaining)))) return { kind: "cancelled" };
+      if (remaining <= 0)
+        return { kind: "timeout", reason: `${action.selector} to be ${state}` };
+      if (!(await this.delay(Math.min(POLL_INTERVAL_MS, remaining))))
+        return { kind: "cancelled" };
     }
   }
 
@@ -527,13 +575,17 @@ class IabPlaywrightLocatorSession {
     const deadline = Date.now() + this.timeoutMs;
     for (;;) {
       if (this.signal?.aborted) return { kind: "cancelled" };
-      const exists = await this.querySingleValue(target, "Boolean(elements[0])", {
-        allowMissing: true,
-      });
+      const exists = await this.querySingleValue(
+        target,
+        "Boolean(elements[0])",
+        { allowMissing: true },
+      );
       if (exists === true) return { kind: "done" };
       const remaining = deadline - Date.now();
-      if (remaining <= 0) return { kind: "timeout", reason: `locator ${selector}` };
-      if (!(await this.delay(Math.min(POLL_INTERVAL_MS, remaining)))) return { kind: "cancelled" };
+      if (remaining <= 0)
+        return { kind: "timeout", reason: `locator ${selector}` };
+      if (!(await this.delay(Math.min(POLL_INTERVAL_MS, remaining))))
+        return { kind: "cancelled" };
     }
   }
 
@@ -595,7 +647,7 @@ class IabPlaywrightLocatorSession {
         let stableFrames = 0;
         for (let index = 0; index < 10 && stableFrames < 2; index += 1) {
           await waitForAnimationFrame();
-          // el-table 等页面会在 rAF 间用同 locator、同几何的新 DOM node 替换旧 node。
+          // Bug 根因：el-table 等页面会在 rAF 间用同 locator、同几何的新 DOM node 替换旧 node。
           // locator 描述当前匹配目标，不绑定首次 node identity；detach 后应重解析再比较几何。
           const currentElement = element.isConnected ? element : resolveCurrentElement();
           if (!currentElement) return { count: 0, actionable: false };
@@ -631,7 +683,9 @@ class IabPlaywrightLocatorSession {
       }
       return { count: 1, actionable: true, x, y, checked };
       })()`;
-      const rawValue = (await this.evaluate(context, expression, true, timeoutMs)).value;
+      const rawValue = (
+        await this.evaluate(context, expression, true, timeoutMs)
+      ).value;
       const value = this.requireActionProbe(rawValue, target.selector);
       return value;
     })();
@@ -670,7 +724,10 @@ class IabPlaywrightLocatorSession {
     return probe;
   }
 
-  private pointerFramePoints(target: LocatorTarget, probe: ActionProbe): PointerFramePoints {
+  private pointerFramePoints(
+    target: LocatorTarget,
+    probe: ActionProbe,
+  ): PointerFramePoints {
     if (probe.x === undefined || probe.y === undefined) {
       throw new Error(
         `Playwright pointer probe returned no click point for selector ${target.selector}`,
@@ -683,8 +740,16 @@ class IabPlaywrightLocatorSession {
       const u = point.x / boundary.childSize.width;
       const v = point.y / boundary.childSize.height;
       point = {
-        x: x0 * (1 - u) * (1 - v) + x1 * u * (1 - v) + x2 * u * v + x3 * (1 - u) * v,
-        y: y0 * (1 - u) * (1 - v) + y1 * u * (1 - v) + y2 * u * v + y3 * (1 - u) * v,
+        x:
+          x0 * (1 - u) * (1 - v) +
+          x1 * u * (1 - v) +
+          x2 * u * v +
+          x3 * (1 - u) * v,
+        y:
+          y0 * (1 - u) * (1 - v) +
+          y1 * u * (1 - v) +
+          y2 * u * v +
+          y3 * (1 - u) * v,
       };
       boundaryPoints.set(boundary, point);
     }
@@ -697,19 +762,32 @@ class IabPlaywrightLocatorSession {
   ): Promise<string | undefined> {
     for (const boundary of target.boundaries.toReversed()) {
       const point = points.boundaryPoints.get(boundary);
-      if (!point) throw new Error("Playwright pointer frame chain is incomplete");
+      if (!point)
+        throw new Error("Playwright pointer frame chain is incomplete");
       const x = Math.round(point.x);
       const y = Math.round(point.y);
       try {
-        const hit = (await this.send(boundary.parent, "DOM.getNodeForLocation", {
-          includeUserAgentShadowDOM: true,
-          x,
-          y,
-        })) as { backendNodeId?: number };
-        if (!hit.backendNodeId || hit.backendNodeId === boundary.ownerBackendNodeId) continue;
-        const described = (await this.send(boundary.parent, "DOM.describeNode", {
-          backendNodeId: hit.backendNodeId,
-        })) as {
+        const hit = (await this.send(
+          boundary.parent,
+          "DOM.getNodeForLocation",
+          {
+            includeUserAgentShadowDOM: true,
+            x,
+            y,
+          },
+        )) as { backendNodeId?: number };
+        if (
+          !hit.backendNodeId ||
+          hit.backendNodeId === boundary.ownerBackendNodeId
+        )
+          continue;
+        const described = (await this.send(
+          boundary.parent,
+          "DOM.describeNode",
+          {
+            backendNodeId: hit.backendNodeId,
+          },
+        )) as {
           node?: {
             attributes?: string[];
             localName?: string;
@@ -717,7 +795,8 @@ class IabPlaywrightLocatorSession {
           };
         };
         const node = described.node;
-        const name = node?.localName || node?.nodeName?.toLowerCase() || "another element";
+        const name =
+          node?.localName || node?.nodeName?.toLowerCase() || "another element";
         return `<${name}>`;
       } catch {
         // frame boundary 的辅助遮挡探测失败不覆盖主 selector/actionability 结果。
@@ -806,10 +885,14 @@ class IabPlaywrightLocatorSession {
         return "done";
       })()`,
     );
-    if (focused !== "done") throw new Error(`locator could not focus element: ${String(focused)}`);
+    if (focused !== "done")
+      throw new Error(`locator could not focus element: ${String(focused)}`);
   }
 
-  private async selectOption(target: LocatorTarget, action: LocatorAction): Promise<unknown> {
+  private async selectOption(
+    target: LocatorTarget,
+    action: LocatorAction,
+  ): Promise<unknown> {
     const selections = JSON.stringify(action.selections ?? []);
     const result = await this.querySingleValue(
       target,
@@ -821,7 +904,10 @@ class IabPlaywrightLocatorSession {
     return result;
   }
 
-  private async evaluateLocator(target: LocatorTarget, action: LocatorAction): Promise<unknown> {
+  private async evaluateLocator(
+    target: LocatorTarget,
+    action: LocatorAction,
+  ): Promise<unknown> {
     const context = await this.context(target.frame);
     const handle = await this.evaluate(
       context,
@@ -858,7 +944,10 @@ class IabPlaywrightLocatorSession {
     }
   }
 
-  private async queryValue(target: LocatorTarget, body: string): Promise<unknown> {
+  private async queryValue(
+    target: LocatorTarget,
+    body: string,
+  ): Promise<unknown> {
     const context = await this.context(target.frame);
     const expression = `(() => {
       const injected = globalThis.${PLAYWRIGHT_GLOBAL};
@@ -914,9 +1003,11 @@ class IabPlaywrightLocatorSession {
           objectId: handle.objectId,
         })) as { node?: { backendNodeId?: number; frameId?: string } };
         const frameId = described.node?.frameId;
-        if (!frameId) throw new Error("frame locator did not resolve to a frame owner");
+        if (!frameId)
+          throw new Error("frame locator did not resolve to a frame owner");
         const ownerBackendNodeId = described.node?.backendNodeId;
-        if (!ownerBackendNodeId) throw new Error("frame locator returned no backend node identity");
+        if (!ownerBackendNodeId)
+          throw new Error("frame locator returned no backend node identity");
         const contentQuads = (await this.send(frame, "DOM.getContentQuads", {
           backendNodeId: ownerBackendNodeId,
         })) as { quads?: number[][] };
@@ -976,12 +1067,16 @@ class IabPlaywrightLocatorSession {
       frameTree?: { frame?: { id?: string } };
     };
     const frameId = tree.frameTree?.frame?.id;
-    if (!frameId) throw new Error("Page.getFrameTree returned no main frame id");
+    if (!frameId)
+      throw new Error("Page.getFrameTree returned no main frame id");
     this.rootFrame = { frameId };
     return this.rootFrame;
   }
 
-  private async childFrame(parent: CdpTarget, frameId: string): Promise<CdpTarget> {
+  private async childFrame(
+    parent: CdpTarget,
+    frameId: string,
+  ): Promise<CdpTarget> {
     const sameTarget = {
       frameId,
       sessionId: parent.sessionId,
@@ -993,7 +1088,8 @@ class IabPlaywrightLocatorSession {
       const attached = (await this.view.cdp
         .send("Target.attachToTarget", { flatten: true, targetId: frameId })
         .catch(() => undefined)) as { sessionId?: string } | undefined;
-      if (!attached?.sessionId) throw new Error(`unable to attach frame target ${frameId}`);
+      if (!attached?.sessionId)
+        throw new Error(`unable to attach frame target ${frameId}`);
       this.attachedSessionIds.add(attached.sessionId);
       const target = { ...sameTarget, sessionId: attached.sessionId };
       await this.send(target, "Page.enable");
@@ -1027,7 +1123,11 @@ class IabPlaywrightLocatorSession {
   }
 
   private async inject(context: FrameContext): Promise<void> {
-    const present = await this.evaluate(context, `Boolean(globalThis.${PLAYWRIGHT_GLOBAL})`, true);
+    const present = await this.evaluate(
+      context,
+      `Boolean(globalThis.${PLAYWRIGHT_GLOBAL})`,
+      true,
+    );
     if (present.value === true) return;
     const options = {
       browserName: "chromium",
@@ -1048,7 +1148,8 @@ class IabPlaywrightLocatorSession {
       return true;
     })()`;
     const injected = await this.evaluate(context, expression, true);
-    if (injected.value !== true) throw new Error("unable to initialize Playwright locator runtime");
+    if (injected.value !== true)
+      throw new Error("unable to initialize Playwright locator runtime");
   }
 
   private async evaluate(
@@ -1080,7 +1181,11 @@ class IabPlaywrightLocatorSession {
     }
   }
 
-  private send(target: { sessionId?: string }, method: string, params?: unknown): Promise<unknown> {
+  private send(
+    target: { sessionId?: string },
+    method: string,
+    params?: unknown,
+  ): Promise<unknown> {
     if (this.signal?.aborted) return Promise.reject(abortError());
     return this.view.cdp.send(method, params, target.sessionId);
   }

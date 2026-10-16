@@ -2,7 +2,7 @@
 // 「配置」弹层的两个字段
 // ============================================================
 // 从 WorkflowRunSettingsPopover.tsx 拆出：那边管表单状态、命令与后果句，这里只画两个受控字段——
-// 子代理模型（composer 的模型菜单 + 思考档）与「同时运行上限」步进器。props 全是烹熟的值。
+// 子代理模型（composer 的模型菜单 + 思考档）与「最大并发数」步进器。props 全是烹熟的值。
 
 import { useMemo, useRef, useState } from "react";
 import { MinusIcon, PlusIcon } from "lucide-react";
@@ -139,29 +139,30 @@ export function WorkflowRunSettingsModelField({
 }
 
 /**
- * 「同时运行上限」步进器：减、等宽数字、加，从 1 到本机天花板。天花板本身即「本 run 没有自己的界」，
- * 提示改写成「= 本机上限」。天花板未知（老 CLI）时没有上限、没有提示，数字可以直接敲。
+ * 「最大并发数」步进器：减、等宽数字、加，从 1 起、**没有上限**——默认并发 D 是起点不是天花板
+ * （docs/dynamic-workflow/presentation.md「The settings popover」）。提示写「默认 N」，停在 D 上即
+ * 「本 run 没有自己的界」，提示改写成「= 默认」。D 未知（老 CLI）时没有提示，数字照样可以直接敲。
  */
 export function WorkflowRunSettingsBoundField({
   bound,
-  ceiling,
+  defaultConcurrency,
   disabled,
   onChange,
 }: {
   bound: number | null;
-  ceiling: number | undefined;
+  defaultConcurrency: number | undefined;
   disabled: boolean;
   onChange: (bound: number) => void;
 }) {
   const { intl } = useZCodeIntl();
   const hint =
-    ceiling === undefined
+    defaultConcurrency === undefined
       ? undefined
-      : bound !== null && bound >= ceiling
-        ? intl.formatMessage({ id: "chat.toolCall.workflow.run.settings.limit.atCeiling" })
+      : bound === defaultConcurrency
+        ? intl.formatMessage({ id: "chat.toolCall.workflow.run.settings.limit.atDefault" })
         : intl.formatMessage(
-            { id: "chat.toolCall.workflow.run.settings.limit.ceiling" },
-            { n: ceiling },
+            { id: "chat.toolCall.workflow.run.settings.limit.default" },
+            { n: defaultConcurrency },
           );
   return (
     <div className="flex flex-col gap-1" data-testid="workflow-run-settings-bound">
@@ -177,9 +178,7 @@ export function WorkflowRunSettingsBoundField({
               })}
               data-testid="workflow-run-settings-bound-decrease"
               disabled={disabled || bound === null || bound <= 1}
-              onClick={() =>
-                bound !== null && onChange(clampWorkflowRunSettingsBound(bound - 1, ceiling))
-              }
+              onClick={() => bound !== null && onChange(clampWorkflowRunSettingsBound(bound - 1))}
               size="icon-xs"
             >
               <MinusIcon className="size-3.5" />
@@ -193,7 +192,7 @@ export function WorkflowRunSettingsBoundField({
             inputMode="numeric"
             onChange={(event) => {
               const parsed = Number.parseInt(event.target.value, 10);
-              if (Number.isFinite(parsed)) onChange(clampWorkflowRunSettingsBound(parsed, ceiling));
+              if (Number.isFinite(parsed)) onChange(clampWorkflowRunSettingsBound(parsed));
             }}
             placeholder="—"
             value={bound === null ? "" : String(bound)}
@@ -204,10 +203,8 @@ export function WorkflowRunSettingsBoundField({
                 id: "chat.toolCall.workflow.run.settings.limit.increase",
               })}
               data-testid="workflow-run-settings-bound-increase"
-              disabled={disabled || bound === null || (ceiling !== undefined && bound >= ceiling)}
-              onClick={() =>
-                bound !== null && onChange(clampWorkflowRunSettingsBound(bound + 1, ceiling))
-              }
+              disabled={disabled || bound === null}
+              onClick={() => bound !== null && onChange(clampWorkflowRunSettingsBound(bound + 1))}
               size="icon-xs"
             >
               <PlusIcon className="size-3.5" />

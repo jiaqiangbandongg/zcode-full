@@ -10,7 +10,7 @@ export interface StorageCatalogContext {
   hasCustomDataBaseDir: boolean;
 }
 
-interface StorageClassification {
+export interface StorageClassification {
   categoryId: StorageCategoryId;
   /** 下钻明细的聚合 key：规则命中路径的下一级。 */
   entryKey: string;

@@ -3,6 +3,7 @@
 // Subagent Runner
 // ============================================================
 
+import type { GetAgentDefinitions } from "./definitions.js";
 import {
   AgentErrorCode,
   CoreErrorType,
@@ -117,6 +118,7 @@ export interface ExploreSubagentPortOptions {
   enqueueParentTaskNotification?: EnqueueParentTaskNotification;
   outputRootDir?: string;
   profiles?: readonly AgentProfile[];
+  getAgentDefinitions?: GetAgentDefinitions;
   builtInModelSelectionOverrides?: Partial<
     Record<"general-purpose" | "Explore", import("@zcode/shared").ModelSelection>
   >;
@@ -132,9 +134,10 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
   const registry = options.runtimeTaskRegistry ?? new InMemoryRuntimeTaskRegistry();
   const abortControllers = new Map<string, AbortController>();
   const borrowedForegroundAgentIds = new Set<string>();
-  const profiles = normalizeAgentProfiles(options.profiles ?? [], {
+  const initialProfiles = normalizeAgentProfiles(options.profiles ?? [], {
     builtInModelSelectionOverrides: options.builtInModelSelectionOverrides,
   });
+  const getProfiles = () => options.getAgentDefinitions?.().activeAgents ?? initialProfiles;
   const autoBackgroundMs = normalizeAutoBackgroundMs(options.autoBackgroundMs);
 
   const port: SubagentPort & { start: NonNullable<SubagentPort["start"]> } = {
@@ -142,7 +145,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
       rawRequest: SubagentLaunchRequest,
       launchOptions?: SubagentLaunchOptions,
     ): Promise<AgentOutput> {
-      const { profile, request } = resolveAgentProfileForRequest(profiles, rawRequest);
+      const { profile, request } = resolveAgentProfileForRequest(getProfiles(), rawRequest);
       const executionRequest = toSubagentExecutionRequest(request);
       const backgroundRequested =
         rawRequest.runInBackground === true || profile.background === true;
@@ -174,7 +177,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
       rawRequest: SubagentRunRequest,
       runOptions?: SubagentRunOptions,
     ): Promise<AgentOutput> {
-      const { profile, request } = resolveAgentProfileForRequest(profiles, rawRequest);
+      const { profile, request } = resolveAgentProfileForRequest(getProfiles(), rawRequest);
       const lifecycle = createSubagentLifecycle(options, request, profile);
       const startedAt = new Date(lifecycle.startedAt);
 
@@ -440,7 +443,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
       rawRequest: SubagentStartRequest,
       startOptions?: SubagentStartOptions,
     ): Promise<AgentBackgroundedOutput> {
-      const { profile, request } = resolveAgentProfileForRequest(profiles, rawRequest);
+      const { profile, request } = resolveAgentProfileForRequest(getProfiles(), rawRequest);
       const lifecycle = createSubagentLifecycle(options, request, profile);
       const startedAt = new Date(lifecycle.startedAt);
       const output = createAgentBackgroundedOutput(request, lifecycle);
@@ -571,7 +574,7 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
     ): Promise<SubagentSendMessageResult> {
       return sendMessageToLocalAgent(
         options,
-        profiles,
+        getProfiles,
         registry,
         abortControllers,
         request,
@@ -899,7 +902,7 @@ function createSubagentLifecycleFromTask(
 
 async function sendMessageToLocalAgent(
   options: ExploreSubagentPortOptions,
-  profiles: readonly AgentProfile[],
+  getProfiles: () => readonly AgentProfile[],
   registry: RuntimeTaskRegistry,
   abortControllers: Map<string, AbortController>,
   request: SubagentSendMessageRequest,
@@ -924,7 +927,7 @@ async function sendMessageToLocalAgent(
 
   return resumeTerminalAgentInBackground(
     options,
-    profiles,
+    getProfiles(),
     registry,
     abortControllers,
     task,

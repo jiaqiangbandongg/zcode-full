@@ -3,7 +3,14 @@ import {
   type ProviderFamilyDomain,
   type UsageEntitlementSnapshot,
 } from "@zcode/shared";
+import type { CodingPlanUsageAvailableProvider } from "@/CodingPlanUsageRemainingPanel.js";
 import type { SidebarUsageCodingPlanProviderId } from "@/lib/sidebarUsageCodingPlanProviderPreference.js";
+
+export interface SidebarCodingPlanUpgradeEntitlement {
+  providerId: SidebarUsageCodingPlanProviderId;
+  snapshot: UsageEntitlementSnapshot | null;
+  loading: boolean;
+}
 
 export function resolveSidebarCodingPlanUpgradeFallbackProviderId(
   providerFamilyDomain: ProviderFamilyDomain | null,
@@ -64,4 +71,73 @@ export function isMaxCodingPlanSnapshot(snapshot: UsageEntitlementSnapshot | nul
     const productName = detail.productName;
     return isMaxCodingPlanLevel(productId) || isMaxCodingPlanLevel(productName);
   });
+}
+
+function hasActiveCodingPlanSnapshot(
+  snapshot: UsageEntitlementSnapshot | null,
+  providerId: string,
+): boolean {
+  return (
+    snapshot?.provider?.id === providerId &&
+    snapshot.unavailableReason !== "no_plan" &&
+    Boolean(snapshot.subscription?.details.length)
+  );
+}
+
+function isUpgradableCodingPlanSnapshot(
+  snapshot: UsageEntitlementSnapshot | null,
+  providerId: string,
+): boolean {
+  if (!snapshot || snapshot.provider?.id !== providerId || !snapshot.authenticated) {
+    return false;
+  }
+
+  if (isTerminalCodingPlanSnapshot(snapshot)) {
+    return false;
+  }
+
+  if (
+    snapshot.unavailableReason === "not_authenticated" ||
+    snapshot.unavailableReason === "not_configured" ||
+    snapshot.unavailableReason === "unavailable"
+  ) {
+    return false;
+  }
+
+  return snapshot.unavailableReason === "no_plan" || Boolean(snapshot.subscription?.details.length);
+}
+
+export function resolveSidebarCodingPlanUpgradeProviderId(params: {
+  availableProviders: CodingPlanUsageAvailableProvider[];
+  entitlements: SidebarCodingPlanUpgradeEntitlement[];
+  modelProvidersLoading: boolean;
+  selectedProviderId?: SidebarUsageCodingPlanProviderId;
+}): SidebarUsageCodingPlanProviderId | undefined {
+  if (params.modelProvidersLoading) {
+    return undefined;
+  }
+
+  const providerEntitlements = params.entitlements.filter(
+    (entitlement) =>
+      !entitlement.loading &&
+      params.availableProviders.some((provider) => provider.providerId === entitlement.providerId),
+  );
+  const upgradableEntitlements = providerEntitlements.filter((entitlement) =>
+    isUpgradableCodingPlanSnapshot(entitlement.snapshot, entitlement.providerId),
+  );
+  if (upgradableEntitlements.length === 0) {
+    return undefined;
+  }
+
+  const selectedEntitlement = upgradableEntitlements.find(
+    (entitlement) => entitlement.providerId === params.selectedProviderId,
+  );
+  if (selectedEntitlement) {
+    return selectedEntitlement.providerId;
+  }
+
+  const activeEntitlement = upgradableEntitlements.find((entitlement) =>
+    hasActiveCodingPlanSnapshot(entitlement.snapshot, entitlement.providerId),
+  );
+  return (activeEntitlement ?? upgradableEntitlements[0])?.providerId;
 }

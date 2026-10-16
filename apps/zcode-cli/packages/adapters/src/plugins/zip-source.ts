@@ -31,7 +31,7 @@ export interface ResolvedZipPluginSourceRoot {
   path: string;
 }
 
-interface ResolveZipPluginSourceInput {
+export interface ResolveZipPluginSourceInput {
   headers?: Record<string, string>;
   path?: string;
   sha256: string;
@@ -40,7 +40,7 @@ interface ResolveZipPluginSourceInput {
   url: string;
 }
 
-interface ResolveHttpZipSourceInput {
+export interface ResolveHttpZipSourceInput {
   headers?: Record<string, string>;
   path?: string;
   requireSingleRoot?: boolean;

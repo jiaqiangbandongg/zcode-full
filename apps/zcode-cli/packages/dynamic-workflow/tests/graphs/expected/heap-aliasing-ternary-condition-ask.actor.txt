@@ -1,0 +1,9 @@
+actor-node source
+actor-node actor#1 "scout" @5:21
+actor-node actor#2 "judge" @6:21
+actor-node actor#3 "writer" @7:8
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#3 exact count=1
+actor-edge actor#1 -> actor#2 exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

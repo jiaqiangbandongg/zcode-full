@@ -1,0 +1,32 @@
+node source
+node join#1 "join" @9:30 type="Draft[]"
+node fan-out#1 "fan-out" @9:34 type="Draft[]"
+node ask#1 "ask" @9:73 actors=actor#1 within=fan-out#1 type="Draft"
+node ask#2 "planner" @11:28 actors=actor#2 type="string[]"
+node join#2 "join" @12:29 type="Draft[]"
+node fan-out#2 "fan-out" @12:33 type="Draft[]"
+node ask#3 "ask" @12:70 actors=actor#3 within=fan-out#2 type="Draft"
+node sink
+actor actor#1 @9:52 within=fan-out#1
+actor actor#2 "planner" @10:17
+actor actor#3 @12:49 within=fan-out#2
+edge source -> fan-out#1 data exact
+edge join#1 -> ask#2 data exact type="Draft[]"
+edge join#1 -> sink data exact type="Draft[]"
+edge fan-out#1 -> join#1 data exact type="Draft[]"
+edge fan-out#1 -> ask#1 data exact type="Draft[]"
+edge fan-out#1 -> ask#2 data exact type="Draft[]"
+edge fan-out#1 -> sink data exact type="Draft[]"
+edge ask#1 -> join#1 data exact type="Draft"
+edge ask#1 -> ask#2 data exact type="Draft"
+edge ask#1 -> sink data exact type="Draft"
+edge ask#2 -> join#2 data exact type="string[]"
+edge ask#2 -> fan-out#2 data exact type="string[]"
+edge ask#2 -> ask#3 data exact type="string[]"
+edge ask#2 -> sink data exact type="string[]"
+edge join#2 -> sink data exact type="Draft[]"
+edge fan-out#2 -> join#2 data exact type="Draft[]"
+edge fan-out#2 -> ask#3 data exact type="Draft[]"
+edge fan-out#2 -> sink data exact type="Draft[]"
+edge ask#3 -> join#2 data exact type="Draft"
+edge ask#3 -> sink data exact type="Draft"

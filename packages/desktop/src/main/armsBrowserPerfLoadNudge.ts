@@ -5,7 +5,7 @@ import type { WebContents } from "electron";
  * perf-collector 的 onLoad/sendPerf 不会跑（webvitals 仍可上报，故 beforeReport 里 perf=0）。
  * 在 did-finish-load 与 dom-ready 后补发 load，且等待 RumSDK 就绪。
  */
-const ARMS_BROWSER_PERF_LOAD_NUDGE_SCRIPT = `(function () {
+export const ARMS_BROWSER_PERF_LOAD_NUDGE_SCRIPT = `(function () {
   function dispatchLoad() {
     try {
       window.dispatchEvent(new Event("load"));

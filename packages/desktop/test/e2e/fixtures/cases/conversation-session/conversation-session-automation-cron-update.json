@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-cron-update",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-cron-update.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-automation-cron-update.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-automation-cron-update-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 CronUpdate 产品语义，只需稳定返回。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-list-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定先调用 CronList；本响应固定查询顺序以验证真实 ID 传递。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "动态 ID 来自真实 CronList tool_result，固定 patch 用于验证原地更新和详情回显。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "CronList 输出会显著增加上下文并触发真实自动 compact；固定摘要用于稳定保留最终 matcher 所需事实。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复只用于结束 case，并验证不生成 text fenced code block。"
+    }
+  ]
+}

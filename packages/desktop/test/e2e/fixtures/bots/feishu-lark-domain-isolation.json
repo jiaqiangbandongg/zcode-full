@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-PV-01",
+  "classification": "synthetic",
+  "syntheticReason": "The case records deterministic mock OpenAPI requests for both provider ids so domain routing is verified without tenant credentials or external network access.",
+  "promptMarker": "E2E_BOT_PROVIDER_DOMAIN",
+  "timing": "fast-text"
+}

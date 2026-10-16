@@ -9,7 +9,7 @@ import {
   windowsPathToGitBashPath,
 } from "@zcode/contracts";
 
-interface CwdCapturePlan {
+export interface CwdCapturePlan {
   command: ExecutionCommand;
   cwdFilePath?: string;
 }
@@ -89,7 +89,10 @@ export function readCapturedCwd(
   }
 }
 
-function normalizeCapturedCwdForHost(value: string, dialect: ExecutionShellDialect): string {
+export function normalizeCapturedCwdForHost(
+  value: string,
+  dialect: ExecutionShellDialect,
+): string {
   return dialect === "git-bash" ? gitBashPathToWindowsPath(value) : value;
 }
 

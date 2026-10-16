@@ -1,0 +1,9 @@
+lane actor#1 "critic" @11:20 families=fanout#1
+lane actor#2 "final" @17:8
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @10:3 label="map"
+step ask#1 ask "critic" @12:35 lane=actor#1 region=fanout#1 maybe serial
+step ask#2 ask "final" @17:23 lane=actor#2 region=seq#1 always
+edge ask#1 -> ask#1 carry maybe
+edge ask#1 -> ask#2 data maybe exact
+sink ask#2

@@ -4,39 +4,42 @@ import {
   isCoreError,
   traceContextToLogContext,
   type CollaborationMode,
-  type PermissionBrokerRequest,
   type PermissionBrokerResult,
   type PermissionRuleset,
   type TraceContext,
   type ToolExecutionSpanWriter,
 } from "@zcode/contracts";
 import type { HookRunResult } from "../../hooks/index.js";
-import type { PermissionContext } from "../../permission/service.js";
-import type { ExecutableToolCall, ToolEntry, ToolExecutionResult } from "../types.js";
-import { normalizeToolExecutionInput } from "../input-normalization.js";
+import type {
+  ExecutableToolCall,
+  ToolEntry,
+  ToolRuntimePermissionCapabilityContext,
+} from "../types.js";
 import { resolveToolApproval } from "./approval-gate.js";
 import { createErrorResult, createPermissionErrorResult } from "./errors.js";
-import { emitPermissionDenied, emitPermissionRequested, emitPermissionResolved } from "./events.js";
-import { applyPreToolPermissionDecision, runPermissionRequestHooks } from "./hook-flow.js";
-import { racePermissionResponders } from "./permission-responder-race.js";
-import {
-  loadProjectPermissionRuleset,
-  persistProjectPermissionUpdates,
-} from "./permission-rules-persistence.js";
+import { emitPermissionDenied, emitPermissionResolved } from "./events.js";
+import { applyPreToolPermissionDecision } from "./hook-flow.js";
+import { applyMemoryFilePermission } from "./memory-file-permission.js";
 import {
   resolveRuntimePermissionCapability,
   resolveRuntimePermissionContext,
 } from "./permission-capability.js";
-import { buildDefaultPermissionUpdates } from "./permission-suggestions.js";
+import { preparePermissionInput } from "./permission-input.js";
+import { applyPermissionInputAdjustments } from "./permission-input-adjustments.js";
 import { recheckPermissionHookModifiedInput } from "./permission-input-recheck.js";
+import { requestPermissionResponse } from "./permission-request.js";
+import {
+  interpretPermissionResponse,
+  type PermissionFlowResult,
+  type PermissionResponseTransition,
+} from "./permission-response.js";
+import {
+  loadProjectPermissionRuleset,
+  applyGrantedPermissionUpdates,
+} from "./permission-rules-persistence.js";
+import { buildDefaultPermissionUpdates } from "./permission-suggestions.js";
 import type { ToolExecutorDeps } from "./types.js";
 import { summarizeInput } from "./utils.js";
-import { validateInput } from "./validation.js";
-import { applyMemoryFilePermission } from "./memory-file-permission.js";
-
-type ToolPermissionFlowResult =
-  | { allowed: true; executionInput: unknown; permissionWaitMs?: number }
-  | { allowed: false; result: ToolExecutionResult };
 
 export async function resolveToolPermission(
   deps: ToolExecutorDeps,
@@ -48,24 +51,15 @@ export async function resolveToolPermission(
   traceContext: TraceContext,
   signal?: AbortSignal,
   telemetry?: ToolExecutionSpanWriter,
-): Promise<ToolPermissionFlowResult> {
-  const permissionContext: PermissionContext = {
-    toolName: toolCall.name,
-    input: executionInput,
-    riskLevel: entry.metadata.riskLevel,
+  preparedContext?: ToolRuntimePermissionCapabilityContext,
+): Promise<PermissionFlowResult> {
+  const context = {
+    ...resolveRuntimePermissionContext(deps),
+    ...preparedContext,
     mode,
-    prePlanMode: deps.sessionModePort?.getPrePlanMode(),
-    planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
-    // workflow 草稿免确认要按工作目录解析相对路径，见 PermissionService 的
-    // isPreapprovedWorkflowDraftWrite。
-    workingDirectory: deps.getWorkingDirectory(),
+    workingDirectory: preparedContext?.workingDirectory ?? deps.getWorkingDirectory(),
+    workspaceRoot: preparedContext?.workspaceRoot ?? deps.getWorkspaceRoot(),
   };
-  const runtimePermissionContext = resolveRuntimePermissionContext(deps);
-  const rulePolicy = entry.resolvePermissionRulePolicy?.(executionInput, runtimePermissionContext);
-  const suggestedPermissionUpdates =
-    rulePolicy?.suggestedPermissionUpdates ??
-    buildDefaultPermissionUpdates(toolCall.name, executionInput, entry.permissionCapabilityGroup);
-
   let projectRules: PermissionRuleset | null;
   try {
     projectRules = await loadProjectPermissionRuleset(deps);
@@ -76,356 +70,264 @@ export async function resolveToolPermission(
         toolCall,
         createCoreError(CoreErrorType.StorageError, "Failed to load project permission rules", {
           cause: error instanceof Error ? error : undefined,
-          context: { sessionId: deps.sessionId, toolCallId: toolCall.id, toolName: toolCall.name },
           recoverable: true,
         }),
       ),
     };
   }
-
-  let permissionDecision = deps.permissionService.checkPermission(
-    permissionContext,
-    resolveRuntimePermissionCapability(entry, executionInput, runtimePermissionContext),
-    projectRules,
-    rulePolicy,
-  );
-  permissionDecision = applyPreToolPermissionDecision(permissionDecision, preToolHookResult, mode);
-  permissionDecision = applyMemoryFilePermission({
-    decision: permissionDecision,
-    executionInput,
-    memoryRoot: deps.getMemoryRoot?.(),
-    toolName: toolCall.name,
-    workingDirectory: deps.getWorkingDirectory(),
-    workspaceRoot: deps.getWorkspaceRoot(),
-  });
-
-  deps.logger?.debug("Tool permission evaluated", {
-    ...traceContextToLogContext(traceContext),
-    decision: permissionDecision.decision,
-    event: "tool.permission.evaluated",
-    inputSummary: summarizeInput(toolCall.input),
-    mode,
-    module: "core.tool.executor",
-    reason: permissionDecision.reason,
-    riskLevel: permissionDecision.riskLevel,
-    ruleId: permissionDecision.ruleId,
-    sideEffectScope: permissionDecision.sideEffectScope,
-    status:
-      permissionDecision.decision === "allow"
-        ? "completed"
-        : permissionDecision.decision === "ask"
-          ? "waiting"
-          : "failed",
-    toolCallId: toolCall.id,
-    toolName: toolCall.name,
-  });
-
-  if (permissionDecision.allowed) {
-    telemetry?.setPermissionDecision("not_required");
-    return { allowed: true, executionInput };
-  }
-
-  if (permissionDecision.decision === "deny") {
-    telemetry?.setPermissionDecision("denied");
-    await emitPermissionDenied(deps, toolCall, permissionDecision.reason, traceContext);
-
-    deps.logger?.warn("Tool permission denied", {
-      ...traceContextToLogContext(traceContext),
-      decision: permissionDecision.decision,
-      event: "tool.permission.denied",
-      mode,
-      module: "core.tool.executor",
-      reason: permissionDecision.reason,
-      ruleId: permissionDecision.ruleId,
-      status: "failed",
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-    });
-    return {
-      allowed: false,
-      result: createPermissionErrorResult(toolCall, permissionDecision.reason, {
-        decision: permissionDecision.decision,
-        mode,
-        ruleId: permissionDecision.ruleId,
-      }),
-    };
-  }
-
-  const approval = resolveToolApproval(deps, toolCall, entry, executionInput, traceContext);
-  if (approval.gate === "proceed") {
-    telemetry?.setPermissionDecision("not_required");
-    return { allowed: true, executionInput };
-  }
-
-  const requestId = `perm_${crypto.randomUUID()}`;
-  telemetry?.markPermissionRequested();
-  await emitPermissionRequested(
-    deps,
-    toolCall,
-    executionInput,
-    requestId,
-    permissionDecision.riskLevel,
-    permissionDecision.reason,
-    suggestedPermissionUpdates,
-    traceContext,
-    approval,
-  );
-
-  let brokerResult: PermissionBrokerResult;
-  let normalizedHookModifiedInput: unknown;
-  let useNormalizedHookModifiedInput = false;
-  const permissionWaitStartedAt = Date.now();
-  try {
-    // 这里曾经串行 `await runPermissionRequestHooks(...)`，
-    // broker 要等 hook 链返回才启动。同步 PermissionRequest hook（外部审批桥接）阻塞期间，
-    // 确认窗已经渲染（上面的 emitPermissionRequested），但应答 deferred 尚未注册，用户的
-    // 每一次点击都被 resolveInteraction 按幂等语义静默丢弃——确认窗永久死亡。
-    // 修法：hook 链与 broker 并发竞速，先到的决定生效，败者被 abort 且不被等待。
-    const raceOutcome = await racePermissionResponders({
-      onHookFailure: (error) => {
-        // hook 链故障只令其退赛：辅助应答方的基础设施故障不应替用户做拒绝决定，
-        // 确认窗继续等待 broker 应答。
-        deps.logger?.warn("PermissionRequest hook chain failed; waiting for client decision", {
-          ...traceContextToLogContext(traceContext),
-          errorMessage: error instanceof Error ? error.message : String(error),
-          event: "tool.permission.hook_race_forfeited",
-          module: "core.tool.executor",
-          requestId,
-          status: "waiting",
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-        });
-      },
-      requestBroker: (brokerSignal, claimResponse) =>
-        deps.permissionBroker.requestPermission(
-          {
-            input: executionInput,
-            mode,
-            reason: permissionDecision.reason ?? `Tool ${toolCall.name} requires approval`,
-            requestId,
-            requestedAt: new Date(),
-            riskLevel: permissionDecision.riskLevel,
-            ruleId: permissionDecision.ruleId,
-            sessionId: deps.sessionId,
-            sideEffectScope: permissionDecision.sideEffectScope,
-            suggestedPermissionUpdates,
-            ...(approval.optionsPolicy ? { optionsPolicy: approval.optionsPolicy } : {}),
-            toolCallId: toolCall.id as PermissionBrokerRequest["toolCallId"],
-            toolName: toolCall.name,
-            traceId: traceContext.traceId,
-            turnId: traceContext.turnId ?? deps.turnId,
-          },
-          {
-            signal: brokerSignal,
-            claimResponse,
-            timeoutMs: deps.permissionTimeoutMs,
-          },
-        ),
-      runHooks: (hookSignal) =>
-        runPermissionRequestHooks(
-          deps,
-          toolCall,
-          executionInput,
-          requestId,
-          permissionDecision,
-          mode,
-          traceContext,
-          hookSignal,
-        ),
-      ...(signal === undefined ? {} : { signal }),
-    });
-    brokerResult = raceOutcome.result;
-    const permissionHookResult = raceOutcome.source === "hook" ? raceOutcome.result : undefined;
-
-    if (permissionHookResult?.decision === "modify") {
-      normalizedHookModifiedInput = normalizeToolExecutionInput({
-        entry,
-        input: permissionHookResult.modifiedInput ?? executionInput,
-        logger: deps.logger,
-        source: "permission",
-      });
-      useNormalizedHookModifiedInput = true;
-      if (!validateInput(normalizedHookModifiedInput, entry)) {
-        // PermissionRequest hook 可以改写目标路径，修改后的输入不能沿用修改前的权限结果。
-        const recheck = await recheckPermissionHookModifiedInput({
-          deps,
-          entry,
-          mode,
-          modifiedInput: normalizedHookModifiedInput,
-          projectRules,
-          requestId,
-          signal,
-          toolCall,
-          traceContext,
-        });
-        if (recheck.permissionDecision) permissionDecision = recheck.permissionDecision;
-        if (recheck.brokerResult) {
-          brokerResult = recheck.brokerResult;
-          useNormalizedHookModifiedInput = brokerResult.decision === "allow";
-        }
-      }
-    }
-  } catch (error) {
-    telemetry?.setPermissionDecision("denied");
-    const coreError = isCoreError(error)
-      ? error
-      : createCoreError(CoreErrorType.PermissionDenied, "Permission request failed", {
-          cause: error instanceof Error ? error : undefined,
-          context: { requestId, toolCallId: toolCall.id, toolName: toolCall.name },
-          recoverable: true,
-        });
-    await emitPermissionResolved(
-      deps,
-      toolCall,
-      requestId,
-      {
-        decision: "deny",
-        reason: coreError.message,
-        resolvedAt: new Date(),
-      },
-      traceContext,
-    );
-    return { allowed: false, result: createErrorResult(toolCall, coreError) };
-  }
-
-  const resolvedPermission = {
-    ...brokerResult,
-    resolvedAt: brokerResult.resolvedAt ?? new Date(),
-  };
-  const permissionWaitMs = Math.max(0, Math.round(Date.now() - permissionWaitStartedAt));
-  await emitPermissionResolved(deps, toolCall, requestId, resolvedPermission, traceContext);
-
-  deps.logger?.info("Tool permission resolved", {
-    ...traceContextToLogContext(traceContext),
-    decision: resolvedPermission.decision,
-    event: "tool.permission.resolved",
-    mode,
-    module: "core.tool.executor",
-    reason: resolvedPermission.reason,
-    requestId,
-    status:
-      resolvedPermission.decision === "allow" || resolvedPermission.decision === "modify"
-        ? "completed"
-        : "failed",
-    toolCallId: toolCall.id,
-    toolName: toolCall.name,
-  });
-
-  if (resolvedPermission.decision === "deny") {
-    telemetry?.setPermissionDecision("denied");
-    return {
-      allowed: false,
-      result: createPermissionErrorResult(
-        toolCall,
-        resolvedPermission.reason,
-        {
-          decision: resolvedPermission.decision,
-          mode,
-          reasonSource: resolvedPermission.reasonSource,
-          requestId,
-          ruleId: permissionDecision.ruleId,
-        },
-        resolvedPermission.preserveReasonFormatting
-          ? { preserveReasonFormatting: true }
-          : undefined,
-      ),
-    };
-  }
-
-  if (resolvedPermission.decision === "escalate") {
-    telemetry?.setPermissionDecision("denied");
-    return {
-      allowed: false,
-      result: createErrorResult(
-        toolCall,
-        createCoreError(
-          CoreErrorType.PermissionEscalation,
-          resolvedPermission.reason ?? `Permission escalation requested for ${toolCall.name}`,
-          {
-            context: {
-              decision: resolvedPermission.decision,
-              mode,
-              requestId,
-              ruleId: permissionDecision.ruleId,
-              toolName: toolCall.name,
-            },
-            recoverable: true,
-          },
-        ),
-      ),
-    };
-  }
-
-  if (resolvedPermission.permissionUpdates?.length) {
-    try {
-      await persistProjectPermissionUpdates(
-        deps,
-        resolvedPermission.permissionUpdates,
-        traceContext,
-      );
-    } catch (error) {
+  let firstInput = true;
+  let hooksAvailable = true;
+  let permissionWaitMs = 0;
+  // 根因：递归重入会重跑 Hook，并把问答答案当新操作；显式转换仅重判新输入。
+  while (true) {
+    if (signal?.aborted)
       return {
         allowed: false,
         result: createErrorResult(
           toolCall,
-          createCoreError(
-            CoreErrorType.StorageError,
-            "Failed to persist project permission update",
-            {
-              cause: error instanceof Error ? error : undefined,
-              context: {
-                requestId,
-                sessionId: deps.sessionId,
-                toolCallId: toolCall.id,
-                toolName: toolCall.name,
-              },
-              recoverable: true,
-            },
-          ),
+          createCoreError(CoreErrorType.ToolCancelled, "Tool execution cancelled", {
+            recoverable: true,
+          }),
         ),
       };
+    const rulePolicy = entry.resolvePermissionRulePolicy?.(executionInput, context);
+    let decision = deps.permissionService.checkPermission(
+      {
+        toolName: toolCall.name,
+        input: executionInput,
+        riskLevel: entry.metadata.riskLevel,
+        mode,
+        planEnabled: deps.sessionModePort?.isPlanEnabled?.(),
+        prePlanMode: deps.sessionModePort?.getPrePlanMode(),
+        // 草稿预批与实际工具输入共用已准备的 cwd，不能在合并 Guarded 时漏传。
+        workingDirectory: context.workingDirectory,
+      },
+      resolveRuntimePermissionCapability(entry, executionInput, context),
+      projectRules,
+      rulePolicy,
+    );
+    if (firstInput && decision.approvalMode !== "user-once") {
+      decision = applyPreToolPermissionDecision(decision, preToolHookResult, mode);
     }
-  }
-
-  if (resolvedPermission.sessionPermissionUpdates?.length) {
-    // 会话免确认：只进内存里的会话 ruleset，
-    // 与上面的项目级持久化互不可见。
-    deps.permissionService.grantSessionPermission(resolvedPermission.sessionPermissionUpdates);
-    deps.logger?.info("Session permission granted", {
+    firstInput = false;
+    decision = applyMemoryFilePermission({
+      decision,
+      executionInput,
+      memoryRoot: deps.getMemoryRoot?.(),
+      toolName: toolCall.name,
+      workingDirectory: context.workingDirectory,
+      workspaceRoot: context.workspaceRoot,
+    });
+    // 修复原因：统一审批流程曾丢失原日志合同；恢复关联字段，输入仍只记录结构摘要。
+    deps.logger?.debug("Tool permission evaluated", {
       ...traceContextToLogContext(traceContext),
-      event: "tool.permission.session_grant.applied",
+      decision: decision.decision,
+      event: "tool.permission.evaluated",
+      inputSummary: summarizeInput(toolCall.input),
+      mode,
       module: "core.tool.executor",
-      requestId,
-      status: "completed",
+      reason: decision.reason,
+      riskLevel: decision.riskLevel,
+      ruleId: decision.ruleId,
+      sideEffectScope: decision.sideEffectScope,
+      status:
+        decision.decision === "allow"
+          ? "completed"
+          : decision.decision === "ask"
+            ? "waiting"
+            : "failed",
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      updateCount: resolvedPermission.sessionPermissionUpdates.length,
     });
-  }
-
-  telemetry?.setPermissionDecision("granted");
-  if (resolvedPermission.decision !== "modify") {
-    return {
-      allowed: true,
-      executionInput: useNormalizedHookModifiedInput ? normalizedHookModifiedInput : executionInput,
-      permissionWaitMs,
-    };
-  }
-
-  const modifiedInput = useNormalizedHookModifiedInput
-    ? normalizedHookModifiedInput
-    : normalizeToolExecutionInput({
-        entry,
-        input: resolvedPermission.modifiedInput ?? executionInput,
-        logger: deps.logger,
-        source: "permission",
+    if (decision.allowed) {
+      telemetry?.setPermissionDecision(permissionWaitMs ? "granted" : "not_required");
+      return { allowed: true, executionInput, permissionWaitMs };
+    }
+    if (decision.decision === "deny") {
+      telemetry?.setPermissionDecision("denied");
+      await emitPermissionDenied(deps, toolCall, decision.reason, traceContext);
+      deps.logger?.warn("Tool permission denied", {
+        ...traceContextToLogContext(traceContext),
+        decision: decision.decision,
+        event: "tool.permission.denied",
+        mode,
+        module: "core.tool.executor",
+        reason: decision.reason,
+        ruleId: decision.ruleId,
+        status: "failed",
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
       });
-  const modifiedInputValidation = validateInput(modifiedInput, entry);
-  if (modifiedInputValidation) {
+      return {
+        allowed: false,
+        result: createPermissionErrorResult(toolCall, decision.reason, {
+          mode,
+          ruleId: decision.ruleId,
+        }),
+      };
+    }
+
+    // 工具预览只能控制普通审批，不能覆盖 Guarded 的单次确认。
+    const approval =
+      decision.approvalMode === "user-once"
+        ? { gate: "ask" as const }
+        : resolveToolApproval(deps, toolCall, entry, executionInput, traceContext);
+    if (approval.gate === "proceed") {
+      telemetry?.setPermissionDecision("not_required");
+      return { allowed: true, executionInput, permissionWaitMs };
+    }
+
+    const requestId = "perm_" + crypto.randomUUID();
+    const startedAt = Date.now();
+    const suggestedPermissionUpdates =
+      decision.approvalMode === "user-once"
+        ? []
+        : (rulePolicy?.suggestedPermissionUpdates ??
+          buildDefaultPermissionUpdates(
+            toolCall.name,
+            executionInput,
+            entry.permissionCapabilityGroup,
+          ));
+    telemetry?.markPermissionRequested();
+    let transition: PermissionResponseTransition;
+    let resolved: PermissionBrokerResult;
+    try {
+      let outcome = await requestPermissionResponse({
+        deps,
+        toolCall,
+        input: executionInput,
+        decision,
+        mode,
+        requestId,
+        traceContext,
+        suggestedPermissionUpdates,
+        approval,
+        runHooks: hooksAvailable && decision.approvalMode !== "user-once",
+        signal,
+      });
+      hooksAvailable = false;
+      let rewrite: PermissionResponseTransition | undefined;
+      // 非 guarded 保留已发布的 Hook/project/Memory 重判范围与授权语义。
+      if (mode !== "guarded" && outcome.source === "hook" && outcome.result.decision === "modify") {
+        const normalized = preparePermissionInput(
+          outcome.result.modifiedInput ?? executionInput,
+          entry,
+          deps,
+        );
+        const recheck = recheckPermissionHookModifiedInput({
+          context,
+          deps,
+          entry,
+          mode,
+          modifiedInput: normalized,
+          projectRules,
+          toolCall,
+        });
+        if (recheck.permissionDecision?.decision === "ask") {
+          // 旧分支用同一 requestId 再次调用 broker，迟到响应可能批准新输入。
+          // 保留原有 project/Memory 重判范围，生命周期改走相同的结束→新建转换。
+          rewrite = { kind: "rewrite", input: normalized };
+        } else {
+          executionInput = normalized;
+          outcome = {
+            source: "hook",
+            result: {
+              ...outcome.result,
+              modifiedInput: undefined,
+              decision: recheck.permissionDecision?.decision === "deny" ? "deny" : "allow",
+              reason: recheck.permissionDecision?.reason ?? outcome.result.reason,
+            },
+          };
+        }
+      }
+      transition =
+        rewrite ??
+        interpretPermissionResponse({
+          deps,
+          toolCall,
+          entry,
+          input: executionInput,
+          mode,
+          decision,
+          outcome,
+          requestId,
+        });
+      resolved = { ...outcome.result, resolvedAt: outcome.result.resolvedAt ?? new Date() };
+    } catch (error) {
+      const coreError = isCoreError(error)
+        ? error
+        : createCoreError(
+            mode === "guarded" ? CoreErrorType.ToolExecutionFailed : CoreErrorType.PermissionDenied,
+            "Permission request failed",
+            {
+              cause: error instanceof Error ? error : undefined,
+              context: { requestId, toolCallId: toolCall.id, toolName: toolCall.name },
+              recoverable: true,
+            },
+          );
+      resolved = { decision: "deny", reason: coreError.message, resolvedAt: new Date() };
+      transition = {
+        kind: "complete",
+        result: { allowed: false, result: createErrorResult(toolCall, coreError) },
+      };
+    }
+    permissionWaitMs += Math.max(0, Date.now() - startedAt);
+    // 只有此处结束请求：校验错误、取消、改写和正常响应都发一次终态。
+    await emitPermissionResolved(deps, toolCall, requestId, resolved, traceContext);
+    deps.logger?.info("Tool permission resolved", {
+      ...traceContextToLogContext(traceContext),
+      event: "tool.permission.resolved",
+      module: "core.tool.executor",
+      requestId,
+      mode,
+      ruleId: decision.ruleId,
+      decision: resolved.decision,
+      reason: resolved.reason,
+      status:
+        resolved.decision === "allow" || resolved.decision === "modify" ? "completed" : "failed",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+    });
+    if (transition.kind === "rewrite") {
+      executionInput = transition.input;
+      continue;
+    }
+    const result = transition.result;
+    telemetry?.setPermissionDecision(result.allowed ? "granted" : "denied");
+    if (!result.allowed) return result;
+    if (signal?.aborted)
+      return {
+        allowed: false,
+        result: createErrorResult(
+          toolCall,
+          createCoreError(CoreErrorType.ToolCancelled, "Tool execution cancelled", {
+            recoverable: true,
+          }),
+        ),
+      };
+    const updateFailure = await applyGrantedPermissionUpdates({
+      deps,
+      permissionUpdates: resolved.permissionUpdates,
+      requestId,
+      sessionPermissionUpdates: resolved.sessionPermissionUpdates,
+      toolCall,
+      traceContext,
+    });
+    if (updateFailure) return { allowed: false, result: updateFailure };
+    const adjusted = applyPermissionInputAdjustments({
+      deps,
+      entry,
+      toolCall,
+      executionInput: result.executionInput,
+      adjustments: resolved.inputAdjustments,
+      traceContext,
+    });
+    if (!adjusted.ok) return { allowed: false, result: adjusted.result };
     return {
-      allowed: false,
-      result: createErrorResult(toolCall, modifiedInputValidation),
+      ...result,
+      executionInput: adjusted.executionInput,
+      permissionWaitMs,
+      ...(adjusted.applied === undefined ? {} : { inputAdjustments: adjusted.applied }),
     };
   }
-  return { allowed: true, executionInput: modifiedInput, permissionWaitMs };
 }

@@ -9,6 +9,9 @@ import type {
   ZCodeSessionCompactResult,
   ZCodeSessionGoalAction,
   ZCodeSessionGoalResult,
+  ZCodeCodexConnectivityCheckResult,
+  ZCodeSwitchAgentResult,
+  ZCodeSyncTaskSessionBindingResult,
   ZCodeTaskCreateResult,
   ZCodeTaskMeta,
   ZCodeStreamEvent,
@@ -209,6 +212,9 @@ export interface IZCodeTaskService {
     provider?: ZCodeProvider;
   }): Promise<void>;
 
+  /** Codex 草稿态预热前的网络检查，用于提前提醒 chatgpt.com 不可达 */
+  checkCodexConnectivity(): Promise<ZCodeCodexConnectivityCheckResult>;
+
   // ---- Task/Session 管理 ----
 
   /** 创建 ZCode session 并同步 task 索引。 */
@@ -237,7 +243,66 @@ export interface IZCodeTaskService {
     deferPersistenceUntilFirstPrompt?: boolean;
     /** Bot/host 使用 v4 原生 createSession 建立 draft，再配置并发送。 */
     v4Create?: boolean;
+    permissionScope?: "session";
   }): Promise<ZCodeTaskCreateResult>;
+
+  readBotTopicSummaries?(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+    remoteSessionId?: string;
+  }): Promise<Array<{ checkpoint: string; text: string }>>;
+
+  invalidateBotTopicInputs?(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+    remoteSessionId?: string;
+  }): Promise<void>;
+  readBotTopicExecution?(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+    remoteSessionId?: string;
+  }): Promise<{ executionId: string; sourceCommandId?: string } | undefined>;
+  stopBotTopicExecution?(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+    remoteSessionId?: string;
+    executionId: string;
+  }): Promise<void>;
+
+  /** 从 CLI 权威快照读取群任务切换的阻塞原因；空闲时返回 null。 */
+  getBotGroupTaskBlockReason?(params: {
+    taskId: string;
+    remoteSessionId?: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+  }): Promise<"running" | "queued" | "interaction" | null>;
+  cancelBotGroupInput?(params: {
+    workspacePath?: string;
+    workspaceIdentity?: string;
+    taskId: string;
+    remoteSessionId?: string;
+    commandId: string;
+    sourceCommandId: string;
+    actorId: string;
+    ownerId: string;
+    botId: string;
+    chatId: string;
+  }): Promise<import("@zcode/shared/zcode-protocol-v4").CommandAck>;
+  submitBotGroupInput?(params: {
+    workspacePath?: string;
+    workspaceIdentity?: string;
+    taskId: string;
+    remoteSessionId?: string;
+    commandId: string;
+    content: string;
+    conversationQuotes?: import("@zcode/shared").ConversationSelectionText[];
+    attachments?: ZCodePromptAttachment[];
+    source: import("@zcode/shared").BotGroupInputSource;
+  }): Promise<import("@zcode/shared/zcode-protocol-v4").CommandAck>;
 
   /** 发送 prompt 到指定 task */
   sendPrompt(
@@ -311,6 +376,8 @@ export interface IZCodeTaskService {
     workspacePath?: string;
     workspaceIdentity?: string;
     runId?: TraceId;
+    /** CLI activeWorks 中观察到的执行身份，防止迟到停止误杀新轮。 */
+    expectedForegroundExecutionId?: string;
   }): Promise<void>;
 
   /** 执行 agent 内建 /compact 命令；手机 replayable 仍经 shared host 路由。 */
@@ -540,6 +607,29 @@ export interface IZCodeTaskService {
     feedback: ZCodeAssistantMessageFeedback | null;
   }): Promise<ZCodeSessionFile>;
 
+  /**
+   * 补齐 task 已存在的 provider session，使其覆盖当前 canonical task 的完整对话边界。
+   * 这里只负责补齐原生日志，不负责切换当前 active provider。
+   */
+  syncTaskSessionBinding(params: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    taskId: string;
+    provider: ZCodeProvider;
+    validate?: boolean;
+  }): Promise<ZCodeSyncTaskSessionBindingResult>;
+
+  /**
+   * 在同一个 task 内切换当前 active provider。
+   * 当前支持 `claude` / `codex` / `gemini` 作为切换目标。
+   */
+  switchAgent(params: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    taskId: string;
+    provider: ZCodeProvider;
+  }): Promise<ZCodeSwitchAgentResult>;
+
   /** 扫描可导入的 Claude 原生 session；可选按 workspace 过滤。 */
   scanImportableClaudeSessions(params: {
     workspacePath?: string;
@@ -582,7 +672,18 @@ export interface IZCodeTaskService {
     mode?: ZCodeTaskMode;
   }): Promise<ZCodeConfigOption[]>;
 
-  /** 获取 ZCode Agent 当前结构化日志文件路径。 */
+  /** 获取 workspace + provider 对应的主配置文件路径 */
+  getWorkspaceProviderConfigFile(params: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    provider?: ZCodeProvider;
+  }): Promise<{
+    provider: ZCodeProvider;
+    path: string;
+    exists: boolean;
+  }>;
+
+  /** 获取 task 对应的原生会话日志文件路径（如 Claude 的 session jsonl） */
   getTaskNativeSessionLogFile(params: {
     taskId: string;
     workspacePath: string;

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-reference-subagent",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-reference-subagent.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-reference-subagent.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "isolated E2E profile/inline Plugin fixture",
+      "source": "created-by-spec",
+      "description": "spec 通过 seedInlineLifecyclePlugin 创建含 Skill 与 agents/inline-reviewer.md 的 inline Plugin，并重启 Desktop/Host/CLI 后发送引用。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "plugin-reference-subagent-title",
+      "description": "PLG16 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首发会触发默认 title sidecar；固定标题响应，避免标题请求命中业务 fixture。"
+    },
+    {
+      "id": "plugin-reference-subagent-reminder",
+      "description": "PLG16 wire 门禁：provider 请求必须携带 inline Plugin stable ID 与 canonical Subagent identifier。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性验证 provider 收到 reminder 中的 Subagent identifier，不依赖真实模型是否主动选择 Agent。"
+    }
+  ]
+}

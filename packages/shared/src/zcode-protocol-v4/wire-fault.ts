@@ -1,11 +1,14 @@
 // V4 physical assembly fault 的分类：**内容确定性失败** vs 瞬态失败。
+// spec：docs/v4-refactor/04-sync-and-recovery.md 封闭规则 11、
+// docs/v4-refactor/05-transport-and-backpressure.md「客户端规则」。
 //
 // 恢复阶梯默认把 fault 当瞬态处理：先 same-sub resync（服务端可能回 resume），再断档则升级
 // forceSnapshot，仍不成则 fail closed。这套升级对丢片、超时、校验和不符是对的——重投一次很可能
 // 就好了。对 **schema 拒收** 却是错的：字节已经过了 length/checksum/UTF-8/JSON 四道关，被拒说明
 // 本端读不懂对端发来的**内容**，而 resume 档只会把同一批 delta 再投一遍，必然同样被拒。
 //
-// 工具卡载荷出现不兼容字段时，重投相同内容无法恢复；应尝试快照后明确报告内容不兼容。
+// 2026-09-21（sess_4142de31）的事故就是这条：一个工具卡载荷多带两个键，恢复阶梯在同一份内容上
+// 烧掉三帧后 fail closed，用户手动「重新连接」两次、每次再烧三帧，会话再也打不开。
 //
 // 本模块只回答「这个 reason code 是不是确定性内容失败」，不决定怎么处置——处置在两个 store 里
 // （conversationProjectionStore / sessionsIndexStore）。

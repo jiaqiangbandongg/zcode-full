@@ -7,13 +7,14 @@ import {
   type ZCodeProvider,
   type ZCodeTaskMeta,
 } from "@zcode/shared";
+import { decodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 
 interface ModelConfigSyncScope {
   provider: ZCodeProvider;
   supplierKey: string;
 }
 
-interface ModelConfigSyncWorkspaceSnapshot {
+export interface ModelConfigSyncWorkspaceSnapshot {
   activeTaskId: string | null;
   selectedProvider: ZCodeProvider;
   selectedSupplierKey: string;
@@ -58,6 +59,10 @@ export function parseCustomProviderIdFromSupplierKey(supplierKey: string): strin
     .find((segment) => segment.startsWith("provider="));
   const providerId = providerSegment?.slice("provider=".length).trim();
   return providerId || null;
+}
+
+export function isCustomSupplierKeyForProvider(supplierKey: string, providerId: string): boolean {
+  return parseCustomProviderIdFromSupplierKey(supplierKey) === providerId.trim();
 }
 
 function isCustomSupplierKey(supplierKey: string): boolean {
@@ -115,7 +120,7 @@ export function resolveWorkspaceModelConfigSyncScope(
   }
 
   if (activeTaskProvider === snapshot.selectedProvider) {
-    // 自定义供应商运行中的 ZCode Agent 回包经常只带纯模型名（如 glm-5.1），
+    // Bugfix: 自定义供应商运行中的 ZCode Agent 回包经常只带纯模型名（如 glm-5.1），
     // 直接按模型值推导会误判成 native supplier，导致设置页保存后刷新到错误的 scope。
     // 当前 provider 与 selectedProvider 一致时，纯模型名不能证明 supplier 已变化，所以继续沿用 selectedSupplierKey。
     return {
@@ -153,4 +158,32 @@ function resolveModelValueFromConfigOptions(
     typeof modelValue === "string" ? modelValue.trim() : String(modelValue ?? "").trim();
 
   return normalizedModelValue.length > 0 ? normalizedModelValue : null;
+}
+
+export function resolveModelNameForConfigSync(params: {
+  configOptions: ZCodeConfigOption[] | null;
+  selectedProvider: ZCodeProvider;
+  providerId: string;
+  providerModels: string[];
+}): string | undefined {
+  const modelValue = resolveModelValueFromConfigOptions(params.configOptions);
+  if (!modelValue) {
+    return undefined;
+  }
+
+  const decodedCustomValue = decodeCustomModelValue(modelValue);
+  if (decodedCustomValue?.providerId === params.providerId) {
+    const customModelName = decodedCustomValue.modelName?.trim();
+    if (customModelName && params.providerModels.includes(customModelName)) {
+      return customModelName;
+    }
+
+    return undefined;
+  }
+
+  if (params.providerModels.includes(modelValue)) {
+    return modelValue;
+  }
+
+  return undefined;
 }

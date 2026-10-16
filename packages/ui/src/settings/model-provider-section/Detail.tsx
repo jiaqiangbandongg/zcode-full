@@ -71,6 +71,8 @@ const PERSONAL_PLAN_ENTRY_BANNER_CLASS =
   "min-h-20 w-full overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_14%_12%,color-mix(in_srgb,#4099ff_24%,var(--color-background)_76%)_0%,color-mix(in_srgb,#4099ff_10%,var(--color-surface)_90%)_64%,var(--color-surface)_300%)] p-4 text-left transition-colors hover:border-border-hover";
 const TEAM_PLAN_ENTRY_BANNER_CLASS =
   "min-h-20 w-full overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_14%_12%,color-mix(in_srgb,#0ea5e9_24%,var(--color-background)_76%)_0%,color-mix(in_srgb,#0ea5e9_10%,var(--color-surface)_90%)_64%,var(--color-surface)_300%)] p-4 text-left transition-colors hover:border-border-hover";
+const TEAM_PLAN_ADVANCED_ENTRY_BANNER_CLASS =
+  "min-h-20 w-full overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_14%_12%,color-mix(in_srgb,#14b8a6_24%,var(--color-background)_76%)_0%,color-mix(in_srgb,#14b8a6_10%,var(--color-surface)_90%)_64%,var(--color-surface)_300%)] p-4 text-left transition-colors hover:border-border-hover";
 
 function isPlanNavItem(
   item: ModelProviderNavItem | null,
@@ -92,7 +94,7 @@ function hasTeamPlanContext(item: ModelProviderNavItem | null): item is Extract<
   );
 }
 
-function resolveTeamScopedPlanNavItem(
+export function resolveTeamScopedPlanNavItem(
   item: Extract<ModelProviderNavItem, { type: "codingPlan" | "teamPlan" }>,
   entitlement: ReturnType<typeof useUsageEntitlement>,
 ): Extract<ModelProviderNavItem, { type: "codingPlan" | "teamPlan" }> {
@@ -186,7 +188,7 @@ function resolveTeamScopedPlanNavItem(
   };
 }
 
-function resolveTeamPlanInspectionAccess(
+export function resolveTeamPlanInspectionAccess(
   item: Extract<ModelProviderNavItem, { type: "teamPlan" }>,
 ) {
   // 不可用套餐仍需查询失效原因；组织/项目身份来自团队导航，不能被执行可用性门禁清空。
@@ -205,7 +207,7 @@ function resolveTeamPlanInspectionAccess(
   };
 }
 
-function resolvePlanSettingsProvider({
+export function resolvePlanSettingsProvider({
   view,
   providerId,
   fallback,
@@ -867,7 +869,9 @@ export function ModelProviderSectionDetail({
   );
 }
 
-function resolvePurchaseChoiceSelectionIntent(status: CodingPlanStatus): "login" | "purchase" {
+export function resolvePurchaseChoiceSelectionIntent(
+  status: CodingPlanStatus,
+): "login" | "purchase" {
   return status === "disconnected" ? "login" : "purchase";
 }
 
@@ -1060,13 +1064,37 @@ function CodingPlanPurchaseChoiceBanners({
   );
 }
 
-function resolvePurchaseChoiceBannerProductsProviderId(
+export function resolveEnterpriseTeamPlanBannerClass(tierKey: string): string {
+  const normalized = tierKey.trim().toLowerCase();
+  if (normalized === "max" || normalized.includes("advanced")) {
+    return TEAM_PLAN_ADVANCED_ENTRY_BANNER_CLASS;
+  }
+  return TEAM_PLAN_ENTRY_BANNER_CLASS;
+}
+
+export function resolveEnterpriseTeamPlanBannerIconClass(tierKey: string): string {
+  const normalized = tierKey.trim().toLowerCase();
+  if (normalized === "max" || normalized.includes("advanced")) {
+    return "text-[#14b8a6]";
+  }
+  return "text-[#0ea5e9]";
+}
+
+export function resolveEnterpriseTeamPlanBannerDescriptionId(tierKey: string): string {
+  const normalized = tierKey.trim().toLowerCase();
+  if (normalized === "max" || normalized.includes("advanced")) {
+    return "settings.modelProvider.codingPlan.purchaseBanner.teamAdvancedDescription";
+  }
+  return "settings.modelProvider.codingPlan.purchaseBanner.teamStandardDescription";
+}
+
+export function resolvePurchaseChoiceBannerProductsProviderId(
   providerId: CodingPlanProviderId,
 ): CodingPlanProviderId {
   return resolveCodingPlanUpgradeProductsProviderId(providerId) ?? providerId;
 }
 
-function resolvePurchaseChoiceBannerPrice({
+export function resolvePurchaseChoiceBannerPrice({
   providerId,
   audience,
   products,
@@ -1117,7 +1145,7 @@ function resolvePurchaseChoiceBannerPrice({
   return null;
 }
 
-function resolveEnterprisePurchaseChoiceBannerPrice(
+export function resolveEnterprisePurchaseChoiceBannerPrice(
   group: EnterpriseCodingPlanProductGroup,
 ): { kind: "price"; price: number; currency: string } | null {
   const product = group.products

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-same-model-draft-provider-identity",
+  "spec": "./test/e2e/conversation-session/conversation-session-same-model-draft-provider-identity.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-same-model-draft-provider-identity.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "same-model-provider-identity-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "same-model-provider-identity-glm52-primary-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 GLM-5.2 primary active session 存在后，workspace default 回包和后续请求不能把同名模型拉回旧 provider；seed 响应只需稳定完成。"
+    },
+    {
+      "id": "same-model-provider-identity-glm52-alternate-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "GLM-5.2 alternate 发送用于验证真实请求 URL 命中 alternate provider Base URL；响应只需稳定完成。"
+    },
+    {
+      "id": "same-model-provider-identity-upstream-flash-primary-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 deepseek-v4-flash primary active session 存在后，workspace default 回包和后续请求不能把同名模型拉回旧 provider；seed 响应只需稳定完成。"
+    },
+    {
+      "id": "same-model-provider-identity-upstream-flash-alternate-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "deepseek-v4-flash alternate 发送用于验证真实请求 URL 命中 alternate provider Base URL；响应只需稳定完成。"
+    }
+  ]
+}

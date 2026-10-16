@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-turn-error-history-activity",
+  "spec": "./test/e2e/conversation-session/conversation-session-turn-error-history-activity.test.ts",
+  "fixtures": [
+    {
+      "id": "turn-error-history-activity-source-500",
+      "description": "TurnError 后冷恢复打开历史 task 的主 turn 500 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 accepted future queue 和可观测的冷恢复清理窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TURN_ERROR_HISTORY_ACTIVITY_SOURCE"],
+        "bodyIncludes": ["E2E_TURN_ERROR_HISTORY_ACTIVITY_SOURCE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "delayMs": 3000,
+        "statusCode": 500,
+        "statusMessage": "Internal Server Error",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"error\":{\"message\":\"synthetic provider failure\",\"type\":\"provider_error\",\"code\":\"e2e_turn_error_history_activity\"}}"
+      }
+    },
+    {
+      "id": "turn-error-history-activity-followup",
+      "description": "错误后的队首输入留在 persisted queue，冷恢复时由 runtime 清理。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "为异常 turn 提供完整的 provider 路由，避免测试受未匹配请求的运行态影响。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TURN_ERROR_HISTORY_ACTIVITY_QUEUED"],
+        "bodyIncludes": ["E2E_TURN_ERROR_HISTORY_ACTIVITY_QUEUED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "turn-error-history-activity-followup",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "TURN_ERROR_HISTORY_ACTIVITY_FOLLOWUP"
+        }
+      }
+    }
+  ]
+}

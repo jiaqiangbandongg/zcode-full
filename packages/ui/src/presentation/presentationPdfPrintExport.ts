@@ -14,8 +14,8 @@ const STYLE_ATTRIBUTE = "data-zcode-pptx-print-style";
 /** 单图解码失败不阻塞导出（预览同样会失败），整体解码等待设上限 */
 const IMAGE_DECODE_TIMEOUT_MS = 10_000;
 
-type PrintableFontScript = "latin" | "cjk" | "symbol";
-type PrintableFontAvailability = (family: string, script: PrintableFontScript) => boolean;
+export type PrintableFontScript = "latin" | "cjk" | "symbol";
+export type PrintableFontAvailability = (family: string, script: PrintableFontScript) => boolean;
 
 const GENERIC_FONT_FAMILIES = new Set([
   "serif",
@@ -199,7 +199,7 @@ function appendGenericFallback(
 /**
  * 返回需要写入打印 DOM 的确定性字体栈；null 表示原首选字体已经可用，无需改动。
  */
-function resolvePrintableFontFamily(
+export function resolvePrintableFontFamily(
   fontFamily: string,
   text: string,
   isFontAvailable: PrintableFontAvailability,
@@ -282,7 +282,7 @@ function createCanvasFontAvailability(hostDocument: Document): PrintableFontAvai
  * 屏幕预览允许未安装字体走隐式 fallback，但 Chromium/Skia 打印不会稳定保留这层回退，
  * 导致对应文字没有写入 PDF。这里只改一次性打印 DOM，把真实可用字体提升到字体栈首位。
  */
-function materializePrintableFontFamilies(
+export function materializePrintableFontFamilies(
   hostDocument: Document,
   host: HTMLElement,
   isFontAvailable: PrintableFontAvailability = createCanvasFontAvailability(hostDocument),

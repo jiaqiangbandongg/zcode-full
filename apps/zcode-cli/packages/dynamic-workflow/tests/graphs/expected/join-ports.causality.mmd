@@ -1,0 +1,17 @@
+flowchart LR
+  subgraph actor_1["first (actor#1)"]
+    ask_1["first<br/>ask#1"]
+  end
+  subgraph actor_2["second (actor#2)"]
+    ask_2["second<br/>ask#2"]
+  end
+  subgraph actor_3["third (actor#3)"]
+    ask_3["third<br/>ask#3"]
+  end
+  sink(["sink"])
+  ask_1 --> ask_3
+  ask_2 --> ask_3
+  ask_2 --> sink
+  ask_3 --> sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

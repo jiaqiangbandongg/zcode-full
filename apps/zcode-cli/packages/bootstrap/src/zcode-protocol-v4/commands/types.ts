@@ -12,7 +12,7 @@ import type {
   StableForkGoalBoundaryMetadata,
   TraceContext,
 } from "@zcode/contracts";
-import type { ZCodeAutomationBotDeliveryTarget } from "@zcode/shared";
+import type { DynamicWorkflowMode, ZCodeAutomationBotDeliveryTarget } from "@zcode/shared";
 import type {
   CommandAck,
   CommandEnvelope,
@@ -38,6 +38,12 @@ export interface V4CommandLogger {
 }
 
 export type V4QueueItemCommand = QueueItem;
+
+/**
+ * 队列项的单轮执行材料（协议原形）。加速卡的 Selection 已随 QueueItem.modelSelection
+ * 进入投影，这里只暂存不可投影的动态凭据，提升时再冻结成 ModelExecutionContext。
+ */
+export type V4QueuedTurnExecution = NonNullable<CommandPayloadMap["sendText"]["modelExecution"]>;
 
 export type V4StableForkTargetResolution =
   | {
@@ -90,6 +96,18 @@ export interface V4CommandCoreHost {
   /** guide eligibility：只阻止已有 ordinary queue；已有 guide 仍允许继续按 FIFO admission。 */
   hasQueuedDelivery?(sessionId: string, delivery: "guide" | "queue"): boolean;
   getQueueLength?(sessionId: string): number;
+  /** Highspeed queue 的执行材料含凭据，只允许驻留内存，禁止进入 queue event/snapshot。 */
+  retainQueuedTurnExecution?(
+    sessionId: string,
+    sourceCommandId: string,
+    execution: V4QueuedTurnExecution,
+  ): void;
+  readQueuedTurnExecution?(
+    sessionId: string,
+    sourceCommandId: string,
+  ): V4QueuedTurnExecution | undefined;
+  deleteQueuedTurnExecution?(sessionId: string, sourceCommandId: string): void;
+  clearQueuedTurnExecutions?(sessionId: string): void;
   /** timeline/child 这类无 user message 的成功副作用持久化查重事实。 */
   recordPersistentCommandFact?(
     sessionId: string,
@@ -188,6 +206,24 @@ export interface V4CommandCoreHost {
       feedback: "like" | "dislike" | null;
     },
   ): Promise<void>;
+  /** Highspeed 完成态统计先更新 user transcript metadata，再发布同一 entity 的投影事件。 */
+  setHighspeedMetrics?(
+    sessionId: string,
+    input: {
+      entityId: string;
+      messageId: string;
+      metrics: {
+        regularTps: number;
+        outputTokens: number;
+        durationMs: number;
+        highspeedTps: number;
+        savedDurationMs: number;
+        modelDurationMs?: number;
+        toolDurationMs?: number;
+        otherDurationMs?: number;
+      };
+    },
+  ): Promise<void>;
   /**
    * 交互应答登记表（v4 原生基础设施，非过渡钩子）：interaction-broker 发起
    * 反向请求（permission/AskUserQuestion）时注册 deferred，resolveInteraction 命令
@@ -231,6 +267,7 @@ export interface V4CommandCoreHost {
    */
   createSessionRecord?(params: {
     workspaceId: string;
+    permissionScope?: "session";
     mcpServers?: CommandPayloadMap["createSession"]["mcpServers"];
     /** host 判定的 Off-Peak 工具面门禁；缺省不注册工具。 */
     offPeakToolEnabled?: boolean;
@@ -239,6 +276,8 @@ export interface V4CommandCoreHost {
      * 缺省回落到进程级 workspace 结论，仍是 fail-closed。
      */
     dynamicWorkflowEnabled?: boolean;
+    /** 与布尔同行的灰度 mode（launch.md「On demand: activation」）；缺省按 alwaysOn。 */
+    dynamicWorkflowMode?: DynamicWorkflowMode;
   }): Promise<{ sessionId: string }>;
   /** 从父会话稳定落盘边界创建隐藏 selection_side_chat child。 */
   createSelectionSideSession?(

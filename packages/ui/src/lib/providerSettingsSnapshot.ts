@@ -12,7 +12,7 @@ let connectionGeneration = 0;
 let activeReload: (() => Promise<void>) | null = null;
 const listeners = new Set<ProviderSettingsSnapshotListener>();
 
-interface ProviderSettingsSnapshotConnection {
+export interface ProviderSettingsSnapshotConnection {
   readonly ready: Promise<void>;
   reload(): Promise<void>;
   dispose(): void;
@@ -77,6 +77,13 @@ export function connectProviderSettingsSnapshot(
       if (generation === connectionGeneration) activeReload = null;
     },
   };
+}
+
+export function resetProviderSettingsSnapshotForTest(): void {
+  connectionGeneration += 1;
+  snapshot = { status: "loading" };
+  activeReload = null;
+  listeners.clear();
 }
 
 function publish(): void {

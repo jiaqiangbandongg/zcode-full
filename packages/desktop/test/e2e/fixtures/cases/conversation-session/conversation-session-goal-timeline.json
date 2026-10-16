@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-timeline",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-timeline.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-goal-timeline.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-goal-timeline-first-reply",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定第 1 轮 goal continuation 文案，复现未完成 timeline 锚点。"
+    },
+    {
+      "id": "upstream-goal-timeline-first-verifier-failed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定第 1 次 verifier 未完成结果，驱动自动续跑。"
+    },
+    {
+      "id": "upstream-goal-timeline-second-reply",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定同 target 第 2 轮 assistant 文案，验证完成 verifier 的 anchor。"
+    },
+    {
+      "id": "upstream-goal-timeline-second-verifier-passed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定同 target 第 2 次 verifier 完成结果。"
+    },
+    {
+      "id": "upstream-goal-timeline-new-target-reply",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定新 target 第 1 轮 assistant 文案，验证目标切换后的 timeline 归属。"
+    },
+    {
+      "id": "upstream-goal-timeline-new-target-verifier-failed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定新 target 第 1 次 verifier 未完成结果，覆盖第二个 /goal 的 divider 顺序。"
+    }
+  ]
+}

@@ -1,4 +1,3 @@
-import { loadEndpointEnv } from "./load-endpoint-env.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
@@ -41,12 +40,9 @@ export async function resolveBuiltinProviderBuildEnvironment({
 
 /** @param {{root?: string, env?: Record<string, string | undefined>}} options */
 export async function loadBuiltinProviderConfig({ root = repositoryRoot, env = process.env } = {}) {
-  env = await loadEndpointEnv({ root, env });
   const environment = await resolveBuiltinProviderBuildEnvironment({ root, env });
-  const sourcePath = resolve(
-    root,
-    env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE?.trim() || "config/provider/zcode-builtin.json",
-  );
+  const filename = environment === "production" ? "zcode-builtin.json" : "zcode-builtin.test.json";
+  const sourcePath = resolve(root, "config/provider", filename);
   try {
     const content = await readFile(sourcePath, "utf8");
     // 构建期复用运行时的完整 Release 校验，避免打包成功后才发现 Schema 不兼容。

@@ -10,7 +10,7 @@ const DEFAULT_LOCK_OWNERLESS_GRACE_MS = 100;
 const DEFAULT_LOCK_MAX_WAIT_MS = 8_000;
 const DEFAULT_TEMP_FILE_STALE_MS = 60_000;
 
-interface AtomicWriteTextOptions {
+export interface AtomicWriteTextOptions {
   renameRetryDelaysMs?: readonly number[];
   lockRetryDelaysMs?: readonly number[];
   lockOwnerlessGraceMs?: number;
@@ -19,6 +19,27 @@ interface AtomicWriteTextOptions {
   useFileLock?: boolean;
   beforeRename?: () => void | Promise<void>;
   runRename?: (renameFile: () => Promise<void>) => Promise<void>;
+}
+
+export async function withAtomicFileLock<T>(
+  filePath: string,
+  task: () => Promise<T>,
+  options?: Pick<
+    AtomicWriteTextOptions,
+    "lockRetryDelaysMs" | "lockOwnerlessGraceMs" | "lockMaxWaitMs"
+  >,
+): Promise<T> {
+  const releaseLock = await acquireFileLock(
+    filePath,
+    options?.lockRetryDelaysMs ?? DEFAULT_LOCK_RETRY_DELAYS_MS,
+    options?.lockOwnerlessGraceMs ?? DEFAULT_LOCK_OWNERLESS_GRACE_MS,
+    options?.lockMaxWaitMs ?? DEFAULT_LOCK_MAX_WAIT_MS,
+  );
+  try {
+    return await task();
+  } finally {
+    await releaseLock();
+  }
 }
 
 function getErrorCode(error: unknown): string | undefined {

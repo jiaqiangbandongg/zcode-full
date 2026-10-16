@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-ssh-artifact",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-ssh-artifact.test.ts",
+  "fixtures": [
+    {
+      "id": "conversation-share-ssh-main",
+      "description": "SSH share case has a deterministic completed response after remote artifact creation.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The case validates remote file authority and publication wiring, not model content."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_SSH_ARTIFACT_V1"],
+        "bodyIncludes": ["share-ssh-ready"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-ssh-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "share-ssh-ready"
+        }
+      }
+    }
+  ]
+}

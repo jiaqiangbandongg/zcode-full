@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-fork.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-fork-title",
+      "description": "E2E_V4_FORK_PARENT 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_FORK_PARENT 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_FORK_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"v4-fork-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"V4 Fork E2E\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"v4-fork-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "v4-fork-parent-turn",
+      "description": "M4 forkAssistant 门禁：父会话首轮完成，产出可 fork 的 assistant 行。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "fork 目标必须是稳定落入 transcript 的 assistant message；用可控快流确保完流稳定。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_V4_FORK_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"v4-fork-parent\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"V4_FORK_PARENT_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"v4-fork-parent\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "v4-fork-child-followup",
+      "description": "fork child 后续输入必须沿用 fork-time 思考等级的 provider 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child follow-up 用独立 marker 命中，验证 live child runtime 与 provider wire 使用同一 thought level。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_V4_FORK_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"v4-fork-child\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"V4_FORK_CHILD_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"v4-fork-child\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

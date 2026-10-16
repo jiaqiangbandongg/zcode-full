@@ -1,0 +1,21 @@
+flowchart LR
+  phase_1["preflight"]
+  phase_2["attempt"]
+  phase_3["gate"]
+  phase_4["checkpoint"]
+  phase_5["recover"]
+  phase_6["wrap-up"]
+  sink(["sink"])
+  phase_1 --> phase_2
+  phase_2 --> phase_3
+  phase_2 --> phase_4
+  phase_2 --> phase_5
+  phase_3 --> phase_2
+  phase_4 --> phase_5
+  phase_5 --> phase_2
+  phase_5 --> phase_6
+  phase_1 --> sink
+  phase_3 --> sink
+  phase_6 --> sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type { GitRepositorySummary } from "@zcode/shared";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -9,7 +16,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command.js";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.js";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.js";
 import { cn } from "@/components/lib/utils.js";
 import {
   GitBranchCreateDialog,
@@ -26,7 +37,13 @@ import {
   isCoarseTouchDevice,
   shouldRestoreChatInputFocusAfterPickerClose,
 } from "@/lib/pickerFocus.js";
-import { ChevronDownIcon, GitBranchIcon, GitGraph, LoaderIcon, PlusIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  GitBranchIcon,
+  GitGraph,
+  LoaderIcon,
+  PlusIcon,
+} from "lucide-react";
 
 interface GitBranchSwitcherProps {
   workspacePath: string;
@@ -38,6 +55,7 @@ interface GitBranchSwitcherProps {
   popoverClassName?: string;
   branchListClassName?: string;
   markAsWorkspaceHeaderBranch?: boolean;
+  compactForRemoteControl?: boolean;
   popoverSide?: "top" | "bottom" | "left" | "right";
   avoidPopoverCollisions?: boolean;
   showFooterActions?: boolean;
@@ -53,6 +71,7 @@ export function GitBranchSwitcher({
   popoverClassName,
   branchListClassName,
   markAsWorkspaceHeaderBranch = false,
+  compactForRemoteControl = false,
   popoverSide = "top",
   avoidPopoverCollisions = true,
   showFooterActions = true,
@@ -89,7 +108,8 @@ export function GitBranchSwitcher({
   });
 
   const isVisible = gitSummary.isGitAvailable && gitSummary.isRepository;
-  const displayedCurrentBranchName = branchesResult?.currentBranchName ?? gitSummary.branchName;
+  const displayedCurrentBranchName =
+    branchesResult?.currentBranchName ?? gitSummary.branchName;
   const triggerLabel = useMemo(
     () =>
       resolveGitBranchTriggerLabel({
@@ -123,7 +143,8 @@ export function GitBranchSwitcher({
     });
   }, [gitSummary.headRefType, intl, switchAssistState, triggerLabel]);
   const branchSearchFilter = useCallback(
-    (value: string, search: string) => (matchesGitBranchSearch(value, search) ? 1 : 0),
+    (value: string, search: string) =>
+      matchesGitBranchSearch(value, search) ? 1 : 0,
     [],
   );
 
@@ -134,7 +155,9 @@ export function GitBranchSwitcher({
 
     const frameId = window.requestAnimationFrame(() => {
       const selectedItem =
-        commandListRef.current?.querySelector<HTMLElement>('[data-branch-current="true"]') ?? null;
+        commandListRef.current?.querySelector<HTMLElement>(
+          '[data-branch-current="true"]',
+        ) ?? null;
       selectedItem?.scrollIntoView({ block: "nearest" });
     });
 
@@ -143,10 +166,11 @@ export function GitBranchSwitcher({
     };
   }, [branchesResult, open]);
 
-  const handleContentKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Tab") {
-      return;
-    }
+  const handleContentKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Tab") {
+        return;
+      }
 
     const highlightedItem =
       event.currentTarget.querySelector<HTMLElement>(
@@ -160,9 +184,11 @@ export function GitBranchSwitcher({
       return;
     }
 
-    event.preventDefault();
-    highlightedItem.click();
-  }, []);
+      event.preventDefault();
+      highlightedItem.click();
+    },
+    [],
+  );
 
   if (!isVisible) {
     return null;
@@ -186,7 +212,10 @@ export function GitBranchSwitcher({
               })}
               className={cn(
                 "min-w-0 rounded-full text-ui-base/relaxed",
-                "max-w-full pl-3 pr-2",
+                // Bugfix: 手机远控聊天页底部空间很窄，分支名会挤压输入工具栏；远控模式只保留图标入口。
+                compactForRemoteControl
+                  ? "size-8 px-0"
+                  : "max-w-full pl-3 pr-2",
                 triggerClassName,
               )}
             >
@@ -194,20 +223,22 @@ export function GitBranchSwitcher({
                 data-branch-switcher-primary-icon="true"
                 className="size-4 text-foreground-subtle"
               />
-              <>
-                <span className="min-w-0 max-w-25 truncate text-left">{triggerLabel}</span>
-                {loadingBranches || mutationPending ? (
-                  <LoaderIcon
-                    data-branch-switcher-trailing-icon="true"
-                    className="size-3.5 animate-spin text-foreground-subtle"
-                  />
-                ) : (
-                  <ChevronDownIcon
-                    data-branch-switcher-trailing-icon="true"
-                    className="size-3.5 text-foreground-subtle"
-                  />
-                )}
-              </>
+              {!compactForRemoteControl ? (
+                <>
+                  <span className="min-w-0 max-w-25 truncate text-left">{triggerLabel}</span>
+                  {loadingBranches || mutationPending ? (
+                    <LoaderIcon
+                      data-branch-switcher-trailing-icon="true"
+                      className="size-3.5 animate-spin text-foreground-subtle"
+                    />
+                  ) : (
+                    <ChevronDownIcon
+                      data-branch-switcher-trailing-icon="true"
+                      className="size-3.5 text-foreground-subtle"
+                    />
+                  )}
+                </>
+              ) : null}
             </Button>
           </PopoverTrigger>
           <PopoverContent
@@ -227,7 +258,9 @@ export function GitBranchSwitcher({
               if (!(target instanceof HTMLElement)) {
                 return;
               }
-              const searchInput = target.querySelector<HTMLElement>('[data-slot="command-input"]');
+              const searchInput = target.querySelector<HTMLElement>(
+                '[data-slot="command-input"]',
+              );
               searchInput?.focus();
             }}
             onCloseAutoFocus={(event) => {
@@ -239,7 +272,9 @@ export function GitBranchSwitcher({
               ) {
                 return;
               }
-              const input = document.querySelector<HTMLElement>('[data-testid="chat-input"]');
+              const input = document.querySelector<HTMLElement>(
+                '[data-testid="chat-input"]',
+              );
               input?.focus();
             }}
           >
@@ -267,7 +302,8 @@ export function GitBranchSwitcher({
                   className="space-y-0.5 p-1 **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-ui-base **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-foreground-subtle"
                 >
                   {(branchesResult?.branches ?? []).map((branch) => {
-                    const isCurrent = branch.name === displayedCurrentBranchName;
+                    const isCurrent =
+                      branch.name === displayedCurrentBranchName;
                     return (
                       <CommandItem
                         key={branch.name}
@@ -275,7 +311,9 @@ export function GitBranchSwitcher({
                         data-checked={isCurrent ? "true" : undefined}
                         data-branch-current={isCurrent ? "true" : undefined}
                         disabled={mutationPending}
-                        className={cn("items-start gap-3 rounded-lg px-3 py-2 text-ui-base")}
+                        className={cn(
+                          "items-start gap-3 rounded-lg px-3 py-2 text-ui-base",
+                        )}
                         onSelect={() => {
                           void switchBranch(branch.name);
                         }}

@@ -2,7 +2,7 @@
 
 The browser registry understands backend types `iab`, `extension`, and `cdp`. Playwright is a `Tab` API surface, not a backend. The desktop host normally advertises `iab`, while ZCode CLI can explicitly advertise a managed headless Chromium as `cdp`. Never treat an unadvertised backend as available.
 
-Start by selecting a browser and a tab. Every Browser Use JS call runs in a fresh kernel, so run the Skill bootstrap and recreate the selected browser wrapper in each call. Read its complete effective documentation once:
+Start from the browser object model. Every Browser Use JS call runs in a fresh kernel, so run the Skill bootstrap and recreate the selected browser wrapper in each call. Read its complete effective documentation once:
 
 ```js
 const browser = await agent.browsers.getDefault();
@@ -109,11 +109,12 @@ keypress? })` scrolls from the supplied viewport anchor. `dom_cua.scroll({ node_
 - CUA and DOM CUA `keypress({ keys })` treat keys as one combination, not a sequence of independent presses.
   IAB does not expose CUA/DOM CUA `downloadMedia`; use a snapshot-proven Playwright locator's
   `downloadMedia()` when the selected element exposes a downloadable media/link URL.
-- `tab.playwright` exposes the supported Playwright surface: `locator/getBy*/frameLocator`, locator actions and
+- `tab.playwright` exposes the common Playwright surface: `locator/getBy*/frameLocator`, locator actions and
   queries, `evaluate`, `domSnapshot`, `waitForURL`, `waitForLoadState`,
   `waitForTimeout`, `expectNavigation`, and download events.
 - Fixed waiting is `tab.playwright.waitForTimeout(timeoutMs)`, never `tab.waitForTimeout`. Prefer
   `locator.waitFor(...)`, `waitForURL(...)`, `waitForLoadState(...)`, or a fresh semantic observation.
-- Routine locator, URL/load-state wait, and evaluate operations default to and are capped at 3000ms. A timeout is a signal to refresh the snapshot and rebuild the locator, not to retry it unchanged.
-- IAB does not support file uploads: `waitForEvent("filechooser")` / `fileChooser.setFiles(...)` fail with
+- Routine locator, URL/load-state wait, and evaluate operations default to and are capped at 3000ms.
+  A timeout is a signal to refresh the snapshot and rebuild the locator, not to retry it unchanged.
+- IAB does not support file upload: `waitForEvent("filechooser")` / `fileChooser.setFiles(...)` fail with
   `capability_unsupported`; no fake upload success is exposed.

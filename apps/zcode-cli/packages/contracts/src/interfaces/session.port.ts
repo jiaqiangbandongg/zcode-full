@@ -29,7 +29,15 @@ import type { ModelSelection } from "../model/model.js";
 // Collaboration Mode and Risk Level
 // -----------------------------------------------
 
-export type CollaborationMode = "plan" | "build" | "edit" | "yolo" | "auto";
+export type CollaborationMode = "plan" | "build" | "edit" | "yolo" | "guarded" | "auto";
+
+/** 父 guarded 只收紧内部 YOLO 派生；显式的其它子模式保留各自策略。 */
+export function inheritPermissionMode<T extends CollaborationMode | undefined>(
+  parent: CollaborationMode | undefined,
+  resolved: T,
+): T | "guarded" {
+  return parent === "guarded" && resolved === "yolo" ? "guarded" : resolved;
+}
 export type SessionStatus = "idle" | "running" | "waiting" | "paused" | "completed" | "error";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
 export type InputDelivery = "auto" | "start_turn" | "steer_active_turn";
@@ -121,6 +129,7 @@ export interface TargetCompletionVerificationProjectionInfo {
 }
 
 export interface PendingPermission {
+  approvalMode?: "user-once";
   requestId?: string;
   toolCallId: string;
   toolName: string;
@@ -277,9 +286,82 @@ export type TurnSteerSource = "plan_approval_feedback" | "workflow_refine_feedba
  */
 export type TurnSteerDeliveryMode = "guide" | "queue";
 
+/** message.data metadata.highspeed 的持久化契约；不包含运行时凭据。 */
+export interface HighspeedMessageMetadata {
+  schemaVersion: 1;
+  cardId: string;
+  taskId: string;
+  provider: string;
+  model: string;
+  issuedAt: number;
+  expiresAt: number;
+  regularTps?: number;
+  outputTokens?: number;
+  durationMs?: number;
+  savedDurationMs?: number;
+  modelDurationMs?: number;
+  toolDurationMs?: number;
+  otherDurationMs?: number;
+  fallbackAt?: number;
+  fallbackReason?: "highspeed_card_expired" | "highspeed_request_failed";
+}
+
 /** 协议无关的输入 intent metadata；bootstrap v4 在事件边界组装为 ConversationInputIntent。 */
+export type TurnInputSourceMetadata =
+  | { kind: "pluginUi"; pluginId: string; toolCallId: string }
+  | { kind: "genUi"; path: string; title?: string };
+
 export interface TurnInputIntentMetadata {
   planEnabled?: boolean;
+  conversationQuotes?: Array<{
+    text: string;
+    path?: string;
+    senderName?: string;
+    senderId?: string;
+    messageId?: string;
+    sentAt?: string;
+  }>;
+  inputOrigin?: "desktop" | "mobile";
+  botGroupSource?: {
+    botIdentity?: { name: string; openId?: string };
+    mentionedBot?: boolean;
+    appId?: string;
+    contentParts?: import("@zcode/shared").ChannelContentPart[];
+    messages?: Array<{
+      mentionedBot?: boolean;
+      messageId: string;
+      senderId: string;
+      senderName: string;
+      text: string;
+      attachmentIndexes: number[];
+      contentParts?: import("@zcode/shared").ChannelContentPart[];
+    }>;
+    /** 入队时由 Host 注入，历史资源请求不能借用后续重新授权的版本。 */
+    authorizationId?: string;
+    botId: string;
+    provider: "feishu" | "lark";
+    chatId: string;
+    threadId?: string;
+    rootMessageId?: string;
+    topicContext?: {
+      checkpoint: string;
+      hasGap: boolean;
+      messages: Array<{
+        id: string;
+        chatId: string;
+        threadId: string;
+        senderId: string;
+        senderType: "user" | "app";
+        text: string;
+        createdAt: number;
+        kind: string;
+        deleted?: boolean;
+      }>;
+    };
+    senderId: string;
+    senderName: string;
+    messageId: string;
+  };
   sourceCommandId: string;
   queueItemId: string;
   clientId: string;
@@ -289,7 +371,7 @@ export interface TurnInputIntentMetadata {
   /** Admission 时固定；Queue/Guide 后续不得重新读取 Composer 或 Session 最新选择。 */
   modelSelection?: ModelSelection;
   /** 与本次用户 Submission 一起固定的协作模式。 */
-  mode?: "build" | "edit" | "plan" | "yolo";
+  mode?: "build" | "edit" | "plan" | "yolo" | "guarded";
   admissionSeq: number;
   admittedAt: number;
   requestedDelivery: "auto" | "startNow" | "queue" | "guide";
@@ -302,7 +384,10 @@ export interface TurnInputIntentMetadata {
     mime: string;
     bytes: number;
     previewRef?: string;
+    sourceKind?: "clipboard-text" | "topic-history";
+    messageCount?: number;
   }>;
+  highspeed?: HighspeedMessageMetadata;
   sharedContextRefs?: Array<{
     kind: "shared_context_import";
     context_id: string;
@@ -313,6 +398,8 @@ export interface TurnInputIntentMetadata {
     queueItemId?: string;
     clientId?: string;
   };
+  /** 插件 UI 代发（MCP Apps ui/message）的来源；用户亲自输入时缺省。 */
+  source?: TurnInputSourceMetadata;
 }
 
 /** queue 内保留尚未 resolve 的附件描述；消费时与普通 turn 使用同一 resolver。 */
@@ -320,7 +407,8 @@ export interface PendingTurnAttachment {
   type: "file" | "image" | "video" | "pdf" | "url";
   path?: string;
   content?: string;
-  sourceKind?: "clipboard-text";
+  sourceKind?: "clipboard-text" | "topic-history";
+  messageCount?: number;
   filename?: string;
   mimeType?: string;
   sizeBytes?: number;

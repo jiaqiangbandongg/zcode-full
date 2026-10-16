@@ -1,0 +1,18 @@
+node source
+node join#1 "join" @22:30 type="[Draft, Verdict]"
+node ask#1 "worker" @23:10 actors=actor#1 type="Draft"
+node ask#2 "worker" @24:10 actors=actor#1 type="Verdict"
+node ask#3 "consumer" @26:35 actors=actor#2 type="string"
+node sink
+actor actor#1 "worker" @21:16
+actor actor#2 "consumer" @26:17
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge join#1 -> ask#3 data exact port=0 type="Draft"
+edge join#1 -> ask#3 data exact port=1 type="Verdict"
+edge ask#1 -> join#1 data exact port=0 type="Draft"
+edge ask#1 -> ask#2 context exact
+edge ask#1 -> ask#3 data exact type="Draft"
+edge ask#2 -> join#1 data exact port=1 type="Verdict"
+edge ask#2 -> ask#3 data exact type="Verdict"
+edge ask#3 -> sink data exact type="string"

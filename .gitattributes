@@ -2,12 +2,17 @@
 *.mjs text eol=lf
 *.sh  text eol=lf
 
+# E2E PDF fixture 含规范 xref 尾空格，必须按二进制处理，避免 diff --check 误报。
+packages/desktop/test/e2e/fixtures/fs/**/*.pdf binary
+
 # 上游许可原文与生成的声明按字节保存，不能自动转换换行或裁剪空白。
 # 原文中的 License / ======= 是 Markdown 标题，不是合并冲突。
 THIRD-PARTY-NOTICES.md -text -whitespace conflict-marker-size=32 linguist-generated=true
 third-party/upstream/** -text -whitespace
 third-party/native-search/licenses/** -text -whitespace
 third-party/runtime/*.txt -text -whitespace
+docs/knip/docs/LICENSE -text -whitespace
+docs/knip/docs/licenses/** -text -whitespace
 third-party/inventory.json linguist-generated=true
 
 # 满血版 README 与上游内容完全不同，同步上游时始终保留本仓库版本。

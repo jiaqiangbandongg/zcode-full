@@ -4,12 +4,16 @@ import { access, cp, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promi
 import { basename, dirname, join, resolve } from "node:path";
 import { appendPluginSourceCleanupError, cleanupPluginSourceBestEffort } from "./helpers.js";
 
-interface ActivateDirectoryAtomicallyInput {
+export interface ActivateDirectoryAtomicallyInput {
   authorityPath?: string;
   prepare?: (stagedPath: string) => Promise<void>;
   signal?: AbortSignal;
   sourcePath?: string;
   targetPath: string;
+}
+
+export interface ReplaceDirectoryAtomicallyInput extends ActivateDirectoryAtomicallyInput {
+  sourcePath: string;
 }
 
 export interface AtomicDirectoryActivation {
@@ -210,6 +214,13 @@ async function writeAtomicTransaction(
     }
     throw error;
   }
+}
+
+export async function replaceDirectoryAtomically(
+  input: ReplaceDirectoryAtomicallyInput,
+): Promise<void> {
+  const activation = await activateDirectoryAtomically(input);
+  await activation.finalize();
 }
 
 export async function activateDirectoryAtomically(

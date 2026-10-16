@@ -1,0 +1,11 @@
+phase phase#1 "A" @13:1
+phase phase#2 "B" @18:1
+lane actor#1 name-head="a-" @15:9 families=fanout#1
+lane actor#2 "b" @19:14
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @14:1 label="map"
+step ask#1 ask "ask" label-head="a-" @15:25 lane=actor#1 phase=phase#1 region=fanout#1 maybe serial
+step ask#2 ask "b" @19:25 lane=actor#2 phase=phase#2 region=seq#1 always
+edge ask#1 -> ask#1 carry maybe
+phase-edge phase#1 -> phase#1 carry maybe
+sink ask#2

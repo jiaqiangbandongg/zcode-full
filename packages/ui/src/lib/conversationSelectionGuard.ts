@@ -1,6 +1,6 @@
 import { CONVERSATION_SELECTION_MAX_TEXT_LENGTH } from "@/lib/conversationSelectionReference.js";
 
-type ConversationSelectionGuardResult = "eligible" | "ineligible" | "single-limit";
+export type ConversationSelectionGuardResult = "eligible" | "ineligible" | "single-limit";
 
 const CONVERSATION_SELECTION_EXCLUDED_SELECTOR = [
   "button",

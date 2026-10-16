@@ -60,14 +60,14 @@ See `scripts/schema-display-nested.tsx` for this example.
 
 ### `<SchemaDisplay />`
 
-| Prop           | Type                | Default | Description               |
-| -------------- | ------------------- | ------- | ------------------------- |
-| `method`       | `unknown`           | -       | HTTP method.              |
-| `path`         | `string`            | -       | API endpoint path.        |
-| `description`  | `string`            | -       | Endpoint description.     |
-| `parameters`   | `SchemaParameter[]` | -       | URL/query parameters.     |
-| `requestBody`  | `SchemaProperty[]`  | -       | Request body properties.  |
-| `responseBody` | `SchemaProperty[]`  | -       | Response body properties. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `method` | `unknown` | - | HTTP method. |
+| `path` | `string` | - | API endpoint path. |
+| `description` | `string` | - | Endpoint description. |
+| `parameters` | `SchemaParameter[]` | - | URL/query parameters. |
+| `requestBody` | `SchemaProperty[]` | - | Request body properties. |
+| `responseBody` | `SchemaProperty[]` | - | Response body properties. |
 
 ### `SchemaParameter`
 

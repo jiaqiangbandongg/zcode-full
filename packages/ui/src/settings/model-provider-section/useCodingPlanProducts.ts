@@ -24,12 +24,15 @@ interface CodingPlanProductsState {
   error: string | null;
 }
 
-type CodingPlanProductsSnapshot = Omit<CodingPlanBatchPreviewResponse, "productList"> & {
+type CodingPlanProductsSnapshot = Omit<
+  CodingPlanBatchPreviewResponse,
+  "productList"
+> & {
   productList: CodingPlanProductDisplay[];
 };
 
 const CODING_PLAN_OAUTH_REQUIRED_ERROR = "coding_plan_oauth_required";
-const ZAI_START_FREE_PRODUCT_ID = "zai-start-free";
+export const ZAI_START_FREE_PRODUCT_ID = "zai-start-free";
 const ZAI_START_FREE_PRODUCT_IDS = {
   month: `${ZAI_START_FREE_PRODUCT_ID}-monthly`,
   quarter: `${ZAI_START_FREE_PRODUCT_ID}-quarterly`,
@@ -37,7 +40,10 @@ const ZAI_START_FREE_PRODUCT_IDS = {
 } as const;
 const CODING_PLAN_PRODUCTS_CACHE_TTL_MS = 30_000;
 const CODING_PLAN_STATIC_PRODUCTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const productRequestCache = new Map<string, Promise<CodingPlanProductsSnapshot>>();
+const productRequestCache = new Map<
+  string,
+  Promise<CodingPlanProductsSnapshot>
+>();
 const productSnapshotCache = new Map<
   string,
   { snapshot: CodingPlanProductsSnapshot; expiresAt: number }
@@ -47,7 +53,8 @@ let staticProductsConfigCache: {
   config: CodingPlanStaticProductsConfig;
   expiresAt: number;
 } | null = null;
-let staticProductsConfigRequest: Promise<CodingPlanStaticProductsConfig> | null = null;
+let staticProductsConfigRequest: Promise<CodingPlanStaticProductsConfig> | null =
+  null;
 
 export function useCodingPlanProducts(
   providerId: CodingPlanProviderId,
@@ -59,7 +66,10 @@ export function useCodingPlanProducts(
     providerId === BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan ||
     isZaiCodingPlanProviderId(providerId);
   const enabled = supportedProvider && options?.remotePreviewEnabled !== false;
-  const staticSnapshot = useMemo(() => buildStaticProductsSnapshot(providerId), [providerId]);
+  const staticSnapshot = useMemo(
+    () => buildStaticProductsSnapshot(providerId),
+    [providerId],
+  );
   const [state, setState] = useState<CodingPlanProductsState>(() => ({
     snapshot: null,
     loading: supportedProvider,
@@ -78,7 +88,10 @@ export function useCodingPlanProducts(
       }
       if (!enabled) {
         const loadedStaticSnapshot = service
-          ? await loadCodingPlanStaticProductsSnapshotForTest(providerId, service)
+          ? await loadCodingPlanStaticProductsSnapshotForTest(
+              providerId,
+              service,
+            )
           : staticSnapshot;
         setState({
           // 未登录/未连接时禁止打 paid batch-preview，但仍要展示静态套餐。
@@ -108,8 +121,14 @@ export function useCodingPlanProducts(
 
       let loadedStaticSnapshot = staticSnapshot;
       try {
-        const staticProducts = await loadCodingPlanStaticProductListForTest(providerId, service);
-        loadedStaticSnapshot = buildStaticProductsSnapshotFromList(providerId, staticProducts);
+        const staticProducts = await loadCodingPlanStaticProductListForTest(
+          providerId,
+          service,
+        );
+        loadedStaticSnapshot = buildStaticProductsSnapshotFromList(
+          providerId,
+          staticProducts,
+        );
         const snapshot = await loadCodingPlanProducts(
           providerId,
           service,
@@ -152,9 +171,11 @@ export function useCodingPlanProducts(
   };
 }
 
-async function loadCodingPlanProductsForTest(
+export async function loadCodingPlanProductsForTest(
   providerId: CodingPlanProviderId,
-  service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
+  service: NonNullable<
+    ReturnType<typeof useOptionalServices>
+  >["codingPlanSubscriptionService"],
   force: boolean,
   staticProducts?: CodingPlanStaticProduct[],
 ): Promise<CodingPlanProductsSnapshot> {
@@ -176,7 +197,11 @@ async function loadCodingPlanProductsForTest(
   // BigModel/Z.AI 套餐预览接口对连发请求会偶发返回“系统繁忙”；这里合并进行中请求，并只短缓存成功结果，
   // 手动刷新、登录/连接成功和购买完成都用 force 绕过缓存，避免交易状态长期陈旧。
   // 登录/连接成功还必须让旧的未登录试算请求失去写缓存资格，避免它晚返回后覆盖新的登录态试算结果。
-  const promise = loadBatchPreviewWithStaticProducts(providerId, service, staticProducts ?? []);
+  const promise = loadBatchPreviewWithStaticProducts(
+    providerId,
+    service,
+    staticProducts ?? [],
+  );
   productRequestCache.set(providerId, promise);
 
   try {
@@ -195,21 +220,34 @@ async function loadCodingPlanProductsForTest(
   }
 }
 
-async function loadCodingPlanStaticProductsSnapshotForTest(
+export async function loadCodingPlanStaticProductsSnapshotForTest(
   providerId: CodingPlanProviderId,
-  service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
+  service: NonNullable<
+    ReturnType<typeof useOptionalServices>
+  >["codingPlanSubscriptionService"],
 ): Promise<CodingPlanProductsSnapshot> {
-  const staticProducts = await loadCodingPlanStaticProductListForTest(providerId, service);
+  const staticProducts = await loadCodingPlanStaticProductListForTest(
+    providerId,
+    service,
+  );
   return buildStaticProductsSnapshotFromList(providerId, staticProducts);
 }
 
 const loadCodingPlanProducts = loadCodingPlanProductsForTest;
 
-function resolveCodingPlanProductsFailureSnapshot(
+export function resolveCodingPlanProductsFailureSnapshot(
   currentSnapshot: CodingPlanProductsSnapshot | null,
   fallbackSnapshot: CodingPlanProductsSnapshot,
 ): CodingPlanProductsSnapshot {
   return currentSnapshot ?? fallbackSnapshot;
+}
+
+export function clearCodingPlanProductsCacheForTest() {
+  productRequestCache.clear();
+  productSnapshotCache.clear();
+  productCacheGeneration.clear();
+  staticProductsConfigCache = null;
+  staticProductsConfigRequest = null;
 }
 
 function invalidateCodingPlanProductsCache(providerId: CodingPlanProviderId) {
@@ -222,7 +260,9 @@ function invalidateCodingPlanProductsCache(providerId: CodingPlanProviderId) {
 
 async function loadBatchPreviewWithStaticProducts(
   providerId: CodingPlanProviderId,
-  service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
+  service: NonNullable<
+    ReturnType<typeof useOptionalServices>
+  >["codingPlanSubscriptionService"],
   staticProducts: CodingPlanStaticProduct[],
 ): Promise<CodingPlanProductsSnapshot> {
   const previewSnapshot = await service.batchPreview({ providerId });
@@ -232,7 +272,10 @@ async function loadBatchPreviewWithStaticProducts(
   const productList =
     staticProducts.length > 0
       ? buildStaticProductDisplayList(staticProducts).map((product) =>
-          mergeStaticProductWithPreview(product, previewByProductId.get(product.productId)),
+          mergeStaticProductWithPreview(
+            product,
+            previewByProductId.get(product.productId),
+          ),
         )
       : previewSnapshot.productList.map((product) => ({
           ...product,
@@ -245,17 +288,25 @@ async function loadBatchPreviewWithStaticProducts(
   };
 }
 
-function buildStaticProductsSnapshot(providerId: CodingPlanProviderId): CodingPlanProductsSnapshot {
+function buildStaticProductsSnapshot(
+  providerId: CodingPlanProviderId,
+): CodingPlanProductsSnapshot {
   return buildStaticProductsSnapshotFromList(providerId, []);
 }
 
-function buildZaiStartStaticProducts(preview: StartPlanPreviewConfig): CodingPlanStaticProduct[] {
+function buildZaiStartStaticProducts(
+  preview: StartPlanPreviewConfig,
+): CodingPlanStaticProduct[] {
   const isChineseLocale =
-    typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh");
+    typeof navigator !== "undefined" &&
+    navigator.language.toLowerCase().startsWith("zh");
   const previewName = preview.name.trim() || "Z.ai Start";
   const equityList = preview.entitlements.map((entitlement) => ({
     productEquityTitle: entitlement.showName,
-    productEquityDetails: formatStartPlanPreviewEntitlement(entitlement, isChineseLocale),
+    productEquityDetails: formatStartPlanPreviewEntitlement(
+      entitlement,
+      isChineseLocale,
+    ),
   }));
 
   return [
@@ -305,20 +356,21 @@ function formatStartPlanPreviewEntitlement(
   entitlement: StartPlanPreviewConfig["entitlements"][number],
   isChineseLocale: boolean,
 ): string {
-  const amount = new Intl.NumberFormat(isChineseLocale ? "zh-CN" : "en-US").format(
-    entitlement.grantUnits,
-  );
+  const amount = new Intl.NumberFormat(
+    isChineseLocale ? "zh-CN" : "en-US",
+  ).format(entitlement.grantUnits);
   const unit = entitlement.unitType.trim();
   const period = entitlement.period.trim();
   return [amount, unit, period].filter(Boolean).join(" ");
 }
 
-function isZaiStartFreeProductId(productId: string | null | undefined) {
+export function isZaiStartFreeProductId(productId: string | null | undefined) {
   if (!productId) {
     return false;
   }
   return (
-    productId === ZAI_START_FREE_PRODUCT_ID || productId.startsWith(`${ZAI_START_FREE_PRODUCT_ID}-`)
+    productId === ZAI_START_FREE_PRODUCT_ID ||
+    productId.startsWith(`${ZAI_START_FREE_PRODUCT_ID}-`)
   );
 }
 
@@ -362,9 +414,11 @@ function buildStaticProductDisplayList(
   });
 }
 
-async function loadCodingPlanStaticProductListForTest(
+export async function loadCodingPlanStaticProductListForTest(
   providerId: CodingPlanProviderId,
-  service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
+  service: NonNullable<
+    ReturnType<typeof useOptionalServices>
+  >["codingPlanSubscriptionService"],
 ): Promise<CodingPlanStaticProduct[]> {
   try {
     const config = await loadCodingPlanStaticProductsConfig(service);
@@ -391,15 +445,16 @@ async function loadCodingPlanStaticProductListForTest(
     // Start 免费档现在归属于独立的 Start Plan 入口，且必须由远端 preview 开关显式打开。
     // Z.AI - Coding Plan 的购买列表只展示付费升级项，避免把 Start 当成可购买套餐重复显示。
     const seen = new Set<string>();
-    return [...buildZaiStartStaticProducts(startPlanPreview), ...remoteProducts].filter(
-      (product) => {
-        if (seen.has(product.productId)) {
-          return false;
-        }
-        seen.add(product.productId);
-        return true;
-      },
-    );
+    return [
+      ...buildZaiStartStaticProducts(startPlanPreview),
+      ...remoteProducts,
+    ].filter((product) => {
+      if (seen.has(product.productId)) {
+        return false;
+      }
+      seen.add(product.productId);
+      return true;
+    });
   } catch (error) {
     logger.warn("[useCodingPlanProducts] 读取远端 Coding Plan 静态套餐失败", {
       providerId,
@@ -415,11 +470,15 @@ function filterCodingPlanPurchaseProducts<
   if (providerId !== BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan) {
     return products;
   }
-  return products.filter((product) => !isZaiStartFreeProductId(product.productId));
+  return products.filter(
+    (product) => !isZaiStartFreeProductId(product.productId),
+  );
 }
 
 async function loadCodingPlanStaticProductsConfig(
-  service: NonNullable<ReturnType<typeof useOptionalServices>>["codingPlanSubscriptionService"],
+  service: NonNullable<
+    ReturnType<typeof useOptionalServices>
+  >["codingPlanSubscriptionService"],
 ): Promise<CodingPlanStaticProductsConfig> {
   const now = Date.now();
   if (staticProductsConfigCache && staticProductsConfigCache.expiresAt > now) {
@@ -498,6 +557,21 @@ export function normalizeErrorMessage(error: unknown): string {
     return CODING_PLAN_OAUTH_REQUIRED_ERROR;
   }
   return message;
+}
+
+export function isCodingPlanOAuthRequiredError(error: string): boolean {
+  return (
+    error === CODING_PLAN_OAUTH_REQUIRED_ERROR ||
+    error === "bigmodel_oauth_required" ||
+    error === "zai_oauth_required" ||
+    isCodingPlanOAuthRequiredMessage(error)
+  );
+}
+
+export function isCodingPlanSystemBusyError(error: string): boolean {
+  return (
+    error === CODING_PLAN_SYSTEM_BUSY || isCodingPlanSystemBusyMessage(error)
+  );
 }
 
 function readErrorMessage(error: unknown): string {

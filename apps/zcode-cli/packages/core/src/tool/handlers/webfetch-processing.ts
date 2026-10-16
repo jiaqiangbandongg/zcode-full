@@ -59,7 +59,6 @@ export async function processFetchedContent(
           toolCallId: context.toolCallId,
           toolName: WEBFETCH_TOOL_NAME,
         },
-        modelRequestSessionType: "other",
         modelCall: { operation: "web_fetch_processing" },
         traceContext: traceFromContext(context),
       },

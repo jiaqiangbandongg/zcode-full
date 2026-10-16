@@ -1,0 +1,4 @@
+lane workspace
+region seq#1 seq
+step world-read#1 world-read "glob src/**" @5:29 lane=workspace region=seq#1 always
+sink world-read#1

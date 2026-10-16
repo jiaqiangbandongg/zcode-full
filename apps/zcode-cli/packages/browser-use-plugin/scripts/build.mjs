@@ -30,6 +30,7 @@ const createBundleOptions = ({ entryPoint, outfile }) => ({
   outfile,
   platform: "node",
   target: "node24",
+  external: ["sharp"],
 });
 
 /**

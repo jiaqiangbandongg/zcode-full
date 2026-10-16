@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-mention",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-mention.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-mention.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-mention-title",
+      "description": "E2E_V4_MENTION_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_MENTION_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-mention-seed",
+      "description": "M5 mention 面板门禁：首轮固定回复建立可被 # 会话 mention 命中的 session（sessions-index 数据源）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "mention 面板只需一个已存在 session 供 # 目录命中；首轮文案固定。"
+    }
+  ]
+}

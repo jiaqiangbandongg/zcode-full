@@ -21,12 +21,14 @@ import type { ExecutableToolCall, ToolExecutionResult } from "../tool/types.js";
 import { resolveContainedMemoryFilePath, resolveSafeMemoryFilePath } from "./memory-file-path.js";
 import { auxiliaryModelOptions } from "../model/auxiliary-model-options.js";
 
-interface MemoryAgentLoopResult {
+export type MemoryAgentModelRequest = ModelRequest;
+
+export interface MemoryAgentLoopResult {
   messages: ModelInputMessage[];
   turns: number;
 }
 
-interface MemoryAgentToolPolicyInput {
+export interface MemoryAgentToolPolicyInput {
   rootDir: string;
   toolCall: ModelToolCall;
   tools: readonly ModelToolContract[];
@@ -34,7 +36,7 @@ interface MemoryAgentToolPolicyInput {
   workspaceRoot: string;
 }
 
-type MemoryAgentToolPolicyDecision = { allowed: true } | { allowed: false; reason: string };
+export type MemoryAgentToolPolicyDecision = { allowed: true } | { allowed: false; reason: string };
 
 const MEMORY_AGENT_READ_ONLY_TOOLS = new Set(["Read", "Grep", "Glob"]);
 
@@ -118,7 +120,7 @@ export async function runMemoryAgentLoop(input: {
   return { messages, turns };
 }
 
-function evaluateMemoryAgentToolPolicy(
+export function evaluateMemoryAgentToolPolicy(
   input: MemoryAgentToolPolicyInput,
 ): MemoryAgentToolPolicyDecision {
   const contract = input.tools.find((tool) => tool.name === input.toolCall.name);

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-load-older",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-load-older.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-load-older.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-load-older-title",
+      "description": "E2E_V4_OLDER_HISTORY_001 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_OLDER_HISTORY_001 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-load-older-turn1-long-history",
+      "description": "M5④ R-06 loadOlder 门禁：25 个 completed turn → 75 条 raw projection rows（> 快照尾窗 60），重开会话后顶部历史需经 rows/range 补页可达。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "游标分页断言需要确定的 completed turn 数、raw row 数和可滚动高度；真实 provider 无法稳定复现该窗口边界。"
+    }
+  ]
+}

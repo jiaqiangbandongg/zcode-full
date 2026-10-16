@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-resume-stale-target",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-resume-stale-target.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-goal-resume-stale-target.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-goal-resume-stale-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "seed 只需要形成 completed task，后续通过 sqlite 注入 stale target 状态。"
+    },
+    {
+      "id": "upstream-goal-resume-stale-send-now-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 queued item 能出队并发起新一轮请求，响应只需稳定完成。"
+    },
+    {
+      "id": "upstream-goal-resume-stale-objective-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 marker 表示被注入的 stale objective，本身不应作为 provider 用户输入发送。"
+    }
+  ]
+}

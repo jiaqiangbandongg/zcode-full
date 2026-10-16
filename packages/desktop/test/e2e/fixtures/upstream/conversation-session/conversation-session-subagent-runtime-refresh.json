@@ -1,0 +1,443 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-runtime-refresh",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-runtime-refresh.test.ts",
+  "fixtures": [
+    {
+      "id": "shr-title",
+      "description": "shr-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHR_FAIL_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-title",
+          "inputTokens": 32,
+          "text": "{\"title\":\"Subagent runtime refresh\"}"
+        }
+      }
+    },
+    {
+      "id": "shr-fail-parent-tool",
+      "description": "shr-fail-parent-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_FAIL_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shr_fail",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "Runtime refresh fail",
+            "prompt": "E2E_SHR_FAIL_CHILD",
+            "subagent_type": "e2e-runtime-reviewer",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "shr-fail-child",
+      "description": "shr-fail-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fault-stream",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_FAIL_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 400,
+        "delayMs": 2000,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"type\": \"error\", \"error\": {\"type\": \"invalid_request_error\", \"message\": \"E2E_SHR_INVALID_MODEL_CONFIGURATION\"}}"
+      }
+    },
+    {
+      "id": "shr-fail-parent-final",
+      "description": "shr-fail-parent-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SHR_FAIL_PARENT", "agentId: agent_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHR_RESUME_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-fail-parent-final",
+          "inputTokens": 32,
+          "text": "E2E_SHR_FAIL_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-stable-parent-tool",
+      "description": "shr-stable-parent-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_STABLE_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shr_stable",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "Runtime refresh stable",
+            "prompt": "E2E_SHR_STABLE_CHILD",
+            "subagent_type": "e2e-runtime-reviewer",
+            "run_in_background": false
+          }
+        },
+        "delayMs": 40000
+      }
+    },
+    {
+      "id": "shr-stable-child",
+      "description": "shr-stable-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_STABLE_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-stable-child",
+          "inputTokens": 32,
+          "text": "E2E_SHR_STABLE_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-stable-parent-final",
+      "description": "shr-stable-parent-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shr_stable", "E2E_SHR_STABLE_CHILD_DONE", "agentId: agent_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHR_NEXT_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-stable-parent-final",
+          "inputTokens": 32,
+          "text": "E2E_SHR_STABLE_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-next-parent-tool",
+      "description": "shr-next-parent-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_NEXT_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shr_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "Runtime refresh next",
+            "prompt": "E2E_SHR_NEXT_CHILD",
+            "subagent_type": "e2e-runtime-reviewer",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shr-next-child",
+      "description": "shr-next-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_NEXT_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-next-child",
+          "inputTokens": 32,
+          "text": "E2E_SHR_NEXT_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-next-parent-final",
+      "description": "shr-next-parent-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shr_next", "E2E_SHR_NEXT_CHILD_DONE", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-next-parent-final",
+          "inputTokens": 32,
+          "text": "E2E_SHR_NEXT_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-failure-notification",
+      "description": "shr-failure-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>failed</status>"],
+        "bodyIncludes": ["E2E_SHR_FAIL_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-failure-notification",
+          "inputTokens": 32,
+          "text": "E2E_SHR_FAILURE_NOTED"
+        }
+      }
+    },
+    {
+      "id": "shr-resume-parent-tool",
+      "description": "shr-resume-parent-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_RESUME_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shr_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "Retry corrected profile",
+            "message": "E2E_SHR_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "shr-resume-child",
+      "description": "shr-resume-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHR_RESUME_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-resume-child",
+          "inputTokens": 32,
+          "text": "E2E_SHR_RESUME_CHILD_DONE"
+        },
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "shr-resume-parent-final",
+      "description": "shr-resume-parent-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SHR_RESUME_PARENT", "resumed it in the background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHR_STABLE_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-resume-parent-final",
+          "inputTokens": 32,
+          "text": "E2E_SHR_RESUME_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "shr-resume-notification",
+      "description": "shr-resume-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SHR_RESUME_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-resume-notification",
+          "inputTokens": 32,
+          "text": "E2E_SHR_RESUME_NOTED"
+        }
+      }
+    },
+    {
+      "id": "shr-compact",
+      "description": "shr-compact",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["CRITICAL: Respond with TEXT ONLY", "E2E_SHR_FAIL_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "shr-compact",
+          "inputTokens": 32,
+          "text": "Preserve original failed child and recovery. agentId: {{latestAgentId}}. E2E_SHR_FAIL_PARENT E2E_SHR_RESUME_PARENT."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-publish-import",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-publish-import.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-share-publish-import.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "conversation-share-local-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+    },
+    {
+      "id": "conversation-share-local-main-second",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+    },
+    {
+      "id": "conversation-share-local-session-b",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+    },
+    {
+      "id": "conversation-share-error-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The case validates actionable share error details, not provider behavior."
+    },
+    {
+      "id": "conversation-share-preview-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The case validates final preview-card candidates and non-uploadable media warnings."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+node source
+node ask#1 "solo" @5:22 actors=actor#1 type="string"
+node sink
+actor actor#1 "solo" @5:8
+edge source -> ask#1 data exact
+edge ask#1 -> sink data exact type="string"

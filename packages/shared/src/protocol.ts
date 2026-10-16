@@ -4,6 +4,7 @@ import type { ProviderFamilyDomain } from "./model-provider-family.js";
 import type { ProviderFamilyConnectionSelectionSettings } from "./provider-family-connection-selection.js";
 import type { ZCodeProvider } from "./zcode-task-types-core.js";
 import type { WorkspacePurpose } from "./workspacePurpose.js";
+import type { DynamicWorkflowMode } from "./dynamic-workflow-feature.js";
 import type { EmbeddedBrowserViewportPreference } from "./browser-use/command-metadata.js";
 
 // ── Domain types ──
@@ -156,10 +157,24 @@ export interface DockerRemoteTargetSnapshot {
   container: string;
 }
 
+export interface ServerRemoteTargetSnapshot {
+  kind: "server";
+  url: string;
+  name?: string;
+  workspacePath?: string;
+  serverId?: string;
+  /**
+   * Server token 不写入 setting.json。
+   * 这里只保存 credentialService 的键名，恢复时再读取真实 token。
+   */
+  tokenCredentialKey?: string;
+}
+
 export type RemoteTargetSnapshot =
   | SSHRemoteTargetSnapshot
   | WSLRemoteTargetSnapshot
-  | DockerRemoteTargetSnapshot;
+  | DockerRemoteTargetSnapshot
+  | ServerRemoteTargetSnapshot;
 
 export interface RemoteWorkspaceSessionSnapshot {
   /** 远程 workspace 的真实绝对路径 */
@@ -276,12 +291,18 @@ export interface AppSettings {
   taskAutoArchiveEnabled?: boolean;
   /** 自动归档阈值；当任务最后更新时间早于该天数时允许被归档 */
   taskAutoArchiveOlderThanDays?: number;
-  /** Windows 桌面端关闭窗口时隐藏到托盘；其它平台忽略 */
+  /** 桌面端关闭窗口时隐藏到托盘驻留（Windows/Linux；spec：docs/desktop/linux-close-to-tray.md） */
   closeToTrayOnWindows?: boolean;
   /** 存在执行中的闲时任务时阻止系统闲置休眠（手动开关，防不了合盖）。 */
   keepAwakeWhileRunning?: boolean;
   /** Windows 关闭到托盘默认值是否已执行过一次性迁移；只用于设置迁移，不参与业务判断。 */
   closeToTrayOnWindowsMigrationInitialized?: boolean;
+  /**
+   * Linux 关闭到托盘默认值（关）是否已执行过一次性归位迁移。
+   * shared 迁移无平台概念、曾把存量 Linux 用户归为 true，而 Linux 此前无设置入口，
+   * main 进程 bootstrap 借此标记把首次启动的 Linux 用户一次性归位为默认关。
+   */
+  closeToTrayLinuxMigrationInitialized?: boolean;
   /** 桌面端全局页面缩放档位；用于重启后恢复界面缩放，Web/手机端忽略。 */
   desktopZoomLevel?: number;
   /** 桌面主窗口最近一次非最大化宽高及最大化状态；Web/手机端忽略。 */
@@ -311,6 +332,13 @@ export interface AppSettings {
   askUserQuestionAutoResolutionEnabled?: boolean;
   /** 是否完整保留 Model I/O；开启后不轮转、不限额重置、不压缩或裁剪，鉴权信息仍会脱敏。 */
   modelIoFullRetentionEnabled?: boolean;
+  /**
+   * 用户选的动态工作流模式（docs/dynamic-workflow/launch.md「The user's choice」）。缺席 = 跟随服务端
+   * 提供的模式；只在功能已提供时生效。选回提供的模式时删除该字段，未改动的安装继续跟随服务端翻转。
+   */
+  dynamicWorkflowMode?: DynamicWorkflowMode;
+  /** 已启用的内置 Agent CLI；UI 对外仍展示为“Install”，底层语义保持为启用内置能力。 */
+  enabledBuiltinAgentCliProviders?: ZCodeProvider[];
   /** 设置页中每个 Provider Family 当前唯一的结构化连接选择。 */
   providerFamilyConnectionSelections?: ProviderFamilyConnectionSelectionSettings;
   /** 用户通过 WelcomeScreen 成功连接后确认的 ZAI / BigModel provider family 运行域。 */
@@ -364,6 +392,16 @@ export interface AppSettings {
   skippedElectronUpdateVersions?: Partial<Record<ElectronReleaseChannel, string>>;
   /** 首次启动设置同步提示是否已消费；只表示弹窗不再出现，不代表导入成功。 */
   settingsSyncFirstRunPromptHandled?: boolean;
+  /** 外部 Web 远控 relay 的非敏感设备身份；passHash 必须存 credentialService。 */
+  webRemoteControlExternalRelayDevice?: {
+    deviceSid: string;
+  };
+  /** 上次成功开启 Web 远控时的目标；缺失表示用户已明确关闭，不自动恢复。 */
+  webRemoteControlLastEnabledContext?: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    initialTaskId?: string;
+  };
   /** 设置页里的临时 endpoint override；正式/测试默认 base url 由 ZCODE_BASE_URL env 管理。 */
   zcodeEndpointOrigin?: string;
 }

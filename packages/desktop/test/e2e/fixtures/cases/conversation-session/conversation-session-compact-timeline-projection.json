@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-compact-timeline-projection",
+  "spec": "./test/e2e/conversation-session/conversation-session-compact-timeline-projection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-compact-timeline-projection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-compact-timeline-projection-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "TP 的核心断言是 auto compact marker 的 UI 投影位置，真实模型 token usage 不稳定；DeepSeek v4 可能是 1M context，需要合成足够高的 provider usage。"
+    },
+    {
+      "id": "upstream-compact-timeline-projection-pending",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只需要稳定产出 pending assistant，核心断言在 compact marker 是否折进同一工作块。"
+    },
+    {
+      "id": "upstream-compact-timeline-projection-manual-split-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "manual failed compact 的核心样本由 renderer store 注入，真实模型只需先创建稳定 task。"
+    }
+  ]
+}

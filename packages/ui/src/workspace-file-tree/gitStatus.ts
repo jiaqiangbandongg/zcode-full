@@ -5,7 +5,7 @@ import {
   type WorkspaceFileGitStatus,
 } from "@/workspace-file-tree/model.js";
 
-interface WorkspaceFileTreeGitStatusState {
+export interface WorkspaceFileTreeGitStatusState {
   available: boolean;
   statusByPath: Map<string, WorkspaceFileGitStatus>;
 }

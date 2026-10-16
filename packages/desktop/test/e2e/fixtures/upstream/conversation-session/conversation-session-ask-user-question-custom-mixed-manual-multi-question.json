@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-mixed-manual-multi-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-mixed-manual-multi-question.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-mixed-manual-multi-question-call",
+      "description": "AskUserQuestion custom mixed input: 首轮返回三题合法问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造三题 AskUserQuestion 等待态，避免真实模型生成非法选项数量或题目结构漂移影响鼠标和 Enter 混合答案采集复现。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_CUSTOM_MIXED_MANUAL_MULTI"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_CUSTOM_MIXED_MANUAL_MULTI",
+          "E2E_ASK_USER_QUESTION_MIXED_MANUAL_MULTI_TOOL",
+          "E2E_AQ_MIXED_MANUAL_MULTI_Q1_CUSTOM",
+          "E2E_AQ_MIXED_MANUAL_MULTI_Q2_CUSTOM",
+          "E2E_AQ_MIXED_MANUAL_MULTI_Q3_CUSTOM"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_ask_user_question_custom_mixed_manual_multi_question",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_AQ_MIXED_MANUAL_MULTI_Q1_CUSTOM: Which custom dashboard feature should be prioritized?",
+                "header": "Mixed Q1",
+                "options": [
+                  {
+                    "label": "Use default Q1",
+                    "description": "Continue with the first default answer."
+                  },
+                  {
+                    "label": "Use fallback Q1",
+                    "description": "Continue with the first fallback answer."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQ_MIXED_MANUAL_MULTI_Q2_CUSTOM: Which custom notification path should be prioritized?",
+                "header": "Mixed Q2",
+                "options": [
+                  {
+                    "label": "Use default Q2",
+                    "description": "Continue with the second default answer."
+                  },
+                  {
+                    "label": "Use fallback Q2",
+                    "description": "Continue with the second fallback answer."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_AQ_MIXED_MANUAL_MULTI_Q3_CUSTOM: Which custom theme update should be prioritized?",
+                "header": "Mixed Q3",
+                "options": [
+                  {
+                    "label": "Use default Q3",
+                    "description": "Continue with the third default answer."
+                  },
+                  {
+                    "label": "Use fallback Q3",
+                    "description": "Continue with the third fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-mixed-manual-multi-question-final",
+      "description": "AskUserQuestion custom mixed input: 三题自定义回答进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明三题鼠标和 Enter 混合提交后的自定义回答已被 agent 消费，核心断言在答案采集和 UI 已回答记录。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AQ_MIXED_MANUAL_MULTI_A1",
+          "E2E_AQ_MIXED_MANUAL_MULTI_A2",
+          "E2E_AQ_MIXED_MANUAL_MULTI_A3",
+          "E2E_ASK_USER_QUESTION_MIXED_MANUAL_MULTI_TOOL",
+          "toolu_e2e_ask_user_question_custom_mixed_manual_multi_question"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

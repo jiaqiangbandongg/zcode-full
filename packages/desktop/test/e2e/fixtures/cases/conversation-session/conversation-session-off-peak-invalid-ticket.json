@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-off-peak-invalid-ticket",
+  "spec": "./test/e2e/conversation-session/conversation-session-off-peak-invalid-ticket.test.ts",
+  "providerFixtures": [],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "requests": []
+}

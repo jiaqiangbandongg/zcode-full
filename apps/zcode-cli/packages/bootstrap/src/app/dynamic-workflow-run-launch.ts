@@ -7,17 +7,14 @@
 //
 // 本文件持有三件事：
 //   1. journal sequence 截取（emit 侧拿到刚 append 的那条事件的 sequence）；
-//   2. RunEvent → 会话事件载荷（有界化 + 两个派生字段）；
+//   2. RunEvent → 会话事件载荷（有界化 + 派生字段；实现在 dynamic-workflow-run-progress-payload.ts）；
 //   3. actor runtime 的接入：全新（落会话行 + task link）或重水化（resumeFromStore）。
 
 import { randomUUID } from "node:crypto";
 import {
-  boundDynamicWorkflowRunEventPayload,
   CoreErrorType,
   ZCODE_DWF_CHILD_COMMAND,
   type CreateSessionTaskLinkInput,
-  type DynamicWorkflowRunEvent,
-  type DynamicWorkflowRunProgressPayload,
   type SessionId,
 } from "@zcode/contracts";
 import type { AgentRuntime } from "@zcode/core";
@@ -32,25 +29,30 @@ import {
   type ImportedRunCache,
   type JournalStorePort,
   type JsonSchema,
-  type RunEvent,
   type RunSettlement,
   type ValidateFn,
 } from "@zcode/dynamic-workflow";
 import { runWorkflowScript } from "@zcode/dynamic-workflow-runtime";
 import { createJournalSequenceCapture } from "./dynamic-workflow-run-sequence-capture.js";
-import { isResumableSettlement } from "./dynamic-workflow-run-observation.js";
+import type { CompiledHole } from "./dynamic-workflow-run-holes.js";
+import { toProgressPayload } from "./dynamic-workflow-run-progress-payload.js";
 import {
   readRunLaunchAnchor,
+  readRunModelBindings,
   readRunSubagentModel,
+  readRunSubagentPermissionMode,
   type RunLaunch,
 } from "./dynamic-workflow-run-launch-anchor.js";
-import { resolveWorkflowConcurrencyCeiling } from "./workflow-concurrency-ceiling.js";
+import { resolveWorkflowDefaultConcurrency } from "./workflow-default-concurrency.js";
 import type { ActorSessionQuiescence } from "./workflow-driver-quiescence.js";
-import { createAgentRuntimeWorkflowDriver, mintActorSessionId } from "./workflow-driver.js";
+import { resolveActorPersonaModel } from "./workflow-actor-model.js";
+import { createAgentRuntimeWorkflowDriver } from "./workflow-driver.js";
 import type { WorkflowEscalationRegistry } from "./workflow-escalation-registry.js";
-import type { WorkflowRunControl } from "./workflow-run-control.js";
+import { runBoundTarget, type WorkflowRunControl } from "./workflow-run-control.js";
 import { createWorkflowRunSeatGate } from "./workflow-seat-gate.js";
 import type { DynamicWorkflowRunServiceDeps } from "./dynamic-workflow-run-service.js";
+
+export { toProgressPayload, toProtocolEvent } from "./dynamic-workflow-run-progress-payload.js";
 
 /** 适配包内校验器到引擎的 ValidateFn 契约（launch 是 runWorkflowScript 的唯一调用点）。 */
 const validateFn: ValidateFn = (schema, value) => validate(schema as JsonSchema, value);
@@ -60,10 +62,22 @@ export interface CompiledDynamicWorkflowScript {
   lowered: string;
   scriptHash: string;
   askSpecs: Map<string, AskSpec>;
-  /** world.run 的已批准命令集（编译期字面量收集）。 */
-  declaredRunCommands: ReadonlySet<string>;
   /** 每个 actor 站点的 submit profile。 */
   actorSubmitProfiles: ReadonlyMap<string, ActorSubmitProfile>;
+  /** 站点 → 词法出生阶段名（docs/execution-engine.md「Identity: sites, ordinals, phases」）。 */
+  sitePhases: ReadonlyMap<string, string>;
+  /**
+   * 已补全留白的函数体文本（站点 id → `(async () => { … })`；docs/execution-engine.md「The text
+   * that runs」）。补全服务把 `holeBodies[siteId]` 交给引擎作为那处留白的 `code`。
+   */
+  holeBodies: Readonly<Record<string, string>>;
+  /** 脚本里每处留白的编译期事实（开放与已补全都在，源码序）：快照与进度载荷的 type / line 来源。 */
+  holes: readonly CompiledHole[];
+  /**
+   * 按控制流投影取的阶段表与其中开放留白的下标（`collectPhaseNames`）。补全服务用它给引擎
+   * `fillHole` 的 `phaseNames` / `holes`；launch 的声明表仍来自提交方（工具层从同一份投影算）。
+   */
+  phases: { phaseNames: string[]; holes: number[] };
 }
 
 interface LaunchDynamicWorkflowRunInput {
@@ -117,11 +131,11 @@ interface LaunchDynamicWorkflowRunInput {
    */
   escalationRegistry: WorkflowEscalationRegistry;
   /**
-   * 本 run 的活体控制面。由 run
+   * 本 run 的活体控制面（docs/dynamic-workflow/concurrency.md「The control path」）。由 run
    * service 按**注册表条目**造一个（submit / amend / resume 三条入口都造），本函数在这里把它的
    * 两端接上：harness 负责 `bind(engine)`，本函数负责 `bindSeatGate`。
    *
-   * 缺席即这次启动没有控制面（如 snippet 执行）——run 照常跑完，只是上界中途改不了。
+   * 缺席即这次启动没有控制面（snippet、集成测试）——run 照常跑完，只是上界中途改不了。
    */
   control?: WorkflowRunControl;
   /**
@@ -130,6 +144,12 @@ interface LaunchDynamicWorkflowRunInput {
    * 问得着「前驱的会话写完了没有」。原样下传，本文件不读它。
    */
   onQuiescenceProbe?: (probe: ActorSessionQuiescence) => void;
+  /**
+   * 某处留白的类型实参原文（进度载荷给 `hole-reached` 补 `type`，docs/execution-engine.md
+   * 「Holes」）。是函数而不是表：一次补全会换掉有效脚本，嵌套在函数体里的新留白随之出现，
+   * 表在 run 的一生里会变——调用方（run service）让它读注册表条目上此刻的那张。缺席即不补。
+   */
+  holeTypeOf?: (siteId: string) => string | undefined;
 }
 
 /**
@@ -157,20 +177,27 @@ export function launchDynamicWorkflowRun(
     toolCallId,
   } = input;
   const childSpawn = dynamicWorkflowChildSpawn();
-  // 本 run 自己上界的**第二个**执行点：调度器管「还能不能再派一个 ask」，闸门管「已经在跑的那些下一次请求能不能发出去」。
+  // 本 run 自己上界的**第二个**执行点（docs/dynamic-workflow/concurrency.md「Two enforcement
+  // points」）：调度器管「还能不能再派一个 ask」，闸门管「已经在跑的那些下一次请求能不能发出去」。
   // 起点就是这次启动的 caps（submit 是钳过的请求值，resume 是 journal 行里的那一份），所以一个
   // 从未被 retune 过的 run 永远走闸门的快路径——不发事件、不持票、与从前逐字相同。
   const seatGate = createWorkflowRunSeatGate({ limit: caps.maxConcurrency });
-  control?.bindSeatGate(seatGate);
+  // 同一个上界还要登记给进程级治理器（docs/dynamic-workflow/concurrency.md「The governor」）：
+  // 它抬的是本 run 用过的 provider key 的增长上限——用户要 40 个，桶的 cap 才爬得到 40，否则
+  // 调度器放出 40 个子代理、治理器只给 2D 个请求，一大半停在「等待槽位」。launch 结算时清掉。
+  // retune 经控制面落到这里，与座位闸门同一刻换值，三处（调度器、闸门、治理器）不会各执一词。
+  deps.concurrency?.setRunBound(runId, caps.maxConcurrency);
+  control?.bindSeatGate(runBoundTarget(seatGate, deps.concurrency, runId));
   // 锚点：submit 给的（本次建 run）或 journal 里的（resume）。升级前的 run 两边都没有 → 缺席，
   // 进度事件不带 launchInputId，子代理不上报。
   const launch = input.launch ?? readRunLaunchAnchor(deps.journal, runId);
   // lineage 指针：submit/amend 路径由入参给出；resume 路径入参缺席（createRun 早已写死），从
   // journal 行读回——两条路径的 `run-started` 载荷因此同形。
   const lineageFrom = resumedFrom ?? deps.journal.getRun(runId)?.resumedFrom;
-  // 并发天花板：`run-started` 载荷的第二个宿主派生字段。每次 launch 算一次而不是每条事件算
-  // 一次——它是进程事实，一个 run 跑到一半核数不会变，而 `availableParallelism()` 是系统调用。
-  const concurrencyCeiling = resolveWorkflowConcurrencyCeiling(deps.availableParallelism);
+  // 默认并发：`run-started` 载荷的第二个宿主派生字段（线上键名 `concurrencyCeiling`）。每次 launch
+  // 算一次而不是每条事件算一次——它是进程事实，一个 run 跑到一半核数不会变，而
+  // `availableParallelism()` 是系统调用。
+  const defaultConcurrency = resolveWorkflowDefaultConcurrency(deps.availableParallelism);
   // 子代理模型：submit 给的（随锚点同车）或 journal 里的（resume 从同一条 run-launched 读回）。
   // 与锚点同一条论证，两条路径因此同形；升级前的 run 两边都没有 → 缺席 = 跑在会话模型上。
   const subagentModel = input.launch?.subagentModel ?? readRunSubagentModel(deps.journal, runId);
@@ -178,6 +205,16 @@ export function launchDynamicWorkflowRun(
   // actor runtime 工厂要的是结构化选择（含 reasoning 档位，pin 的两段身份带不回来）。
   const runSubagentModel =
     subagentModel === undefined ? undefined : parseModelPickerValue(subagentModel);
+  // 脚本点名的模型绑定表：与子代理模型同源同路（submit 给的，或 resume 从同一条 run-launched 读回）。
+  // 名字在 launch 时解析过一次，此后不再对着目录重解——resume 的 run 跑的仍是用户批准时那几个模型。
+  const modelBindings = input.launch?.modelBindings ?? readRunModelBindings(deps.journal, runId);
+  // 子代理权限模式（docs/dynamic-workflow/launch.md「Permissions inside a run」）：submit 给的
+  // 就是建 run 那一刻会话的模式；resume 只从 run-launched 读回，**不看会话此刻的模式**——
+  // 会话中途换到 Full access 不能把一个 guarded / build run 的子代理放开。
+  const subagentPermissionMode =
+    input.launch === undefined
+      ? readRunSubagentPermissionMode(deps.journal, runId)
+      : input.launch.subagentPermissionMode;
 
   // 事件的 journal sequence 只有 appendEvent 知道，而引擎在 record() 里
   // `journal.appendEvent(...)` 之后**同步**紧接着 `driver.emit(...)`，并丢掉了返回的
@@ -200,10 +237,18 @@ export function launchDynamicWorkflowRun(
             runId,
             sequence: sequenceCapture.sequenceOf(event),
             ...(toolCallId === undefined ? {} : { toolCallId }),
+            // 留白到达的两个宿主派生字段：类型来自编译产物，到达时刻来自 journal 给这条事件盖的戳
+            //（冷回放从 `timeCreated` 读回同一个数，两侧载荷因此逐字节相等）。
+            ...(input.holeTypeOf === undefined ? {} : { holeTypeOf: input.holeTypeOf }),
+            ...(() => {
+              const reachedAt = sequenceCapture.timeCreatedOf(event);
+              return reachedAt === undefined ? {} : { reachedAt };
+            })(),
             ...(launch === undefined ? {} : { launchInputId: launch.inputId }),
             ...(lineageFrom === undefined ? {} : { resumedFrom: lineageFrom }),
-            concurrencyCeiling,
+            concurrencyCeiling: defaultConcurrency,
             ...(subagentModel === undefined ? {} : { subagentModel }),
+            ...(modelBindings === undefined ? {} : { modelBindings }),
           }),
           // 路由与载荷分开：事件必须落在**发起该 run 的**会话里，而 parentSessionId 是
           // 判断"是不是那个会话"的唯一依据。
@@ -233,7 +278,6 @@ export function launchDynamicWorkflowRun(
           artifactStore: deps.artifactStore,
           parentSessionId: deps.parentSessionId as SessionId,
         }),
-    declaredRunCommands: compiled.declaredRunCommands,
     // 每个 actor 站点拿哪一种 submit_result（typed / generic / 无），编译期已定。
     actorSubmitProfiles: compiled.actorSubmitProfiles,
     runId,
@@ -291,6 +335,13 @@ export function launchDynamicWorkflowRun(
         // 决定），pin 只守没有它时的隐式缺省。与 pin 不同，它整条带着 reasoning 档位下去——
         // journal 的 pin 只记身份两段。
         ...(runSubagentModel === undefined ? {} : { runSubagentModel }),
+        // persona 点名的模型（最高优先级，workflow-actor-model.ts）：按本 run 的绑定表查成整条选择。
+        // 表里没有这个名字只可能来自绕过 9010 的类型断言——在建会话这里抛，这次 ask 以 DriverError 失败。
+        ...(() => {
+          const actorModel = resolveActorPersonaModel(persona.model, modelBindings);
+          return actorModel === undefined ? {} : { actorModel };
+        })(),
+        ...(subagentPermissionMode === undefined ? {} : { subagentPermissionMode }),
       });
       // persona 的模型档位实际解析成了哪个模型，只有造好的 runtime 说得准（档位映射见
       // workflow-actor-model.ts）。先落库再接入会话：一次失败的会话持久化会让这次 ask 失败，
@@ -322,8 +373,9 @@ export function launchDynamicWorkflowRun(
     },
   });
 
-  return runWorkflowScript({
+  const settlement = runWorkflowScript({
     askSpecs: compiled.askSpecs,
+    sitePhases: compiled.sitePhases,
     caps,
     // SEA 下必须换 spawn 策略，非 SEA 一律不传。
     ...(childSpawn === undefined ? {} : { childSpawn }),
@@ -366,6 +418,9 @@ export function launchDynamicWorkflowRun(
     ...(control === undefined ? {} : { control }),
     validate: validateFn,
   });
+  // 治理器上的上界随 launch 一起结束：结算（含失败、取消）后本 run 不再抬任何 key 的增长上限，
+  // 高于新上限的 cap 由治理器当场拉下来（`limit_lowered`）。
+  return settlement.finally(() => deps.concurrency?.clearRunBound(runId));
 }
 
 /**
@@ -554,137 +609,11 @@ function requireActorModelSelection(runtime: AgentRuntime, actor: ActorRef): Mod
  * 误当成上一轮的 pin。pin 与本 run 的 subagentModel 谁优先，见 workflow-actor-model.ts
  * （run 选择在上；pin 只守没有 run 选择时的缺省，persona 冻结不变式的持久化那一半）。
  */
-function pinnedActorModel(input: {
+export function pinnedActorModel(input: {
   actor: ActorRef;
   journal: JournalStorePort;
   runId: string;
 }): string | undefined {
   return input.journal.getActor(input.runId, input.actor.siteId, input.actor.ordinal)
     ?.resolvedModel;
-}
-
-/**
- * RunEvent → 协议事件的映射（**本注释即契约**）：`type` 取事件的判别式，`payload` 是同一个
- * 事件对象去掉 `type` 后的其余字段，经 {@link boundDynamicWorkflowRunEventPayload} 有界化。
- * 刻意不重塑字段名——读端（详情页事件日志）按事件种类解释 payload，而引擎的词汇表就是那份 schema。
- *
- * 引擎实际发出的种类：run-started / actor-created / node-queued / node-dispatched /
- * node-repairing / node-nudged / node-settled / usage-updated / log / report / phase-entered /
- * run-settled。
- * （`executing` 不是可观察事件；`compaction` v1 从不发出。）另有两种由 **driver** 发出、
- * 走同样两条轨的事件：escalation-raised / escalation-resolved（workflow-driver.ts 的升级桥接）。
- *
- * 新增一个事件种类在**本函数**里是零改动的，这正是"不重塑字段名"买到的东西：`type` 取判别式、
- * payload 是其余字段，这里没有按种类的分支可漏。**但下游确实有一个按种类的 switch**：
- * `zcode-protocol-v4/product-projection.ts` 的 `applyWorkflowRunEvent` 逐种类归约，其
- * `eventType` 形参是 `string` 而不是 `RunEvent["type"]`，漏一支 tsc 不会报——加事件种类时
- * 要去读那个 switch，不能指望编译器。
- */
-export function toProtocolEvent(sequence: number, event: RunEvent): DynamicWorkflowRunEvent {
-  const { type, ...rest } = event;
-  const { payload, truncated } = boundDynamicWorkflowRunEventPayload(
-    rest as Record<string, unknown>,
-  );
-  return { sequence, type, payload, ...(truncated ? { truncated } : {}) };
-}
-
-/**
- * RunEvent → 会话事件载荷。`payload` 与 {@link toProtocolEvent} 使用同一次序列化，
- * 派生字段放在 payload 之外，保留引擎事件原文。
- *
- * `actorSessionId` 通过与 driver 相同的生成函数获取，避免 renderer 重复实现会话 ID 规则。
- * `actor-created` 和带 actor 的 `node-dispatched` 都补充该字段，使运行中实例被收进有界表时，
- * 仍能关联到对应的子代理会话。进程并发上限和子代理来源按下方各自的事件条件补充。
- */
-export function toProgressPayload(input: {
-  event: RunEvent;
-  runId: string;
-  sequence: number;
-  toolCallId?: string;
-  /** run 的锚点 inputId；只在 actor-created / run-settled 上派生（子代理归属的两个时刻）。 */
-  launchInputId?: string;
-  /** 修订 run 的前驱；只在 `run-started` 上派生（卡片的「调整自 run X」）。 */
-  resumedFrom?: string;
-  /**
-   * 铸造这条载荷那一刻的进程并发天花板；在 `run-started` 与 `run-caps-changed` 两种事件上派生。
-   *
-   * 引擎事件只带它自己的 `caps.maxConcurrency`，而「这个数值不值得显示」要拿它和天花板比——
-   * 天花板是宿主事实（机器核数），引擎既看不见也不该看见。投影侧据 `caps.maxConcurrency <
-   * concurrencyCeiling` 记下本 run 的自有上界，UI 的并发 chip 再取 min(共享 cap, 本 run 上界)。
-   *
-   * 一次就地 retune 发的 `run-caps-changed` 带着**新的** caps，判据却是同一条：低于天花板就写下
-   * 上界、等于天花板就把它清掉（= 解除限制）。所以两种事件必须拿到同一个天花板，也就是这一个。
-   */
-  concurrencyCeiling?: number;
-  /**
-   * 本 run 的子代理模型（规范 picker 串）；只在 `run-started` 上派生，且**只在设过时**在场。
-   * 与 `concurrencyCeiling` 不同，它不需要与任何默认值比对：
-   * 引擎压根不知道有这件事（模型面整个在宿主侧），所以缺席即「子代理跑在会话模型上」。
-   * 冷回放从同一条 `run-launched` 事件给出同一个键，两侧载荷因此逐字节相等。
-   */
-  subagentModel?: string;
-}): DynamicWorkflowRunProgressPayload {
-  const {
-    event,
-    runId,
-    sequence,
-    toolCallId,
-    launchInputId,
-    resumedFrom,
-    concurrencyCeiling,
-    subagentModel,
-  } = input;
-  const protocolEvent = toProtocolEvent(sequence, event);
-  const actorRef = actorSessionRefOf(event);
-  return {
-    runId,
-    ...(toolCallId === undefined ? {} : { toolCallId }),
-    sequence,
-    eventType: protocolEvent.type,
-    // `run-settled` 多带一位 `resumable`：
-    // resume 门的谓词只在 CLI 有，投影与 UI 只搬运这一位、绝不自行按 status 推导。
-    // 谓词 = stopped ∧ 非 superseded；冷回放对孤儿收敛过的
-    // 行给同一个键——两条链、一个谓词（isResumableSettlement）。stopReason / supersededBy 随事件载荷原样透出。
-    // `run-started` 多带 `resumedFrom`：引擎事件不带它（引擎不读 lineage），但卡片要画这条边。
-    // 同一条缝里还多带 `concurrencyCeiling`：引擎只发自己的 caps，而「这个上界是不是默认值」
-    // 要拿它和宿主的天花板比（见上面的字段注释）。两者互不相关，各自缺席即各自不出。
-    // `run-caps-changed` 走**同一条**缝、同一个天花板：一次就地 retune 之后读面要靠它判断新上界
-    // 该写下还是该清掉，缺了它这条事件就只是两个没有标尺的数。
-    payload:
-      event.type === "run-settled" && isResumableSettlement(event.status, event.stopReason)
-        ? { ...protocolEvent.payload, resumable: true }
-        : event.type === "run-started"
-          ? {
-              ...protocolEvent.payload,
-              ...(resumedFrom === undefined ? {} : { resumedFrom }),
-              ...(concurrencyCeiling === undefined ? {} : { concurrencyCeiling }),
-              ...(subagentModel === undefined ? {} : { subagentModel }),
-            }
-          : event.type === "run-caps-changed"
-            ? {
-                ...protocolEvent.payload,
-                ...(concurrencyCeiling === undefined ? {} : { concurrencyCeiling }),
-              }
-            : protocolEvent.payload,
-    ...(protocolEvent.truncated ? { truncated: true } : {}),
-    ...(actorRef === undefined ? {} : { actorSessionId: mintActorSessionId(runId, actorRef) }),
-    // 第三个派生字段：埋点事实层只在这两种事件上
-    // 需要锚点——actor-created 登记子代理归属，run-settled 结算该 run 全部子代理。
-    ...((event.type === "actor-created" || event.type === "run-settled") &&
-    launchInputId !== undefined
-      ? { launchInputId }
-      : {}),
-  };
-}
-
-/**
- * 这条事件点名了哪个子代理（要补 `actorSessionId` 的那个 ref），没点名即 undefined。
- *
- * 两种事件：`actor-created`（子代理的出生），以及带 `actor` 的 `node-dispatched`（ask 派发时重复出生事实）。
- * world-read 的派发不带 `actor`，因此不补——它没有转录可开。
- */
-function actorSessionRefOf(event: RunEvent): ActorRef | undefined {
-  if (event.type === "actor-created") return event.actor;
-  if (event.type === "node-dispatched") return event.actor;
-  return undefined;
 }

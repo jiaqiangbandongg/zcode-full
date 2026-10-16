@@ -1,21 +1,16 @@
 import { resolve } from "node:path";
 import process from "node:process";
 import {
+  LEGACY_REMOTE_RIPGREP_ARCHIVE_SHA256_BY_TARGET,
+  LEGACY_REMOTE_RIPGREP_VERSION,
   NATIVE_SEARCH_DEPENDENCIES_DIR,
   resolveNativeSearchBuildPlan,
   resolveNativeSearchPrebuiltPlan,
 } from "./native-search-tools-config.mjs";
 
-export const LEGACY_REMOTE_RIPGREP_VERSION = "v13.0.0-10";
-
-export const LEGACY_REMOTE_RIPGREP_ARCHIVE_SHA256_BY_TARGET = Object.freeze({
-  "darwin-arm64": "de44338ca53677968bdd7403ddc1cf9c735e708f7b63e3b34367f9411010a7db",
-  "darwin-x64": "3b501c05ff9b1d24ae8897dd1c6b5bf842fd12a6f7114264407ac42bc222b25b",
-  "linux-arm64": "705fc9bcd14baa18bd4dda8fe0651bff440fc0fb934fcdb8e745a85efd7b2afa",
-  "linux-x64": "ef820a62c1d6fdc396646762ff0f0e47e127947073ed8b5aa4ceea8b61cb1659",
-  "win32-arm64": "6c12d2c95073a4b981e5706981f42327b6359fc4cd7449ebd11f6769768dea97",
-  "win32-x64": "7b35b95cf3d7f92d8fe087006899617b1b5a6dac4bbed5d4f6ace6f0934799dc",
-});
+// legacy rg13 的版本与摘要仍由 native-search-tools-config.mjs 唯一持有（内网 download-ripgrep 链路同样读取），
+// 这里只转出，避免两份常量漂移。
+export { LEGACY_REMOTE_RIPGREP_ARCHIVE_SHA256_BY_TARGET, LEGACY_REMOTE_RIPGREP_VERSION };
 
 export function resolveRemoteNativeSearchPrebuiltPlan({
   platform = process.platform,

@@ -188,18 +188,18 @@ export class BackgroundTaskTracker {
           taskId,
           toolName: toolCall.name,
         });
-        void Promise.resolve(this.deps.executionPort?.cancelBackgroundTask?.(taskId)).catch(
-          (error) => {
-            this.deps.logger?.warn("Subagent background Bash cancellation failed", {
-              ...traceContextToLogContext(traceContext),
-              errorMessage: error instanceof Error ? error.message : String(error),
-              event: "background_task.subagent_bash.cancel_failed",
-              module: "core.tool.executor",
-              taskId,
-              toolName: toolCall.name,
-            });
-          },
-        );
+        void Promise.resolve(
+          this.deps.executionPort?.cancelBackgroundTask?.(taskId),
+        ).catch((error) => {
+          this.deps.logger?.warn("Subagent background Bash cancellation failed", {
+            ...traceContextToLogContext(traceContext),
+            errorMessage: error instanceof Error ? error.message : String(error),
+            event: "background_task.subagent_bash.cancel_failed",
+            module: "core.tool.executor",
+            taskId,
+            toolName: toolCall.name,
+          });
+        });
       }, this.deps.subagentBackgroundBashMaxMs);
     }
 
@@ -262,16 +262,13 @@ export class BackgroundTaskTracker {
         }
 
         if (this.isNotifiedLocalAgentSnapshot(toolCall, snapshot)) {
-          this.deps.logger?.debug?.(
-            "Background task terminal notification already handled by subagent",
-            {
-              ...traceContextToLogContext(traceContext),
-              event: "background_task.tracking.notification_already_handled",
-              module: "core.tool.executor",
-              taskId,
-              toolName: toolCall.name,
-            },
-          );
+          this.deps.logger?.debug?.("Background task terminal notification already handled by subagent", {
+            ...traceContextToLogContext(traceContext),
+            event: "background_task.tracking.notification_already_handled",
+            module: "core.tool.executor",
+            taskId,
+            toolName: toolCall.name,
+          });
           stopped = true;
           stopTracking();
           return;
@@ -564,13 +561,7 @@ export class BackgroundTaskTracker {
         // （workflowNotification）在此处发射侧铸造：GUI 渲染的唯一数据源，随 originMeta 走全管线。
         ...(isDynamicWorkflowRunDispatchToolName(toolCall.name)
           ? {
-              originMeta: buildWorkflowNotificationOriginMeta(
-                toolCall,
-                taskId,
-                status,
-                snapshot,
-                output,
-              ),
+              originMeta: buildWorkflowNotificationOriginMeta(toolCall, taskId, status, snapshot, output),
             }
           : {}),
         taskId,
@@ -683,7 +674,10 @@ export class BackgroundTaskTracker {
     // 条目来自 journal 的 kind="report" 行（run service 放在快照上），不是 memory-only 的投影。
     const isDynamicWorkflow = isDynamicWorkflowRunDispatchToolName(toolCall.name);
     const reports = isDynamicWorkflow
-      ? buildWorkflowReportsNotificationSection(workflowSnapshotReports(snapshot))
+      ? buildWorkflowReportsNotificationSection(
+          workflowSnapshotReports(snapshot),
+          workflowSnapshotReportCount(snapshot),
+        )
       : undefined;
     // 用户面产物同样只属于 dwf（legacy `Workflow` 没有这个概念，通知逐字节不变）。三个终态
     // 一律携带：一个失败的 run 已经发布的产物仍然摆在用户面前，通知不提它，模型就会重述一遍。
@@ -751,10 +745,8 @@ export class BackgroundTaskTracker {
     if (isSubagentDispatchToolName(toolCall.name)) {
       const getTask = deps.subagentPort?.getTask;
       return {
-        ...(getTask
-          ? { getSnapshot: (taskId: string) => getTask.call(deps.subagentPort, taskId) }
-          : {}),
-        // background Agent 的停止入口在 subagentPort.stopTask；
+        ...(getTask ? { getSnapshot: (taskId: string) => getTask.call(deps.subagentPort, taskId) } : {}),
+        // 修复原因：background Agent 的停止入口在 subagentPort.stopTask；
         // started payload 不能沿用 Bash 的 executionPort 能力判断。
         cancellable: Boolean(deps.subagentPort?.stopTask),
       };
@@ -782,9 +774,7 @@ export class BackgroundTaskTracker {
       const getTask = deps.workflowPort?.getTask;
       const waiter = getWorkflowTaskWaiter(deps.workflowPort);
       return {
-        ...(getTask
-          ? { getSnapshot: (taskId: string) => getTask.call(deps.workflowPort, taskId) }
-          : {}),
+        ...(getTask ? { getSnapshot: (taskId: string) => getTask.call(deps.workflowPort, taskId) } : {}),
         ...(waiter ? { waitForTerminal: (taskId: string) => waiter.waitForTask(taskId) } : {}),
         cancellable: false,
       };
@@ -843,7 +833,10 @@ function normalizeBackgroundTaskNotificationStatus(status: string): BashTaskNoti
   }
 }
 
-function resolveBashBackgroundResultTitle(toolCall: ExecutableToolCall, taskId: string): string {
+function resolveBashBackgroundResultTitle(
+  toolCall: ExecutableToolCall,
+  taskId: string,
+): string {
   const input = isRecord(toolCall.input) ? toolCall.input : {};
   const description = stringField(input, "description")?.trim();
   const command = stringField(input, "command")?.trim();
@@ -1046,15 +1039,16 @@ function buildWorkflowTerminalNotification(
   if (error !== undefined) meta.error = error.slice(0, WORKFLOW_NOTIFICATION_ERROR_MAX_CHARS);
 
   // 渐进产物三个终态一律携带：一个死在第 12 个 ask 上的 run 仍做完了 11 个 ask 的活。
-  const reports = buildWorkflowReportsManifestSection(workflowSnapshotReports(snapshot));
+  const reports = buildWorkflowReportsManifestSection(
+    workflowSnapshotReports(snapshot),
+    workflowSnapshotReportCount(snapshot),
+  );
   if (reports !== undefined) meta.reports = reports;
 
   // 用户面产物的 chips 载荷。这是通知行 chips 的
   // **唯一**数据源：hydration 冷恢复把它按 shared 的 zod 原样读回，缺一个键就等于 chips 永久
   // 消失。三个终态一律携带，理由同 reports。
-  const artifactsSection = buildWorkflowArtifactsManifestSection(
-    workflowSnapshotArtifacts(snapshot),
-  );
+  const artifactsSection = buildWorkflowArtifactsManifestSection(workflowSnapshotArtifacts(snapshot));
   if (artifactsSection !== undefined) {
     meta.artifacts = artifactsSection.artifacts;
     if (artifactsSection.artifactsTruncated) meta.artifactsTruncated = true;
@@ -1086,14 +1080,15 @@ function workflowTerminalNotificationStatus(
 }
 
 /**
- * 通知里的墙钟时长（完成卡的「时间」格）。
+ * 通知里的墙钟时长（完成卡的「时间」格，见
+ * docs/dynamic-workflow/transcript-and-notifications.md「How long it took」）。
  *
  * 两个来源，取**大**者：
  *   - 本世：`completedAt - startedAt`，结算它的这个进程自己看到的那一段；
  *   - 整条 lineage 的活动时长：`activeDurationMs`，由端口从 journal 求和（resume 的每一世 +
  *     沿 `resumedFrom` 的每个前驱），缺席即读不出。
  *
- * 只报本次启动的墙钟时长会漏掉之前的运行时间：修订与
+ * 缺陷原因（2026-09-21）：只报本世会把「跑了四小时、修订过一次」的 run 报成 12 秒——修订与
  * resume 各自重开一次进程内时钟，而那一世大半是缓存重放。取大而不是直接取 lineage，是为了守住
  * 「永不少报本进程亲眼所见」：老 run 的事件早于本记账、journal 读面不在场时 `activeDurationMs`
  * 缺席，退回本世；而 lineage 值正常总比本世大（它含本世）。
@@ -1148,6 +1143,14 @@ function workflowSnapshotReports(
 ): readonly unknown[] | undefined {
   if (snapshot === undefined || !("reports" in snapshot)) return undefined;
   return Array.isArray(snapshot.reports) ? snapshot.reports : undefined;
+}
+
+/** 快照上的 report 真实总数（`reports` 只带前 256 条）；缺席即老快照，读侧退回条目数。 */
+function workflowSnapshotReportCount(
+  snapshot: BackgroundTaskSnapshot | undefined,
+): number | undefined {
+  if (snapshot === undefined || !("reportCount" in snapshot)) return undefined;
+  return typeof snapshot.reportCount === "number" ? snapshot.reportCount : undefined;
 }
 
 /**

@@ -21,7 +21,7 @@ import {
   type UseCuaComposerEntryParams,
 } from "@/hooks/useCuaComposerEntry.js";
 
-type V4ComposerCuaEntryProps = UseCuaComposerEntryParams;
+export type V4ComposerCuaEntryProps = UseCuaComposerEntryParams;
 
 /**
  * 平台门前置层：平台不支持（或宿主根本没提供 platform / services context）时连内层都不挂载。

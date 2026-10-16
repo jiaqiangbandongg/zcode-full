@@ -342,7 +342,7 @@ function buildLastTurnDataset(options: {
   };
 }
 
-function shouldRefreshLiveGitData(
+export function shouldRefreshLiveGitData(
   previous: GitLiveDataRefreshInput | null,
   next: GitLiveDataRefreshInput,
 ): boolean {

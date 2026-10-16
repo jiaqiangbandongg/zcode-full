@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-slash-arguments",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-slash-arguments.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-side-slash-arguments.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "side-slash-arguments-title",
+      "description": "所有 slash argument child 的标题 sidecar 固定返回。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是 slash argument 语义；按统一 E2E marker 返回固定标题，隔离 replay 匹配。"
+    },
+    {
+      "id": "side-slash-arguments-parent-running",
+      "description": "父任务 running 窗口的 controlled stream。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "running 组合需要稳定的父 active turn；真实 provider 完流时间不可控。"
+    },
+    {
+      "id": "side-slash-arguments-parent-seed",
+      "description": "父会话首发 seed 的固定快速文本响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父会话只需稳定建立 session，不依赖真实 provider 生成。"
+    },
+    {
+      "id": "side-slash-arguments-side-idle",
+      "description": "idle /side firstInput 的固定快速文本响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "idle alias 断言只需稳定的 child 文本响应。"
+    },
+    {
+      "id": "side-slash-arguments-btw-multiline",
+      "description": "带外层空白和内部换行的 /btw firstInput 固定响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 parser trim 边界与多行参数保留。"
+    },
+    {
+      "id": "side-slash-arguments-second-side",
+      "description": "连续提交组合中的第二个 /side child 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "连续 child 创建只需稳定响应，验证不复用 child。"
+    },
+    {
+      "id": "side-slash-arguments-second-btw",
+      "description": "连续提交组合中的第二个 /btw child 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "连续 child 创建只需稳定响应，验证不复用 child。"
+    },
+    {
+      "id": "side-slash-arguments-running-child",
+      "description": "父任务 running 时 /btw child 的固定快速响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child startNow 断言需要在父 controlled stream 期间快速完成。"
+    }
+  ]
+}

@@ -20,14 +20,14 @@ const COMMIT_MESSAGE_QUERY_SOURCE = "git_commit_message";
 const CONVENTIONAL_COMMIT_RE =
   /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .{1,100}$/;
 
-interface GitCommitMessageCurrentModelProvider {
+export interface GitCommitMessageCurrentModelProvider {
   readCurrentModel(params: {
     workspacePath: string;
     workspaceIdentity?: string;
   }): Promise<ZCodeWorkspaceGenerateTextParams["selection"] | null>;
 }
 
-interface GitCommitMessageTextGenerator {
+export interface GitCommitMessageTextGenerator {
   generateText(params: {
     workspacePath: string;
     workspaceIdentity?: string;
@@ -37,13 +37,13 @@ interface GitCommitMessageTextGenerator {
   }): Promise<{ text: string; selection: ZCodeWorkspaceGenerateTextParams["selection"] }>;
 }
 
-interface GitCommitMessageGeneratorOptions {
+export interface GitCommitMessageGeneratorOptions {
   currentModelProvider: GitCommitMessageCurrentModelProvider;
   textGenerator: GitCommitMessageTextGenerator;
   logger?: ServiceLogger;
 }
 
-class GitCommitMessageGenerationError extends Error {
+export class GitCommitMessageGenerationError extends Error {
   constructor(
     message: string,
     readonly reason: "model-unavailable" | "request-failed" | "invalid-output",

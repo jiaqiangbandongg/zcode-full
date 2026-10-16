@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ttft-diagnostics",
+  "spec": "./test/e2e/conversation-session/conversation-session-ttft-diagnostics.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ttft-diagnostics.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/ttft-diagnostics/input.txt",
+      "source": "created-by-helper",
+      "description": "用例通过异步 fs 创建，只在隔离 E2E workspace 执行。"
+    },
+    {
+      "path": ".zcode-e2e/ttft-diagnostics/hook.cjs",
+      "source": "created-by-helper",
+      "description": "用例通过异步 fs 创建，只在隔离 E2E workspace 执行。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "ttft-diag-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离标题生成，不让无关后台请求产生 Missing Fixture 重试与性能噪音。"
+    },
+    {
+      "id": "ttft-diag-hold",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-queue",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-cancel",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-retry-failure",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-retry-success",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-fail",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-guide-read",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-guide-final",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-pause",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-held",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    },
+    {
+      "id": "ttft-diag-confirm",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+    }
+  ]
+}

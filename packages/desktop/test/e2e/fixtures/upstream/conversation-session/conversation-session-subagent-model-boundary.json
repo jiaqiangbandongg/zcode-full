@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-model-boundary",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-model-boundary.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-boundary-parent-agent",
+      "description": "父会话触发没有显式模型覆盖的 general-purpose child。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "固定 Agent tool_use，模型身份由真实运行时请求断言。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_MODEL_BOUNDARY_PARENT", "E2E_SUBAGENT_MODEL_BOUNDARY_CHILD"], "bodyExcludes": ["E2E_SUBAGENT_MODEL_BOUNDARY_CHILD_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_e2e_subagent_model_boundary", "name": "Agent", "input": { "description": "Run inherited child", "prompt": "E2E_SUBAGENT_MODEL_BOUNDARY_CHILD: reply exactly E2E_SUBAGENT_MODEL_BOUNDARY_CHILD_DONE and no other text.", "subagent_type": "general-purpose" } } }
+    },
+    {
+      "id": "subagent-boundary-child-delayed",
+      "description": "child 响应延迟，给父会话切换模型的在途窗口。",
+      "metadata": { "kind": "main", "timingPolicy": "delayed-text", "source": "synthetic", "syntheticReason": "延迟只用于验证 child execution snapshot，不改变业务结果。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_MODEL_BOUNDARY_CHILD"], "bodyExcludes": ["E2E_SUBAGENT_MODEL_BOUNDARY_CHILD_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "delayMs": 30000, "text": { "id": "subagent-boundary-child", "inputTokens": 40, "outputTokens": 8, "text": "E2E_SUBAGENT_MODEL_BOUNDARY_CHILD_DONE" } }
+    },
+    {
+      "id": "subagent-boundary-parent-final",
+      "description": "父会话消费 child 结果并完成。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "验证父 continuation 仍能完成。" },
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_MODEL_BOUNDARY_PARENT", "E2E_SUBAGENT_MODEL_BOUNDARY_CHILD_DONE"], "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "text": { "id": "subagent-boundary-parent-final", "inputTokens": 60, "outputTokens": 8, "text": "E2E_SUBAGENT_MODEL_BOUNDARY_PARENT_DONE" } }
+    },
+    {
+      "id": "subagent-nested-parent-agent",
+      "description": "三层场景的父 Agent tool_use。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "固定第一层 child。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_NESTED_PARENT", "E2E_SUBAGENT_NESTED_CHILD"], "bodyExcludes": ["E2E_SUBAGENT_NESTED_CHILD_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_e2e_subagent_nested_child", "name": "Agent", "input": { "description": "Run nested child", "prompt": "E2E_SUBAGENT_NESTED_CHILD: launch a grandchild Agent for E2E_SUBAGENT_NESTED_GRANDCHILD, then reply exactly E2E_SUBAGENT_NESTED_CHILD_DONE.", "subagent_type": "general-purpose" } } }
+    },
+    {
+      "id": "subagent-nested-child-agent",
+      "description": "第二层 child 继续触发 grandchild。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "固定第二层 Agent tool_use。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_NESTED_CHILD", "E2E_SUBAGENT_NESTED_GRANDCHILD"], "bodyExcludes": ["E2E_SUBAGENT_NESTED_GRANDCHILD_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "toolUse": { "id": "toolu_e2e_subagent_nested_grandchild", "name": "Agent", "input": { "description": "Run nested grandchild", "prompt": "E2E_SUBAGENT_NESTED_GRANDCHILD: reply exactly E2E_SUBAGENT_NESTED_GRANDCHILD_DONE and no other text.", "subagent_type": "general-purpose" } } }
+    },
+    {
+      "id": "subagent-nested-grandchild-final",
+      "description": "第三层 grandchild 固定回复。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "验证第三层请求实际使用继承身份。" },
+      "maxMatches": 1,
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_NESTED_GRANDCHILD"], "bodyExcludes": ["E2E_SUBAGENT_NESTED_GRANDCHILD_DONE", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "text": { "id": "subagent-nested-grandchild", "inputTokens": 32, "outputTokens": 8, "text": "E2E_SUBAGENT_NESTED_GRANDCHILD_DONE" } }
+    },
+    {
+      "id": "subagent-nested-child-final",
+      "description": "第二层 child 消费 grandchild 结果。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "验证直接父级收到 grandchild tool_result。" },
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_NESTED_CHILD", "E2E_SUBAGENT_NESTED_GRANDCHILD_DONE"], "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "text": { "id": "subagent-nested-child-final", "inputTokens": 48, "outputTokens": 8, "text": "E2E_SUBAGENT_NESTED_CHILD_DONE" } }
+    },
+    {
+      "id": "subagent-nested-parent-final",
+      "description": "父会话消费第二层 child 结果。",
+      "metadata": { "kind": "main", "timingPolicy": "fast-text", "source": "synthetic", "syntheticReason": "验证三层调用最终收口。" },
+      "match": { "method": "POST", "pathIncludes": "/messages", "bodyIncludes": ["E2E_SUBAGENT_NESTED_PARENT", "E2E_SUBAGENT_NESTED_CHILD_DONE"], "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"] },
+      "response": { "statusCode": 200, "text": { "id": "subagent-nested-parent-final", "inputTokens": 56, "outputTokens": 8, "text": "E2E_SUBAGENT_NESTED_PARENT_DONE" } }
+    }
+  ]
+}

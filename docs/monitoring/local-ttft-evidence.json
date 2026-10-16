@@ -1,0 +1,228 @@
+{
+  "runId": "desktop-e2e-20260914065825460-p98341-a1be9784bec76dad",
+  "collectedAt": "2026-09-14",
+  "source": "real Composer → window Host → CLI replay provider → actual Renderer content → decoded OTLP protobuf receiver",
+  "e2eTestsPassed": 3,
+  "focusEvents": [],
+  "clockMaxAllowedErrorMs": 10,
+  "samples": [
+    {
+      "observationId": "fe738b95-f6f7-4266-847e-aaf458d2b8df",
+      "traceId": "/nOLlfb3QmaEfqr0WNK43w==",
+      "firstOutputKind": "text",
+      "quality": "complete",
+      "ttftMs": 3284.400147,
+      "firstTextMs": 3284.600098,
+      "clockErrorMs": 3.125244140625,
+      "cliVersion": "0.16.9",
+      "logicalCallId": "f1fda3a5-b2f4-451e-bc8b-7ef724eb423c",
+      "intervals": [
+        {
+          "stage": "renderer_prepare",
+          "startMs": 0.0,
+          "endMs": 8.5,
+          "durationMs": 8.5
+        },
+        {
+          "stage": "command_admission",
+          "startMs": 8.5,
+          "endMs": 693.044678,
+          "durationMs": 684.544678
+        },
+        {
+          "stage": "execution_wait",
+          "startMs": 693.044678,
+          "endMs": 877.281738,
+          "durationMs": 184.23706
+        },
+        {
+          "stage": "request_prepare",
+          "startMs": 877.281738,
+          "endMs": 2928.792969,
+          "durationMs": 2051.511231
+        },
+        {
+          "stage": "model_request",
+          "startMs": 2928.792969,
+          "endMs": 2965.738525,
+          "durationMs": 36.945556
+        },
+        {
+          "stage": "output_return",
+          "startMs": 2965.738525,
+          "endMs": 3284.400147,
+          "durationMs": 318.661622
+        }
+      ],
+      "unattributedMs": "0"
+    },
+    {
+      "observationId": "5603c1be-9d14-4d88-b2a9-3cfa202dd5c9",
+      "traceId": "VgPBvp0UTYiyqTz6IC3VyQ==",
+      "firstOutputKind": "reasoning",
+      "quality": "complete",
+      "ttftMs": 589.800049,
+      "firstTextMs": 8341.0,
+      "clockErrorMs": 3.125244140625,
+      "cliVersion": "0.16.9",
+      "logicalCallId": "ccd8bcb7-ed7e-4842-a8c4-367332fa9afe",
+      "intervals": [
+        {
+          "stage": "renderer_prepare",
+          "startMs": 0.0,
+          "endMs": 2.0,
+          "durationMs": 2.0
+        },
+        {
+          "stage": "command_admission",
+          "startMs": 2.0,
+          "endMs": 272.736084,
+          "durationMs": 270.736084
+        },
+        {
+          "stage": "execution_wait",
+          "startMs": 272.736084,
+          "endMs": 275.037842,
+          "durationMs": 2.301758
+        },
+        {
+          "stage": "request_prepare",
+          "startMs": 275.037842,
+          "endMs": 294.702392,
+          "durationMs": 19.66455
+        },
+        {
+          "stage": "model_request",
+          "startMs": 294.702392,
+          "endMs": 560.654541,
+          "durationMs": 265.952149
+        },
+        {
+          "stage": "output_return",
+          "startMs": 560.654541,
+          "endMs": 589.800049,
+          "durationMs": 29.145508
+        }
+      ],
+      "unattributedMs": "0"
+    },
+    {
+      "observationId": "4c25406e-0c74-4cbc-ab47-8a61c6c33283",
+      "traceId": "TCVAbgx0TLyrR4phxsMygw==",
+      "firstOutputKind": "tool",
+      "quality": "complete",
+      "ttftMs": 816.600098,
+      "firstTextMs": 1033.600098,
+      "clockErrorMs": 3.125244140625,
+      "cliVersion": "0.16.9",
+      "logicalCallId": "752515b7-cc25-4de6-bc68-dfcce76d433e",
+      "intervals": [
+        {
+          "stage": "renderer_prepare",
+          "startMs": 0.0,
+          "endMs": 5.800049,
+          "durationMs": 5.800049
+        },
+        {
+          "stage": "command_admission",
+          "startMs": 5.800049,
+          "endMs": 57.357178,
+          "durationMs": 51.557129
+        },
+        {
+          "stage": "execution_wait",
+          "startMs": 57.357178,
+          "endMs": 160.872314,
+          "durationMs": 103.515136
+        },
+        {
+          "stage": "request_prepare",
+          "startMs": 160.872314,
+          "endMs": 672.192139,
+          "durationMs": 511.319825
+        },
+        {
+          "stage": "model_request",
+          "startMs": 672.192139,
+          "endMs": 771.999268,
+          "durationMs": 99.807129
+        },
+        {
+          "stage": "output_return",
+          "startMs": 771.999268,
+          "endMs": 816.600098,
+          "durationMs": 44.60083
+        }
+      ],
+      "unattributedMs": "0"
+    }
+  ],
+  "histograms": {
+    "zcode.local_ttft.duration": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 875.0,
+      "p95BucketEstimateMs": 4550.0
+    },
+    "zcode.local_ttft.stage.duration:renderer_prepare": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 6.25,
+      "p95BucketEstimateMs": 9.625
+    },
+    "zcode.local_ttft.stage.duration:command_admission": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 350.0,
+      "p95BucketEstimateMs": 925.0
+    },
+    "zcode.local_ttft.stage.duration:execution_wait": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 125.0,
+      "p95BucketEstimateMs": 192.5
+    },
+    "zcode.local_ttft.stage.duration:request_prepare": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 750.0,
+      "p95BucketEstimateMs": 4550.0
+    },
+    "zcode.local_ttft.stage.duration:model_request": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 75.0,
+      "p95BucketEstimateMs": 455.0
+    },
+    "zcode.local_ttft.stage.duration:output_return": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 42.5,
+      "p95BucketEstimateMs": 455.0
+    },
+    "zcode.local_ttft.first_text.duration": {
+      "sampleCount": 3,
+      "boundsMs": [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000, 60000, 300000],
+      "bucketCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+      "p50BucketEstimateMs": 3500.0,
+      "p95BucketEstimateMs": 9250.0
+    }
+  },
+  "arms": {
+    "readAccessVerified": true,
+    "region": "cn-beijing",
+    "project": "arms-project-placeholder",
+    "traceStore": "logstore-tracing",
+    "metricStore": "metricstore-apm-metrics-custom",
+    "newServiceSamples": 0,
+    "controlledTtftIngestionVerified": false,
+    "reason": "本机没有目标 OTLP 写入 endpoint/headers；平台新指标和瀑布图验收未完成。"
+  }
+}

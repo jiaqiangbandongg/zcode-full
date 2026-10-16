@@ -298,8 +298,7 @@ function WorkflowArtifactContent({
   }
 
   // 表外类型（`application/octet-stream` 与一切没人认得的东西）：给一张**元数据卡**，
-  // 不假装能渲染。卡上带「在工作区显示」——那是这种产物唯一能对它做的事（没有「下载」：
-  // renderer 没有任何把字节存成用户文件的宿主能力）。
+  // 不假装能渲染。卡上带「在工作区显示」；交给别的 App 打开走 tab 头部的「作为文件打开」。
   return (
     <ArtifactMetadataCard
       artifact={artifact}

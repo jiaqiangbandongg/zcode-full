@@ -231,7 +231,7 @@ export function AppView(props: {
   );
 }
 
-function ComposerInputArea(props: {
+export function ComposerInputArea(props: {
   focused?: boolean;
   busy: boolean;
   contentWidth: number;

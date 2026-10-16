@@ -1,0 +1,13 @@
+lane actor#1 "analyst" @10:11
+lane actor#2 "builder" @11:11
+lane actor#3 "reviewer" @18:8
+region seq#1 seq
+step ask#1 ask "a" @13:24 lane=actor#1 region=seq#1 always
+step ask#2 ask "a" @13:52 lane=actor#1 region=seq#1 always
+step ask#3 ask "b" @14:24 lane=actor#2 region=seq#1 always
+step ask#4 ask "reviewer" @18:26 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#2 fifo always
+edge ask#1 -> ask#4 data maybe exact
+edge ask#2 -> ask#4 data maybe exact
+edge ask#3 -> ask#4 data always exact
+sink ask#4

@@ -1,0 +1,17 @@
+node source
+node ask#1 "alpha" @5:26 actors=actor#1 type="string"
+node ask#2 "beta" @6:25 actors=actor#2 type="string"
+node ask#3 "gamma" @8:26 actors=actor#3 type="string"
+node ask#4 "judge" @10:23 actors=actor#4 type="string"
+node sink
+actor actor#1 "alpha" @5:11
+actor actor#2 "beta" @6:11
+actor actor#3 "gamma" @8:11
+actor actor#4 "judge" @10:8
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> ask#3 data exact
+edge ask#1 -> ask#4 data exact type="string"
+edge ask#2 -> ask#4 data exact type="string"
+edge ask#3 -> ask#4 data exact type="string"
+edge ask#4 -> sink data exact type="string"

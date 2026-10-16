@@ -114,7 +114,6 @@ const webSearchHandler: ToolHandler<WebSearchInput, WebSearchOutput> = async (in
           toolName: WEBSEARCH_TOOL_NAME,
           querySource: "web_search_tool",
         },
-        modelRequestSessionType: "other",
         modelCall: { operation: "web_search" },
         // statusSink 不在这里设：执行器交出的 context.model 已带默认会话事件出口。
         traceContext: webSearchTraceFromContext(context),

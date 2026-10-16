@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { normalize } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { BrowserWindow } from "electron";
 import { shell } from "electron";
 
@@ -8,6 +9,21 @@ type DesktopIpcLogger = {
   info?: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
 };
+
+export async function openFileUrlInDefaultApp(
+  url: string,
+  logger: DesktopIpcLogger,
+): Promise<void> {
+  try {
+    const filePath = fileURLToPath(url);
+    await openPathInDefaultApp(filePath, logger);
+  } catch (error) {
+    logger.warn("[open-external] file URL 打开失败", {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export async function openPathInDefaultApp(
   rawPath: string,

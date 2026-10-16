@@ -1,0 +1,4159 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background",
+  "spec": "./test/e2e/conversation-session/conversation-session-background.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-background-title",
+      "description": "Background spec 内所有 E2E 标题生成固定响应，避免 title 请求阻塞业务 replay。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 background runtime task 语义；同一 spec 还包含 foreground 对照组，因此按通用 E2E marker 稳定返回，避免标题请求重试阻塞业务请求。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-background-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Background E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-background-agent-tool-call",
+      "description": "BG01: main agent launches a background Agent.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 Agent(run_in_background=true)，验证 background Agent notification wake。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT: Launch a background agent and summarize only after its notification."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_AGENT: Launch a background agent and summarize only after its notification."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Check background",
+            "prompt": "E2E_BACKGROUND_AGENT_CHILD: Return exactly E2E_BACKGROUND_AGENT_CHILD_RESULT.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-launch-ack",
+      "description": "BG01: parent finishes launch turn after async Agent result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型在 async launch tool result 后结束当前 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT: Launch a background agent and summarize only after its notification.",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-agent-launch-ack",
+          "text": "background-agent-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-child-delayed-result",
+      "description": "BG01: delayed child Agent result.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "延迟子 agent 完成，稳定制造 parent idle wake。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD: Return exactly E2E_BACKGROUND_AGENT_CHILD_RESULT."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD: Return exactly E2E_BACKGROUND_AGENT_CHILD_RESULT."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1500,
+        "text": {
+          "id": "upstream-e2e-background-agent-child-result",
+          "text": "E2E_BACKGROUND_AGENT_CHILD_RESULT"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-notification-consumed",
+      "description": "BG01: parent consumes background Agent notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 provider-visible request 消费 <task-notification>。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_AGENT_CHILD_RESULT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-agent-notification",
+          "text": "background-agent-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-bash-tool-call",
+      "description": "BG02: main agent launches a background Bash command.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 Bash(run_in_background=true)。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_BASH"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_BASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_BACKGROUND_BASH_RESULT\\n'",
+            "description": "Print background marker",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-bash-launch-ack",
+      "description": "BG02: parent finishes launch turn after backgrounded Bash result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型在 backgrounded Bash tool result 后结束当前 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_BASH", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-bash-launch-ack",
+          "text": "background-bash-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-bash-notification-consumed",
+      "description": "BG02: parent consumes background Bash notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 Bash completion notification 进入父模型请求。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_BASH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_bash</tool-use-id>",
+          "<status>completed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-bash-notification",
+          "text": "background-bash-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-bash-tool-call",
+      "description": "BG15: main agent starts a long background Bash before the user sends a second prompt.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 main idle 但 background task 仍 running 的窗口，验证后续用户普通消息不会进入 queued prompt。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_DIRECT_USER_PROMPT_SETUP"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_DIRECT_USER_PROMPT_SETUP"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_direct_user_prompt_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'sleep 60; printf \"E2E_BACKGROUND_DIRECT_USER_PROMPT_BASH_DONE\\n\"'",
+            "description": "background direct user prompt bash sleep",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-launch-ack",
+      "description": "BG15: parent finishes launch turn while background Bash keeps running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 main 回到 idle，但统一 background control UI 仍有 running Bash task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_DIRECT_USER_PROMPT_SETUP",
+          "Command running in background"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-direct-user-prompt-launch-ack",
+          "text": "background-direct-user-prompt-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-received",
+      "description": "BG15: second user prompt is sent immediately while background task is still running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 background task running 不会把用户普通消息放入 queue，而是立即进入 provider request。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_DIRECT_USER_PROMPT",
+          "E2E_BACKGROUND_DIRECT_USER_PROMPT_PAYLOAD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_DIRECT_USER_PROMPT_PAYLOAD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-direct-user-prompt-received",
+          "text": "background-direct-user-prompt-received-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-stop-notification-consumed",
+      "description": "BG15: parent consumes stopped notification after the test stops the still-running background Bash.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "测试结束前收口长时间 background Bash，避免留下后台进程，同时验证 stop notification 仍走标准链路。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_DIRECT_USER_PROMPT_SETUP",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_direct_user_prompt_bash</tool-use-id>",
+          "<status>killed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-direct-user-prompt-stop-notification",
+          "text": "background-direct-user-prompt-bash-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-compact-after-idle-bash-tool-call",
+      "description": "BG19: main agent starts a background Bash before manual compact.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 main idle 但 background task running 的窗口，验证此时允许 manual compact。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_COMPACT_AFTER_IDLE"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_COMPACT_AFTER_IDLE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_compact_after_idle_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'sleep 6; printf \"E2E_BACKGROUND_COMPACT_AFTER_IDLE_DONE\\n\"'",
+            "description": "background compact bash sleep",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-compact-after-idle-launch-ack",
+      "description": "BG19: parent finishes launch turn while background Bash keeps running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 main 回到 idle，后续手动 compact 不应被 background running 阻塞。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_COMPACT_AFTER_IDLE",
+          "E2E_BACKGROUND_COMPACT_AFTER_IDLE_DONE",
+          "Command running in background"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-compact-after-idle-launch-ack",
+          "text": "background-compact-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-compact-after-idle-summary",
+      "description": "BG19: manual compact while background task is running succeeds.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-json",
+        "source": "synthetic",
+        "syntheticReason": "给 background completion notification 的后续请求留下可断言的 compact 后摘要 marker。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_BACKGROUND_COMPACT_AFTER_IDLE",
+          "\"stream\":true"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-compact-after-idle-summary",
+          "inputTokens": 260,
+          "outputTokens": 64,
+          "text": "<analysis>Manual compact happened while a background Bash task was running.</analysis>\n\n<summary>E2E_BACKGROUND_COMPACT_SUMMARY_MARKER: compact preserved the background Bash setup while the task continued running.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-compact-after-idle-notification-consumed",
+      "description": "BG19: parent consumes background Bash notification after compact.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 compact 后 background completion notification 仍进入父模型请求，且请求上下文来自 compact 后摘要。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_COMPACT_SUMMARY_MARKER",
+          "<task-notification>",
+          "toolu_e2e_background_compact_after_idle_bash",
+          "<status>completed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-compact-after-idle-notification",
+          "text": "background-compact-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-tool-call",
+      "description": "BG11: main agent starts an eligible foreground Bash command that should auto-background on timeout.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 foreground Bash timeout auto-background，验证没有显式 run_in_background 时也能进入 background task control UI。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_AUTO_TIMEOUT_BASH"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_AUTO_TIMEOUT_BASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_auto_timeout_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'sleep 1.5; printf \"E2E_BACKGROUND_AUTO_TIMEOUT_BASH_DONE\\n\"'",
+            "description": "auto timeout bash sleep",
+            "timeout": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-launch-ack",
+      "description": "BG11: parent finishes launch turn after foreground Bash auto-backgrounds.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 UI 在 Bash 自然完成前展示 auto-background 后的 running control row。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_AUTO_TIMEOUT_BASH", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-auto-timeout-bash-launch-ack",
+          "text": "background-auto-timeout-bash-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-notification-consumed",
+      "description": "BG12: parent consumes completed notification and UI should remove the auto-background Bash row.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 auto-background Bash 自然完成后 provider-visible notification 和 UI control row cleanup。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AUTO_TIMEOUT_BASH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_auto_timeout_bash</tool-use-id>",
+          "<status>completed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-auto-timeout-bash-notification",
+          "text": "background-auto-timeout-bash-completed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-tool-call",
+      "description": "BG37: main agent starts explicit background Bash with an input timeout shorter than its runtime.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证 explicit background commit 后 input timeout 不再终止进程。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG37_EXPLICIT_TIMEOUT"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BG37_EXPLICIT_TIMEOUT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bg37_explicit_timeout",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_BG37_STARTED\\n'; sleep 8; printf 'E2E_BG37_DONE\\n'",
+            "description": "BG37 explicit timeout bash",
+            "run_in_background": true,
+            "timeout": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-launch-ack",
+      "description": "BG37: parent finishes the launch turn while explicit Bash remains running past its input timeout.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "保留 input timeout 后仍可见的 running control row 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG37_EXPLICIT_TIMEOUT", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-bg37-explicit-timeout-launch-ack",
+          "text": "bg37-explicit-timeout-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-auto-compact-summary",
+      "description": "BG37: automatic compact preserves the explicit Bash setup before consuming its completion notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Bash prompt 变长后该轮会先自动 compact；固定 summary 以继续验证 completion notification，而不是让 replay 缺 fixture。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_BG37_EXPLICIT_TIMEOUT",
+          "toolu_e2e_bg37_explicit_timeout",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-bg37-explicit-timeout-auto-compact-summary",
+          "inputTokens": 210,
+          "outputTokens": 64,
+          "text": "<analysis>Automatic compact preserved the explicit background Bash launch while it continued beyond its input timeout.</analysis>\n\n<summary>E2E_BG37_EXPLICIT_TIMEOUT remains active as toolu_e2e_bg37_explicit_timeout and its single completion notification is still pending.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-notification-consumed",
+      "description": "BG37: parent consumes the one completed notification from explicit Bash.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 explicit Bash 越过 input timeout 后自然完成且只通知一次。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BG37_EXPLICIT_TIMEOUT",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg37_explicit_timeout</tool-use-id>",
+          "<status>completed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-bg37-explicit-timeout-notification",
+          "text": "bg37-explicit-timeout-completed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg38-parent-abort-tool-call",
+      "description": "BG38: main agent commits an explicit Bash before the parent turn is stopped.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "后台命令先写 started marker，再由测试停止仍 active 的 parent turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG38_PARENT_ABORT"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BG38_PARENT_ABORT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bg38_parent_abort",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_BG38_STARTED\\n' > .zcode-e2e/conversation-session-background/bg38-bash-started; printf 'E2E_BG38_STARTED\\n'; sleep 4; printf 'E2E_BG38_DONE\\n'",
+            "description": "BG38 parent abort bash",
+            "run_in_background": true,
+            "timeout": 10
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-bg38-parent-abort-launch-running",
+      "description": "BG38: keep the parent launch response active so the test can stop it after Bash commit.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟 launch response，稳定制造 task 已 commit 但 parent turn 仍 active 的 abort 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG38_PARENT_ABORT", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-bg38-parent-abort-launch-running",
+          "text": "bg38-parent-turn-should-be-stopped"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg38-parent-abort-notification-consumed",
+      "description": "BG38: parent consumes completed notification after its original turn was stopped.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 parent abort 不会杀死已 commit Bash，且不会产生重复 notification。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BG38_PARENT_ABORT",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg38_parent_abort</tool-use-id>",
+          "<status>completed</status>",
+          "E2E_BG38_STARTED",
+          "E2E_BG38_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-bg38-parent-abort-notification",
+          "text": "bg38-parent-abort-background-completed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-bg39-sleep-hard-timeout-tool-call",
+      "description": "BG39: main agent starts a foreground Bash whose first raw token is sleep.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证首 token sleep 沿用 foreground hard timeout，不进入 auto-background。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG39_SLEEP_HARD_TIMEOUT"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BG39_SLEEP_HARD_TIMEOUT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bg39_sleep_timeout",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 2; printf 'E2E_BG39_UNEXPECTED\\n'",
+            "description": "BG39 sleep hard timeout",
+            "timeout": 50
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-bg39-sleep-hard-timeout-completed",
+      "description": "BG39: parent receives foreground aborted output without a background task ID.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 provider-visible result 为 foreground timeout，且没有 background notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BG39_SLEEP_HARD_TIMEOUT",
+          "<error>Command was aborted before completion</error>"
+        ],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-bg39-sleep-hard-timeout",
+          "text": "bg39-sleep-hard-timeout-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-bash-tool-call",
+      "description": "BG08: main agent launches a cross-PGID background Bash process tree that will be stopped from the UI.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发由 Bash job control 构造的跨 PGID launcher/worker 子树，用于验证统一 background control UI 的 stop 杀树路径。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CANCEL_BASH"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_CANCEL_BASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_cancel_bash",
+          "name": "Bash",
+          "input": {
+            "command": "bash -c 'printf \"%s\\n\" \"$$\" > .zcode-e2e/conversation-session-background/bg08-root.pid; set -m; node .zcode-e2e/conversation-session-background/bg08-launcher.cjs .zcode-e2e/conversation-session-background/bg08-launcher.pid .zcode-e2e/conversation-session-background/bg08-worker.pid & wait'",
+            "description": "background cancel bash process tree",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-bash-launch-ack",
+      "description": "BG08: parent finishes launch turn after backgrounded Bash result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 UI 在 idle 状态展示 running background Bash control，随后由测试点击 stop。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CANCEL_BASH", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-cancel-bash-launch-ack",
+          "text": "background-cancel-bash-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-bash-notification-consumed",
+      "description": "BG08: parent consumes stopped Bash notification after UI stop.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 UI stop Bash 仍走 background task notification，而不是只在 UI 本地消失。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CANCEL_BASH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_cancel_bash</tool-use-id>",
+          "<status>killed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-cancel-bash-notification",
+          "text": "background-cancel-bash-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-agent-tool-call",
+      "description": "BG09: main agent launches a long background Agent that will be stopped from the UI.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 running local_agent task，验证统一 background control UI 能停止 subagent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CANCEL_AGENT"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_CANCEL_AGENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_cancel_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background cancel agent",
+            "prompt": "E2E_BACKGROUND_CANCEL_AGENT_CHILD: Stay running until stopped. If not stopped, return E2E_BACKGROUND_CANCEL_AGENT_CHILD_UNEXPECTED.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-agent-launch-ack",
+      "description": "BG09: parent finishes launch turn after async Agent result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 UI 在 idle 状态展示 running background Agent control，随后由测试点击 stop。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CANCEL_AGENT", "Async agent launched successfully"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-cancel-agent-launch-ack",
+          "text": "background-cancel-agent-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-agent-child-delayed-result",
+      "description": "BG09: delayed child Agent response that should be aborted by UI stop.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "保持 child provider request 运行，验证 stop 会 abort running background Agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CANCEL_AGENT_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_CANCEL_AGENT_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-background-cancel-agent-child-unexpected",
+          "text": "E2E_BACKGROUND_CANCEL_AGENT_CHILD_UNEXPECTED"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-cancel-agent-notification-consumed",
+      "description": "BG09: parent consumes stopped Agent notification after UI stop.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 UI stop subagent 复用 local_agent task notification 链路。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CANCEL_AGENT",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_cancel_agent</tool-use-id>",
+          "<status>stopped</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-cancel-agent-notification",
+          "text": "background-cancel-agent-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-taskstop-agent-tool-call",
+      "description": "BG10: main agent launches a background Agent that the model will stop with TaskStop.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 running local_agent task，后续 provider replay 用 TaskStop 停止它。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_TASKSTOP_AGENT"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_TASKSTOP_AGENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_taskstop_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background TaskStop agent",
+            "prompt": "E2E_BACKGROUND_TASKSTOP_AGENT_CHILD: Stay running until stopped. If not stopped, return E2E_BACKGROUND_TASKSTOP_AGENT_CHILD_UNEXPECTED.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-taskstop-agent-tool-stop",
+      "description": "BG10: parent uses TaskStop with the launched Agent task id.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "验证 provider-visible TaskStop tool 会复用 runtime background stop dispatcher。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_TASKSTOP_AGENT",
+          "Async agent launched successfully",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_taskstop_stop",
+          "name": "TaskStop",
+          "input": {
+            "task_id": "{{latestAgentId}}"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-taskstop-agent-child-delayed-result",
+      "description": "BG10: delayed child Agent response that should be aborted by TaskStop.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "保持 child provider request 运行，验证 TaskStop 会 abort running background Agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_TASKSTOP_AGENT_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_TASKSTOP_AGENT_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-background-taskstop-agent-child-unexpected",
+          "text": "E2E_BACKGROUND_TASKSTOP_AGENT_CHILD_UNEXPECTED"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-taskstop-agent-notification-consumed",
+      "description": "BG10: parent consumes stopped Agent notification after TaskStop result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 TaskStop tool result 和 stopped notification 在同一 runtime queue/active-loop 链路中收口。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_TASKSTOP_AGENT",
+          "Successfully stopped task:",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_taskstop_agent</tool-use-id>",
+          "<status>stopped</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-taskstop-agent-notification",
+          "text": "background-taskstop-agent-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-active-loop-bash-tool-calls",
+      "description": "BG04: main agent starts a short Bash command that auto-backgrounds and completes before the active tool-loop follow-up request.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 active-loop background notification intake：Bash 先因短 timeout 转后台，命令随即完成并在后续 provider request 前入队 notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_ACTIVE_LOOP_BASH"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_ACTIVE_LOOP_BASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_background_active_loop_bash_bg",
+            "name": "Bash",
+            "input": {
+              "command": "sh -c 'sleep 0.05; printf \"E2E_BACKGROUND_ACTIVE_LOOP_BASH_DONE\\n\"'",
+              "description": "Active-loop background marker",
+              "timeout": 1
+            }
+          },
+          {
+            "id": "toolu_e2e_background_active_loop_bash_wait",
+            "name": "Bash",
+            "input": {
+              "command": "sh -c 'sleep 0.2; printf \"E2E_BACKGROUND_ACTIVE_LOOP_WAIT_DONE\\n\"'",
+              "description": "Hold active tool loop for background completion"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-background-active-loop-notification-consumed",
+      "description": "BG04: parent consumes completed background Bash notification in the active tool-loop follow-up request.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证同一次 provider request 同时包含上一轮 Bash tool result 与 <task-notification>，而不是等 idle wake 单独开一轮。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_ACTIVE_LOOP_BASH",
+          "E2E_BACKGROUND_ACTIVE_LOOP_WAIT_DONE",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_background_active_loop_bash_bg</tool-use-id>",
+          "<status>completed</status>"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-active-loop-notification",
+          "text": "background-active-loop-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-seed",
+      "description": "BG34: create the v4 session before setting the background goal.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "V4 /goal 需要已有 session；首轮仅建立 BG34 的稳定会话边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_GOAL_SEED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Continue working toward the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-goal-seed",
+          "text": "background-goal-seed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-agent-tool-call",
+      "description": "BG03: goal continuation launches a background Agent.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "goal continuation 中启动 background Agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_GOAL", "Continue working toward the active session goal"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_goal_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Goal background",
+            "prompt": "E2E_BACKGROUND_GOAL_CHILD: Return exactly E2E_BACKGROUND_GOAL_CHILD_RESULT.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-agent-launch-ack",
+      "description": "BG03: goal continuation finishes before child Agent result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "goal continuation 的当前 turn 在子任务完成前先结束。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_GOAL", "Async agent launched successfully"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-goal-launch-ack",
+          "text": "background-goal-agent-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-direct-prompt",
+      "description": "BG34: a real user prompt starts immediately while only the goal background Agent is running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定证明 active goal 的 background-only 状态不等于 main busy，用户输入不经过 future queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_GOAL_DIRECT_PROMPT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_GOAL_DIRECT_PROMPT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-goal-direct-prompt",
+          "text": "background-goal-direct-prompt-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-child-delayed-result",
+      "description": "BG03: delayed child Agent result for goal.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "延迟子 agent 完成，证明 verifier 会等 notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_GOAL_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_GOAL_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-background-goal-child-result",
+          "text": "E2E_BACKGROUND_GOAL_CHILD_RESULT"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-notification-consumed",
+      "description": "BG03: parent consumes goal background notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "goal notification turn 消费子结果。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_GOAL_CHILD_RESULT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-goal-notification",
+          "text": "E2E_BACKGROUND_GOAL_NOTIFICATION_CONSUMED"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-goal-verifier-passed",
+      "description": "BG03: verifier passes only after background notification is consumed.",
+      "metadata": {
+        "kind": "goal-verifier",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "验证 verifier 只在 notification 后执行并通过，并稳定留出 future queue admission 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_GOAL",
+          "E2E_BACKGROUND_GOAL_NOTIFICATION_CONSUMED",
+          "Verify whether the active session goal"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 4000,
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-background-goal-verifier-passed\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"passed\\\":true,\\\"reason\\\":\\\"The background notification has been consumed.\\\",\\\"nextAction\\\":\\\"\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":220,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-background-goal-verifier-queue-drained",
+      "description": "BG34: verifier pass promotes the queued real user prompt without another legacy mutation.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证 TargetChanged(complete) 本身会重新评估 CLI queue gate 并自动提升队首。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_GOAL_VERIFIER_QUEUE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_GOAL_VERIFIER_QUEUE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-goal-verifier-queue-drained",
+          "text": "background-goal-verifier-queue-drained-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-agent-tool-call",
+      "description": "BG07: main agent launches a background Agent before sending it a coordinator message.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 Agent(run_in_background=true)，后续用 SendMessage 验证 running child steer。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_SEND_MESSAGE"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SEND_MESSAGE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_send_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Wait for coordinator message",
+            "prompt": "E2E_BACKGROUND_SEND_MESSAGE_CHILD: Start working. When you receive E2E_BACKGROUND_SEND_MESSAGE_PAYLOAD, reply exactly E2E_BACKGROUND_SEND_MESSAGE_CHILD_RECEIVED.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-message-tool-call",
+      "description": "BG07: parent sends a message to the running background Agent after the launch tool result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "根据 Agent tool result 中的 agentId 调用 SendMessage，验证父 agent 能 steer running child。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_MESSAGE",
+          "Async agent launched successfully",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": [
+          "sent to its active turn",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_send_message",
+          "name": "SendMessage",
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "E2E_BACKGROUND_SEND_MESSAGE_STEER",
+            "message": "E2E_BACKGROUND_SEND_MESSAGE_PAYLOAD"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-message-ack",
+      "description": "BG07: parent finishes the SendMessage turn after delivery status.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型收到 SendMessage tool result 后结束当前 turn，等待 background notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_MESSAGE",
+          "E2E_BACKGROUND_SEND_MESSAGE_PAYLOAD",
+          "sent to its active turn"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-message-ack",
+          "text": "background-send-message-sent-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-child-bash-tool-call",
+      "description": "BG07: child Agent starts a long local Bash tool so it can receive SendMessage during an active turn.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "子 agent 首轮立即释放 provider 连接，但通过 build mode 可直接允许且不会自动后台化的 sleep foreground Bash 保持 active turn，稳定覆盖 running child steer。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_SEND_MESSAGE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SEND_MESSAGE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_send_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 8; printf 'E2E_BACKGROUND_SEND_MESSAGE_CHILD_BASH_DONE\\n'",
+            "description": "Keep child turn active"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-child-steered-result",
+      "description": "BG07: child Agent receives SendMessage as coordinator input.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证子 agent 的 provider-visible request 收到完整 coordinator 中途提示。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_MESSAGE_CHILD",
+          "E2E_BACKGROUND_SEND_MESSAGE_CHILD_BASH_DONE",
+          "The coordinator sent a message while you were working:\nE2E_BACKGROUND_SEND_MESSAGE_STEER",
+          "E2E_BACKGROUND_SEND_MESSAGE_PAYLOAD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "The coordinator sent a message while you were working:\nE2E_BACKGROUND_SEND_MESSAGE_STEER",
+          "E2E_BACKGROUND_SEND_MESSAGE_PAYLOAD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-child-received",
+          "text": "E2E_BACKGROUND_SEND_MESSAGE_CHILD_RECEIVED"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-notification-consumed",
+      "description": "BG07: parent consumes completion notification after SendMessage-steered child result.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 SendMessage steer 后的子 agent completion 仍走 background notification。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_SEND_MESSAGE_CHILD_RECEIVED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-notification",
+          "text": "background-send-message-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-long-bash-loading-tool-call",
+      "description": "BG14: main agent starts a normal foreground Bash command that should keep the parent loading while running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造普通 foreground Bash running 窗口，验证 background event 豁免没有误伤前台 loading。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FOREGROUND_LONG_BASH_LOADING"],
+        "bodyExcludes": [
+          "E2E_FOREGROUND_LONG_BASH_DONE",
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_FOREGROUND_LONG_BASH_LOADING"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_foreground_long_bash_loading",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'i=1; while [ \"$i\" -le 120 ]; do printf \"progress-line-%s\\n\" \"$i\"; i=$((i+1)); done; i=0; while [ ! -f .zcode-e2e/conversation-session-background/bg14-preview-release ] && [ \"$i\" -lt 400 ]; do sleep 0.1; i=$((i+1)); done; i=0; while [ \"$i\" -lt 4000 ]; do printf \"padding-%s\\n\" \"$i\"; i=$((i+1)); done; printf \"E2E_FOREGROUND_LONG_BASH_DONE\\n\"'",
+            "description": "foreground long bash loading sleep"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-long-bash-loading-completed",
+      "description": "BG14: parent continues after the normal foreground Bash command completes.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 foreground Bash 完成后仍正常进入 provider continuation 并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FOREGROUND_LONG_BASH_LOADING", "<persisted-output>"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-foreground-long-bash-loading-completed",
+          "text": "foreground-long-bash-loading-completed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-agent-tool-call",
+      "description": "BG13: main agent launches a foreground Agent whose child tool updates should keep the parent streaming.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 foreground Agent，让 child Bash 运行期间验证 parent loading 仍按原语义显示。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING_STATUS"],
+        "bodyExcludes": [
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING_STATUS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_foreground_child_tool_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E foreground child tool streaming",
+            "prompt": "E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING: Run Bash with description foreground child visible bash sleep, then reply exactly E2E_FOREGROUND_AGENT_CHILD_TOOL_DONE."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-child-bash-tool-call",
+      "description": "BG13: foreground child Agent starts a visible foreground Bash tool while parent remains running.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "用真实 child Bash tool update 覆盖 foreground mirrored subagent event 的 streaming 保留分支。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING"],
+        "bodyExcludes": [
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_foreground_child_tool_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'sleep 4; printf \"E2E_FOREGROUND_AGENT_CHILD_TOOL_BASH_DONE\\n\"'",
+            "description": "foreground child visible bash sleep"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-child-done",
+      "description": "BG13: foreground child Agent completes after the visible Bash tool finishes.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 foreground Agent 正常完成并把结果回传父 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING",
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-foreground-child-tool-streaming-child-done",
+          "text": "E2E_FOREGROUND_AGENT_CHILD_TOOL_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-completed",
+      "description": "BG13: parent consumes the foreground Agent result and completes.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 foreground subagent child tool running 窗口后，父 turn 正常收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING_STATUS",
+          "E2E_FOREGROUND_AGENT_CHILD_TOOL_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-foreground-child-tool-streaming-completed",
+          "text": "foreground-agent-child-tool-streaming-completed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-idle-agent-tool-call",
+      "description": "BG13: main agent launches a background Agent whose child tool updates should not mark the parent idle turn as streaming.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 background Agent，让 child Bash 运行期间验证 parent idle UI 不显示 fake loading。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_STATUS: Launch a background agent that runs a visible child Bash tool while the parent conversation is idle."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_STATUS: Launch a background agent that runs a visible child Bash tool while the parent conversation is idle."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_idle_child_tool_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background child tool idle",
+            "prompt": "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE: Run Bash with description background idle child visible bash sleep, then reply exactly E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-idle-agent-launch-ack",
+      "description": "BG13: parent finishes launch turn while child Agent continues running a local tool.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn，制造 parent idle + child tool running 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_STATUS",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-idle-launch-ack",
+          "text": "background-agent-child-tool-idle-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-idle-child-bash-tool-call",
+      "description": "BG13: child Agent starts a visible foreground Bash tool while parent remains idle.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "用真实 child Bash tool update 覆盖 mirrored background subagent event 的 UI streaming 保护。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE"],
+        "bodyExcludes": [
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_idle_child_tool_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f \".zcode-e2e/conversation-session-background/background-child-tool-idle-release\" ]; do sleep 0.1; done; printf \"E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_BASH_DONE\\n\"'",
+            "description": "background idle child visible bash sleep"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-idle-child-done",
+      "description": "BG13: child Agent completes after the visible Bash tool finishes.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 background Agent 正常完成并产生 parent notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE",
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-idle-child-done",
+          "text": "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-idle-notification-consumed",
+      "description": "BG13: parent consumes background Agent completion after the child tool running window.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 child tool running 窗口后，Agent completion 仍走标准 task-notification 链路。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-idle-notification",
+          "text": "background-agent-child-tool-idle-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-agent-tool-call",
+      "description": "BG18: main agent launches a background Agent whose child tool update is delayed until a later main reply exists.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 background Agent 已启动、父会话已 idle、后续主回复已完成后 child tool update 才到达的 live 聚合窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR: Launch a background agent whose child tool update arrives after my next main prompt has completed."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR: Launch a background agent whose child tool update arrives after my next main prompt has completed."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_parent_anchor_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background child tool parent anchor",
+            "prompt": "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD: Wait briefly, run Bash with description background parent anchor child visible bash sleep, then reply exactly E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-launch-ack",
+      "description": "BG18: parent finishes the launch turn while child Agent remains running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让父会话先回 idle，随后用户可发送第二条主消息。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-parent-anchor-launch-ack",
+          "text": "background-child-tool-parent-anchor-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-follow-up",
+      "description": "BG18: a later main prompt completes while the background child tool response is still delayed.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "在 child tool update 到达前创建新的主 assistant 回复，用来复现 live child tool 被错误挂到最新回复下的问题。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_FOLLOWUP"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_FOLLOWUP"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-parent-anchor-follow-up",
+          "text": "background-child-tool-parent-anchor-main-followup-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-child-bash-tool-call",
+      "description": "BG18: child Agent starts a visible Bash tool after the later main reply already exists.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "延迟 child Bash tool_use，稳定验证 mirrored child tool update 必须按 parentToolUseId 回挂原 Agent message。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD"],
+        "bodyExcludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 6000,
+        "toolUse": {
+          "id": "toolu_e2e_background_parent_anchor_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f \".zcode-e2e/conversation-session-background/background-parent-anchor-release\" ]; do sleep 0.1; done; printf \"E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_BASH_DONE\\n\"'",
+            "description": "background parent anchor child visible bash sleep"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-child-done",
+      "description": "BG18: child Agent completes after its visible Bash tool finishes.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 background Agent 正常完成并产生 parent notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD",
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-parent-anchor-child-done",
+          "text": "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-notification-consumed",
+      "description": "BG18: parent consumes background Agent completion after the parented child tool placement assertion.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 child tool placement 修复不影响标准 task-notification 收口。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-child-tool-parent-anchor-notification",
+          "text": "background-child-tool-parent-anchor-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-session-switch-agent-tool-call",
+      "description": "BG21: main agent launches a background Agent whose child Bash completes while the user is viewing another session.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 background Agent + child Bash tool 已出现，随后切走父 session 的窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH: Launch a background agent whose child Bash completes while I am viewing another session."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH: Launch a background agent whose child Bash completes while I am viewing another session."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_session_switch_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background session switch child tool",
+            "prompt": "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD: Run Bash with description background session switch child visible bash, then reply exactly E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-session-switch-launch-ack",
+      "description": "BG21: parent finishes launch turn while child Agent remains running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让父会话先回 idle，随后测试切到其他 session/draft。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-session-switch-launch-ack",
+          "text": "background-session-switch-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-session-switch-child-bash-tool-call",
+      "description": "BG21: child Agent starts a visible Bash tool before the parent session is hidden.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "先让 child Bash running card 进入父 renderer store；命令等待文件 barrier，由测试在父 session 隐藏后释放。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD"],
+        "bodyExcludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 500,
+        "toolUse": {
+          "id": "toolu_e2e_background_session_switch_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f .zcode-e2e/conversation-session-background/bg21-child-tool-release ]; do sleep 0.1; done; printf \"E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_BASH_DONE\\n\"'",
+            "description": "background session switch child visible bash"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-session-switch-child-done",
+      "description": "BG21: child Agent completes after Bash finishes while the parent session is hidden.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 hidden/tombstoned terminal tool update 和 Agent completion notification 都完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD",
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-session-switch-child-done",
+          "text": "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-session-switch-notification-consumed",
+      "description": "BG21: parent consumes completion notification while the task is not active.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证切回后 UI 从 store/snapshot 恢复 terminal child tool 投影。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_CHILD_TOOL_SESSION_SWITCH_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-session-switch-notification",
+          "text": "background-session-switch-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-switch-back-running-agent-tool-call",
+      "description": "BG22: main agent launches a background Agent whose child Bash is still running when the user switches back.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 background Agent + child Bash tool 已出现且切回时仍 running 的窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING: Launch a background agent whose child Bash is still running when I switch back."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING: Launch a background agent whose child Bash is still running when I switch back."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_switch_back_running_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background switch back running child tool",
+            "prompt": "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD: Run Bash with description background switch back running child visible bash, then reply exactly E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-switch-back-running-launch-ack",
+      "description": "BG22: parent finishes launch turn while child Agent remains running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让父会话先回 idle，随后测试切到其他 session/draft 后立即切回。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-switch-back-running-launch-ack",
+          "text": "background-switch-back-running-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-switch-back-running-child-bash-tool-call",
+      "description": "BG22: child Agent starts a visible Bash tool that is still running when the parent session is selected again.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "先让 child Bash running card 进入父 renderer store，并保持足够长时间覆盖切回时仍 running 的窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD"],
+        "bodyExcludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 500,
+        "toolUse": {
+          "id": "toolu_e2e_background_switch_back_running_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f \".zcode-e2e/conversation-session-background/background-switch-back-release\" ]; do sleep 0.1; done; printf \"E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_BASH_DONE\\n\"'",
+            "description": "background switch back running child visible bash"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-switch-back-running-child-done",
+      "description": "BG22: child Agent completes after Bash finishes while the parent session is visible again.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证切回可见状态后 child Bash terminal update 仍会 patch 同一 tool card。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD",
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-switch-back-running-child-done",
+          "text": "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-switch-back-running-notification-consumed",
+      "description": "BG22: parent consumes completion notification after the user has switched back.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证切回后后续 Agent completion notification 仍按标准链路消费。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_CHILD_TOOL_SWITCH_BACK_RUNNING_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-switch-back-running-notification",
+          "text": "background-switch-back-running-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-agent-tool-call",
+      "description": "BG16: main agent launches a background Agent whose child tool keeps raw runtime streaming while main is idle.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 main idle + background-only child tool running + held queue 的窗口，复现 queued prompt Send now 不应 stop background task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_NOW_QUEUE: Launch a background agent with a visible child Bash tool, then wait."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_SEND_NOW_QUEUE: Launch a background agent with a visible child Bash tool, then wait."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_send_now_queue_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background send now queue",
+            "prompt": "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD: Run Bash with description background send now queue child bash sleep, then reply exactly E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-agent-launch-ack",
+      "description": "BG16: parent finishes launch turn while background Agent continues running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn，制造 parent idle + child tool running 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_NOW_QUEUE",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-now-queue-launch-ack",
+          "text": "background-send-now-queue-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-child-bash-tool-call",
+      "description": "BG16: child Agent starts a visible foreground Bash tool while parent remains idle.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "用文件 barrier 控制真实 child Bash 生命周期，让父侧 raw runtime streaming 但 mainActive=false；点击 Send now 后再释放，避免固定 sleep 受全量负载影响。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD"],
+        "bodyExcludes": [
+          "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_BASH_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_send_now_queue_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f \".zcode-e2e/conversation-session-background/background-send-now-queue-release\" ]; do sleep 0.1; done; printf \"E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_BASH_DONE\\n\"'",
+            "description": "background send now queue child bash sleep"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-hold",
+      "description": "BG16: foreground hold turn creates a real typed queue before stop transitions to background-only idle.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "使用真实主 turn 与 composer queue 替代已删除的 renderer store 注入，稳定构造 stop 后 background-only + paused queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOLD_STREAM",
+          "E2E_BACKGROUND_SEND_NOW_QUEUE_HOLD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SEND_NOW_QUEUE_HOLD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-background-send-now-queue-hold",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-prompt-received",
+      "description": "BG16: clicked queued prompt is sent as a normal provider request without stopping background task.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 background-only running 下 queued prompt Send now 直接触发 provider request，而不是先 stop background task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_SEND_NOW_QUEUE_PAYLOAD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SEND_NOW_QUEUE_PAYLOAD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-now-queue-received",
+          "text": "background-send-now-queue-received-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-child-done",
+      "description": "BG16: child Agent completes after the queued prompt has already been sent.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 Send now 没有停止 background Agent；child Bash 自然完成后 Agent 继续产生 completion notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD",
+          "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_BASH_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-now-queue-child-done",
+          "text": "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-send-now-queue-notification-consumed",
+      "description": "BG16: parent consumes background Agent completion after queued Send now.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 queued Send now 后 background Agent completion 仍走标准 task-notification 链路。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_SEND_NOW_QUEUE_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-send-now-queue-notification",
+          "text": "background-send-now-queue-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-agent-tool-call",
+      "description": "BG17: main agent starts a background Agent before user follow-up messages are queued.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定启动真实 background Agent；后续 delayed launch ack 再制造 main running + background running 的 queue 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END: Start a background agent, but let me queue follow-up messages while this main turn is still running."
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END: Start a background agent, but let me queue follow-up messages while this main turn is still running."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_queue_drain_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background queue drain agent",
+            "prompt": "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD: Wait briefly, then reply exactly E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-agent-launch-ack",
+      "description": "BG17: parent keeps the launch turn active after starting the background Agent.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟父模型 launch ack，稳定制造 background Agent 已 running、main turn 仍 active 时用户消息进入 renderer queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-launch-ack",
+          "text": "background-queue-drain-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-child-delayed-result",
+      "description": "BG17: child Agent remains running while queued prompts drain.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "延迟 background Agent completion，避免 notification 抢在 queued prompt drain 验证前进入父会话。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD: Wait briefly, then reply exactly E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD_DONE."
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD: Wait briefly, then reply exactly E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD_DONE."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 30000,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-child-done",
+          "text": "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-first-queued-prompt",
+      "description": "BG17: first follow-up prompt after the background launch stays active long enough to queue another prompt.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟 Q2 响应，稳定验证 launch ack 前已入队的 Q3/Q4 不会在 Q2 drain 后丢失。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q2"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q2"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-first",
+          "text": "background-queue-drain-first-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-second-queued-prompt",
+      "description": "BG17: second follow-up prompt drains after Q2 completes.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟 Q3 响应，稳定观察 Q3 已渲染为 user message 且 Q4 仍留在 queue 的 UI 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q3"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q3"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-second",
+          "text": "background-queue-drain-second-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-third-queued-prompt",
+      "description": "BG17: Q4 queued before launch ack drains after Q3.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟 Q4 响应，稳定观察 Q4 drain 后已渲染为 user message。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q4"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_Q4"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 2000,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-third",
+          "text": "background-queue-drain-third-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-queue-drain-notification-consumed",
+      "description": "BG17: parent consumes background Agent completion after queued prompt drain.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 queued prompt drain 不会丢失后续 background Agent completion notification。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_QUEUE_DRAIN_AFTER_MAIN_END_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-queue-drain-notification",
+          "text": "background-queue-drain-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-nested-agent-tool-call",
+      "description": "BG06: main agent launches a background Agent that starts a nested background Bash.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 background Agent 内部启动 background Bash，验证 parent surface 只消费 Agent completion。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_NESTED_BASH"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_NESTED_BASH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_nested_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Nested background Bash",
+            "prompt": "E2E_BACKGROUND_NESTED_BASH_CHILD: Start Bash(run_in_background=true), then finish with exactly E2E_BACKGROUND_NESTED_BASH_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-nested-agent-launch-ack",
+      "description": "BG06: parent finishes launch turn after nested Agent starts asynchronously.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_NESTED_BASH", "Async agent launched successfully"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-nested-launch-ack",
+          "text": "background-nested-bash-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-nested-child-bash-tool-call",
+      "description": "BG06: child Agent starts a background Bash command and then should be allowed to complete before Bash exits.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定触发 child runtime 内部 Bash(run_in_background=true)。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_NESTED_BASH_CHILD"],
+        "bodyExcludes": [
+          "Command running in background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_NESTED_BASH_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_nested_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sleep 1; printf 'nested bash done\\n'",
+            "description": "Nested child background Bash",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-nested-child-stops-after-bash-launch",
+      "description": "BG06: child Agent stops after receiving the backgrounded Bash launch result.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 parent Agent completion 不等待 nested Bash terminal。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_NESTED_BASH_CHILD", "Command running in background"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-nested-child-done",
+          "text": "E2E_BACKGROUND_NESTED_BASH_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-nested-notification-consumed",
+      "description": "BG06: parent consumes the Agent completion notification and does not receive a second parent result for nested Bash.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 parent surface 只消费 Agent completion notification。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_NESTED_BASH_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "toolu_e2e_background_nested_child_bash",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-nested-notification",
+          "text": "background-nested-bash-notification-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-snapshot-control-ready",
+      "description": "BG23: launch two real background Bash tasks so the right summary panel can reproduce a partial terminal update.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定启动两个 background Bash：第一个先完成，第二个保持 running，用真实右上角 background control 面板复现闪没场景。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_SNAPSHOT_CONTROL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SNAPSHOT_CONTROL"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_bg23_bash_one",
+            "name": "Bash",
+            "input": {
+              "command": "sh -c 'sleep 8; printf \"E2E_BG23_BASH_ONE_DONE\\n\"'",
+              "description": "E2E BG23 bash one",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg23_bash_two",
+            "name": "Bash",
+            "input": {
+              "command": "sh -c 'sleep 60; printf \"E2E_BG23_BASH_TWO_DONE\\n\"'",
+              "description": "E2E BG23 bash two",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-background-snapshot-control-launch-ack",
+      "description": "BG23: parent finishes the launch turn while both background Bash controls are visible.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 main 回到 idle，同时右上角 background control 面板仍有两个 running Bash row。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SNAPSHOT_CONTROL",
+          "toolu_e2e_bg23_bash_one",
+          "toolu_e2e_bg23_bash_two",
+          "Command running in background"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-snapshot-control-ready",
+          "text": "background-snapshot-control-ready-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-snapshot-control-first-notification",
+      "description": "BG23: first background Bash completes while the second stays running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "消费第一个 background Bash completion notification，并保持第二个 running row 可见。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SNAPSHOT_CONTROL",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg23_bash_one</tool-use-id>",
+          "<status>completed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-snapshot-control-first-notification",
+          "text": "background-snapshot-control-first-notification-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-snapshot-control-second-stopped",
+      "description": "BG23: stop the second background Bash for deterministic cleanup.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "消费第二个 background Bash stop notification，避免长 running task 泄漏到后续测试。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SNAPSHOT_CONTROL",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg23_bash_two</tool-use-id>",
+          "<status>killed</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-snapshot-control-second-stopped",
+          "text": "background-snapshot-control-second-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-ready",
+      "description": "BG24: launch one long cc background Agent and three zcode background Agent tasks so the third zcode completion notification can run while the cc peer remains running.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定启动四个 background Agent：三个 zcode Agent 依次完成，cc Agent 保持 running，用真实右上角 background control 面板复现 Agent row 闪没场景。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_AGENT_CONTROL_PRESERVE"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_AGENT_CONTROL_PRESERVE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_bg24_cc_agent",
+            "name": "Agent",
+            "input": {
+              "description": "E2E BG24 cc keepalive agent",
+              "prompt": "E2E_BG24_CC_CHILD: Stay running until stopped. If not stopped, return E2E_BG24_CC_CHILD_UNEXPECTED.",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg24_zcode_one_agent",
+            "name": "Agent",
+            "input": {
+              "description": "E2E BG24 zcode one agent",
+              "prompt": "E2E_BG24_ZCODE_ONE_CHILD: Finish after a short delay and return exactly E2E_BG24_ZCODE_ONE_CHILD_DONE.",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg24_zcode_two_agent",
+            "name": "Agent",
+            "input": {
+              "description": "E2E BG24 zcode two agent",
+              "prompt": "E2E_BG24_ZCODE_TWO_CHILD: Finish after a short delay and return exactly E2E_BG24_ZCODE_TWO_CHILD_DONE.",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg24_zcode_three_agent",
+            "name": "Agent",
+            "input": {
+              "description": "E2E BG24 zcode three agent",
+              "prompt": "E2E_BG24_ZCODE_THREE_CHILD: Finish after a short delay and return exactly E2E_BG24_ZCODE_THREE_CHILD_DONE.",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-cc-child-keepalive-tool",
+      "description": "BG24: cc peer Agent stays running while zcode Agent completes.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "让 cc Agent 进入不会自行完成的 child Bash，保持 running，证明另一个 Agent completion notification 不会清掉它的 control row。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG24_CC_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BG24_CC_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bg24_cc_keepalive_bash",
+          "name": "Bash",
+          "input": {
+            "command": "while true; do sleep 1; done",
+            "description": "E2E BG24 cc keepalive bash"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-one-child-result",
+      "description": "BG24: first zcode peer Agent completes first.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "短延迟完成第一个 zcode background Agent，稳定触发 parent task-notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG24_ZCODE_ONE_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BG24_ZCODE_ONE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 4000,
+        "text": {
+          "id": "upstream-e2e-bg24-zcode-one-child-done",
+          "text": "E2E_BG24_ZCODE_ONE_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-two-child-result",
+      "description": "BG24: second zcode peer Agent completes second.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "短延迟完成第二个 zcode background Agent，稳定触发 parent task-notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG24_ZCODE_TWO_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BG24_ZCODE_TWO_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 14000,
+        "text": {
+          "id": "upstream-e2e-bg24-zcode-two-child-done",
+          "text": "E2E_BG24_ZCODE_TWO_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-three-child-result",
+      "description": "BG24: third zcode peer Agent completes third.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "短延迟完成第三个 zcode background Agent，复现真实场景中第三个 completion notification 触发 UI 闪没。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG24_ZCODE_THREE_CHILD"],
+        "lastUserMessageIncludes": ["E2E_BG24_ZCODE_THREE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 24000,
+        "text": {
+          "id": "upstream-e2e-bg24-zcode-three-child-done",
+          "text": "E2E_BG24_ZCODE_THREE_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-launch-ack",
+      "description": "BG24: parent finishes launch turn while all background Agent controls are visible.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 main 回到 idle，同时右上角 background control 面板仍有多个 running Agent row。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "toolu_e2e_bg24_cc_agent",
+          "toolu_e2e_bg24_zcode_one_agent",
+          "toolu_e2e_bg24_zcode_two_agent",
+          "toolu_e2e_bg24_zcode_three_agent",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-agent-control-preserve-ready",
+          "text": "background-agent-control-preserve-ready-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-one-notification",
+      "description": "BG24: first zcode background Agent completion notification is consumed before the third completion reproducer.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "先消费第一个 zcode Agent completion notification，复现真实场景中多个 zcode Agent 依次完成。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg24_zcode_one_agent</tool-use-id>",
+          "<status>completed</status>",
+          "E2E_BG24_ZCODE_ONE_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-agent-control-preserve-zcode-one-notification",
+          "text": "background-agent-control-preserve-zcode-one-notification-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-two-notification",
+      "description": "BG24: second zcode background Agent completion notification is consumed before the third completion reproducer.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "再消费第二个 zcode Agent completion notification，复现真实场景中多个 zcode Agent 依次完成。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg24_zcode_two_agent</tool-use-id>",
+          "<status>completed</status>",
+          "E2E_BG24_ZCODE_TWO_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 12000,
+        "text": {
+          "id": "upstream-e2e-background-agent-control-preserve-zcode-two-notification",
+          "text": "background-agent-control-preserve-zcode-two-notification-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-three-notification",
+      "description": "BG24: third zcode background Agent completion notification asks the main model to update todos before the final reply.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "复现真实场景：main 处理第三个 Agent completion notification 时先执行 TodoWrite，覆盖 notification turn 内部状态更新。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg24_zcode_three_agent</tool-use-id>",
+          "<status>completed</status>",
+          "E2E_BG24_ZCODE_THREE_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bg24_todo_write",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "E2E_BG24_TODO_UPDATED",
+                "status": "completed",
+                "priority": "low"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-after-todo",
+      "description": "BG24: final notification-turn reply after TodoWrite is delayed so the UI can assert the cc peer row remains visible while main is still processing.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "复现真实场景：TodoWrite 之后 main notification turn 仍在处理，另一个 still-running Agent row 不能从右上角闪没。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "toolu_e2e_bg24_todo_write",
+          "E2E_BG24_TODO_UPDATED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 15000,
+        "text": {
+          "id": "upstream-e2e-background-agent-control-preserve-zcode-notification",
+          "text": "background-agent-control-preserve-zcode-notification-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-cc-stopped",
+      "description": "BG24: stop the cc Agent for deterministic cleanup.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "测试结束前收口仍 running 的 cc Agent，避免长 running task 泄漏到后续测试。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_AGENT_CONTROL_PRESERVE",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg24_cc_agent</tool-use-id>",
+          "<status>stopped</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-agent-control-preserve-cc-stopped",
+          "text": "background-agent-control-preserve-cc-stopped-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-agent-composition-mixed-launch",
+      "description": "Telemetry: main turn launches one foreground and one background Agent.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "同一 main turn 启动 foreground/background Agent，验证两类结果在同一 provider request 消费后生成 main_plus_fg_bg。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AGENT_COMPOSITION_MIXED"],
+        "bodyExcludes": [
+          "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_DONE",
+          "E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_DONE",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_AGENT_COMPOSITION_MIXED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_composition_mixed_foreground",
+            "name": "Agent",
+            "input": {
+              "description": "E2E mixed foreground Agent",
+              "prompt": "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_CHILD: Return exactly E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_DONE.",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_e2e_composition_mixed_background",
+            "name": "Agent",
+            "input": {
+              "description": "E2E mixed background Agent",
+              "prompt": "E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_CHILD: Return exactly E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_DONE.",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-agent-composition-mixed-foreground-child",
+      "description": "Telemetry: foreground child completes after background result is ready.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "用 child Bash 文件 barrier 等待 background response 完成，再释放 foreground child，稳定制造同一 main turn 的 mixed 消费窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_composition_mixed_foreground_bash",
+          "name": "Bash",
+          "input": {
+            "command": "sh -c 'while [ ! -f .zcode-e2e/conversation-session-background/agent-composition-mixed-foreground-release ]; do sleep 0.1; done; printf \"E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_BARRIER_DONE\\n\"'",
+            "description": "E2E mixed foreground child barrier"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-agent-composition-mixed-foreground-child-done",
+      "description": "Telemetry: foreground child completes after background result is ready.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "文件 barrier 释放 foreground child 后返回最终结果，确保 main active-loop 仍可消费已完成的 background notification。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_CHILD",
+          "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_BARRIER_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-agent-composition-mixed-foreground-child-done",
+          "text": "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-agent-composition-mixed-background-child",
+      "description": "Telemetry: background child completes before foreground child.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "先完成 background child，确保其结构化 subagent notification 在 foreground child 收口前可被 active loop 消费。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-agent-composition-mixed-background-child",
+          "text": "E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-agent-composition-mixed-final",
+      "description": "Telemetry: main consumes both subagent results in one continuation request.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "provider-visible request 同时包含 foreground tool result 与 background subagent notification，验证 mixed composition。 验证来源提示及非用户授权边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AGENT_COMPOSITION_MIXED",
+          "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_DONE",
+          "E2E_AGENT_COMPOSITION_MIXED_BACKGROUND_DONE",
+          "<task-notification>",
+          "toolu_e2e_composition_mixed_foreground",
+          "toolu_e2e_composition_mixed_background"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "E2E_AGENT_COMPOSITION_MIXED_FOREGROUND_DONE",
+          "[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-agent-composition-mixed-final",
+          "text": "agent-composition-mixed-completed-ok"
+        }
+      }
+    }
+  ]
+}

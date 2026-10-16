@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-unregistered-tool-cold-snapshot",
+  "spec": "./test/e2e/conversation-session/conversation-session-unregistered-tool-cold-snapshot.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-unregistered-tool-cold-snapshot.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "unregistered-tool-cold-snapshot-title",
+      "description": "UTL 首发的 case-local 标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 O17/CHL09 语义；固定响应避免误命中主请求。"
+    },
+    {
+      "id": "unregistered-tool-cold-snapshot-grep-batch",
+      "description": "单个 model step 返回 60 个 embedded-search Grep 和 1 个必定未注册的 Grep sentinel。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定复现线上 registry miss，并让同一 turn 超过 60 行 snapshot 尾窗。"
+    },
+    {
+      "id": "unregistered-tool-cold-snapshot-final",
+      "description": "全部搜索工具快速失败后的同 turn continuation 最终回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 provider 收到 failed tool results 后 turn 正常 completed，隔离 terminal UI 语义。"
+    }
+  ]
+}

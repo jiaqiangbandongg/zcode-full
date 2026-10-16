@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-parallel-projection",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-parallel-projection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-parallel-projection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "subagent-parallel-projection-parent-launch",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定产生 7 个并行 Agent tool calls，稳定覆盖 child persist 与父投影发布的竞态窗口。"
+    },
+    {
+      "id": "subagent-parallel-projection-child-controlled-window",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实模型完成速度不可控；固定延迟让 E2E 能在 child 全部 running 时断言并切换任务。"
+    },
+    {
+      "id": "subagent-parallel-projection-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定父 continuation 收口，证明 7 个真实 child 都已完成且 parent 可恢复 idle。"
+    }
+  ]
+}

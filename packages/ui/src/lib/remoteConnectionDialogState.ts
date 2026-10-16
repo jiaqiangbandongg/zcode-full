@@ -1,6 +1,6 @@
 import type { RemoteWizardStep } from "@/RemoteConnectionWizardChrome.js";
 
-interface RemoteConnectionDialogSnapshot {
+export interface RemoteConnectionDialogSnapshot {
   currentStep: RemoteWizardStep;
   loading: boolean;
   connectedSessionId: string | null;
@@ -18,7 +18,9 @@ interface RemoteConnectionDirectoryFailureState {
   step: RemoteWizardStep;
 }
 
-export function isRemoteConnectionFlowActive(snapshot: RemoteConnectionDialogSnapshot): boolean {
+export function isRemoteConnectionFlowActive(
+  snapshot: RemoteConnectionDialogSnapshot,
+): boolean {
   return snapshot.loading || Boolean(snapshot.connectedSessionId);
 }
 
@@ -26,6 +28,19 @@ export function shouldResetRemoteConnectionOnOpen(
   snapshot: RemoteConnectionDialogSnapshot,
 ): boolean {
   return !isRemoteConnectionFlowActive(snapshot);
+}
+
+export function getRemoteConnectionDialogResumeStep(
+  snapshot: RemoteConnectionDialogSnapshot,
+): RemoteWizardStep {
+  if (isRemoteConnectionFlowActive(snapshot)) {
+    return snapshot.currentStep;
+  }
+  if (snapshot.currentStep === "connecting") {
+    return "connecting";
+  }
+
+  return "kind";
 }
 
 export function getRemoteConnectionCompletionDialogState(

@@ -4,7 +4,7 @@ import type { WorkspaceZCodeUIState } from "@/store/zcodeSessionStoreTypes.js";
 import { isChatTaskRunning } from "@/lib/chatStatus.js";
 import { logger } from "@/logger.js";
 
-const WINDOWS_RESERVED_NAME_SCAN_SKIPPED_DIRECTORIES = new Set([
+export const WINDOWS_RESERVED_NAME_SCAN_SKIPPED_DIRECTORIES = new Set([
   ".git",
   "node_modules",
   "dist",
@@ -17,13 +17,13 @@ const WINDOWS_RESERVED_NAME_SCAN_SKIPPED_DIRECTORIES = new Set([
   ".vite",
 ]);
 
-interface WorkspaceRemovalRiskScanOptions {
+export interface WorkspaceRemovalRiskScanOptions {
   maxEntries?: number;
   maxFindings?: number;
   skippedDirectories?: ReadonlySet<string>;
 }
 
-interface WorkspaceRemovalRiskScanResult {
+export interface WorkspaceRemovalRiskScanResult {
   findings: string[];
   scannedEntries: number;
   truncated: boolean;
@@ -51,11 +51,11 @@ export function hasRunningWorkspaceChat(params: {
   );
 }
 
-function isWorkspaceRemovalBlockingRuntimeStatus(status: ZCodeTaskRuntimeStatus): boolean {
+export function isWorkspaceRemovalBlockingRuntimeStatus(status: ZCodeTaskRuntimeStatus): boolean {
   return isChatTaskRunning(status);
 }
 
-function isWindowsReservedDevicePathSegment(segment: string): boolean {
+export function isWindowsReservedDevicePathSegment(segment: string): boolean {
   const normalizedSegment = segment.replace(/[ .]+$/u, "");
   if (!normalizedSegment) {
     return false;
@@ -73,8 +73,7 @@ export async function scanWindowsReservedDeviceNameFiles(
 ): Promise<WorkspaceRemovalRiskScanResult> {
   const maxEntries = options.maxEntries ?? DEFAULT_MAX_SCAN_ENTRIES;
   const maxFindings = options.maxFindings ?? DEFAULT_MAX_FINDINGS;
-  const skippedDirectories =
-    options.skippedDirectories ?? WINDOWS_RESERVED_NAME_SCAN_SKIPPED_DIRECTORIES;
+  const skippedDirectories = options.skippedDirectories ?? WINDOWS_RESERVED_NAME_SCAN_SKIPPED_DIRECTORIES;
   const pendingDirectories = [rootPath];
   const findings: string[] = [];
   let scannedEntries = 0;

@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-markdown-protocols",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-markdown-protocols.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-output-limit-continue-markdown-protocols.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/continue-markdown-protocols/cross-seam.svg",
+      "source": "created-by-spec",
+      "description": "OTC11 写入固定 SVG，让 Chat Completions 与 Responses API 子用例复用 OTC09 的 workspace-relative 图片拼接缝。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "otc11-chat-title",
+      "description": "Chat Completions 子用例标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 Continue 协议归一化探针，固定响应避免占用四次主请求 fixture。"
+    },
+    {
+      "id": "otc11-chat-partial-p1",
+      "description": "Chat Completions 第一次主请求返回 OTC09 p1 与 finish_reason=length。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第一条 Continue 并保留 Markdown 拼接缝。"
+    },
+    {
+      "id": "otc11-chat-partial-p2",
+      "description": "Chat Completions 第二次主请求返回 OTC09 p2 与 finish_reason=length。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第二条 Continue。"
+    },
+    {
+      "id": "otc11-chat-partial-p3",
+      "description": "Chat Completions 第三次主请求返回 OTC09 p3 与 finish_reason=length。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第三条 Continue。"
+    },
+    {
+      "id": "otc11-chat-final-p4",
+      "description": "Chat Completions 第四次主请求返回 OTC09 p4 与 finish_reason=stop。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "正常结束 Chat Completions Continue 链并提供最终累计 Markdown DOM。"
+    },
+    {
+      "id": "otc11-responses-title",
+      "description": "Responses API 子用例标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 Continue 协议归一化探针，固定响应避免占用四次主请求 fixture。"
+    },
+    {
+      "id": "otc11-responses-partial-p1",
+      "description": "Responses API 第一次主请求返回 OTC09 p1 与 response.incomplete/max_output_tokens。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会归一化为 length 并触发第一条 Continue。"
+    },
+    {
+      "id": "otc11-responses-partial-p2",
+      "description": "Responses API 第二次主请求返回 OTC09 p2 与 response.incomplete/max_output_tokens。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会触发第二条 Continue。"
+    },
+    {
+      "id": "otc11-responses-partial-p3",
+      "description": "Responses API 第三次主请求返回 OTC09 p3 与 response.incomplete/max_output_tokens。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会触发第三条 Continue。"
+    },
+    {
+      "id": "otc11-responses-final-p4",
+      "description": "Responses API 第四次主请求返回 OTC09 p4 与 response.completed。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "正常结束 Responses Continue 链并提供最终累计 Markdown DOM。"
+    }
+  ]
+}

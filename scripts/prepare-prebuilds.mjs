@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable max-lines */
 
-import { access, cp, mkdir } from "node:fs/promises";
 import {
   chmodSync,
   copyFileSync,
@@ -24,15 +23,24 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import {
+  LEGACY_REMOTE_RIPGREP_VERSION,
+  NATIVE_SEARCH_PREBUILT_RELEASES,
+  resolveNativeSearchArtifactSource,
+  resolveNativeSearchPrebuiltRelease,
+} from "./native-search-tools-config.mjs";
 import { resolveRemoteNativeSearchPrebuiltPlan } from "./remote-native-search-tools-config.mjs";
 import { prepareNativeSearchTools } from "./prepare-native-search-tools.mjs";
-import { stageNodeNotices, stageThirdPartyNotices } from "./third-party-notices.mjs";
+import {
+  stageNativeSearchNotices,
+  stageNodeNotices,
+  stageThirdPartyNotices,
+} from "./third-party-notices.mjs";
 import {
   computeDeterministicSourceSha256 as computeComponentSourceSha256,
   packSourceAsDeterministicTarGzip as packComponentSourceAsArchive,
 } from "./deterministic-tar-archive.mjs";
 import { runCommand } from "./spawn-command.mjs";
-import { resolveIntranetDepsBaseUrl } from "./intranetDefaults.mjs";
 
 export { computeComponentSourceSha256, packComponentSourceAsArchive };
 
@@ -92,10 +100,77 @@ const browserUseRequiredRuntimePaths = [
   "skills/web-gui-tester/SKILL.md",
 ];
 const remoteOfficialPluginPackages = [
-  // 44b25ed46c「remove bundled plugins except browser use and cua」删掉了其余
-  // 内置插件源码，但漏改这份清单，bootstrap:with-remote 在 staging 第一个 manifest 就抛
-  // missing。此处与 packages/desktop/scripts/prepare-agent-node-bundle.mjs 的桌面 seed
-  // 清单、packages/server/src/remote/zcodeAgentOfficialPluginAssets.ts 的远端合同保持一致。
+  {
+    packageName: "@zcode/android-emulator-plugin",
+    relativePath: "apps/zcode-cli/packages/android-emulator-plugin",
+    requiresRuntime: true,
+    requiredRuntimePaths: ["dist/mcp/server.js"],
+    runtimeBuildScript: "scripts/build-mcp.mjs",
+    stagedPath: "packages/android-emulator-plugin",
+  },
+  {
+    packageName: "@zcode/documents-plugin",
+    relativePath: "apps/zcode-cli/packages/documents-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/documents-plugin",
+  },
+  {
+    packageName: "@zcode/image-search-plugin",
+    relativePath: "apps/zcode-cli/packages/image-search-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/image-search-plugin",
+  },
+  {
+    packageName: "@zcode/pdf-plugin",
+    relativePath: "apps/zcode-cli/packages/pdf-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/pdf-plugin",
+  },
+  {
+    packageName: "@zcode/presentations-plugin",
+    relativePath: "apps/zcode-cli/packages/presentations-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/presentations-plugin",
+  },
+  {
+    packageName: "@zcode/spreadsheets-plugin",
+    relativePath: "apps/zcode-cli/packages/spreadsheets-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/spreadsheets-plugin",
+  },
+  {
+    packageName: "@zcode/visualize-plugin",
+    relativePath: "apps/zcode-cli/packages/visualize-plugin",
+    requiresRuntime: false,
+    requiredSeedPaths: [
+      "skills/visualize/SKILL.md",
+      "skills/visualize/references/api.md",
+      "skills/visualize/references/styles.md",
+      "skills/visualize/tweak.md",
+      "skills/visualize/LICENSE.md",
+      "skills/visualize/scripts/render.py",
+      "skills/visualize/assets/visualize.css",
+      "skills/visualize/assets/visualize.html",
+      "skills/visualize/assets/calendar.js",
+      "skills/visualize/assets/runtime-manifest.json",
+      "skills/visualize/scripts/vendor.py",
+      "skills/visualize/assets/vendor/manifest.json",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js.LICENSE",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js.LICENSE",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js.LICENSE",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js.LICENSE",
+      "skills/visualize/widgets/calendar.md",
+      "skills/visualize/examples/calendar.html",
+      "skills/visualize/assets/standalone-host-bridge.js",
+      "skills/visualize/assets/standalone-shell.js",
+    ],
+    requiredRuntimePaths: [],
+    stagedPath: "packages/visualize-plugin",
+  },
   {
     // 远端 shared-host 必须部署 node_repl runtime，否则只剩 skill 而没有 mcp__node_repl__js ——
     // 该 runtime 现由 @zcode/node-repl-host 提供（见下一个条目），browser-use 只带自己的
@@ -117,6 +192,46 @@ const remoteOfficialPluginPackages = [
     runtimeBuildScript: "scripts/build.mjs",
     stagedPath: "packages/node-repl-host",
   },
+  {
+    // CUA 远端只部署 SDK/skill/docs；runtime 仍必须 attachment 到 desktop shared host，
+    // 不在 remote workspace 安装或启动 native Helper。
+    packageName: "@zcode/zcode-cua-plugin",
+    relativePath: "apps/zcode-cli/packages/zcode-cua-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/zcode-cua-plugin",
+  },
+  {
+    packageName: "@zcode/ios-simulator-plugin",
+    relativePath: "apps/zcode-cli/packages/ios-simulator-plugin",
+    requiresRuntime: true,
+    requiredRuntimePaths: ["dist/mcp/server.js"],
+    runtimeBuildScript: "scripts/build-mcp.mjs",
+    stagedPath: "packages/ios-simulator-plugin",
+  },
+  {
+    packageName: "@zcode/restore-legacy-sessions-plugin",
+    relativePath: "apps/zcode-cli/packages/restore-legacy-sessions-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/restore-legacy-sessions-plugin",
+  },
+  {
+    packageName: "@zcode/skill-creator-plugin",
+    relativePath: "apps/zcode-cli/packages/skill-creator-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/skill-creator-plugin",
+  },
+  {
+    packageName: "@zcode/plugin-creator-plugin",
+    relativePath: "apps/zcode-cli/packages/plugin-creator-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/plugin-creator-plugin",
+  },
+  {
+    packageName: "@zcode/zcode-guide-plugin",
+    relativePath: "apps/zcode-cli/packages/zcode-guide-plugin",
+    requiresRuntime: false,
+    stagedPath: "packages/zcode-guide-plugin",
+  },
 ];
 // 随 CLI 内置的技能包（不是插件）：远端 agent 的 bootstrap 沿官方插件同款候选目录在 zcode.cjs 旁
 // 找 packages/bundled-skills 并原地读取；与 packages/desktop/scripts/prepare-agent-node-bundle.mjs 同一份清单。
@@ -128,7 +243,7 @@ const remoteBundledSkillPack = {
     "skills/dynamic-workflows/examples.md",
   ],
   stagedPath: "packages/bundled-skills",
-  topLevelPaths: ["skills"],
+  topLevelPaths: ["README.md", "skills"],
 };
 const remoteOfficialPluginTopLevelPaths = new Set([
   ".mcp.json",
@@ -158,8 +273,32 @@ function shouldCopyOfficialPluginAsset(sourcePath) {
   return !excludedOfficialPluginAssetNames.has(name) && !name.endsWith(".pyc");
 }
 const remoteOfficialPluginRequiredPaths = [
+  "packages/android-emulator-plugin/.zcode-plugin/plugin.json",
   "packages/browser-use-plugin/.zcode-plugin/plugin.json",
-  "packages/node-repl-host/.zcode-plugin/plugin.json",
+  "packages/zcode-cua-plugin/.zcode-plugin/plugin.json",
+  "packages/image-search-plugin/.zcode-plugin/plugin.json",
+  "packages/image-search-plugin/.mcp.json",
+  "packages/documents-plugin/.zcode-plugin/plugin.json",
+  "packages/pdf-plugin/.zcode-plugin/plugin.json",
+  "packages/presentations-plugin/.zcode-plugin/plugin.json",
+  "packages/spreadsheets-plugin/.zcode-plugin/plugin.json",
+  "packages/ios-simulator-plugin/.zcode-plugin/plugin.json",
+  "packages/restore-legacy-sessions-plugin/.zcode-plugin/plugin.json",
+  "packages/skill-creator-plugin/.zcode-plugin/plugin.json",
+  "packages/plugin-creator-plugin/.zcode-plugin/plugin.json",
+  "packages/plugin-creator-plugin/skills/plugin-creator/SKILL.md",
+  "packages/zcode-guide-plugin/.zcode-plugin/plugin.json",
+  // 修复原因：文档技能正文与 visual-judge 都是必需 seed 资产，不能只校验 manifest。
+  "packages/documents-plugin/agents/visual-judge.md",
+  "packages/documents-plugin/skills/docx/SKILL.md",
+  "packages/pdf-plugin/agents/visual-judge.md",
+  "packages/pdf-plugin/skills/pdf/SKILL.md",
+  "packages/presentations-plugin/agents/visual-judge.md",
+  "packages/presentations-plugin/skills/pptx/SKILL.md",
+  "packages/spreadsheets-plugin/agents/visual-judge.md",
+  "packages/spreadsheets-plugin/skills/xlsx/SKILL.md",
+  "packages/visualize-plugin/.zcode-plugin/plugin.json",
+  "packages/visualize-plugin/skills/visualize/SKILL.md",
 ];
 
 function readZCodeAgentRuntimeVersion() {
@@ -284,6 +423,7 @@ async function prepareNodeBinaries() {
   for (const platformKey of remotePlatforms) {
     const nodeDir = join(releaseDir, "node", platformKey);
     const nodeBinaryPath = join(nodeDir, "node");
+    // 远端 node 组件独立下载；复用缓存时也要刷新精确版本的 Node 许可原文。
     await stageNodeNotices(nodeDir, nodeVersion, rootDir);
 
     if (existsSync(nodeBinaryPath)) {
@@ -498,20 +638,25 @@ function stageRemoteOfficialPlugins(glmDir) {
   }
 }
 
-async function stageRemoteBundledSkillPack(glmDir) {
+function stageRemoteBundledSkillPack(glmDir) {
   const sourceRoot = join(rootDir, remoteBundledSkillPack.relativePath);
   const targetRoot = join(glmDir, ...remoteBundledSkillPack.stagedPath.split("/"));
-  await mkdir(targetRoot, { recursive: true });
+  mkdirSync(targetRoot, { recursive: true });
   for (const entryName of remoteBundledSkillPack.topLevelPaths) {
     const sourcePath = join(sourceRoot, entryName);
-    await cp(sourcePath, join(targetRoot, entryName), {
+    if (!existsSync(sourcePath)) continue;
+    cpSync(sourcePath, join(targetRoot, entryName), {
       recursive: true,
       filter: shouldCopyOfficialPluginAsset,
     });
   }
   for (const relativePath of remoteBundledSkillPack.requiredPaths) {
     const stagedAssetPath = join(targetRoot, ...relativePath.split("/"));
-    await access(stagedAssetPath);
+    if (!existsSync(stagedAssetPath)) {
+      throw new Error(
+        `[prepare-prebuilds] missing staged remote bundled skill asset: ${stagedAssetPath}`,
+      );
+    }
   }
   console.log(`  [ok] mock-cdn glm bundled skill pack ${remoteBundledSkillPack.stagedPath}`);
 }
@@ -520,7 +665,7 @@ async function stageRemoteBundledSkillPack(glmDir) {
 // 远端部署时已经有一份独立 node（跑 zcode-server.cjs），agent 复用它执行 zcode.cjs 即可，
 // 不必再为每个平台准备一份内嵌 node 的 SEA 二进制。zcode.cjs 跨平台同一份，逐平台只是放进各自的
 // glm/<platform> 组件目录，保持现有 manifest 组件结构不变。
-async function stageRemoteAgentBundles() {
+function stageRemoteAgentBundles() {
   console.log("==> Building zcode-cli bundle for remote agents");
   // 复用桌面同款构建脚本（turbo build:desktop-agent --filter=@zcode/cli），命中缓存时几乎瞬时。
   runCommand(process.execPath, [join(rootDir, "scripts/build-desktop-agent-cli.mjs")], {
@@ -543,38 +688,85 @@ async function stageRemoteAgentBundles() {
     mkdirSync(glmDir, { recursive: true });
     copyFileSync(cliBundlePath, join(glmDir, "zcode.cjs"));
     stageRemoteOfficialPlugins(glmDir);
-    await stageRemoteBundledSkillPack(glmDir);
+    stageRemoteBundledSkillPack(glmDir);
     console.log(`  [ok] mock-cdn glm/${platformKey}/zcode.cjs`);
   }
 }
 
-function canResolveIntranetDepsBaseUrl() {
+function downloadRemoteNativeSearchToolsFromIntranet(platformKey, targetOs, targetArch) {
   try {
-    resolveIntranetDepsBaseUrl();
-    return true;
-  } catch {
-    return false;
+    if (targetOs === "linux") {
+      // 修复原因：Linux remote 过去仍走 legacy rg13 单工具下载链，导致 WSL 的 Bash
+      // 找不到随包 bfs/ugrep。这里复用 desktop/SEA 已验证的同一 release plan，
+      // 一次准备 glibc 2.28 的 bfs/ugrep -2 与 Microsoft musl rg14。
+      runCommand(
+        process.execPath,
+        [
+          join(rootDir, "scripts/download-native-search-tools.mjs"),
+          "--platform",
+          targetOs,
+          "--arch",
+          targetArch,
+          "--output-dir",
+          join(releaseDir, "tools", platformKey),
+        ],
+        {
+          cwd: rootDir,
+          env: process.env,
+        },
+      );
+    } else {
+      runCommand(
+        process.execPath,
+        [
+          join(rootDir, "scripts/download-ripgrep.mjs"),
+          LEGACY_REMOTE_RIPGREP_VERSION,
+          targetOs,
+          targetArch,
+        ],
+        {
+          cwd: rootDir,
+          env: {
+            ...process.env,
+            ZCODE_FORCE_REMOTE_MOCK_CDN: "1",
+          },
+        },
+      );
+    }
+  } catch (error) {
+    console.error(
+      `  [error] native search 下载失败 (${platformKey})，请检查依赖镜像和 runner 网络访问`,
+    );
+    throw error;
   }
 }
 
-export async function prepareRemoteNativeSearchTools({
-  platforms = remotePlatforms,
-  outputDir = join(releaseDir, "tools"),
-} = {}) {
-  console.log("==> Preparing local native search binaries for remote platforms");
-  for (const platformKey of platforms) {
+// 远端 native search 与 desktop/SEA 使用同一来源判定：内网依赖源已配置时保持原有下载命令
+// （Linux 走 release plan，macOS 保留 legacy rg13 单工具下载），未配置时按远端 plan 解包仓库归档。
+// 两条路径都在组件哈希计算前把许可声明写进各工具目录，保证组件归档自带材料。
+async function prepareRemoteNativeSearchTools({ env = process.env } = {}) {
+  const source = resolveNativeSearchArtifactSource(env);
+  console.log(
+    source === "intranet"
+      ? "==> Downloading native search binaries for remote platforms"
+      : "==> Preparing native search binaries for remote platforms from repository archives",
+  );
+  for (const platformKey of remotePlatforms) {
     const [targetOs, targetArch] = platformKey.split("-");
     if (!targetOs || !targetArch) {
       throw new Error(`Invalid remote platform key: ${platformKey}`);
     }
-
-    await prepareNativeSearchTools({
-      prebuiltPlan: resolveRemoteNativeSearchPrebuiltPlan({
-        platform: targetOs,
-        arch: targetArch,
-        outputDir: join(outputDir, platformKey),
-      }),
+    const prebuiltPlan = resolveRemoteNativeSearchPrebuiltPlan({
+      platform: targetOs,
+      arch: targetArch,
+      outputDir: join(releaseDir, "tools", platformKey),
     });
+    if (source === "intranet") {
+      downloadRemoteNativeSearchToolsFromIntranet(platformKey, targetOs, targetArch);
+      await stageNativeSearchNotices(prebuiltPlan, rootDir, { origin: "intranet-mirror" });
+    } else {
+      await prepareNativeSearchTools({ prebuiltPlan, source: "repository" });
+    }
   }
 }
 
@@ -844,23 +1036,38 @@ export function buildRemoteComponentDefinitions(platformKey) {
     },
   ];
 
-  const [platform, arch] = platformKey.split("-");
-  const nativeSearchPlan = resolveRemoteNativeSearchPrebuiltPlan({
-    platform,
-    arch,
-    outputDir: join(releaseDir, "tools", platformKey),
-  });
+  if (platformKey.startsWith("linux-")) {
+    return [
+      ...baseComponents,
+      {
+        id: "bfs",
+        semanticPrefix: resolveNativeSearchPrebuiltRelease("bfs", "linux"),
+        mount: joinPosix("tools", platformKey, "bfs"),
+        sourcePath: join(releaseDir, "tools", platformKey, "bfs"),
+      },
+      {
+        id: "ripgrep",
+        semanticPrefix: NATIVE_SEARCH_PREBUILT_RELEASES.ripgrep,
+        mount: joinPosix("tools", platformKey, "ripgrep"),
+        sourcePath: join(releaseDir, "tools", platformKey, "ripgrep"),
+      },
+      {
+        id: "ugrep",
+        semanticPrefix: resolveNativeSearchPrebuiltRelease("ugrep", "linux"),
+        mount: joinPosix("tools", platformKey, "ugrep"),
+        sourcePath: join(releaseDir, "tools", platformKey, "ugrep"),
+      },
+    ];
+  }
 
   return [
     ...baseComponents,
-    ...nativeSearchPlan.artifacts
-      .toSorted((left, right) => left.toolId.localeCompare(right.toolId))
-      .map((artifact) => ({
-        id: artifact.toolId,
-        semanticPrefix: artifact.release,
-        mount: joinPosix("tools", platformKey, artifact.toolId),
-        sourcePath: dirname(artifact.binaryPath),
-      })),
+    {
+      id: "ripgrep",
+      semanticPrefix: LEGACY_REMOTE_RIPGREP_VERSION,
+      mount: joinPosix("tools", platformKey, "ripgrep"),
+      sourcePath: join(releaseDir, "tools", platformKey, "ripgrep"),
+    },
   ];
 }
 
@@ -991,14 +1198,6 @@ function prepareRemoteComponentArtifacts() {
     );
 
     for (const component of componentDefinitions) {
-      if (!existsSync(component.sourcePath)) {
-        if (!canResolveIntranetDepsBaseUrl()) {
-          console.warn(
-            `  [skip] component ${component.id} (${platformKey}): source missing and intranet deps source is not configured`,
-          );
-          continue;
-        }
-      }
       componentManifestEntries.push(
         prepareRemoteComponentArtifact({
           mockCdnDir,
@@ -1043,7 +1242,7 @@ async function main() {
   buildServerBundle();
   copyServerBundle();
   copyNodePtyPrebuilds();
-  await stageRemoteAgentBundles();
+  stageRemoteAgentBundles();
   await prepareRemoteNativeSearchTools();
   // 修复：server、pty、agent 均可独立下载，需在组件哈希计算前补齐各自的声明。
   await stageThirdPartyNotices(join(releaseDir, "server"), rootDir);

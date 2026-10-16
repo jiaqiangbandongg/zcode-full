@@ -13,6 +13,7 @@ import type {
   CoreAskSite,
   CoreFacts,
   CoreFanoutSite,
+  CoreHoleSite,
   CoreSimpleSite,
   CoreSites,
   CoreTypes,
@@ -154,10 +155,25 @@ function mintCore(
       ...(cardinality === undefined ? {} : { cardinality }),
     };
   });
+  // 只有开放的留白是站点（docs/analysis.md「Sites」）：已补全的留白是一个阶段，不是一步。
+  // 名字 / 类型缺席的留白在 9012 处已挡下，这里的兜底只是把不变量写下来。
+  const holes: CoreHoleSite[] = table.holes
+    .filter((site) => site.body === undefined)
+    .map((site) => ({
+      ...(site.fill === undefined ? {} : { fill: site.fill }),
+      id: site.id,
+      loc: site.loc,
+      name: site.name ?? site.id,
+      order: site.order,
+      ...(site.tail ? { tail: true as const } : {}),
+      type: site.typeText ?? "unknown",
+      ...withinOf(site.call),
+    }));
   const sites: CoreSites = {
     actors,
     asks,
     fanouts,
+    holes,
     joins: table.joins.map(simple),
     worldReads: table.worldReads.map(simple),
   };
@@ -195,6 +211,7 @@ function mintFacts(
     askActor: renameMap(facts.askActor),
     askData: renameMap(facts.askData),
     fanoutIn,
+    holeData: renameMap(facts.holeData),
     joinIn: renameMap(facts.joinIn),
     returnData: renameOccs(facts.returnData),
     worldReadData: renameMap(facts.worldReadData),

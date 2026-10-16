@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "upstream-plugin-mcp-skill-not-installed-noop",
+      "description": "Plugin MCP skill not-installed baseline: agent must NOT advertise the namespaced tool, so the model replies with a normal text turn (no tool_use).",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MCP_PING_NOT_INSTALLED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_e2e_plugin_mcp_ping_not_installed",
+          "inputTokens": 32,
+          "model": "deepseek-v4-flash",
+          "outputTokens": 16,
+          "text": "E2E_PLUGIN_MCP_PING_NOT_INSTALLED_NOOP\nupstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-mcp-skill-disabled-noop",
+      "description": "Plugin MCP skill disabled: agent must NOT advertise the namespaced tool even though the plugin is installed, so the model replies with a normal text turn (no tool_use).",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MCP_PING_DISABLED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_e2e_plugin_mcp_ping_disabled",
+          "inputTokens": 32,
+          "model": "deepseek-v4-flash",
+          "outputTokens": 16,
+          "text": "E2E_PLUGIN_MCP_PING_DISABLED_NOOP\nupstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

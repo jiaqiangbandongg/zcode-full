@@ -1,0 +1,14 @@
+lane workspace
+lane actor#1 "a" @8:9
+lane actor#2 "b" @9:9
+lane actor#3 "c" @16:8
+region seq#1 seq
+step ask#1 ask "a" @8:20 lane=actor#1 region=seq#1 always
+step ask#2 ask "b" @9:20 lane=actor#2 region=seq#1 always
+step world-read#1 world-read "read seed.txt" @11:23 lane=workspace region=seq#1 always
+step ask#3 ask "c" @16:19 lane=actor#3 region=seq#1 always
+edge world-read#1 -> ask#1 data always exact
+edge world-read#1 -> ask#2 data always exact
+edge ask#1 -> ask#3 data maybe exact
+edge ask#2 -> ask#3 data maybe exact
+sink ask#3

@@ -1,0 +1,6 @@
+node source
+node ask#1 "planner" @6:25 actors=actor#1 type="string"
+node sink
+actor actor#1 "planner" @2:17
+edge ask#1 -> ask#1 data exact type="string"
+edge ask#1 -> sink data exact type="string"

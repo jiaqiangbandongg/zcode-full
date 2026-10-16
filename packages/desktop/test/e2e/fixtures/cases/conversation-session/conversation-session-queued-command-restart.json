@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-queued-command-restart",
+  "spec": "./test/e2e/conversation-session/conversation-session-queued-command-restart.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-queued-command-restart.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "queued-command-restart-title",
+      "description": "PV4-25Q running session 的 case-local 标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定创建任务列表行，供整进程重启后显式恢复原 session。"
+    },
+    {
+      "id": "queued-command-restart-running-turn",
+      "description": "PV4-25Q controlled stream：保持首轮 running，让第二条输入真实进入 CLI queue。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "只有 running 窗口才能形成 delivery=queue 的 durable session_input；随后由整进程重启真实转成 discarded。"
+    }
+  ]
+}

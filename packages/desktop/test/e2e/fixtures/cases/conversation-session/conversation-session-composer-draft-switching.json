@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-composer-draft-switching",
+  "spec": "./test/e2e/conversation-session/conversation-session-composer-draft-switching.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-composer-draft-switching.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-composer-draft-completed-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只需要稳定形成 completed task，后续断言聚焦 composer 草稿正文和附件的 taskId 作用域恢复。"
+    },
+    {
+      "id": "upstream-composer-draft-running-seed-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "running task 草稿恢复必须在 assistant 仍可能 streaming 时验证；真实 provider 可能过快完成，导致无法稳定覆盖 inactive stream 更新。"
+    },
+    {
+      "id": "upstream-composer-draft-completed-text-should-not-send",
+      "kind": "ignore",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "composer 草稿正文只应保存在本地 draft scope；切换 task 不应把草稿内容作为 user prompt 发送给 provider。"
+    },
+    {
+      "id": "upstream-composer-draft-running-text-should-not-send",
+      "kind": "ignore",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "running task 切换期间 composer 草稿正文只应保存在本地 draft scope；inactive stream 更新不应把草稿内容发送给 provider。"
+    },
+    {
+      "id": "upstream-composer-draft-unsent-text-should-not-send",
+      "kind": "ignore",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "未发送的新 task 草稿只应保存在 __draft__ scope；切换到已有 task 再返回不应触发 provider 请求。"
+    }
+  ]
+}

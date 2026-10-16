@@ -1,0 +1,16 @@
+flowchart TD
+  subgraph actor_1["seed (actor#1)"]
+    ask_1["seed<br/>ask#1"]
+  end
+  subgraph actor_2["out (actor#2)"]
+    ask_2["out<br/>ask#2"]
+  end
+  source(["source"])
+  sink(["sink"])
+  ask_1 -.->|"string"| ask_2
+  ask_2 -->|"string"| sink
+  source --> ask_1
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  classDef relay fill:#fff2cc,stroke:#d6b656;
+  class source,sink endpoint;

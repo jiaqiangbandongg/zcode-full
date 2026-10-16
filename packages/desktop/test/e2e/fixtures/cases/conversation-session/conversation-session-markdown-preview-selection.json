@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-markdown-preview-selection",
+  "spec": "./test/e2e/conversation-session/conversation-session-markdown-preview-selection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-markdown-preview-selection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "markdown-side-parent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父任务仅用于验证 Markdown 选区辅助对话，响应固定正文，不执行工具。"
+    }
+  ]
+}

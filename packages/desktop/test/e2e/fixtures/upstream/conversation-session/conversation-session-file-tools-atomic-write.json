@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-file-tools-atomic-write",
+  "spec": "./test/e2e/conversation-session/conversation-session-file-tools-atomic-write.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-title",
+      "description": "File tools atomic write case 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 file tools 权限语义，只需要稳定返回，避免标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_FILE_TOOLS_ATOMIC_WRITE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-file-tools-atomic-write-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"File Tools Atomic Write E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-read-write",
+      "description": "首段响应：先读取 write.sh，让后续 Write 覆盖已有可执行文件时通过 read-before-write guard。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定先 Read 再 Write；本响应固定触发已读既有可执行文件的覆盖路径。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_FILE_TOOLS_ATOMIC_WRITE"],
+        "bodyIncludes": ["E2E_FILE_TOOLS_ATOMIC_WRITE", "file-tools-atomic-write-e2e/write.sh"],
+        "bodyExcludes": ["Generate a concise title", "toolu_e2e_file_tools_atomic_write_read_write"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_file_tools_atomic_write_read_write",
+          "messageId": "msg_e2e_file_tools_atomic_write_read_write",
+          "name": "Read",
+          "input": {
+            "file_path": "file-tools-atomic-write-e2e/write.sh"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-write",
+      "description": "第二段响应：覆盖已读过的 write.sh，验证 Write 走 atomic overwrite。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 Write；本响应固定触发已有脚本的完整覆盖写入。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FILE_TOOLS_ATOMIC_WRITE", "old-write"],
+        "bodyExcludes": ["Generate a concise title", "toolu_e2e_file_tools_atomic_write_write"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_file_tools_atomic_write_write",
+          "messageId": "msg_e2e_file_tools_atomic_write_write",
+          "name": "Write",
+          "input": {
+            "file_path": "file-tools-atomic-write-e2e/write.sh",
+            "content": "#!/usr/bin/env bash\necho new-write\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-read-edit",
+      "description": "第三段响应：读取 edit.sh，让后续 Edit 覆盖已有可执行文件时通过 read-before-write guard。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定在 Edit 前读取目标；本响应固定触发已读既有可执行文件的编辑路径。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_FILE_TOOLS_ATOMIC_WRITE", "The file file-tools-atomic-write-e2e/write.sh has been updated successfully"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_file_tools_atomic_write_read_edit",
+          "messageId": "msg_e2e_file_tools_atomic_write_read_edit",
+          "name": "Read",
+          "input": {
+            "file_path": "file-tools-atomic-write-e2e/edit.sh"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-edit",
+      "description": "第四段响应：编辑已读过的 edit.sh，验证 Edit 走 atomic overwrite。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 Edit；本响应固定触发已有脚本的局部编辑写入。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FILE_TOOLS_ATOMIC_WRITE",
+          "toolu_e2e_file_tools_atomic_write_read_edit",
+          "old-edit"
+        ],
+        "bodyExcludes": ["Generate a concise title", "toolu_e2e_file_tools_atomic_write_edit"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_file_tools_atomic_write_edit",
+          "messageId": "msg_e2e_file_tools_atomic_write_edit",
+          "name": "Edit",
+          "input": {
+            "file_path": "file-tools-atomic-write-e2e/edit.sh",
+            "old_string": "old-edit",
+            "new_string": "new-edit"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-final",
+      "description": "最终响应：Edit 成功后结束 case。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终 marker 只用于稳定结束窗口级 replay；真实 provider 回复内容不影响文件权限语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FILE_TOOLS_ATOMIC_WRITE",
+          "The file file-tools-atomic-write-e2e/edit.sh has been updated successfully"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-file-tools-atomic-write-final",
+          "inputTokens": 240,
+          "outputTokens": 12,
+          "text": "E2E_FILE_TOOLS_ATOMIC_WRITE_OK"
+        }
+      }
+    }
+  ]
+}

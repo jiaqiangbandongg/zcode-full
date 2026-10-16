@@ -4,18 +4,18 @@ import type { CommandAck, CommandKey } from "@zcode/shared/zcode-protocol-v4";
 
 export type PersistentCommandFactSource = "transcript" | "timeline" | "child" | "discarded";
 
-interface PersistentCommandIndexSeed {
+export interface PersistentCommandIndexSeed {
   workspacePath: string;
   workspaceIdentity?: string;
   facts?: Partial<Record<PersistentCommandFactSource, readonly CommandAck[]>>;
 }
 
-interface PersistentCommandIndexTarget {
+export interface PersistentCommandIndexTarget {
   workspacePath: string;
   workspaceIdentity?: string;
 }
 
-interface PersistentCommandIndexHost {
+export interface PersistentCommandIndexHost {
   loadSession(sessionId: string): Promise<PersistentCommandIndexSeed | null>;
 }
 

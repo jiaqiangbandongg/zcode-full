@@ -16,7 +16,9 @@ import {
   type TimelineLayout,
 } from "./timeline-geometry.js";
 import { MarchLight } from "./WorkflowMarchLight.js";
+import { STREAM_GAP, StreamChevrons } from "./WorkflowStreamChevrons.js";
 import { stationLampClass } from "./WorkflowTimelineLedge.js";
+import { slideClass, slideStyle, type FillSlide } from "./use-fill-growth.js";
 
 /**
  * 轨道层。
@@ -49,8 +51,12 @@ export interface TimelineRailPiece {
   start: TimelinePoint;
   end: TimelinePoint;
   ink: TimelineInk;
-  /** `fork` / `merge` 是带两端的曲线；`tail` / `stub` 是没有前驱 / 汇合站时主线的那一小截。 */
-  kind?: "fork" | "merge" | "tail" | "stub";
+  /**
+   * `fork` / `merge` 是带两端的曲线；`tail` / `stub` 是没有前驱 / 汇合站时主线的那一小截；`stream`
+   * 是一条轨道上的流轨——路径在正中断开 `STREAM_GAP`，`chevrons` 是缺口的中心。
+   */
+  kind?: "fork" | "merge" | "tail" | "stub" | "stream";
+  chevrons?: TimelinePoint;
   from?: number;
   to?: number;
 }
@@ -179,7 +185,22 @@ export function timelineRailPieces(
       continue;
     }
     const yt = rowOf(trackOfStation(rail.from));
-    pieces.push({ ...ends, ...straight(lx(rail.from) + 8, lx(rail.to) - 8, yt) });
+    const x1 = lx(rail.from) + 8;
+    const x2 = lx(rail.to) - 8;
+    if (rail.kind === "stream") {
+      // 流轨（presentation.md「Stream rails」）：一条直线两笔，中间让出 chevron 的缺口。
+      const mid = (x1 + x2) / 2;
+      pieces.push({
+        ...ends,
+        chevrons: { x: mid, y: yt },
+        d: `M${x1},${yt} H${mid - STREAM_GAP / 2} M${mid + STREAM_GAP / 2},${yt} H${x2}`,
+        end: { x: x2, y: yt },
+        kind: "stream",
+        start: { x: x1, y: yt },
+      });
+      continue;
+    }
+    pieces.push({ ...ends, ...straight(x1, x2, yt) });
   }
   return pieces;
 }
@@ -219,7 +240,11 @@ export function WorkflowTimelineTracks({
             stroke={INK_STROKE[piece.ink]}
             strokeWidth={1}
           />
-          {piece.ink === "march" ? (
+          {piece.chevrons === undefined ? null : (
+            <StreamChevrons ink={piece.ink} x={piece.chevrons.x} y={piece.chevrons.y} />
+          )}
+          {/* 流从不叠行进的光：它的墨在 chevron 上。 */}
+          {piece.ink === "march" && piece.kind !== "stream" ? (
             <MarchLight
               d={piece.d}
               from={piece.start}
@@ -257,12 +282,15 @@ export function WorkflowTimelineLamps({
   draft,
   folded,
   layout,
+  slide,
   stations,
 }: {
   stations: readonly TimelineStation[];
   layout: TimelineLayout;
   folded: ReadonlySet<number>;
   draft: boolean;
+  /** 补全的生长（`use-fill-growth.ts`）：插入列右侧的灯随站滑开。 */
+  slide?: FillSlide;
 }) {
   return (
     <>
@@ -270,16 +298,18 @@ export function WorkflowTimelineLamps({
         <span
           aria-hidden
           className={cn(
-            stationLampClass(station.status),
+            stationLampClass(station.status, station.hole),
             "absolute",
             "wf-foldable",
             folded.has(i) && "wf-folded",
             draft && "wf-land",
+            slideClass(i, slide),
           )}
           data-lamp={station.status ?? "pending"}
           data-lamp-track={station.track}
           key={station.id}
           style={{
+            ...slideStyle(i, slide),
             left: lampX(i, layout.inset) - 5,
             top: (layout.rowY[station.track] ?? layout.rowY[0]!) - 5,
           }}

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-oversized-inline-image-attachment",
+  "spec": "./test/e2e/conversation-session/conversation-session-oversized-inline-image-attachment.test.ts",
+  "fixtures": [
+    {
+      "id": "oversized-local-path-image-main",
+      "description": "T05 有 localPath 的 21MiB 图片发送链路固定回复，用于断言请求不携带 dataBase64。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 provider-visible 请求的附件形态；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_OVERSIZED_LOCAL_PATH_IMAGE"],
+        "bodyIncludes": [
+          "E2E_OVERSIZED_LOCAL_PATH_IMAGE",
+          "upstream-e2e-ok"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-oversized-local-path-image-main",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

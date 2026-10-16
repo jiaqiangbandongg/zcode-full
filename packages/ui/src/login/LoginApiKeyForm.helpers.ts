@@ -26,7 +26,7 @@ export function resolveLoginApiKeyProviderLabel(choice: ApiKeyProviderChoice): s
   return choice === "zai" ? "Z.ai" : "BigModel";
 }
 
-function resolveLoginApiKeyProviderFamilyDomain(
+export function resolveLoginApiKeyProviderFamilyDomain(
   choice: ApiKeyProviderChoice,
 ): ProviderFamilyDomain {
   return choice;
@@ -60,4 +60,17 @@ export function buildLoginApiKeyDefaultModelPreferenceFromSelection(
   const firstModel = view.providers.find((provider) => provider.providerId === providerId)
     ?.models[0]?.modelId;
   return firstModel ? encodeCustomModelValue(providerId, firstModel) : null;
+}
+
+export function resolveHydratedLoginApiKeyValue({
+  savedApiKey,
+  userEdited,
+}: {
+  savedApiKey: string;
+  userEdited: boolean;
+}): string | null {
+  if (userEdited) {
+    return null;
+  }
+  return savedApiKey.trim();
 }

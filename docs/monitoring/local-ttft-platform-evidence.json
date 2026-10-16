@@ -1,0 +1,265 @@
+{
+  "collectedAt": "2026-09-15T02:25:00+08:00",
+  "source": "阶段 0 平台验收：真实 desktop E2E → OTLP → 北京 ARMS/SLS，随后只读查询核对",
+  "scope": "本文件只记录平台侧验收；本地 OTLP 出口证据见 local-ttft-evidence.json 与 local-ttft-diagnostics-evidence.json",
+  "platform": {
+    "region": "cn-beijing",
+    "project": "arms-project-placeholder",
+    "traceStore": "logstore-tracing",
+    "metricStore": "metricstore-apm-metrics-custom",
+    "serviceName": "zcode-local-ttft"
+  },
+  "endpointProbe": {
+    "note": "接入值取自 CI 变量 ZCODE_PACKAGED_AGENT_OTEL_ENDPOINT/_HEADERS，密钥不入库；下表只记录路径形态与状态码",
+    "basePath": "/apm/trace/opentelemetry",
+    "headerKeys": ["x-arms-license-key", "x-arms-project", "x-cms-workspace"],
+    "results": [
+      {
+        "path": "/apm/trace/opentelemetry/v1/traces",
+        "status": 200,
+        "meaning": "Trace 侧现有拼接，可用"
+      },
+      {
+        "path": "/apm/trace/opentelemetry/v1/metrics",
+        "status": 200,
+        "meaning": "Metric 侧 base+/v1/metrics 拼接可用；此前担心的路径不兼容风险不成立"
+      },
+      {
+        "path": "/apm/metric/opentelemetry/v1/metrics",
+        "status": 404,
+        "meaning": "SLS 不使用独立 metric base"
+      },
+      {
+        "path": "/apm/metrics/opentelemetry/v1/metrics",
+        "status": 400,
+        "meaning": "同上"
+      }
+    ],
+    "conclusion": "同一个 OTLP base 同时接收 traces 与 metrics，桌面 main 不需要独立 metrics endpoint 注入通道"
+  },
+  "runs": [
+    {
+      "runId": "desktop-e2e-20260915020619919-p56853-722f219491dafb0d",
+      "spec": "conversation-session-ttft-stages",
+      "passed": 3,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "runId": "desktop-e2e-20260915021204704-p61755-cbf7df537b79ae11",
+      "spec": "conversation-session-ttft-stages",
+      "passed": 3,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "runId": "desktop-e2e-20260915021512862-p67329-8016dda6fb7d3237",
+      "spec": "conversation-session-ttft-diagnostics",
+      "passed": 6,
+      "failed": 0,
+      "exitCode": 0
+    }
+  ],
+  "transport": {
+    "mode": "E2E 运行时 env 注入 OTEL_EXPORTER_OTLP_ENDPOINT 指向本地接收器，接收器把原始 body/编码逐字转发到真实接入点",
+    "forwardedRequests": 85,
+    "forwardedFailures": 0,
+    "byPath": { "/v1/traces": 55, "/v1/metrics": 30 },
+    "allStatus": 200,
+    "caveat": "转发字节与 exporter 直连一致，但打包版从 Finder/开始菜单启动的编译注入写入路径仍未验证（阶段 1）"
+  },
+  "traceAcceptance": {
+    "serviceVisible": true,
+    "rootSpanSamples": 12,
+    "observationIdIsTraceId": {
+      "observationId": "820f1085-7bf1-4b04-9229-c2625b11da47",
+      "traceId": "820f10857bf14b049229c2625b11da47",
+      "verified": true
+    },
+    "singleMessageWaterfall": {
+      "observationId": "820f1085-7bf1-4b04-9229-c2625b11da47",
+      "spanCount": 62,
+      "rootMs": 701.7,
+      "mainStagesMs": {
+        "command_admission": 295.48,
+        "model_request": 285.38,
+        "request_prepare": 73.81,
+        "output_return": 32.75,
+        "renderer_prepare": 7.5,
+        "execution_wait": 6.77
+      },
+      "mainStagesSumMs": 701.69,
+      "reconciliation": "六个主阶段并集 701.69ms 对账根 701.70ms，与该样本 unattributed_ms=0 一致",
+      "firstTextMs": 8450.5,
+      "checkpointSpans": 31,
+      "startedPointRecordsZeroDuration": true
+    },
+    "rootAttributesPresent": [
+      "observation_id",
+      "command_id",
+      "input_id",
+      "query_id",
+      "turn_id",
+      "product_turn_id",
+      "logical_call_id",
+      "request_id",
+      "cli_instance_id",
+      "session_id",
+      "quality",
+      "send_mode",
+      "visibility",
+      "first_output_kind",
+      "unattributed_ms",
+      "missing_stages",
+      "truncated",
+      "clock_error_ms",
+      "timing_reliable"
+    ],
+    "sampleRootValues": {
+      "quality": "complete",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "first_output_kind": "reasoning",
+      "clock_error_ms": 5.02,
+      "unattributed_ms": 0,
+      "truncated": false
+    }
+  },
+  "metricAcceptance": {
+    "nameMapping": "OTel → Prometheus 不追加单位后缀，local-ttft-queries.md 的 zcode_local_ttft_* 默认名成立",
+    "deltaTemporality": "sum_over_time 累加区间样本成立；未使用 rate/increase",
+    "labelSet": {
+      "observed": [
+        "app_version",
+        "os",
+        "provider",
+        "model",
+        "quality",
+        "send_mode",
+        "visibility",
+        "stage",
+        "role",
+        "outcome",
+        "kind"
+      ],
+      "sampleValues": {
+        "app_version": "3.12.1",
+        "os": "darwin",
+        "provider": "e2e-deepseek",
+        "model": "deepseek-v4-flash"
+      },
+      "highCardinalityLeak": false
+    },
+    "queries": [
+      {
+        "name": "总样本 count",
+        "promql": "sum(sum_over_time(zcode_local_ttft_duration_count[30m]))",
+        "result": 12
+      },
+      {
+        "name": "阶段样本 count",
+        "promql": "sum(sum_over_time(zcode_local_ttft_stage_duration_count[30m]))",
+        "result": 18,
+        "note": "首个 stages run 的 3 次发送 × 6 阶段，无 attempt 放大"
+      },
+      {
+        "name": "总 P50",
+        "promql": "histogram_quantile(0.50, sum by (le) (sum_over_time(zcode_local_ttft_duration_bucket{quality=\"complete\"}[10m])))",
+        "result": 1500.0,
+        "note": "桶插值，非精确原始分位数"
+      },
+      {
+        "name": "阶段 P95",
+        "promql": "histogram_quantile(0.95, sum by (le,stage) (sum_over_time(zcode_local_ttft_stage_duration_bucket{quality=\"complete\"}[10m])))",
+        "result": {
+          "command_admission": 1850.0,
+          "request_prepare": 4550.0,
+          "model_request": 455.0,
+          "output_return": 455.0,
+          "execution_wait": 455.0,
+          "renderer_prepare": 18.5
+        }
+      },
+      {
+        "name": "默认体验总 P95（前台+complete）",
+        "promql": "histogram_quantile(0.95, sum by (le,send_mode) (sum_over_time(zcode_local_ttft_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[30m])))",
+        "result": { "idle": 9000.0, "queued": 4850.0 }
+      },
+      {
+        "name": "默认体验样本数",
+        "promql": "sum by (send_mode) (sum_over_time(zcode_local_ttft_duration_count{quality=\"complete\",visibility=\"foreground\"}[30m]))",
+        "result": { "idle": 4, "queued": 1 }
+      },
+      {
+        "name": "准备子阶段 P95（前台+complete）",
+        "promql": "histogram_quantile(0.95, sum by (le,stage) (sum_over_time(zcode_local_ttft_preparation_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[30m])))",
+        "result": {
+          "context": 937.5,
+          "hooks": 875.0,
+          "retry_wait": 1950.0,
+          "user_confirmation": 485.0,
+          "request_assembly": 8.75,
+          "persistence": 4.64,
+          "mcp": 0.95,
+          "tools": 0.95
+        }
+      },
+      {
+        "name": "records by kind",
+        "promql": "sum by (kind) (sum_over_time(zcode_local_ttft_records[30m]))",
+        "result": {
+          "start": 16,
+          "first_output": 12,
+          "first_text": 12,
+          "excluded": 4,
+          "checkpoint": 442
+        }
+      },
+      {
+        "name": "excluded by outcome",
+        "promql": "sum by (outcome) (sum_over_time(zcode_local_ttft_records{kind=\"excluded\"}[30m]))",
+        "result": { "cancelled": 2, "failed": 1, "guided": 1 }
+      },
+      {
+        "name": "attempt by role/outcome",
+        "promql": "sum by (role,outcome) (sum_over_time(zcode_local_ttft_attempt_duration_count[30m]))",
+        "result": { "response/first_output": 12, "response/failed": 2 },
+        "note": "重试的失败 attempt 与首输出 attempt 分别计数，主 TTFT 未被放大"
+      },
+      {
+        "name": "no_output.wait by outcome",
+        "promql": "sum by (outcome) (sum_over_time(zcode_local_ttft_no_output_wait_count[30m]))",
+        "result": { "cancelled": 2, "failed": 1 }
+      },
+      {
+        "name": "quality × visibility",
+        "promql": "sum by (quality,visibility) (sum_over_time(zcode_local_ttft_duration_count[30m]))",
+        "result": {
+          "complete/foreground": 5,
+          "complete/background_returned": 6,
+          "complete/background": 1
+        }
+      }
+    ],
+    "droppedCounter": "本次未观察到 zcode.local_ttft.dropped 序列，即无容量/队列丢弃"
+  },
+  "ingestionLatency": {
+    "method": "第二次 stages run 结束瞬间开始 5 秒间隔轮询，直到新样本可查",
+    "traceVisibleAfterSeconds": 0,
+    "metricVisibleAfterSeconds": 0,
+    "interpretation": "E2E 结束时明细与聚合都已可查（首次轮询即命中，上界 <5s），优于明细秒到几十秒、聚合约 5 分钟的目标；这不是逐条从产生到可见的精确测量",
+    "precise": false
+  },
+  "notVerified": [
+    "ARMS/Trace Explorer 控制台界面上的瀑布渲染与跳转目视确认（本次全部通过只读 API 核对数据完整性）",
+    "打包版从 Finder/开始菜单启动时的编译注入写入路径（阶段 1）",
+    "明细 7 天 / 聚合 30 天保留期、容量与实际费用（阶段 3）",
+    "灰度经服务端 client configs 下发后的端到端生效（阶段 2）",
+    "Windows / Linux 实机"
+  ],
+  "sideEffects": {
+    "productionWrites": "本次向生产遥测库写入 12 次发送的受控样本",
+    "identification": "可按 provider=\"e2e-deepseek\" 与 model=\"deepseek-v4-flash\" 识别并排除；这些标签不会出现在真实用户样本中",
+    "cleanup": "指标与 Trace 均按保留期自然过期，未做人工删除"
+  }
+}

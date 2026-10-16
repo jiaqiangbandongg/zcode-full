@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-assistant-preview-cards",
+  "spec": "./test/e2e/conversation-session/conversation-session-assistant-preview-cards.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-assistant-preview-cards.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "assistant-preview-e2e/本轮 输出/index 页面.html",
+      "source": "created-by-provider-tool",
+      "description": "APC04/APC05/APC09/APC11 由真实 Write 创建的 HTML，用于 current-turn fileChanges、Browser、side pane 会话偏好和 cold resume。"
+    },
+    {
+      "path": "assistant-preview-e2e/本轮 输出/说明 文档.md",
+      "source": "created-by-provider-tool",
+      "description": "APC05/APC09/APC11 由真实 Write 创建的 Markdown，用于 current-turn fileChanges、Preview Pane、side pane 会话偏好和 cold resume。"
+    },
+    {
+      "path": "assistant-preview-e2e/office/*.{docx,xlsx,pptx,pdf}",
+      "source": "created-by-spec",
+      "description": "spec 从 case-local 最小有效二进制 fixture 复制到 workspace，验证真实 Host stat 过滤与 Desktop 完成态 PPTX 自动打开 renderer。"
+    },
+    {
+      "path": "assistant-preview-e2e/media/*.{mp4,wav}",
+      "source": "created-by-spec",
+      "description": "spec 写入媒体 fixture，验证 APC12 媒体卡片、Host stat、本地授权 URL 与原生 audio 控件。"
+    },
+    {
+      "path": "assistant-preview-e2e/bounds/*.pdf",
+      "source": "created-by-spec",
+      "description": "spec 写入存在性候选；不打开内容，只验证 Host stat、15 个候选和最多 10 张卡片。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "assistant-preview-cards-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于预览卡片产品语义，只需避免 sidecar 请求误命中业务 fixture。"
+    },
+    {
+      "id": "assistant-preview-cards-local-url",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 assistant 文本中的动态随机端口 URL，稳定验证卡片投影和 Browser side pane。"
+    },
+    {
+      "id": "assistant-preview-cards-interrupted",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "interrupted 卡片必须在可重复的半流窗口中触发 Stop，普通 fast-text 无法提供该边界。"
+    },
+    {
+      "id": "assistant-preview-cards-streaming",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "需要在 assistant text 已可见但 row 尚未 terminal 时断言没有卡片。"
+    },
+    {
+      "id": "assistant-preview-cards-suppression-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Write 工具选择以建立本轮 active HTML fileChanges。"
+    },
+    {
+      "id": "assistant-preview-cards-suppression-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定现有业务语义：任一本地 HTTP URL 都抑制同轮全部 HTML 卡片。"
+    },
+    {
+      "id": "assistant-preview-cards-office-pptx",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定给出 Unicode/空格文件引用和出现顺序，文件存在性与 renderer 仍走真实产品链路。"
+    },
+    {
+      "id": "assistant-preview-cards-audio",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "将音频从 PPTX 自动打开轮拆出，避免 side pane active tab 竞争。"
+    },
+    {
+      "id": "assistant-preview-cards-video",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "将视频从 PPTX 自动打开轮拆出，避免 side pane active tab 竞争。"
+    },
+    {
+      "id": "assistant-preview-cards-max-ten",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定候选数量和文本顺序，真实存在性继续由 Host stat 决定。"
+    },
+    {
+      "id": "assistant-preview-cards-no-backfill",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 15 候选边界和缺失分布，验证产品不会为了凑满 10 张继续探测。"
+    },
+    {
+      "id": "assistant-preview-cards-source-write-html",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Write 工具选择，建立可持久化的当前轮 HTML fileChanges。"
+    },
+    {
+      "id": "assistant-preview-cards-source-write-markdown",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定第二次 Write，确保 HTML/Markdown 都属于同一 turn 的 active fileChanges。"
+    },
+    {
+      "id": "assistant-preview-cards-source-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E provider 的极小 context window 会在第二次 Write 后触发自动 compact；固定 summary，避免 replay 缺口打断文件预览与 cold resume 语义。"
+    },
+    {
+      "id": "assistant-preview-cards-source-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定文本顺序，验证卡片逆序、打开目标和 cold resume 重建。"
+    },
+    {
+      "id": "assistant-preview-cards-parking",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "冷启动后显式选择目标历史 task，避免把自动恢复当前 task 误算成 cold resume 证据。"
+    }
+  ]
+}

@@ -2,22 +2,22 @@
 /* off-peak 进程内 mock 网关。
    本地起 127.0.0.1 http 服务完整模拟 额度快照/取号/批量状态/结算/messages，
    真实 HTTP client 与 idle plan provider 的 baseURL 只需指到本网关 origin——生产代码路径
-   与联调完全一致，联调时删掉 ZCODE_OFFPEAK_MOCK 开关即可。
+   与联调完全一致，联调时删掉 ZCODE_OFFPEAK_MOCK 开关即可（tech-design §10 工序 3）。
 
    ⚠ messages 端点在准入后把请求原样代理到 resolveUpstream() 指定的真实模型端点
    （通常是用户 coding plan 的 anthropic 兼容端点）——mock 模式下跑的是真模型、
-   计费走用户自己的 key，仅用于开发/演示。
+   计费走用户自己的 key，仅用于开发/演示，文档已注明。
 
-   状态机（对齐两轴的服务端轴）：
+   状态机（对齐 D26 两轴的服务端轴）：
    take → queued（FIFO position）；status 轮询触发晋级（轮询即 Promote）：
    取号超过 readyDelayMs → ready（readyDeadline = +readyTtlMs）；ready 超时未发首个
    message → expired；首个 message 准入 → active（activeDeadline = +activeMs）；
    active 到期 → expired，messages 返回 400/3102；settle → settled（幂等）。
-   messages 准入前可注入 N 次 429/3105 + Retry-After（模拟资源满载细阀）。 */
+   messages 准入前可注入 N 次 429/3105 + Retry-After（模拟资源满载细阀，D24）。 */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ServiceLogger } from "../logger/serviceLogger.js";
 
-interface OffPeakMockGatewayOptions {
+export interface OffPeakMockGatewayOptions {
   /** queued→ready 的晋级延迟；默认 15s（演示低峰等待）。 */
   readyDelayMs?: number;
   /** ready 后须发首个 message 的窗口；默认 5min。 */
@@ -38,7 +38,7 @@ interface OffPeakMockGatewayOptions {
   scenario?: "foreground-subagents" | "capture" | "invalid-ticket";
 }
 
-interface OffPeakMockGatewayDeps {
+export interface OffPeakMockGatewayDeps {
   logger: ServiceLogger;
   /**
    * 准入后 messages 的转发目标：完整 messages URL + 出站头（含上游鉴权）。
@@ -127,7 +127,7 @@ interface OffPeakMockCapturedRequest {
   project?: string;
 }
 
-interface OffPeakMockGatewayHandle {
+export interface OffPeakMockGatewayHandle {
   origin: string;
   port: number;
   /** true = 端口已被另一个 host 的网关占用，本 handle 只是指向它（close 为 no-op）。 */

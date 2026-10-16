@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-markdown-protocols",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-markdown-protocols.test.ts",
+  "fixtures": [
+    {
+      "id": "otc11-chat-title",
+      "description": "Chat Completions 子用例标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 Continue 协议归一化探针，固定响应避免占用四次主请求 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS",
+          "OTC11_CHAT_COMPLETIONS"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"otc11-chat-title\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"OTC11 Chat Protocol\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"otc11-chat-title\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"otc11-chat-title\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":4,\"total_tokens\":14}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-chat-partial-p1",
+      "description": "Chat Completions p1 以标准 finish_reason=length 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第一条 Continue 并保留 Markdown 拼接缝。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_CHAT_COMPLETIONS"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"otc11-chat-p1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"## Continue Markdown 全量边界\\n\\n首段包含 **粗体边界**、*斜体边界*、~~删除线边界~~ 与 `inline-boundary`。\\n\\n- [x] 已完成任务\\n- [ ] **带跨缝[链接\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"otc11-chat-p1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\ndata: {\"id\":\"otc11-chat-p1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":8,\"total_tokens\":20}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-chat-partial-p2",
+      "description": "Chat Completions p2 以标准 finish_reason=length 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第二条 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_CHAT_COMPLETIONS"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"otc11-chat-p2\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"](https://example.com/continue-edge)** 保持完整\\n- 普通 bullet 在 Continue 中保留\\n\\n1. *~~有序项中的图片 ![跨缝图片\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"otc11-chat-p2\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\ndata: {\"id\":\"otc11-chat-p2\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":8,\"total_tokens\":28}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-chat-partial-p3",
+      "description": "Chat Completions p3 以标准 finish_reason=length 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Chat Completions 标准 length 会触发第三条 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_CHAT_COMPLETIONS"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"otc11-chat-p3\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"](.zcode-e2e/continue-markdown-protocols/cross-seam.svg)~~* 保持完整\\n2. 第二个有序项\\n\\n| 来源 | 结果 |\\n| --- | --- |\\n| p3 | p4 |\\n\\n---\\n\\n```ts\\nconst beforeBoundary = \\\"P3\\\";\\n\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"otc11-chat-p3\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n\ndata: {\"id\":\"otc11-chat-p3\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":28,\"completion_tokens\":8,\"total_tokens\":36}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-chat-final-p4",
+      "description": "Chat Completions p4 以 finish_reason=stop 正常结束。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "正常结束 Chat Completions Continue 链并提供最终累计 Markdown DOM。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_CHAT_COMPLETIONS"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"otc11-chat-p4\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"const afterBoundary = \\\"P4\\\";\\nconsole.log(beforeBoundary + afterBoundary);\\n```\\n\\n> 围栏闭合后的引用仍然正常。\\n\\n硬换行第一行  \\n硬换行第二行。\\n\\n行内公式 $E = mc^2$。\\n\\n$$\\na^2 + b^2 = c^2\\n$$\\n\\n```mermaid\\ngraph TD\\n  A[Continue] --> B[One assistant]\\n```\\n\\n自动链接 <https://example.com/autolink>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"otc11-chat-p4\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"otc11-chat-p4\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"otc-protocol-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":36,\"completion_tokens\":12,\"total_tokens\":48}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-responses-title",
+      "description": "Responses API 子用例标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 Continue 协议归一化探针，固定响应避免占用四次主请求 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/responses",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS",
+          "OTC11_RESPONSES_API"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"otc11-responses-title\",\"created_at\":1,\"model\":\"otc-protocol-responses\",\"service_tier\":null}}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-title-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"otc11-responses-title-message\",\"delta\":\"{\\\"title\\\":\\\"OTC11 Responses Protocol\\\"}\"}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-title-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"incomplete_details\":null,\"usage\":{\"input_tokens\":10,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":4,\"output_tokens_details\":{\"reasoning_tokens\":0}},\"service_tier\":null}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-responses-partial-p1",
+      "description": "Responses p1 以 response.incomplete/max_output_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会归一化为 length 并触发第一条 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/responses",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_RESPONSES_API"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"otc11-responses-p1\",\"created_at\":1,\"model\":\"otc-protocol-responses\",\"service_tier\":null}}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p1-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"otc11-responses-p1-message\",\"delta\":\"## Continue Markdown 全量边界\\n\\n首段包含 **粗体边界**、*斜体边界*、~~删除线边界~~ 与 `inline-boundary`。\\n\\n- [x] 已完成任务\\n- [ ] **带跨缝[链接\"}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p1-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.incomplete\",\"response\":{\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{\"input_tokens\":12,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":8,\"output_tokens_details\":{\"reasoning_tokens\":0}},\"service_tier\":null}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-responses-partial-p2",
+      "description": "Responses p2 以 response.incomplete/max_output_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会触发第二条 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/responses",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_RESPONSES_API"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"otc11-responses-p2\",\"created_at\":1,\"model\":\"otc-protocol-responses\",\"service_tier\":null}}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p2-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"otc11-responses-p2-message\",\"delta\":\"](https://example.com/continue-edge)** 保持完整\\n- 普通 bullet 在 Continue 中保留\\n\\n1. *~~有序项中的图片 ![跨缝图片\"}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p2-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.incomplete\",\"response\":{\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{\"input_tokens\":20,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":8,\"output_tokens_details\":{\"reasoning_tokens\":0}},\"service_tier\":null}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-responses-partial-p3",
+      "description": "Responses p3 以 response.incomplete/max_output_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性证明 Responses 标准 incomplete reason 会触发第三条 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/responses",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_RESPONSES_API"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"otc11-responses-p3\",\"created_at\":1,\"model\":\"otc-protocol-responses\",\"service_tier\":null}}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p3-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"otc11-responses-p3-message\",\"delta\":\"](.zcode-e2e/continue-markdown-protocols/cross-seam.svg)~~* 保持完整\\n2. 第二个有序项\\n\\n| 来源 | 结果 |\\n| --- | --- |\\n| p3 | p4 |\\n\\n---\\n\\n```ts\\nconst beforeBoundary = \\\"P3\\\";\\n\"}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p3-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.incomplete\",\"response\":{\"incomplete_details\":{\"reason\":\"max_output_tokens\"},\"usage\":{\"input_tokens\":28,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":8,\"output_tokens_details\":{\"reasoning_tokens\":0}},\"service_tier\":null}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otc11-responses-final-p4",
+      "description": "Responses p4 以 response.completed 正常结束。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "正常结束 Responses Continue 链并提供最终累计 Markdown DOM。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/responses",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_PROTOCOLS", "OTC11_RESPONSES_API"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"otc11-responses-p4\",\"created_at\":1,\"model\":\"otc-protocol-responses\",\"service_tier\":null}}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p4-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"otc11-responses-p4-message\",\"delta\":\"const afterBoundary = \\\"P4\\\";\\nconsole.log(beforeBoundary + afterBoundary);\\n```\\n\\n> 围栏闭合后的引用仍然正常。\\n\\n硬换行第一行  \\n硬换行第二行。\\n\\n行内公式 $E = mc^2$。\\n\\n$$\\na^2 + b^2 = c^2\\n$$\\n\\n```mermaid\\ngraph TD\\n  A[Continue] --> B[One assistant]\\n```\\n\\n自动链接 <https://example.com/autolink>\"}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"otc11-responses-p4-message\",\"phase\":\"final_answer\"}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"incomplete_details\":null,\"usage\":{\"input_tokens\":36,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":12,\"output_tokens_details\":{\"reasoning_tokens\":0}},\"service_tier\":null}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

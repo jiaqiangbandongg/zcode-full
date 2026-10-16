@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-markdown-table-enhanced-scroll",
+  "spec": "./test/e2e/conversation-session/conversation-session-markdown-table-enhanced-scroll.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-markdown-table-enhanced-scroll.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "markdown-table-enhanced-scroll-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回。"
+    },
+    {
+      "id": "markdown-table-enhanced-scroll-status-panel-goal",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "W15 需要稳定创建 target objective 和 status panel，避免真实模型输出影响布局断言。"
+    },
+    {
+      "id": "markdown-table-enhanced-scroll-tables",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "增强滚动 case 需要稳定构造不同宽高的 markdown 表格，避免真实模型返回形态漂移。"
+    }
+  ]
+}

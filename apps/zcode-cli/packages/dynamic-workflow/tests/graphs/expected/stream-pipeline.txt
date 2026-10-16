@@ -1,0 +1,24 @@
+node source
+node join#1 "join" @19:19 type="void[]"
+node fan-out#1 "fan-out" @20:7 type="Promise<void>[]"
+node ask#1 "ask" @21:58 actors=actor#1 within=fan-out#1 type="Fact[]"
+node join#2 "join" @32:17 type="void[]"
+node fan-out#2 "fan-out" @33:5 type="Promise<void>[]"
+node fan-out#3 "fan-out" @34:7 within=fan-out#2
+node ask#2 "ask" @35:54 actors=actor#2 within=fan-out#3 type="Verdict"
+node ask#3 "writer" @44:24 actors=actor#3 type="string"
+node sink
+actor actor#1 @21:29 within=fan-out#1
+actor actor#2 @35:25 within=fan-out#3
+actor actor#3 "writer" @44:8
+edge source -> fan-out#1 data exact
+edge source -> fan-out#2 data exact
+edge fan-out#1 -> join#1 data exact type="Promise<void>[]"
+edge fan-out#1 -> ask#1 data exact type="Promise<void>[]"
+edge ask#1 -> fan-out#3 data exact type="Fact[]"
+edge ask#1 -> ask#2 data exact type="Fact[]"
+edge ask#1 -> ask#3 data exact type="Fact[]"
+edge fan-out#2 -> join#2 data exact type="Promise<void>[]"
+edge fan-out#3 -> ask#2 data exact
+edge fan-out#3 -> ask#3 data exact
+edge ask#3 -> sink data exact type="string"

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-video-preview",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-video-preview.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-video-preview-send",
+      "description": "VI06/VI07：空正文与一张图片、四个 video AttachmentRef 到达 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "五个媒体文件名同时出现，约束共享 gallery 场景的图片与视频都进入媒体能力投影。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "e2e-composer-preview.mp4",
+          "e2e-gallery-image.png",
+          "e2e-unsupported.mov",
+          "e2e-chunk-fallback.ogg",
+          "e2e-sent-large.mp4"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-video-preview-send",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_VIDEO_PREVIEW_SEND_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-video-preview-edit",
+      "description": "VI06：edit 删除第一个 video 后，provider 只看到剩余图片与三个 video。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "bodyIncludes 剩余图片与三个 video 且排除被删除 video，约束 branch-cut 后的附件投影。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "e2e-gallery-image.png",
+          "e2e-unsupported.mov",
+          "e2e-chunk-fallback.ogg",
+          "e2e-sent-large.mp4"
+        ],
+        "bodyExcludes": [
+          "e2e-composer-preview.mp4",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-video-preview-edit",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_VIDEO_PREVIEW_EDIT_OK"
+        }
+      }
+    }
+  ]
+}

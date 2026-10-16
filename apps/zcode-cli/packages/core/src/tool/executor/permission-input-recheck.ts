@@ -1,38 +1,36 @@
-import {
-  type CollaborationMode,
-  type PermissionBrokerRequest,
-  type PermissionBrokerResult,
-  type PermissionRuleset,
-  type TraceContext,
-} from "@zcode/contracts";
+import { type CollaborationMode, type PermissionRuleset } from "@zcode/contracts";
 
 import type { PermissionDecisionResult, PermissionContext } from "../../permission/service.js";
-import type { ExecutableToolCall, ToolEntry } from "../types.js";
+import type {
+  ExecutableToolCall,
+  ToolEntry,
+  ToolRuntimePermissionCapabilityContext,
+} from "../types.js";
 import { applyMemoryFilePermission, targetsMemoryFile } from "./memory-file-permission.js";
-import {
-  resolveRuntimePermissionCapability,
-  resolveRuntimePermissionContext,
-} from "./permission-capability.js";
-import { buildDefaultPermissionUpdates } from "./permission-suggestions.js";
+import { resolveRuntimePermissionCapability } from "./permission-capability.js";
 import type { ToolExecutorDeps } from "./types.js";
 
-interface PermissionHookInputRecheckResult {
-  brokerResult?: PermissionBrokerResult;
+export interface PermissionHookInputRecheckResult {
   permissionDecision?: PermissionDecisionResult;
 }
 
-export async function recheckPermissionHookModifiedInput(input: {
+export function recheckPermissionHookModifiedInput(input: {
   deps: ToolExecutorDeps;
   entry: ToolEntry;
   mode: CollaborationMode;
   modifiedInput: unknown;
   projectRules: PermissionRuleset | null;
-  requestId: string;
-  signal?: AbortSignal;
   toolCall: ExecutableToolCall;
-  traceContext: TraceContext;
-}): Promise<PermissionHookInputRecheckResult> {
-  const runtimePermissionContext = resolveRuntimePermissionContext(input.deps);
+  /** 与首次判权同一份上下文（mode、bashShellSelection、cwd 快照），由 executor 构造并透传。 */
+  context: ToolRuntimePermissionCapabilityContext & {
+    workingDirectory: string;
+    workspaceRoot: string;
+  };
+}): PermissionHookInputRecheckResult {
+  // 根因（2026-09-17 review）：此前在此重新构造只含 runtimeScope/cwd 的缩减上下文，丢掉 mode 与
+  // bashShellSelection；一旦 guarded 复用重判路径，matcher 会静默失效。上下文只能有一个构造点。
+  const { context: runtimePermissionContext } = input;
+  const { workingDirectory, workspaceRoot } = runtimePermissionContext;
   const permissionContext: PermissionContext = {
     input: input.modifiedInput,
     mode: input.mode,
@@ -41,7 +39,7 @@ export async function recheckPermissionHookModifiedInput(input: {
     riskLevel: input.entry.metadata.riskLevel,
     toolName: input.toolCall.name,
     // 与首次判定同源：hook 改过 input 之后，草稿免确认仍要按同一个工作目录复核。
-    workingDirectory: input.deps.getWorkingDirectory(),
+    workingDirectory,
   };
   const rulePolicy = input.entry.resolvePermissionRulePolicy?.(
     input.modifiedInput,
@@ -58,13 +56,12 @@ export async function recheckPermissionHookModifiedInput(input: {
     executionInput: input.modifiedInput,
     memoryRoot: input.deps.getMemoryRoot?.(),
     toolName: input.toolCall.name,
-    workingDirectory: input.deps.getWorkingDirectory(),
-    workspaceRoot: input.deps.getWorkspaceRoot(),
+    workingDirectory,
+    workspaceRoot,
   });
 
   if (decision.decision === "deny") {
     return {
-      brokerResult: { decision: "deny", reason: decision.reason },
       permissionDecision: decision,
     };
   }
@@ -75,37 +72,13 @@ export async function recheckPermissionHookModifiedInput(input: {
         executionInput: input.modifiedInput,
         memoryRoot: input.deps.getMemoryRoot?.(),
         toolName: input.toolCall.name,
-        workingDirectory: input.deps.getWorkingDirectory(),
-        workspaceRoot: input.deps.getWorkspaceRoot(),
+        workingDirectory,
+        workspaceRoot,
       }))
   ) {
     return {};
   }
 
-  const suggestedPermissionUpdates =
-    rulePolicy?.suggestedPermissionUpdates ??
-    buildDefaultPermissionUpdates(input.toolCall.name, input.modifiedInput);
-  const brokerResult = await input.deps.permissionBroker.requestPermission(
-    {
-      input: input.modifiedInput,
-      mode: input.mode,
-      reason: decision.reason ?? `Tool ${input.toolCall.name} requires approval`,
-      requestId: input.requestId,
-      requestedAt: new Date(),
-      riskLevel: decision.riskLevel,
-      ruleId: decision.ruleId,
-      sessionId: input.deps.sessionId,
-      sideEffectScope: decision.sideEffectScope,
-      suggestedPermissionUpdates,
-      toolCallId: input.toolCall.id as PermissionBrokerRequest["toolCallId"],
-      toolName: input.toolCall.name,
-      traceId: input.traceContext.traceId,
-      turnId: input.traceContext.turnId ?? input.deps.turnId,
-    },
-    {
-      signal: input.signal,
-      timeoutMs: input.deps.permissionTimeoutMs,
-    },
-  );
-  return { brokerResult, permissionDecision: decision };
+  // 仅返回旧模式需要保留的策略事实；请求登记/发布/终态全部由 executor 统一处理。
+  return { permissionDecision: decision };
 }

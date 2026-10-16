@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+  </head>
+  <body>
+    <div>
+      <div>
+        <h1>Clipboard paste</h1>
+        <i>Supports: Win, macOS, Linux <span>|</span> Process: Main, Renderer (non-sandboxed only)</i>
+        <div>
+          <div>
+            <button id="paste-to">Paste</button>
+            <span id="paste-from"></span>
+          </div>
+          <p>In this example we copy a string to the clipboard and then paste the results into a message above.</p>
+        </div>
+      </div>
+    </div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zcode.dev/schemas/release-candidate.v1.schema.json",
+  "title": "ZCode Release Candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "candidateId",
+    "source",
+    "state",
+    "platforms",
+    "provenance",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "release-candidate.v1"
+    },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^cand_[A-Za-z0-9_-]{8,128}$"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "state": {
+      "enum": [
+        "created",
+        "building",
+        "ready",
+        "approval_pending",
+        "approved",
+        "publishing",
+        "published",
+        "build_failed",
+        "rejected",
+        "publish_failed_retryable",
+        "cancelled"
+      ]
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/platformManifest"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "version"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+        },
+        "ref": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch"],
+      "properties": {
+        "os": {
+          "enum": ["macos", "windows", "linux"]
+        },
+        "arch": {
+          "enum": ["x64", "arm64"]
+        }
+      }
+    },
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "sha512"],
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sha512": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "role", "fileName", "objectKey", "size", "digest"],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "pattern": "^art_[A-Za-z0-9_-]{8,128}$"
+        },
+        "role": {
+          "enum": ["installer", "blockmap", "update_metadata_base", "auxiliary"]
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^/\\\\]+$"
+        },
+        "objectKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[^/].*$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "platformManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "artifacts", "baseUpdateMetadata"],
+      "properties": {
+        "platform": {
+          "$ref": "#/$defs/platform"
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        },
+        "baseUpdateMetadata": {
+          "$ref": "#/$defs/artifact"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builder", "builderImage", "tools"],
+      "properties": {
+        "builder": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "builderImage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "tools": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "signer": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    }
+  }
+}

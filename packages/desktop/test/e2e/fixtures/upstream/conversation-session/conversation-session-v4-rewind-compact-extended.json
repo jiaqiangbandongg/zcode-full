@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-rewind-compact-extended",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-rewind-compact-extended.test.ts",
+  "fixtures": [
+    {
+      "id": "pv4-18-title",
+      "description": "PV4-18 attachment edit case-local 标题。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不影响附件 branch cut 语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_PV4_18_ATTACHMENT_ORIGINAL"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-18-title",
+          "inputTokens": 48,
+          "outputTokens": 8,
+          "text": "{\"title\":\"PV4 18 Attachment Rewind\"}"
+        }
+      }
+    },
+    {
+      "id": "pv4-18-original",
+      "description": "PV4-18 compact 前的附件原回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "被 same-session branch cut 移出 active branch。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_18_ATTACHMENT_ORIGINAL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-18-original",
+          "inputTokens": 72,
+          "outputTokens": 8,
+          "text": "PV4_18_ATTACHMENT_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-18-compact",
+      "description": "PV4-18 覆盖附件 turn 的 stable compact summary。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 compact-covered 附件 edit 不 fork。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PV4_18_ATTACHMENT_ORIGINAL",
+          "PV4_18_ATTACHMENT_ORIGINAL_REPLY",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-18-compact",
+          "inputTokens": 128,
+          "outputTokens": 24,
+          "text": "<summary>PV4_18_ATTACHMENT_SUMMARY</summary>"
+        }
+      }
+    },
+    {
+      "id": "pv4-18-edited",
+      "description": "PV4-18 附件 canonical ref 重放后的回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "新 provider request 必须同时携带 edited text 和原附件。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_18_ATTACHMENT_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-18-edited",
+          "inputTokens": 72,
+          "outputTokens": 8,
+          "text": "PV4_18_ATTACHMENT_EDITED_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-title",
+      "description": "PV4-19 multiple compact case-local 标题。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与 boundary 选择。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_PV4_19_FIRST"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-title",
+          "inputTokens": 48,
+          "outputTokens": 8,
+          "text": "{\"title\":\"PV4 19 Multiple Compact\"}"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-first",
+      "description": "PV4-19 第一轮回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "建立第一个仍需保留的 compact boundary。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_19_FIRST"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-first",
+          "inputTokens": 56,
+          "outputTokens": 8,
+          "text": "PV4_19_FIRST_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-compact-first",
+      "description": "PV4-19 第一个 compact summary，编辑目标之前仍有效。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "cold follow-up 必须仍能看到 PV4_19_FIRST_SUMMARY。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PV4_19_FIRST",
+          "PV4_19_FIRST_REPLY",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_PV4_19_SECOND_ORIGINAL"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-compact-first",
+          "inputTokens": 128,
+          "outputTokens": 24,
+          "text": "<summary>PV4_19_FIRST_SUMMARY</summary>"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-second-original",
+      "description": "PV4-19 被第二次 compact 覆盖的 latest input 原回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "编辑后必须退出 active/cold/provider history。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_19_SECOND_ORIGINAL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-second-original",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "PV4_19_SECOND_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-compact-second",
+      "description": "PV4-19 第二个 compact summary，跨 boundary edit 后应失效。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "cold follow-up 不得再看到 PV4_19_SECOND_SUMMARY。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "PV4_19_FIRST_SUMMARY",
+          "E2E_PV4_19_SECOND_ORIGINAL",
+          "PV4_19_SECOND_ORIGINAL_REPLY",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-compact-second",
+          "inputTokens": 144,
+          "outputTokens": 28,
+          "text": "<summary>PV4_19_SECOND_SUMMARY includes E2E_PV4_19_SECOND_ORIGINAL</summary>"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-second-edited",
+      "description": "PV4-19 same-session branch cut 后第二轮新回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明跨最新 boundary 后按 edited intent 重放。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_19_SECOND_EDITED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-second-edited",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "PV4_19_SECOND_EDITED_REPLY"
+        }
+      }
+    },
+    {
+      "id": "pv4-19-followup",
+      "description": "PV4-19 cold restore 后 follow-up 回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "捕获请求体断言第一 summary 保留、第二 summary/旧输入失效。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PV4_19_FOLLOWUP"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pv4-19-followup",
+          "inputTokens": 72,
+          "outputTokens": 8,
+          "text": "PV4_19_FOLLOWUP_REPLY"
+        }
+      }
+    }
+  ]
+}

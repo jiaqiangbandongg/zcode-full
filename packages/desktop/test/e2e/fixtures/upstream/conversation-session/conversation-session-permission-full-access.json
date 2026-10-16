@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-full-access",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-full-access.test.ts",
+  "fixtures": [
+    {
+      "id": "pa158-title",
+      "description": "E2E_PA158_MAIN 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_PA158_MAIN 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_PA158_MAIN"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "pa158-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Permission E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "pa158-write-call",
+      "description": "M4 resolveInteraction 门禁：Write tool_use，默认模式下触发权限弹窗。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "PA158 在真实 Write 审批前保留受控窗口，通过 UI 排入混合 Plan 队列并暂停自动消费。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PA158_MAIN"],
+        "bodyIncludes": ["E2E_PA158_MAIN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"pa158-main\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"fixture\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 80, \"output_tokens\": 1}}}\n\n"
+          },
+          {
+            "offsetMs": 10,
+            "text": "event: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\n"
+          },
+          {
+            "offsetMs": 20,
+            "text": "event: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_PA158_RUNNING\"}}\n\n"
+          },
+          {
+            "offsetMs": 20000,
+            "text": "event: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\n"
+          },
+          {
+            "offsetMs": 20010,
+            "text": "event: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 1, \"content_block\": {\"type\": \"tool_use\", \"id\": \"toolu_v4_permission_write\", \"name\": \"Write\", \"input\": {}}}\n\n"
+          },
+          {
+            "offsetMs": 20020,
+            "text": "event: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 1, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"file_path\\\": \\\"{{e2eRuntimeRoot}}/conversation-session-permission-full-access/output.txt\\\", \\\"content\\\": \\\"E2E_PA158_TOOL_RESULT\\\\n\\\"}\"}}\n\n"
+          },
+          {
+            "offsetMs": 20030,
+            "text": "event: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 1}\n\n"
+          },
+          {
+            "offsetMs": 20040,
+            "text": "event: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 50}}\n\n"
+          },
+          {
+            "offsetMs": 20050,
+            "text": "event: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pa158-final",
+      "description": "M4 resolveInteraction 门禁：批准后 tool_result 回灌 → 最终文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "权限批准后工具执行成功，模型据 tool_result 给出终态文本。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_PA158_MAIN", "toolu_v4_permission_write"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"pa158-final\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"fixture\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 80, \"output_tokens\": 1}}}\n\n"
+          },
+          {
+            "offsetMs": 10,
+            "text": "event: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\n"
+          },
+          {
+            "offsetMs": 20,
+            "text": "event: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_PA158_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 30000,
+            "text": "event: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\n"
+          },
+          {
+            "offsetMs": 30010,
+            "text": "event: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 8}}\n\n"
+          },
+          {
+            "offsetMs": 30020,
+            "text": "event: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+          }
+        ]
+      }
+    }
+  ]
+}

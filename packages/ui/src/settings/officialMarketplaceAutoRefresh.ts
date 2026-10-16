@@ -12,7 +12,7 @@
 // - 商店页每次进入都是重新挂载（key 带 pluginStoreOpenVersion），组件内 ref 无法承载节流状态，
 //   所以放在模块级。
 
-const OFFICIAL_MARKETPLACE_AUTO_REFRESH_INTERVAL_MS = 10 * 60_000;
+export const OFFICIAL_MARKETPLACE_AUTO_REFRESH_INTERVAL_MS = 10 * 60_000;
 
 const lastAttemptAtByMarketplace = new Map<string, number>();
 
@@ -22,7 +22,7 @@ function parseTimestamp(value: string | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
-function shouldAutoRefreshMarketplace(params: {
+export function shouldAutoRefreshMarketplace(params: {
   lastUpdated?: string;
   lastAttemptAt?: number;
   now: number;
@@ -50,4 +50,8 @@ export function claimMarketplaceAutoRefresh(
     lastAttemptAtByMarketplace.set(marketplaceId, now);
   }
   return shouldRefresh;
+}
+
+export function resetMarketplaceAutoRefreshForTests(): void {
+  lastAttemptAtByMarketplace.clear();
 }

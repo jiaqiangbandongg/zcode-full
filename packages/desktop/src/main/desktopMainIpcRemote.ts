@@ -9,7 +9,6 @@ import {
   normalizeUnknownError,
   InternalChannels,
   isTrustedCodingPlanWebviewOrigin,
-  resolveZaiBusinessBaseUrl,
   PlatformChannels,
   remoteTargetSchema,
   rendererTelemetryEventPayloadSchema,
@@ -33,9 +32,13 @@ import {
   reportRemoteConnectResultToArms,
   type RemoteConnectionStats,
 } from "./desktopRemoteUsageArmsTelemetry.js";
-import { openPathInDefaultApp } from "./desktopMainIpcHelpers.js";
+import {
+  registerWebRemoteControlIpcHandlers,
+  type WebRemoteControlIpcManager,
+} from "./desktopWebRemoteControlIpc.js";
+import { openFileUrlInDefaultApp, openPathInDefaultApp } from "./desktopMainIpcHelpers.js";
 
-function isAllowedExternalOpenUrl(value: string): boolean {
+export function isAllowedExternalOpenUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "file:";
@@ -66,6 +69,8 @@ function parseOpenExternalRequest(payload: unknown): OpenExternalRequest | null 
   };
 }
 
+const CODING_PLAN_ZAI_PAYPAL_RELAY_HOSTS = new Set(["api.z.ai", "api.z.ai"]);
+
 function isPaypalHostname(hostname: string): boolean {
   return hostname === "paypal.com" || hostname.endsWith(".paypal.com");
 }
@@ -76,7 +81,7 @@ function isCodingPlanPaypalNavigationUrl(url: string): boolean {
     if (parsed.protocol !== "https:") return false;
     if (isPaypalHostname(parsed.hostname)) return true;
     return (
-      ["https://api.z.ai", resolveZaiBusinessBaseUrl()].includes(parsed.origin) &&
+      CODING_PLAN_ZAI_PAYPAL_RELAY_HOSTS.has(parsed.hostname) &&
       parsed.pathname.startsWith("/api/pay/paypal/")
     );
   } catch {
@@ -165,6 +170,7 @@ export function registerRemoteIpcHandlers(options: {
   };
   /** 仅由 VITE_ZCODE_E2E_STORE_BRIDGE + test runner 双门禁打开。 */
   finalArmsCustomEventE2EEnabled?: boolean;
+  webRemoteControlManager: WebRemoteControlIpcManager;
   createRemoteWorkspaceSession: (
     win: BrowserWindow,
     target: RemoteTarget,
@@ -258,6 +264,11 @@ export function registerRemoteIpcHandlers(options: {
     );
   }
 
+  registerWebRemoteControlIpcHandlers({
+    reportRemoteUsageEvent,
+    webRemoteControlManager: options.webRemoteControlManager,
+  });
+
   ipcMain.on(PlatformChannels.OAuthRegisterState, (event, payload: unknown) => {
     const registration = parseOAuthStateRegistration(payload);
     if (!registration) {
@@ -277,6 +288,10 @@ export function registerRemoteIpcHandlers(options: {
     const { url } = request;
     if (!isAllowedExternalOpenUrl(url)) {
       options.logger.warn("[open-external] blocked unsupported url", url);
+      return;
+    }
+    if (new URL(url).protocol === "file:") {
+      void openFileUrlInDefaultApp(url, options.logger);
       return;
     }
     const sender = event.sender;

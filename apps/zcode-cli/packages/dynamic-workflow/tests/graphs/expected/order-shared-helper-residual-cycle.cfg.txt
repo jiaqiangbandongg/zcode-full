@@ -1,0 +1,13 @@
+node world-read#1@1 issue site=world-read#1 phase=unphased
+node ask#1@1 issue site=ask#1 phase=unphased
+node world-read#2@1 issue site=world-read#2 phase=unphased
+node world-read#1@2 issue site=world-read#1 phase=unphased
+edge entry -> world-read#1@1 fork
+edge entry -> ask#1@1 next
+edge world-read#1@1 -> ask#1@1 join via=return
+edge ask#1@1 -> world-read#2@1 next
+edge world-read#2@1 -> ask#1@1 loop
+edge world-read#2@1 -> world-read#1@2 fork
+edge world-read#2@1 -> sink exit
+edge world-read#1@2 -> ask#1@1 loop
+edge world-read#1@2 -> sink join via=return

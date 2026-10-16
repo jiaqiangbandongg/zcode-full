@@ -1,0 +1,41 @@
+flowchart LR
+  subgraph phase_1["总设计"]
+    phase_1_actor_1["architect<br/>ask#1"]
+  end
+  subgraph phase_2["并行构建"]
+    phase_2_actor_2["harness<br/>ask#2"]
+    phase_2_actor_3_0_["actor#3 [1/5]<br/>ask#3"]
+    phase_2_actor_3_1_["actor#3 [2/5]<br/>ask#3"]
+    phase_2_actor_3_2_["actor#3 [3/5]<br/>ask#3"]
+    phase_2_actor_3_3_["actor#3 [4/5]<br/>ask#3"]
+    phase_2_actor_3_4_["actor#3 [5/5]<br/>ask#3"]
+  end
+  subgraph phase_3["集成与门禁"]
+    phase_3_workspace[("workspace<br/>world-read#1, world-read#2")]
+    phase_3_actor_4["fixer<br/>ask#4, ask#5"]
+  end
+  subgraph phase_4["视觉评审"]
+    phase_4_workspace[("workspace<br/>world-read#3, world-read#4")]
+    phase_4_actor_4["fixer<br/>ask#6"]
+    phase_4_actor_5["jury-a<br/>ask#7~actor#5, ask#9"]
+    phase_4_actor_6["jury-b<br/>ask#7~actor#6"]
+    phase_4_actor_7["jury-c<br/>ask#7~actor#7"]
+    phase_4_actor_8["polisher<br/>ask#8"]
+  end
+  subgraph phase_5["终验与交付"]
+    phase_5_workspace[("workspace<br/>world-read#5, world-read#6")]
+  end
+  phase_3_workspace -->|"WorldRunResult"| phase_3_actor_4
+  phase_3_actor_4 -.-> phase_3_workspace
+  phase_4_workspace -->|"WorldRunResult"| phase_4_actor_4
+  phase_4_workspace --> phase_4_actor_5
+  phase_4_workspace --> phase_4_actor_6
+  phase_4_workspace --> phase_4_actor_7
+  phase_4_actor_4 --> phase_4_workspace
+  phase_4_actor_4 -.-> phase_4_actor_7
+  phase_4_actor_5 -->|"JuryVerdict"| phase_4_actor_8
+  phase_4_actor_6 -->|"JuryVerdict"| phase_4_actor_8
+  phase_4_actor_7 -->|"JuryVerdict"| phase_4_actor_8
+  phase_4_actor_8 --> phase_4_workspace
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  class phase_3_workspace,phase_4_workspace,phase_5_workspace world;

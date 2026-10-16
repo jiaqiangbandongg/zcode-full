@@ -4,9 +4,11 @@ import { phaseNameMatches } from "@/components/workflow-graph/phase-name.js";
 import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/types.js";
 
 /**
- * 一站观察到的东西：落在这一站站点上的实例，加上界在这一站花掉的**表外**条目。
+ * 一站观察到的东西（docs/dynamic-workflow/presentation.md「The timeline model」「Past six
+ * participants」）：落在这一站站点上的实例，加上界在这一站花掉的**表外**条目。
  *
- * 与 timeline-bands.ts 一样只计算展示模型，不依赖 React、DOM 或时钟。
+ * 住在时间线模型之外，与 timeline-bands.ts 同一个理由（主文件的 max-lines 门），也同一条纪律：
+ * 纯函数、无 React、无 DOM、无时间。
  */
 
 export interface ObservedPhase {
@@ -19,7 +21,7 @@ export interface ObservedPhase {
 }
 
 /**
- * 归约列不出来的那些（`run.unlistedByPhase`）。`actors` 是这一站
+ * 归约列不出来的那些（`run.unlistedByPhase`，presentation.md「Reduction」）。`actors` 是这一站
  * 出生、此刻不在表里的子代理——出生就被拒的、排队时被淘汰的、跑完被淘汰的都算，它们没有药丸、
  * 没有脸、没有转录；`settled` 是其中已知跑完的，`failed ⊆ settled`；`nodesSettled` 是记在这一格
  * 上的表外已结算**节点**数。缺席 = 这一站一条都没少。
@@ -58,7 +60,8 @@ export function stationUnlisted(
 type WorkflowRunPhaseEntry = NonNullable<WorkflowRunState["phases"]>[number];
 
 /**
- * 一站的进入记录：按名字关联（`phaseNameMatches`，与实例绑定共用 phase-name.ts 中的规则）。同一个 128 字
+ * 一站的进入记录：按名字关联（`phaseNameMatches`，docs/dynamic-workflow/presentation.md
+ * 追记 2026-09-05；规则 2026-09-09 抽到 phase-name.ts，与实例绑定共用一条）。同一个 128 字
  * 前缀下可能有两条记录，精确的那条优先。
  */
 export function phaseEntryFor(
@@ -85,7 +88,7 @@ export function siteIdsOf(
 
 /**
  * 一站观察到的节点：站点相同还不够——同一个站点被 k 个阶段再入时 k 张卡共享站点 id，节点还要
- * 按实例的出生戳落到这一站（`belongs`），否则 visited / rounds /
+ * 按实例的出生戳落到这一站（`belongs`，追记 2026-09-09「站的观察」），否则 visited / rounds /
  * fraction 一起虚高 k 倍。
  */
 export function observePhase(

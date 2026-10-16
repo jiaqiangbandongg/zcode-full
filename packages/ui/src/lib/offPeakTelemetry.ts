@@ -6,14 +6,14 @@ import {
 import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
 import { legacyTelemetryProviderId } from "@/lib/providerTelemetryIdentity.js";
 
-type OffPeakCreateEventRegion = "app.session" | "app.automations";
+export type OffPeakCreateEventRegion = "app.session" | "app.automations";
 
-interface OffPeakCreateTelemetrySource {
+export interface OffPeakCreateTelemetrySource {
   eventRegion: OffPeakCreateEventRegion;
   templateId: string;
 }
 
-interface OffPeakCreateTelemetrySnapshot extends OffPeakCreateTelemetrySource {
+export interface OffPeakCreateTelemetrySnapshot extends OffPeakCreateTelemetrySource {
   modelName: string;
   modelProvider: string;
 }
@@ -34,7 +34,7 @@ export function freezeOffPeakCreateTelemetrySnapshot(params: {
   };
 }
 
-function buildOffPeakCreateResultTelemetryPayload(
+export function buildOffPeakCreateResultTelemetryPayload(
   snapshot: OffPeakCreateTelemetrySnapshot,
   result: OffPeakTaskCreateResult,
 ): TelemetryEventPayload {

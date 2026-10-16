@@ -14,13 +14,15 @@ export function PluginAddMenu({
   onCreateTask,
   onAddMarketplace,
   testId,
+  isWebRemoteControl = false,
 }: {
   onCreateTask?: (request?: CreateTaskRequest) => void;
   onAddMarketplace: () => void;
   testId: string;
+  isWebRemoteControl?: boolean;
 }) {
   const { intl } = useZCodeIntl();
-  const creator = usePluginCreator(onCreateTask);
+  const creator = usePluginCreator(onCreateTask, isWebRemoteControl);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

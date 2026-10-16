@@ -12,7 +12,6 @@ import { isSessionWorkflowRunLive } from "@zcode/shared/zcode-protocol-v4";
 import { cn } from "@/components/lib/utils.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import {
-  STATUS_DOT,
   readWorkflowRunStopReason,
   workflowRunStopReasonMessageId,
 } from "@/components/workflow-graph/run-status-presentation.js";
@@ -25,6 +24,7 @@ import {
   workflowRunParallelPhaseLabel,
   type WorkflowRunRail,
 } from "@/lib/workflowRunLine.js";
+import { WorkflowRunRail as RunRail } from "@/components/workflow-run-line/WorkflowRunRail.js";
 import { useWorkflowRunOpen } from "@/v4/workflowRunOpenContext.js";
 
 export interface TaskWorkflowRunLinesIntl {
@@ -43,73 +43,7 @@ interface TaskWorkflowRunLinesProps {
   className?: string;
 }
 
-const TRACE_FAINT = "var(--color-workflow-trace)";
-const TRACE_STRONG = "var(--color-workflow-trace-strong)";
 const SEPARATOR = " · ";
-
-function RunRail({ rail, intl }: { rail: WorkflowRunRail; intl: TaskWorkflowRunLinesIntl }) {
-  if (rail.implicit) {
-    return (
-      <span
-        data-workflow-run-rail="true"
-        data-implicit="true"
-        className="flex shrink-0 items-center"
-      >
-        <span aria-hidden="true" className={cn("size-1.5 rounded-full", STATUS_DOT.running)} />
-      </span>
-    );
-  }
-  return (
-    <span data-workflow-run-rail="true" className="flex shrink-0 items-center">
-      {rail.stations.map((station, index) => (
-        <span key={`${station.name}:${index}`} className="flex items-center">
-          {index > 0 ? (
-            station.twin === true ? (
-              // 双线段：本站与前一站并行，控制流没有从那站走到这站。两条 1px 线相距 2px
-              // （容器 4px，上下各贴一条），宽度与墨色规则与普通段完全相同。
-              <span
-                aria-hidden="true"
-                data-rail-segment={station.reached ? "strong" : "faint"}
-                data-rail-twin="true"
-                className="flex h-1 w-1.5 flex-col justify-between"
-              >
-                <span
-                  className="h-px w-full"
-                  style={{ backgroundColor: station.reached ? TRACE_STRONG : TRACE_FAINT }}
-                />
-                <span
-                  className="h-px w-full"
-                  style={{ backgroundColor: station.reached ? TRACE_STRONG : TRACE_FAINT }}
-                />
-              </span>
-            ) : (
-              <span
-                aria-hidden="true"
-                data-rail-segment={station.reached ? "strong" : "faint"}
-                className="h-px w-1.5"
-                style={{ backgroundColor: station.reached ? TRACE_STRONG : TRACE_FAINT }}
-              />
-            )
-          ) : null}
-          <span
-            aria-hidden="true"
-            data-rail-station={station.status}
-            title={station.name}
-            className={cn("size-1.5 rounded-full", STATUS_DOT[station.status])}
-          />
-        </span>
-      ))}
-      {rail.hidden > 0 ? (
-        <span className="ml-1 text-ui-xs leading-none text-foreground-subtlest">
-          {intl.formatMessage(
-            { id: "taskList.workflowRun.moreStations" },
-            { count: String(rail.hidden) },
-          )}
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 function runStatusWord(run: SessionWorkflowRunSummary, intl: TaskWorkflowRunLinesIntl): string {
   return intl.formatMessage({ id: `chat.toolCall.workflow.run.status.${run.status}` });
@@ -122,6 +56,13 @@ function runLineText(
   intl: TaskWorkflowRunLinesIntl,
 ): string {
   if (isSessionWorkflowRunLive(run.status)) {
+    // 停在留白上：「决定分组 · 等待补全」（docs/dynamic-workflow/presentation.md「Holes on the timeline」）。
+    if (run.waitingHole !== undefined) {
+      return intl.formatMessage(
+        { id: "taskList.workflowRun.holeWaiting" },
+        { name: run.waitingHole },
+      );
+    }
     if (rail.implicit) {
       return intl.formatMessage({ id: "chat.toolCall.workflow.graph.phase.workflow" });
     }

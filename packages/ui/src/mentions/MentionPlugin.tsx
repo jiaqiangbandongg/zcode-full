@@ -67,7 +67,11 @@ interface MentionPluginProps {
   onWhiteboardMentionSelected?: (boardId: string) => void | Promise<void>;
 }
 
-function getWrappedMentionIndex(currentIndex: number, delta: number, itemCount: number): number {
+export function getWrappedMentionIndex(
+  currentIndex: number,
+  delta: number,
+  itemCount: number,
+): number {
   if (itemCount <= 0) {
     return 0;
   }
@@ -81,7 +85,7 @@ function getWrappedMentionIndex(currentIndex: number, delta: number, itemCount: 
  * 在循环导航的基础上跳过禁选项（V1 同名 Plugin 冲突项）。
  * 全部禁选时保持原地不动，Enter/Tab 的选择守卫会拒绝插入。
  */
-function getNextEnabledMentionIndex(
+export function getNextEnabledMentionIndex(
   currentIndex: number,
   delta: number,
   items: ReadonlyArray<Pick<MentionItem, "disabled">>,
@@ -104,7 +108,7 @@ function getNextEnabledMentionIndex(
  * 根因：冲突 Plugin 保持可见后可能占据 flatItems[0]；若仍默认选中 0，
  * 第一次 Enter/Tab 会命中禁选项并回落编辑器默认行为，而不是继续键盘导航。
  */
-function coerceEnabledMentionIndex(
+export function coerceEnabledMentionIndex(
   currentIndex: number,
   items: ReadonlyArray<Pick<MentionItem, "disabled">>,
 ): number {
@@ -125,7 +129,10 @@ function coerceEnabledMentionIndex(
  * Android 例外：Chrome + Gboard 对拉丁词也走 composition（整词到空格才 compositionend），
  * 冻结会让手机 Web 的 @ 面板失去逐字过滤，因此 Android 保持实时重算。
  */
-function shouldFreezeMentionRecalcWhileComposing(isComposing: boolean, userAgent: string): boolean {
+export function shouldFreezeMentionRecalcWhileComposing(
+  isComposing: boolean,
+  userAgent: string,
+): boolean {
   return isComposing && !/Android/i.test(userAgent);
 }
 
@@ -318,7 +325,7 @@ export function MentionPlugin({
               <ContextMentionOptionContent item={item} workspacePath={workspacePath} />
             ) : item.category === "skills" ? (
               <span className="min-w-0 flex flex-1 items-center gap-2">
-                {/* skills 候选项需要和命令类项保持一致的主次信息密度，
+                {/* Bugfix: skills 候选项需要和命令类项保持一致的主次信息密度，
                     这里保留图标 + 名称主文案，再把描述压成右侧弱信息，而不是额外占第二行。 */}
                 <WandSparkles className="size-3.5 shrink-0 text-foreground" />
                 <span className="shrink-0 whitespace-nowrap text-ui-base font-medium text-foreground">

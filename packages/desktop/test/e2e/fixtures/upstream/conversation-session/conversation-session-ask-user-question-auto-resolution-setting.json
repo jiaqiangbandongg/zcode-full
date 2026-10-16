@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-auto-resolution-setting",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-auto-resolution-setting.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-ask-auto-resolution-setting-first-controlled-stream",
+      "description": "首个 AskUserQuestion 以 controlled-stream 建立可观察的计时等待态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造计时中关闭设置的 GUI 窗口，避免真实模型工具选择和流速漂移。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST"],
+        "bodyIncludes": ["E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_e2e_ask_auto_resolution_first\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":100,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_e2e_ask_auto_resolution_first\",\"name\":\"AskUserQuestion\",\"input\":{}}}\n\n"
+          },
+          {
+            "offsetMs": 700,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"questions\\\":[{\\\"question\\\":\\\"E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST: keep waiting?\\\",\\\"header\\\":\\\"First\\\",\\\"options\\\":[{\\\"label\\\":\\\"Wait\\\",\\\"description\\\":\\\"Keep waiting for an answer.\\\"},{\\\"label\\\":\\\"Continue\\\",\\\"description\\\":\\\"Continue after an answer.\\\"}]}]}\"}}\n\n"
+          },
+          {
+            "offsetMs": 800,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 900,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":100,\"output_tokens\":20,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 1000,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-first-final",
+      "description": "旧问题在重开后仍由人工回答收口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明重开设置没有追溯恢复旧问题的 deadline。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST",
+          "E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST_ANSWER",
+          "toolu_e2e_ask_auto_resolution_first"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ASK_AUTO_RESOLUTION_SETTING_FIRST_DONE"
+      }
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-second-controlled-stream",
+      "description": "重开后新问题以 controlled-stream 注册并重新取得计时资格。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定证明重新开启只影响随后注册的新 AskUserQuestion。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_AUTO_RESOLUTION_SETTING_SECOND"],
+        "bodyIncludes": ["E2E_ASK_AUTO_RESOLUTION_SETTING_SECOND_AUTO_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_e2e_ask_auto_resolution_second\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":100,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_e2e_ask_auto_resolution_second\",\"name\":\"AskUserQuestion\",\"input\":{}}}\n\n"
+          },
+          {
+            "offsetMs": 700,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"questions\\\":[{\\\"question\\\":\\\"E2E_ASK_AUTO_RESOLUTION_SETTING_SECOND: auto continue?\\\",\\\"header\\\":\\\"Second\\\",\\\"options\\\":[{\\\"label\\\":\\\"One\\\",\\\"description\\\":\\\"First option.\\\"},{\\\"label\\\":\\\"Two\\\",\\\"description\\\":\\\"Second option.\\\"}]}]}\"}}\n\n"
+          },
+          {
+            "offsetMs": 800,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 900,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":100,\"output_tokens\":20,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 1000,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-second-final",
+      "description": "新问题到达注入 deadline 后由空答案自动继续。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只证明新注册问题恢复五分钟规则，详细计时由 fake-clock 单测覆盖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_AUTO_RESOLUTION_SETTING_SECOND",
+          "toolu_e2e_ask_auto_resolution_second"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ASK_AUTO_RESOLUTION_SETTING_SECOND_AUTO_DONE"
+      }
+    }
+  ]
+}

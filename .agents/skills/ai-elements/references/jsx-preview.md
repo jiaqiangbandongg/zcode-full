@@ -64,7 +64,10 @@ You can inject custom components to be used within the rendered JSX:
 ```tsx title="components/generated-ui-with-components.tsx"
 "use client";
 
-import { JSXPreview, JSXPreviewContent } from "@/components/ai-elements/jsx-preview";
+import {
+  JSXPreview,
+  JSXPreviewContent,
+} from "@/components/ai-elements/jsx-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -84,25 +87,25 @@ export const GeneratedUIWithComponents = ({ jsx }: { jsx: string }) => (
 
 ### `<JSXPreview />`
 
-| Prop          | Type                                  | Default  | Description                                               |
-| ------------- | ------------------------------------- | -------- | --------------------------------------------------------- |
-| `jsx`         | `string`                              | Required | The JSX string to render.                                 |
-| `isStreaming` | `boolean`                             | `false`  | When true, automatically completes unclosed tags.         |
-| `components`  | `Record<string, React.ComponentType>` | -        | Custom components available within the rendered JSX.      |
-| `bindings`    | `Record<string, unknown>`             | -        | Variables and functions available within the JSX scope.   |
-| `onError`     | `(error: Error) => void`              | -        | Callback fired when a parsing or rendering error occurs.  |
-| `...props`    | `React.ComponentProps<`               | -        | Any other props are spread to the underlying div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `jsx` | `string` | Required | The JSX string to render. |
+| `isStreaming` | `boolean` | `false` | When true, automatically completes unclosed tags. |
+| `components` | `Record<string, React.ComponentType>` | - | Custom components available within the rendered JSX. |
+| `bindings` | `Record<string, unknown>` | - | Variables and functions available within the JSX scope. |
+| `onError` | `(error: Error) => void` | - | Callback fired when a parsing or rendering error occurs. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div element. |
 
 ### `<JSXPreviewContent />`
 
-| Prop          | Type                    | Default | Description                                               |
-| ------------- | ----------------------- | ------- | --------------------------------------------------------- |
-| `renderError` | `JsxParserProps[`       | -       | Custom error renderer passed to react-jsx-parser.         |
-| `...props`    | `React.ComponentProps<` | -       | Any other props are spread to the underlying div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `renderError` | `JsxParserProps[` | - | Custom error renderer passed to react-jsx-parser. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div element. |
 
 ### `<JSXPreviewError />`
 
-| Prop       | Type                    | Default                        | Description                                               |
-| ---------- | ----------------------- | ------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------ |
-| `children` | `ReactNode              | ((error: Error) => ReactNode)` | -                                                         | Custom error content or render function receiving the error. |
-| `...props` | `React.ComponentProps<` | -                              | Any other props are spread to the underlying div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `ReactNode | ((error: Error) => ReactNode)` | - | Custom error content or render function receiving the error. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the underlying div element. |

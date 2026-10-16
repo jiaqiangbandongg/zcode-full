@@ -32,13 +32,16 @@ function parseLogDateFromFileName(fileName: string): Date | null {
   return parsed;
 }
 
-function getLogRetentionCutoffDate(now: Date, retentionDays: number = LOG_RETENTION_DAYS): Date {
+function getLogRetentionCutoffDate(
+  now: Date,
+  retentionDays: number = LOG_RETENTION_DAYS,
+): Date {
   const cutoff = getStartOfLocalDay(now);
   cutoff.setDate(cutoff.getDate() - Math.max(retentionDays - 1, 0));
   return cutoff;
 }
 
-function shouldDeleteExpiredLogFile(
+export function shouldDeleteExpiredLogFile(
   fileName: string,
   now: Date,
   retentionDays: number = LOG_RETENTION_DAYS,

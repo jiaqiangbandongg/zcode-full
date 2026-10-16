@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-pasted-image-path-edge-cases",
+  "spec": "./test/e2e/conversation-session/conversation-session-pasted-image-path-edge-cases.test.ts",
+  "fixtures": [
+    {
+      "id": "pasted-image-edge-title",
+      "description": "T15-T17 三个首轮的固定标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不属于 T15-T17 语义；只需把三个首轮 title sidecar 与 provider-visible 功能请求隔离。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_PASTED_IMAGE_EDGE_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Image Edge\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-edge-unknown",
+      "description": "T15 unknown capability 的 image + path 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；E2E 通过真实 PNG paste 和 requestJson 结构化断言 unknown capability 保留 image + path。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_UNKNOWN_"],
+        "bodyIncludes": [
+          "e2e-image-unknown-capability-model",
+          "data:image/png;base64,",
+          "[Image: source:"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_UNKNOWN_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-edge-failure-seed",
+      "description": "T16 删除 artifact 前建立 completed image 历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首轮响应只建立含 durable image 与派生 path 的 completed 历史；T16 核心断言发生在删除两类文件后的无 provider follow-up。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_FAILURE_SEED_"],
+        "bodyIncludes": [
+          "e2e-image-edge-vision-model",
+          "data:image/png;base64,",
+          "[Image: source:"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_FAILURE_SEED_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-edge-bmp-image",
+      "description": "T17 image-capable 模型接收 BMP 且没有派生 path。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；E2E 抓包固定有效 BMP 在 image-capable 模型中保留 image 且不追加 unsupported cache path。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_BMP_IMAGE_"],
+        "bodyIncludes": [
+          "e2e-image-edge-vision-model",
+          "data:image/bmp;base64,"
+        ],
+        "bodyExcludes": ["[Image: source:", "Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_BMP_IMAGE_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-edge-bmp-text",
+      "description": "T17 text-only 模型接收 omitted 且没有 BMP/path。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；E2E 抓包固定同一 BMP 历史切到 text-only 后只保留 omitted 文本且没有 image/path。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_BMP_TEXT_"],
+        "bodyIncludes": [
+          "deepseek-v4-flash",
+          "Media omitted from provider request because the selected model does not support image input."
+        ],
+        "bodyExcludes": [
+          "data:image",
+          "[Image: source:",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_BMP_TEXT_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

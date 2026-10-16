@@ -1,0 +1,9 @@
+node source
+node ask#1 "scan" @3:34 actors=actor#1 type="Record<string, string>"
+node ask#2 "plan" @8:22 actors=actor#2 type="string"
+node sink
+actor actor#1 "scan" @3:20
+actor actor#2 "plan" @8:8
+edge source -> ask#1 data exact
+edge ask#1 -> ask#2 data exact type="Record<string, string>"
+edge ask#2 -> sink data exact type="string"

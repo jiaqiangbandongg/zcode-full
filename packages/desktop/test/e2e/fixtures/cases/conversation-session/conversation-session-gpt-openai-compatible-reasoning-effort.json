@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-gpt-openai-compatible-reasoning-effort",
+  "spec": "./test/e2e/conversation-session/conversation-session-gpt-openai-compatible-reasoning-effort.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-gpt-openai-compatible-reasoning-effort.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "gpt-openai-compatible-reasoning-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中 low/xhigh 业务 fixture。"
+    },
+    {
+      "id": "gpt-openai-compatible-reasoning-low-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 provider/model 身份、OpenAI-compatible transport 和 GPT OpenAI-compatible low 请求 body；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "gpt-openai-compatible-reasoning-xhigh-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在同一 provider/model 下后续请求切换 xhigh 后的 GPT OpenAI-compatible 请求 body；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

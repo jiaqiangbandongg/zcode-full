@@ -2,7 +2,7 @@ import type { CollaborationMode } from "@zcode/contracts";
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { TuiSetMode } from "./types.js";
 
-export const TUI_SWITCHABLE_MODES = ["plan", "build", "edit", "yolo"] as const;
+export const TUI_SWITCHABLE_MODES = ["plan", "build", "guarded", "yolo"] as const;
 
 export type TuiSwitchableMode = (typeof TUI_SWITCHABLE_MODES)[number];
 

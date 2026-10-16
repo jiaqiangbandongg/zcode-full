@@ -1,6 +1,7 @@
 import { CREATE_WORKFLOW_TOOL_NAME, type TraceContext } from "@zcode/contracts";
 import type { ExecutableToolCall } from "../../tool/types.js";
 import type { AgentRuntimeInternal } from "../internal.js";
+import { activateDynamicWorkflowTools } from "./dynamic-workflow-activation.js";
 
 /**
  * 把一个**恢复的** dwf run 重新纳入后台追踪。
@@ -38,4 +39,7 @@ export async function trackResumedDynamicWorkflowRun(
     traceContext,
     undefined,
   );
+  // GUI Resume 成功即激活工具面（launch.md「On demand: activation」）：run 的终态通知会让模型
+  // 去调 GetWorkflowRun，没有那个工具它就卡住。
+  await activateDynamicWorkflowTools.call(this, { source: "run_control", traceContext });
 }

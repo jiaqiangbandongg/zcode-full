@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-send-now",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-send-now.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-running-send-now-head-base",
+      "description": "M07a 队首 send-now 的基础 running 窗口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定当前轮的 text-only assistant 输出并保持运行，验证抢占后 human reminder 的 MCS 位置降级。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOLD_STREAM",
+          "E2E_RUNNING_SEND_NOW_HEAD_BASE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_RUNNING_SEND_NOW_HEAD_BASE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"send-now-head-partial\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"output_tokens\":0}}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 0,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 0,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"send-now-head-partial\"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 60000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "sequence": 4,
+            "offsetMs": 60000,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":8}}\n\n"
+          },
+          {
+            "sequence": 5,
+            "offsetMs": 60000,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-running-send-now-head-selected",
+      "description": "M07a 被点队首项提升后的慢响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "保持下一轮 streaming，便于同时断言 user 投影、queue 清空与请求次数。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_RUNNING_SEND_NOW_HEAD",
+          "The user sent a new message while you were working:",
+          "<system-reminder>",
+          "Address the message above as you continue this turn."
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_RUNNING_SEND_NOW_HEAD"
+        ],
+        "lastUserMessageExcludes": [
+          "E2E_RUNNING_SEND_NOW_HEAD_BASE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-head-selected",
+          "inputTokens": 140,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-promote-base",
+      "description": "M07b 非队首提升的基础 running 窗口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定保留两条 typed queue，避免首轮提前完成并自动 drain。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOLD_STREAM", "E2E_RUNNING_SEND_NOW_PROMOTE_BASE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_RUNNING_SEND_NOW_PROMOTE_BASE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-promote-base",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-promote-first-not-selected",
+      "description": "M07b 未点队首项不得产生 provider 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "maxMatches=0 把未点项保持在 queue 的负向合同纳入 replay ledger。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_RUNNING_SEND_NOW_PROMOTE_FIRST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-running-send-now-promote-first-should-not-send",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-promote-second-selected",
+      "description": "M07b 被点非队首项提升后的慢响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证被点项成为 active，未点项仍保留。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SLOW_STREAM", "E2E_RUNNING_SEND_NOW_PROMOTE_SECOND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_RUNNING_SEND_NOW_PROMOTE_SECOND"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-promote-second-selected",
+          "inputTokens": 140,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-goal-base",
+      "description": "M07c queued goal send-now 的基础 running 窗口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "确保 /goal 先形成 typed queue，再由用户显式提升。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOLD_STREAM", "E2E_RUNNING_SEND_NOW_GOAL_BASE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_RUNNING_SEND_NOW_GOAL_BASE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-goal-base",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-goal-continuation",
+      "description": "M07c goal item 提升后启动的目标 continuation。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "保持 active target + streaming 窗口，直接验证 intent 未退化成普通 text。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Continue working toward the active session goal"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY", "Verify whether the active session goal"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-goal-continuation",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-double-base",
+      "description": "M07g 双击幂等的基础 running 窗口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "让两个 click 在同一 active turn 和同一 React 刷新边界内发生。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOLD_STREAM", "E2E_RUNNING_SEND_NOW_DOUBLE_BASE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_RUNNING_SEND_NOW_DOUBLE_BASE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-double-base",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-double-first-not-selected",
+      "description": "M07g 双击期间未点队首项不得被误消费。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "maxMatches=0 证明第二条 command 不会触发普通 drain 消费 sibling queue item。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_RUNNING_SEND_NOW_DOUBLE_FIRST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-running-send-now-double-first-should-not-send",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-running-send-now-double-second-selected-once",
+      "description": "M07g 被点项只能提升并发送一次。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "maxMatches=1 将重复 provider 请求直接视为 replay 失败，并保留 streaming 断言窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SLOW_STREAM", "E2E_RUNNING_SEND_NOW_DOUBLE_SECOND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_RUNNING_SEND_NOW_DOUBLE_SECOND"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "upstream-e2e-running-send-now-double-second-selected-once",
+          "inputTokens": 140,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

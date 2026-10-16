@@ -15,14 +15,14 @@ import { logger } from "../logger.js";
 
 const DEBOUNCE_MS = 300;
 
-interface TabPersistenceRestoreLifecycle {
+export interface TabPersistenceRestoreLifecycle {
   settingService?: ISettingService;
   restoreSession: boolean;
   completed: boolean;
   fullyCompleted: boolean;
 }
 
-interface TabPersistenceRestoreResult {
+export interface TabPersistenceRestoreResult {
   /** 恢复期间识别出的 app-owned 路径，不得回填为最近项目。 */
   excludedRecentProjectPaths?: readonly string[];
   /** active workspace 已恢复后，在首帧后的 idle period 补齐 inactive workspace。 */
@@ -41,7 +41,7 @@ function scheduleDeferredRestore(callback: () => void): () => void {
   return () => globalThis.clearTimeout(timer);
 }
 
-function hasCompletedTabPersistenceInitialRestore({
+export function hasCompletedTabPersistenceInitialRestore({
   settingService,
   restoreSession,
   restoreLifecycle,
@@ -59,7 +59,7 @@ function hasCompletedTabPersistenceInitialRestore({
   );
 }
 
-function getRecentProjectPathsFromSettings(
+export function getRecentProjectPathsFromSettings(
   settings: Pick<AppSettings, "lastWorkspaceSession">,
   excludedPaths: readonly string[] = [],
 ): string[] {
@@ -75,7 +75,7 @@ function getRecentProjectPathsFromSettings(
     .slice(0, 10);
 }
 
-function buildRestoredRecentProjectPaths(
+export function buildRestoredRecentProjectPaths(
   settings: Pick<AppSettings, "lastWorkspaceSession" | "recentProjects">,
   excludedPaths: readonly string[] = [],
 ): string[] {

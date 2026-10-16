@@ -1,0 +1,39 @@
+ask ask#1 "scanner" @4:37 order=0 type="string"
+actor actor#1 "scanner" @4:20 order=1
+ask ask#2 "fixer" @6:24 order=2 type="string"
+actor actor#2 "fixer" @6:9 order=3
+ask ask#3 "auditor" @10:36 order=4 type="string"
+actor actor#3 "auditor" @10:19 order=5
+ask ask#4 "approver" @12:37 order=6 type="string"
+actor actor#4 "approver" @12:19 order=7
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#3 <- ask#1 exact
+fact ask-data ask#4 <- ask#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact ask-actor ask#4 <- actor#4 exact
+fact return <- ask#3 exact
+fact return <- ask#4 exact
+region seq#1 seq entered
+region choice#1 choice parent=seq#1 @5:1 entered
+region branch#1 branch parent=choice#1 @5:28
+region choice#2 choice parent=seq#1 @9:1 entered exhaustive
+region branch#2 branch parent=choice#2 @9:29
+region branch#3 branch parent=choice#2 @11:8
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+spawn actor#2 in=seq#1>choice#1>branch#1
+issue ask#2 in=seq#1>choice#1>branch#1 phase=unphased
+settle ask#2 in=seq#1>choice#1>branch#1
+spawn actor#3 in=seq#1>choice#2>branch#2
+issue ask#3 in=seq#1>choice#2>branch#2 phase=unphased
+settle ask#3 in=seq#1>choice#2>branch#2
+spawn actor#4 in=seq#1>choice#2>branch#3
+issue ask#4 in=seq#1>choice#2>branch#3 phase=unphased
+settle ask#4 in=seq#1>choice#2>branch#3
+jump return seq#1 in=seq#1 phase=unphased
+control branch#1 by=ask#1
+control branch#2 by=ask#1
+control branch#3 by=ask#1

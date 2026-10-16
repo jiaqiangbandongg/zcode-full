@@ -1,6 +1,10 @@
 /**
- * 引擎的结构化错误：稳定错误码、可序列化形态，以及跨 Boundary A 抛出的 {@link WorkflowError}。
- * 本模块依赖 schema 的 Violation 与终态明细；types.ts 再导出这些类型供调用方使用。
+ * 引擎的结构化错误（docs/execution-engine.md「Errors are first-class」）：稳定错误码、
+ * 它的可序列化形态，以及跨 Boundary A 抛出的 {@link WorkflowError} 本身。
+ *
+ * 独立成文件的理由与 run-terminal.ts 同一条：types.ts 已抵 oxlint 的 400 行门，而这一族
+ * 高度自足——它只依赖 schema 的 `Violation` 与终态明细，不依赖词汇表里的任何别的东西。
+ * 消费者按惯例仍从 types.ts 取（那边原样再导出），导入路径因此一处都不必改。
  */
 
 import type { Violation } from "../schema/types.js";
@@ -19,10 +23,11 @@ import type { ProviderStopDetails } from "./run-terminal.js";
  *   DuplicateActorName——同一个 run 内两次 createActor 得到相同的**非空**有效名
  *   （有效名 = normalizePersona 后的 `spec.name`，persona.name 压过 name 实参）。规则对
  *   **所有** run 生效而不只是修订 run：具名 actor 是 amend-resume 缓存导入的身份键，而任何
- *   run 都是未来修订的潜在前驱，前驱里重名会让导入匹配歧义。匿名（名缺席或空串）不查、不禁——代价是没有缓存资格。
+ *   run 都是未来修订的潜在前驱，前驱里重名会让导入匹配歧义（docs/execution-engine.md
+ *   的「命名唯一性（引擎）」行）。匿名（名缺席或空串）不查、不禁——代价是没有缓存资格。
  *   字面量重名另有编译期 courtesy 诊断（analysis/actor-names.ts），但动态名只有运行期能查，
  *   所以这条才是真正的门。
- *   ReportCapExceeded——一个 run 超过 256 条报告，或单条 item 序列化超过 32KB
+ *   ReportCapExceeded——一个 run 超过 65,536 条报告、单条 item 序列化超过 1 MiB，或全部 item 超过 1 GiB
  *   （见 `facade/report-caps.ts`）。它是 run 级而不是 node 级，与上面 WorldReadCapExceeded 的
  *   分界同理、结论相反：`report` 返回 `void`，脚本**没有**可以 catch 的通道，除了 run 无处可放。
  *   也正因如此这两个数字必须宽到讲道理的脚本永远碰不到——脚本作者写不出恢复路径。
@@ -30,10 +35,11 @@ import type { ProviderStopDetails } from "./run-terminal.js";
  * - 构造期（run 尚未开始，引擎构造函数同步抛出）：ScriptHashMismatch
  * - 宿主级（**引擎从不产出**）：Interrupted——拥有该 run 的进程在结算之前就没了，由宿主在
  *   下一次构造时收敛那行永远停在 running 的记录（`bootstrap/src/app/dynamic-workflow-run-service.ts`
- *   的孤儿收敛）。它必须是**独立的码**而不是复用 DriverError：脚本
+ *   的孤儿收敛，桌面实测 bug 2026-08-19）。它必须是**独立的码**而不是复用 DriverError：脚本
  *   自己抛错也编码成 DriverError（`dynamic-workflow-runtime/src/harness.ts:311`），两者若同码，
  *   「进程被杀」与「脚本真失败」就只能靠 message 文本区分——而这正是本联合类型要避免的。
- *   ProviderStop——一个子代理（或工具侧）的模型请求撞上**确定性的**模型侧错误（认证失效、模型不在套餐里、配额耗尽等），driver 让
+ *   ProviderStop——一个子代理（或工具侧）的模型请求撞上**确定性的**模型侧错误（认证失效、
+ *   模型不在套餐里、配额耗尽……，docs/execution-engine.md 的策略表），driver 让
  *   run 以 `stopped(provider)` 停下而不是让节点失败；结构化明细在 `providerStop`。它是宿主级
  *   的另一条：引擎只在 `stop("provider", error)` 里原样落库。
  * 流程判断一律用这里的码，绝不匹配错误文本。
@@ -53,7 +59,7 @@ export type WorkflowErrorCode =
   | "ScriptHashMismatch"
   | "Interrupted"
   | "ProviderStop"
-  // ——————————— 用户面产物———————————
+  // ——————————— 用户面产物（docs/dynamic-workflow/authoring.md「Publishing content」）———————————
   // ⚠ 术语：这一批 artifact 全是**用户面产物**（脚本发布给用户看的产出），与
   // `RunSettlement.artifact`（顶层返回值）无关。
   //
@@ -71,7 +77,7 @@ export type WorkflowErrorCode =
   | "ArtifactSpecInvalid"
   | "ArtifactRedeclared"
   | "ArtifactUndeclared"
-  // 第二个 id 想当 primary：内容成员是节点级拒绝，
+  // 第二个 id 想当 primary（docs/dynamic-workflow/authoring.md「Ids, tags and versions」）：内容成员是节点级拒绝，
   // 预置成员是 failRun——与上面几条同一条分界。
   | "ArtifactPrimaryConflict";
 

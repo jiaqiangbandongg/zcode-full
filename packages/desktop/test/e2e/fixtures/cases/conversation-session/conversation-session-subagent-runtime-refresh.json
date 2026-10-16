@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-runtime-refresh",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-runtime-refresh.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-runtime-refresh.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "~/.zcode/agents/e2e-runtime-reviewer.md",
+      "source": "created-by-spec",
+      "description": "通过真实 Settings 创建和更新；不重启 Host、CLI 或父 session。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "shr-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-fail-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-fail-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-fail-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-stable-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-stable-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-stable-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-next-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-next-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-failure-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-resume-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-resume-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-resume-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    },
+    {
+      "id": "shr-compact",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定工具调用和模型响应，以实际 provider 请求验证父上下文快照、Settings 保存及失败 child 恢复。"
+    }
+  ]
+}

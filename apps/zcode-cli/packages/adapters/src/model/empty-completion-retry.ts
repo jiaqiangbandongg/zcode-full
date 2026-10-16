@@ -5,11 +5,11 @@ import { calculateRetryDelay, logRetryDelayDecision, sleep } from "./runner-retr
 import { publishModelStatus, type ModelStatusContext } from "./runner-status.js";
 import type { ResolvedAiSdkModelRetryOptions } from "./retry-policy.js";
 
-const EMPTY_COMPLETION_MAX_RETRIES = 1;
-const EMPTY_COMPLETION_MESSAGE =
+export const EMPTY_COMPLETION_MAX_RETRIES = 1;
+export const EMPTY_COMPLETION_MESSAGE =
   "Model returned no text, no tool calls, and no usage before completing the turn.";
 
-function createEmptyCompletionFailure(): ClassifiedModelFailure {
+export function createEmptyCompletionFailure(): ClassifiedModelFailure {
   return {
     code: ModelErrorCode.InvalidModelResponse,
     message: EMPTY_COMPLETION_MESSAGE,

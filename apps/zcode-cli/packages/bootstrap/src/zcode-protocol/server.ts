@@ -1,4 +1,6 @@
 import { querySessionDebug } from "./session-debug.js";
+import { createNodeNetworkCapture } from "@zcode/shared/node";
+import { networkCaptureControlSchema, zcodeProtocolNotifications } from "@zcode/shared";
 import {
   zcodePluginsCancelOperationParamsSchema,
   zcodeProtocolMethods,
@@ -6,6 +8,12 @@ import {
   zcodeWorkspaceHookTrustGrantParamsSchema,
 } from "@zcode/shared";
 import type { BrowserControlPort } from "@zcode/contracts";
+import type {
+  McpElicitationRequest,
+  McpElicitationResult,
+  McpServerNotification,
+} from "@zcode/contracts";
+import { requestMcpElicitation } from "./interaction-broker.js";
 import { InMemoryWorkspaceHookPolicyProvider } from "@zcode/core";
 import {
   V4_METHODS,
@@ -81,7 +89,26 @@ import {
   moveSavedWorkflowOp,
   updateSavedWorkflowMetaOp,
 } from "./saved-workflows.js";
+import { findSavedWorkflowForRunOp, saveSavedWorkflowFromRunOp } from "./saved-workflows-run.js";
 import { listMcpServers } from "./mcp.js";
+import {
+  callMcpUiTool,
+  sampleMcpUi,
+  cancelMcpUiSampling,
+  cancelMcpUiToolCall,
+  listMcpUiResourceTemplates,
+  listMcpUiResources,
+  claimMcpUiAppToolCall,
+  registerMcpUiAppTools,
+  resolveMcpUiAppToolCall,
+  unregisterMcpUiAppTools,
+  readMcpUiResource,
+  readMcpUiResourceForUi,
+  routeMcpServerNotification,
+  subscribeMcpUiResource,
+  unsubscribeMcpUiResource,
+} from "./mcp-ui/index.js";
+import { listPluginUiSurfaces } from "./plugin-ui-surfaces.js";
 import { updateInteractionPreferences } from "./interaction-preferences.js";
 import { updateAccountProviderConfig } from "./account-provider-config.js";
 import { updateModelIoPreferences } from "./model-io-preferences.js";
@@ -105,6 +132,7 @@ import {
   isNotification,
   isRequest,
   isResponse,
+  PROTOCOL_CLIENT_REQUEST_ERROR_CODES,
   ProtocolRequestError,
   type ParamsSchema,
   parseParams,
@@ -118,6 +146,7 @@ import { createInMemorySessionEventStore } from "@zcode/contracts";
 
 export type { ZCodeProtocolAgentDependencies, ZCodeProtocolSessionRecord };
 
+import { closeMcpUiInstance, openMcpUiInstance, validateMcpUiInstance } from "./mcp-ui/index.js";
 const MAX_CLIENT_REQUEST_REANNOUNCE_INTERVAL_MS = 10_000;
 
 type ZCodeProtocolOutboundMessage = ZCodeProtocolNotification | ZCodeProtocolRequest;
@@ -128,7 +157,7 @@ type ZCodeProtocolOutboundMessage = ZCodeProtocolNotification | ZCodeProtocolReq
  * 停留旧值。pretrust 授权成功后按 workspaceKey 通知所有匹配的活跃 session 重载。
  * 独立导出为纯调度函数（不触网、不发事件），便于回归测试直接构造 sessions Map。
  */
-async function notifyWorkspaceHookTrustGrantSessions(input: {
+export async function notifyWorkspaceHookTrustGrantSessions(input: {
   grantedWorkspaceKey?: string;
   sessions: Map<string, ZCodeProtocolSessionRecord>;
 }): Promise<void> {
@@ -183,7 +212,7 @@ function getOperationId(params: unknown): string | undefined {
     : undefined;
 }
 
-interface ZCodeProtocolPostResponseBatch {
+export interface ZCodeProtocolPostResponseBatch {
   readonly messages: readonly ZCodeProtocolOutboundMessage[];
   commit(): boolean;
 }
@@ -201,6 +230,12 @@ interface PendingClientRequest<T> {
 }
 
 export class ZCodeProtocolAgentServer {
+  private readonly networkCapture = createNodeNetworkCapture("cli", (batch) => {
+    this.messageSink?.({
+      method: zcodeProtocolNotifications.processNetworkRequests,
+      params: batch,
+    });
+  });
   private readonly runtimeResources: ProtocolRuntimeResources;
   private shutdownPromise?: Promise<void>;
   readonly browserControlPort: BrowserControlPort;
@@ -209,6 +244,19 @@ export class ZCodeProtocolAgentServer {
    * MCP 连接池的构造早于 server，需要在 server 就绪后回填闭包持有的引用——
    * 与 v4Gateway 同样的构造顺序收口方式。只暴露 requestClient，不外泄整个 context。
    */
+  /** MCP server 发起的 elicitation/create → 用户提问。 */
+  requestMcpElicitation(
+    request: McpElicitationRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpElicitationResult> {
+    return requestMcpElicitation(this.context, request, options);
+  }
+
+  /** MCP server 通知 → 会话 live 事件 / agent 日志。 */
+  handleMcpNotification(notification: McpServerNotification): void {
+    routeMcpServerNotification(this.context, notification);
+  }
+
   get officialMcpAuthRequestContext(): Pick<ZCodeProtocolAgentServerContext, "requestClient"> {
     return this.context;
   }
@@ -344,6 +392,7 @@ export class ZCodeProtocolAgentServer {
   }
 
   disconnectClient(error: Error): void {
+    this.networkCapture.setCaptureId(null);
     this.clientDisconnectError = error;
     // 连接关闭后反向请求已不可能收到响应，必须先结束 pending，
     // 否则正在物化 Session 的 handler 会阻塞 connection 的关闭流程。
@@ -422,6 +471,11 @@ export class ZCodeProtocolAgentServer {
       return await this.handleRequest(message);
     }
     if (isNotification(message)) {
+      if (message.method === zcodeProtocolMethods.processNetworkCapture) {
+        const control = networkCaptureControlSchema.safeParse(message.params);
+        if (control.success) this.networkCapture.setCaptureId(control.data.captureId);
+        return undefined;
+      }
       this.logger?.debug("ZCode Protocol notification ignored", {
         event: "zcode_protocol.notification.ignored",
         method: message.method,
@@ -643,12 +697,48 @@ export class ZCodeProtocolAgentServer {
         return await testProviderModelConnectivity(this.context, request.params);
       case zcodeProtocolMethods.mcpList:
         return await listMcpServers(this.context, request.params);
+      case zcodeProtocolMethods.mcpReadResource:
+        return await readMcpUiResource(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiOpenInstance:
+        return openMcpUiInstance(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiValidateInstance:
+        return validateMcpUiInstance(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiCloseInstance:
+        return closeMcpUiInstance(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiSampling:
+        return sampleMcpUi(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiCancelSampling:
+        return cancelMcpUiSampling(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiCallTool:
+        return await callMcpUiTool(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiCancelCall:
+        return await cancelMcpUiToolCall(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiReadResource:
+        return await readMcpUiResourceForUi(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiListResources:
+        return await listMcpUiResources(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiListResourceTemplates:
+        return await listMcpUiResourceTemplates(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiSubscribeResource:
+        return await subscribeMcpUiResource(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiUnsubscribeResource:
+        return await unsubscribeMcpUiResource(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiRegisterAppTools:
+        return await registerMcpUiAppTools(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiUnregisterAppTools:
+        return await unregisterMcpUiAppTools(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiClaimAppToolCall:
+        return await claimMcpUiAppToolCall(this.context, request.params);
+      case zcodeProtocolMethods.mcpUiResolveAppToolCall:
+        return await resolveMcpUiAppToolCall(this.context, request.params);
       case zcodeProtocolMethods.pluginsList:
         return await listPlugins(this.context, request.params);
       case zcodeProtocolMethods.pluginsReferenceCatalogWithCategory:
         return await getPluginReferenceCatalog(this.context, request.params, true);
       case zcodeProtocolMethods.pluginsReferenceCatalog:
         return await getPluginReferenceCatalog(this.context, request.params);
+      case zcodeProtocolMethods.pluginsListUiSurfaces:
+        return await listPluginUiSurfaces(this.context, request.params);
       case zcodeProtocolMethods.skillsReferenceCatalog:
         return await getSkillReferenceCatalog(this.context, request.params);
       case zcodeProtocolMethods.workflowsList:
@@ -663,6 +753,10 @@ export class ZCodeProtocolAgentServer {
         return await listSavedWorkflowRunsOp(this.context, request.params);
       case zcodeProtocolMethods.workflowsMove:
         return await moveSavedWorkflowOp(this.context, request.params);
+      case zcodeProtocolMethods.workflowsSave:
+        return await saveSavedWorkflowFromRunOp(this.context, request.params);
+      case zcodeProtocolMethods.workflowsForRun:
+        return await findSavedWorkflowForRunOp(this.context, request.params);
       case zcodeProtocolMethods.pluginsResolveSuggestedReference:
         return await this.withPluginOperationSignal(request, (signal) =>
           resolveSuggestedPluginReference(this.context, request.params, signal),
@@ -812,7 +906,10 @@ export class ZCodeProtocolAgentServer {
       throw this.clientDisconnectError;
     }
     if (!this.messageSink) {
-      throw new ProtocolRequestError(-32020, `No ZCode Protocol client is attached for ${method}`);
+      throw new ProtocolRequestError(
+        PROTOCOL_CLIENT_REQUEST_ERROR_CODES.noClientAttached,
+        `No ZCode Protocol client is attached for ${method}`,
+      );
     }
 
     return new Promise<T>((resolve, reject) => {
@@ -831,7 +928,12 @@ export class ZCodeProtocolAgentServer {
       };
       pending.abortHandler = () => {
         cleanup();
-        reject(new ProtocolRequestError(-32021, `Client request cancelled: ${method}`));
+        reject(
+          new ProtocolRequestError(
+            PROTOCOL_CLIENT_REQUEST_ERROR_CODES.cancelled,
+            `Client request cancelled: ${method}`,
+          ),
+        );
       };
       if (options?.signal?.aborted) {
         pending.abortHandler();
@@ -841,9 +943,13 @@ export class ZCodeProtocolAgentServer {
         pending.timeout = setTimeout(() => {
           cleanup();
           reject(
-            new ProtocolRequestError(-32022, `Client request timed out: ${method}`, {
-              timeoutMs: options.timeoutMs,
-            }),
+            new ProtocolRequestError(
+              PROTOCOL_CLIENT_REQUEST_ERROR_CODES.timedOut,
+              `Client request timed out: ${method}`,
+              {
+                timeoutMs: options.timeoutMs,
+              },
+            ),
           );
         }, options.timeoutMs);
       }

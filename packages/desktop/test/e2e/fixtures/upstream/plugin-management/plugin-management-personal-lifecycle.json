@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-personal-lifecycle",
+  "spec": "./test/e2e/plugins/plugin-management-personal-lifecycle.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-management-lifecycle-v2-tool-call",
+      "description": "PLM-LC-003 advertises and calls the v2 lifecycle MCP tool from a newly created session.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_2.0.0"],
+        "bodyIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_2.0.0"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_lifecycle_v2",
+          "name": "mcp__plugin_e2e-plugin-lifecycle_lifecycle__version_marker",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-management-lifecycle-v2-final",
+      "description": "PLM-LC-003 final response after the lifecycle MCP tool result.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_2.0.0", "toolu_e2e_plugin_lifecycle_v2"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

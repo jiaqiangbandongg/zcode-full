@@ -1,0 +1,38 @@
+{
+  "name": "@zcode/e2e-report",
+  "private": true,
+  "type": "module",
+  "main": "./dist-node/node/index.js",
+  "types": "./dist-node/node/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-node/node/index.d.ts",
+      "import": "./dist-node/node/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm build:node && pnpm build:viewer",
+    "build:node": "tsc -p tsconfig.json",
+    "build:viewer": "vite build",
+    "dev": "vite --host 127.0.0.1 --port 4173",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.app.json --noEmit"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "lucide-react": "^1.17.0",
+    "react": "^19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.2",
+    "typescript": "^6.0.2"
+  }
+}

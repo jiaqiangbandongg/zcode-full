@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-markdown-boundaries",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-markdown-boundaries.test.ts",
+  "fixtures": [
+    {
+      "id": "output-limit-continue-markdown-title",
+      "description": "OTC09 标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是 Continue Markdown 边界探针的产品语义；固定响应避免干扰四次主请求。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_BOUNDARIES"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "output-limit-continue-markdown-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Continue Markdown Probe\"}"
+        }
+      }
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p1",
+      "description": "第一次主请求在 task bullet 的 strong 外链 label 中间以 max_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性让 task bullet、strong 与外链 token 同时跨第一条 Continue 拼接缝。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_BOUNDARIES"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-markdown-partial-p1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"## Continue Markdown 全量边界\\n\\n首段包含 **粗体边界**、*斜体边界*、~~删除线边界~~ 与 `inline-boundary`。\\n\\n- [x] 已完成任务\\n- [ ] **带跨缝[链接\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":12,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p2",
+      "description": "第二次主请求闭合 strong 外链、包含多个换行，并在 ordered item 的 emphasis/strikethrough 图片 alt 中间再次截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性覆盖 Continue partial 内部多个换行，并让 ordered item、emphasis、strikethrough 与本地图片 token 同时跨第二条拼接缝。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_BOUNDARIES"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-markdown-partial-p2\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":20,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"](https://example.com/continue-edge)** 保持完整\\n- 普通 bullet 在 Continue 中保留\\n\\n1. *~~有序项中的图片 ![跨缝图片\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":20,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p3",
+      "description": "第三次主请求闭合本地图片并写入表格和分隔线，在 fenced code 行末换行后第三次截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性让第三条拼接缝精确落在尚未闭合的 TypeScript fenced code 行末换行。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_BOUNDARIES"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-markdown-partial-p3\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":28,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"](.zcode-e2e/continue-markdown/cross-seam.svg)~~* 保持完整\\n2. 第二个有序项\\n\\n| 来源 | 结果 |\\n| --- | --- |\\n| p3 | p4 |\\n\\n---\\n\\n```ts\\nconst beforeBoundary = \\\"P3\\\";\\n\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":28,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "output-limit-continue-markdown-final-p4",
+      "description": "第四次主请求继续并闭合 fenced code，追加引用、硬换行、数学公式、Mermaid 与 autolink 后正常结束。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "正常结束最大三次 Continue 的累计 Markdown，并提供其余受支持结构的最终 DOM 证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_MARKDOWN_BOUNDARIES"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-markdown-final-p4\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":36,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"const afterBoundary = \\\"P4\\\";\\nconsole.log(beforeBoundary + afterBoundary);\\n```\\n\\n> 围栏闭合后的引用仍然正常。\\n\\n硬换行第一行  \\n硬换行第二行。\\n\\n行内公式 $E = mc^2$。\\n\\n$$\\na^2 + b^2 = c^2\\n$$\\n\\n```mermaid\\ngraph TD\\n  A[Continue] --> B[One assistant]\\n```\\n\\n自动链接 <https://example.com/autolink>\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":36,\"output_tokens\":12}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import { isSessionWorkflowRunLive } from "@zcode/shared/zcode-protocol-v4";
 import { bandOf, foldPhaseBands, trackOf } from "../components/workflow-timeline/timeline-bands.js";
 
 /** 一个会话最多画的运行行数；其余折成「+n」。 */
-const WORKFLOW_RUN_LINE_MAX_LINES = 2;
+export const WORKFLOW_RUN_LINE_MAX_LINES = 2;
 /** 迷你轨道最多画的站点数；更多时折到运行站 ±2 并带「+n」尾。 */
 const WORKFLOW_RUN_RAIL_MAX_STATIONS = 6;
 /** 折叠时保留在运行站两侧的站点数。 */
@@ -27,6 +27,8 @@ export interface WorkflowRunRailStation {
    * 标志挂在**站**上而不是段上，所以它能活过下面的窗口折叠。
    */
   twin?: true;
+  /** 这一站是还开着的留白：虚线 6px 灯，等待时警示色（docs/dynamic-workflow/presentation.md「Holes on the timeline」）。 */
+  hole?: "open" | "waiting";
 }
 
 export interface WorkflowRunRail {
@@ -38,7 +40,9 @@ export interface WorkflowRunRail {
 }
 
 /** 控制流是否到过这一站：running / done / failed 都算。 */
-function isWorkflowRunStationReached(status: SessionWorkflowPhaseSummary["status"]): boolean {
+function isWorkflowRunStationReached(
+  status: SessionWorkflowPhaseSummary["status"],
+): boolean {
   return status !== "pending";
 }
 
@@ -67,14 +71,19 @@ export function foldWorkflowRunRail(
     return {
       name: phase.name,
       status: phase.status,
-      reached: isWorkflowRunStationReached(phase.status),
+      // 等着补全的留白是控制流到了的地方：进入它的段已走过。
+      reached: isWorkflowRunStationReached(phase.status) || phase.hole === "waiting",
       ...(twin ? { twin: true as const } : {}),
+      ...(phase.hole === undefined ? {} : { hole: phase.hole }),
     };
   });
   if (all.length <= WORKFLOW_RUN_RAIL_MAX_STATIONS) {
     return { stations: all, hidden: 0, implicit: false };
   }
-  let anchor = all.findIndex((station) => station.status === "running");
+  // 窗口以运行站为锚；run 停在留白上时那一站就是锚（灯是警示色的虚线，不是 running）。
+  let anchor = all.findIndex(
+    (station) => station.status === "running" || station.hole === "waiting",
+  );
   if (anchor < 0) {
     for (let index = all.length - 1; index >= 0; index -= 1) {
       if (all[index]!.reached) {
@@ -93,7 +102,7 @@ export function foldWorkflowRunRail(
 }
 
 /** 并行阶段之间的连接词：同时在跑的几站并排，而不是排队。 */
-const WORKFLOW_RUN_PARALLEL_SEPARATOR = " ∥ ";
+export const WORKFLOW_RUN_PARALLEL_SEPARATOR = " ∥ ";
 
 /**
  * 同时在跑的站名，连成 tooltip 里的一段。并行时「当前阶段」不再是一个站——谁都不比谁更当前，

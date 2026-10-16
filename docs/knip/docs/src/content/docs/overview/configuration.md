@@ -1,0 +1,104 @@
+---
+title: Configuration
+description: config
+---
+
+## Defaults
+
+Knip has good defaults and aims for "zero config". Here's a simplified version
+of the default `entry` and `project` values:
+
+```json
+{
+  "entry": ["index.{js,ts}", "src/index.{js,ts}"],
+  "project": ["**/*.{js,ts}"]
+}
+```
+
+Entry files are the starting point for Knip to find more source files and
+external dependencies.
+
+## Location
+
+By default, Knip will look for a configuration file with the following names:
+
+- `knip.json`
+- `knip.jsonc`
+- `.knip.json`
+- `.knip.jsonc`
+- `knip.ts`
+- `knip.js`
+- `knip.config.ts`
+- `knip.config.js`
+- `package.json` (in the `"knip"` property)
+
+If you want to use a custom file name or path, use the `--config` flag:
+
+```sh
+knip --config path/to/knip.json
+```
+
+## Customize
+
+Your project structure may not match the default `entry` and `project` files.
+Here's an example custom configuration to include `.js` files in the `scripts`
+folder:
+
+```json title="knip.json"
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["src/index.ts", "scripts/{build,create}.js"],
+  "project": ["src/**/*.ts", "scripts/**/*.js"]
+}
+```
+
+The set of `project` files determines the analysis scope. Use negated `project`
+patterns to exclude files from the analysis. See [configuring project files][1]
+for details.
+
+The values you set override the default values, they are not merged.
+
+:::tip
+
+Be specific with `entry` files. Minimize the number of entry files and wildcards
+for better results.
+
+Plugins are enabled automatically, and their entry files are added
+automatically. Such as for Next.js, Astro, Remix, Vitest, Playwright and many
+more.
+
+:::
+
+Knip looks for entry files in many places. Learn more in the next page about
+[entry files][2].
+
+## Configuration Options
+
+See [configuration file options][3].
+
+Use JavaScript or TypeScript in a [dynamic configuration file][4].
+
+## What's next?
+
+The best way to understand Knip and what it can do for you is to read the pages
+in the "Understanding Knip" sections, starting with [entry files][2].
+
+Want to learn more about some of the main features?
+
+- Working with [monorepos & workspaces][5].
+- Learn more about [production mode][6].
+
+Having trouble configuring Knip?
+
+- [Configuring project files][1]
+- [Troubleshooting][7]
+
+Search this website using the bar at the top (`Ctrl+K` or `⌘+K`).
+
+[1]: ../guides/configuring-project-files.md
+[2]: ../explanations/entry-files.md
+[3]: ../reference/configuration.md
+[4]: ../reference/dynamic-configuration.mdx
+[5]: ../features/monorepos-and-workspaces.md
+[6]: ../features/production-mode.md
+[7]: ../guides/troubleshooting.md

@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-switch-restore-repro",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-switch-restore-repro.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-model-switch-restore-repro-quota-failure",
+      "description": "复现用户日志里的第一轮 quota-like 失败态，随后允许同一 session 切模型继续发送。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "复现探针需要稳定制造失败态，避免依赖真实 GLM 额度。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_RESTORE_REPRO_FAIL"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_RESTORE_REPRO_FAIL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_MODEL_SWITCH_RESTORE_REPRO_SUCCESS"
+        ]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"error\":{\"message\":\"已达到 5 小时的使用上限。您的限额将在 2026-06-25 18:11:31 重置。\",\"type\":\"rate_limit_error\",\"code\":\"rate_limit_exceeded\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-model-switch-restore-repro-success",
+      "description": "失败态后切换模型配置的成功回复，用固定 token 验证恢复后是否仍可见。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "复现探针只需要稳定产出一条 completed assistant。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_SWITCH_RESTORE_REPRO_SUCCESS"],
+        "bodyIncludes": ["E2E_MODEL_SWITCH_RESTORE_REPRO_SUCCESS"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"upstream-e2e-model-switch-restore-repro-success\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"E2E_MODEL_SWITCH_RESTORE_REPRO_ASSISTANT_VISIBLE\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":120,\"output_tokens\":12,\"service_tier\":\"standard\"}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

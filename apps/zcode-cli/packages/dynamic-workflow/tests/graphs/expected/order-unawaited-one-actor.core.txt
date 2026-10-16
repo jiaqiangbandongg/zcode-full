@@ -1,0 +1,18 @@
+actor actor#1 "critic" @4:16 order=0
+ask ask#1 "critic" @5:19 order=1 type="string"
+ask ask#2 "critic" @6:19 order=2 type="string"
+join join#1 "join" @7:30 order=3 type="[string, string]" ports="string","string"
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#1 exact
+fact join-in join#1 <- ask#1 exact port=0
+fact join-in join#1 <- ask#2 exact port=1
+fact return <- ask#1 exact
+fact return <- join#1 exact port=0
+fact return <- ask#2 exact
+fact return <- join#1 exact port=1
+region seq#1 seq entered
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+issue ask#2 in=seq#1 phase=unphased
+settle maybe ask#1,ask#2 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

@@ -91,7 +91,7 @@ function sortGroupTasks(
   });
 }
 
-interface BuildGroupedTaskViewParams {
+export interface BuildGroupedTaskViewParams {
   structure: ZCodeGroupedTaskViewStructure;
   /** tasks-index active/pinned/archived 三个持久分区的 task 行并集。 */
   taskIndexItems: ZCodeTaskMeta[];

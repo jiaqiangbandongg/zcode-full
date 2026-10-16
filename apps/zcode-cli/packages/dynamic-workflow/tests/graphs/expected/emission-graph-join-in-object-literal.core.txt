@@ -1,0 +1,33 @@
+actor actor#1 "analyst" @10:11 order=0
+actor actor#2 "builder" @11:11 order=1
+join join#1 "join" @13:17 order=2 type="[string, string]" ports="string","string"
+ask ask#1 "a" @13:24 order=3 type="string"
+ask ask#2 "a" @13:52 order=4 type="string"
+join join#2 "join" @14:17 order=5 type="[string]" ports="string"
+ask ask#3 "b" @14:24 order=6 type="string"
+ask ask#4 "reviewer" @18:26 order=7 type="string"
+actor actor#3 "reviewer" @18:8 order=8
+fact ask-data ask#4 <- join#1 exact
+fact ask-data ask#4 <- ask#1 exact
+fact ask-data ask#4 <- ask#2 exact
+fact ask-data ask#4 <- join#2 exact
+fact ask-data ask#4 <- ask#3 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#1 exact
+fact ask-actor ask#3 <- actor#2 exact
+fact ask-actor ask#4 <- actor#3 exact
+fact join-in join#1 <- ask#1 exact port=0
+fact join-in join#1 <- ask#2 exact port=1
+fact join-in join#2 <- ask#3 exact port=0
+fact return <- ask#4 exact
+region seq#1 seq entered
+spawn actor#1 in=seq#1
+spawn actor#2 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+issue ask#2 in=seq#1 phase=unphased
+issue ask#3 in=seq#1 phase=unphased
+settle maybe ask#1,ask#2 in=seq#1
+settle ask#3 in=seq#1
+spawn actor#3 in=seq#1
+issue ask#4 in=seq#1 phase=unphased
+jump return seq#1 in=seq#1 phase=unphased

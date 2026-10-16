@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workspace Hook Trust Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --app: #151515;
+        --sidebar: #292a2a;
+        --panel: #202020;
+        --panel-raised: #2a2a2a;
+        --row: #222222;
+        --border: rgba(255, 255, 255, 0.09);
+        --border-strong: rgba(255, 255, 255, 0.15);
+        --text: #ececec;
+        --muted: #9a9a9d;
+        --subtle: #6e6e72;
+        --orange: #f08032;
+        --orange-bg: #2b1c13;
+        --green: #72ba8d;
+        --blue: #68a9d8;
+        --focus: #63a6d6;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #101010;
+        color: var(--text);
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      .archive-notice {
+        margin: 16px;
+        padding: 12px 16px;
+        border: 1px solid var(--orange);
+        border-radius: 10px;
+        background: var(--orange-bg);
+        color: var(--text);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .icon {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 310px minmax(0, 1fr);
+        overflow: hidden;
+        background: var(--app);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 18px;
+      }
+
+      .sidebar {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 22px 12px 18px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--border);
+      }
+
+      .window-controls {
+        display: flex;
+        gap: 12px;
+        padding: 2px 13px 28px;
+      }
+
+      .window-controls span {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+      }
+
+      .window-controls span:nth-child(1) {
+        background: #ff5f57;
+      }
+
+      .window-controls span:nth-child(2) {
+        background: #febc2e;
+      }
+
+      .window-controls span:nth-child(3) {
+        background: #28c840;
+      }
+
+      .back-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        margin: 0 4px 12px;
+        padding: 0 10px;
+        color: #9d9da0;
+        font-size: 16px;
+        font-weight: 650;
+      }
+
+      .sidebar-search {
+        position: relative;
+        margin-bottom: 18px;
+      }
+
+      .sidebar-search .icon {
+        position: absolute;
+        left: 13px;
+        top: 50%;
+        color: #858589;
+        transform: translateY(-50%);
+      }
+
+      .sidebar-search input {
+        width: 100%;
+        height: 38px;
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 0 12px 0 40px;
+        color: var(--text);
+      }
+
+      .sidebar-search input::placeholder {
+        color: #747478;
+      }
+
+      .nav-section {
+        margin-bottom: 13px;
+      }
+
+      .nav-heading {
+        margin: 0 13px 6px;
+        color: #707074;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .nav-item {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        padding: 0 12px;
+        color: #c9c9cb;
+        text-align: left;
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: #f3f3f3;
+      }
+
+      .nav-item .icon {
+        color: #b9b9bc;
+      }
+
+      .main {
+        min-width: 0;
+        min-height: 100vh;
+        background: var(--app);
+        padding: 64px 62px;
+      }
+
+      .main-inner {
+        width: min(1120px, 100%);
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: 38px;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+      }
+
+      .page-heading-row,
+      .description-row,
+      .tab-row,
+      .review-summary {
+        display: flex;
+        align-items: center;
+      }
+
+      .page-heading-row {
+        justify-content: space-between;
+      }
+
+      .icon-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .icon-button {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #99999c;
+        cursor: pointer;
+      }
+
+      .icon-button:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #dedede;
+      }
+
+      .description-row {
+        justify-content: space-between;
+        margin: 48px 0 26px;
+        color: var(--muted);
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .page-search {
+        position: relative;
+        margin-bottom: 24px;
+      }
+
+      .page-search .icon {
+        position: absolute;
+        top: 50%;
+        left: 16px;
+        color: #7f7f82;
+        transform: translateY(-50%);
+      }
+
+      .page-search input {
+        width: 100%;
+        height: 52px;
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        background: #292929;
+        padding: 0 18px 0 48px;
+        color: var(--text);
+        font-size: 16px;
+      }
+
+      .page-search input::placeholder {
+        color: #737377;
+      }
+
+      .tab-row {
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+
+      .tabs {
+        display: inline-flex;
+        gap: 3px;
+        padding: 3px;
+        border-radius: 12px;
+        background: #202020;
+      }
+
+      .tab {
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        padding: 0 14px;
+        color: #97979a;
+        cursor: pointer;
+      }
+
+      .tab.active {
+        background: #151515;
+        color: #e6e6e6;
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .scope-note {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #86868a;
+        font-size: 14px;
+      }
+
+      .scope-note .icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .review-summary {
+        width: 100%;
+        min-height: 86px;
+        justify-content: space-between;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #1d1d1d;
+        padding: 0 20px;
+        cursor: pointer;
+      }
+
+      .review-summary:hover {
+        background: #202020;
+        border-color: var(--border-strong);
+      }
+
+      .review-summary-main {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .review-summary-copy strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 16px;
+      }
+
+      .review-summary-copy span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .review-summary-side {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #c4c4c6;
+        font-weight: 650;
+      }
+
+      .status-icon {
+        width: 20px;
+        height: 20px;
+        color: var(--orange);
+      }
+
+      .review-summary[data-state="trusted"] .status-icon {
+        color: var(--green);
+      }
+
+      .empty-state {
+        min-height: 86px;
+        display: none;
+        align-items: center;
+        border: 1px dashed var(--border-strong);
+        border-radius: 14px;
+        padding: 0 20px;
+        color: var(--muted);
+      }
+
+      .backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 38px;
+        background: rgba(0, 0, 0, 0.42);
+      }
+
+      .backdrop.open {
+        display: flex;
+      }
+
+      .review-dialog {
+        width: min(940px, calc(100vw - 76px));
+        max-height: min(820px, calc(100vh - 76px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 25px;
+        background: var(--panel-raised);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      }
+
+      .dialog-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 28px 30px 20px;
+      }
+
+      .dialog-title-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .dialog-title-row .icon {
+        width: 22px;
+        height: 22px;
+        color: #bdbdc0;
+      }
+
+      .dialog-title {
+        margin: 0;
+        font-size: 25px;
+        line-height: 1.2;
+      }
+
+      .dialog-subtitle {
+        margin: 7px 0 0 34px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .warning {
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin: 12px 30px 18px;
+        border: 1px solid rgba(240, 128, 50, 0.2);
+        border-radius: 14px;
+        background: var(--orange-bg);
+        padding: 0 18px;
+        color: #ebebeb;
+        font-size: 15px;
+        font-weight: 620;
+      }
+
+      .warning .icon {
+        color: var(--orange);
+      }
+
+      .hook-list {
+        min-height: 0;
+        overflow: auto;
+        margin: 0 30px;
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        background: var(--row);
+      }
+
+      .event-group + .event-group {
+        border-top: 1px solid var(--border);
+      }
+
+      .event-header {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+      }
+
+      .event-name {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+
+      .event-name .hook-icon {
+        width: 20px;
+        height: 20px;
+        color: #dedede;
+      }
+
+      .event-copy strong,
+      .event-copy span {
+        display: block;
+      }
+
+      .event-copy strong {
+        margin-bottom: 3px;
+        font-size: 16px;
+      }
+
+      .event-copy span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .event-status {
+        color: var(--orange);
+      }
+
+      .event-group.trusted .event-status {
+        color: var(--green);
+      }
+
+      .event-group.once .event-status {
+        color: #b7b7ba;
+      }
+
+      .hook-item {
+        margin: 0 14px 14px;
+        border-top: 1px solid var(--border);
+      }
+
+      .hook-line {
+        min-height: 58px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+        align-items: center;
+        gap: 10px;
+        padding: 0 8px 0 20px;
+        border-radius: 13px;
+      }
+
+      .hook-item.expanded .hook-line {
+        margin-top: -1px;
+        box-shadow: inset 0 0 0 2px var(--focus);
+      }
+
+      .hook-name-button {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .hook-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 16px;
+      }
+
+      .row-icon-button {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: #8a8a8e;
+        cursor: pointer;
+      }
+
+      .trust-button {
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid var(--border-strong);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 0 13px;
+        color: #e5e5e5;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      .trust-button.trusted {
+        color: #cfd8d2;
+      }
+
+      .trust-button.once {
+        color: #c9c9cc;
+      }
+
+      .trust-button .icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .switch {
+        position: relative;
+        width: 46px;
+        height: 27px;
+        display: inline-block;
+        margin: 0 2px;
+      }
+
+      .switch input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .switch-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #3c3c3e;
+        cursor: pointer;
+      }
+
+      .switch-track::after {
+        content: "";
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        width: 19px;
+        height: 19px;
+        border-radius: 50%;
+        background: #a7a7aa;
+        transition: transform 140ms ease;
+      }
+
+      .switch input:checked + .switch-track {
+        background: #505052;
+      }
+
+      .switch input:checked + .switch-track::after {
+        background: #d0d0d2;
+        transform: translateX(19px);
+      }
+
+      .hook-details {
+        display: none;
+        margin: 10px 8px 0 50px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: #232323;
+        padding: 16px 18px;
+      }
+
+      .hook-item.expanded .hook-details {
+        display: block;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        row-gap: 12px;
+        color: #e3e3e3;
+        font-size: 14px;
+      }
+
+      .detail-label {
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .detail-value {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .detail-value code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+      }
+
+      .detail-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 15px;
+        padding-top: 13px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .text-button {
+        border: 0;
+        background: transparent;
+        padding: 4px;
+        color: #b8b8bb;
+        cursor: pointer;
+      }
+
+      .text-button:hover {
+        color: #f0f0f0;
+      }
+
+      .dialog-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 30px 24px;
+      }
+
+      .waiting-note {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .waiting-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+
+      .footer-actions {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .button {
+        min-height: 38px;
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        background: #303030;
+        padding: 0 15px;
+        color: #e8e8e8;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      .button:hover {
+        background: #373737;
+      }
+
+      .button.primary {
+        background: #e8e8e8;
+        color: #181818;
+      }
+
+      .button.primary:hover {
+        background: #ffffff;
+      }
+
+      .button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      .toast {
+        position: fixed;
+        z-index: 40;
+        left: 50%;
+        bottom: 26px;
+        min-width: 260px;
+        max-width: calc(100vw - 40px);
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        background: #292929;
+        padding: 11px 16px;
+        color: #e8e8e8;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, 8px);
+        transition:
+          opacity 140ms ease,
+          transform 140ms ease;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 240px minmax(0, 1fr);
+        }
+
+        .main {
+          padding: 44px 30px;
+        }
+
+        .backdrop {
+          padding: 20px;
+        }
+
+        .review-dialog {
+          width: calc(100vw - 40px);
+          max-height: calc(100vh - 40px);
+        }
+
+        .dialog-footer {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .footer-actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
+      }
+
+      @media (max-width: 680px) {
+        .app {
+          display: block;
+          border-radius: 0;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .main {
+          padding: 30px 20px;
+        }
+
+        .description-row {
+          margin-top: 30px;
+        }
+
+        .scope-note {
+          display: none;
+        }
+
+        .backdrop {
+          align-items: stretch;
+          padding: 0;
+        }
+
+        .review-dialog {
+          width: 100%;
+          max-height: none;
+          border-radius: 0;
+        }
+
+        .hook-line {
+          grid-template-columns: minmax(0, 1fr) auto auto auto;
+        }
+
+        .row-icon-button.external-link {
+          display: none;
+        }
+
+        .hook-details {
+          margin-left: 12px;
+        }
+
+        .footer-actions {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="archive-notice">
+      历史交互原型：其中批量信任、本次授权、状态徽章和撤销交互已不再生效。现行设计见
+      workspace-hook-trust-persistent-only.md：未信任行只在配置开关左侧显示“信任”，成功后按钮消失。
+    </div>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-arrow-left" viewBox="0 0 24 24">
+        <path d="m15 18-6-6 6-6" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.04V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.96 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"
+        />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path
+          d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+        />
+      </symbol>
+      <symbol id="i-box" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M3 9h18M8 14h.01" />
+      </symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path
+          d="M3 12h18M12 3c2.5 2.7 3.5 5.7 3.5 9S14.5 18.3 12 21c-2.5-2.7-3.5-5.7-3.5-9S9.5 5.7 12 3Z"
+        />
+      </symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24">
+        <path d="M8 12V5M16 12V5M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v3" />
+      </symbol>
+      <symbol id="i-command" viewBox="0 0 24 24">
+        <path d="m4 17 5-5-5-5M11 19h9" />
+      </symbol>
+      <symbol id="i-hook" viewBox="0 0 24 24">
+        <path d="M12 3v11a5 5 0 0 1-10 0v-1M12 8h4a4 4 0 1 1 0 8h-1" />
+        <circle cx="12" cy="3" r="1" />
+      </symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21a8 8 0 0 1 16 0" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5M12 8h.01" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path
+          d="M20 7v5h-5M4 17v-5h5M6.1 8a7 7 0 0 1 11.4-2.4L20 8M4 16l2.5 2.4A7 7 0 0 0 17.9 16"
+        />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-warning" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v6M12 17h.01" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8 12 2.5 2.5L16 9" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M12 3 20 6v6c0 4.8-3.3 7.8-8 9-4.7-1.2-8-4.2-8-9V6l8-3Z" />
+        <path d="m9 12 2 2 4-4" />
+      </symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24">
+        <path d="m9 18 6-6-6-6" />
+      </symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6" />
+      </symbol>
+      <symbol id="i-external" viewBox="0 0 24 24">
+        <path d="M14 4h6v6M20 4l-9 9" />
+        <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+      </symbol>
+    </svg>
+
+    <div class="app">
+      <aside class="sidebar" aria-label="设置导航">
+        <div class="window-controls" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="back-link">
+          <svg class="icon"><use href="#i-arrow-left"></use></svg>
+          返回工作区
+        </div>
+        <div class="sidebar-search">
+          <svg class="icon"><use href="#i-search"></use></svg>
+          <input type="text" placeholder="搜索设置..." aria-label="搜索设置" />
+        </div>
+
+        <nav>
+          <section class="nav-section">
+            <div class="nav-heading">基础设置</div>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-settings"></use></svg>常规
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-sun"></use></svg>外观
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-box"></use></svg>模型设置
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-globe"></use></svg>浏览器
+            </button>
+          </section>
+          <section class="nav-section">
+            <div class="nav-heading">Agent 能力</div>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-plug"></use></svg>插件
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-box"></use></svg>技能
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-command"></use></svg>命令
+            </button>
+            <button class="nav-item active">
+              <svg class="icon"><use href="#i-hook"></use></svg>钩子
+            </button>
+          </section>
+          <section class="nav-section">
+            <div class="nav-heading">数据与统计</div>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-shield"></use></svg>索引库
+            </button>
+            <button class="nav-item">
+              <svg class="icon"><use href="#i-chart"></use></svg>使用统计
+            </button>
+          </section>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <div class="main-inner">
+          <div class="page-heading-row">
+            <h1 class="page-title">钩子</h1>
+            <div class="icon-buttons">
+              <button class="icon-button" aria-label="添加钩子">
+                <svg class="icon"><use href="#i-plus"></use></svg>
+              </button>
+              <button class="icon-button" id="resetButton" aria-label="重置演示">
+                <svg class="icon"><use href="#i-refresh"></use></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="description-row">
+            <span>管理任务生命周期钩子，在特定事件发生时自动执行命令。</span>
+          </div>
+
+          <div class="page-search">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <input id="hookSearch" type="search" placeholder="搜索钩子..." aria-label="搜索钩子" />
+          </div>
+
+          <div class="tab-row">
+            <div class="tabs" role="tablist" aria-label="Hook 配置范围">
+              <button class="tab" id="userTab" role="tab" aria-selected="false">
+                <svg class="icon"><use href="#i-user"></use></svg>用户
+              </button>
+              <button class="tab active" id="workspaceTab" role="tab" aria-selected="true">
+                <svg class="icon"><use href="#i-folder"></use></svg>工作区
+              </button>
+            </div>
+            <div class="scope-note">
+              <svg class="icon"><use href="#i-info"></use></svg>
+              Hook 配置变更将在新任务中生效。
+            </div>
+          </div>
+
+          <button class="review-summary" id="reviewSummary" data-state="pending">
+            <div class="review-summary-main">
+              <svg class="icon status-icon" id="summaryIcon"><use href="#i-warning"></use></svg>
+              <div class="review-summary-copy">
+                <strong id="summaryTitle">3 项待审核</strong>
+                <span id="summaryDescription">工作区 Hook 在获得信任前不会执行</span>
+              </div>
+            </div>
+            <div class="review-summary-side">
+              <span id="summaryCount">查看</span>
+              <svg class="icon"><use href="#i-chevron-right"></use></svg>
+            </div>
+          </button>
+
+          <div class="empty-state" id="userEmpty">暂无用户级钩子配置</div>
+        </div>
+      </main>
+    </div>
+
+    <div
+      class="backdrop open"
+      id="backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialogTitle"
+    >
+      <section class="review-dialog">
+        <header class="dialog-header">
+          <div>
+            <div class="dialog-title-row">
+              <svg class="icon"><use href="#i-settings"></use></svg>
+              <h2 class="dialog-title" id="dialogTitle">工作区配置</h2>
+            </div>
+            <p class="dialog-subtitle">/Users/dev/workspace/z-code</p>
+          </div>
+          <button class="icon-button" id="closeDialogButton" aria-label="关闭审核窗口">
+            <svg class="icon"><use href="#i-close"></use></svg>
+          </button>
+        </header>
+
+        <div class="warning" id="warningBanner">
+          <svg class="icon"><use href="#i-warning"></use></svg>
+          <span id="warningText"
+            >Hook 可在沙盒外运行，因此请审查此工作区最近安装或修改的所有 Hook。</span
+          >
+        </div>
+
+        <div class="hook-list" id="hookList"></div>
+
+        <footer class="dialog-footer">
+          <div>
+            <div class="waiting-note" id="waitingNote">
+              <span class="waiting-dot"></span>
+              <span>当前任务正在等待 Hook 信任决定</span>
+            </div>
+            <button class="text-button" id="simulateChangeButton">模拟 Hook 配置发生变化</button>
+          </div>
+          <div class="footer-actions">
+            <button class="button" id="continueBlockedButton">保持屏蔽并继续</button>
+            <button class="button" id="allowOnceButton">仅允许当前任务</button>
+            <button class="button primary" id="trustAllButton">信任全部</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      const ICON = (name) => `<svg class="icon"><use href="#i-${name}"></use></svg>`;
+
+      const initialHooks = () => [
+        {
+          id: "session-start",
+          event: "SessionStart",
+          eventDescription: "当新任务开始时",
+          name: "加载工作区上下文",
+          handler: "命令",
+          command: ".zcode/hooks/session-start.sh",
+          timeout: "30 秒",
+          source: ".zcode/config.json",
+          trusted: false,
+          once: false,
+          enabled: true,
+          expanded: true,
+        },
+        {
+          id: "pre-tool-use",
+          event: "PreToolUse",
+          eventDescription: "工具执行前",
+          name: "检查高风险命令",
+          handler: "命令",
+          command: ".zcode/hooks/pre-tool-use.sh",
+          timeout: "10 秒",
+          source: ".zcode/config.json",
+          trusted: false,
+          once: false,
+          enabled: true,
+          expanded: false,
+        },
+        {
+          id: "post-tool-use",
+          event: "PostToolUse",
+          eventDescription: "工具执行后",
+          name: "记录工具执行结果",
+          handler: "命令",
+          command: ".zcode/hooks/post-tool-use.sh",
+          timeout: "10 秒",
+          source: ".zcode/config.json",
+          trusted: false,
+          once: false,
+          enabled: true,
+          expanded: false,
+        },
+      ];
+
+      let hooks = initialHooks();
+      let scope = "workspace";
+      let taskWaiting = true;
+      let modalOpen = true;
+      let searchQuery = "";
+      let toastTimer;
+
+      const byId = (id) => document.getElementById(id);
+
+      function effectiveState(hook) {
+        if (!hook.enabled) return "disabled";
+        if (hook.trusted) return "trusted";
+        if (hook.once) return "once";
+        return "pending";
+      }
+
+      function pendingHooks() {
+        return hooks.filter((hook) => hook.enabled && !hook.trusted && !hook.once);
+      }
+
+      function showToast(message) {
+        const toast = byId("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 1900);
+      }
+
+      function renderMain() {
+        const pending = pendingHooks().length;
+        const enabled = hooks.filter((hook) => hook.enabled).length;
+        const allTrusted =
+          enabled > 0 && hooks.filter((hook) => hook.enabled && hook.trusted).length === enabled;
+        const hasOnce = hooks.some((hook) => hook.once && !hook.trusted);
+        const summary = byId("reviewSummary");
+
+        if (allTrusted) {
+          summary.dataset.state = "trusted";
+          byId("summaryIcon").innerHTML = '<use href="#i-check"></use>';
+          byId("summaryTitle").textContent = `${enabled} 项已审核`;
+          byId("summaryDescription").textContent = "当前 Hook 声明已获得工作区信任";
+          byId("summaryCount").textContent = "管理";
+        } else if (hasOnce && pending === 0) {
+          summary.dataset.state = "pending";
+          byId("summaryIcon").innerHTML = '<use href="#i-warning"></use>';
+          byId("summaryTitle").textContent = "当前任务已临时允许";
+          byId("summaryDescription").textContent = "下一任务仍需重新审核这些 Hook";
+          byId("summaryCount").textContent = "查看";
+        } else {
+          summary.dataset.state = "pending";
+          byId("summaryIcon").innerHTML = '<use href="#i-warning"></use>';
+          byId("summaryTitle").textContent = `${pending} 项待审核`;
+          byId("summaryDescription").textContent = taskWaiting
+            ? "当前任务正在等待；未信任的 Hook 保持屏蔽"
+            : "工作区 Hook 在获得信任前不会执行";
+          byId("summaryCount").textContent = "查看";
+        }
+      }
+
+      function renderHooks() {
+        const normalized = searchQuery.trim().toLowerCase();
+        const visibleHooks = hooks.filter((hook) => {
+          if (!normalized) return true;
+          return [hook.event, hook.eventDescription, hook.name, hook.command]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalized);
+        });
+
+        byId("hookList").innerHTML = visibleHooks.length
+          ? visibleHooks
+              .map((hook) => {
+                const state = effectiveState(hook);
+                const trustLabel = hook.trusted ? "已信任" : hook.once ? "本次已允许" : "信任";
+                const statusIcon =
+                  state === "trusted" ? "check" : state === "once" ? "check" : "warning";
+                return `
+                  <section class="event-group ${state}" data-hook-id="${hook.id}">
+                    <header class="event-header">
+                      <div class="event-name">
+                        ${ICON("hook")}
+                        <div class="event-copy">
+                          <strong>${hook.event}</strong>
+                          <span>${hook.eventDescription}</span>
+                        </div>
+                      </div>
+                      <svg class="icon event-status"><use href="#i-${statusIcon}"></use></svg>
+                    </header>
+                    <div class="hook-item ${hook.expanded ? "expanded" : ""}">
+                      <div class="hook-line">
+                        <button class="hook-name-button" data-action="expand" data-id="${hook.id}">
+                          <span class="hook-name">${hook.name}</span>
+                        </button>
+                        <button class="row-icon-button external-link" aria-label="查看来源" data-action="source" data-id="${hook.id}">
+                          ${ICON("external")}
+                        </button>
+                        <button class="row-icon-button" aria-label="展开详情" data-action="expand" data-id="${hook.id}">
+                          ${ICON(hook.expanded ? "chevron-down" : "chevron-right")}
+                        </button>
+                        <button class="trust-button ${state}" data-action="trust" data-id="${hook.id}">
+                          ${ICON("shield")}<span>${trustLabel}</span>
+                        </button>
+                        <label class="switch" aria-label="启用 ${hook.name}">
+                          <input type="checkbox" data-action="toggle" data-id="${hook.id}" ${hook.enabled ? "checked" : ""} />
+                          <span class="switch-track"></span>
+                        </label>
+                      </div>
+                      <div class="hook-details">
+                        <div class="detail-grid">
+                          <span class="detail-label">处理程序</span><span class="detail-value">${hook.handler}</span>
+                          <span class="detail-label">命令</span><span class="detail-value"><code>${hook.command}</code></span>
+                          <span class="detail-label">超时</span><span class="detail-value">${hook.timeout}</span>
+                          <span class="detail-label">来源</span><span class="detail-value"><code>${hook.source}</code></span>
+                        </div>
+                        <div class="detail-foot">
+                          <span>信任与当前工作区及 Hook 声明绑定；命令变化后需要重新审核。</span>
+                          ${
+                            !hook.trusted && taskWaiting
+                              ? `<button class="text-button" data-action="allow-once" data-id="${hook.id}">${hook.once ? "撤销本次允许" : "仅允许此 Hook 用于当前任务"}</button>`
+                              : ""
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </section>`;
+              })
+              .join("")
+          : '<div class="empty-state" style="display:flex;border:0">没有匹配的 Hook</div>';
+
+        const pending = pendingHooks().length;
+        const allReviewed = hooks
+          .filter((hook) => hook.enabled)
+          .every((hook) => hook.trusted || hook.once);
+        byId("warningText").textContent = allReviewed
+          ? "当前启用的 Hook 已完成本次审核。配置内容变化后将重新要求信任。"
+          : "Hook 可在沙盒外运行，因此请审查此工作区最近安装或修改的所有 Hook。";
+        byId("waitingNote").style.visibility = taskWaiting ? "visible" : "hidden";
+        byId("allowOnceButton").disabled = !taskWaiting || pending === 0;
+        byId("trustAllButton").disabled =
+          hooks.filter((hook) => hook.enabled && !hook.trusted).length === 0;
+      }
+
+      function renderScope() {
+        const isWorkspace = scope === "workspace";
+        byId("workspaceTab").classList.toggle("active", isWorkspace);
+        byId("workspaceTab").setAttribute("aria-selected", String(isWorkspace));
+        byId("userTab").classList.toggle("active", !isWorkspace);
+        byId("userTab").setAttribute("aria-selected", String(!isWorkspace));
+        byId("reviewSummary").style.display = isWorkspace ? "flex" : "none";
+        byId("userEmpty").style.display = isWorkspace ? "none" : "flex";
+        byId("backdrop").classList.toggle("open", modalOpen && isWorkspace);
+      }
+
+      function render() {
+        renderMain();
+        renderHooks();
+        renderScope();
+      }
+
+      function closeDialog() {
+        modalOpen = false;
+        renderScope();
+      }
+
+      function openDialog() {
+        if (scope !== "workspace") return;
+        modalOpen = true;
+        renderScope();
+      }
+
+      function trustHook(id) {
+        const hook = hooks.find((item) => item.id === id);
+        if (!hook) return;
+        hook.trusted = !hook.trusted;
+        hook.once = false;
+        if (hook.trusted && taskWaiting && pendingHooks().length === 0) {
+          taskWaiting = false;
+          showToast("审核完成，当前任务继续执行");
+        } else {
+          showToast(hook.trusted ? `已信任「${hook.name}」` : `已撤销「${hook.name}」的信任`);
+        }
+        render();
+      }
+
+      function allowHookOnce(id) {
+        const hook = hooks.find((item) => item.id === id);
+        if (!hook || !taskWaiting || hook.trusted) return;
+        hook.once = !hook.once;
+        if (hook.once && pendingHooks().length === 0) {
+          taskWaiting = false;
+          showToast("本次审核完成，当前任务继续执行");
+        } else {
+          showToast(
+            hook.once ? `当前任务已允许「${hook.name}」` : `已撤销「${hook.name}」的本次允许`,
+          );
+        }
+        render();
+      }
+
+      function toggleHook(id, enabled) {
+        const hook = hooks.find((item) => item.id === id);
+        if (!hook) return;
+        hook.enabled = enabled;
+        if (!enabled) hook.once = false;
+        showToast(enabled ? `已启用「${hook.name}」` : `已停用「${hook.name}」`);
+        render();
+      }
+
+      byId("hookList").addEventListener("click", (event) => {
+        const control = event.target.closest("[data-action]");
+        if (!control) return;
+        const id = control.dataset.id;
+        const hook = hooks.find((item) => item.id === id);
+        if (!hook) return;
+
+        if (control.dataset.action === "expand") {
+          hook.expanded = !hook.expanded;
+          renderHooks();
+        } else if (control.dataset.action === "trust") {
+          trustHook(id);
+        } else if (control.dataset.action === "allow-once") {
+          allowHookOnce(id);
+        } else if (control.dataset.action === "source") {
+          showToast(`来源：${hook.source}`);
+        }
+      });
+
+      byId("hookList").addEventListener("change", (event) => {
+        const control = event.target.closest('[data-action="toggle"]');
+        if (control) toggleHook(control.dataset.id, control.checked);
+      });
+
+      byId("reviewSummary").addEventListener("click", openDialog);
+      byId("closeDialogButton").addEventListener("click", closeDialog);
+      byId("backdrop").addEventListener("click", (event) => {
+        if (event.target === byId("backdrop")) closeDialog();
+      });
+
+      byId("userTab").addEventListener("click", () => {
+        scope = "user";
+        modalOpen = false;
+        renderScope();
+      });
+
+      byId("workspaceTab").addEventListener("click", () => {
+        scope = "workspace";
+        renderScope();
+      });
+
+      byId("hookSearch").addEventListener("input", (event) => {
+        searchQuery = event.target.value;
+        if (scope === "workspace" && searchQuery.trim()) modalOpen = true;
+        render();
+      });
+
+      byId("continueBlockedButton").addEventListener("click", () => {
+        taskWaiting = false;
+        hooks.forEach((hook) => (hook.once = false));
+        modalOpen = false;
+        showToast("任务已继续；未信任的 Hook 保持屏蔽");
+        render();
+      });
+
+      byId("allowOnceButton").addEventListener("click", () => {
+        hooks.forEach((hook) => {
+          if (hook.enabled && !hook.trusted) hook.once = true;
+        });
+        taskWaiting = false;
+        modalOpen = false;
+        showToast("仅为当前任务允许这些 Hook");
+        render();
+      });
+
+      byId("trustAllButton").addEventListener("click", () => {
+        hooks.forEach((hook) => {
+          if (hook.enabled) hook.trusted = true;
+          hook.once = false;
+        });
+        taskWaiting = false;
+        modalOpen = false;
+        showToast("已信任当前工作区的 Hook 声明");
+        render();
+      });
+
+      byId("simulateChangeButton").addEventListener("click", () => {
+        const changed = hooks[0];
+        changed.command = changed.command.includes("--strict")
+          ? ".zcode/hooks/session-start.sh"
+          : ".zcode/hooks/session-start.sh --strict";
+        changed.trusted = false;
+        changed.once = false;
+        changed.enabled = true;
+        changed.expanded = true;
+        taskWaiting = true;
+        showToast("SessionStart 命令已变化，需要重新审核");
+        render();
+      });
+
+      byId("resetButton").addEventListener("click", () => {
+        hooks = initialHooks();
+        scope = "workspace";
+        taskWaiting = true;
+        modalOpen = true;
+        searchQuery = "";
+        byId("hookSearch").value = "";
+        showToast("演示已重置");
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>

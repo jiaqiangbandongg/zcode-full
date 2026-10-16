@@ -15,11 +15,11 @@ import { registerCrashEventMonitor as registerBaseCrashEventMonitor } from "./de
 import { getResourceManagerWindowId } from "./resourceManagerWindow.js";
 
 /** ANR：主线程无响应阈值（与 Electron unresponsive 对齐） */
-const STABILITY_ANR_THRESHOLD_MS = 5_000;
+export const STABILITY_ANR_THRESHOLD_MS = 5_000;
 /** 挂死：未恢复且未 crash 的更长无响应阈值 */
-const STABILITY_FREEZE_THRESHOLD_MS = 30_000;
-const AGENT_CRASH_ERROR_DETAIL_MAX_LENGTH = 4_000;
-const STABILITY_TELEMETRY_SCHEMA_VERSION = 2;
+export const STABILITY_FREEZE_THRESHOLD_MS = 30_000;
+export const AGENT_CRASH_ERROR_DETAIL_MAX_LENGTH = 4_000;
+export const STABILITY_TELEMETRY_SCHEMA_VERSION = 2;
 const WINDOWS_CONTROLLED_TERMINATION_EXIT_CODE = 0x40010004;
 const AGENT_EXCEPTION_DEDUP_CAPACITY = 1024;
 const reportedAgentExceptions = new Set<string>();
@@ -39,13 +39,13 @@ const AGENT_CRASH_POSIX_ABSOLUTE_PATH_PATTERN =
   /\/(?:[^/\s"'`()[\]{}<>:]+\/)*[^/\s"'`()[\]{}<>:]+/g;
 const AGENT_CRASH_KNOWN_PATH_PLACEHOLDER_PATTERN = /<(?:workspace|home)>[^\s"'`()[\]{}<>]*/g;
 
-type StabilityLifecycleScene = "cold_start" | "runtime" | "app_quit" | "update_install";
+export type StabilityLifecycleScene = "cold_start" | "runtime" | "app_quit" | "update_install";
 
-type StabilityWindowScene = "main" | "process_monitor" | "other";
+export type StabilityWindowScene = "main" | "process_monitor" | "other";
 
-type StabilityCrashKind = "native" | "js" | "oom";
+export type StabilityCrashKind = "native" | "js" | "oom";
 
-type StabilityCrashScope =
+export type StabilityCrashScope =
   | "app_native_process"
   | "main_window_renderer"
   | "auxiliary_window_renderer"
@@ -53,7 +53,7 @@ type StabilityCrashScope =
   | "host"
   | "child";
 
-type StabilityCrashCause =
+export type StabilityCrashCause =
   | "oom"
   | "process_crashed"
   | "abnormal_exit"
@@ -62,13 +62,13 @@ type StabilityCrashCause =
   | "native_crash"
   | "unknown";
 
-interface StabilityCrashClassification {
+export interface StabilityCrashClassification {
   crashKind: StabilityCrashKind;
   crashScope: StabilityCrashScope;
   crashCause: StabilityCrashCause;
 }
 
-type StabilityProcessRole =
+export type StabilityProcessRole =
   | "main"
   | "renderer"
   | "gpu"
@@ -78,9 +78,9 @@ type StabilityProcessRole =
   | "child"
   | "unknown";
 
-type AgentCrashPhase = "startup" | "runtime" | "unknown";
-type AgentTerminationClass = "exit_zero" | "exit_nonzero" | "signal" | "unknown";
-type AgentDiagnosticClass = "oom" | "sqlite" | "errno" | "generic" | "none";
+export type AgentCrashPhase = "startup" | "runtime" | "unknown";
+export type AgentTerminationClass = "exit_zero" | "exit_nonzero" | "signal" | "unknown";
+export type AgentDiagnosticClass = "oom" | "sqlite" | "errno" | "generic" | "none";
 
 interface StabilityLogger {
   info: (...args: unknown[]) => void;
@@ -107,14 +107,14 @@ interface UnresponsiveWatchState {
   pollTimer: ReturnType<typeof setTimeout> | null;
 }
 
-interface RenderProcessGoneInput {
+export interface RenderProcessGoneInput {
   reason: string;
   exitCode: number;
   webContentsType: string;
   windowScene?: StabilityWindowScene;
 }
 
-interface ChildProcessGoneInput {
+export interface ChildProcessGoneInput {
   type: string;
   reason: string;
   exitCode: number;
@@ -653,6 +653,12 @@ export function reportAgentProcessSpawnErrorToArms(
   });
 }
 
+export function mapRenderProcessGoneToCrashKind(
+  input: RenderProcessGoneInput,
+): StabilityCrashKind | null {
+  return classifyRenderProcessCrash(input)?.crashKind ?? null;
+}
+
 function mapExitReasonToCrashKind(reason: string): StabilityCrashKind {
   // Electron 的 renderer/child gone 回调共用这组退出原因，OOM 不能因进程来源不同而被归为 native。
   return reason === "oom" || reason === "memory-eviction" ? "oom" : "native";
@@ -679,7 +685,7 @@ function mapExitReasonToCrashCause(reason: string): StabilityCrashCause {
   }
 }
 
-function classifyRenderProcessCrash(
+export function classifyRenderProcessCrash(
   input: RenderProcessGoneInput,
 ): StabilityCrashClassification | null {
   if (input.reason === "killed" || input.reason === "clean-exit") {
@@ -695,6 +701,13 @@ function classifyRenderProcessCrash(
           : "auxiliary_window_renderer",
     crashCause: mapExitReasonToCrashCause(input.reason),
   };
+}
+
+export function mapChildProcessGoneToProcessRole(
+  type: string,
+  processName?: string,
+): StabilityProcessRole {
+  return mapChildProcessGoneToProcessRoleWithName(type, processName);
 }
 
 function mapChildProcessGoneToProcessRoleWithName(
@@ -717,7 +730,7 @@ function mapChildProcessGoneToProcessRoleWithName(
   }
 }
 
-function shouldReportChildProcessGoneAsCrash(input: ChildProcessGoneInput): boolean {
+export function shouldReportChildProcessGoneAsCrash(input: ChildProcessGoneInput): boolean {
   if (input.reason === "killed" || input.reason === "clean-exit") {
     return false;
   }
@@ -737,11 +750,11 @@ function shouldReportChildProcessGoneAsCrash(input: ChildProcessGoneInput): bool
   return true;
 }
 
-function shouldReportAnr(elapsedMs: number, anrReported: boolean): boolean {
+export function shouldReportAnr(elapsedMs: number, anrReported: boolean): boolean {
   return !anrReported && elapsedMs >= STABILITY_ANR_THRESHOLD_MS;
 }
 
-function shouldReportFreeze(
+export function shouldReportFreeze(
   elapsedMs: number,
   freezeReported: boolean,
   crashReported: boolean,
@@ -895,7 +908,7 @@ export function configureDesktopStabilityTelemetry(context: StabilityGlobalConte
 /** 与 @arms/rum-electron pv-collector 的 initial_load 窗口对齐，避免早于首屏 PV 单独 flush */
 const PERF_APP_START_AFTER_VIEW_MS = 3_200;
 
-function reportPerfAppStart(logger: StabilityLogger): void {
+export function reportPerfAppStart(logger: StabilityLogger): void {
   if (perfAppStartReported) {
     return;
   }

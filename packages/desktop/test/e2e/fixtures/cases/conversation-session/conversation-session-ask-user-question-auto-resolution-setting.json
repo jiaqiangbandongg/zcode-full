@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-auto-resolution-setting",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-auto-resolution-setting.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-auto-resolution-setting.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-ask-auto-resolution-setting-first-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定制造计时中关闭设置的 GUI 窗口，避免真实模型工具选择和流速漂移。"
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-first-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明重开设置没有追溯恢复旧问题的 deadline。"
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-second-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定证明重新开启只影响随后注册的新 AskUserQuestion。"
+    },
+    {
+      "id": "upstream-ask-auto-resolution-setting-second-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复证明新注册问题恢复自动继续，详细时序由 fake-clock 单测覆盖。"
+    }
+  ]
+}

@@ -1,5 +1,8 @@
 import { Loader2Icon } from "lucide-react";
-import type { UsageEntitlementSubscriptionDetail, UsageQuotaLimit } from "@zcode/shared";
+import type {
+  UsageEntitlementSubscriptionDetail,
+  UsageQuotaLimit,
+} from "@zcode/shared";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { formatStartPlanBucketResetTime } from "@/lib/codingPlanQuotaPresentation.js";
 import { formatStartPlanExpireDate } from "./CodingPlanStatusMeta.js";
@@ -34,7 +37,9 @@ export function StartPlanBalanceCard({
     locale,
   });
   return (
-    <div className={embedded ? "" : "rounded-lg border border-border bg-card p-4"}>
+    <div
+      className={embedded ? "" : "rounded-lg border border-border bg-card p-4"}
+    >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 items-center gap-2">
           <h4 className="min-w-0 truncate text-ui-base font-medium text-foreground">
@@ -47,7 +52,9 @@ export function StartPlanBalanceCard({
           ) : null}
         </div>
         {expireTimeLabel ? (
-          <span className="shrink-0 text-ui-xs text-foreground-subtle">{expireTimeLabel}</span>
+          <span className="shrink-0 text-ui-xs text-foreground-subtle">
+            {expireTimeLabel}
+          </span>
         ) : null}
       </div>
       {displayLimits.length > 0 ? (
@@ -59,7 +66,10 @@ export function StartPlanBalanceCard({
               locale={locale}
               // 桶刷新时间只来自本桶的 expires_at（limit.nextResetTime），
               // 不再用套餐级 renewTime 兜底，避免把同一时间复制到所有桶。
-              renewTimeLabel={formatStartPlanBucketResetTime(locale, limit.nextResetTime)}
+              renewTimeLabel={formatStartPlanBucketResetTime(
+                locale,
+                limit.nextResetTime,
+              )}
             />
           ))}
         </div>
@@ -79,7 +89,8 @@ function StartPlanBalanceLimit({
 }) {
   const total = resolveLimitTotal(limit);
   const remaining = resolveLimitRemaining(limit);
-  const remainingRatio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
+  const remainingRatio =
+    total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
   const remainingPercent = formatRemainingPercent(locale, remainingRatio);
 
   return (
@@ -135,7 +146,7 @@ function formatFullTokenUsage(locale: string, value: number): string {
   }).format(value);
 }
 
-interface StartPlanQuotaCardEntry {
+export interface StartPlanQuotaCardEntry {
   plan: UsageEntitlementSubscriptionDetail;
   limits: UsageQuotaLimit[];
 }
@@ -180,7 +191,9 @@ function formatLimitModels(limit: UsageQuotaLimit): string {
   const modelNames = limit.usageDetails
     .map((detail) => {
       const displayName = detail.displayName?.trim();
-      return formatQuotaModelDisplayName(displayName || formatModelCode(detail.modelCode.trim()));
+      return formatQuotaModelDisplayName(
+        displayName || formatModelCode(detail.modelCode.trim()),
+      );
     })
     .filter((modelName) => modelName.length > 0);
   if (modelNames.length === 0) {

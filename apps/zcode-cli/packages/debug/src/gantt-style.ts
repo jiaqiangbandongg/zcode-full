@@ -1,4 +1,4 @@
-const GANTT_BAR_MIN_WIDTH_PX = 18;
+export const GANTT_BAR_MIN_WIDTH_PX = 18;
 
 type GanttItemType = "range" | "point";
 

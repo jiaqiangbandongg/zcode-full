@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-spreadsheet-paste",
+  "spec": "./test/e2e/conversation-session/conversation-session-spreadsheet-paste.test.ts",
+  "fixtures": [
+    {
+      "id": "spreadsheet-paste-text-priority",
+      "description": "T11：Excel HTML + TSV + 合成 PNG paste 后 provider 只收到表格文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "lastUserMessage matcher 证明 TSV 进入 provider；bodyExcludes 合成 PNG 文件名证明没有误走附件链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPREADSHEET_PASTE", "Alice\t42"],
+        "bodyExcludes": [
+          "e2e-spreadsheet-synthetic.png",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "spreadsheet-paste-text-priority",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "SPREADSHEET_PASTE_OK"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "plugin-creator",
+  "version": "0.1.1",
+  "description": "Develop and validate ZCode plugins through a local dev marketplace, installation, trials and updates.",
+  "author": {
+    "name": "Z.ai"
+  },
+  "license": "MIT",
+  "skills": "skills"
+}

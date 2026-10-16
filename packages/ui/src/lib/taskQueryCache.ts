@@ -41,13 +41,11 @@ export function buildTaskWorkspaceKey(workspacePath: string, workspaceIdentity?:
   return resolveWorkspaceStateKey(workspacePath, workspaceIdentity);
 }
 
-export function buildTaskEntityKey(
-  task: Pick<ZCodeTaskMeta, "taskId" | "workspacePath" | "workspaceIdentity">,
-): TaskEntityKey {
+export function buildTaskEntityKey(task: Pick<ZCodeTaskMeta, "taskId" | "workspacePath" | "workspaceIdentity">): TaskEntityKey {
   return `${buildTaskWorkspaceKey(task.workspacePath, task.workspaceIdentity)}::${task.taskId}`;
 }
 
-function normalizeTaskListWorkspaceScopes(
+export function normalizeTaskListWorkspaceScopes(
   scopes: ZCodeTaskListWorkspaceScope[],
 ): ZCodeTaskListWorkspaceScope[] {
   const uniqueScopes = new Map<string, ZCodeTaskListWorkspaceScope>();
@@ -87,7 +85,8 @@ export function buildTaskListCacheDescriptor(params: {
     sortBy: params.sortBy,
     search: normalizeTaskListSearch(params.search),
     expanded: params.expanded,
-    visibleLimit: params.expanded || params.visibleLimit === undefined ? null : params.visibleLimit,
+    visibleLimit:
+      params.expanded || params.visibleLimit === undefined ? null : params.visibleLimit,
     workspaceKeys,
   };
 }

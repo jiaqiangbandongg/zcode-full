@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { pathToFileURL } from "node:url";
 
 const exec = promisify(execFile);
@@ -56,9 +56,14 @@ try {
     }),
   );
   await until(
-    () => /ZCode/.test(screen) && /(?:登录|\/login|输入提示词|Type a prompt)/i.test(screen),
+    () => {
+      // 修复：TUI 渲染器会在相邻字符之间插入 SGR/光标定位序列，原始 PTY 输出里的提示词不连续；
+      // 先去掉终端控制序列再匹配可见文本，避免界面已就绪却被判定为超时。
+      const visible = stripVTControlCharacters(screen);
+      return /ZCode/.test(visible) && /(?:登录|\/login|输入提示词|Type a prompt)/i.test(visible);
+    },
     "TUI initialized render",
-    () => screen,
+    () => stripVTControlCharacters(screen),
   );
   assert.equal(terminalExit, undefined, screen);
   assert.doesNotMatch(screen, /Cannot find (?:module|package)|ERR_MODULE_NOT_FOUND/);

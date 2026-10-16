@@ -1,0 +1,11 @@
+lane actor#1 "w0" @7:15
+lane actor#2 "w1" @7:28
+lane actor#3 "w2" @7:41
+lane actor#4 "w3" @7:54
+lane actor#5 "w4" @7:67
+lane actor#6 "seed" @8:20
+region seq#1 seq
+step ask#1 ask "seed" @8:34 lane=actor#6 region=seq#1 always
+step ask#2 ask "picked" @10:26 lane=actor#1 lanes=actor#1,actor#2,actor#3,actor#4,actor#5 region=seq#1 always
+edge ask#1 -> ask#2 data always exact
+sink ask#2

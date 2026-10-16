@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-merged-assistant",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-merged-assistant.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-fork-merged-assistant-title",
+      "description": "Fork merged assistant case 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 fork 历史边界语义，只需要稳定返回，避免标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_FORK_MERGED_ASSISTANT_SOURCE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-fork-merged-assistant-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Fork Merged Assistant E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-merged-assistant-write-call",
+      "description": "E10 复现：首段 assistant 返回 Write tool_use，制造 tool_result 后还有最终 assistant 的同轮结构。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 Write；本响应固定生成 workspace handoff 文件，专门复现 fork target 落到早段 raw assistant 的边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_FORK_MERGED_ASSISTANT_SOURCE"],
+        "bodyIncludes": ["E2E_FORK_MERGED_ASSISTANT_SOURCE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_fork_merged_assistant_write",
+          "messageId": "msg_e2e_fork_merged_assistant_write",
+          "name": "Write",
+          "input": {
+            "file_path": "tmp/handoff/e2e-fork-merged-assistant.md",
+            "content": "E2E_FORK_MERGED_ASSISTANT_FILE_CONTENT\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-fork-merged-assistant-final",
+      "description": "E10 复现：Write tool_result 后才出现的最终 assistant 文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终 marker 必须位于 tool_result 之后，才能暴露 fork 只复制早段 raw assistant 时丢最后回复的问题。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_FORK_MERGED_ASSISTANT_SOURCE",
+          "toolu_e2e_fork_merged_assistant_write",
+          "File created successfully at: tmp/handoff/e2e-fork-merged-assistant.md"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-fork-merged-assistant-final",
+          "inputTokens": 190,
+          "outputTokens": 18,
+          "text": "E2E_FORK_MERGED_ASSISTANT_FINAL"
+        }
+      }
+    }
+  ]
+}

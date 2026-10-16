@@ -13,7 +13,7 @@ import {
   testId,
 } from "@zcode/shared";
 
-const PROVIDER_CONNECTION_API_FORMATS: readonly ProviderApiType[] = [
+export const PROVIDER_CONNECTION_API_FORMATS: readonly ProviderApiType[] = [
   "anthropic-messages",
   "openai-chat-completions",
   "openai-responses",

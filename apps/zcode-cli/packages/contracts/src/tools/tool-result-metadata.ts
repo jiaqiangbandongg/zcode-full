@@ -1,5 +1,13 @@
 import { z } from "zod";
 import { OFFICIAL_MCP_TOOL_ERROR_CODES } from "@zcode/shared";
+import {
+  MCP_APPS_RESOURCE_URI_MAX_CHARS,
+  MCP_APPS_CONTENT_MAX_BYTES,
+  MCP_APPS_STRUCTURED_CONTENT_MAX_BYTES,
+  MCP_APPS_SURFACE_ID_MAX_CHARS,
+  MCP_APPS_SURFACE_ID_PATTERN,
+  MCP_APPS_WIDGET_META_MAX_BYTES,
+} from "@zcode/shared/mcp-apps";
 
 import {
   CREATE_WORKFLOW_DISPLAY_MAX_DIAGNOSTICS,
@@ -183,6 +191,45 @@ export const nodeReplImageToolResultDisplayPayloadSchema = z
   })
   .strict();
 
+/**
+ * 插件 UI 元数据。
+ * contracts 仍在 zod v3，无法直接复用 `@zcode/shared/mcp-apps` 的 zod v4 schema 对象，这里按同一常量
+ * 手写一份；字段集合与 `mcpToolDisplayUiSchema` 必须一致，由 core/tests/mcp-ui-display.test.ts 用同一
+ * fixture 双侧 parse 锁住。
+ */
+export const mcpToolDisplayUiPayloadSchema = z
+  .object({
+    pluginId: z.string().min(1).max(MCP_TOOL_DISPLAY_MAX_NAME_CHARS),
+    resourceUri: z.string().min(1).max(MCP_APPS_RESOURCE_URI_MAX_CHARS),
+    preferredDisplayMode: z.enum(["inline", "fullscreen", "pip"]).optional(),
+    prefersBorder: z.boolean().optional(),
+    csp: z
+      .object({
+        connectDomains: z.array(z.string().min(1).max(512)).optional(),
+        resourceDomains: z.array(z.string().min(1).max(512)).optional(),
+      })
+      .strict()
+      .optional(),
+    structuredContent: z.string().max(MCP_APPS_STRUCTURED_CONTENT_MAX_BYTES).optional(),
+    widgetMeta: z.string().max(MCP_APPS_WIDGET_META_MAX_BYTES).optional(),
+    // 原始 content 数组 JSON（≤ 32 KiB）与被省略字节数；与 shared mcpToolDisplayUiSchema 同步。
+    content: z.string().max(MCP_APPS_CONTENT_MAX_BYTES).optional(),
+    truncated: z.boolean().optional(),
+    truncatedBytes: z.number().int().nonnegative().optional(),
+    // MCP isError 结果（调用完成但工具报错），与 shared 同步。
+    isError: z.literal(true).optional(),
+    // 工具级强制常驻，与 shared 同步。
+    showInline: z.literal(true).optional(),
+    // 与 shared mcpToolDisplayUiSchema 同步；已删 widgetStateVisibility。
+    surface: z
+      .string()
+      .min(1)
+      .max(MCP_APPS_SURFACE_ID_MAX_CHARS)
+      .regex(MCP_APPS_SURFACE_ID_PATTERN)
+      .optional(),
+  })
+  .strict();
+
 export const mcpToolResultDisplayPayloadSchema = z
   .object({
     kind: z.literal("mcp_tool"),
@@ -198,6 +245,8 @@ export const mcpToolResultDisplayPayloadSchema = z
       .object({ code: z.enum(OFFICIAL_MCP_TOOL_ERROR_CODES) })
       .strict()
       .optional(),
+    // 与 `@zcode/shared` v4 toolDisplay 的 mcp_tool.ui 同步；两侧都是 strict，缺一处会被 zod 静默 strip。
+    ui: mcpToolDisplayUiPayloadSchema.optional(),
   })
   .strict();
 

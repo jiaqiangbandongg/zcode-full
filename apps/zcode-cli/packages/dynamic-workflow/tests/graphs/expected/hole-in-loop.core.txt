@@ -1,0 +1,22 @@
+world-read world-read#1 "glob src/**/*.ts" @7:27 order=0 type="string[]"
+ask ask#1 "ask" head="审查-" @10:39 order=1 type="string"
+actor actor#1 head="审查-" @10:22 order=2
+hole hole#2e33cec5 "决定修法" @11:21 order=3 type="Fix"
+fact ask-data ask#1 <- world-read#1 inexact
+fact ask-actor ask#1 <- actor#1 exact
+fact hole-data hole#2e33cec5 <- world-read#1 inexact
+fact hole-data hole#2e33cec5 <- ask#1 exact
+fact return <- hole#2e33cec5 exact
+region seq#1 seq entered
+region loop#1 loop parent=seq#1 @9:1
+issue world-read#1 in=seq#1 phase=unphased
+settle world-read#1 in=seq#1
+spawn actor#1 in=seq#1>loop#1
+issue ask#1 in=seq#1>loop#1 phase=unphased
+settle ask#1 in=seq#1>loop#1
+issue hole#2e33cec5 in=seq#1>loop#1 phase=unphased
+mark hole#2e33cec5 in=seq#1>loop#1
+settle hole#2e33cec5 in=seq#1>loop#1
+jump return seq#1 in=seq#1 phase=unphased
+control loop#1 by=world-read#1
+phase hole#2e33cec5 "决定修法" @11:21

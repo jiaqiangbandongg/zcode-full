@@ -1,9 +1,7 @@
 # Policy schema
 
-`architecture-policy.yaml` contains `version: 1`, `modules`, global thresholds and optional exceptions. The current parser is `scripts/architecture/policy.mjs`.
+`architecture-policy.yaml` contains `version: 1`, a list of modules, global thresholds, and optional exceptions.
 
-Each module declares an `id`, one or more `roots`, optional `managed: true`, `requires`, `publicEntrypoints`, `layers`, `layerOrder` and `owner`. Existing legacy modules can remain unmanaged. Dependencies must name registered module IDs.
+Each module has an `id`, one or more `roots`, optional `managed: true`, `requires`, `provides`, `publicEntrypoints`, and an optional `owner`. Existing modules may remain unmanaged while they are in baseline migration.
 
-Global keys are `maxFileLines`, `maxContractLines`, `maxPublicMethods`, `forbidCycles`, `forbidDeepImports` and `managedOnly`. Layer names and ordering come from each module's configuration; do not assume a global layer list.
-
-The policy owns module topology. A managed module's `module.ts` declares local dependencies; keep it consistent with the policy. Verify supported options in the parser before documenting or using them.
+The policy owns path and layer topology. A module's `module.ts` owns its local dependency declaration. Do not add a second hand-maintained dependency graph.

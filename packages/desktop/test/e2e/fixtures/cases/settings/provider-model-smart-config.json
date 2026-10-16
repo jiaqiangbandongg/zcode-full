@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "provider-model-smart-config",
+  "spec": "./test/e2e/settings/provider-model-smart-config.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-data-seed",
+      "path": "provider_config.json",
+      "purpose": "退出窗口 seed 隔离供应商；SC90 验证智能/固定编辑，F98 验证真实 Built-in Map 继承与 Personal 原样保存，不请求模型。"
+    }
+  ],
+  "requests": []
+}

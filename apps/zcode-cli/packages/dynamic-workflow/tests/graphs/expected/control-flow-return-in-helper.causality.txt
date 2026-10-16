@@ -1,0 +1,8 @@
+lane actor#1 "triage" @5:23
+lane actor#2 "deep" @7:10
+region seq#1 seq
+step ask#1 ask "triage" @5:39 lane=actor#1 region=seq#1 always
+step ask#2 ask "deep" @7:24 lane=actor#2 region=seq#1 always
+edge ask#1 -> ask#2 data always exact
+edge ask#2 -> ask#1 seq always
+sink ask#2

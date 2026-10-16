@@ -1,0 +1,12 @@
+lane actor#1 "seed" @4:20
+lane actor#2 "fast" @5:29
+lane actor#3 "slow" @6:29
+region seq#1 seq
+region branch#1 branch parent=seq#1 @5:14
+region branch#2 branch parent=seq#1 @6:14
+step ask#1 ask "seed" @4:34 lane=actor#1 region=seq#1 always
+step ask#2 ask "fast" @5:43 lane=actor#2 region=branch#1 maybe
+step ask#3 ask "slow" @6:43 lane=actor#3 region=branch#2 maybe
+edge ask#1 -> ask#2 data maybe inexact
+edge ask#1 -> ask#3 data maybe inexact
+sink ask#2,ask#3

@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-DT-01",
+  "classification": "synthetic",
+  "timing": "fast-text",
+  "syntheticReason": "Use a deterministic deleted-task tombstone and recording Feishu HTTP mock to verify replacement, notification, Desktop broadcast and inbound deduplication without contacting a real user's bot.",
+  "promptMarker": "E2E_BOT_DELETED_TASK_RECOVERY"
+}

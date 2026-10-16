@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "provider-key-native-open",
+  "spec": "./test/e2e/settings/provider-key-native-open.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-data-seed",
+      "path": "provider_config.json",
+      "purpose": "隔离普通／Coding Plan Key Provider；唯一链接指向本机临时 canary，真实系统浏览器打开，不请求模型或操作账号。"
+    }
+  ],
+  "requests": []
+}

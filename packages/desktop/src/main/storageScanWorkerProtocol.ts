@@ -6,7 +6,7 @@ export interface StorageScanWorkerData {
   progressIntervalMs: number;
 }
 
-type StorageScanWorkerCommand = { type: "abort" };
+export type StorageScanWorkerCommand = { type: "abort" };
 
 export type StorageScanWorkerMessage =
   | { type: "progress"; progress: StorageScanProgress }

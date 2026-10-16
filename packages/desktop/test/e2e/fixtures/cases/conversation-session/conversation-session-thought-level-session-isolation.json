@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-thought-level-session-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-thought-level-session-isolation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-thought-level-session-isolation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "thought-level-session-isolation-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 thought session 隔离语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "thought-level-session-isolation-a-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言需要先用相同模型和 high 思考深度建立 completed Session A；响应只需稳定完成。"
+    },
+    {
+      "id": "thought-level-session-isolation-b-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言需要先用相同模型和 high 思考深度建立 completed Session B；响应只需稳定完成。"
+    },
+    {
+      "id": "thought-level-session-isolation-b-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 Session A 切为 max 后，Session B 的真实续发请求仍使用 high；响应只需稳定完成。"
+    },
+    {
+      "id": "thought-level-session-isolation-a-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 A/B 切换后，Session A 的真实续发请求仍使用 max；响应只需稳定完成。"
+    }
+  ]
+}

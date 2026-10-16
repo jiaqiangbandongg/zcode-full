@@ -1,6 +1,15 @@
 import { UNPHASED_ID } from "./constants.js";
 import type { OrderTrace } from "./causality-order.js";
-import { FLOW_ABORT, FLOW_ENTRY, FLOW_SINK, type FlowEdge, type FlowNode, type FlowPhase } from "./flow-graph.js";
+import type { AnalysisCore } from "./core.js";
+import {
+  FLOW_ABORT,
+  FLOW_ENTRY,
+  FLOW_SINK,
+  type FlowEdge,
+  type FlowHole,
+  type FlowNode,
+  type FlowPhase,
+} from "./flow-graph.js";
 
 /**
  * The phase quotient of the control-flow graph — the control-flow counterpart of
@@ -33,10 +42,42 @@ export function collectFlowPhases(trace: OrderTrace, nodes: readonly FlowNode[])
   if (present.has(UNPHASED_ID)) out.push({ id: UNPHASED_ID, ...alongsideOf(UNPHASED_ID) });
   for (const phase of trace.phases) {
     if (present.has(phase.id)) {
-      out.push({ id: phase.id, loc: phase.loc, name: phase.name, ...alongsideOf(phase.id) });
+      out.push({
+        id: phase.id,
+        loc: phase.loc,
+        name: phase.name,
+        ...alongsideOf(phase.id),
+        ...(phase.fill === undefined ? {} : { fill: phase.fill }),
+      });
     }
   }
   return out;
+}
+
+/**
+ * The open holes for the display (docs/dynamic-workflow/presentation.md, `holes`), in source
+ * order. `phase` is the phase of the hole's FIRST issue node — where it stands; a hole the
+ * walk never reached (none in practice: the sweep issues every step) carries none.
+ */
+export function collectFlowHoles(core: AnalysisCore, nodes: readonly FlowNode[]): FlowHole[] {
+  const phaseOf = new Map<string, string>();
+  for (const node of nodes) {
+    if (node.kind === "issue" && node.site !== undefined && !phaseOf.has(node.site)) {
+      phaseOf.set(node.site, node.phase);
+    }
+  }
+  return [...core.sites.holes]
+    .sort((a, b) => a.order - b.order)
+    .map((hole) => {
+      const phase = phaseOf.get(hole.id);
+      return {
+        siteId: hole.id,
+        name: hole.name,
+        type: hole.type,
+        ...(phase === undefined ? {} : { phase }),
+        ...(hole.tail ? { tail: true as const } : {}),
+      };
+    });
 }
 
 /**

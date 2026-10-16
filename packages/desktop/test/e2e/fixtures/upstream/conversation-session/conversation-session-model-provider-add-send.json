@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-add-send",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-add-send.test.ts",
+  "fixtures": [
+    {
+      "id": "model-provider-add-send-title",
+      "description": "设置页新增 provider 首发 case 内的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中首发业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-model-provider-add-send-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Provider Add Send\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-model-provider-add-send-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "model-provider-add-send-first-send",
+      "description": "I08 设置页从 上游 Template 创建两个 Provider 实例、编辑目标实例输出预算并显式选择 high 后首发普通文本的固定最终回复，配合 UI、落盘和抓包断言实例身份、继承隔离、请求模型、high 思考深度与 max_completion_tokens。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在设置页模型高级配置、provider 落盘、模型 currentValue provider 身份、显式选择 high 后的请求 body/model/thought/max_tokens 和 UI 回复；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_ADD_SEND"],
+        "bodyIncludes": ["E2E_MODEL_PROVIDER_ADD_SEND", "upstream-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-model-provider-add-send-first-send\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-model-provider-add-send-first-send\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

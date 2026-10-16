@@ -60,7 +60,7 @@ export interface BrowserTabInfo {
   viewport: BrowserViewportSize;
 }
 
-class BrowserCapability {
+export class BrowserCapability {
   readonly #readDocumentation: (name?: string) => string;
 
   constructor(
@@ -76,7 +76,7 @@ class BrowserCapability {
   }
 }
 
-class VisibilityBrowserCapability extends BrowserCapability {
+export class VisibilityBrowserCapability extends BrowserCapability {
   constructor(
     info: BrowserCapabilityInfo,
     readDocumentation: (name?: string) => string,
@@ -142,7 +142,7 @@ export interface BrowserClientTransport {
   execute: BrowserTransportExecuteFn;
 }
 
-interface CuaTab {
+export interface CuaTab {
   click(options: Point & { button?: number; keypress?: string[] }): Promise<void>;
   double_click(options: Point & { keypress?: string[] }): Promise<void>;
   downloadMedia(options: Point & { timeoutMs?: number }): Promise<void>;
@@ -153,7 +153,7 @@ interface CuaTab {
   type(options: { text: string }): Promise<void>;
 }
 
-interface DomCuaTab {
+export interface DomCuaTab {
   get_visible_dom(): Promise<BrowserSnapshot>;
   click(options: { node_id: string }): Promise<void>;
   double_click(options: { node_id: string }): Promise<void>;
@@ -347,7 +347,7 @@ export class RawTab {
   }
 }
 
-type JsDialog = AlertDialog | ConfirmDialog | PromptDialog | BeforeUnloadDialog;
+export type JsDialog = AlertDialog | ConfirmDialog | PromptDialog | BeforeUnloadDialog;
 
 class DialogBase {
   constructor(
@@ -1003,8 +1003,8 @@ export class BrowsersFacade {
   ) {
     const assertAvailable = options.assertAvailable ?? (() => undefined);
     this.assertAvailable = assertAvailable;
-    // 主 agent 与 subagent 复用 node_repl 内核，Browser 对象可能由主 agent 创建后
-    // 被 child 持有。guard 必须包住持久对象的每次 transport/doc 调用，不能只在初始化时判断。
+    // Browser 对象是持久引用，内核 reset 后旧绑定必须失效。guard 必须包住持久对象的每次
+    // transport/doc 调用，不能只在初始化时判断。
     this.transport = {
       list: async () => {
         assertAvailable();

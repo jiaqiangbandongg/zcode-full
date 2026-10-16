@@ -15,7 +15,7 @@ export {
   shouldWalkSkillDirectoryEntry,
 } from "@zcode/shared";
 
-interface WalkSkillMarkdownOptions {
+export interface WalkSkillMarkdownOptions {
   /** readdir / stat 失败时回调；不传则静默跳过该目录，调用方按需收集诊断。 */
   onError?: (path: string, error: unknown) => void;
 }

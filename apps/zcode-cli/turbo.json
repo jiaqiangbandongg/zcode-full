@@ -26,8 +26,8 @@
         "!dist/**",
         "!.turbo/**",
         "$TURBO_ROOT$/../../config/provider/zcode-builtin.json",
+        "$TURBO_ROOT$/../../config/provider/zcode-builtin.test.json",
         "$TURBO_ROOT$/../../scripts/builtin-provider-config.mjs",
-        "$TURBO_ROOT$/../../scripts/load-endpoint-env.mjs",
         "$TURBO_ROOT$/../../packages/provider/src/**",
         "$TURBO_ROOT$/../../packages/provider-node/src/zcode-builtin-release.ts",
         "$TURBO_ROOT$/../../packages/model-option-map/src/**",
@@ -40,11 +40,21 @@
       ],
       "outputs": ["dist/**"],
       "cache": true,
-      "env": ["ZCODE_ENV", "ZCODE_BUILTIN_PROVIDER_CONFIG_FILE", "NODE_ENV"]
+      "env": ["ZCODE_ENV", "NODE_ENV"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["**"],
+      "outputs": []
+    },
+    "coverage": {
+      "dependsOn": ["build"],
+      "inputs": ["**"],
+      "outputs": ["coverage/**"]
     },
     "lint": {},
     "lint:fix": {},
@@ -61,8 +71,8 @@
         "!dist/**",
         "!.turbo/**",
         "$TURBO_ROOT$/../../config/provider/zcode-builtin.json",
+        "$TURBO_ROOT$/../../config/provider/zcode-builtin.test.json",
         "$TURBO_ROOT$/../../scripts/builtin-provider-config.mjs",
-        "$TURBO_ROOT$/../../scripts/load-endpoint-env.mjs",
         "$TURBO_ROOT$/../../packages/provider/src/**",
         "$TURBO_ROOT$/../../packages/provider-node/src/zcode-builtin-release.ts",
         "$TURBO_ROOT$/../../packages/model-option-map/src/**",
@@ -76,7 +86,7 @@
       ],
       "outputs": ["dist/**"],
       "cache": true,
-      "env": ["ZCODE_ENV", "ZCODE_BUILTIN_PROVIDER_CONFIG_FILE", "NODE_ENV"]
+      "env": ["ZCODE_ENV", "NODE_ENV"]
     }
   }
 }

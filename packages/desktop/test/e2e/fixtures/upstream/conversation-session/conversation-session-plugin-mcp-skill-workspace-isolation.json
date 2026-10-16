@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "workspace-isolation-no-provider",
+      "description": "Unused guard fixture for the config-only Workspace A/B isolation case.",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 不发送 provider 请求；保留 case-local fixture 以满足 pending fixture contract。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_WORKSPACE_ISOLATION_UNUSED"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": { "statusCode": 200, "text": "workspace-isolation-unused" }
+    }
+  ]
+}

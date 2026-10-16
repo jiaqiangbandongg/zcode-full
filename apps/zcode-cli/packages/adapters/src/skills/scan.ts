@@ -27,7 +27,7 @@ import { lstat, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { SKILL_FILE_NAME, shouldWalkSkillDirectoryEntry } from "@zcode/shared";
 
-interface ScanSkillFilesOptions {
+export interface ScanSkillFilesOptions {
   /**
    * 是否跟随符号链接（目录级与文件级），默认 true（用户级技能根的 symlink 导入
    * 是受支持功能）。plugin-scope 扫描必须传 false：链接可指向插件根外，拒绝

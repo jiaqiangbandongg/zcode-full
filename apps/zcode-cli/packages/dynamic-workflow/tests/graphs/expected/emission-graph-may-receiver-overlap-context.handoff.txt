@@ -1,0 +1,6 @@
+phase unphased
+participant unphased:actor#1 "alpha" steps=ask#1,ask#2~actor#1
+participant unphased:actor#2 "beta" steps=ask#2~actor#2,ask#3~actor#2
+participant unphased:actor#3 "gamma" steps=ask#3~actor#3
+handoff unphased:actor#1 -> unphased:actor#2 types="string"
+handoff unphased:actor#2 -> unphased:actor#3 types="string"

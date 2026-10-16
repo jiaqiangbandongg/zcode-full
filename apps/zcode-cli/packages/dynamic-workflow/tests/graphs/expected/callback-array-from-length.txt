@@ -1,0 +1,19 @@
+node source
+node join#1 "join" @31:29 type="Item[]"
+node fan-out#1 "fan-out" @32:3 type="Item[]"
+node ask#1 "ask" @35:8 actors=actor#1 within=fan-out#1 type="Item"
+node ask#2 "summarizer" @44:4 actors=actor#2 type="string"
+node sink
+actor actor#1 @33:5 within=fan-out#1
+actor actor#2 "summarizer" @42:23
+edge source -> fan-out#1 data exact
+edge source -> ask#1 data exact
+edge join#1 -> ask#2 data exact type="Item[]"
+edge join#1 -> sink data exact type="Item[]"
+edge fan-out#1 -> join#1 data exact type="Item[]"
+edge fan-out#1 -> ask#2 data exact type="Item[]"
+edge fan-out#1 -> sink data exact type="Item[]"
+edge ask#1 -> join#1 data exact type="Item"
+edge ask#1 -> ask#2 data exact type="Item"
+edge ask#1 -> sink data exact type="Item"
+edge ask#2 -> sink data exact type="string"

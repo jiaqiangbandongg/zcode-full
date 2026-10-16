@@ -8,9 +8,21 @@ const h = React.createElement as (
 ) => React.ReactElement;
 
 const SHIMMER_FRAME_INTERVAL_MS = 80;
-const SHIMMER_SWEEP_PERIOD_MS = 1_800;
-const SPINNER_FRAME_INTERVAL_MS = 80;
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+export const SHIMMER_SWEEP_PERIOD_MS = 1_800;
+export const SPINNER_FRAME_INTERVAL_MS = 80;
+export const SPINNER_WIDTH = 1;
+const SPINNER_FRAMES = [
+  "⠋",
+  "⠙",
+  "⠹",
+  "⠸",
+  "⠼",
+  "⠴",
+  "⠦",
+  "⠧",
+  "⠇",
+  "⠏",
+] as const;
 const SHIMMER_PADDING_COLUMNS = 10;
 const SHIMMER_BAND_HALF_WIDTH = 5;
 const SHIMMER_HIGHLIGHT_STRENGTH = 0.9;
@@ -78,7 +90,7 @@ export function ShimmerText({
   );
 }
 
-function shimmerTextSegments(
+export function shimmerTextSegments(
   text: string,
   frameMs: number,
   options: {
@@ -182,9 +194,7 @@ function rgbToHex(color: RgbColor): string {
 }
 
 function hexChannel(value: number): string {
-  return Math.round(clamp(value, 0, RGB_MAX))
-    .toString(HEX_RADIX)
-    .padStart(2, "0");
+  return Math.round(clamp(value, 0, RGB_MAX)).toString(HEX_RADIX).padStart(2, "0");
 }
 
 function blendChannel(base: number, highlight: number, amount: number): number {

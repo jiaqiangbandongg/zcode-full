@@ -1,6 +1,6 @@
 import type { QueueItem, QueueState } from "@zcode/shared/zcode-protocol-v4";
 
-interface PendingGuideQueueProjection {
+export interface PendingGuideQueueProjection {
   pendingGuides: readonly QueueItem[];
   visibleQueue: QueueState;
 }
@@ -10,7 +10,9 @@ interface PendingGuideQueueProjection {
  * queue.items，导致等待 model-step 注入的 guide 被误画成下一轮消息。这里只按权威
  * admitted delivery 分流展示，不复制、不改写 accepted input 状态。
  */
-export function projectPendingGuideQueue(queue: QueueState): PendingGuideQueueProjection {
+export function projectPendingGuideQueue(
+  queue: QueueState,
+): PendingGuideQueueProjection {
   const pendingGuides: QueueItem[] = [];
   const visibleItems: QueueItem[] = [];
   for (const item of queue.items) {
@@ -23,6 +25,8 @@ export function projectPendingGuideQueue(queue: QueueState): PendingGuideQueuePr
   return {
     pendingGuides,
     visibleQueue:
-      visibleItems.length === queue.items.length ? queue : { ...queue, items: visibleItems },
+      visibleItems.length === queue.items.length
+        ? queue
+        : { ...queue, items: visibleItems },
   };
 }

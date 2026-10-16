@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bot-topic-worker",
+  "spec": "./test/e2e/conversation-session/conversation-session-bot-topic-worker.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-bot-topic-worker.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "topic-slow",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+    },
+    {
+      "id": "topic-next",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+    },
+    {
+      "id": "topic-resource-tool",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+    },
+    {
+      "id": "topic-resource-final",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+    }
+  ]
+}

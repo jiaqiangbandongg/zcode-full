@@ -5,11 +5,11 @@ import { HookEventName as HookEventNameValue } from "@zcode/contracts";
 import { fileExists, isRecord, resolveInside } from "./helpers.js";
 import type { LoadedPlugin } from "./types.js";
 
-const STANDARD_HOOKS_PATH = join("hooks", "hooks.json");
+export const STANDARD_HOOKS_PATH = join("hooks", "hooks.json");
 
 const SUPPORTED_HOOK_EVENTS = new Set<string>(Object.values(HookEventNameValue));
 
-interface PluginHookSource {
+export interface PluginHookSource {
   rawHooks: unknown;
   sourcePath: string;
   wrapper: boolean;
@@ -159,8 +159,7 @@ function loadPluginHookSource(input: {
   } catch (error) {
     input.diagnostics.push({
       code: "plugin_hook_read_failed",
-      message:
-        error instanceof Error ? error.message : `Failed to read plugin hooks: ${input.path}`,
+      message: error instanceof Error ? error.message : `Failed to read plugin hooks: ${input.path}`,
       path: input.path,
       pluginId: input.loaded.id,
       severity: "error",

@@ -67,6 +67,11 @@ interface SavedWorkflowLaunchDialogProps {
   targets?: readonly AutomationWorkspaceOption[];
   /** 默认选中的项目 key（活动项目）；不在候选里时回落到首个候选。 */
   defaultTargetKey?: string | null;
+  /**
+   * 预填实参：完成卡的「再次运行」传这次 run 跑过的那一份（journal 给的）。声明里没有的键忽略；
+   * 缺席即按声明的默认值铺（中枢自己的「运行」就是这条）。
+   */
+  initialArgs?: Record<string, unknown>;
   /** 正在启动：主按钮 loading + 禁用，防重复点击（launcher.pending）。 */
   pending?: boolean;
   /** 启动失败：行内错误区展示（title 按 reason + 服务端 message）；成功由组关窗清空。 */
@@ -87,6 +92,7 @@ export function SavedWorkflowLaunchDialog({
   onSubmit,
   targets,
   defaultTargetKey,
+  initialArgs,
   pending = false,
   error = null,
 }: SavedWorkflowLaunchDialogProps) {
@@ -96,9 +102,9 @@ export function SavedWorkflowLaunchDialog({
   const [targetKey, setTargetKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setFields(buildSavedWorkflowArgFields(entry?.args));
+    setFields(buildSavedWorkflowArgFields(entry?.args, initialArgs));
     setErrors({});
-  }, [entry]);
+  }, [entry, initialArgs]);
 
   // 候选变化时保留仍有效的选择，否则回落到默认项目、首个候选或 null（reconcile 同一套规则）。
   useEffect(() => {

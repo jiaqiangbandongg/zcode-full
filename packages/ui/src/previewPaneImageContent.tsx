@@ -17,7 +17,7 @@ interface ImageNaturalSize {
 const IMAGE_PREVIEW_CHECKERBOARD_CLASS =
   "[background-color:var(--color-background)] [background-image:linear-gradient(45deg,var(--color-surface)_25%,transparent_25%),linear-gradient(-45deg,var(--color-surface)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--color-surface)_75%),linear-gradient(-45deg,transparent_75%,var(--color-surface)_75%)] [background-position:0_0,0_4px,4px_-4px,-4px_0] [background-size:8px_8px]";
 
-function getImagePreviewPixelRatio(sourceName: string): number {
+export function getImagePreviewPixelRatio(sourceName: string): number {
   const fileName = sourceName.replace(/\\/g, "/").split("/").at(-1) ?? "";
   const match = /@(\d+(?:\.\d+)?)x(?=(?:\.[^./\\]+)?$)/i.exec(fileName);
   const ratio = match ? Number(match[1]) : 1;
@@ -88,7 +88,13 @@ export function ImagePreviewContent({
   );
 }
 
-export function SvgPreviewContent({ title, svgContent }: { title: string; svgContent: string }) {
+export function SvgPreviewContent({
+  title,
+  svgContent,
+}: {
+  title: string;
+  svgContent: string;
+}) {
   return (
     <ImagePreviewContent
       fitToContainer

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-enabled",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-enabled.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-mcp-skill-workspace-enabled.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "workspace-enabled-tool-call",
+      "description": "Workspace Plugin enabled 后的 MCP tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定工具调用，证明 Workspace Plugin 直接进入新 Session runtime。"
+    },
+    {
+      "id": "workspace-enabled-final",
+      "description": "MCP tool_result 后的最终响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终响应，证明 Plugin MCP tool call 完成。"
+    }
+  ]
+}

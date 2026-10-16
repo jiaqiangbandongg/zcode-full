@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-guide-steer",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-guide-steer.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-background-guide-steer-agent-tool-call",
+      "description": "BG20: main agent launches a background Agent before the user sends guide text.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "延迟 Agent tool_use 响应，稳定覆盖 background Agent 创建过程中发送 guide 的窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_GUIDE_STEER_LAUNCH"
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "agentId: agent_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_GUIDE_STEER_LAUNCH"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 5000,
+        "toolUse": {
+          "id": "toolu_e2e_background_guide_steer_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E background guide steer agent",
+            "prompt": "E2E_BACKGROUND_GUIDE_STEER_CHILD: Reply exactly E2E_BACKGROUND_GUIDE_STEER_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-background-guide-steer-child-result",
+      "description": "BG20: child Agent completes after a short delay.",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "延迟 background Agent completion，避免 notification 抢在 launch+guide 合流断言前完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_GUIDE_STEER_CHILD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "lastUserMessageIncludes": [
+          "E2E_BACKGROUND_GUIDE_STEER_CHILD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 2500,
+        "text": {
+          "id": "upstream-e2e-background-guide-steer-child",
+          "text": "E2E_BACKGROUND_GUIDE_STEER_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-guide-steer-launch-and-guide",
+      "description": "BG20: parent consumes Agent launch tool result and guide text in the same model request.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 guide 文本随 background Agent launch tool result 合流，而不是进入普通 future queue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_GUIDE_STEER_LAUNCH",
+          "E2E_BACKGROUND_GUIDE_STEER_MESSAGE",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-guide-steer-launch-consumed",
+          "text": "background-guide-steer-launch-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-guide-steer-notification-consumed",
+      "description": "BG20: parent consumes background Agent completion notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "验证 launch+guide 合流后 background Agent completion notification 仍按标准链路消费。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "<task-notification>",
+          "E2E_BACKGROUND_GUIDE_STEER_CHILD_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-guide-steer-notification",
+          "text": "background-guide-steer-notification-consumed-ok"
+        }
+      }
+    }
+  ]
+}

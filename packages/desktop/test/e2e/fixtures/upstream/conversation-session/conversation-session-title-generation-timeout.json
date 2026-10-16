@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-title-generation-timeout",
+  "spec": "./test/e2e/conversation-session/conversation-session-title-generation-timeout.test.ts",
+  "fixtures": [
+    {
+      "id": "title-generation-timeout-delayed-title",
+      "description": "V01: 首条消息以 skill markdown link 开头，session_title sidecar 响应慢于旧 15s timeout，但应在 60s 内完成并回写标题。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider title 延迟不可控；该 case 需要稳定制造 15s 之后、60s 之前才返回的标题响应。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_TITLE_SIDECAR_TIMEOUT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 20000,
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-title-generation-timeout-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"e2e-case-lifecycle 技能说明\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "title-generation-timeout-main-response",
+      "description": "V01: 主回复快速完成，验证 title sidecar 独立慢回写，不阻塞主 turn idle。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 title sidecar 超时边界；主回复只需要稳定完成并暴露 marker。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_TITLE_SIDECAR_TIMEOUT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_TITLE_SIDECAR_TIMEOUT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-title-generation-timeout-main",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "e2e-title-timeout-ok"
+        }
+      }
+    }
+  ]
+}

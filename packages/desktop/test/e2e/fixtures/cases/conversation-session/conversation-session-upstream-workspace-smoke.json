@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-upstream-workspace-smoke",
+  "spec": "./test/e2e/conversation-session/conversation-session-upstream-workspace-smoke.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-upstream-workspace-smoke.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-workspace-smoke-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中首发业务 fixture。"
+    },
+    {
+      "id": "upstream-workspace-smoke-first-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在模型列表、请求 body/model/thought 和 UI 回复；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-single-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-single-question.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-custom-enter-single-question.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-single-question-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 单题等待态，对照 custom input Enter 在单题场景是否直接提交。"
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-single-question-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明单题 custom input Enter 已提交给 agent，并允许 UI 断言已回答记录。"
+    }
+  ]
+}

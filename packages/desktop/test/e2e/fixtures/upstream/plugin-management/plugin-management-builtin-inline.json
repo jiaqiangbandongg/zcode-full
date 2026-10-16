@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-builtin-inline",
+  "spec": "./test/e2e/plugins/plugin-management-builtin-inline.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-management-inline-skill-call",
+      "description": "PLM-LC-009 asks the fresh session to invoke the inline skill.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_INLINE_REQUEST"],
+        "bodyIncludes": ["E2E_PLUGIN_INLINE_REQUEST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "replay": { "consumeOnce": true },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_inline_skill",
+          "name": "Skill",
+          "input": { "skill": "inline-lifecycle" }
+        }
+      }
+    },
+    {
+      "id": "upstream-plugin-management-inline-skill-result",
+      "description": "PLM-LC-009 proves the inline skill body was injected after Skill execution.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_INLINE_REQUEST",
+          "E2E_PLUGIN_INLINE_LIFECYCLE_RUNTIME",
+          "toolu_e2e_plugin_inline_skill"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

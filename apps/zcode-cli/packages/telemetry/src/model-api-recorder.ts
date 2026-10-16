@@ -166,6 +166,9 @@ export class ModelApiTelemetryStatusSink implements ModelStatusSink {
       case "model_stream_stalled":
         attempt?.writer.markStreamStalled(event.idleMs);
         return;
+      case "model_request_observation":
+        attempt?.writer.recordRequestObservation(event.observation);
+        return;
       case "model_retry_scheduled":
         call.pendingRetryDelayMs = event.delayMs;
         return;

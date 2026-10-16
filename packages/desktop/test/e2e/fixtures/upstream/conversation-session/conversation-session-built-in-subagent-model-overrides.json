@@ -1,0 +1,385 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-built-in-subagent-model-overrides",
+  "spec": "./test/e2e/conversation-session/conversation-session-built-in-subagent-model-overrides.test.ts",
+  "fixtures": [
+    {
+      "id": "built-in-subagent-model-overrides-title",
+      "description": "内置 subagent 模型覆盖 case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-built-in-subagent-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Built-in Subagent Models\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "built-in-subagent-general-parent-tool",
+      "description": "父 agent 首轮请求返回携带历史 model 字段的 general-purpose Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 Agent schema 已不声明 model，历史版本额外参数不能覆盖内置 general-purpose profile；父请求只需要稳定触发 legacy shape 的 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BUILT_IN_SUBAGENT_GENERAL_PARENT"],
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_GENERAL_PARENT",
+          "general-purpose"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_built_in_general_model_override",
+          "name": "Agent",
+          "input": {
+            "description": "Run the built-in general-purpose agent",
+            "model": "haiku",
+            "prompt": "E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD: Reply with exactly \"E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD_OK\" and no other text.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-general-child",
+      "description": "general-purpose child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD"],
+        "bodyIncludes": ["E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-built-in-general-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-general-parent-final",
+      "description": "父 agent 收到 general-purpose child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_GENERAL_PARENT",
+          "E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD_OK"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-built-in-general-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "built-in-general-subagent-model-override-done"
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-model-overrides-cold-auto-compact",
+      "description": "真实冷启动恢复父会话后、执行 Explore 场景前的自动 compact sidecar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "进程级冷启动会恢复完整父会话，并在下一轮前触发自动 compact；固定摘要避免 sidecar 阻断目标链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_GENERAL_PARENT",
+          "E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD_OK",
+          "built-in-general-subagent-model-override-done",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-built-in-subagent-cold-auto-compact",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>The E2E_BUILT_IN_SUBAGENT_GENERAL_PARENT scenario completed after E2E_BUILT_IN_SUBAGENT_GENERAL_CHILD_OK with built-in-general-subagent-model-override-done. Continue with the next user request.</summary>"
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-explore-parent-tool",
+      "description": "父 agent 首轮请求返回 Explore Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是内置 Explore child request 使用覆盖模型且工具面按 effective model 计算；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT"],
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT",
+          "Explore"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_built_in_explore_model_override",
+          "name": "Agent",
+          "input": {
+            "description": "Run the built-in Explore agent",
+            "prompt": "E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD: Reply with exactly \"E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD_OK\" and no other text.",
+            "subagent_type": "Explore"
+          }
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-explore-child",
+      "description": "Explore child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD"],
+        "bodyIncludes": ["E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-built-in-explore-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-model-overrides-explore-auto-compact",
+      "description": "Explore child 完成后、父 continuation 前的自动 compact sidecar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "完整 E2E system prompt 会让 Explore turn 在消费 child tool_result 前再次触发自动 compact；固定摘要以保留当前请求语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT",
+          "built-in-explore-subagent-model-override-done",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-built-in-subagent-explore-auto-compact",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>The current E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT request must run the Explore agent, consume E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD_OK, and finish with built-in-explore-subagent-model-override-done.</summary>"
+        }
+      }
+    },
+    {
+      "id": "built-in-subagent-explore-parent-final",
+      "description": "父 agent 收到 Explore child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BUILT_IN_SUBAGENT_EXPLORE_PARENT",
+          "E2E_BUILT_IN_SUBAGENT_EXPLORE_CHILD_OK"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-built-in-explore-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "built-in-explore-subagent-model-override-done"
+        }
+      }
+    },
+    {
+      "id": "custom-subagent-reasoning-parent-tool",
+      "description": "父 agent 首轮请求触发 custom reasoning agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父请求只需稳定触发 Settings 已保存的 custom agent，核心证据由后续 child provider request 提供。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CUSTOM_SUBAGENT_REASONING_PARENT"],
+        "bodyIncludes": ["E2E_CUSTOM_SUBAGENT_REASONING_PARENT", "e2e-reasoning-reviewer"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_custom_subagent_reasoning",
+          "name": "Agent",
+          "input": {
+            "description": "Run the custom reasoning reviewer",
+            "prompt": "E2E_CUSTOM_SUBAGENT_REASONING_CHILD: Reply with exactly \"E2E_CUSTOM_SUBAGENT_REASONING_CHILD_OK\" and no other text.",
+            "subagent_type": "e2e-reasoning-reviewer"
+          }
+        }
+      }
+    },
+    {
+      "id": "custom-subagent-reasoning-child",
+      "description": "custom reasoning child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 请求用于验证 custom Markdown 中 model 与 thoughtLevel 经冷启动后实际进入 provider request。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CUSTOM_SUBAGENT_REASONING_CHILD"],
+        "bodyIncludes": ["E2E_CUSTOM_SUBAGENT_REASONING_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-custom-subagent-reasoning-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_CUSTOM_SUBAGENT_REASONING_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "custom-subagent-reasoning-parent-final",
+      "description": "父 agent 收到 custom child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只用于证明 custom Agent tool_result 被父会话继续消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CUSTOM_SUBAGENT_REASONING_PARENT",
+          "E2E_CUSTOM_SUBAGENT_REASONING_CHILD_OK"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-custom-subagent-reasoning-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "custom-subagent-reasoning-override-done"
+        }
+      }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import {
   isArtifactPresetKind,
 } from "@/app-shell/workflow-artifacts/artifactPresentation.js";
 import { ArtifactPresetBody } from "@/app-shell/workflow-artifacts/ArtifactPresetBody.js";
+import { artifactPresetFieldPaths } from "@/app-shell/workflow-artifacts/presets/spec.js";
 import { cn } from "@/components/lib/utils.js";
 import {
   ArtifactSheetGlyph,
@@ -44,7 +45,7 @@ const CSV_CELL_MAX_CHARS = 28;
 
 type PreviewMode = "markdown" | "csv" | "text" | "image";
 
-function previewModeFor(artifact: {
+export function previewModeFor(artifact: {
   kind: WorkflowCompletionArtifact["kind"];
   contentType?: string;
   bytes?: number;
@@ -64,7 +65,7 @@ function previewModeFor(artifact: {
 }
 
 /** 最小的 CSV 读法：只认逗号与成对引号，够画一张缩略；不是解析器。 */
-function csvPreviewRows(text: string): string[][] {
+export function csvPreviewRows(text: string): string[][] {
   const rows: string[][] = [];
   for (const line of text.split(/\r?\n/u)) {
     if (line.trim().length === 0) continue;
@@ -135,12 +136,21 @@ export function WorkflowArtifactTilePreview({
     version: artifact.version ?? 1,
     enabled: mode !== undefined,
   });
+  // 看板只让 CLI 取 spec 点名的字段；spec 还没到或画不了时不取数——预览此时本来也画不出图。
+  const fields = useMemo(
+    () =>
+      isArtifactPresetKind(artifact.kind)
+        ? artifactPresetFieldPaths(artifact.kind, artifact.spec)
+        : undefined,
+    [artifact.kind, artifact.spec],
+  );
   const dataState = useWorkflowRunArtifactData({
     sessionId,
     runId,
     artifactId: artifact.id,
     ...(artifact.itemCount === undefined ? {} : { itemCount: artifact.itemCount }),
-    enabled: preset,
+    enabled: fields !== undefined,
+    ...(fields === undefined ? {} : { fields }),
   });
   const labels = useMemo(
     () => buildPresetLabels((descriptor, values) => intl.formatMessage(descriptor, values)),

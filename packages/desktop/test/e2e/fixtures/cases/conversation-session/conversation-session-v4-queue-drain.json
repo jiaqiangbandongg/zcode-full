@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-queue-drain",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-queue-drain.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-queue-drain.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-queue-drain-title",
+      "description": "E2E_V4_DRAIN_SLOW 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_DRAIN_SLOW 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-queue-drain-q1",
+      "description": "C02：队首排队项被 drain 后的第二次 roundtrip 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "drain 消费需要可断言的回复哨兵。"
+    },
+    {
+      "id": "v4-queue-drain-slow-turn",
+      "description": "C02：8s 慢流首轮——留出入队窗口，流结束后 runtime 自动 drain 队首。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "自动消费需要 running 窗口入队 + 可预期的流结束时点。"
+    }
+  ]
+}

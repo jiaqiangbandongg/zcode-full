@@ -44,6 +44,20 @@ export interface CodingPlanUsageRequest {
   timeZone?: string;
 }
 
+/** Highspeed 只读取普通 Pro/Max decode TPS，不触发完整 Coding Plan 用量聚合。 */
+export interface CodingPlanRegularTpsRequest {
+  preferredProviderId: string;
+  /**
+   * Registry 静态访问类别，或调用边界已解析的动态账号访问上下文。
+   *
+   * Bug 原因：此前该请求只带 organizationId/projectId，请求期鉴权靠 host 自行按 provider
+   * 猜测账号。Provider 重构后 Coding Plan 授权统一由 accountAccess 解析（Team scope 也内含
+   * 其中），缺失时 resolveAuthorization 必定返回 null，节省时间会静默不展示。
+   */
+  accountAccess: ZCodeProviderAccountAccess | ZCodeAccountAccess;
+  timeZone?: string;
+}
+
 export interface UsageEntitlementRequest {
   /** 购买或领取完成后，使对应 Start Plan balance 短期缓存失效。 */
   invalidateBalanceCache?: boolean;

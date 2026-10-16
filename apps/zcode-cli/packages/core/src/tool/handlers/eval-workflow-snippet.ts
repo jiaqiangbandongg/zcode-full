@@ -51,8 +51,7 @@ import { requireDynamicWorkflowSkill } from "./workflow-skill-gate.js";
 const EVAL_WORKFLOW_SNIPPET_TOOL_TIMEOUT_MS = 660_000;
 const EVAL_WORKFLOW_SNIPPET_MODEL_BYTES = 24_000;
 
-const NOT_EXECUTED_NOTE =
-  "NOTE: The snippet was NOT executed — fix the errors above and call the tool again.";
+const NOT_EXECUTED_NOTE = "NOTE: The snippet was NOT executed — fix the errors above and call the tool again.";
 const UNAVAILABLE_NOTE =
   "NOTE: The snippet was NOT executed — snippet evaluation is not available in this session.";
 

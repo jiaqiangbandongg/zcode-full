@@ -1,0 +1,130 @@
+% ═══════════════════════════════════════════════════════════
+% Academic CV Template
+% Single-column, multi-page, with bibliography support
+% ═══════════════════════════════════════════════════════════
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[top=2cm,bottom=2cm,left=2.5cm,right=2.5cm]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[numbers,sort&compress]{natbib}
+
+% ── Fonts ──
+\usepackage[rm]{roboto}
+\renewcommand{\familydefault}{\rmdefault}
+
+% ── Section Formatting ──
+\definecolor{accent}{HTML}{1F4E79}
+\titleformat{\section}
+  {\Large\bfseries\color{accent}}  % format
+  {}                                % label (no number)
+  {0em}                             % sep
+  {\MakeUppercase}                  % before-code
+  [\vspace{-0.8em}\color{accent}\rule{\linewidth}{0.8pt}]  % after-code (rule)
+
+\titleformat{\subsection}
+  {\large\bfseries}
+  {}
+  {0em}
+  {}
+
+% ── Header/Footer ──
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{gray}{Curriculum Vitae — Your Name}}
+\fancyhead[R]{\small\textcolor{gray}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyfoot{}
+
+\setlength{\parindent}{0pt}
+\setlist{nosep,leftmargin=1.5em}
+
+% ── CV Entry command ──
+\newcommand{\cventry}[4]{%
+  \textbf{#1}\hfill\textit{#2}\\
+  #3\hfill#4\par\smallskip
+}
+
+\begin{document}
+
+% ── Header ──
+\begin{center}
+{\LARGE\bfseries Your Full Name, Ph.D.}\par\smallskip
+{\small
+Department of Computer Science, Tsinghua University\\
+Beijing, China 100084\\
+\href{mailto:name@tsinghua.edu.cn}{name@tsinghua.edu.cn}
+\quad|\quad
+\href{https://yoursite.com}{yoursite.com}
+\quad|\quad
+ORCID: \href{https://orcid.org/0000-0000-0000-0000}{0000-0000-0000-0000}
+}\par
+\end{center}
+
+\section{Research Interests}
+Large-scale distributed systems, graph neural networks, efficient inference for large language models, and privacy-preserving machine learning.
+
+\section{Education}
+\cventry{Ph.D. in Computer Science}{2017 -- 2022}{Stanford University}{Stanford, CA}
+Advisor: Prof.\ Jane Smith\\
+Dissertation: \textit{Scalable Graph Processing in Heterogeneous Computing Environments}
+
+\smallskip
+\cventry{B.Eng. in Software Engineering}{2013 -- 2017}{Zhejiang University}{Hangzhou, China}
+First Class Honours, GPA: 3.9/4.0
+
+\section{Academic Appointments}
+\cventry{Assistant Professor}{2022 -- Present}{Tsinghua University, Dept.\ of CS}{Beijing}
+\cventry{Postdoctoral Researcher}{2022}{Stanford University, InfoLab}{Stanford, CA}
+
+\section{Selected Publications}
+
+\subsection{Journal Articles}
+\begin{enumerate}[label={[J\arabic*]}]
+\item \textbf{Your Name}, A.\ Coauthor, and B.\ Coauthor. ``Title of journal paper.'' \textit{IEEE Transactions on Knowledge and Data Engineering}, vol.\ 35, no.\ 4, pp.\ 1234--1248, 2023.
+\item C.\ Coauthor and \textbf{Your Name}. ``Another journal paper.'' \textit{ACM Computing Surveys}, vol.\ 55, no.\ 2, pp.\ 1--35, 2023.
+\end{enumerate}
+
+\subsection{Conference Papers}
+\begin{enumerate}[label={[C\arabic*]}]
+\item \textbf{Your Name} and D.\ Coauthor. ``Title of conference paper.'' In \textit{Proc.\ NeurIPS 2023}, pp.\ 5678--5690.
+\item \textbf{Your Name}, E.\ Coauthor, and F.\ Coauthor. ``Another conference paper.'' In \textit{Proc.\ ICML 2022}, pp.\ 3456--3468.
+\end{enumerate}
+
+\section{Grants \& Funding}
+\cventry{NSFC Young Scientist Fund}{2023 -- 2025}{Principal Investigator}{¥300,000}
+Project: Efficient Graph Neural Network Training on Heterogeneous Hardware
+
+\section{Teaching}
+\cventry{CS101: Introduction to Programming}{Fall 2022, 2023}{Tsinghua University}{120 students}
+\cventry{CS502: Advanced Distributed Systems}{Spring 2023}{Tsinghua University}{45 students}
+
+\section{Professional Service}
+\begin{itemize}
+\item \textbf{Program Committee}: NeurIPS 2023, ICML 2023, KDD 2022--2023
+\item \textbf{Reviewer}: IEEE TKDE, ACM TODS, VLDB Journal
+\item \textbf{Session Chair}: SIGMOD 2023 (Graph Processing)
+\end{itemize}
+
+\section{Awards \& Honours}
+\begin{itemize}
+\item Best Paper Award, KDD 2022
+\item Stanford Graduate Fellowship, 2017--2019
+\item National Scholarship, Ministry of Education, China, 2016
+\end{itemize}
+
+\section{Skills}
+\textbf{Programming:} Python, C++, Rust, CUDA\\
+\textbf{Frameworks:} PyTorch, TensorFlow, Apache Spark, DGL\\
+\textbf{Languages:} Chinese (native), English (fluent), Japanese (basic)
+
+\hypersetup{
+    pdftitle={CV - Your Name},
+    pdfauthor={Z.ai},
+    pdfsubject={Academic Curriculum Vitae},
+}
+
+\end{document}

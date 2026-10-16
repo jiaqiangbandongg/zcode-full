@@ -19,14 +19,16 @@ import {
   actorNamePattern,
   askLabel,
   askLabelPattern,
-  Counter,
   eachCandidate,
   forOfCandidate,
   isFacadeDeclared,
   literalText,
   resolveSymbol,
+  SiteCounters,
   worldReadLabel,
 } from "./sites-labels.js";
+import { holeSiteOf } from "./hole-sites.js";
+import { holeSiteId } from "./hole-id.js";
 
 // 拆分：本文件顶到 oxlint max-lines 上限（400 行）。名字 / 标签辅助与符号解析
 // （resolveSymbol / isFacadeDeclared）搬到 sites-labels.ts；后两者原本就从这里导出，故原样
@@ -236,6 +238,41 @@ export interface IterationCandidate {
   iterated: ts.Expression;
 }
 
+/**
+ * A `hole<T>(name, prompt?, body?)` call site: a typed gap the main agent fills with code
+ * while the run waits at it (docs/dynamic-workflow/authoring.md「Holes」, docs/analysis.md
+ * 「Sites」). Its id is the key of its NAME (`hole#<hash>`, hole-id.ts), the same at any
+ * nesting depth, so every existing id stays unchanged when a fill inserts code; it consumes
+ * the global `order` like every other site. A hole whose name is not a literal (9012) falls
+ * back to a positional `hole#N`, which never reaches a run.
+ *
+ * 留白的函数体（`body`）在收集时以**全新的一套 per-kind 计数器**走查，体内铸出的 id 一律带
+ * `<holeId>/` 前缀（见 {@link SiteCounters}）；体内的 `return` 不是顶层 return——它从留白
+ * 返回。补全前后，体外的每个 id 逐字不变，这是活 run 能被补全的全部理由。
+ */
+export interface HoleSite {
+  id: string;
+  /** 包着这个留白的那个（已补全的）留白的 id；顶层留白没有。嵌套关系只记在这里，不在 id 里。 */
+  fill?: string;
+  order: number;
+  /** 留白名（也是它的阶段名）——只在首参是无洞字面量时设置。 */
+  name?: string;
+  /** 名字实参原样保留：9012 的诊断按它定位。 */
+  nameExpr: ts.Expression | undefined;
+  /** 显式类型实参的源码文本（`hole<Plan>` 的 `Plan`）；缺席即 9012。 */
+  typeText?: string;
+  typeArg?: ts.TypeNode;
+  /** 给主代理的提示（第二实参，非函数体时）；taint 趟把它当 sink。 */
+  prompt?: ts.Expression;
+  /** 已补全的留白的函数体（最后一个实参的内联函数字面量）；开放的留白没有。 */
+  body?: ts.ArrowFunction | ts.FunctionExpression;
+  loc: ScriptLoc;
+  /** The `hole(...)` call. */
+  call: ts.CallExpression;
+  /** 调用是顶层 `return` 的（await 过的）操作数：脚本的结尾开着，run 的结果就是补全的返回值。 */
+  tail: boolean;
+}
+
 /** A `return` in the top-level script body (not inside a nested function). */
 export interface TopLevelReturn {
   loc: ScriptLoc;
@@ -254,6 +291,8 @@ export interface SiteTable {
   /** `phase("…")` markers — collected but NOT sited (see {@link PhaseMarkerSite}). */
   phases: PhaseMarkerSite[];
   joins: JoinSite[];
+  /** `hole<T>(...)` sites — open and filled, body sites included with prefixed ids (see {@link HoleSite}). */
+  holes: HoleSite[];
   iterations: IterationCandidate[];
   topLevelReturns: TopLevelReturn[];
 }
@@ -268,6 +307,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
     actors: [],
     artifacts: [],
     asks: [],
+    holes: [],
     iterations: [],
     joins: [],
     phases: [],
@@ -276,16 +316,12 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
     worldReads: [],
   };
   let order = 0;
-  const askCounter = new Counter();
-  const actorCounter = new Counter();
-  const worldReadCounter = new Counter();
-  const joinCounter = new Counter();
-  const reportCounter = new Counter();
-  const artifactCounter = new Counter();
 
   const locOf = (node: ts.Node): ScriptLoc => toScriptLoc(node.getStart(scriptFile));
 
-  const classify = (node: ts.Node, funcDepth: number): void => {
+  // `ids` 是当前作用域的 per-kind 计数器组：顶层一套，每个留白函数体一套新的（带前缀）。
+  // 返回值只在收到一个**带函数体的留白**时非空：walk 据此给函数体换计数器。
+  const classify = (node: ts.Node, funcDepth: number, ids: SiteCounters): HoleSite | undefined => {
     if (ts.isReturnStatement(node)) {
       if (funcDepth === 0) {
         table.topLevelReturns.push({ expression: node.expression, loc: locOf(node) });
@@ -307,7 +343,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
           const labelPattern = askLabelPattern(access.expression, checker);
           table.asks.push({
             call: node,
-            id: `ask#${askCounter.next()}`,
+            id: ids.next("ask"),
             instructions: node.arguments[0],
             label: askLabel(access.expression, checker),
             ...(labelPattern === undefined ? {} : { labelPattern }),
@@ -328,7 +364,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
             artifactIdExpr: idExpr,
             ...(id === undefined ? {} : { artifactId: id }),
             call: node,
-            id: `artifact#${artifactCounter.next()}`,
+            id: ids.next("artifact"),
             loc: toScriptLoc(access.name.getStart(scriptFile)),
             op: artifact.op,
             order: order++,
@@ -346,7 +382,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
           table.worldReads.push({
             args: node.arguments,
             call: node,
-            id: `world-read#${worldReadCounter.next()}`,
+            id: ids.next("world-read"),
             label: worldReadLabel(op, node.arguments[0]),
             loc: toScriptLoc(access.name.getStart(scriptFile)),
             op,
@@ -363,7 +399,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
         table.joins.push({
           arg: node.arguments[0],
           call: node,
-          id: `join#${joinCounter.next()}`,
+          id: ids.next("join"),
           label: "join",
           loc: toScriptLoc(access.name.getStart(scriptFile)),
           method,
@@ -396,7 +432,7 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
       const namePattern = name === undefined ? actorNamePattern(node) : undefined;
       table.actors.push({
         call: node,
-        id: `actor#${actorCounter.next()}`,
+        id: ids.next("actor"),
         loc: locOf(node),
         name,
         ...(namePattern === undefined ? {} : { namePattern }),
@@ -414,12 +450,22 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
         artifactIdExpr: tagExpr,
         ...(tag === undefined ? {} : { artifactId: tag }),
         call: node,
-        id: `report#${reportCounter.next()}`,
+        id: ids.next("report"),
         item: node.arguments[0],
         loc: locOf(node),
         order: order++,
       });
       return;
+    }
+    if (fn === "hole") {
+      // 留白（docs/analysis.md「Sites」的 Hole sites 段）：id 是名字键（hole-id.ts），占全局 order；
+      // 带函数体时交回给 walk，让函数体在一套**全新的、带前缀的**计数器下走查。名字不是字面量
+      // 时（9012，脚本提交不了）退回位置计数器，只为让诊断有个可定位的站点。
+      const holeName = literalText(node.arguments[0]);
+      const holeId = holeName === undefined ? ids.next("hole") : holeSiteId(holeName);
+      const site = holeSiteOf(node, holeId, order++, locOf(node), funcDepth, ids.holeId);
+      table.holes.push(site);
+      return site.body === undefined ? undefined : site;
     }
     // `phase("…")` is a marker, not a site: no id and no counter of any kind is consumed
     // here (see PhaseMarkerSite). Resolved by declaration like the calls above — a
@@ -436,12 +482,16 @@ export function collectSites(workflow: WorkflowProgram): SiteTable {
     }
   };
 
-  const walk = (node: ts.Node, funcDepth: number): void => {
-    classify(node, funcDepth);
+  const walk = (node: ts.Node, funcDepth: number, ids: SiteCounters): void => {
+    const hole = classify(node, funcDepth, ids);
     const childDepth = funcDepth + (isFunctionLike(node) ? 1 : 0);
-    ts.forEachChild(node, (child) => walk(child, childDepth));
+    ts.forEachChild(node, (child) =>
+      walk(child, childDepth, hole !== undefined && child === hole.body ? ids.child(hole.id) : ids),
+    );
   };
-  for (const statement of body.statements) walk(statement, 0);
+  // 顶层一套计数器贯穿整个脚本体（每个语句都用同一套！）；留白函数体各自换一套带前缀的。
+  const topLevel = new SiteCounters();
+  for (const statement of body.statements) walk(statement, 0, topLevel);
 
   return table;
 }

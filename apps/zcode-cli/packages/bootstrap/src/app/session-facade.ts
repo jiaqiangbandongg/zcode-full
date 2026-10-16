@@ -1,16 +1,15 @@
 import { updateUiLocaleInFileConfig, type ConfigResult } from "@zcode/adapters/config";
-import type { AgentRuntime } from "@zcode/core";
-import { resolveLocale } from "@zcode/i18n";
-import { normalizeModelSelection, type ModelSelection } from "@zcode/provider";
 import {
+  McpResourceSubscribeUnsupportedError,
+  resolveMcpToolVisibility,
   SESSION_ENTRY_MODEL_SELECTION,
   traceContextToLogContext,
   type CollaborationMode,
   type ExecutionPort,
   type GoalStatus,
+  type LocalSettingStorePort,
   type Logger,
   type LoggerFactory,
-  type LocalSettingStorePort,
   type McpPort,
   type McpServerConfig,
   type MessageId,
@@ -23,11 +22,17 @@ import {
   type UiLocale,
   type UiThemePreference,
 } from "@zcode/contracts";
+import {
+  createMcpAppProvidedToolEntry,
+  createMcpToolEntry,
+  toMcpToolName,
+  type AgentRuntime,
+} from "@zcode/core";
+import { resolveLocale } from "@zcode/i18n";
+import { normalizeModelSelection, type ModelSelection } from "@zcode/provider";
 import { listMcpServerStatuses } from "../mcp-config.js";
 import { loadSessionTranscriptFromStore } from "../session-transcript.js";
-import { createSubagentObservation } from "./subagent-observation.js";
 import { getLocaleConfigPath } from "./locale-selection.js";
-import { isClosableSessionStore } from "./session-store.js";
 import type { ProviderRegistryModelSource } from "./provider-registry-model-runtime.js";
 import {
   completeAuxiliaryRegistryModelSelection,
@@ -40,6 +45,8 @@ import {
   resolveRegistryThoughtLevel,
   type ResolvedRegistrySelection,
 } from "./provider-registry-selection.js";
+import { isClosableSessionStore } from "./session-store.js";
+import { createSubagentObservation } from "./subagent-observation.js";
 import type { PrepareUserExecutionBoundary, ZCodeApp } from "./types.js";
 
 type SessionFacade = Pick<
@@ -48,9 +55,14 @@ type SessionFacade = Pick<
   | "cancelBackgroundTask"
   | "clearTarget"
   | "close"
+  | "callMcpToolForUi"
+  | "getMcpAppConnectionSnapshot"
+  | "onMcpAppConnectionInvalidated"
+  | "replaceMcpAppProvidedTools"
   | "connectMcpServer"
   | "disconnectMcpServer"
   | "generateWorkspaceText"
+  | "sampleModel"
   | "testModelConnectivity"
   | "forkFromCheckpoint"
   | "getMode"
@@ -63,9 +75,17 @@ type SessionFacade = Pick<
   | "getTheme"
   | "listCheckpoints"
   | "listMcpServers"
+  | "getMcpToolVisibility"
   | "listModels"
   | "listThoughtLevels"
   | "loadSessionTranscript"
+  | "readMcpResource"
+  | "readMcpResourceForUi"
+  | "listMcpResourcesForUi"
+  | "listMcpResourceTemplatesForUi"
+  | "subscribeMcpResourceForUi"
+  | "unsubscribeMcpResourceForUi"
+  | "unsubscribeMcpResourcesForUi"
   | "readSubagents"
   | "readSubagentTranscript"
   | "readTodos"
@@ -126,6 +146,8 @@ interface CreateSessionFacadeDeps {
 export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacade {
   let closePromise: Promise<void> | undefined;
   let currentLocale = resolveLocale(deps.configResult.config.ui.locale);
+  // App-Provided Tools：本会话当前登记在 ToolRegistry 里的模型侧名字（整体替换时先注销）。
+  let appProvidedToolNames: string[] = [];
   const currentRegistrySelection = ():
     | { owned: false }
     | {
@@ -371,6 +393,150 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
         workingDirectory: deps.workingDirectory,
       });
     },
+    readMcpResource: async (serverName, uri, options) => {
+      if (!deps.mcpPort) {
+        throw new Error("MCP is disabled");
+      }
+      if (!deps.mcpPort.readResource) {
+        throw new Error("MCP resources are not supported by this runtime");
+      }
+      return deps.mcpPort.readResource(
+        { serverName, uri, trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    readMcpResourceForUi: async (serverName, uri, options) => {
+      if (!deps.mcpPort) {
+        throw new Error("MCP is disabled");
+      }
+      if (!deps.mcpPort.readResource) {
+        throw new Error("MCP resources are not supported by this runtime");
+      }
+      return deps.mcpPort.readResource(
+        { serverName, uri, trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    listMcpResourcesForUi: async (serverName, cursor, options) => {
+      if (!deps.mcpPort) throw new Error("MCP is disabled");
+      if (!deps.mcpPort.listResources) {
+        throw new McpResourceSubscribeUnsupportedError(serverName);
+      }
+      return deps.mcpPort.listResources(
+        { serverName, ...(cursor ? { cursor } : {}), trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    listMcpResourceTemplatesForUi: async (serverName, cursor, options) => {
+      if (!deps.mcpPort) throw new Error("MCP is disabled");
+      if (!deps.mcpPort.listResourceTemplates) {
+        throw new McpResourceSubscribeUnsupportedError(serverName);
+      }
+      return deps.mcpPort.listResourceTemplates(
+        { serverName, ...(cursor ? { cursor } : {}), trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    subscribeMcpResourceForUi: async (serverName, uri, subscriberKey, options) => {
+      if (!deps.mcpPort) throw new Error("MCP is disabled");
+      if (!deps.mcpPort.subscribeResource) {
+        throw new McpResourceSubscribeUnsupportedError(serverName);
+      }
+      await deps.mcpPort.subscribeResource(
+        { serverName, uri, subscriberKey, trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    unsubscribeMcpResourceForUi: async (serverName, uri, subscriberKey, options) => {
+      if (!deps.mcpPort?.unsubscribeResource) return;
+      await deps.mcpPort.unsubscribeResource(
+        { serverName, uri, subscriberKey, trace: deps.traceContext },
+        { signal: options?.signal },
+      );
+    },
+    unsubscribeMcpResourcesForUi: async (subscriberKeyPrefix) => {
+      if (!deps.mcpPort?.unsubscribeResourcesBySubscriber) return 0;
+      return deps.mcpPort.unsubscribeResourcesBySubscriber(subscriberKeyPrefix);
+    },
+    onMcpAppConnectionInvalidated: (name, listener) =>
+      deps.mcpPort?.onAppConnectionInvalidated?.(name, listener) ?? (() => {}),
+    getMcpAppConnectionSnapshot: (name) => deps.mcpPort?.appConnectionSnapshot?.(name) ?? null,
+    callMcpToolForUi: async (serverName, toolName, args, options) => {
+      if (!deps.mcpPort) {
+        throw new Error("MCP is disabled");
+      }
+      const snapshot = deps.mcpPort.appConnectionSnapshot?.(serverName);
+      if (!snapshot) throw new Error("MCP App connection is unavailable");
+      const descriptor = (await deps.mcpPort.listTools()).find(
+        (tool) => tool.serverName === serverName && tool.toolName === toolName,
+      );
+      if (!descriptor || !resolveMcpToolVisibility(descriptor).includes("app"))
+        throw new Error("Tool is not available to this App");
+      const registry = deps.runtime.getToolRegistry();
+      const registered = registry
+        .list()
+        .map((name) => registry.get(name))
+        .find(
+          (entry) =>
+            entry?.metadata.mcpPresentation?.serverName === serverName &&
+            entry.metadata.mcpPresentation.toolName === toolName,
+        );
+      const entry =
+        registered ??
+        createMcpToolEntry(toMcpToolName(descriptor), descriptor, deps.mcpPort, false);
+      const executor = deps.runtime.getToolExecutor();
+      if (!executor.authorizeAppTool) throw new Error("MCP App host authorization is unavailable");
+      const input = await executor.authorizeAppTool(
+        { id: crypto.randomUUID(), name: entry.metadata.name, input: args ?? {} },
+        entry,
+        { signal: options?.signal, traceContext: deps.traceContext },
+      );
+      // 审批期间连接可能被替换：批准只属于原连接，执行前必须再次验证。
+      options?.signal?.throwIfAborted();
+      const current = deps.mcpPort.appConnectionSnapshot?.(serverName);
+      if (
+        !current ||
+        current.identity !== snapshot.identity ||
+        current.generation !== snapshot.generation
+      )
+        throw new Error("MCP App connection changed during authorization");
+      return deps.mcpPort.callTool(
+        {
+          serverName,
+          toolName,
+          arguments: input as Record<string, unknown>,
+          trace: deps.traceContext,
+          runtimeScope: "main",
+        },
+        { signal: options?.signal, appConnection: snapshot },
+      );
+    },
+    replaceMcpAppProvidedTools: (definitions, execute) => {
+      const registry = deps.runtime.getToolRegistry();
+      for (const name of appProvidedToolNames) registry.unregister(name);
+      const registered: string[] = [];
+      for (const definition of definitions) {
+        // 不覆盖内置 / MCP 工具：`app__` 前缀本不该冲突，冲突时以既有工具为准。
+        if (registry.has(definition.modelName) || registered.includes(definition.modelName))
+          continue;
+        registry.register(createMcpAppProvidedToolEntry(definition, execute), {
+          silentDuplicateWarning: true,
+        });
+        registered.push(definition.modelName);
+      }
+      appProvidedToolNames = registered;
+      // 同回合下一次模型请求即可见：只是让 getTools 重建缓存；工具集合没变时发给模型的内容也不变。
+      deps.runtime.invalidateToolCache();
+      return registered;
+    },
+    getMcpToolVisibility: async (serverName, toolName) => {
+      if (!deps.mcpPort) return null;
+      // 真相是 adapter 归一化过的 descriptor（同一份 tools/list），不另存副本。
+      const descriptor = (await deps.mcpPort.listTools()).find(
+        (tool) => tool.serverName === serverName && tool.toolName === toolName,
+      );
+      return descriptor ? resolveMcpToolVisibility(descriptor) : null;
+    },
     readBackgroundBashOutput: (workId, sessionId) =>
       deps.runtime.readBackgroundBashOutput(workId, sessionId),
     cancelBackgroundTask: async (taskId, options) =>
@@ -393,6 +559,11 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
         traceContext: options?.traceContext ?? deps.traceContext,
       });
     },
+    sampleModel: (input, options) =>
+      deps.runtime.sampleModel(input, {
+        ...options,
+        traceContext: options.traceContext ?? deps.traceContext,
+      }),
     generateWorkspaceText: async (input, options) => {
       // 辅助文本入口只规范化模型身份；具体的最低档位由 Core 的辅助请求调用点显式决定。
       const selection =
@@ -422,8 +593,16 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
     },
     setMode: async (mode: CollaborationMode) => {
       const previousMode = deps.runtime.getMode();
+      const session = await deps.sessionStore.getSession(deps.sessionId);
+      // 群模式属于任务授权；不能写入工作区默认模式，让其他群或私聊继承。
+      if (session?.permission?.scope === "session") {
+        await deps.sessionStore.updateSession({
+          id: deps.sessionId,
+          permission: { ...session.permission, mode },
+        });
+      }
       await deps.runtime.setExecutionState({ mode }, deps.traceContext);
-      if (deps.localSettingStore) {
+      if (deps.localSettingStore && session?.permission?.scope !== "session") {
         try {
           await deps.localSettingStore.saveProjectPermissionMode({
             mode: deps.runtime.getMode(),
@@ -481,6 +660,7 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
           : {}),
       };
       deps.runtime.setSessionModelSelection(sessionSelection);
+      // transient 切换不产出 modelChange 聊天通知：应用/还原成对出现会刷出两条无意义通知。
       if (!options?.transient) {
         deps.runtime.recordPendingModelChange({
           fromModel: previousSelection,
@@ -570,7 +750,7 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
   };
 }
 
-async function closeSessionResources(input: SessionResourceCloseInput): Promise<void> {
+export async function closeSessionResources(input: SessionResourceCloseInput): Promise<void> {
   try {
     // 第一拍先关闭 runtime admission；后续 execution cancel 只能收口状态，不能再唤醒模型。
     input.beginShutdown();

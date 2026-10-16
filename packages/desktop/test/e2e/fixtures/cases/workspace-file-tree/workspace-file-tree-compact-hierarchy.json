@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "workspace-file-tree-compact-hierarchy",
+  "spec": "./test/e2e/workspace-file-tree/workspace-file-tree-compact-hierarchy.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "runtime-workspace-files",
+      "path": "E2E_FILE_TREE_COMPACT_HIERARCHY/",
+      "purpose": "构造多层 compact folders 与足够的子文件，验证逐级缩进、层级引导线和 sticky folders 无额外间隙。"
+    }
+  ],
+  "requests": []
+}

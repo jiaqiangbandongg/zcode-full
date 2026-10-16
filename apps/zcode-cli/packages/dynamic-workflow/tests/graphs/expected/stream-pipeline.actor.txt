@@ -1,0 +1,7 @@
+actor-node actor#1 @21:29 family=fan-out#1
+actor-node actor#2 @35:25 family=fan-out#3
+actor-node actor#3 "writer" @44:8
+actor-node sink
+actor-edge actor#1 -> actor#2 exact count=1 types="Fact[]"
+actor-edge actor#1 -> actor#3 exact count=1 types="Fact[]"
+actor-edge actor#3 -> sink exact count=1 types="string"

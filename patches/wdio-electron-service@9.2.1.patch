@@ -1,0 +1,48 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index 600092c2e531c2a5a74abf9e4b1a9d8dc20e13ca..0318e15f7dfe80fc6b5342703cac71884f2ca2eb 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -842,12 +842,16 @@ class ElectronCdpBridge extends cdpBridge.CdpBridge {
+ }
+ _ElectronCdpBridge_contextId = new WeakMap(), _ElectronCdpBridge_instances = new WeakSet(), _ElectronCdpBridge_getContextIdHandler = function _ElectronCdpBridge_getContextIdHandler() {
+     return new Promise((resolve, reject) => {
+-        this.on('Runtime.executionContextCreated', (params) => {
++        const onExecutionContextCreated = (params) => {
+             if (params.context.auxData.isDefault) {
++                clearTimeout(timeout);
++                this.off('Runtime.executionContextCreated', onExecutionContextCreated);
+                 resolve(params.context.id);
+             }
+-        });
+-        setTimeout(() => {
++        };
++        this.on('Runtime.executionContextCreated', onExecutionContextCreated);
++        const timeout = setTimeout(() => {
++            this.off('Runtime.executionContextCreated', onExecutionContextCreated);
+             const err = new Error('Timeout exceeded to get the ContextId.');
+             log$7.error(err.message);
+             reject(err);
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 68e76a2c4a87f0d6da3fbae2afbf55dbbd8d0548..a2896bdefd08fc0cca3a630c65f502090a3407a3 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -819,12 +819,16 @@ class ElectronCdpBridge extends CdpBridge {
+ }
+ _ElectronCdpBridge_contextId = new WeakMap(), _ElectronCdpBridge_instances = new WeakSet(), _ElectronCdpBridge_getContextIdHandler = function _ElectronCdpBridge_getContextIdHandler() {
+     return new Promise((resolve, reject) => {
+-        this.on('Runtime.executionContextCreated', (params) => {
++        const onExecutionContextCreated = (params) => {
+             if (params.context.auxData.isDefault) {
++                clearTimeout(timeout);
++                this.off('Runtime.executionContextCreated', onExecutionContextCreated);
+                 resolve(params.context.id);
+             }
+-        });
+-        setTimeout(() => {
++        };
++        this.on('Runtime.executionContextCreated', onExecutionContextCreated);
++        const timeout = setTimeout(() => {
++            this.off('Runtime.executionContextCreated', onExecutionContextCreated);
+             const err = new Error('Timeout exceeded to get the ContextId.');
+             log$7.error(err.message);
+             reject(err);

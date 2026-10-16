@@ -1,0 +1,14 @@
+actor actor#1 "writer" @5:16 order=0
+ask ask#1 "got" @9:23 order=1 type="string"
+ask ask#2 "writer" @10:26 order=2 type="string"
+fact ask-data ask#2 <- ask#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#1 exact
+fact return <- ask#2 exact
+region seq#1 seq entered
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+issue ask#2 in=seq#1 phase=unphased
+settle ask#2 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

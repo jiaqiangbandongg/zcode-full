@@ -25,7 +25,6 @@ export async function persistToolResultMediaAttachments(input: {
   content: ModelMessageContent;
   sessionId: SessionId;
   sessionStore?: SessionStorePort;
-  signal?: AbortSignal;
   toolCallId: string;
   toolName: string;
   traceContext: TraceContext;
@@ -49,22 +48,20 @@ export async function persistToolResultMediaAttachments(input: {
     const existingArtifactUri = block.source?.uri?.startsWith("zcode-artifact://")
       ? block.source.uri
       : undefined;
+    // 已完成工具的媒体属于结果收尾；继承本轮 Stop 信号会中断保存并丢失冷恢复内容。
     const artifactUri =
       existingArtifactUri ??
       (
-        await input.artifactStore.writeToolResultArtifact(
-          {
-            content: block.dataUrl,
-            contentType: "text/plain",
-            retention: "session",
-            sessionId: input.sessionId,
-            toolCallId: `${input.toolCallId}-media-${index + 1}`,
-            toolName: input.toolName,
-            trace: input.traceContext,
-            turnId: input.turnId,
-          },
-          { signal: input.signal },
-        )
+        await input.artifactStore.writeToolResultArtifact({
+          content: block.dataUrl,
+          contentType: "text/plain",
+          retention: "session",
+          sessionId: input.sessionId,
+          toolCallId: `${input.toolCallId}-media-${index + 1}`,
+          toolName: input.toolName,
+          trace: input.traceContext,
+          turnId: input.turnId,
+        })
       ).uri;
 
     attachments.push({

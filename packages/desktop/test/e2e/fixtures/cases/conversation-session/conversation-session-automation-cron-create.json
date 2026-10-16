@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-cron-create",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-cron-create.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-automation-cron-create.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-automation-cron-create-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于定时任务产品语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-create-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 CronCreate；本响应固定触发工具，专门验证会话内创建→聊天卡片→按 automationId 直达任务详情。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-create-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "CronCreate tool_result 进入历史后结束 case，真实 provider 回复内容不影响产品语义。"
+    }
+  ]
+}

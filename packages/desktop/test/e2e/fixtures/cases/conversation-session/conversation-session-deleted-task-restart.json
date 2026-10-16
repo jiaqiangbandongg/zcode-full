@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-deleted-task-restart",
+  "spec": "./test/e2e/conversation-session/conversation-session-deleted-task-restart.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-deleted-task-restart.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "deleted-task-restart-title",
+      "description": "TSL20 待删除任务的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定标题用于在 Archived 真实 UI 中定位目标行；标题本身不是产品断言。"
+    },
+    {
+      "id": "deleted-task-restart-turn",
+      "description": "TSL20 建立可归档并永久删除的 interactive task。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 tombstone 与冷启动 join；provider 只需稳定提交一个普通任务。"
+    }
+  ]
+}

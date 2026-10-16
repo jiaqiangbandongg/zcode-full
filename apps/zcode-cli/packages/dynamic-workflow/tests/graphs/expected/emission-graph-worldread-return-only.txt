@@ -1,0 +1,5 @@
+node source
+node world-read#1 "glob src/**" @5:29 type="string[]"
+node sink
+edge source -> world-read#1 data exact
+edge world-read#1 -> sink data exact type="string[]"

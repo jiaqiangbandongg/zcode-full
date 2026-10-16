@@ -9,6 +9,8 @@ export const AgentTelemetryOperation = {
   GoalCompletionVerification: "goal_completion_verification",
   GoalTitleGeneration: "goal_title_generation",
   ProjectMemoryExtract: "project_memory_extract",
+  ProjectMemoryDream: "project_memory_dream",
+  ProjectMemoryRecall: "project_memory_recall",
   ReadSessionContextExtract: "read_session_context_extract",
   ReadSessionContextSynthesize: "read_session_context_synthesize",
   SessionTitleGeneration: "session_title_generation",

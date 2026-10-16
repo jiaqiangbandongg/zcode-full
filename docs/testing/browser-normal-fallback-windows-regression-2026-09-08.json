@@ -1,0 +1,505 @@
+{
+  "date": "2026-09-08",
+  "branch": "feat/fix-browser-zoom-coordinates-windows",
+  "baseCommit": "28f297339ad2126fdd92e0e69277e432be9ae95a",
+  "case": "conversation-session-browser-zoom-coordinates",
+  "sourceSha256": {
+    "packages/ui/src/browser-use/UnifiedBrowserView.tsx": "4a49abed2bb7402038d77a30eabc954fa98ca36388ed9f28431050a2e6e9b26c",
+    "packages/desktop/src/main/browserView/browserGuestManager.ts": "ae4b11bc1a51e5efc366cef0fc0b3e6fd77146348a404f72ccd9a6983ba4ce2d",
+    "packages/desktop/test/e2e/conversation-session/manual-review/pending/conversation-session-browser-zoom-coordinates.test.ts": "2503bffe289e5b3ffb2d7979325e4690bcfc15e97864117916ab18d5f6ef5c3c"
+  },
+  "notes": [
+    "Existing five rounds use case-local model replay and the real Node REPL -> Host/Main -> guest chain.",
+    "New normal-background case drives production prepare/ready/release IPC with injected fallback metrics; native layout, capture and CDP input are real. It does not exercise manager fallback cache creation end to end.",
+    "Manager unit regression separately covers fallback install, attached zoom changes, idle reattach, reset/shrink, native screenshot selection and CDP coordinate compensation.",
+    "Windows is one physical 125% display; forced 200% is Chromium device scale emulation. macOS/Linux and mobile remote control were not rerun."
+  ],
+  "red": {
+    "artifact": "desktop-e2e-20260908-024203-610",
+    "error": "普通模式 native prepare 在 3000ms 内未 ready",
+    "layout": {
+      "innerWidth": 960,
+      "innerHeight": 600,
+      "width": 960,
+      "height": 552,
+      "mode": "inactive"
+    }
+  },
+  "checks": {
+    "relatedUnitTests": 340,
+    "typecheck": "passed",
+    "lint": "passed (43 existing warnings, 0 errors)",
+    "e2eTypecheck": "passed",
+    "fixtureCheck": "passed"
+  },
+  "matrix": [
+    {
+      "dpi": "system 125%",
+      "artifact": "desktop-e2e-20260908-025710-354",
+      "status": "passed",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1536,
+            "height": 960
+          },
+          "scaleFactor": 1.25
+        }
+      ],
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "894ccdf1094ab16ecf87b3ca45789df7ce2ec4546832bb0408653455645afb84"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 199
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 399
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "e0200fe11a32b365b2f3f8a3395db7226ee0f857fc08f1e6d5ead5558e3a9c5d"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "894ccdf1094ab16ecf87b3ca45789df7ce2ec4546832bb0408653455645afb84"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "6ff7a07621036168d8c2d04dbbb156d7a898d73c89c49794950e38aa09a685f3"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 299,
+              "y": 199
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 599,
+              "y": 399
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 999,
+              "y": 599
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "d204eaae19a888391a982543dccc7ce52c4e89d691ca085debbf53f92e7da8eb"
+        }
+      ],
+      "normalBackground": {
+        "requestedViewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "layout": {
+          "innerWidth": 873,
+          "innerHeight": 545,
+          "width": 1280,
+          "height": 720,
+          "scale": 0.7111089409722222
+        },
+        "released": {
+          "width": 1280,
+          "height": 720,
+          "events": [
+            {
+              "x": 300,
+              "y": 199,
+              "target": "p0",
+              "trusted": true
+            },
+            {
+              "x": 600,
+              "y": 399,
+              "target": "p1",
+              "trusted": true
+            },
+            {
+              "x": 1000,
+              "y": 600,
+              "target": "p2",
+              "trusted": true
+            }
+          ],
+          "guestZoom": 1,
+          "desktopZoom": 1.1
+        },
+        "colors": [
+          [80, 180, 20],
+          [80, 180, 20],
+          [80, 180, 20]
+        ],
+        "sameGuest": true,
+        "maxClickError": 1,
+        "pngSha256": "6d8d7954f71c204e2a6738411a348e26248ac2a7b095f9f7d1a53e2713adcf77"
+      }
+    },
+    {
+      "dpi": "forced 200%",
+      "artifact": "desktop-e2e-20260908-031302-774",
+      "status": "passed",
+      "platform": "win32",
+      "arch": "x64",
+      "electron": "41.0.3",
+      "chromium": "146.0.7680.80",
+      "displays": [
+        {
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 480,
+            "height": 300
+          },
+          "scaleFactor": 2
+        }
+      ],
+      "rounds": [
+        {
+          "round": 0,
+          "desktopZoomLevel": 0,
+          "previewZoom": "fit",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "52a7ec7160edf7d41fa939cf1ef58f67b1a8d4d7b3fb69852333cf77dac9ebd0"
+        },
+        {
+          "round": 1,
+          "desktopZoomLevel": 1,
+          "previewZoom": "fit",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 999,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "c0d411406fa3f3d0da5ec4eceb26213a7d627d28a6e20ef19697da7ddb9a4958"
+        },
+        {
+          "round": 2,
+          "desktopZoomLevel": 0,
+          "previewZoom": "100",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "52a7ec7160edf7d41fa939cf1ef58f67b1a8d4d7b3fb69852333cf77dac9ebd0"
+        },
+        {
+          "round": 3,
+          "desktopZoomLevel": -2,
+          "previewZoom": "200",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 300,
+              "y": 200
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 600,
+              "y": 400
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 1000,
+              "y": 600
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "865443e78f6b07bcd22ddd79f0a7eed6c93d7b3d9bb982ef9f2d992986c4ba3f"
+        },
+        {
+          "round": 4,
+          "desktopZoomLevel": 2,
+          "previewZoom": "50",
+          "viewport": [1280, 720],
+          "guestZoom": 1,
+          "clicks": [
+            {
+              "target": "p0",
+              "trusted": true,
+              "x": 299,
+              "y": 199
+            },
+            {
+              "target": "p1",
+              "trusted": true,
+              "x": 599,
+              "y": 399
+            },
+            {
+              "target": "p2",
+              "trusted": true,
+              "x": 999,
+              "y": 599
+            }
+          ],
+          "pixelCenters": [
+            [300, 200],
+            [600, 400],
+            [1000, 600]
+          ],
+          "pngSha256": "30e8d83ffb41a6eac7de6381d1e0e7004ec106974a06019693d4ff149b1ee095"
+        }
+      ],
+      "normalBackground": {
+        "requestedViewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "layout": {
+          "innerWidth": 872,
+          "innerHeight": 545,
+          "width": 1280,
+          "height": 720,
+          "scale": 0.7111089409722222
+        },
+        "released": {
+          "width": 1280,
+          "height": 720,
+          "events": [
+            {
+              "x": 300,
+              "y": 200,
+              "target": "p0",
+              "trusted": true
+            },
+            {
+              "x": 600,
+              "y": 400,
+              "target": "p1",
+              "trusted": true
+            },
+            {
+              "x": 999,
+              "y": 600,
+              "target": "p2",
+              "trusted": true
+            }
+          ],
+          "guestZoom": 1,
+          "desktopZoom": 1.1
+        },
+        "colors": [
+          [80, 180, 20],
+          [80, 180, 20],
+          [80, 180, 20]
+        ],
+        "sameGuest": true,
+        "maxClickError": 1,
+        "pngSha256": "a56e599f52064224e568427c88dbc4ba56e00656e33e58882e16a911e71f659a"
+      }
+    }
+  ]
+}

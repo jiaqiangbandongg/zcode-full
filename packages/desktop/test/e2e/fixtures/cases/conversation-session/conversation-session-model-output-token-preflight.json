@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-output-token-preflight",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-output-token-preflight.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-output-token-preflight.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-output-token-preflight-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于预算策略语义，只需避免干扰主请求和 Compact 匹配。"
+    },
+    {
+      "id": "otb08-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第一轮仅建立 Auto Compact 所需历史，并确认 preflight-v1 在低 usage 时仍发送 64K。"
+    },
+    {
+      "id": "otb08-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控 94K usage 用于证明 128K context、21K reserve、13K buffer 的 94K 阈值。"
+    },
+    {
+      "id": "otb08-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "成功 summary 请求体与 compact.auto.started 日志共同验证 preflight-v1 的 reserve 与 summary 预算。"
+    },
+    {
+      "id": "otb08-post-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 Compact 清空旧 usage 锚点，preflight cap 不持久化到后续 model step。"
+    },
+    {
+      "id": "otb09-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 provider base 为 1；provider usage 已覆盖上一轮 assistant，结合共享 /3 estimator 与精确长度的下一轮消息稳定得到 estimatedCurrentUsage=85,329。"
+    },
+    {
+      "id": "otb09-exact-cap",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "请求体是共享 /3 estimator 下 preflight 公式 128,000 - 85,329 - 1,000 = 41,671 的端到端证据。"
+    },
+    {
+      "id": "otb10-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第一轮只满足既有 reactive compact 的历史前置条件。"
+    },
+    {
+      "id": "otb10-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控 usage 用于稳定证明错误发生前请求已被裁剪，而不是直接发送 64K baseline。"
+    },
+    {
+      "id": "otb10-capped-context-error",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "immediate-error",
+      "syntheticReason": "故障只用于进入项目既有 reactive compact；本需求不新增或修改错误识别语料。"
+    },
+    {
+      "id": "otb10-reactive-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 capped failure 不产生 reduction retry，而是直接进入既有 reactive compact summary。"
+    },
+    {
+      "id": "otb10-post-reactive-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "成功请求证明裁剪值未持久化；与首个 error model-io 合计恰好两次 main 请求。"
+    }
+  ]
+}

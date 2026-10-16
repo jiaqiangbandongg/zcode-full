@@ -21,7 +21,7 @@ export function createInitialInputValidationModelContent(
   )}</tool_use_error>`;
 }
 
-function formatToolInputValidationError(
+export function formatToolInputValidationError(
   toolName: string,
   issues: readonly ToolInputValidationIssue[],
 ): string {

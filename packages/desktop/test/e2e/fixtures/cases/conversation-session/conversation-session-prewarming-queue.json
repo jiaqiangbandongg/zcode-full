@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-prewarming-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-prewarming-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-prewarming-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-prewarming-queue-first-delay",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "prewarming queue 需要首轮请求保持提交/流式窗口，真实模型可能过快完成。"
+    },
+    {
+      "id": "upstream-prewarming-queue-queued-marker-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "queued prompt 的产品语义是不发送到 provider；fixture 只覆盖 marker 合同，运行时若命中反而说明队列 guard 失效。"
+    }
+  ]
+}

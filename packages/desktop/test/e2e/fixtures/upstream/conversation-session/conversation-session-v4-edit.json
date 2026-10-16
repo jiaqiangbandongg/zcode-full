@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-edit",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-edit.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-edit-title",
+      "description": "E2E_V4_EDIT_ORIGINAL 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_EDIT_ORIGINAL 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_EDIT_ORIGINAL"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-edit-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Edit E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-edit-original",
+      "description": "M4 editUserQuery 门禁：原始 turn 回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "edit 前的原始回复，编辑后应被新 query 的回复替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_V4_EDIT_ORIGINAL"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageExcludes": [
+          "E2E_V4_EDIT_NEWTEXT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-edit-original",
+          "inputTokens": 50,
+          "outputTokens": 5,
+          "text": "V4_EDIT_ORIGINAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "v4-edit-compact",
+      "description": "PV4-11：覆盖原始 turn 的 stable manual compact summary。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "先建立 compact coverage，再验证 edit 使用 same-session branch cut。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_V4_EDIT_ORIGINAL",
+          "CRITICAL: Respond with TEXT ONLY",
+          "V4_EDIT_ORIGINAL_REPLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 100,
+        "text": {
+          "id": "v4-edit-compact",
+          "inputTokens": 128,
+          "outputTokens": 32,
+          "text": "<summary>The original compact-covered request asked for V4_EDIT_ORIGINAL_REPLY. No files or tools were used.</summary>"
+        }
+      }
+    },
+    {
+      "id": "v4-edit-new",
+      "description": "M4 editUserQuery 门禁：编辑后 newText 的回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "editUserQuery 用 newText 重跑，产出新回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_V4_EDIT_NEWTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-edit-new",
+          "inputTokens": 50,
+          "outputTokens": 5,
+          "text": "V4_EDIT_NEW_REPLY"
+        }
+      }
+    }
+  ]
+}

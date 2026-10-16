@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-grouped-archive-resurrection",
+  "spec": "./test/e2e/conversation-session/conversation-session-grouped-archive-resurrection.test.ts",
+  "fixtures": []
+}

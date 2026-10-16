@@ -1,0 +1,11 @@
+lane workspace
+lane actor#1 "drafter" @9:21 families=fanout#1
+lane actor#2 "merger" @11:22
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @9:3 label="map"
+step world-read#1 world-read "glob *.md" @7:28 lane=workspace region=seq#1 always
+step ask#1 ask "drafter" @9:38 lane=actor#1 region=fanout#1 maybe stack
+step ask#2 ask "merger" @11:38 lane=actor#2 region=seq#1 always
+edge world-read#1 -> ask#1 data maybe exact
+edge ask#1 -> ask#2 data maybe exact
+sink ask#2

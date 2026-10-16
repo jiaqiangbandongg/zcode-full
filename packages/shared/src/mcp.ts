@@ -15,10 +15,16 @@ export const ZCODE_CUA_OFFICIAL_MCP_NAMESPACE_NAME = "plugin:computer-use:comput
 // bootstrap + cli/plugin-host-command.ts 复用此常量识别 official zcode-cua plugin server，避免字面量漂移。
 export const ZCODE_PLUGIN_ID_ENV_KEY = "ZCODE_PLUGIN_ID";
 
-export type McpSource = "mcp" | "zcodeagentmcp";
+export type McpSource =
+  | "mcp"
+  | "zcodeagentmcp"
+  | "claudeclimcp"
+  | "geminiclimcp"
+  | "codexclimcp"
+  | "opencodemcp";
 export type CliMcpSource = Exclude<McpSource, "mcp">;
 export type McpScope = "common" | "user" | "workspace";
-export type McpFileFormat = "json";
+export type McpFileFormat = "json" | "toml";
 
 // Single MCP server configuration
 export interface McpServerConfig {
@@ -108,6 +114,10 @@ export interface McpConfig {
     mcpServers: Record<string, McpServerConfig>;
   };
   zcodeagentmcp: CliMcpConfig;
+  claudeclimcp: CliMcpConfig;
+  geminiclimcp: CliMcpConfig;
+  codexclimcp: CliMcpConfig;
+  opencodemcp: CliMcpConfig;
 }
 
 export interface ZCodeMcpServer {

@@ -4,7 +4,7 @@ import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
  * transcript 和 custom provider 的安全 code/message 证据集中在这里判定：
  * 低基数 allowlist，每条规则原子返回同一份证据决定的 source/reason。
  */
-interface TelemetryEvidenceAttribution {
+export interface TelemetryEvidenceAttribution {
   errorSource: "provider" | "runtime" | "network";
   failureReason: string;
 }
@@ -233,6 +233,7 @@ export function resolveControlledUnknownMessageAttribution(
     /upstream truncated response without stop reason/iu.test(message) ||
     /server disconnected without sending a response/iu.test(message) ||
     /responses\s+流式调用失败/iu.test(message) ||
+    /codex responses websocket stream error/iu.test(message) ||
     /engine protocol predict request failed:\s*fetch failed/iu.test(message) ||
     /the model provider encountered a streaming error/iu.test(message) ||
     /上游流式响应长时间无数据/iu.test(message) ||

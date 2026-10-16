@@ -31,13 +31,13 @@ import type { WorkbenchNewTaskTarget } from "@/v4/workbenchNewTaskTarget.js";
 import { useWorkbenchGroupStore } from "@/v4/workbenchGroupStore.js";
 import { persistV4ComposerDraft, V4_DRAFT_SCOPE_ROOT } from "@/v4/composer/composerDraftStore.js";
 
-interface OpenRemoteConnectionPreference {
+export interface OpenRemoteConnectionPreference {
   preferredKind?: RemoteTarget["kind"];
   preferredWslDistro?: string;
 }
 
 /** 新任务落点：identity 缺省一律归一化为 null，供只读校验、focus/addTab 统一消费。 */
-interface NewTaskTargetResolution {
+export interface NewTaskTargetResolution {
   workspacePath: string;
   workspaceIdentity: string | null;
 }
@@ -46,7 +46,7 @@ interface NewTaskTargetResolution {
  * 解析新任务落点：请求显式带 targetWorkspace 时（跨项目发起已保存工作流）直接采用它，不再询问 workbench 焦点；
  * 否则惰性回退到 resolveWorkbenchNewTaskTarget。identity 缺省归一化为 null。
  */
-function resolveNewTaskTargetFromRequest(
+export function resolveNewTaskTargetFromRequest(
   request: CreateTaskRequest | undefined,
   resolveFallback: () => WorkbenchNewTaskTarget | null,
 ): NewTaskTargetResolution | null {

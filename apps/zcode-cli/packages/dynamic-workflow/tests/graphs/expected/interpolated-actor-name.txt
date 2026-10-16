@@ -1,0 +1,28 @@
+node source
+node join#1 "join" @24:30 type="string[]"
+node fan-out#1 "fan-out" @25:3 type="string[]"
+node ask#1 "ask" @25:45 actors=actor#1 within=fan-out#1 type="string"
+node ask#2 "ask" @28:41 actors=actor#2 type="string"
+node ask#3 "ask" @29:33 actors=actor#3 type="string"
+node ask#4 "ask" @30:45 actors=actor#4 type="string"
+node ask#5 "ask" @31:34 actors=actor#5 type="string"
+node ask#6 "ask" @32:32 actors=actor#6 type="string"
+node sink
+actor actor#1 @25:24 within=fan-out#1
+actor actor#2 @28:17
+actor actor#3 @29:17
+actor actor#4 @30:17
+actor actor#5 @31:17
+actor actor#6 @32:17
+edge source -> fan-out#1 data exact
+edge join#1 -> ask#2 data exact type="string[]"
+edge fan-out#1 -> join#1 data exact type="string[]"
+edge fan-out#1 -> ask#1 data exact type="string[]"
+edge fan-out#1 -> ask#2 data exact type="string[]"
+edge ask#1 -> join#1 data exact type="string"
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> ask#3 data exact type="string"
+edge ask#3 -> ask#4 data exact type="string"
+edge ask#4 -> ask#5 data exact type="string"
+edge ask#5 -> ask#6 data exact type="string"
+edge ask#6 -> sink data exact type="string"

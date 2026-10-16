@@ -3,7 +3,10 @@
 // 本文件只做 store 装配 + 持久化订阅，并 re-export 两者（消费面单一入口）。
 import { create } from "zustand";
 import { isRendererReloadNavigation } from "@/lib/rendererNavigation.js";
-import { persistPaneLayout, readPersistedPaneLayout } from "@/v4/paneLayoutPersistence.js";
+import {
+  persistPaneLayout,
+  readPersistedPaneLayout,
+} from "@/v4/paneLayoutPersistence.js";
 import {
   bindPaneSession,
   closePane,
@@ -35,11 +38,19 @@ export function hadPersistedPaneLayoutAtModuleLoad(): boolean {
 export * from "@/v4/paneLayoutTree.js";
 export * from "@/v4/paneLayoutPersistence.js";
 
-interface PaneLayoutStore extends PaneLayoutSnapshot {
+export interface PaneLayoutStore extends PaneLayoutSnapshot {
   /** 在 anchor pane 处拆分出 draft pane（绑 scope，首发 createSession 后原地绑定）。 */
-  splitPane: (anchorPaneId: string, direction: SplitDirection, scope: PaneWorkspaceScope) => void;
+  splitPane: (
+    anchorPaneId: string,
+    direction: SplitDirection,
+    scope: PaneWorkspaceScope,
+  ) => void;
   /** 在 anchor pane 四周拆出已绑定 session 的 pane（draft drop / 非 group 拖拽入口）。 */
-  splitPaneWithBinding: (anchorPaneId: string, side: PaneSplitSide, binding: PaneBinding) => void;
+  splitPaneWithBinding: (
+    anchorPaneId: string,
+    side: PaneSplitSide,
+    binding: PaneBinding,
+  ) => void;
   /** 侧栏/下钻入口：已开 → 聚焦；否则焦点 pane 向右拆分并绑定 session。 */
   openSessionInNewPane: (scope: PaneWorkspaceScope, sessionId: string) => void;
   /** draft 临时布局：普通 sidebar 点击只替换 focused secondary，不覆盖 primary draft。 */

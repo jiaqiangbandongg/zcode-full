@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-guide-steer",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-guide-steer.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-running-guide-steer.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-running-guide-timeline-restored",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 Electron/CLI 冷恢复后切换 endpoint 能力，检查原始 guide 重新投影且无重复包装。"
+    },
+    {
+      "id": "upstream-running-guide-timeline-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于 P06 steer 时序，只需稳定返回，避免后台重试给 provider 记录和运行日志引入噪声。"
+    },
+    {
+      "id": "upstream-running-guide-timeline-initial-read",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "guide-1 必须稳定进入首轮 active request，并等待 Read tool result batch 完整提交后 drain。"
+    },
+    {
+      "id": "upstream-running-guide-timeline-middle-text",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "guide-2 需要稳定进入 guide-1 后的 text-only active request，并等待 assistant 正常收口后 drain。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-running-guide-timeline-final-text",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定最终正文 marker，用于直接断言两条 guide、三个工作段与最终 assistant 的 live DOM 全序。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-running-guide-steer-base-slow-stream",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "guide steer 需要稳定 running 窗口；真实 provider 可能过快完成。"
+    },
+    {
+      "id": "upstream-running-guide-goal-seed-active",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "goal guide case 只验证已建立 session 上的目标链路，避免 draft prewarm admission 混入状态窗口。"
+    },
+    {
+      "id": "upstream-running-guide-goal-seed-verify",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "goal verifier guide case 只验证已建立 session 上的目标链路，避免 draft prewarm admission 混入状态窗口。"
+    },
+    {
+      "id": "upstream-running-guide-goal-active-continuation-slow",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "active goal guide steer 需要稳定 active target running 窗口。"
+    },
+    {
+      "id": "upstream-running-guide-goal-verify-continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "稳定让 guide 文本在 goal verifier running 窗口进入 future queue。"
+    },
+    {
+      "id": "upstream-running-guide-goal-verify-delayed",
+      "kind": "goal-verifier",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "goal verifier queue 需要稳定 verifier running 窗口；真实 verifier 可能过快完成。"
+    },
+    {
+      "id": "upstream-running-guide-steer-followup-drain",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "稳定观察 guide 从 steer queue drain 为真实 user row，并保留后续 running 窗口。"
+    },
+    {
+      "id": "upstream-running-guide-goal-steer-drain",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "稳定观察 active goal guide drain 为真实 user row，同时保持 active target 与 running 链路。"
+    },
+    {
+      "id": "upstream-running-guide-goal-verify-queue-no-standalone-request",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "goal verifier 不是普通 active turn；guide 文本应作为 future queue 保留，不应走 immediate provider request。"
+    }
+  ]
+}

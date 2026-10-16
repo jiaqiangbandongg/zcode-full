@@ -1,11 +1,37 @@
+import { conversationQuotesSchema } from "../conversationSelection.js";
+import { botGroupInputSourceSchema } from "../bots.js";
 // CLI admission 后的自包含输入事实。
 // queue / guide / runtime / transcript 只能携带同一个 intent，不允许各层重建字段。
 import { z } from "zod";
 import { timestampSchema } from "./core.js";
 import { attachmentRefSchema } from "./attachment-ref.js";
+import { highspeedMessageMetaSchema } from "../highspeed.js";
 import { modelSelectionSchema } from "../model-selection.js";
 import { submissionModeSchema } from "./submission.js";
 import { sharedContextRefSchema } from "./shared-context-ref.js";
+
+/**
+ * 用户输入的结构化来源：插件 UI 经 `ui/message`
+ * 代用户发送时带上，落库后卡片显示"来自插件 X"。缺省即用户亲自输入。
+ */
+const pluginUiInputSourceSchema = z
+  .object({
+    kind: z.literal("pluginUi"),
+    pluginId: z.string().min(1),
+    toolCallId: z.string().min(1),
+  })
+  .strict();
+export const conversationInputSourceSchema = z.discriminatedUnion("kind", [
+  pluginUiInputSourceSchema,
+  z
+    .object({
+      kind: z.literal("genUi"),
+      path: z.string().min(1).max(4096),
+      title: z.string().max(250).optional(),
+    })
+    .strict(),
+]);
+export type ConversationInputSource = z.infer<typeof conversationInputSourceSchema>;
 
 export const conversationInputDeliverySchema = z
   .object({
@@ -38,6 +64,9 @@ export const conversationInputDispatchSchema = z
 
 export const conversationInputIntentSchema = z
   .object({
+    inputOrigin: z.enum(["desktop", "mobile"]).optional(),
+    botGroupSource: botGroupInputSourceSchema.optional(),
+    conversationQuotes: conversationQuotesSchema.optional(),
     sourceCommandId: z.string().min(1),
     queueItemId: z.string().min(1),
     clientId: z.string().min(1),
@@ -55,6 +84,7 @@ export const conversationInputIntentSchema = z
     steer: conversationInputSteerSchema,
     dispatch: conversationInputDispatchSchema,
     admittedAt: timestampSchema,
+    highspeed: highspeedMessageMetaSchema.optional(),
     provenance: z
       .object({
         sourceCommandId: z.string().min(1),
@@ -63,6 +93,7 @@ export const conversationInputIntentSchema = z
       })
       .strict()
       .optional(),
+    source: conversationInputSourceSchema.optional(),
   })
   .strict();
 

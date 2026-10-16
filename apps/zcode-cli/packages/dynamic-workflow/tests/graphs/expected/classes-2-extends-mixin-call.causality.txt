@@ -1,0 +1,7 @@
+lane actor#1 "w" @7:14
+lane actor#2 "r" @19:19
+region seq#1 seq
+step ask#1 ask "w" @7:25 lane=actor#1 region=seq#1 always
+step ask#2 ask "r" @19:30 lane=actor#2 region=seq#1 always
+edge ask#1 -> ask#2 data always inexact
+sink ask#2

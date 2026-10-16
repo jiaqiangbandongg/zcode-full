@@ -1,0 +1,13 @@
+node source
+node ask#1 "seed" @4:34 actors=actor#1 type="string"
+node ask#2 "fast" @5:43 actors=actor#2 type="string"
+node ask#3 "slow" @6:43 actors=actor#3 type="string"
+node sink
+actor actor#1 "seed" @4:20
+actor actor#2 "fast" @5:29
+actor actor#3 "slow" @6:29
+edge source -> ask#1 data exact
+edge ask#1 -> ask#2 data inexact type="string"
+edge ask#1 -> ask#3 data inexact type="string"
+edge ask#2 -> sink data inexact type="string"
+edge ask#3 -> sink data inexact type="string"

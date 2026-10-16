@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-provisioning-failure",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-provisioning-failure.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-provisioning-failure.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "只验证 SSH 首次配置同步失败的安全诊断和失效默认偏好的连接行为，不发送模型请求。",
+  "requests": []
+}

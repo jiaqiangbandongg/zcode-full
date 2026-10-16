@@ -65,19 +65,19 @@ interface RuntimeEventObserver {
 }
 
 export async function recordPromptTrajectory(input: {
-  referenceRequestPath?: string;
+  ccRequestPath?: string;
   fixturePath: string;
   outDir: string;
 }): Promise<void> {
   await recordPromptTrajectoryFromFixture({
-    referenceRequestPath: input.referenceRequestPath,
+    ccRequestPath: input.ccRequestPath,
     fixture: await loadFixture(input.fixturePath),
     outDir: input.outDir,
   });
 }
 
 export async function recordPromptTrajectoryFromFixture(input: {
-  referenceRequestPath?: string;
+  ccRequestPath?: string;
   fixture: PromptTrajectoryFixture;
   outDir: string;
 }): Promise<void> {
@@ -136,7 +136,7 @@ export async function recordPromptTrajectoryFromFixture(input: {
   }
 
   await writeDerivedTrajectories({
-    referenceRequestPath: input.referenceRequestPath,
+    ccRequestPath: input.ccRequestPath,
     inputPath: jsonlPath,
     outDir: input.outDir,
   });
@@ -173,7 +173,7 @@ function wrapModelAdapterConnectionForFixture(
   });
 }
 
-async function executeFixtureSteps(input: {
+export async function executeFixtureSteps(input: {
   app: {
     submitPrompt(prompt: RecorderPromptInput): Promise<unknown>;
   };
@@ -350,7 +350,7 @@ function createRecorderProviderRegistry(
   ]);
 }
 
-function buildRecorderRuntimeConfig(input: {
+export function buildRecorderRuntimeConfig(input: {
   fixture: PromptTrajectoryFixture;
   modelSelection: unknown;
   workingDirectory: string;

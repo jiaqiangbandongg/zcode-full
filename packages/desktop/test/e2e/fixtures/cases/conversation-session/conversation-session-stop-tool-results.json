@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-stop-tool-results",
+  "spec": "./test/e2e/conversation-session/conversation-session-stop-tool-results.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-stop-tool-results.json"
+  ],
+  "fileFixtures": [
+    "./test/e2e/fixtures/fs/conversation-session/conversation-session-stop-tool-results"
+  ],
+  "requests": [
+    {
+      "id": "stop-results-title",
+      "description": "本例辅助标题",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定三个真实 Read：首个成功，后两个由隔离 PreToolUse Hook 挂起；在模型流完成后点击 Stop。只改变首个文件为文本或 PNG，不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-text-tools",
+      "description": "text 真实 Read 批次",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定三个真实 Read：首个成功，后两个由隔离 PreToolUse Hook 挂起；在模型流完成后点击 Stop。只改变首个文件为文本或 PNG，不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-text-followup",
+      "description": "text Stop 后正常续聊",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定三个真实 Read：首个成功，后两个由隔离 PreToolUse Hook 挂起；在模型流完成后点击 Stop。只改变首个文件为文本或 PNG，不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-image-tools",
+      "description": "image 真实 Read 批次",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定三个真实 Read：首个成功，后两个由隔离 PreToolUse Hook 挂起；在模型流完成后点击 Stop。只改变首个文件为文本或 PNG，不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-image-followup",
+      "description": "image Stop 后正常续聊",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定三个真实 Read：首个成功，后两个由隔离 PreToolUse Hook 挂起；在模型流完成后点击 Stop。只改变首个文件为文本或 PNG，不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-db-tools",
+      "description": "纯文本 Bash 工具调用",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "独立非媒体对照：真实 Bash 仅返回短文本；PostToolUse barrier 后持有隔离 SQLite 写锁，进入失败收尾后放锁再从 UI 续聊。对照组不持锁，均不点 Stop、不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-db-initial",
+      "description": "纯文本 Bash 初始轮正常完成",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "独立非媒体对照：真实 Bash 仅返回短文本；PostToolUse barrier 后持有隔离 SQLite 写锁，进入失败收尾后放锁再从 UI 续聊。对照组不持锁，均不点 Stop、不伪造工具结果或 SDK 错误。"
+    },
+    {
+      "id": "stop-results-db-followup",
+      "description": "数据库恢复后续聊",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "独立非媒体对照：真实 Bash 仅返回短文本；PostToolUse barrier 后持有隔离 SQLite 写锁，进入失败收尾后放锁再从 UI 续聊。对照组不持锁，均不点 Stop、不伪造工具结果或 SDK 错误。"
+    }
+  ]
+}

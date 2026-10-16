@@ -1,8 +1,8 @@
 node_modules/
 dist/
-# zcode-server-cli 发行包 staging 输出，本地组装产物不入库。
+# zcode-server-cli 发行包 staging 输出（spec §7.1），本地组装产物不入库。
 dist-release/
-# macOS CI 按架构隔离 electron-builder 输出目录，这些仍是构建产物。
+# Bugfix: macOS CI 按架构隔离 electron-builder 输出目录，这些仍是构建产物。
 packages/desktop/dist-*/
 out/
 prebuilds/
@@ -12,6 +12,12 @@ packages/desktop/bundled-resources/
 packages/desktop/bundled-agents/
 packages/desktop/bundled-tools/
 packages/desktop/mock-cdn/
+packages/desktop/.e2e-home/
+# 修复原因：Windows shard runner 会生成带 run id 的 HOME；中断后不应把测试产物误判为源码改动。
+packages/desktop/.e2e-home-*/
+packages/desktop/.e2e-artifacts/
+packages/desktop/.e2e-cache/
+packages/desktop/.e2e-network-capture/
 *.tsbuildinfo
 .DS_Store
 coverage/
@@ -31,12 +37,15 @@ coverage/
 z-work/
 openclaw/
 .run-logs/
+# 旧开发目录：开发版运行时已改名为 .zcode-runtime，老机器上残留的目录仍需忽略，避免误提交 Electron.app 副本。
+.codex-runtime/
 .worktrees/
 packages/stream-animate/dist-server/
 packages/stream-animate/.stream-animate-data/
+.claude/worktrees/
 .codegraph
 .mimosa/
-# 集成分支曾混入 node-gyp 构建产物与 .playwright-mcp 临时快照；
+# 2026-08-20：集成分支曾混入 node-gyp 构建产物与 .playwright-mcp 临时快照；
 # 入库由 scripts/ci/ci-repo-hygiene.mjs 在 CI 第一站拒绝，这里让本地 git add 也忽略它们。
 .playwright-mcp/
 *.o
@@ -46,11 +55,12 @@ config.gypi
 gyp-mac-tool
 *.target.mk
 binding.Makefile
-# 这两条原来写成 build/Makefile、build/Release/*.node，含中间斜杠的 pattern
-# 只相对 .gitignore 所在目录（仓库根）生效，匹配不到 packages/ax-macos/build/ 下的产物；
-# 而 ci-repo-hygiene.mjs 的 denylist 用的是 (^|/)build/... 任意层级匹配。
-# 宽严不一致时无斜杠 pattern 能拦住的产物会被 git add -A 重新扫进索引。
-# 加 **/ 让忽略范围与门禁范围对齐。
+# 修复原因（2026-08-25）：这两条原来写成 build/Makefile、build/Release/*.node，
+# 含中间斜杠的 pattern 只相对 .gitignore 所在目录（仓库根）生效，压根匹配不到
+# packages/ax-macos/build/ 下的产物；而 ci-repo-hygiene.mjs 的 denylist 用的是
+# (^|/)build/... 任意层级匹配。宽严不一致的结果：合并 wf-more-primitives 时一次
+# git add -A 把这两个文件重新扫进索引（其余 7 个产物因 *.o / obj.target/ 等无斜杠
+# pattern 生效而被拦住），CI 第一站直接红。加 **/ 让忽略范围与门禁范围对齐。
 **/build/Makefile
 **/build/Release/*.node
 
@@ -62,10 +72,4 @@ packages/desktop/resources/macos-window-bounds/
 # Python 字节码（docker/plugin-eval/summarize.py 在主机上跑会生成）。
 __pycache__/
 *.pyc
-
-# 本地工具运行产物，均可再生：桌面端 e2e 的截图/缓存/网络抓包，以及桌面
-# 开发运行器的 Electron 下载缓存。
-packages/desktop/.e2e-artifacts/
-packages/desktop/.e2e-cache/
-packages/desktop/.e2e-network-capture/
-.zcode-runtime/
+.zcode-runtime

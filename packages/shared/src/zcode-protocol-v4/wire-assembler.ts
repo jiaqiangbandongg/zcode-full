@@ -192,7 +192,10 @@ export class TopicWireFrameAssembler<F> {
   accept(wire: TopicWireFrameCandidate, now = Date.now()): TopicWireAssemblyEvent<F>[] {
     const events = this.expire(now);
     const key = routeKey(wire.topic, wire.subscriptionId);
-    if (!Number.isSafeInteger(wire.logicalFrameOrdinal) || wire.logicalFrameOrdinal < 1) {
+    if (
+      !Number.isSafeInteger(wire.logicalFrameOrdinal) ||
+      wire.logicalFrameOrdinal < 1
+    ) {
       events.push(this.fault(wire, "proto.frameAssemblyMetadataMismatch"));
       return events;
     }

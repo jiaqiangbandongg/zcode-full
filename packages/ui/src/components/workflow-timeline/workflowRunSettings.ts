@@ -37,7 +37,7 @@ export type WorkflowRunSettingsModel =
   | { kind: "session" }
   | { kind: "model"; providerId: string; modelId: string; level?: string };
 
-/** 表单的两项设置。`bound` 为 null 即「本 run 没有自己的界」（跑在本机上限上）。 */
+/** 表单的两项设置。`bound` 为 null 即「本 run 没有自己的界」（跑在默认并发上）。 */
 export interface WorkflowRunSettingsDraft {
   model: WorkflowRunSettingsModel;
   bound: number | null;
@@ -67,11 +67,16 @@ export function isWorkflowRunConfigurable(run: WorkflowRunState | undefined): bo
 }
 
 /**
- * 本机的并发天花板：优先 `run.concurrencyCeiling`（`run-started` 随带、恒在），老 CLI 没发它时退回
- * 读数芯片自己的水位 `concurrency.ceiling`。都没有即未知——步进器没有上限、不写提示。
+ * 默认并发 D（docs/dynamic-workflow/concurrency.md「Protocol state」）：只读 `run.concurrencyCeiling`
+ * （`run-started` 随带、恒在；键名早于「默认并发」）。它是起点不是上限：步进器据它写「默认 N」、
+ * 判「等于默认 = 不设自己的界」，没有上界。
+ *
+ * Bug 根因（用户报「本机上限 2」）：此前老 CLI 没发它时退回读数芯片的水位 `concurrency.ceiling`，
+ * 而那个水位是「见过的最大 cap」——共享桶在本 run 启动前就被限流压低时，它就是一个学到的 cap，
+ * 被当成本机上限念了出来。宁可说不知道默认是几，也不拿一个学到的数冒充它。
  */
-export function workflowRunSettingsCeiling(run: WorkflowRunState): number | undefined {
-  return run.concurrencyCeiling ?? run.concurrency?.ceiling;
+export function workflowRunDefaultConcurrency(run: WorkflowRunState): number | undefined {
+  return run.concurrencyCeiling;
 }
 
 /** 规范串 → 表单模型；解析不动（坏串）按会话模型处理不成立，所以原样保留成一个查不到的具体模型。 */
@@ -107,45 +112,47 @@ export function workflowRunSettingsModelCanonical(
   });
 }
 
-/** 打开弹层时的起点：两项都取 run 自己的当前设置。界缺席时停在天花板上（天花板也未知则为 null）。 */
+/** 打开弹层时的起点：两项都取 run 自己的当前设置。界缺席时停在默认上（默认也未知则为 null）。 */
 export function initialWorkflowRunSettingsDraft(run: WorkflowRunState): WorkflowRunSettingsDraft {
   const limit = run.concurrency?.limit;
   return {
     model: workflowRunSettingsModelOf(run.subagentModel),
-    bound: limit ?? workflowRunSettingsCeiling(run) ?? null,
+    bound: limit ?? workflowRunDefaultConcurrency(run) ?? null,
   };
 }
 
-/** 界的归一：达到或超过天花板即「没有自己的界」。 */
-function normalizedBound(bound: number | null, ceiling: number | undefined): number | null {
+/** 界的归一：**等于**默认即「没有自己的界」；高于默认是一个真的数（默认不是上限）。 */
+function normalizedBound(
+  bound: number | null,
+  defaultConcurrency: number | undefined,
+): number | null {
   if (bound === null) return null;
-  return ceiling !== undefined && bound >= ceiling ? null : bound;
+  return bound === defaultConcurrency ? null : bound;
 }
 
 /**
  * Apply 发什么：只发**改过的**那几项（工具的同一条三态：省略 = 沿用）。模型按规范串比较——
- * 只改思考档也算改了模型；回到会话模型发 `null`。界等于天花板发 `null`（解除本 run 自己的界）。
+ * 只改思考档也算改了模型；回到会话模型发 `null`。界等于默认发 `null`（解除本 run 自己的界）。
  * 两项都没变 → undefined（Apply 禁用）。
  */
 export function workflowRunSettingsChange(
   initial: WorkflowRunSettingsDraft,
   draft: WorkflowRunSettingsDraft,
-  ceiling: number | undefined,
+  defaultConcurrency: number | undefined,
 ): WorkflowRunSettingsChange | undefined {
   const change: WorkflowRunSettingsChange = {};
   const fromModel = workflowRunSettingsModelCanonical(initial.model);
   const toModel = workflowRunSettingsModelCanonical(draft.model);
   if (fromModel !== toModel) change.subagentModel = toModel ?? null;
-  const fromBound = normalizedBound(initial.bound, ceiling);
-  const toBound = normalizedBound(draft.bound, ceiling);
+  const fromBound = normalizedBound(initial.bound, defaultConcurrency);
+  const toBound = normalizedBound(draft.bound, defaultConcurrency);
   if (fromBound !== toBound) change.maxConcurrency = toBound;
   return Object.keys(change).length === 0 ? undefined : change;
 }
 
-/** 步进器夹界：下限 1，上限天花板（未知则不设上限）。 */
-export function clampWorkflowRunSettingsBound(value: number, ceiling: number | undefined): number {
-  const floor = Math.max(1, Math.floor(value));
-  return ceiling === undefined ? floor : Math.min(floor, ceiling);
+/** 步进器夹界：只有下限 1、向下取整，没有上限（默认并发是起点不是天花板）。 */
+export function clampWorkflowRunSettingsBound(value: number): number {
+  return Math.max(1, Math.floor(value));
 }
 
 /**
@@ -160,14 +167,19 @@ function isConcurrencyOnlyChange(change: WorkflowRunSettingsChange | undefined):
 /**
  * 后果句的文案 key：随 run 状态换最后一句（completed 不会走到这里）。
  *
- * **正在跑**的 run 只改并发上限时会就地生效，不停止或另起 run，
- * 因此这里显示并发调整的后果说明。`pending` 不算在内：它的引擎可能还没建起来，就地设不上就照旧退回一次
+ * 什么都还没改 → undefined（不念后果句）：Apply 禁用，没有后果可说。原先这里按 run 状态兜一句，
+ * running 就念「将停止当前运行」——可只改并发恰恰不会停，改动之前替它下结论总有一项说错。
+ *
+ * 例外一条：**正在跑**的 run 只改并发上限时，这次修订就地生效——不停这次 run、不另起一次
+ * （docs/dynamic-workflow/concurrency.md）。这是原来那句「将停止当前运行」唯一会说错话的场景，
+ * 所以只在这一格换词。`pending` 不算在内：它的引擎可能还没建起来，就地设不上就照旧退回一次
  * 真正的修订，那时原句仍然是对的。
  */
 export function workflowRunSettingsConsequenceId(
   status: WorkflowRunState["status"],
-  change?: WorkflowRunSettingsChange,
-): string {
+  change: WorkflowRunSettingsChange | undefined,
+): string | undefined {
+  if (change === undefined) return undefined;
   if (status === "running" && isConcurrencyOnlyChange(change))
     return "chat.toolCall.workflow.run.settings.consequence.concurrencyLive";
   switch (status) {

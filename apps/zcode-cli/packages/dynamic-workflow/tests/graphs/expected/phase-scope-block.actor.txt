@@ -1,0 +1,7 @@
+actor-node workspace
+actor-node actor#1 "auditor" @7:17
+actor-node actor#2 "scribe" @8:16
+actor-node sink
+actor-edge workspace -> actor#1 exact count=1 types="string"
+actor-edge workspace -> actor#2 exact count=2 types="string[]","string"
+actor-edge actor#2 -> sink exact count=1 types="string"

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-attachment-layout",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-attachment-layout.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-attachment-layout.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-attachment-layout-send",
+      "description": "AL01-AL14：附件、context 与可见文本首发。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定附件和四类 context 组合，稳定验证布局与 edit 解析。图片请求使用缓存路径，不匹配原文件名；原文件名由 UI 断言覆盖。"
+    },
+    {
+      "id": "v4-attachment-layout-edit",
+      "description": "AL15：删除网页 context 后重新序列化。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "bodyExcludes 网页 URL，证明 edit branch 不保留已删除 context。"
+    },
+    {
+      "id": "v4-attachment-context-only",
+      "description": "AL02/AL14：仅 conversation selection 不产生空气泡。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅 context prompt 是确定性 renderer/provider 合同。"
+    },
+    {
+      "id": "v4-attachment-failed-image",
+      "description": "AL18/AL19：失败图片静态降级，gallery 保持消息隔离。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定第二条图片消息，稳定验证 renderer 缩略图失败和跨消息 gallery 边界。"
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-create-telemetry",
+  "spec": "./test/e2e/conversation-session/conversation-session-create-telemetry.test.ts",
+  "fixtures": [
+    {
+      "id": "session-create-first",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_SESSION_CREATE_TELEMETRY_FIRST"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "SESSION_CREATE_OK"
+      }
+    },
+    {
+      "id": "session-create-next",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_SESSION_CREATE_TELEMETRY_NEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "SESSION_NEXT_OK"
+      }
+    },
+    {
+      "id": "session-create-group",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_SESSION_CREATE_TELEMETRY_GROUP"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "SESSION_GROUP_OK"
+      }
+    },
+    {
+      "id": "session-create-direct",
+      "description": "session_create 首发/后续轮次的确定性完成屏障。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证创建埋点的次数与归因，模型回复仅用于结束真实会话轮次。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_SESSION_CREATE_TELEMETRY_DIRECT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "SESSION_DIRECT_OK"
+      }
+    }
+  ]
+}

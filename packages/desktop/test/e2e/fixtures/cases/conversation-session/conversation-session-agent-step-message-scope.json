@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-agent-step-message-scope",
+  "spec": "./test/e2e/conversation-session/conversation-session-agent-step-message-scope.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-agent-step-message-scope.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-agent-step-message-scope-first",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定首轮为单一纯文本响应，以便精确建立同 session 的历史 step 基线。"
+    },
+    {
+      "id": "upstream-conversation-agent-step-message-scope-second",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定第二轮为单一纯文本响应，以便对账当前 message 的 generation step 与 completion 计数。"
+    }
+  ]
+}

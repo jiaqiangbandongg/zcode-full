@@ -12,20 +12,31 @@ import {
 let desktopTray: Tray | null = null;
 let rebuildDesktopTrayContextMenu: (() => void) | null = null;
 
-function resolveDesktopTrayIconPath() {
+export function resolveDesktopTrayIconPath(platform: NodeJS.Platform = process.platform) {
+  // Linux 托盘只接受 PNG（.ico 不会渲染）；打包态 icon.png 已由 extraResources 无条件放入
+  // resources 目录（electron-builder.config.js），Windows 继续用独立托盘 .ico 避免高 DPI 模糊。
+  if (platform === "linux") {
+    return app.isPackaged
+      ? join(process.resourcesPath, "icon.png")
+      : join(import.meta.dirname, "../../build/icon.png");
+  }
   return app.isPackaged
     ? join(process.resourcesPath, "tray_icon.ico")
     : join(import.meta.dirname, "../../build/icon.ico");
 }
 
-export function createWindowsDesktopTray(options: {
+export function createDesktopTray(options: {
+  platform?: NodeJS.Platform;
   getLocale: () => Locale;
   showCurrentWindow: () => Promise<void> | void;
   executeDesktopCommand: (command: DesktopCommandId) => Promise<unknown>;
   quitApp: () => void;
   logger: { warn: (...args: unknown[]) => void };
 }) {
-  if (process.platform !== "win32") {
+  const platform = options.platform ?? process.platform;
+  // Linux 驻留能力由 createCloseToTrayCapabilityMonitor 探测决定（spec：
+  // docs/desktop/linux-close-to-tray.md）；这里只挡平台，能力不过关时调用方不应传入 linux。
+  if (platform !== "win32" && platform !== "linux") {
     return null;
   }
 
@@ -34,7 +45,7 @@ export function createWindowsDesktopTray(options: {
   }
 
   try {
-    desktopTray = new Tray(resolveDesktopTrayIconPath());
+    desktopTray = new Tray(resolveDesktopTrayIconPath(platform));
   } catch (error) {
     options.logger.warn("[desktop-tray] failed to create tray icon", error);
     return null;
@@ -86,8 +97,9 @@ export function createWindowsDesktopTray(options: {
           click: () => executeTrayCommand(DesktopCommandIds.ShowAbout),
         },
         {
-          label: getLabel(desktopMenuMessageIds.helpClearAllData),
-          click: () => executeTrayCommand(DesktopCommandIds.ClearAllData),
+          // 托盘只提供日志诊断入口，避免右键菜单暴露清除全部数据操作；复用应用菜单导出命令。
+          label: getLabel(desktopMenuMessageIds.helpExportLogs),
+          click: () => executeTrayCommand(DesktopCommandIds.ExportLogs),
         },
         { type: "separator" },
         {

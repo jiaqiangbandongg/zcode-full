@@ -248,3 +248,11 @@ export declare function requestHelperScreenRecordingPermissionViaLaunchServices(
 ): Promise<HelperPermissionRequestResult>;
 
 export type { CuaPermissionRestartOptions, CuaPermissionRestartResult };
+
+export declare function resolveHelperAppName(env?: NodeJS.ProcessEnv): string;
+export declare function resolveCuaHelperInstallRoot(env: NodeJS.ProcessEnv): string | null;
+export declare function standaloneHelperCandidatePaths(env?: NodeJS.ProcessEnv): string[];
+export declare function injectPermissionBrokerAgentMcpServers<T>(
+  servers: T[] | undefined,
+  options: unknown,
+): T[] | undefined;

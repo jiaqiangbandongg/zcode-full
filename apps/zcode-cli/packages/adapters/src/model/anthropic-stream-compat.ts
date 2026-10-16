@@ -9,6 +9,8 @@ export function createAnthropicCompatFetch(baseFetch: ProviderFetch): ProviderFe
   };
 }
 
+export const createAnthropicStreamCompatFetch = createAnthropicCompatFetch;
+
 function applyAnthropicRequestBodyCompatibility(
   init: RequestInit | undefined,
 ): RequestInit | undefined {
@@ -16,12 +18,41 @@ function applyAnthropicRequestBodyCompatibility(
 
   const body = safeParseRecord(init.body);
   if (!body) return init;
-  const restoredSystemBody = restoreMidConversationSystemStringContent(body);
+  const restoredSelectorBody = restoreMemorySelectorMessageBoundaries(body);
+  const restoredSystemBody = restoreMidConversationSystemStringContent(restoredSelectorBody);
   if (restoredSystemBody === body) return init;
 
   return {
     ...init,
     body: JSON.stringify(restoredSystemBody),
+  };
+}
+
+function restoreMemorySelectorMessageBoundaries(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const messages = Array.isArray(body?.messages) ? body.messages : undefined;
+  const firstMessage = safeRecord(messages?.[0]);
+  const content = Array.isArray(firstMessage?.content) ? firstMessage.content : undefined;
+  if (
+    !isMemorySelectorOutput(body?.output_config) ||
+    firstMessage?.role !== "user" ||
+    content?.length !== 2 ||
+    !hasTextPrefix(content[0], "Available memories:\n") ||
+    !hasTextPrefix(content[1], "Select memories relevant to:\n")
+  ) {
+    return body;
+  }
+
+  // 修复原因：AI SDK 会在发请求前合并连续的 user message；Memory selector 的
+  // provider-visible 基线要求 manifest 与当前 query 保持为两个独立 message。
+  return {
+    ...body,
+    messages: [
+      { ...firstMessage, content: [content[0]] },
+      { role: "user", content: [content[1]] },
+      ...messages!.slice(1),
+    ],
   };
 }
 
@@ -53,6 +84,19 @@ function singlePlainTextBlock(value: unknown): string | undefined {
   if (block?.type !== "text" || typeof block.text !== "string") return undefined;
   if (Object.keys(block).some((key) => key !== "type" && key !== "text")) return undefined;
   return block.text;
+}
+
+function isMemorySelectorOutput(value: unknown): boolean {
+  const outputConfig = safeRecord(value);
+  const format = safeRecord(outputConfig?.format);
+  const schema = safeRecord(format?.schema);
+  const required = Array.isArray(schema?.required) ? schema.required : [];
+  return format?.type === "json_schema" && required.includes("selected_memories");
+}
+
+function hasTextPrefix(value: unknown, prefix: string): boolean {
+  const block = safeRecord(value);
+  return block?.type === "text" && typeof block.text === "string" && block.text.startsWith(prefix);
 }
 
 function shouldFilterAnthropicStream(response: Response): boolean {

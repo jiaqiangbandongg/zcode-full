@@ -1,0 +1,5 @@
+actor-node actor#1 @18:19 family=fan-out#1
+actor-node actor#2 "writer" @24:19
+actor-node sink
+actor-edge actor#1 -> actor#2 exact count=1 types="ResearchResult"
+actor-edge actor#2 -> sink exact count=1 types="Report"

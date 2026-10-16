@@ -1,0 +1,15 @@
+{
+  "name": "documents",
+  "version": "0.1.8",
+  "description": "DOCX document production skills, published as an official ZCode plugin.",
+  "description_i18n": {
+    "en": "Word document production skills for DOCX: create, edit, format, review, and comment.",
+    "zh-CN": "面向 DOCX 的 Word 文档制作技能：创建、编辑、排版、审阅与批注。"
+  },
+  "author": {
+    "name": "Z.ai"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "agents": "agents"
+}

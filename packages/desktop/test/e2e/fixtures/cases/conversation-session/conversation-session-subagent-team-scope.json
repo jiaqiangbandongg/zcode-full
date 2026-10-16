@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-team-scope",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-team-scope.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-team-scope.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    { "id": "subagent-team-scope-parent-agent", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "固定父 Agent。" },
+    { "id": "subagent-team-scope-parent-final", "kind": "main", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "父 continuation。" }
+  ]
+}

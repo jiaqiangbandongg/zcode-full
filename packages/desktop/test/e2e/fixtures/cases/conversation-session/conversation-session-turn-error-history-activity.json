@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-turn-error-history-activity",
+  "spec": "./test/e2e/conversation-session/conversation-session-turn-error-history-activity.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-turn-error-history-activity.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "turn-error-history-activity-source-500",
+      "description": "TurnError 后冷恢复打开历史 task 的主 turn 500 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "稳定制造 accepted future queue 和可观测的冷恢复清理窗口。"
+    },
+    {
+      "id": "turn-error-history-activity-followup",
+      "description": "错误后的队首输入留在 persisted queue，冷恢复时由 runtime 清理。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "为异常 turn 提供完整的 provider 路由，避免测试受未匹配请求的运行态影响。"
+    }
+  ]
+}

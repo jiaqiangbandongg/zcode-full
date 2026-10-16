@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-provider-registry-prewarm",
+  "spec": "./test/e2e/conversation-session/conversation-session-provider-registry-prewarm.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-provider-registry-prewarm.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "provider-registry-prewarm-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 provider registry 冷启动屏障语义。"
+    },
+    {
+      "id": "provider-registry-prewarm-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是冷启动首个预热会话与真实请求保持 custom GLM，响应仅用于稳定收口。"
+    }
+  ]
+}

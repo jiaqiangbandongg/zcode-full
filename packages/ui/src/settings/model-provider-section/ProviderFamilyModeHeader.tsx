@@ -83,7 +83,7 @@ export function ProviderFamilyHeader({
             : familySpec.label}
         </h3>
       </div>
-      {/* 按团队全称的固有宽度参与外层换行，会让标题右侧空着却整组掉行；以操作区基础宽度参与分配，再让名称在剩余空间内收缩。*/}
+      {/* 修复原因：按团队全称的固有宽度参与外层换行，会让标题右侧空着却整组掉行；以操作区基础宽度参与分配，再让名称在剩余空间内收缩。 */}
       {trailingAction ? (
         <div className="min-w-0 max-w-full flex-1 basis-64">{trailingAction}</div>
       ) : null}
@@ -215,7 +215,7 @@ export function ProviderFamilyPlanModeSwitch({
   );
 }
 
-function buildProviderFamilyConnectionOptions({
+export function buildProviderFamilyConnectionOptions({
   familyId,
   navigationItems,
   codingPlanLabel,

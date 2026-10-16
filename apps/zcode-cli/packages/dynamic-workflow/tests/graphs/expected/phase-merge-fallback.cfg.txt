@@ -1,0 +1,21 @@
+phase unphased
+phase phase#1 "gate"
+node world-read#1@1 issue site=world-read#1 phase=unphased
+node phase#1@1 mark phase=phase#1
+node world-read#2@1 issue site=world-read#2 phase=phase#1
+node ask#1@1 issue site=ask#1 phase=phase#1
+node phase#1@2 mark phase=phase#1
+node world-read#3@1 issue site=world-read#3 phase=phase#1
+node ask#2@1 issue site=ask#2 phase=phase#1
+edge entry -> world-read#1@1 next
+edge world-read#1@1 -> phase#1@1 branch
+edge world-read#1@1 -> phase#1@2 branch
+edge phase#1@1 -> world-read#2@1 next
+edge world-read#2@1 -> ask#1@1 next
+edge ask#1@1 -> sink jump via=return
+edge phase#1@2 -> world-read#3@1 next
+edge world-read#3@1 -> ask#2@1 next
+edge ask#2@1 -> sink jump via=return
+phase-edge entry -> unphased next
+phase-edge unphased -> phase#1 branch
+phase-edge phase#1 -> sink jump via=return

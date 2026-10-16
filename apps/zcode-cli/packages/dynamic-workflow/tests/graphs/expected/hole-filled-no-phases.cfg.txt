@@ -1,0 +1,22 @@
+phase phase#1 "审阅"
+phase hole#cd7e8315 "评判"
+phase phase#2 "收尾"
+node phase#1@1 mark phase=phase#1
+node ask#1@1 issue site=ask#1 phase=phase#1
+node hole#cd7e8315@1 mark phase=hole#cd7e8315
+node hole#cd7e8315/ask#1@1 issue site=hole#cd7e8315/ask#1 phase=hole#cd7e8315
+node phase#2@1 mark phase=phase#2
+node ask#2@1 issue site=ask#2 phase=phase#2
+edge entry -> phase#1@1 next
+edge phase#1@1 -> ask#1@1 next
+edge ask#1@1 -> hole#cd7e8315@1 next
+edge hole#cd7e8315@1 -> hole#cd7e8315/ask#1@1 fork
+edge hole#cd7e8315@1 -> phase#2@1 next
+edge hole#cd7e8315/ask#1@1 -> phase#2@1 join via=return
+edge phase#2@1 -> ask#2@1 next
+edge ask#2@1 -> sink jump via=return
+phase-edge entry -> phase#1 next
+phase-edge phase#1 -> hole#cd7e8315 next
+phase-edge hole#cd7e8315 -> phase#2 join via=return
+phase-edge hole#cd7e8315 -> phase#2 next
+phase-edge phase#2 -> sink jump via=return

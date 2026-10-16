@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-title-generation-timeout",
+  "spec": "./test/e2e/conversation-session/conversation-session-title-generation-timeout.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-title-generation-timeout.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "title-generation-timeout-delayed-title",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 provider title 延迟不可控；该 case 需要稳定制造 15s 之后、60s 之前才返回的标题响应。"
+    },
+    {
+      "id": "title-generation-timeout-main-response",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 title sidecar 超时边界；主回复只需要稳定完成并暴露 marker。"
+    }
+  ]
+}

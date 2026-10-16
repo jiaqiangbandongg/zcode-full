@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-disabled",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-disabled.test.ts",
+  "fixtures": [
+    {
+      "id": "workspace-disabled-noop",
+      "description": "Workspace Plugin 显式 disabled：模型请求不包含 namespaced MCP tool。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定普通文本响应，断言 disabled runtime 不进入工具注册。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MCP_PING_DISABLED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_PLUGIN_MCP_PING_DISABLED_NOOP\nupstream-e2e-ok"
+      }
+    }
+  ]
+}

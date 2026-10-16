@@ -1,0 +1,8 @@
+lane actor#1 "decider" @7:21
+lane actor#2 "actor2" @9:16
+region seq#1 seq
+region branch#1 branch parent=seq#1 @8:11
+step ask#1 ask "decider" @7:38 lane=actor#1 region=seq#1 always
+step ask#2 ask "actor2" @9:32 lane=actor#2 region=branch#1 maybe
+edge ask#1 -> ask#2 control maybe
+sink ask#2

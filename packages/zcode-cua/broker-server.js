@@ -1,4 +1,5 @@
 import { CuaHelperError } from "./broker.js";
+import { HELPER_APP_NAME } from "./broker-helper-constants.js";
 
 export const HELPER_ADDON_ENV = "ZCODE_CUA_HELPER_ADDON";
 export const WINDOWS_DEV_CONTROL_PROTOCOL = "zcode-cua-windows-dev/v1";
@@ -175,4 +176,22 @@ export async function requestHelperAccessibilityPermissionViaLaunchServices(_opt
 
 export async function requestHelperScreenRecordingPermissionViaLaunchServices(_options) {
   return { ok: false, reason: UNAVAILABLE };
+}
+
+// 开源构建不携带 Computer Use Helper：没有安装根目录，也没有独立 Helper 候选路径。
+export function resolveHelperAppName(_env) {
+  return HELPER_APP_NAME;
+}
+
+export function resolveCuaHelperInstallRoot(_env) {
+  return null;
+}
+
+export function standaloneHelperCandidatePaths(_env) {
+  return [];
+}
+
+// 开源构建不注入 Computer Use broker MCP 服务，原样返回。
+export function injectPermissionBrokerAgentMcpServers(servers, _options) {
+  return servers;
 }

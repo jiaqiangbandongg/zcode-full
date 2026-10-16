@@ -28,10 +28,11 @@ function buildProvisionalResolutionKey(target: WslTarget): string {
   return `${distro}\0${user}`;
 }
 
-function createCanonicalWslTargetResolver(
+export function createCanonicalWslTargetResolver(
   options: CanonicalWslTargetResolverOptions = {},
 ): (target: WslTarget) => Promise<WslTarget> {
-  const createBackend = options.createBackend ?? ((target: WslTarget) => new WSLBackend(target));
+  const createBackend =
+    options.createBackend ?? ((target: WslTarget) => new WSLBackend(target));
   const ttlMs = Math.max(1, Math.floor(options.ttlMs ?? DEFAULT_RESOLUTION_TTL_MS));
   const now = options.now ?? Date.now;
   const cache = new Map<string, CachedResolution>();

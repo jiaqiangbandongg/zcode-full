@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-markdown-boundaries",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-markdown-boundaries.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-output-limit-continue-markdown-boundaries.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/continue-markdown/cross-seam.svg",
+      "source": "created-by-spec",
+      "description": "OTC09 写入固定 SVG，验证在 Markdown token 中间跨 Continue 的 workspace-relative 图片最终仍由 fileService 加载。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "output-limit-continue-markdown-title",
+      "description": "OTC09 标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是 Continue Markdown 边界探针的产品语义；固定响应避免干扰四次主请求。"
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p1",
+      "description": "第一次主请求在 task bullet 的 strong 外链 label 中间以 max_tokens 截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性让 task bullet、strong 与外链 token 同时跨第一条 Continue 拼接缝。"
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p2",
+      "description": "第二次主请求闭合 strong 外链、包含多个换行，并在 ordered item 的 emphasis/strikethrough 图片 alt 中间再次截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性覆盖 Continue partial 内部多个换行，并让 ordered item、emphasis、strikethrough 与本地图片 token 同时跨第二条拼接缝。"
+    },
+    {
+      "id": "output-limit-continue-markdown-partial-p3",
+      "description": "第三次主请求闭合本地图片并写入表格和分隔线，在 fenced code 行末换行后第三次截断。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确定性让第三条拼接缝精确落在尚未闭合的 TypeScript fenced code 行末换行。"
+    },
+    {
+      "id": "output-limit-continue-markdown-final-p4",
+      "description": "第四次主请求继续并闭合 fenced code，追加引用、硬换行、数学公式、Mermaid 与 autolink 后正常结束。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "正常结束最大三次 Continue 的累计 Markdown，并提供其余受支持结构的最终 DOM 证据。"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "caseId": "BOT-E2E-SC-01",
+  "classification": "synthetic",
+  "syntheticReason": "Deterministically controls ZCode task stream phases so the running and terminal Feishu card states can both be asserted without a real tenant or timing-dependent model stream.",
+  "prompt": "E2E_BOT_STREAMING_CARD_LIFECYCLE 请检查当前项目",
+  "events": [
+    { "type": "agent_message_chunk", "content": "E2E_STREAM_MESSAGE_1 我先检查项目。" },
+    {
+      "type": "tool_call",
+      "toolId": "tool-1",
+      "title": "Read README.md",
+      "kind": "read",
+      "input": { "path": "E2E_SECRET_INPUT_PATH" },
+      "raw": { "private": "E2E_SECRET_RAW" }
+    },
+    {
+      "type": "tool_call_update",
+      "toolId": "tool-1",
+      "status": "completed",
+      "title": "Read README.md",
+      "kind": "read",
+      "content": "E2E_SECRET_TOOL_OUTPUT",
+      "raw": { "stdout": "E2E_SECRET_STDOUT" }
+    },
+    {
+      "type": "agent_message_chunk",
+      "content": "E2E_STREAM_MESSAGE_2 README 看完了，我再跑测试。"
+    },
+    {
+      "type": "tool_call",
+      "toolId": "tool-2",
+      "title": "pnpm test",
+      "kind": "exec",
+      "input": { "command": "E2E_SECRET_COMMAND" },
+      "raw": { "private": "E2E_SECRET_RAW_2" }
+    },
+    {
+      "type": "tool_call_update",
+      "toolId": "tool-2",
+      "status": "completed",
+      "title": "pnpm test",
+      "kind": "exec",
+      "content": "E2E_SECRET_TOOL_OUTPUT_2",
+      "raw": { "stderr": "E2E_SECRET_STDERR" }
+    },
+    { "type": "agent_message_chunk", "content": "E2E_STREAM_MESSAGE_3 测试完成。" },
+    { "type": "task_complete", "stopReason": "end_turn" }
+  ],
+  "expectedTimeline": [
+    "message:E2E_STREAM_MESSAGE_1 我先检查项目。",
+    "tools:🛠️ 工具摘要 (1):false",
+    "message:E2E_STREAM_MESSAGE_2 README 看完了，我再跑测试。",
+    "tools:🛠️ 工具摘要 (1):false",
+    "message:E2E_STREAM_MESSAGE_3 测试完成。",
+    "message:_✅ 已完成_"
+  ],
+  "forbiddenCardMarkers": [
+    "E2E_SECRET_RAW",
+    "E2E_SECRET_TOOL_OUTPUT",
+    "E2E_SECRET_STDOUT",
+    "E2E_SECRET_RAW_2",
+    "E2E_SECRET_TOOL_OUTPUT_2",
+    "E2E_SECRET_STDERR"
+  ]
+}

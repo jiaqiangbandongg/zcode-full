@@ -58,7 +58,7 @@ export const createHeadlessPermissionBroker = (): NonNullable<
  * v3 app-server 在类型面上宣告一个它永不发出的事件。stream-json 是 CLI 私有输出格式，
  * 不受协议 strict schema 约束。
  */
-const WORKFLOW_RUN_PROGRESS_STREAM_TYPE = "workflow.run.progress";
+export const WORKFLOW_RUN_PROGRESS_STREAM_TYPE = "workflow.run.progress";
 
 /**
  * 一行定型的 dwf 进度 NDJSON。信封字段与 `mapSessionEvent` 逐字对齐（同一批 key、同样的
@@ -76,7 +76,7 @@ interface WorkflowRunProgressStreamLine {
 }
 
 /** 这条会话事件是 dwf 进度吗？stream-json 与 stderr 进度共用这道判别。 */
-const isDynamicWorkflowRunProgressEvent = (event: SessionEvent): boolean =>
+export const isDynamicWorkflowRunProgressEvent = (event: SessionEvent): boolean =>
   event.type === SessionEventType.DynamicWorkflowRunProgress;
 
 const progressPayloadOf = (event: SessionEvent): DynamicWorkflowRunProgressPayload =>
@@ -92,7 +92,9 @@ const progressPayloadOf = (event: SessionEvent): DynamicWorkflowRunProgressPaylo
  * 注意 dwf 事件是**出回合**的（`turnId` 恒空），所以信封里不带
  * `turnId`：写一个恒为 undefined 的键只会让读者以为它有时有值。
  */
-const mapWorkflowRunProgressStreamLine = (event: SessionEvent): WorkflowRunProgressStreamLine => ({
+export const mapWorkflowRunProgressStreamLine = (
+  event: SessionEvent,
+): WorkflowRunProgressStreamLine => ({
   type: WORKFLOW_RUN_PROGRESS_STREAM_TYPE,
   eventId: String(event.id),
   sessionId: String(event.sessionId),
@@ -179,7 +181,7 @@ const DEFAULT_WORKFLOW_PROGRESS_THROTTLE_MS = 400;
  * `--output-format text` 下的 stderr 进度打印器。
  * 只认 dwf 进度事件，其余会话事件直接忽略（返回后无副作用）。
  */
-const createWorkflowProgressReporter = (
+export const createWorkflowProgressReporter = (
   input: WorkflowProgressReporterInput,
 ): ((event: SessionEvent) => void) => {
   const now = input.now ?? Date.now;

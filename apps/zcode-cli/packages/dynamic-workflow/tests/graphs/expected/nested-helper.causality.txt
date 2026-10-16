@@ -1,0 +1,4 @@
+lane actor#1 "worker" @4:18
+region seq#1 seq
+step ask#1 ask "worker" @5:31 lane=actor#1 region=seq#1 always
+sink ask#1

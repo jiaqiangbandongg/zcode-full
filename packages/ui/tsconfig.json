@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  // ui 包沿用 NodeNext 的 ESM 解析规则，包内导入必须能直接落到真实文件路径。
+  // 修复原因：ui 包沿用 NodeNext 的 ESM 解析规则，包内导入必须能直接落到真实文件路径。
   // 之前 ai-elements 一边从包内部自引用 @zcode/ui/...，一边大量省略内部 .js 后缀，
   // 会同时踩中 package exports 限制和 NodeNext 的路径解析失败。
   // 这里保留现有配置，把包内导入统一收敛到带 .js 后缀的相对路径，避免开发态、构建态和类型检查结果不一致。
@@ -13,10 +13,10 @@
       "@/*": ["./src/*"]
     }
   },
-  // 某些 tsserver/增量工程状态下，目录式 include（"src"）会出现新文件已存在、
+  // Bugfix: 某些 tsserver/增量工程状态下，目录式 include（"src"）会出现新文件已存在、
   // 也能被 CLI `tsc --showConfig` 展开，但编辑器仍短暂报“文件不在 project file list”。
   // 这里改成显式 glob，强制把 ui 包下的 ts/tsx/d.ts 源文件稳定纳入工程，避免设置页辅助文件这类新增模块被误判漏收录。
-  // 同时纳入 src 下的 .json（如 assets 下的 provider-icons 数据），让 resolveJsonModule 导入能被工程文件列表收录。
+  // 同时纳入 src 下的 .json（如 recommendedPlugins.json），让 resolveJsonModule 导入能被工程文件列表收录。
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "src/**/*.json"],
   // ui 里也直接用了 rpc 的类型；补上工程引用后，ui 不会再把 rpc 源码当成自己的输入重新检查。
   "references": [

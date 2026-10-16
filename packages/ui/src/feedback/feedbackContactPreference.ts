@@ -8,7 +8,9 @@ function getStorage(): Storage | null {
   }
 }
 
-export function readFeedbackContactPreference(storage: Storage | null = getStorage()): string {
+export function readFeedbackContactPreference(
+  storage: Storage | null = getStorage(),
+): string {
   if (!storage) return "";
   try {
     return storage.getItem(FEEDBACK_CONTACT_STORAGE_KEY)?.trim() ?? "";
@@ -17,7 +19,9 @@ export function readFeedbackContactPreference(storage: Storage | null = getStora
   }
 }
 
-function clearFeedbackContactPreference(storage: Storage | null = getStorage()): void {
+export function clearFeedbackContactPreference(
+  storage: Storage | null = getStorage(),
+): void {
   if (!storage) return;
   try {
     storage.removeItem(FEEDBACK_CONTACT_STORAGE_KEY);

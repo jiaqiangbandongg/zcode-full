@@ -984,7 +984,7 @@ function resolveRuntimeBaseUrlForStore(
   }
 
   // 旧 store 可能还只有 endpoints.anthropic/openai。
-  // OpenCode runtime config 只能保存当前 kind 的 baseURL，这里按 defaultKind 取一条旧入口。
+  // runtime config 只能保存当前 kind 的 baseURL，这里按 defaultKind 取一条旧入口。
   return resolveLegacyRuntimeBaseUrlForKind(endpoints, defaultKind);
 }
 

@@ -1,6 +1,6 @@
 import ts from "typescript";
 import type { WorkflowProgram } from "../compiler/compile.js";
-import type { IterationCandidate, SiteTable } from "./sites.js";
+import type { HoleSite, IterationCandidate, SiteTable } from "./sites.js";
 import {
   addOcc,
   addPlaceholder,
@@ -41,6 +41,8 @@ export class TaintState {
   readonly worldByCall = new Map<ts.CallExpression, { id: string; args: readonly ts.Expression[] }>();
   readonly joinByCall = new Map<ts.CallExpression, { id: string; arg: ts.Expression | undefined }>();
   readonly actorByCall = new Map<ts.CallExpression, string>();
+  /** 留白调用 → 站点（开放与已补全都在；transfer 规则按有无 body 分派）。 */
+  readonly holeByCall = new Map<ts.CallExpression, HoleSite>();
   /** Per-element callback calls (`xs.map(fn)`, `Array.from(xs, fn)`, …), keyed by the CALL. */
   readonly candByCall = new Map<ts.CallExpression, IterationCandidate>();
   readonly candByForOf = new Map<ts.Node, IterationCandidate>();
@@ -125,6 +127,8 @@ export class TaintState {
   readonly askInstr = new Map<string, AbstractValue>();
   readonly askRecv = new Map<string, AbstractValue>();
   readonly worldRead = new Map<string, AbstractValue>();
+  /** 开放留白的提示 sink（docs/analysis.md「Sites」：提示流入留白，如 ask 的 instructions）。 */
+  readonly holePrompt = new Map<string, AbstractValue>();
   readonly joinInByPort = new Map<string, Map<number, AbstractValue>>();
   readonly fanoutInVal = new Map<string, AbstractValue>();
   /**
@@ -169,6 +173,7 @@ export class TaintState {
     for (const site of this.table.worldReads) this.worldByCall.set(site.call, { args: site.args, id: site.id });
     for (const site of this.table.joins) this.joinByCall.set(site.call, { arg: site.arg, id: site.id });
     for (const site of this.table.actors) this.actorByCall.set(site.call, site.id);
+    for (const site of this.table.holes) this.holeByCall.set(site.call, site);
     for (const cand of this.table.iterations) {
       if (cand.form === "array-method" && cand.call !== undefined) {
         this.candByCall.set(cand.call, cand);
@@ -490,6 +495,8 @@ export class TaintState {
     for (const [id, value] of this.askInstr) askData.set(id, this.resolveArtifact(value));
     for (const [id, value] of this.askRecv) askActor.set(id, this.resolveActor(value));
     for (const [id, value] of this.worldRead) worldReadData.set(id, this.resolveArtifact(value));
+    const holeData = new Map<string, TaintOcc[]>();
+    for (const [id, value] of this.holePrompt) holeData.set(id, this.resolveArtifact(value));
     for (const [id, ports] of this.joinInByPort) {
       const occs: TaintOcc[] = [];
       for (const [port, value] of ports) {
@@ -510,6 +517,7 @@ export class TaintState {
       askActor,
       askData,
       fanoutIn,
+      holeData,
       joinIn,
       promoted,
       returnData: this.resolveArtifact(this.returnVal),

@@ -51,7 +51,7 @@ export interface SessionQuotaBannerState {
   priority: number;
 }
 
-const HIDDEN_SESSION_QUOTA_BANNER_STATE: SessionQuotaBannerState = {
+export const HIDDEN_SESSION_QUOTA_BANNER_STATE: SessionQuotaBannerState = {
   visible: false,
   kind: null,
   concurrentLimitBusinessCode: null,
@@ -77,7 +77,9 @@ function isGlmQuotaBannerProviderId(providerId: string): boolean {
   );
 }
 
-function normalizeProviderLimitedBannerMessage(message: string | null | undefined): string | null {
+export function normalizeProviderLimitedBannerMessage(
+  message: string | null | undefined,
+): string | null {
   const normalizedMessage = message?.trim();
   if (!normalizedMessage) return null;
   const bracketParts = [...normalizedMessage.matchAll(/\[([^\]]*)\]/gu)].map(

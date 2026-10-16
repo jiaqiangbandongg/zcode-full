@@ -48,7 +48,9 @@ function normalizeOutputCandidate(value: unknown): unknown {
   return typeof value === "string" ? parseJsonString(value) : value;
 }
 
-function readOffPeakCreateTaskOutputSummary(value: unknown): OffPeakCreateTaskSummary | null {
+export function readOffPeakCreateTaskOutputSummary(
+  value: unknown,
+): OffPeakCreateTaskSummary | null {
   const normalizedValue = normalizeOutputCandidate(value);
   if (!isPlainRecord(normalizedValue)) {
     return null;
@@ -106,7 +108,10 @@ export function readOffPeakCreateTaskSummary(
 }
 
 /** 卡片第二行：创建时位次快照优先，缺位次回退「已加入闲时队列」文案。 */
-function describeOffPeakCardStatus(task: OffPeakCreateTaskSummary, intl: IntlInstance): string {
+export function describeOffPeakCardStatus(
+  task: OffPeakCreateTaskSummary,
+  intl: IntlInstance,
+): string {
   if (typeof task.queuePosition === "number" && task.queuePosition > 0) {
     return intl.formatMessage(
       { id: "offPeak.chatCreated.queuedAt" },

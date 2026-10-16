@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "marketing-touch-task-completion",
+  "spec": "./test/e2e/ui-shell/marketing-touch-task-completion.test.ts",
+  "fixtures": [
+    {
+      "id": "marketing-touch-task-completion",
+      "description": "任务成功完成后触发营销接口刷新",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "延迟文本响应以观察 running 状态并在任务结束前重置轮询计时，排除定时刷新假阳性。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MARKETING_TASK_COMPLETE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 6000,
+        "text": { "id": "marketing-task-complete", "text": "E2E_MARKETING_TASK_DONE" }
+      }
+    }
+  ]
+}

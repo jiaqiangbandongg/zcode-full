@@ -8,14 +8,14 @@
 // 直到超时仍 stale(或一直 unavailable/抛错)才返回 true,触发 UI 升级到"重启 ZCode"兜底。
 import { isCuaPermissionStatusAvailable, type CuaPermissionStatusResult } from "@zcode/services";
 
-interface WaitForAccessibilityNotStaleOptions {
+export interface WaitForAccessibilityNotStaleOptions {
   /** 总超时(默认 6s):覆盖 tccd 传播 lag,首轮通常立即 granted。 */
   timeoutMs?: number;
   /** 轮询间隔(默认 500ms)。 */
   intervalMs?: number;
 }
 
-type GetCuaPermissionStatusFn = () => Promise<CuaPermissionStatusResult>;
+export type GetCuaPermissionStatusFn = () => Promise<CuaPermissionStatusResult>;
 
 const DEFAULT_TIMEOUT_MS = 6000;
 const DEFAULT_INTERVAL_MS = 500;

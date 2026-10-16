@@ -47,12 +47,14 @@ const SUBAGENT_NOTIFICATION_PREFIX = "<subagent-notification>";
 const REWIND_NOTICE_MARKERS = ["Conversation rewind applied.", "Workspace rewind applied."];
 
 const PROVIDER_CONTEXT_SYNTHETIC_SOURCES = new Set([
+  "agent_listing_delta",
   "agent_control_message",
   "background_task",
   "goal-continuation",
   "goal_completion_verification",
   "goal_state_change",
   "plugin_reference",
+  "bot_topic_context",
   "queued_system_notification",
   "resume_goal_state",
   "resume_referenced_session_context",

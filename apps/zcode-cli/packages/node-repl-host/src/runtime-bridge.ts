@@ -1,7 +1,6 @@
 import type { BrowserClientTransport } from "@zcode/core/browser-client";
 
 export const NODE_REPL_BROWSER_BRIDGE_SYMBOL = Symbol.for("zcode.node-repl.browser-control-bridge");
-export const BROWSER_UNAVAILABLE_IN_SUBAGENT_MESSAGE = "Browser is not available in subagent";
 
 export interface NodeReplBrowserRuntimeBridge extends BrowserClientTransport {
   documentationRoot: string;

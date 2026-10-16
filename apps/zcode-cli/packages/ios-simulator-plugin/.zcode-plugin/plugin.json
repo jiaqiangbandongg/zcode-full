@@ -1,0 +1,34 @@
+{
+  "name": "ios-simulator",
+  "version": "0.1.0",
+  "description": "Provides iOS development workflows and simulator automation for ZCode.",
+  "author": { "name": "Z.ai" },
+  "license": "MIT",
+  "skills": "skills",
+  "commands": "commands",
+  "mcpServers": {
+    "ios-simulator": {
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "IOS_SIM_PACKAGE_ROOT": "${ZCODE_PLUGIN_ROOT}",
+        "IOS_SIM_PLUGIN_DATA": "${ZCODE_PLUGIN_DATA}",
+        "IOS_SIM_DEFAULT_DEVICE": "${user_config.default_device}",
+        "IOS_SIM_UI_BACKEND": "${user_config.ui_backend}"
+      }
+    }
+  },
+  "userConfig": {
+    "default_device": {
+      "type": "string",
+      "default": "iPhone 16",
+      "description": "Preferred simulator device name."
+    },
+    "ui_backend": {
+      "type": "string",
+      "default": "auto",
+      "description": "UI interaction backend: auto, idb, xcodebuildmcp, or none."
+    }
+  }
+}

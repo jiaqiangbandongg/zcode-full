@@ -80,7 +80,7 @@ export interface GitCommitResult {
 const GIT_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/@^~-]*$/;
 
 /** `git log` 的字段格式：NUL 分隔的 hash / subject / author name / author date(ISO-8601)。 */
-const GIT_LOG_PRETTY = "--pretty=format:%H%x00%s%x00%an%x00%aI";
+export const GIT_LOG_PRETTY = "--pretty=format:%H%x00%s%x00%an%x00%aI";
 
 /**
  * 工作区相对仓库根的前缀（`"sub/nested/"`，在仓库根为空串）。这是把线上的仓库根相对路径
@@ -105,7 +105,7 @@ export const GIT_STATUS_ARGV: readonly string[] = [
  * 未跟踪文件的固定 argv。`--exclude-standard` 让它尊重 .gitignore；`--full-name` 把它从
  * cwd 相对拉成仓库根相对，与 status / diff 对齐（本模块顶部的输出契约 2）。
  */
-const GIT_UNTRACKED_ARGV: readonly string[] = [
+export const GIT_UNTRACKED_ARGV: readonly string[] = [
   "ls-files",
   "--others",
   "--exclude-standard",

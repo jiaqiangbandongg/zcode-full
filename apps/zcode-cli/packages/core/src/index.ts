@@ -44,6 +44,16 @@ export {
   serializeSavedWorkflow,
   validateWorkflowArgs,
 } from "./tool/handlers/saved-workflows/index.js";
+// 同一个类型检查器（docs/dynamic-workflow/launch.md「`SaveWorkflow`」）：GUI 从一次 run 直接
+// 保存时走的也必须是它——「存得下来却跑不起来」是这个特性最难解释的一种坏掉方式，而两个入口
+// 各编译一次就是它的标准产地。
+export { analyzeScript } from "./tool/handlers/workflow-script-analysis.js";
+// 草稿铸名规则只此一份（docs/dynamic-workflow/launch.md「The draft after a fill」）：bootstrap 的 run
+// service 经注入拿它给启动时没写成草稿的 run 在补全时补铸一份，而不是把 slug / `-2` / `wx` 再抄一遍。
+export {
+  writeWorkflowDraft,
+  type WriteWorkflowDraftInput,
+} from "./tool/handlers/workflow-drafts.js";
 export type {
   ResolvedSavedWorkflow,
   SavedWorkflowListResult,

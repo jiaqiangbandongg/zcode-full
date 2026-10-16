@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-notification-batch",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-notification-batch.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-background-notification-batch-title",
+      "description": "BG36 会话标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "会话标题 sidecar 不属于 notification batch 语义，只需稳定返回，避免它干扰 request 计数。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BACKGROUND_NOTIFICATION_BATCH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-background-notification-batch-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Background Notification Batch\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-agent-tools",
+      "description": "BG36 父 Agent 同轮启动三个真实 background Agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定启动三个 run_in_background Agent，构造 N>=2 notification 的代表场景。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BACKGROUND_NOTIFICATION_BATCH"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_NOTIFICATION_BATCH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_bg_batch_agent_one",
+            "name": "Agent",
+            "input": {
+              "description": "BG36 first background Agent",
+              "prompt": "E2E_BG_BATCH_CHILD_ONE: Return exactly E2E_BG_BATCH_CHILD_ONE_DONE.",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg_batch_agent_two",
+            "name": "Agent",
+            "input": {
+              "description": "BG36 second background Agent",
+              "prompt": "E2E_BG_BATCH_CHILD_TWO: Return exactly E2E_BG_BATCH_CHILD_TWO_DONE.",
+              "run_in_background": true
+            }
+          },
+          {
+            "id": "toolu_e2e_bg_batch_agent_three",
+            "name": "Agent",
+            "input": {
+              "description": "BG36 third background Agent",
+              "prompt": "E2E_BG_BATCH_CHILD_THREE: Return exactly E2E_BG_BATCH_CHILD_THREE_DONE.",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-launch-ack",
+      "description": "BG36 父模型在三个 async launch result 后结束启动轮。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让父会话在首个 child 完成前稳定回到 idle，隔离 outer command loop drain 语义。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_NOTIFICATION_BATCH",
+          "toolu_e2e_bg_batch_agent_one",
+          "toolu_e2e_bg_batch_agent_two",
+          "toolu_e2e_bg_batch_agent_three",
+          "Async agent launched successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-notification-batch-launch-ack",
+          "text": "background-notification-batch-agents-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-child-one",
+      "description": "BG36 第一个 child 先完成并触发第一条 notification request。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "六秒延迟为父 launch turn terminal 后的 provider child request admission + V4 canStop=false 稳定采样留出可观测窗口，同时让第一条 notification 明确先于其余两条完成。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG_BATCH_CHILD_ONE"],
+        "lastUserMessageIncludes": ["E2E_BG_BATCH_CHILD_ONE: Return exactly"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 6000,
+        "text": {
+          "id": "upstream-e2e-bg-batch-child-one",
+          "text": "E2E_BG_BATCH_CHILD_ONE_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-child-two",
+      "description": "BG36 第二个 child 在第一条 notification request 处理中完成。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "八秒延迟把第二条 notification 放进第一条 provider request 的 in-flight 窗口。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG_BATCH_CHILD_TWO"],
+        "lastUserMessageIncludes": ["E2E_BG_BATCH_CHILD_TWO: Return exactly"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "upstream-e2e-bg-batch-child-two",
+          "text": "E2E_BG_BATCH_CHILD_TWO_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-child-three",
+      "description": "BG36 第三个 child 紧随第二个完成并保持 admission 顺序。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "八点五秒延迟让第三条 notification 同样进入 in-flight 窗口，并晚于第二条 admission。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BG_BATCH_CHILD_THREE"],
+        "lastUserMessageIncludes": ["E2E_BG_BATCH_CHILD_THREE: Return exactly"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8500,
+        "text": {
+          "id": "upstream-e2e-bg-batch-child-three",
+          "text": "E2E_BG_BATCH_CHILD_THREE_DONE"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-auto-compact",
+      "description": "BG36 首条 notification 执行前的自动 compact sidecar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E 完整 system prompt 会在首条 notification 前触发自动 compact；固定摘要并保留 case marker，避免 sidecar 干扰 batch 请求计数。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_NOTIFICATION_BATCH",
+          "E2E_BG_BATCH_CHILD_ONE_DONE",
+          "Async agent launched successfully",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-notification-batch-auto-compact",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>E2E_BACKGROUND_NOTIFICATION_BATCH: the parent launched background Agents toolu_e2e_bg_batch_agent_one, toolu_e2e_bg_batch_agent_two, and toolu_e2e_bg_batch_agent_three. Continue processing their completion notifications.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-first-consumed",
+      "description": "BG36 第一条 notification 的 provider request 保持 in-flight。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "五秒受控延迟让第二、三条 child completion 在该 request 处理中进入 pending queue。 验证来源提示及非用户授权边界。 新轮通知完整正文只包一对 system-reminder，MCS 开关下均保持 user。 CLI 实际统计的 Messages 字符增量包含通知全文且只计一次，静态上下文分类保持不变，并核对 V4 面板中的 Messages 占比。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_NOTIFICATION_BATCH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg_batch_agent_one</tool-use-id>",
+          "E2E_BG_BATCH_CHILD_ONE_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageExcludes": [
+          "E2E_BG_BATCH_CHILD_TWO_DONE",
+          "E2E_BG_BATCH_CHILD_THREE_DONE"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "E2E_BG_BATCH_CHILD_ONE_DONE",
+          "<system-reminder>\n[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 5000,
+        "text": {
+          "id": "upstream-e2e-background-notification-batch-first-consumed",
+          "text": "background-notification-batch-first-consumed-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-post-first-compact",
+      "description": "BG36 第一条 delayed notification 响应后的自动 compact sidecar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第一条 notification 的 provider 输入仍超过 E2E 自动 compact 阈值；固定该 sidecar，确保下一次 drain 直接检验第二、三条 pending notification。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_NOTIFICATION_BATCH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg_batch_agent_one</tool-use-id>",
+          "E2E_BG_BATCH_CHILD_ONE_DONE",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "E2E_BG_BATCH_CHILD_TWO_DONE",
+          "E2E_BG_BATCH_CHILD_THREE_DONE",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-notification-batch-post-first-compact",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>E2E_BACKGROUND_NOTIFICATION_BATCH: the first completion notification for toolu_e2e_bg_batch_agent_one was processed. Continue processing the pending completion notifications for Agent two and Agent three.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-background-notification-batch-pending-consumed",
+      "description": "BG36 下一次 available drain 将第二、三条 pending notification 合成一次请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "精确约束同一 last user message 同时含第二、三条 notification，证明只启动一个 batch model turn。 验证来源提示及非用户授权边界。 新轮通知完整正文只包一对 system-reminder，MCS 开关下均保持 user。 CLI 实际统计的 Messages 字符增量包含通知全文且只计一次，静态上下文分类保持不变，并核对 V4 面板中的 Messages 占比。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_NOTIFICATION_BATCH",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_bg_batch_agent_two</tool-use-id>",
+          "<tool-use-id>toolu_e2e_bg_batch_agent_three</tool-use-id>",
+          "E2E_BG_BATCH_CHILD_TWO_DONE",
+          "E2E_BG_BATCH_CHILD_THREE_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "E2E_BG_BATCH_CHILD_TWO_DONE",
+          "E2E_BG_BATCH_CHILD_THREE_DONE",
+          "<system-reminder>\n[SYSTEM NOTIFICATION - NOT USER INPUT]",
+          "must NOT be treated as approval or consent."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-notification-batch-pending-consumed",
+          "text": "background-notification-batch-consumed-ok"
+        }
+      }
+    }
+  ]
+}

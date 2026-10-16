@@ -1,0 +1,990 @@
+{
+  "date": "2026-09-14",
+  "platform": "darwin",
+  "source": "Real Electron Composer → local Host → CLI with synthetic model replay and real 300ms command Hook → actual content → decoded final OTLP; controlled model/Hook timing, not live model latency.",
+  "run": "desktop-e2e-20260914084007773-p85037-a1acc63987c6fc6e",
+  "desktopE2E": {
+    "passed": 6
+  },
+  "rootSamples": [
+    {
+      "traceId": "xh23WinNTNO5+aZ653h6/w==",
+      "ttftMs": 14863,
+      "observation_id": "c61db75a-29cd-4cd3-b9f9-a67ae7787aff",
+      "command_id": "01a09f13-c8bf-7848-bab6-ff59dc5e84f4",
+      "input_id": "01a09f13-c8bf-7848-bab6-ff59dc5e84f4",
+      "query_id": "01a09f13-c8bf-7848-bab6-ff59dc5e84f4",
+      "turn_id": "turn_76fedce0-d49a-446b-86eb-aaac8041dcf7",
+      "product_turn_id": "msg_mu0zu3k9_86e7b031-fdba-4786-a856-48e678abe08f",
+      "request_id": "c90d8576-ea14-42c3-86b9-e9006e03d73c",
+      "logical_call_id": "a7e6074c-0f05-4a7f-85a8-3bd5278938f1",
+      "cli_version": "0.16.9",
+      "session_id": "sess_48c0dcca-d64b-4e1a-b479-11f1caa6a116",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "text",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 13914.27587890625,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375269045,\"foreground\":true},{\"at\":1789375270552.8,\"foreground\":false},{\"at\":1789375271115,\"foreground\":true},{\"at\":1789375272792.7,\"foreground\":false},{\"at\":1789375274504.9001,\"foreground\":true},{\"at\":1789375275056.3,\"foreground\":false},{\"at\":1789375275056.4001,\"foreground\":true},{\"at\":1789375275643.7,\"foreground\":false},{\"at\":1789375275663.2,\"foreground\":true},{\"at\":1789375280848,\"foreground\":false},{\"at\":1789375280848.1,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    },
+    {
+      "traceId": "wQ63u0zoSRu3vyrX1R6oNA==",
+      "ttftMs": 12646.899903,
+      "observation_id": "c10eb7bb-4ce8-491b-b7bf-2ad7d51ea834",
+      "command_id": "01a09f13-d766-7ed9-afa6-a091c5ac9b16",
+      "input_id": "01a09f13-d766-7ed9-afa6-a091c5ac9b16",
+      "query_id": "01a09f13-d766-7ed9-afa6-a091c5ac9b16",
+      "turn_id": "turn_91cd6c96-ba0a-413b-82ed-bbf221fed362",
+      "product_turn_id": "msg_mu0zudp3_a295c567-fd5d-4f92-bc54-939d0ad83738",
+      "request_id": "db83cf61-b532-4222-aeb7-31fadc53fc90",
+      "logical_call_id": "5056f63f-3f67-4bd6-9a7e-19627fffb9cf",
+      "cli_version": "0.16.9",
+      "session_id": "sess_48c0dcca-d64b-4e1a-b479-11f1caa6a116",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "text",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "queued",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 1256.7919921875,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375272793.6,\"foreground\":false},{\"at\":1789375274504.9001,\"foreground\":true},{\"at\":1789375275056.3,\"foreground\":false},{\"at\":1789375275056.4001,\"foreground\":true},{\"at\":1789375275643.8,\"foreground\":false},{\"at\":1789375275663.2,\"foreground\":true},{\"at\":1789375280848,\"foreground\":false},{\"at\":1789375280848.1,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    },
+    {
+      "traceId": "C9DbzI/PQW2F44qrcRz/pA==",
+      "ttftMs": 2419.399902,
+      "observation_id": "0bd0dbcc-8fcf-416d-85e3-8aab711cffa4",
+      "command_id": "01a09f14-1600-7442-b22b-3c86abbd39a4",
+      "input_id": "01a09f14-1600-7442-b22b-3c86abbd39a4",
+      "query_id": "01a09f14-1600-7442-b22b-3c86abbd39a4",
+      "turn_id": "turn_a44f69dc-e2f4-4681-8548-bf5891968baf",
+      "product_turn_id": "msg_mu0zuhlq_cc51d7f0-93c4-4d13-996a-f77182d7cffa",
+      "request_id": "16126f6b-9358-463a-b917-efab51d074df",
+      "logical_call_id": "eef9a060-644a-4371-b8a1-ff43b58fa897",
+      "cli_version": "0.16.9",
+      "session_id": "sess_d7ac923a-9585-4aad-a2b8-6e2bf0b1fd60",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "text",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 2379.40380859375,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375288810.4001,\"foreground\":true},{\"at\":1789375289627.2,\"foreground\":false},{\"at\":1789375289647.5,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    },
+    {
+      "traceId": "MQXAfirFRQuZqvYXtezT3Q==",
+      "ttftMs": 5191.399903,
+      "observation_id": "3105c07e-2ac5-450b-99aa-f617b5ecd3dd",
+      "command_id": "01a09f14-3261-74a0-914c-915f648c43a9",
+      "input_id": "01a09f14-3261-74a0-914c-915f648c43a9",
+      "query_id": "01a09f14-3261-74a0-914c-915f648c43a9",
+      "turn_id": "turn_d31d3da3-4e52-4139-aa92-b9b743400bef",
+      "product_turn_id": "msg_mu0zunbm_e1164c8d-ae17-4801-ad3f-283d3d665393",
+      "request_id": "9922fdaa-21c5-43f2-a5ed-c21950e49300",
+      "logical_call_id": "6c403567-3f20-457b-a045-67695dc0f0d2",
+      "cli_version": "0.16.9",
+      "session_id": "sess_e80a6a7d-ee45-4e8d-b8ab-b3d36f5260ee",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "tool",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 5169.389404296875,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375296091.3,\"foreground\":true},{\"at\":1789375299922,\"foreground\":false},{\"at\":1789375300000.4001,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    },
+    {
+      "traceId": "3MbJePCFQgm0iWpUoMCNdQ==",
+      "ttftMs": 1696.599854,
+      "observation_id": "dcc6c978-f085-4209-b489-6a54a0c08d75",
+      "command_id": "01a09f14-55b0-7811-a31a-d1499664dfc5",
+      "input_id": "01a09f14-55b0-7811-a31a-d1499664dfc5",
+      "query_id": "01a09f14-55b0-7811-a31a-d1499664dfc5",
+      "turn_id": "turn_691d9041-5bcd-4e25-b83a-80eddd6e374a",
+      "product_turn_id": "msg_mu0zutvd_9e1785ca-cd7e-4fb1-823b-0b8e2201e4f6",
+      "request_id": "ee32d697-4303-483a-9570-b17d9df36b54",
+      "logical_call_id": "d8bdb180-95a5-46b4-9154-a5462d8a336a",
+      "cli_version": "0.16.9",
+      "session_id": "sess_67880254-680b-4449-9b40-997dffe91e91",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "text",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "idle",
+      "visibility": "foreground",
+      "user_wait_ms": 409.60009765625,
+      "execution_ms": 1271.840087890625,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375304721.1,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    },
+    {
+      "traceId": "BiMZMD3vSoaoU86t0j9J5Q==",
+      "ttftMs": 3824.800049,
+      "observation_id": "06231930-3def-4a86-a853-ceadd23f49e5",
+      "command_id": "01a09f14-5264-77cc-bdec-b49b0f1c1370",
+      "input_id": "01a09f14-5264-77cc-bdec-b49b0f1c1370",
+      "query_id": "01a09f14-5264-77cc-bdec-b49b0f1c1370",
+      "turn_id": "turn_4c4c266b-f10a-4963-9f67-0299ee557670",
+      "product_turn_id": "msg_mu0zuvjf_8e9e42f1-937d-4617-a71d-5dda1e928e05",
+      "request_id": "83bcf47b-c3e6-4f15-826c-847a1d68927e",
+      "logical_call_id": "7fdafc98-6109-4145-976b-c2220673e12c",
+      "cli_version": "0.16.9",
+      "session_id": "sess_67880254-680b-4449-9b40-997dffe91e91",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "first_output_kind": "text",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "complete",
+      "outcome": "success",
+      "send_mode": "queued",
+      "visibility": "foreground",
+      "user_wait_ms": 0,
+      "execution_ms": 807.91455078125,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375304291.2,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "unattributed_ms": 0,
+      "missing_stages": "",
+      "checkpoint_id": "first_output"
+    }
+  ],
+  "outcomes": [
+    {
+      "observation_id": "dcc7c404-b49a-45ee-9ae3-3bf1295e97d6",
+      "command_id": "01a09f14-0d94-7d4d-b457-635721beedc6",
+      "input_id": "01a09f14-0d94-7d4d-b457-635721beedc6",
+      "turn_id": "turn_75b0f5df-81c1-47dd-acc6-258836a567c6",
+      "product_turn_id": "msg_mu0zugiy_b219e076-418c-4b2d-aba6-fd966a62315f",
+      "cli_version": "0.16.9",
+      "session_id": "sess_73bd41dd-cc17-4333-9820-d435ae488c58",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "quality": "missing",
+      "outcome": "cancelled",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 1172.671142578125,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375286659.3,\"foreground\":true},{\"at\":1789375287727.4001,\"foreground\":false},{\"at\":1789375287749,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "checkpoint_id": "excluded"
+    },
+    {
+      "observation_id": "60592221-b5e4-404b-9923-58f2e7d4dd33",
+      "command_id": "01a09f14-2619-74c7-bde9-faf8b4a68aa1",
+      "input_id": "01a09f14-2619-74c7-bde9-faf8b4a68aa1",
+      "query_id": "01a09f14-2619-74c7-bde9-faf8b4a68aa1",
+      "turn_id": "turn_abf5dfe1-02a2-4a37-a517-4151ef41e766",
+      "product_turn_id": "msg_mu0zul0o_6296a705-415a-47f6-8d85-5afb0283366b",
+      "request_id": "ee0c1538-feed-413a-a1da-67de61691df8",
+      "logical_call_id": "abd9337d-b390-434d-a290-847079b54be1",
+      "cli_version": "0.16.9",
+      "session_id": "sess_e8a6c2ec-c65b-4eaa-9400-34843a3c1e58",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "model": "deepseek-v4-flash",
+      "provider": "e2e-deepseek",
+      "quality": "missing",
+      "outcome": "failed",
+      "send_mode": "idle",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "execution_ms": 1333.853271484375,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375292948.3,\"foreground\":true},{\"at\":1789375293905.7,\"foreground\":false},{\"at\":1789375293921.3,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "checkpoint_id": "excluded"
+    },
+    {
+      "observation_id": "8e815b11-1798-4693-9ba9-d49aa8af6dfb",
+      "command_id": "01a09f14-3608-7ea9-a249-eea32ba1b58a",
+      "input_id": "01a09f14-3608-7ea9-a249-eea32ba1b58a",
+      "session_id": "sess_e80a6a7d-ee45-4e8d-b8ab-b3d36f5260ee",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "quality": "missing",
+      "outcome": "guided",
+      "send_mode": "guided",
+      "visibility": "background_returned",
+      "user_wait_ms": 0,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375297030.1,\"foreground\":true},{\"at\":1789375299922.2,\"foreground\":false},{\"at\":1789375300000.6,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "checkpoint_id": "excluded"
+    },
+    {
+      "observation_id": "c7c1a858-db97-42af-89f8-44c561e144bf",
+      "command_id": "01a09f14-4d62-758d-b939-252d601f332a",
+      "input_id": "01a09f14-4d62-758d-b939-252d601f332a",
+      "turn_id": "turn_dda1ddce-2cab-4ed4-a352-4daf199b1727",
+      "product_turn_id": "msg_mu0zusyg_7420b577-26e0-4847-be54-41808d340663",
+      "cli_version": "0.16.9",
+      "session_id": "sess_67880254-680b-4449-9b40-997dffe91e91",
+      "cli_instance_id": "0cdc5305-00dc-4004-aeb1-c2307f62d318",
+      "quality": "missing",
+      "outcome": "cancelled",
+      "send_mode": "idle",
+      "visibility": "foreground",
+      "user_wait_ms": 0,
+      "execution_ms": 1260.537841796875,
+      "truncated": "false",
+      "timing_reliable": "true",
+      "visibility_changes": "[{\"at\":1789375302989.6,\"foreground\":true}]",
+      "clock_error_ms": 3.3792724609375,
+      "checkpoint_id": "excluded"
+    }
+  ],
+  "spanCount": 532,
+  "uniqueSpanCount": 532,
+  "histograms": {
+    "zcode.local_ttft.stage.observation.duration": {
+      "count": 48,
+      "sumMs": 42298.5849609375
+    },
+    "zcode.local_ttft.preparation.observation.duration": {
+      "count": 84,
+      "sumMs": 13853.34033203125
+    },
+    "zcode.local_ttft.duration": {
+      "count": 6,
+      "sumMs": 40642.099609375
+    },
+    "zcode.local_ttft.stage.duration": {
+      "count": 36,
+      "sumMs": 40642.099609375
+    },
+    "zcode.local_ttft.system.duration": {
+      "count": 6,
+      "sumMs": 40232.49951171875
+    },
+    "zcode.local_ttft.preparation.duration": {
+      "count": 62,
+      "sumMs": 10153.557373046875
+    },
+    "zcode.local_ttft.attempt.duration": {
+      "count": 8,
+      "sumMs": 13929.37646484375
+    },
+    "zcode.local_ttft.execution.duration": {
+      "count": 6,
+      "sumMs": 24799.61572265625
+    },
+    "zcode.local_ttft.first_text.duration": {
+      "count": 6,
+      "sumMs": 40935.599609375
+    },
+    "zcode.local_ttft.no_output.wait": {
+      "count": 3,
+      "sumMs": 4124.699951171875
+    }
+  },
+  "observedAttributeCombinations": {
+    "zcode.local_ttft.stage.observation.duration": 23,
+    "zcode.local_ttft.records": 29,
+    "zcode.local_ttft.dropped": 1,
+    "zcode.local_ttft.preparation.observation.duration": 29,
+    "zcode.local_ttft.duration": 4,
+    "zcode.local_ttft.stage.duration": 24,
+    "zcode.local_ttft.system.duration": 4,
+    "zcode.local_ttft.preparation.duration": 26,
+    "zcode.local_ttft.attempt.duration": 5,
+    "zcode.local_ttft.execution.duration": 4,
+    "zcode.local_ttft.first_text.duration": 4,
+    "zcode.local_ttft.no_output.wait": 3
+  },
+  "clockErrorMaxMs": 3.3792724609375,
+  "rendererPerformance": [
+    {
+      "focused": false,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 3,
+        "longTaskMs": 301
+      },
+      "visibility": "visible"
+    },
+    {
+      "focused": false,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 0,
+        "longTaskMs": 0
+      },
+      "visibility": "visible"
+    },
+    {
+      "focused": false,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 0,
+        "longTaskMs": 0
+      },
+      "visibility": "visible"
+    },
+    {
+      "focused": false,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 0,
+        "longTaskMs": 0
+      },
+      "visibility": "visible"
+    },
+    {
+      "focused": false,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 2,
+        "longTaskMs": 212
+      },
+      "visibility": "visible"
+    },
+    {
+      "focused": true,
+      "heapEnd": 97400000,
+      "sample": {
+        "heapStart": 97400000,
+        "longTaskCount": 0,
+        "longTaskMs": 0
+      },
+      "visibility": "visible"
+    }
+  ],
+  "processPerformance": [
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 2.532911,
+          "percentCPUUsage": 0.9932625032391812,
+          "idleWakeupsPerSecond": 13
+        },
+        "memory": {
+          "workingSetSize": 167408,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 1.77819,
+          "percentCPUUsage": 0.0047958522359040825,
+          "idleWakeupsPerSecond": 13
+        },
+        "memory": {
+          "workingSetSize": 81936,
+          "peakWorkingSetSize": 97504
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.103174,
+          "percentCPUUsage": 0.002592453368245039,
+          "idleWakeupsPerSecond": 13
+        },
+        "memory": {
+          "workingSetSize": 45472,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.520517,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 60912,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 4.275955,
+          "percentCPUUsage": 0.23515990614345533,
+          "idleWakeupsPerSecond": 104
+        },
+        "memory": {
+          "workingSetSize": 288288,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 1.553925,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 126208,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.153811,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 47520,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ],
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 2.719812,
+          "percentCPUUsage": 0.899452438999741,
+          "idleWakeupsPerSecond": 26
+        },
+        "memory": {
+          "workingSetSize": 156416,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 1.995628,
+          "percentCPUUsage": 1.046388185483444,
+          "idleWakeupsPerSecond": 121
+        },
+        "memory": {
+          "workingSetSize": 75024,
+          "peakWorkingSetSize": 97504
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.106985,
+          "percentCPUUsage": 0.018339820365044716,
+          "idleWakeupsPerSecond": 10
+        },
+        "memory": {
+          "workingSetSize": 43232,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.528107,
+          "percentCPUUsage": 0.03652554044806588,
+          "idleWakeupsPerSecond": 1
+        },
+        "memory": {
+          "workingSetSize": 60864,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 4.824609,
+          "percentCPUUsage": 2.640298363811357,
+          "idleWakeupsPerSecond": 72
+        },
+        "memory": {
+          "workingSetSize": 232240,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 1.673056,
+          "percentCPUUsage": 0.5732956112190406,
+          "idleWakeupsPerSecond": 14
+        },
+        "memory": {
+          "workingSetSize": 122160,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.189935,
+          "percentCPUUsage": 0.17383939442062357,
+          "idleWakeupsPerSecond": 20
+        },
+        "memory": {
+          "workingSetSize": 49680,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ],
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 2.908971,
+          "percentCPUUsage": 0.10379321956424428,
+          "idleWakeupsPerSecond": 15
+        },
+        "memory": {
+          "workingSetSize": 155984,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 2.234519,
+          "percentCPUUsage": 0.028590478586218417,
+          "idleWakeupsPerSecond": 50
+        },
+        "memory": {
+          "workingSetSize": 80640,
+          "peakWorkingSetSize": 97504
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.11189,
+          "percentCPUUsage": 0.016459269056979905,
+          "idleWakeupsPerSecond": 9
+        },
+        "memory": {
+          "workingSetSize": 43280,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.528107,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 54688,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 5.573201,
+          "percentCPUUsage": 0.05705977819853936,
+          "idleWakeupsPerSecond": 74
+        },
+        "memory": {
+          "workingSetSize": 264704,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 1.953177,
+          "percentCPUUsage": 0.03936970601879088,
+          "idleWakeupsPerSecond": 8
+        },
+        "memory": {
+          "workingSetSize": 130944,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.211356,
+          "percentCPUUsage": 0.057532901543542556,
+          "idleWakeupsPerSecond": 16
+        },
+        "memory": {
+          "workingSetSize": 50352,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ],
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 3.105963,
+          "percentCPUUsage": 0.48058329288456403,
+          "idleWakeupsPerSecond": 8
+        },
+        "memory": {
+          "workingSetSize": 193344,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 2.465523,
+          "percentCPUUsage": 0.06159324836250988,
+          "idleWakeupsPerSecond": 67
+        },
+        "memory": {
+          "workingSetSize": 74800,
+          "peakWorkingSetSize": 97504
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.115126,
+          "percentCPUUsage": 0.0029589638435382976,
+          "idleWakeupsPerSecond": 10
+        },
+        "memory": {
+          "workingSetSize": 42992,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.528107,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 54672,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 6.176255,
+          "percentCPUUsage": 0.11403809316160782,
+          "idleWakeupsPerSecond": 67
+        },
+        "memory": {
+          "workingSetSize": 223104,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 2.07828,
+          "percentCPUUsage": 0.02949902275564738,
+          "idleWakeupsPerSecond": 5
+        },
+        "memory": {
+          "workingSetSize": 112448,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.229668,
+          "percentCPUUsage": 0.059270891464316765,
+          "idleWakeupsPerSecond": 17
+        },
+        "memory": {
+          "workingSetSize": 49952,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ],
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 3.620222,
+          "percentCPUUsage": 0.41873596998418866,
+          "idleWakeupsPerSecond": 7
+        },
+        "memory": {
+          "workingSetSize": 145056,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 3.059479,
+          "percentCPUUsage": 0.7748496089376418,
+          "idleWakeupsPerSecond": 117
+        },
+        "memory": {
+          "workingSetSize": 75088,
+          "peakWorkingSetSize": 97504
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.126029,
+          "percentCPUUsage": 0.01792940001104439,
+          "idleWakeupsPerSecond": 6
+        },
+        "memory": {
+          "workingSetSize": 41872,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.529902,
+          "percentCPUUsage": 0.003287818909568769,
+          "idleWakeupsPerSecond": 1
+        },
+        "memory": {
+          "workingSetSize": 52480,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 8.146157,
+          "percentCPUUsage": 4.052290561660005,
+          "idleWakeupsPerSecond": 55
+        },
+        "memory": {
+          "workingSetSize": 302128,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 2.548977,
+          "percentCPUUsage": 0.3468794627681967,
+          "idleWakeupsPerSecond": 13
+        },
+        "memory": {
+          "workingSetSize": 111728,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.269432,
+          "percentCPUUsage": 0.05154077744809828,
+          "idleWakeupsPerSecond": 15
+        },
+        "memory": {
+          "workingSetSize": 43968,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ],
+    [
+      {
+        "type": "Browser",
+        "cpu": {
+          "cumulativeCPUUsage": 4.088712,
+          "percentCPUUsage": 0.31631642403332816,
+          "idleWakeupsPerSecond": 20
+        },
+        "memory": {
+          "workingSetSize": 150272,
+          "peakWorkingSetSize": 349584
+        }
+      },
+      {
+        "type": "GPU",
+        "cpu": {
+          "cumulativeCPUUsage": 3.5726,
+          "percentCPUUsage": 0.5910411574418742,
+          "idleWakeupsPerSecond": 112
+        },
+        "memory": {
+          "workingSetSize": 72320,
+          "peakWorkingSetSize": 102672
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.135927,
+          "percentCPUUsage": 0.01443399152847131,
+          "idleWakeupsPerSecond": 9
+        },
+        "memory": {
+          "workingSetSize": 41616,
+          "peakWorkingSetSize": 50288
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.534898,
+          "percentCPUUsage": 0,
+          "idleWakeupsPerSecond": 0
+        },
+        "memory": {
+          "workingSetSize": 56592,
+          "peakWorkingSetSize": 254496
+        }
+      },
+      {
+        "type": "Tab",
+        "cpu": {
+          "cumulativeCPUUsage": 9.468635,
+          "percentCPUUsage": 2.202390037520712,
+          "idleWakeupsPerSecond": 61
+        },
+        "memory": {
+          "workingSetSize": 271008,
+          "peakWorkingSetSize": 378912
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 2.766007,
+          "percentCPUUsage": 0.18813622320937876,
+          "idleWakeupsPerSecond": 10
+        },
+        "memory": {
+          "workingSetSize": 113344,
+          "peakWorkingSetSize": 283936
+        }
+      },
+      {
+        "type": "Utility",
+        "cpu": {
+          "cumulativeCPUUsage": 0.302582,
+          "percentCPUUsage": 0.057379191299841,
+          "idleWakeupsPerSecond": 15
+        },
+        "memory": {
+          "workingSetSize": 42896,
+          "peakWorkingSetSize": 54464
+        }
+      }
+    ]
+  ],
+  "limitations": [
+    "No enabled/disabled A/B overhead comparison; startup and fixture/user waiting are included.",
+    "Chromium performance.memory is quantized; values do not establish absence of leaks.",
+    "SIGSTOP/SIGCONT/SIGKILL coverage is controlled macOS CLI process testing, not full desktop crash recovery.",
+    "Windows/Linux device E2E and ARMS ingestion/waterfall/retention/cost validation remain open."
+  ],
+  "arms": {
+    "query": "\"zcode-local-ttft\" | select count(1) as samples",
+    "range": "now-1h..now",
+    "sampleCount": 0,
+    "verified": "read-only logstore access; no new service samples"
+  },
+  "sourceSnapshot": {
+    "baseCommit": "a77a09bb3eaa9d147f6878b83ab10ec064690532",
+    "sha256": "1d6b342e73d58493a9bb50dbfda7c37efd2272af8ae4fbe35e7f0189cea4bd30",
+    "files": [
+      "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/local-ttft-clock.ts",
+      "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/local-ttft-compaction.ts",
+      "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/local-ttft.ts",
+      "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/v4-gateway.ts",
+      "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/v4-bridge.ts",
+      "apps/zcode-cli/packages/contracts/src/index.ts",
+      "apps/zcode-cli/packages/contracts/src/tracing/local-turn-preparation.ts",
+      "apps/zcode-cli/packages/core/src/runtime/methods/model.ts",
+      "apps/zcode-cli/packages/core/src/runtime/methods/turn-loop.ts",
+      "apps/zcode-cli/packages/core/src/runtime/methods/turn-model-step.ts",
+      "apps/zcode-cli/packages/core/src/runtime/methods/turn.ts",
+      "packages/desktop/src/main/localTtftExportDedupe.ts",
+      "packages/desktop/src/main/localTtftExporter.ts",
+      "packages/desktop/src/main/localTtftSpans.ts",
+      "packages/desktop/src/renderer/src/localTtftBootstrap.ts",
+      "packages/services/src/zcode-agent/zcodeAgent.ts",
+      "packages/services/src/zcode-agent/zcodeAgentConnectionScope.ts",
+      "packages/services/src/zcode-agent/zcodeAgentService.ts",
+      "packages/shared/src/localTtft.ts",
+      "packages/shared/src/zcode-protocol-v4/transport.ts",
+      "packages/shared/src/zcode-protocol/index.ts",
+      "packages/ui/src/v4/ConversationComposer.tsx",
+      "packages/ui/src/v4/SessionPane.tsx",
+      "packages/ui/src/v4/agentConversationTransport.ts",
+      "packages/ui/src/v4/telemetry/localTtftFacts.ts",
+      "packages/ui/src/v4/telemetry/localTtftObserver.ts",
+      "packages/ui/src/v4/telemetry/localTtftRecord.ts",
+      "packages/ui/src/v4/workspaceConnectionRegistry.ts"
+    ]
+  },
+  "ticket01Regression": {
+    "passed": 3,
+    "run": "desktop-e2e-20260914084255841-p89847-c0325fa80fc6db2e"
+  },
+  "validation": {
+    "rootTypecheck": "passed",
+    "e2eTypecheck": "passed",
+    "bootstrapTypecheck": "passed",
+    "lint": {
+      "errors": 0,
+      "warnings": 42
+    },
+    "architecture": {
+      "violations": 0,
+      "new": 0
+    },
+    "fixtureCheck": "passed",
+    "unitScope": "affected only",
+    "knownBaselineFailure": "v4-gateway stale-revision case reproduced using original a77a09bb3e gateway/recorder/test sources",
+    "platformsNotRun": ["Windows desktop", "Linux desktop", "mobile remote end-to-end"]
+  }
+}

@@ -148,7 +148,7 @@ export function StartPlanStatusMeta({
       <CodingPlanMetaSeparator visible={Boolean(pendingEffectiveTimeLabel && expireTimeLabel)} />
       {statusState === "refreshable" && onRefresh ? (
         <>
-          {/* 排期权益到点后服务端才创建额度桶，本地仍可能展示旧模型。
+          {/* Bug 原因：排期权益到点后服务端才创建额度桶，本地仍可能展示旧模型。
               就地刷新只在尚未拿到额度桶时出现；立即生效和已同步成功的套餐不显示。 */}
           <Button
             type="button"
@@ -172,7 +172,7 @@ export function StartPlanStatusMeta({
       ) : null}
       {expireTimeLabel ? (
         <>
-          {/* Start Plan 不展示 renew 时间，状态卡片只保留过期日期，避免把免费额度刷新时间误读成套餐续费。*/}
+          {/* Bugfix: Start Plan 不展示 renew 时间，状态卡片只保留过期日期，避免把免费额度刷新时间误读成套餐续费。 */}
           <span className="whitespace-nowrap">{expireTimeLabel}</span>
         </>
       ) : null}
@@ -180,7 +180,7 @@ export function StartPlanStatusMeta({
   );
 }
 
-function resolveStartPlanStatusMetaState({
+export function resolveStartPlanStatusMetaState({
   entitlements,
   hasQuota,
   now = Date.now(),
@@ -208,7 +208,7 @@ function resolveStartPlanStatusMetaState({
   return "settled";
 }
 
-function resolvePendingStartPlanEffectiveTime(
+export function resolvePendingStartPlanEffectiveTime(
   entitlements: UsageEntitlementSubscriptionDetail["entitlements"],
   now = Date.now(),
 ): string | null {
@@ -224,7 +224,11 @@ function resolvePendingStartPlanEffectiveTime(
   return futureTimes[0]?.effectiveTime ?? null;
 }
 
-function formatStartPlanEffectiveDate(value: string, locale: string, now = Date.now()): string {
+export function formatStartPlanEffectiveDate(
+  value: string,
+  locale: string,
+  now = Date.now(),
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const currentDate = new Date(now);

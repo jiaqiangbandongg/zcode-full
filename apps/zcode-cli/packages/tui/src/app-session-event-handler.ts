@@ -31,7 +31,10 @@ const MAX_REMEMBERED_EVENT_IDS = 2_048;
  *
  * 拿不到主 sessionId 时放行：宁可多渲染一点，也不要因为缺一个 id 就让转写整片空白。
  */
-function isMainSessionEvent(event: SessionEvent, mainSessionId: string | undefined): boolean {
+export function isMainSessionEvent(
+  event: SessionEvent,
+  mainSessionId: string | undefined,
+): boolean {
   // Tool mirrors deliberately carry the parent's sessionId. They are activity
   // metadata, not parent transcript/tool/usage facts.
   if (isSubagentToolMirror(event)) return false;
@@ -59,7 +62,7 @@ type SessionEventApplierInput = SessionEventHandlers & {
  * 闸门排在去重之前：外来事件不该占用去重窗口的名额（窗口有界，被 actor 事件挤掉
  * 会让主会话的重复投递漏过去）。
  */
-function applyMainSessionEvent(
+export function applyMainSessionEvent(
   event: SessionEvent,
   applied: Set<string>,
   input: SessionEventApplierInput,
@@ -87,7 +90,7 @@ export function useSessionEventApplier(
 }
 
 /** A stable subscription survives renders; both event sources share the applier. */
-function useSessionEventSubscription(
+export function useSessionEventSubscription(
   subscribe: ((sink: (event: SessionEvent) => void) => () => void) | undefined,
   applyEvent: (event: SessionEvent) => void,
 ): void {
@@ -101,7 +104,7 @@ function useSessionEventSubscription(
  *
  * 没有 id 的事件一律放行：宁可重复渲染一次，也不要因为缺一个 key 就把事件整条吞掉。
  */
-function rememberSessionEvent(applied: Set<string>, event: SessionEvent): boolean {
+export function rememberSessionEvent(applied: Set<string>, event: SessionEvent): boolean {
   const eventId = typeof event.id === "string" && event.id.length > 0 ? event.id : undefined;
   if (eventId === undefined) return true;
   if (applied.has(eventId)) return false;

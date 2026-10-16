@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-attachment-only-wire-padding",
+  "spec": "./test/e2e/conversation-session/conversation-session-attachment-only-wire-padding.test.ts",
+  "fixtures": [
+    {
+      "id": "attachment-only-wire-padding",
+      "description": "T06W：文本附件拆为 prompt reminder 后 session 事实保持空正文，Anthropic provider wire user content 精确补单个空格。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "matcher 以文本附件内容定位唯一主请求；spec 再对 network capture 结构化断言 user content parts 含精确空格。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "e2e-attachment-wire-padding.txt",
+          "E2E_ATTACHMENT_WIRE_CONTEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "attachment-only-wire-padding",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "ATTACHMENT_WIRE_PADDING_OK"
+        }
+      }
+    }
+  ]
+}

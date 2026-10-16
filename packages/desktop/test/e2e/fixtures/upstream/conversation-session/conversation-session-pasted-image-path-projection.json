@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-pasted-image-path-projection",
+  "spec": "./test/e2e/conversation-session/conversation-session-pasted-image-path-projection.test.ts",
+  "fixtures": [
+    {
+      "id": "pasted-image-path-title",
+      "description": "T12-T14 目标与 parking 会话的标题生成固定响应，避免标题 sidecar 消费主请求 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不是本 case 语义；只需把它与 provider-visible 功能请求隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_PASTED_IMAGE_PATH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-path-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Pasted Image Path\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":64,\"completion_tokens\":8,\"total_tokens\":72}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-path-live",
+      "description": "T12 双图真实 paste 首发，provider 同时收到 data URL image blocks 与普通 absolute path texts。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；E2E 对捕获的 requestJson 做 content 数量、顺序、path 与 MCS 边界的结构化断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_PATH_LIVE"],
+        "bodyIncludes": [
+          "E2E_PASTED_IMAGE_PATH_LIVE",
+          "e2e-pasted-image-vision-model",
+          "data:image/png;base64",
+          "[Image: source:"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-path-live\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-live\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_PATH_LIVE_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-live\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":160,\"completion_tokens\":12,\"total_tokens\":172}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-path-parking",
+      "description": "T13 重启前完成独立 parking 会话，确保目标 session 已进入持久 task index 且冷启动不会自动打开目标。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "parking 只建立确定的 cold-resume 前置状态，不承载图片投影断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_PATH_PARKING"],
+        "bodyIncludes": ["E2E_PASTED_IMAGE_PATH_PARKING", "e2e-pasted-image-vision-model"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-path-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_PATH_PARKING_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":48,\"completion_tokens\":8,\"total_tokens\":56}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-path-cold-rebuild",
+      "description": "T13 删除派生图片并完整重启后，follow-up 请求从 durable artifact 重建相同 image paths。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；E2E 在请求前删除真实派生文件，并在抓包后验证相同路径和文件已经重建。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_PATH_COLD"],
+        "bodyIncludes": [
+          "E2E_PASTED_IMAGE_PATH_LIVE",
+          "E2E_PASTED_IMAGE_PATH_COLD",
+          "e2e-pasted-image-vision-model",
+          "data:image/png;base64",
+          "[Image: source:"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-path-cold\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-cold\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_PATH_COLD_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-cold\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-pasted-image-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":180,\"completion_tokens\":12,\"total_tokens\":192}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "pasted-image-path-text-only",
+      "description": "T14 切到明确 text-only 模型后，历史 image 变为 omitted 文本但派生 path 仍保留。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只负责稳定收口；fixture 与结构化抓包共同要求请求无 data URL/image block，并保留 omitted + path。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_PATH_TEXT_ONLY"],
+        "bodyIncludes": [
+          "E2E_PASTED_IMAGE_PATH_TEXT_ONLY",
+          "deepseek-v4-flash",
+          "Media omitted from provider request because the selected model does not support image input.",
+          "[Image: source:"
+        ],
+        "bodyExcludes": [
+          "data:image",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-pasted-image-path-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_PATH_TEXT_ONLY_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-path-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":190,\"completion_tokens\":12,\"total_tokens\":202}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

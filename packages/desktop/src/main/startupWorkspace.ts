@@ -37,7 +37,10 @@ export interface StartupWorkspaceWarmupTarget {
   workspaceIdentity?: string;
 }
 
-const STARTUP_AGENT_WARMUP_LIMIT = 3;
+// 修复原因：会话 CLI 没有 idle 回收，启动预热 3 个会让每个窗口常驻 3 份 Agent 进程内存；
+// 切到最近项目的冷启动收益抵不上常驻成本，收敛为只预热 active workspace。
+// 与 @zcode/protocol 的 init-local `agentWarmupTargets.max(1)` 保持一致。
+export const STARTUP_AGENT_WARMUP_LIMIT = 1;
 
 export interface StartupWindowBootstrap {
   restoreSession?: boolean;
@@ -71,7 +74,7 @@ function resolvePersistedActiveSession(
   return sessions[activeIndex];
 }
 
-function resolveStartupAgentWarmupTargets(
+export function resolveStartupAgentWarmupTargets(
   settings: Pick<ReturnType<typeof appSettingsSchema.parse>, "recentProjects">,
   activeTarget: StartupWorkspaceWarmupTarget,
 ): StartupWorkspaceWarmupTarget[] {
@@ -145,9 +148,9 @@ export async function resolveStartupWindowBootstrap({
     const activeSession =
       localActiveSessionIndex == null ? undefined : sessions[localActiveSessionIndex];
     if (activeSession?.kind === "local") {
-      // 被动 sessions-index 全量恢复不能再启动全部 workspace，但只预热当前一个又让
-      // 用户在最近项目间切换重新承担完整冷启动。Main 在唯一启动边界固定选出最近 3 个，
-      // Host 仍走原 initializeWorkspace 路径；失败不继续扫描第 4 个补位。
+      // 被动 sessions-index 全量恢复不能启动全部 workspace；Main 在唯一启动边界固定只选
+      // active workspace（STARTUP_AGENT_WARMUP_LIMIT），Host 走原 initializeWorkspace 路径；
+      // recentProjects 保持 dormant，预热失败也不扫描其它 workspace 补位。
       const agentWarmupTargets = resolveStartupAgentWarmupTargets(settings, {
         workspacePath: activeSession.workspacePath,
       });
@@ -168,4 +171,22 @@ export async function resolveStartupWindowBootstrap({
     initialWorkspacePurpose: "conversation",
     agentWarmupTargets: [{ workspacePath: conversationWorkspaceDir }],
   };
+}
+
+export async function resolveStartupWorkspacePath({
+  settingsFile,
+  conversationWorkspaceDir,
+  logger,
+}: {
+  settingsFile: string;
+  conversationWorkspaceDir: string;
+  logger?: StartupWorkspaceLogger;
+}): Promise<string | undefined> {
+  return (
+    await resolveStartupWindowBootstrap({
+      settingsFile,
+      conversationWorkspaceDir,
+      logger,
+    })
+  ).initialWorkspacePath;
 }

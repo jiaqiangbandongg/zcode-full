@@ -1,5 +1,9 @@
 import { BrowserWindow, ipcMain } from "electron";
-import { PlatformChannels, type RendererActionTraceConfigV1 } from "@zcode/shared";
+import {
+  DISABLED_RENDERER_ACTION_TRACE_CONFIG,
+  PlatformChannels,
+  type RendererActionTraceConfigV1,
+} from "@zcode/shared";
 import type { RendererActionTraceBroker } from "./rendererActionTraceBroker.js";
 import type { RendererActionTraceRollout } from "./rendererActionTraceRollout.js";
 
@@ -112,7 +116,7 @@ export function registerRendererActionTraceIpc(options: {
   };
 }
 
-function resolveRuntimeConfig(
+export function resolveRuntimeConfig(
   config: RendererActionTraceConfigV1,
   env: Record<string, string | undefined>,
 ): RendererActionTraceConfigV1 {
@@ -125,6 +129,10 @@ function resolveRuntimeConfig(
     enabledGroups: ["core", "settings"],
     configVersion: "local-explicit",
   } as RendererActionTraceConfigV1;
+}
+
+export function disabledRendererActionTraceConfig(): RendererActionTraceConfigV1 {
+  return { ...DISABLED_RENDERER_ACTION_TRACE_CONFIG };
 }
 
 function isTruthy(value: string | undefined): boolean {

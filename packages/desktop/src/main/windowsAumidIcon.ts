@@ -86,7 +86,7 @@ const defaultDependencies: WindowsAumidIconDependencies = {
   systemRoot: process.env.SystemRoot ?? "C:\\Windows",
 };
 
-function createWindowsAumidIconReader(
+export function createWindowsAumidIconReader(
   dependencies: WindowsAumidIconDependencies = defaultDependencies,
 ) {
   return async (aumid: string): Promise<ApplicationIconInfo | null> => {

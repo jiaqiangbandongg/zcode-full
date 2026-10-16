@@ -17,7 +17,7 @@ interface PendingBackgroundSessionEvent {
   event: SessionServiceEvent;
 }
 
-interface BackgroundSessionEventCoalescer {
+export interface BackgroundSessionEventCoalescer {
   accept(event: ZCodeAgentServiceEvent): void;
   flush(): void;
   dispose(): void;
@@ -25,7 +25,7 @@ interface BackgroundSessionEventCoalescer {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
+    ? value as Record<string, unknown>
     : {};
 }
 

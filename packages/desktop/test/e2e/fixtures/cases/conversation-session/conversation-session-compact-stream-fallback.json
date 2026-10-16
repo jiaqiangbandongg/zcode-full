@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-compact-stream-fallback",
+  "spec": "./test/e2e/conversation-session/conversation-session-compact-stream-fallback.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-compact-stream-fallback.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "compact-stream-fallback-title",
+      "description": "compact stream fallback seed 首发的 case-local 标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首发会触发 title sidecar；固定标题响应并用 case marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "compact-stream-fallback-seed",
+      "description": "形成可 compact 的稳定历史。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "transport fallback 门禁只需要一段已完成历史；固定文本避免真实 provider 漂移。"
+    },
+    {
+      "id": "compact-stream-fallback-stream-failure",
+      "description": "compact 首个 stream 请求的确定性 non-retryable 失败。",
+      "kind": "fault",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "fixture 只有在 compact body 明确包含 stream:true 时命中，以稳定证明 stream-first；404 避免 adapter 内部重试放大。"
+    },
+    {
+      "id": "compact-stream-fallback-non-stream-success",
+      "description": "同一逻辑 compact attempt 的 non-stream JSON fallback 成功响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "fixture 显式排除 stream:true，证明首腿失败后才进入 non-stream，并固定 summary 以验证最终 success marker。"
+    }
+  ]
+}

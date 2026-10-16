@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-approval-feedback-user-message",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-approval-feedback-user-message.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plan-approval-feedback-user-message.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-plan-approval-enter-plan-call",
+      "description": "首轮请求返回 EnterPlanMode，进入 plan mode。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+    },
+    {
+      "id": "upstream-conversation-plan-approval-exit-plan-call",
+      "description": "plan mode 内返回 ExitPlanMode，触发审批弹窗。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发 ExitPlanMode 审批弹窗，避免模型输出文本而跳过工具。"
+    },
+    {
+      "id": "upstream-conversation-plan-approval-feedback-final",
+      "description": "审批 feedback 作为下一条用户消息发送给模型。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 custom feedback 已作为下一条 user message 进入 provider-visible 请求。"
+    }
+  ]
+}

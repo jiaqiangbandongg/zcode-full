@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "android-emulator": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${CLAUDE_PROJECT_DIR}",
+      "env": {
+        "ANDROID_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "ANDROID_PLUGIN_SDK_PATH": "${user_config.sdk_path}",
+        "ANDROID_PLUGIN_DEFAULT_AVD": "${user_config.default_avd}",
+        "ANDROID_PLUGIN_API_LEVEL": "${user_config.api_level}",
+        "ANDROID_PLUGIN_BUILD_TOOLS_VERSION": "${user_config.build_tools_version}",
+        "ANDROID_PLUGIN_SYSTEM_IMAGE_VARIANT": "${user_config.system_image_variant}",
+        "ANDROID_PLUGIN_SYSTEM_IMAGE_ABI": "${user_config.system_image_abi}",
+        "ANDROID_PLUGIN_JDK_MAJOR": "${user_config.jdk_major}"
+      }
+    }
+  }
+}

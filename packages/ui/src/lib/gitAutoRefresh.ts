@@ -1,6 +1,6 @@
 import type { GitRepositorySummary, SystemInfo } from "@zcode/shared";
 
-interface GitAutoRefreshWatchPath {
+export interface GitAutoRefreshWatchPath {
   path: string;
   recursive: boolean;
 }
@@ -72,7 +72,9 @@ export function stringifyGitAutoRefreshWatchPaths(
   return JSON.stringify(watchPaths);
 }
 
-export function parseGitAutoRefreshWatchPaths(signature: string): GitAutoRefreshWatchPath[] {
+export function parseGitAutoRefreshWatchPaths(
+  signature: string,
+): GitAutoRefreshWatchPath[] {
   const parsed = JSON.parse(signature) as GitAutoRefreshWatchPath[];
   return parsed.map((watchPath) => ({
     path: watchPath.path,

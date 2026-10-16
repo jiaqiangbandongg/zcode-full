@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-RW-01",
+  "classification": "synthetic",
+  "syntheticReason": "The case injects a disconnected remote workspace service to prove normal Bot messages neither reconnect nor fall back to the local task service.",
+  "promptMarker": "E2E_BOT_REMOTE_DISCONNECTED",
+  "timing": "controlled-stream"
+}

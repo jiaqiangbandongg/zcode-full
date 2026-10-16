@@ -1,0 +1,13 @@
+lane actor#1 "a0" @5:15
+lane actor#2 "a1" @5:28
+lane actor#3 "a2" @5:41
+lane actor#4 "seed" @6:20
+region seq#1 seq
+step ask#1 ask "seed" @6:34 lane=actor#4 region=seq#1 always
+step ask#2~actor#1 ask "picked" @8:26 lane=actor#1 lanes=actor#1,actor#2,actor#3 source=ask#2 region=seq#1 maybe
+step ask#2~actor#2 ask "picked" @8:26 lane=actor#2 lanes=actor#1,actor#2,actor#3 source=ask#2 region=seq#1 maybe
+step ask#2~actor#3 ask "picked" @8:26 lane=actor#3 lanes=actor#1,actor#2,actor#3 source=ask#2 region=seq#1 maybe
+edge ask#1 -> ask#2~actor#1 data maybe exact
+edge ask#1 -> ask#2~actor#2 data maybe exact
+edge ask#1 -> ask#2~actor#3 data maybe exact
+sink ask#2~actor#1,ask#2~actor#2,ask#2~actor#3

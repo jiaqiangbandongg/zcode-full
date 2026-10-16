@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-isolation.test.ts",
+  "providerFixtures": ["./test/e2e/fixtures/upstream/common.json"],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "workspace-isolation-no-provider",
+      "description": "Workspace A/B isolation is asserted from config and Plugin overview without a provider request.",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 只验证两个 workspace 的 config/source projection；不创建会话，因此无需 provider 主请求。"
+    }
+  ]
+}

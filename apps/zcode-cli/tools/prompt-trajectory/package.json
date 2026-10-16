@@ -8,8 +8,9 @@
     "record:prompt": "tsx src/cli.ts record-prompt",
     "derive": "tsx src/cli.ts derive",
     "model-io": "tsx src/cli.ts model-io",
+    "run:testcases": "node scripts/run-testcases.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint src scripts"
+    "lint": "oxlint src tests scripts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

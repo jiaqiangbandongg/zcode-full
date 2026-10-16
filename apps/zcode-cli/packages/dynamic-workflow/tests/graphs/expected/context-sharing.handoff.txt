@@ -1,0 +1,7 @@
+phase unphased
+participant unphased:actor#1 "shared" steps=ask#1,ask#2,ask#3
+participant unphased:actor#2 "loner" steps=ask#4
+participant unphased:actor#3 "ephemeral" steps=ask#5
+handoff unphased:actor#1 -> unphased:actor#2
+handoff unphased:actor#2 -> unphased:actor#3
+handoff unphased:actor#3 -> unphased:actor#1

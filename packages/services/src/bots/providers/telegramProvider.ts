@@ -8,10 +8,7 @@ import type {
 } from "@zcode/shared";
 import { BOT_MENU_COMMAND_ORDER } from "../commandOrder.js";
 import type { BotProviderAdapter } from "./types.js";
-import {
-  fetchBotProvider,
-  fetchBotProviderJson,
-} from "#src/bots/providers/providerRequest.js";
+import { fetchBotProvider, fetchBotProviderJson } from "#src/bots/providers/providerRequest.js";
 
 interface TelegramProviderDeps {
   loadCredential(key: string): Promise<string | null>;
@@ -84,7 +81,10 @@ function truncateCallbackToast(text: string): string {
   return normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized;
 }
 
-function readTelegramPrivateMessage(botId: string, update: Record<string, unknown>): BotInboundMessage | null {
+function readTelegramPrivateMessage(
+  botId: string,
+  update: Record<string, unknown>,
+): BotInboundMessage | null {
   const message = isRecord(update.message) ? update.message : null;
   if (!message) {
     return null;
@@ -97,7 +97,8 @@ function readTelegramPrivateMessage(botId: string, update: Record<string, unknow
       : typeof message.caption === "string"
         ? message.caption
         : "";
-  const userId = typeof from?.id === "number" || typeof from?.id === "string" ? String(from.id) : "";
+  const userId =
+    typeof from?.id === "number" || typeof from?.id === "string" ? String(from.id) : "";
   const chatType = chat?.type === "private" ? "private" : "group";
   const attachments = readTelegramAttachments(message);
   if ((!text && attachments.length === 0) || !userId) {
@@ -119,9 +120,7 @@ function readTelegramPrivateMessage(botId: string, update: Record<string, unknow
             : undefined,
       chatType,
       chatId:
-        typeof chat?.id === "number" || typeof chat?.id === "string"
-          ? String(chat.id)
-          : undefined,
+        typeof chat?.id === "number" || typeof chat?.id === "string" ? String(chat.id) : undefined,
       providerMessageId:
         typeof message.message_id === "number" || typeof message.message_id === "string"
           ? String(message.message_id)
@@ -143,9 +142,7 @@ function readTelegramFileAttachment(
     return null;
   }
   const filename =
-    typeof value.file_name === "string" && value.file_name.trim()
-      ? value.file_name
-      : fallbackName;
+    typeof value.file_name === "string" && value.file_name.trim() ? value.file_name : fallbackName;
   return {
     id: providerFileId,
     kind,
@@ -159,7 +156,9 @@ function readTelegramFileAttachment(
   };
 }
 
-function readTelegramPhotoAttachment(message: Record<string, unknown>): BotInboundAttachment | null {
+function readTelegramPhotoAttachment(
+  message: Record<string, unknown>,
+): BotInboundAttachment | null {
   if (!Array.isArray(message.photo) || message.photo.length === 0) {
     return null;
   }
@@ -187,7 +186,10 @@ function readTelegramAttachments(message: Record<string, unknown>): BotInboundAt
   ].filter((attachment): attachment is BotInboundAttachment => attachment !== null);
 }
 
-function readTelegramCallbackMessage(botId: string, update: Record<string, unknown>): BotInboundMessage | null {
+function readTelegramCallbackMessage(
+  botId: string,
+  update: Record<string, unknown>,
+): BotInboundMessage | null {
   const callbackQuery = isRecord(update.callback_query) ? update.callback_query : null;
   if (!callbackQuery) {
     return null;
@@ -196,7 +198,8 @@ function readTelegramCallbackMessage(botId: string, update: Record<string, unkno
   const chat = isRecord(message?.chat) ? message.chat : null;
   const from = isRecord(callbackQuery.from) ? callbackQuery.from : null;
   const data = typeof callbackQuery.data === "string" ? callbackQuery.data : "";
-  const userId = typeof from?.id === "number" || typeof from?.id === "string" ? String(from.id) : "";
+  const userId =
+    typeof from?.id === "number" || typeof from?.id === "string" ? String(from.id) : "";
   if (!data || !userId) {
     return null;
   }
@@ -216,9 +219,7 @@ function readTelegramCallbackMessage(botId: string, update: Record<string, unkno
             : undefined,
       chatType: chat?.type === "private" ? "private" : "group",
       chatId:
-        typeof chat?.id === "number" || typeof chat?.id === "string"
-          ? String(chat.id)
-          : undefined,
+        typeof chat?.id === "number" || typeof chat?.id === "string" ? String(chat.id) : undefined,
       providerMessageId:
         typeof callbackQuery.id === "string"
           ? callbackQuery.id
@@ -238,7 +239,9 @@ function readTelegramCallbackId(payload: unknown): string | null {
   return typeof callbackQuery?.id === "string" ? callbackQuery.id : null;
 }
 
-function readTelegramCallbackMessageRef(payload: unknown): { chatId: string; messageId: number } | null {
+function readTelegramCallbackMessageRef(
+  payload: unknown,
+): { chatId: string; messageId: number } | null {
   if (!isRecord(payload)) {
     return null;
   }
@@ -246,19 +249,22 @@ function readTelegramCallbackMessageRef(payload: unknown): { chatId: string; mes
   const callbackQuery = isRecord(update.callback_query) ? update.callback_query : null;
   const message = isRecord(callbackQuery?.message) ? callbackQuery.message : null;
   const chat = isRecord(message?.chat) ? message.chat : null;
-  const chatId = typeof chat?.id === "number" || typeof chat?.id === "string" ? String(chat.id) : "";
+  const chatId =
+    typeof chat?.id === "number" || typeof chat?.id === "string" ? String(chat.id) : "";
   const messageId = typeof message?.message_id === "number" ? message.message_id : null;
   return chatId && messageId !== null ? { chatId, messageId } : null;
 }
 
-function buildSelectionCallbackData(selection: SelectionPrompt, optionId: string, index: number): string {
+function buildSelectionCallbackData(
+  selection: SelectionPrompt,
+  optionId: string,
+  index: number,
+): string {
   if (selection.action === "permission.respond") {
     return `zc:permission:${index + 1}`;
   }
   if (selection.action === "elicitation.respond") {
-    return selection.token
-      ? `zc:e:${selection.token}:${index + 1}`
-      : `zc:elicitation:${index + 1}`;
+    return selection.token ? `zc:e:${selection.token}:${index + 1}` : `zc:elicitation:${index + 1}`;
   }
   if (selection.action === "model.provider.set") {
     return `zc:cmd:/model provider ${index + 1}`;
@@ -271,13 +277,16 @@ function buildSelectionCallbackData(selection: SelectionPrompt, optionId: string
   return `zc:${selection.action.replace(".set", "")}:${index + 1}`;
 }
 
-function buildSelectionReplyMarkup(selection: SelectionPrompt): { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } {
-  const cancelRows = selection.showCancel === false
-    ? []
-    : [
-        // Bugfix: Telegram 原生按钮以前没有取消入口，用户只能手敲 0 才能退出 pending selection。
-        [{ text: selection.cancelLabel ?? "Cancel", callback_data: "zc:cancel" }],
-      ];
+function buildSelectionReplyMarkup(selection: SelectionPrompt): {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+} {
+  const cancelRows =
+    selection.showCancel === false
+      ? []
+      : [
+          // Bugfix: Telegram 原生按钮以前没有取消入口，用户只能手敲 0 才能退出 pending selection。
+          [{ text: selection.cancelLabel ?? "Cancel", callback_data: "zc:cancel" }],
+        ];
   return {
     inline_keyboard: [
       ...selection.options.map((option, index) => [
@@ -309,17 +318,15 @@ function decodeTelegramCallbackData(data: string): string {
 }
 
 function buildTelegramCommands(bot: BotConfig): TelegramBotCommand[] {
-  return BOT_MENU_COMMAND_ORDER
-    .filter((command) => command === "help" || command === "bind" || bot.allowedCommands[command] !== false)
-    .map((command) => ({
-      command: telegramCommandNames[command],
-      description: telegramCommandDescriptions[command],
-    }));
+  return BOT_MENU_COMMAND_ORDER.filter(
+    (command) => command === "help" || command === "bind" || bot.allowedCommands[command] !== false,
+  ).map((command) => ({
+    command: telegramCommandNames[command],
+    description: telegramCommandDescriptions[command],
+  }));
 }
 
-export function createTelegramBotProvider(
-  deps: TelegramProviderDeps,
-): BotProviderAdapter {
+export function createTelegramBotProvider(deps: TelegramProviderDeps): BotProviderAdapter {
   async function loadToken(bot: BotConfig): Promise<string | null> {
     return bot.credentialRef ? deps.loadCredential(bot.credentialRef) : null;
   }
@@ -351,13 +358,18 @@ export function createTelegramBotProvider(
       return {
         ok: payload.ok === true,
         name,
-        message: payload.ok === true ? "Telegram bot is reachable." : payload.description ?? "Telegram getMe failed.",
+        message:
+          payload.ok === true
+            ? "Telegram bot is reachable."
+            : (payload.description ?? "Telegram getMe failed."),
       };
     },
 
     async resolveName(bot) {
       const payload = await getMe(bot);
-      return payload?.ok === true ? payload.result?.first_name || payload.result?.username || null : null;
+      return payload?.ok === true
+        ? payload.result?.first_name || payload.result?.username || null
+        : null;
     },
 
     async syncCommands(bot) {
@@ -386,9 +398,7 @@ export function createTelegramBotProvider(
 
     async send(bot: BotConfig, message: BotOutboundMessage) {
       const token = await loadToken(bot);
-      if (!token?.trim()) {
-        return;
-      }
+      if (!token?.trim()) throw new Error("Telegram bot token is missing");
       const selection = message.selection;
       const replyMarkup = selection ? buildSelectionReplyMarkup(selection) : undefined;
       const chunks = splitTelegramText(message.text);
@@ -396,28 +406,40 @@ export function createTelegramBotProvider(
         // Bugfix: 长 Plan 会被拆成多条消息，审批提示位于最后一条。
         // 按钮必须跟随最终决策上下文，不能挂在尚未发送完整正文的第一条上。
         const shouldAttachReplyMarkup = index === chunks.length - 1 && replyMarkup;
-        const response = await fetchBotProvider(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            chat_id: message.providerUserId,
-            text,
-            parse_mode: "Markdown",
-            ...(shouldAttachReplyMarkup ? { reply_markup: replyMarkup } : {}),
-          }),
-        });
-        if (!response.ok) {
-          // Bugfix: Telegram Markdown 对未闭合的 `_*[]()` 很敏感，模型输出偶尔会被拒收。
-          // 解析失败时退回纯文本重发，既优先支持 Markdown，也保证消息不会丢。
-          await fetchBotProvider(`https://api.telegram.org/bot${token}/sendMessage`, {
+        const send = (markdown: boolean) =>
+          fetchBotProviderJson<{
+            ok?: boolean;
+            description?: string;
+            error_code?: number;
+            parameters?: { retry_after?: number };
+          }>(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               chat_id: message.providerUserId,
               text,
+              ...(markdown ? { parse_mode: "Markdown" } : {}),
               ...(shouldAttachReplyMarkup ? { reply_markup: replyMarkup } : {}),
             }),
           });
+        let response = await send(true);
+        // 只有明确的格式拒绝才改纯文本；限流、封禁和结果未知不能盲目重发。
+        if (
+          response.status === 400 &&
+          (!response.payload?.description ||
+            /parse|entities|markdown/i.test(response.payload.description))
+        )
+          response = await send(false);
+        if (!response.ok || response.payload?.ok !== true) {
+          throw Object.assign(
+            new Error(
+              `Telegram send failed (${response.payload?.error_code ?? response.status}): ${response.payload?.description ?? "unknown delivery result"}`,
+            ),
+            {
+              deliveryRejected: response.payload?.ok === false,
+              retryAfter: response.payload?.parameters?.retry_after,
+            },
+          );
         }
       }
     },
@@ -437,7 +459,13 @@ export function createTelegramBotProvider(
       });
     },
 
-    async acknowledgeCallback(bot: BotConfig, payload: unknown, text?: string, _message?: BotOutboundMessage, signal?: AbortSignal) {
+    async acknowledgeCallback(
+      bot: BotConfig,
+      payload: unknown,
+      text?: string,
+      _message?: BotOutboundMessage,
+      signal?: AbortSignal,
+    ) {
       const token = await loadToken(bot);
       const callbackQueryId = readTelegramCallbackId(payload);
       if (!token?.trim() || !callbackQueryId) {
@@ -473,10 +501,7 @@ export function createTelegramBotProvider(
         return null;
       }
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        TELEGRAM_ATTACHMENT_DOWNLOAD_TIMEOUT_MS,
-      );
+      const timeout = setTimeout(() => controller.abort(), TELEGRAM_ATTACHMENT_DOWNLOAD_TIMEOUT_MS);
       try {
         const fileResponse = await fetch(`https://api.telegram.org/bot${token}/getFile`, {
           method: "POST",
@@ -527,7 +552,8 @@ export function createTelegramBotProvider(
       if (!botId) {
         return [];
       }
-      const message = readTelegramPrivateMessage(botId, update) ?? readTelegramCallbackMessage(botId, update);
+      const message =
+        readTelegramPrivateMessage(botId, update) ?? readTelegramCallbackMessage(botId, update);
       return message ? [message] : [];
     },
   };

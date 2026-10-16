@@ -8,6 +8,7 @@
  * 条目只会**追加**（journal 只追加），所以四种折叠都可以按到达顺序单遍完成。
  */
 
+import { readWorkflowArtifactField } from "@zcode/shared/zcode-protocol-v4";
 import {
   artifactFieldLabel,
   chartSeriesFields,
@@ -31,7 +32,13 @@ export type ArtifactItem = {
   sequence: number;
   siteId: string;
   ordinal: number;
-  item: unknown;
+  /** 整条 item（老 CLI、或没有点名字段的取数）。 */
+  item?: unknown;
+  /**
+   * 只取字段时：spec 点名的路径 → 值（CLI 在 SQLite 里取好、超长的值已截短）。走不通的路径
+   * 不在表里。在场时折叠只读它，不读 `item`。
+   */
+  fields?: Record<string, unknown>;
 };
 
 export type ChartSeriesModel = {
@@ -111,30 +118,22 @@ type ArtifactPresetModel = ChartModel | TableModel | MetricsModel | BoardModel;
 const BOARD_OTHER_COLUMN_ID = "__other__";
 
 /**
- * 点路径读取："timing.after"、"rounds.0.ms"。
- * 数组下标按数字段处理；路径走不通返回 `undefined`（= 该条目没有这个字段）。
+ * 点路径读取："timing.after"、"rounds.0.ms"。规则是协议上的契约
+ * （`readWorkflowArtifactField`）：CLI 只取字段时在 SQLite 里按同一套规则取值，两边必须逐字相同。
  */
-function readArtifactField(item: unknown, path: string): unknown {
-  const segments = path.split(".");
-  let cursor: unknown = item;
-  for (const segment of segments) {
-    if (cursor === null || cursor === undefined) {
-      return undefined;
-    }
-    if (Array.isArray(cursor)) {
-      const index = Number(segment);
-      if (!Number.isInteger(index) || index < 0 || index >= cursor.length) {
-        return undefined;
-      }
-      cursor = cursor[index];
-      continue;
-    }
-    if (typeof cursor !== "object") {
-      return undefined;
-    }
-    cursor = (cursor as Record<string, unknown>)[segment];
+export function readArtifactField(item: unknown, path: string): unknown {
+  return readWorkflowArtifactField(item, path);
+}
+
+/**
+ * 从一条到达的条目里取字段：只取字段的条目查表（CLI 已按同一条规则取好，走不通的路径不在表里），
+ * 整条 item 的条目（老 CLI）现场按路径读。四种折叠都只经这一个口子读条目。
+ */
+function readEntryField(entry: ArtifactItem, path: string): unknown {
+  if (entry.fields !== undefined) {
+    return Object.hasOwn(entry.fields, path) ? entry.fields[path] : undefined;
   }
-  return cursor;
+  return readArtifactField(entry.item, path);
 }
 
 /**
@@ -158,7 +157,7 @@ function toFiniteNumber(value: unknown): number | undefined {
 }
 
 /** 单元格 / 卡片明细的显示文本。对象走紧凑 JSON——比 "[object Object]" 有用得多。 */
-function formatArtifactValue(value: unknown): string {
+export function formatArtifactValue(value: unknown): string {
   if (value === undefined || value === null) {
     return "";
   }
@@ -195,13 +194,13 @@ function applyChart(spec: ChartSpec, items: readonly ArtifactItem[]): ChartModel
   let baseline: ChartModel["baseline"];
 
   for (const entry of items) {
-    const rawX = readArtifactField(entry.item, spec.x.field);
+    const rawX = readEntryField(entry, spec.x.field);
     if (!hasValue(rawX)) {
       // x 都没有的条目在图上无处安放；静默跳过（它仍在 Results 区里可见）。
       continue;
     }
     const values = fields.map((field) => {
-      const value = toFiniteNumber(readArtifactField(entry.item, field.field));
+      const value = toFiniteNumber(readEntryField(entry, field.field));
       if (value === undefined) {
         return undefined;
       }
@@ -211,7 +210,7 @@ function applyChart(spec: ChartSpec, items: readonly ArtifactItem[]): ChartModel
     raws.push({ sequence: entry.sequence, x: rawX, values });
 
     if (spec.baseline && !baseline) {
-      const raw = readArtifactField(entry.item, spec.baseline.field);
+      const raw = readEntryField(entry, spec.baseline.field);
       const value = toFiniteNumber(raw);
       if (value !== undefined && !(spec.scale === "log" && value <= 0)) {
         baseline = {
@@ -286,7 +285,7 @@ function applyTable(spec: TableSpec, items: readonly ArtifactItem[]): TableModel
   // 一张会跳动排序的表在运行期没法读。
   const byId = new Map<string, TableRowModel>();
   for (const entry of items) {
-    const keyValue = spec.key ? readArtifactField(entry.item, spec.key) : undefined;
+    const keyValue = spec.key ? readEntryField(entry, spec.key) : undefined;
     // key 缺席（或声明了 key 但这条没带）时用 journal 身份兜底：`siteId@ordinal` 逐条唯一，
     // 于是 upsert 自然退化成追加——不必为两种模式各写一条路径。
     const id = hasValue(keyValue)
@@ -295,9 +294,7 @@ function applyTable(spec: TableSpec, items: readonly ArtifactItem[]): TableModel
     byId.set(id, {
       id,
       sequence: entry.sequence,
-      cells: columns.map((column) =>
-        formatArtifactValue(readArtifactField(entry.item, column.field)),
-      ),
+      cells: columns.map((column) => formatArtifactValue(readEntryField(entry, column.field))),
     });
   }
 
@@ -315,7 +312,7 @@ function applyMetrics(spec: MetricsSpec, items: readonly ArtifactItem[]): Metric
   // 一个只报 stage 的心跳条目不该把上一轮的 p99 抹成空。
   for (const entry of items) {
     metrics.forEach((tile, index) => {
-      const raw = readArtifactField(entry.item, tile.field);
+      const raw = readEntryField(entry, tile.field);
       if (!hasValue(raw)) {
         return;
       }
@@ -337,14 +334,14 @@ function applyBoard(spec: BoardSpec, items: readonly ArtifactItem[]): BoardModel
   const byId = new Map<string, BoardCardModel>();
 
   for (const entry of items) {
-    const keyValue = readArtifactField(entry.item, spec.key);
+    const keyValue = readEntryField(entry, spec.key);
     if (!hasValue(keyValue)) {
       // 没有身份的条目在看板上无处安放（看板整个语义就是「按 key upsert」）。
       continue;
     }
     const id = formatArtifactValue(keyValue);
-    const status = formatArtifactValue(readArtifactField(entry.item, spec.status));
-    const titleRaw = spec.cardTitle ? readArtifactField(entry.item, spec.cardTitle) : undefined;
+    const status = formatArtifactValue(readEntryField(entry, spec.status));
+    const titleRaw = spec.cardTitle ? readEntryField(entry, spec.cardTitle) : undefined;
     byId.set(id, {
       id,
       sequence: entry.sequence,
@@ -352,7 +349,7 @@ function applyBoard(spec: BoardSpec, items: readonly ArtifactItem[]): BoardModel
       status,
       details: detail.map((field) => ({
         label: artifactFieldLabel(field),
-        value: formatArtifactValue(readArtifactField(entry.item, field.field)),
+        value: formatArtifactValue(readEntryField(entry, field.field)),
         ...(field.unit ? { unit: field.unit } : {}),
       })),
     });

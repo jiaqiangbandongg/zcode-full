@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-builtin-workspace-disable",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-builtin-workspace-disable.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-builtin-workspace-disable.json"
+  ],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "fileFixtures": [],
+  "requests": []
+}

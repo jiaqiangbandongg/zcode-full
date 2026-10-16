@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-refresh-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-refresh-permission.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-refresh-permission.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-v4-refresh-permission/write-output.txt",
+      "source": "created-by-provider-tool",
+      "description": "spec 创建父目录，刷新后批准 fixture 驱动的 Bash redirect 并创建目标文件。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "v4-refresh-permission-title",
+      "description": "E2E_V4_REFRESH_PERM 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_REFRESH_PERM 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-refresh-permission-write-call",
+      "description": "刷新恢复×权限挂起：Bash redirect exact tool_use，触发权限弹窗后 renderer 刷新。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "redirect 强制 exact suggestion，稳定验证刷新前后 scope 与 response。"
+    },
+    {
+      "id": "v4-refresh-permission-final",
+      "description": "刷新恢复×权限挂起：批准后 tool_result 回灌 → 最终文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "刷新后批准仍能路由回 CLI broker deferred，工具执行并收口。"
+    },
+    {
+      "id": "v4-refresh-permission-repeat-call",
+      "description": "刷新后重复完全相同 Bash exact command。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 allowAlways updates 已持久化且 v4 optionId 映射未丢失。"
+    },
+    {
+      "id": "v4-refresh-permission-repeat-final",
+      "description": "重复 exact command 自动允许后的终态。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "无二次权限弹窗时稳定收口。"
+    }
+  ]
+}

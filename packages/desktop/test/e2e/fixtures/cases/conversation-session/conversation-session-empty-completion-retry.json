@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-empty-completion-retry",
+  "spec": "./test/e2e/conversation-session/conversation-session-empty-completion-retry.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-empty-completion-retry.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "empty-completion-retry-title",
+      "description": "空 completion retry case 的标题 sidecar 固定响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是空 completion retry 的产品语义；固定响应避免 title sidecar 依赖共享 legacy fixture。"
+    },
+    {
+      "id": "empty-completion-retry-stream-first-empty",
+      "description": "首个主请求正常 EOF 收口，但 finish=other 且 text/reasoning/tool/usage 全为空。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 provider 正常 EOF + finish=other 的零输出 completion，验证 adapter 隐藏首个 attempt 并只重试一次。"
+    },
+    {
+      "id": "empty-completion-retry-stream-second-success",
+      "description": "第二个主请求返回正常文本，作为唯一一次 retry 的成功结果。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 retry 后的成功文本，证明首个空 attempt 没有泄漏到 UI 且逻辑 turn 正常收口。"
+    }
+  ]
+}

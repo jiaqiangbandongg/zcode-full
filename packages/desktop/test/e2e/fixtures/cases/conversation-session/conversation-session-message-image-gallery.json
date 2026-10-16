@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-message-image-gallery",
+  "spec": "./test/e2e/conversation-session/conversation-session-message-image-gallery.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-message-image-gallery.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/message-image-gallery/*.svg",
+      "source": "created-by-spec",
+      "description": "MIG01-MIG05/MIG07 在 Agent workspace 写入 4 张不同颜色的 1200x800 SVG，验证本地 fileService 加载、分组、导航和缩放。"
+    },
+    {
+      "path": "${TMPDIR}/zcode-e2e-message-image-gallery-*.svg",
+      "source": "created-by-spec",
+      "description": "MIG08 mock desktop native Save As 后校验当前预览图片的完整落盘字节，并覆盖取消不创建文件。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "message-image-gallery-title",
+      "description": "消息图片画廊 case 的固定标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于图片布局合同，只需避免 sidecar 阻塞主消息。"
+    },
+    {
+      "id": "message-image-gallery-main",
+      "description": "稳定返回三张连续本地 Markdown 图片和一张正文分隔后的独立图片。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "图片 gallery 布局需要确定的相邻 Markdown 块、alt 和 workspace-relative 文件路径，真实模型输出不稳定。"
+    }
+  ]
+}

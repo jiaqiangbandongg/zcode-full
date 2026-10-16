@@ -46,10 +46,10 @@ See `scripts/shimmer-elements.tsx` for this example.
 
 ### `<Shimmer />`
 
-| Prop        | Type          | Default | Description                                                                |
-| ----------- | ------------- | ------- | -------------------------------------------------------------------------- |
-| `children`  | `string`      | -       | The text content to apply the shimmer effect to.                           |
-| `as`        | `ElementType` | -       | The HTML element or React component to render.                             |
-| `className` | `string`      | -       | Additional CSS classes to apply to the component.                          |
-| `duration`  | `number`      | `2`     | The duration of the shimmer animation in seconds.                          |
-| `spread`    | `number`      | `2`     | The spread multiplier for the shimmer gradient, multiplied by text length. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `string` | - | The text content to apply the shimmer effect to. |
+| `as` | `ElementType` | - | The HTML element or React component to render. |
+| `className` | `string` | - | Additional CSS classes to apply to the component. |
+| `duration` | `number` | `2` | The duration of the shimmer animation in seconds. |
+| `spread` | `number` | `2` | The spread multiplier for the shimmer gradient, multiplied by text length. |

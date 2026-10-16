@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-model-switch",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-model-switch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-model-switch.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-model-switch-title",
+      "description": "E2E_V4_MODEL_SWITCH_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_MODEL_SWITCH_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-model-switch-seed",
+      "description": "M4 switchModelConfig 门禁：首轮固定回复，建立可切模型的 session。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "模型切换只需一个已存在 session；首轮文案固定。"
+    }
+  ]
+}

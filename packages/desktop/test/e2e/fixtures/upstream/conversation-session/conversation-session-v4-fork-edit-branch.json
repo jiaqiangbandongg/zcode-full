@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-fork-edit-branch",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-fork-edit-branch.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-fork-edit-branch-title",
+      "description": "E2E_V4_BRANCH_T1 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_BRANCH_T1 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_BRANCH_T1"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-fork-edit-branch-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Fork Edit Branch E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-branch-edited",
+      "description": "E09：edit 重跑后的新分支回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "edit 重跑需要与原回复可区分的新分支哨兵。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_BRANCH_EDITED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-branch-edited",
+          "inputTokens": 80,
+          "outputTokens": 6,
+          "text": "V4_BRANCH_EDITED_REPLY"
+        }
+      }
+    },
+    {
+      "id": "v4-branch-t1",
+      "description": "E09：原始首轮回复（edit 前的旧分支）。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "fork-after-edit 需要旧分支哨兵证明 child 未继承被 rewind 的历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_BRANCH_T1"],
+        "lastUserMessageExcludes": ["E2E_V4_BRANCH_EDITED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-branch-t1",
+          "inputTokens": 80,
+          "outputTokens": 6,
+          "text": "V4_BRANCH_T1_REPLY"
+        }
+      }
+    }
+  ]
+}

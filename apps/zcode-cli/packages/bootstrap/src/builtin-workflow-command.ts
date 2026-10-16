@@ -3,11 +3,14 @@ import { BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES } from "@zcode/shared";
 import { DYNAMIC_WORKFLOW_SKILL_NAME } from "./app/bundled-skills.js";
 
 /**
- * 内置 `/workflow` 命令。
- * 命令正文随 CLI 编译，与 `/init` 同为代码定义的 prompt 命令，不依赖可卸载插件。
- * 命令名进入保留字表，用户或插件的同名命令不会被展开。
+ * 内置 `/workflow` 命令（docs/dynamic-workflow/authoring.md「The `/workflow` command and the skill」）。
  *
- * 正文复用 contracts 的 custom command 展开规则：替换 $ARGUMENTS，并补充 `skills:` 前言。
+ * 它曾是 zcode-guide 内置插件的 `commands/workflow.md`：插件一被卸载/停用，命令与加号菜单入口一起消失，
+ * 而十个工作流工具仍在（2026-09-19 事故）。现在命令正文随 CLI 编译，与 `/init` 同为代码定义的
+ * prompt 型内置命令；名字进入保留字表，用户或插件同名命令不再被展开。
+ *
+ * 正文刻意复用 contracts 的 custom command 展开（$ARGUMENTS 替换 + `skills:` 前言），
+ * 让模型看到的提示词与插件时代逐字同形，不重新调教。
  */
 export const BUILTIN_WORKFLOW_COMMAND_NAME = "workflow";
 

@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-send-message-resume-stop",
+  "spec": "./test/e2e/conversation-session/conversation-session-send-message-resume-stop.test.ts",
+  "fixtures": [
+    {
+      "id": "send-message-resume-stop-title",
+      "description": "固定本 case 的 session title generation。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 SAT12 语义；固定响应避免隐藏请求重试阻塞主 turn。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SEND_MESSAGE_RESUME_STOP_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-send-message-resume-stop-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"SendMessage Resume Stop E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":32,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":12,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "send-message-resume-stop-parent-agent",
+      "description": "父模型启动一个 foreground Agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定 foreground Agent 启动，避免 live 模型改变 SAT12 前置状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SEND_MESSAGE_RESUME_STOP_PARENT"],
+        "bodyIncludes": ["E2E_SEND_MESSAGE_RESUME_STOP_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_send_message_resume_stop_agent",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "E2E foreground agent for resume stop",
+            "prompt": "Reply with exactly E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE.",
+            "run_in_background": false,
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-foreground-child",
+      "description": "foreground child 完成并进入 terminal。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定形成可由 SendMessage resume 的 terminal local agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-foreground-done",
+          "inputTokens": 32,
+          "text": "E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-parent-foreground-idle",
+      "description": "foreground Agent 完成后父模型结束第一个 turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "在 SendMessage 前形成稳定 idle 边界，供 E2E 固化原 foreground identity。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_PARENT",
+          "E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "resumed it in the background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-foreground-parent-idle",
+          "inputTokens": 32,
+          "text": "E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_PARENT_IDLE"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-parent-send-message",
+      "description": "第二个用户 turn 让父模型向已完成的同一 agent 发送 SendMessage。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "使用 replay 注入的真实 agentId，固定触发 terminal resume。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": [
+          "resumed it in the background",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_send_message_resume_stop_send_message",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "resume stopped agent for stop check",
+            "message": "You MUST invoke the Bash tool with command \"sleep 120\". Do not send any text before the Bash tool finishes. After it finishes, reply with exactly E2E_SEND_MESSAGE_RESUME_STOP_CHILD_DONE."
+          }
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-parent-idle",
+      "description": "SendMessage 成功后父模型结束 resume turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 SendMessage 成功后的 parent idle 边界，避免 live 模型额外调用 TaskOutput。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "resumed it in the background"
+        ],
+        "bodyExcludes": [
+          "<status>stopped</status>",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-parent-idle",
+          "inputTokens": 32,
+          "text": "E2E_SEND_MESSAGE_RESUME_STOP_PARENT_IDLE"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-stop-notification",
+      "description": "Stop completion notification 被父模型消费并结束 turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "为 Stop 后的后台 completion notification turn 提供唯一完成屏障。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "<status>stopped</status>"
+        ],
+        "bodyIncludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_PARENT",
+          "<task-notification>",
+          "<tool-use-id>toolu_e2e_send_message_resume_stop_send_message</tool-use-id>",
+          "<status>stopped</status>"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-notification-done",
+          "inputTokens": 32,
+          "text": "E2E_SEND_MESSAGE_RESUME_STOP_NOTIFICATION_DONE"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-foreground-compact",
+      "description": "foreground Agent 完成后的自动 compact 保留原 agent identity。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E 默认模型窗口会在 foreground tool result 后 compact；固定 summary 保留第二个 turn 所需 identity。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SEND_MESSAGE_RESUME_STOP_PARENT",
+          "E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": [
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "resumed it in the background",
+          "<status>stopped</status>"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-foreground-compact",
+          "inputTokens": 32,
+          "text": "<summary>E2E_SEND_MESSAGE_RESUME_STOP_PARENT: foreground Agent returned E2E_SEND_MESSAGE_RESUME_STOP_FOREGROUND_DONE and completed. agentId: {{latestAgentId}}. Finish this foreground-only turn without another tool call.</summary>"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-resume-pending-compact",
+      "description": "SendMessage tool result 进入上下文前的自动 compact 保留目标 agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "SendMessage tool call/result 位于 compact 保留段；summary 只保留当前用户请求和原 agent identity。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": ["<status>stopped</status>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-resume-pending-compact",
+          "inputTokens": 32,
+          "text": "<summary>E2E_SEND_MESSAGE_RESUME_STOP_PARENT E2E_SEND_MESSAGE_RESUME_STOP_RESUME: the user requested one SendMessage call to agentId: {{latestAgentId}}. Preserve the in-flight tool call and result outside this summary, then finish the parent turn without another tool call.</summary>"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-resumed-compact",
+      "description": "SendMessage 成功后的自动 compact 保留 resume 状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父 turn 结束后的 compact 必须保留真实 SendMessage 成功结果，供 Stop notification turn 继续。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SEND_MESSAGE_RESUME_STOP_RESUME",
+          "toolu_e2e_send_message_resume_stop_send_message",
+          "resumed it in the background",
+          "agentId: agent_"
+        ],
+        "bodyExcludes": ["<status>stopped</status>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-send-message-resume-stop-resumed-compact",
+          "inputTokens": 32,
+          "text": "<summary>E2E_SEND_MESSAGE_RESUME_STOP_PARENT E2E_SEND_MESSAGE_RESUME_STOP_RESUME: SendMessage toolu_e2e_send_message_resume_stop_send_message resumed agentId: {{latestAgentId}} in the background. Wait for its task notification.</summary>"
+        }
+      }
+    },
+    {
+      "id": "send-message-resume-stop-child-bash",
+      "description": "resumed child 启动可取消的长时间 Bash。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定 resumed child running 窗口，以验证 Stop 可见和 accepted cancel。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SEND_MESSAGE_RESUME_STOP_CHILD_DONE"],
+        "bodyIncludes": ["sleep 120"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_send_message_resume_stop_bash",
+          "name": "Bash",
+          "inputTokens": 32,
+          "input": {
+            "command": "sleep 120",
+            "description": "Keep resumed child running for Stop"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,14 +1,57 @@
-// AgentRuntime-backed WorkflowDriver：dispose 时的会话释放与静默状态。
-// `dispose()` 不等待仍在执行的 turn；释放会话时记录这些 promise，供 amend 判断哪些会话已停止写入。
+// ============================================================
+// AgentRuntime-backed WorkflowDriver：dispose 时的会话释放与静默账本
+// ============================================================
+// 两件事同住一个模块，因为它们是同一时刻的一体两面：dispose **不等**在飞的 turn，静默账正是
+// 为这件事记的。释放的编排（{@link releaseActorSessions}）顺手把「此刻还有没有在写的 turn」
+// 登记进账本，两者之间没有第二个观察点。
 //
-// 引擎结算并不表示被中止的 turn 已完成最后的消息持久化。amend 需要先等待会话静默，
-// 再读取消息条数作为 `inFlight.messageBoundary`。已完成 ask 的边界已记入 journal，不受此影响。
-// 等待超时的会话不导入未完成部分，后继从完整前缀重新执行，不能将超时视为静默。
+// 见 apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md「Amend-resume」的
+// 「What is imported」与「Tool contract and refusals」两行。
 //
-// 此处只等待 turn 主线，不保证所有流式工具 part 都已落库：部分工具句柄可能已与 turn 的
-// promise 脱离。转录复制读取当时可见的 part；历史恢复会将 pending/running 工具视为中断，
-// 缺失的 part 不会生成无结果的 tool_use，空 assistant 消息会被跳过。
-// part 按同一 ID 更新，不增加消息条数，因此迟到的 part 不会改变消息边界。
+// 为什么需要这本账：修订一个**在飞**前驱时，amend 先 abort 它、再 await 它自己的结算 promise，
+// 随后去数前驱会话的消息条数，把那个数当成「接续位置」（`inFlight.messageBoundary`）。但
+// `dispose()` 是同步的——它对还有在飞 turn 的会话只挂了一条 `state.turn.then(close, close)`，
+// 并不等；而引擎在 `cancelAsk` 中止 turn 之后立刻结算。于是「结算 promise 已解决」并不蕴含
+// 「被中止的 turn 已经把它的尾巴写完」：那一刻数出来的条数可能少一条消息，或者数到一条 part
+// 还没落全的消息。已完结前缀不受影响——它们的边界在 ask 结算时就已经 journal 了。
+//
+// 所以 driver 在 dispose 的那一刻把每个会话此刻仍在飞的 turn 记进这本账，amend 随后问一次
+// 「哪些会话已经静默了」，只对静默的会话谈接续。
+//
+// **这不是用超时掩盖竞态**：到点仍未落地的会话不会被「当作静默继续用」，它只是拿不到
+// `inFlight`——也就是本特性之前的行为（整段在飞转录丢弃，ask 从完整前缀重开）。我们宁可少做
+// 一次优化，也绝不拿一个正在变动的条数去截断转录。
+//
+// ——————————————————————————————————————————————————————————————
+// 这道闸门**关不住**的那一件事（2026-09-19 核实，已裁决接受）
+// ——————————————————————————————————————————————————————————————
+// core 的 turn 主线是全 await 的：中止时依次 await `abandon("cancelled")`
+// （core/src/runtime/methods/turn-model-step.ts:365）、`persistCancelledStreamSnapshot`（同上 :372）
+// 与 `persistAssistantMessage`（同上 :405），所以本闸门等到的「turn 落地」确实蕴含这几步写完。
+//
+// 漏在外面的是**流式工具的 part**，两条路，都与消息条数无关：
+//   1. 同上 :633 的 `throwIfTurnAborted` 在跑 `abandon()` 的 try/catch **之外**（`drain()` 在 :646），
+//      于是「流结束 → drain」这段窗口里到达的中止会绕过 abandon，把在飞的流式工具句柄丢在外面；
+//   2. `abandon()` 自己只等 250ms（core/src/runtime/methods/streaming-tool-coordinator.ts:38、:121）。
+// 两条都让一个已经落库的 assistant 消息在本闸门放行之后**再长出一个 part**
+// （同上 :253 的 pending part、:294 的 running part）。等不到它：那些句柄与我们 await 的 promise
+// 已经脱钩，没有东西可等——这不是闸门宽严的问题。
+//
+// 为什么可以接受：**数条数在 amend 时，抄消息在后继子代理首次派发时**
+// （workflow-actor-transcript.ts 的 seedActorTranscript 按 `messageCount` 连 part 一起读）。
+// 夹在中间落地的 part 会被原样抄走；真正丢的只有「抄的那一刻仍然缺席」的 part。两种形态都能
+// 正常重水化（core/src/agent/session-history-hydrator.ts）：
+//   - part 在场但停在 pending / running：hydrator 只给 `completed` 与 `error` 单独分支，其余一律
+//     落到 :189 的 `INTERRUPTED_TOOL_RESULT`，所以 pending 与 running 走的是同一条路；
+//   - part 整个缺席：assistant 的工具调用取自**在场的** part（同上 :173 的 `addAssistant`），
+//     所以不会凭空出现一个没有结果的 `tool_use`；而一条既无正文、无 reasoning、无工具 part、
+//     也无 token 基线的 assistant 消息会被整条跳过（同上 :162），也不会留下空消息。
+// 两种形态都不会产出 provider 眼里非法的历史（不会有 tool_use 缺 tool_result，也不会有空
+// assistant）。另外 part 的三态是**同一个 part id 上的 upsert**（adapters 的
+// storage/session-store/repositories/messages.ts 的 `savePart`，`on conflict(id) do update`），
+// 不是追加，所以迟到的 part 不会让消息条数变化，也就动不了任何边界。
+//
+// 第 1 条的正解在 core（把那句 `throwIfTurnAborted` 挪进 abandon 的保护区内），不在本文件。
 
 import type { WorkflowClock } from "./workflow-driver-concurrency.js";
 import { defaultSchedule } from "./workflow-driver-helpers.js";
@@ -49,7 +92,7 @@ export interface ActorSessionQuiescenceLedger extends ActorSessionQuiescence {
 }
 
 /**
- * 造一本会话静默账。纯内存、无 I/O；时钟由调用方注入。
+ * 造一本会话静默账。纯内存、无 I/O；时钟可注入，所以测试不必真睡。
  *
  * 所有权：每个 driver 实例恰好一本，随 driver 一起生灭。刻意**不做**进程级注册表——一个会话
  * 属于哪个 run 已经由 driver 的归属关系说清了，第二张表只会带来「两边不一致时信谁」。

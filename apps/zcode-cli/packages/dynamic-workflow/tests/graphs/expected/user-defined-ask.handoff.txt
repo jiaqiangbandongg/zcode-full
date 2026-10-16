@@ -1,0 +1,2 @@
+phase unphased
+participant unphased:actor#1 "scanner" steps=ask#1

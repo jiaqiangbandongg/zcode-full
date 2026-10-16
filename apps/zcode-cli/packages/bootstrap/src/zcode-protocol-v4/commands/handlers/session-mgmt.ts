@@ -15,9 +15,9 @@ import type { V4CommandCoreHost } from "../types.js";
 import { applyRequestedSessionConfig } from "./model-config.js";
 import {
   hasPromptInput,
-  V4InputAdmissionRejectedError,
   resolveSubmittedExecutionState,
-} from "./session-flow.js";
+  V4InputAdmissionRejectedError,
+} from "../input-admission.js";
 
 /**
  * createSession：回落面最后一项的原生化。
@@ -49,19 +49,29 @@ async function createSession(
   }
   const { sessionId } = await host.createSessionRecord({
     workspaceId: payload.workspaceId,
+    ...(payload.permissionScope ? { permissionScope: payload.permissionScope } : {}),
     mcpServers: payload.mcpServers,
     offPeakToolEnabled: payload.offPeakToolEnabled,
     dynamicWorkflowEnabled: payload.dynamicWorkflowEnabled,
+    dynamicWorkflowMode: payload.dynamicWorkflowMode,
   });
   // createSession.config 消费——草稿态 UI 的先行选择（模型/思考深度/
   // 模式）在首发之前应用并补发事件，首条 turn 即用所选配置。必须在 firstInput 之前。
-  // 应用失败不连坐会话创建（record 已建成，failed ACK 只会泄漏会话）：降级 warn，
-  // 会话保持 runtime 缺省。
+  // 普通配置保留既有 warn 降级；Guarded 是明确的授权选择，失败不得用缺省模式执行。
   if (payload.config) {
     const record = requireRecord(host, sessionId);
     try {
       await applyRequestedSessionConfig(host, record, payload.config);
     } catch (error) {
+      if (payload.config.mode === "guarded" || payload.firstInput?.mode === "guarded") {
+        // 根因：旧 catch 吞掉模式应用失败后仍提交首轮，Guarded 会静默退化。
+        try {
+          await host.closeSession?.(sessionId);
+        } catch (closeError) {
+          host.logger?.warn?.("v4 guarded draft cleanup failed", { sessionId, closeError });
+        }
+        throw error;
+      }
       host.logger?.warn?.("v4 createSession config apply failed; session keeps runtime defaults", {
         error: error instanceof Error ? error.message : String(error),
         sessionId,

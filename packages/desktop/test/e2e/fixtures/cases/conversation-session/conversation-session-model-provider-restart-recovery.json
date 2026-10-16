@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-restart-recovery",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-restart-recovery.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-restart-recovery.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-provider-restart-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于模型恢复语义。"
+    },
+    {
+      "id": "model-provider-restart-title-anthropic",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "重启窗口可能在 seed provider 水合前先恢复启动 provider transport。"
+    },
+    {
+      "id": "model-provider-restart-r01",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是请求模型，响应仅用于稳定收口。"
+    },
+    {
+      "id": "model-provider-restart-r01-anthropic",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "case 验证 provider/model，允许重启恢复阶段使用启动 transport。"
+    },
+    {
+      "id": "model-provider-restart-r02",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是请求模型，响应仅用于稳定收口。"
+    },
+    {
+      "id": "model-provider-restart-r03",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是失效 Recent 回退后的真实请求模型，响应仅用于稳定收口。"
+    },
+    {
+      "id": "model-provider-restart-r04",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是失效 Recent 回退后的真实请求模型，响应仅用于稳定收口。"
+    }
+  ]
+}

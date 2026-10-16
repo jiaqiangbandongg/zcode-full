@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-offpeak-create-existing-session",
+  "spec": "./test/e2e/conversation-session/conversation-session-offpeak-create-existing-session.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-title",
+      "description": "标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于闲时任务产品语义，只需稳定返回。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_OFFPEAK_EXISTING_WARMUP"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\": \"upstream-e2e-conversation-session-offpeak-create-existing-session-title\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"deepseek-v4-flash\", \"content\": [{\"type\": \"text\", \"text\": \"{\\\"title\\\": \\\"OffPeak Existing Session E2E\\\"}\"}], \"stop_reason\": \"end_turn\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 120, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0, \"output_tokens\": 20, \"service_tier\": \"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-warmup",
+      "description": "重启前的普通一轮：纯文本回复，让会话成为有历史的已持久化会话。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只需要一条稳定的已完成历史，回复内容不影响产品语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_OFFPEAK_EXISTING_WARMUP"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_OFFPEAK_EXISTING_CREATE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-conversation-session-offpeak-create-existing-session-warmup",
+          "inputTokens": 200,
+          "outputTokens": 12,
+          "text": "E2E_OFFPEAK_EXISTING_WARMUP_OK"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-tool",
+      "description": "冷恢复后的第二轮：返回 OffPeakCreate tool_use（只给 title/prompt，缺省走 D49-4）。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 OffPeakCreate；固定触发工具，专门验证 v4 冷恢复会话仍有工具面并可直达编辑。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_OFFPEAK_EXISTING_CREATE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_OFFPEAK_EXISTING_TASK"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_conversation_session_offpeak_create_existing_session",
+          "messageId": "msg_e2e_conversation_session_offpeak_create_existing_session",
+          "name": "OffPeakCreate",
+          "input": {
+            "title": "E2E_OFFPEAK_EXISTING_TASK",
+            "prompt": "E2E_OFFPEAK_SUBAGENT_CHILD_INHERIT: Review the open TODO comments in this workspace and draft a cleanup plan in TODO-PLAN.md."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-session-offpeak-create-existing-session-final",
+      "description": "OffPeakCreate tool_result 进入历史后的收尾文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "tool_result 进入历史后结束 case，真实回复内容不影响产品语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_OFFPEAK_EXISTING_CREATE",
+          "E2E_OFFPEAK_EXISTING_TASK"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-conversation-session-offpeak-create-existing-session-final",
+          "inputTokens": 200,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

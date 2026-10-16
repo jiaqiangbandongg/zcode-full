@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-side-pane-empty-state",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-side-pane-empty-state.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-fork-side-pane-empty-state.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "fork-side-pane-empty-state-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不是本 case 的产品语义；固定响应避免严格 case-local replay 依赖共享 fallback。"
+    },
+    {
+      "id": "fork-side-pane-empty-state-parent-turn",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 fork task 切换后的 Side Pane 可见性；provider 只需稳定形成 completed assistant。"
+    }
+  ]
+}

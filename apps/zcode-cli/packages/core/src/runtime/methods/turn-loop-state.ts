@@ -12,7 +12,7 @@ import type {
 } from "../deps.js";
 import type { ActiveTurnSteeringState } from "../types.js";
 import type { SubagentRunOptions } from "@zcode/contracts";
-import type { DrainedPendingInputDiagnostics } from "../types.js";
+import type { DrainedPendingInputDiagnostics, ModelExecutionContext } from "../types.js";
 import type { TurnMachineImpl } from "../deps.js";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
 
@@ -52,6 +52,7 @@ export type CompactAttemptOutcome = "skipped" | "compacted" | "failed";
 export type AutoCompactOutcome = CompactAttemptOutcome | "rapid_refill_blocked";
 
 export interface AutoCompactLoopContext {
+  getAgentListingTools?: () => readonly { name: string }[];
   compactReason: CompactReason;
   modelStepIndex: number;
   phase: CompactPhase;
@@ -61,6 +62,7 @@ export interface AutoCompactLoopContext {
 }
 
 export interface ReactiveCompactLoopContext {
+  agentListingTools?: readonly { name: string }[];
   activeEntries?: readonly RuntimeMessageEntry[];
   modelStepIndex: number;
   model: Model;
@@ -91,16 +93,20 @@ export interface RegularTurnLoopState {
   drainedSteerForNextRequest?: DrainedPendingInputDiagnostics;
   events: SessionEvent[];
   input: string;
+  inputId?: string;
   modelResponse: string;
   /** 本轮固定使用的可调用模型；配置变化只影响以后创建的 Loop。 */
   model: Model;
   /** execution 表示当前 Active Model 不能被同 loop 的 guide 改写。 */
   modelSelectionScope?: "execution";
+  /** 本轮执行 Selection 的降级声明；命中一次后清空，退回后的模型不再二次降级。 */
+  selectionFallback?: ModelExecutionContext["selectionFallback"];
   /** Core Server 的前台 child Selection override；优先于 profile 与父模型继承。 */
   subagentModelOverride?: SubagentRunOptions["modelOverride"];
   modelStepCount: number;
   /** 当前 query 已成功写入 provider 可见持久历史的 assistant/compact 产物数量。 */
   historyRoundCount: number;
+  completedRealToolResultBatch: boolean;
   reactiveCompactAttemptedInCurrentModelStep: boolean;
   repeatedToolCallSignature?: string;
   repeatedToolCallStreakCount: number;

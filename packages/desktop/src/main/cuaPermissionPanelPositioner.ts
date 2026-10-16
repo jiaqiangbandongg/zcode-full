@@ -18,7 +18,7 @@ export interface PanelSize {
   height: number;
 }
 
-interface ResolvePanelBoundsInput {
+export interface ResolvePanelBoundsInput {
   /** 系统设置主窗口的屏幕坐标；null 表示当前拿不到（fail-open 到屏幕底部）。 */
   settings: Rect | null;
   /** 目标显示器的可用工作区（已排除菜单栏/Dock）。 */

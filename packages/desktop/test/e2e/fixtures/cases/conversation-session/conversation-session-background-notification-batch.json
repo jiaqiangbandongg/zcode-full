@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-notification-batch",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-notification-batch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-background-notification-batch.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-background-notification-batch-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "会话标题 sidecar 不属于 notification batch 语义，只需稳定返回，避免它干扰 request 计数。"
+    },
+    {
+      "id": "upstream-background-notification-batch-agent-tools",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定启动三个 run_in_background Agent，构造 N>=2 notification 的代表场景。"
+    },
+    {
+      "id": "upstream-background-notification-batch-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父会话在首个 child 完成前稳定回到 idle，隔离 outer command loop drain 语义。"
+    },
+    {
+      "id": "upstream-background-notification-batch-child-one",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "六秒延迟为父 launch turn terminal 后的 provider child request admission + V4 canStop=false 稳定采样留出可观测窗口，同时让第一条 notification 明确先于其余两条完成。"
+    },
+    {
+      "id": "upstream-background-notification-batch-child-two",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "八秒延迟把第二条 notification 放进第一条 provider request 的 in-flight 窗口。"
+    },
+    {
+      "id": "upstream-background-notification-batch-child-three",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "八点五秒延迟让第三条 notification 同样进入 in-flight 窗口，并晚于第二条 admission。"
+    },
+    {
+      "id": "upstream-background-notification-batch-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E 完整 system prompt 会在首条 notification 前触发自动 compact；固定摘要并保留 case marker，避免 sidecar 干扰 batch 请求计数。"
+    },
+    {
+      "id": "upstream-background-notification-batch-first-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "五秒受控延迟让第二、三条 child completion 在该 request 处理中进入 pending queue。 验证来源提示及非用户授权边界。 新轮通知完整正文只包一对 system-reminder，MCS 开关下均保持 user。 CLI 实际统计的 Messages 字符增量包含通知全文且只计一次，静态上下文分类保持不变，并核对 V4 面板中的 Messages 占比。"
+    },
+    {
+      "id": "upstream-background-notification-batch-post-first-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第一条 notification 的 provider 输入仍超过 E2E 自动 compact 阈值；固定该 sidecar，确保下一次 drain 直接检验第二、三条 pending notification。"
+    },
+    {
+      "id": "upstream-background-notification-batch-pending-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "精确约束同一 last user message 同时含第二、三条 notification，证明只启动一个 batch model turn。 验证来源提示及非用户授权边界。 新轮通知完整正文只包一对 system-reminder，MCS 开关下均保持 user。 CLI 实际统计的 Messages 字符增量包含通知全文且只计一次，静态上下文分类保持不变，并核对 V4 面板中的 Messages 占比。"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "out/e2e",
+    "rootDir": ".",
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "types": ["node", "@wdio/globals/types", "@wdio/electron-types", "mocha"],
+    "noEmit": true,
+    "paths": {
+      "@zcode/e2e-report": ["../e2e-report/src/node/index.ts"]
+    }
+  },
+  "include": ["wdio.conf.ts", "test/e2e"],
+  "references": [{ "path": "../shared" }, { "path": "../ui" }, { "path": "../e2e-report" }]
+}

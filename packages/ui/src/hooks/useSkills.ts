@@ -3,7 +3,7 @@ import type { ZCodeSkillReferenceCatalogEntry } from "@zcode/shared";
 import { useWorkspaceServicesResolution } from "@/hooks/useWorkspaceServices.js";
 import { logger } from "@/logger.js";
 
-interface ConversationSkillCatalogState {
+export interface ConversationSkillCatalogState {
   skills: ZCodeSkillReferenceCatalogEntry[];
   authority: "session" | "workspace" | null;
   loading: boolean;
@@ -27,7 +27,7 @@ const EMPTY_SCOPED_STATE: ScopedConversationSkillCatalogState = {
   value: EMPTY_STATE,
 };
 
-interface UseSkillsOptions {
+export interface UseSkillsOptions {
   workspacePath: string;
   workspaceIdentity?: string;
   sessionId: string | null;
@@ -131,12 +131,7 @@ export function useSkills(options: UseSkillsOptions): ConversationSkillCatalogSt
     services,
   ]);
 
-  if (
-    !options.enabled ||
-    !options.workspacePath ||
-    !rpcReady ||
-    scopedState.scope !== requestScope
-  ) {
+  if (!options.enabled || !options.workspacePath || !rpcReady || scopedState.scope !== requestScope) {
     return EMPTY_STATE;
   }
   return scopedState.value;

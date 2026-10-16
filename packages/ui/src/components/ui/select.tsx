@@ -174,6 +174,58 @@ const SelectItem = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Item
 
 SelectItem.displayName = "SelectItem";
 
+type SelectRichItemProps = Omit<React.ComponentProps<typeof SelectPrimitive.Item>, "children"> & {
+  /** 左侧 16–18px 图标。 */
+  icon?: React.ReactNode;
+  /** 进入 ItemText：触发器（SelectValue）只显示这一段。 */
+  title: React.ReactNode;
+  /** 标题同一行的标记（例如「默认」），不进触发器。 */
+  titleAdornment?: React.ReactNode;
+  /** 标题下一行的说明，不进触发器。 */
+  description?: React.ReactNode;
+};
+
+/**
+ * 两行选项：图标 + 标题 + 说明，选中态用尾部对勾（与输入框权限模式菜单同一版式）。
+ * 用于选项需要解释后果的设置；列表宜配 `position="popper"`，避免 item-aligned 盖住行标签。
+ */
+const SelectRichItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  SelectRichItemProps
+>(({ className, icon, title, titleAdornment, description, ...props }, ref) => {
+  return (
+    <SelectPrimitive.Item
+      ref={ref}
+      data-slot="select-item"
+      className={cn(
+        "relative flex min-h-13 w-full cursor-default items-start gap-3 rounded-md py-2 pr-8 pl-2 text-ui-base text-foreground outline-hidden select-none data-[highlighted]:bg-menu-hover data-[highlighted]:text-foreground data-disabled:pointer-events-none data-disabled:text-foreground-subtlest [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        className,
+      )}
+      {...props}
+    >
+      {icon ? (
+        <span className="mt-0.5 flex size-4.5 items-center justify-center">{icon}</span>
+      ) : null}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <SelectPrimitive.ItemText>{title}</SelectPrimitive.ItemText>
+          {titleAdornment}
+        </span>
+        {description ? (
+          <span className="text-ui-sm text-foreground-subtle">{description}</span>
+        ) : null}
+      </span>
+      <span className="pointer-events-none absolute top-2.5 right-2 flex items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <CheckIcon className="pointer-events-none size-4 text-foreground-subtle" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+    </SelectPrimitive.Item>
+  );
+});
+
+SelectRichItem.displayName = "SelectRichItem";
+
 function SelectSeparator({
   className,
   ...props
@@ -228,6 +280,7 @@ export {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectRichItem,
   SelectLabel,
   SelectScrollDownButton,
   SelectScrollUpButton,

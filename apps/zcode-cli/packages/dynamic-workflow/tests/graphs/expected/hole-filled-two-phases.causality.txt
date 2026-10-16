@@ -1,0 +1,20 @@
+phase phase#1 "摸底" @14:1
+phase phase#2 "冒烟测试" @17:3 fill=hole#21b40fca
+phase phase#3 "分组" @19:3 fill=hole#21b40fca
+phase phase#4 "执行" @22:1
+lane actor#1 "勘察员" @15:22
+lane hole#21b40fca/actor#1 "烟测员" @18:23
+lane hole#21b40fca/actor#2 "分组员" @20:16
+lane actor#2 "执行者" @23:8
+region seq#1 seq
+step ask#1 ask "勘察员" @15:35 lane=actor#1 phase=phase#1 region=seq#1 always
+step hole#21b40fca/ask#1 ask "烟测员" @18:36 lane=hole#21b40fca/actor#1 phase=phase#2 region=seq#1 always fill=hole#21b40fca
+step hole#21b40fca/ask#2 ask "分组员" @20:29 lane=hole#21b40fca/actor#2 phase=phase#3 region=seq#1 always fill=hole#21b40fca
+step ask#2 ask "执行者" @23:21 lane=actor#2 phase=phase#4 region=seq#1 always
+edge ask#1 -> hole#21b40fca/ask#1 data always exact
+edge hole#21b40fca/ask#1 -> hole#21b40fca/ask#2 data always exact
+edge hole#21b40fca/ask#2 -> ask#2 data always exact
+phase-edge phase#1 -> phase#2 data always
+phase-edge phase#2 -> phase#3 data always
+phase-edge phase#3 -> phase#4 data always
+sink ask#2

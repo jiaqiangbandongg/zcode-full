@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-file-tools-atomic-write",
+  "spec": "./test/e2e/conversation-session/conversation-session-file-tools-atomic-write.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-file-tools-atomic-write.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "file-tools-atomic-write-e2e/write.sh",
+      "source": "created-by-spec",
+      "description": "spec 在默认工作区写入的 0755 脚本；Read 后由 Write 覆盖，断言执行位保留。"
+    },
+    {
+      "path": "file-tools-atomic-write-e2e/edit.sh",
+      "source": "created-by-spec",
+      "description": "spec 在默认工作区写入的 0755 脚本；Read 后由 Edit 修改，断言执行位保留。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 file tools 权限语义，只需要稳定返回，避免标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-read-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定先 Read 再 Write；本响应固定触发已读既有可执行文件的覆盖路径。"
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 Write；本响应固定触发已有脚本的完整覆盖写入。"
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-read-edit",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定在 Edit 前读取目标；本响应固定触发已读既有可执行文件的编辑路径。"
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-edit",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 Edit；本响应固定触发已有脚本的局部编辑写入。"
+    },
+    {
+      "id": "upstream-conversation-file-tools-atomic-write-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终 marker 只用于稳定结束窗口级 replay；真实 provider 回复内容不影响文件权限语义。"
+    }
+  ]
+}

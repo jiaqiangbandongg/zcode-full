@@ -32,6 +32,27 @@
 //     （种子 id 按 (会话, 下标) 纯确定，重抄是 upsert），所以那只是多带一点上文，不会变错。
 // 这条也是给**将来**每一个非 journal 事实的兜底：不必逐个去证明它们不会变大，复制点一次性堵死。
 //
+// 一处例外要说清楚，它是这张表里**第一个不是 journal 纯函数**的数：在飞 ask 的接续
+// （`inFlight`）的边界取自**前驱会话此刻的消息条数**，不是 journal 里的某一列。
+//
+// 它在两次构建之间大体稳定，靠的是「前驱已经结算、没人再写它的会话」：
+//   - 提交时由 {@link AmendImportOptions.quietSessions} 保证（被取代的前驱刚 abort，driver 等它
+//     的 turn 落地；没等到的会话不接续）；
+//   - 重建时前驱早已终态、本进程里没有它的 driver，天然无人在写，所以不带这个集合（缺席 =
+//     全部静默）。
+//
+// 但「大体」不是「一定」，而且**不必**是：两条路能让重建算出一个更大的 M——前驱被重新 resume
+// 过又写了几轮（被 supersede 的前驱不可 resume，所以只有「修订一个早已 stopped 的 run、之后
+// 又去 resume 它」构造得出），或者一条迟到的后台通知消息落进了那个会话。两者都只会让 M **变大**，
+// 而正确性不依赖 M 稳定：
+//   - 抄进去的那一侧已经把门关死了——`seedActorTranscript` 只往「空的、或只装着本会话种子
+//     消息的」目标里写（workflow-actor-transcript.ts 的性质 2）。后继一旦跑出自己的消息，更大的
+//     M 再送回来也一个字节都不会被写进去，所以绝无「前驱的消息被追加到本会话历史之后」这种
+//     静默错乱；
+//   - 后继还没跑出自己的消息时，更大的 M 抄来的是**同一条 ask 的更晚快照**，顺序仍由下标决定
+//     （种子 id 按 (会话, 下标) 纯确定，重抄是 upsert），所以那只是多带一点上文，不会变错。
+// 这条也是给**将来**每一个非 journal 事实的兜底：不必逐个去证明它们不会变大，复制点一次性堵死。
+//
 // 唯一的 I/O 是 journal 读与转录条数读（两者都经窄端口注入），本模块自己不碰会话存储实现。
 
 import type { Logger, SessionId } from "@zcode/contracts";
@@ -42,6 +63,9 @@ import type {
   ImportedInFlightAsk,
   ImportedRunCache,
   ImportedWorldEntry,
+  ListActorsOptions,
+  ListNodesOptions,
+  NodeKind,
   NodeRecord,
   RunRecord,
 } from "@zcode/dynamic-workflow";
@@ -57,9 +81,15 @@ import type { ActorTranscriptStore } from "./workflow-actor-transcript.js";
  */
 interface ImportedCacheJournalReader {
   getRun(runId: string): RunRecord | undefined;
-  listActors(runId: string): ActorRecord[];
-  listNodes(runId: string): NodeRecord[];
+  listActors(runId: string, opts: ListActorsOptions): ActorRecord[];
+  listNodes(runId: string, opts: ListNodesOptions): NodeRecord[];
 }
+
+/**
+ * 导入缓存读的节点 kind：ask（接续前缀）与 world 行（世界读取队列）。report 与 artifact 行从不
+ * 进导入缓存，一条都不读——一个前驱可以报过 65,536 条（docs/execution-engine.md「Reading the journal」）。
+ */
+const IMPORTED_NODE_KINDS: readonly NodeKind[] = ["ask", "world-read", "world-run"];
 
 /**
  * 导入构建被拒的三个理由。**判别键而非文案**：模型据它选下一步动作（换 run / 等它结算 /
@@ -104,7 +134,9 @@ export function preflightAmendImport(
 ): AmendPreflightResult {
   const run = journal.getRun(predecessorRunId);
   if (run === undefined) return { ok: false, reason: "run_not_found" };
-  if (!completedAsksHaveBoundaries(journal.listNodes(predecessorRunId))) {
+  // 边界检查只看 ask 行的 status 与 message_boundary，不读它们的回答。
+  const asks = journal.listNodes(predecessorRunId, { kinds: ["ask"], withResult: false });
+  if (!completedAsksHaveBoundaries(asks)) {
     return { ok: false, reason: "missing_boundaries" };
   }
   return { ok: true, run };
@@ -160,8 +192,7 @@ export interface AmendImportOptions {
 }
 
 /**
- * 读取前驱 journal 与转录状态，构建 {@link ImportedRunCache}。
- * 已完成前缀由 journal 决定；未完成 ask 的接续还取决于源会话条数与静默状态。
+ * 读前驱 journal，构建 {@link ImportedRunCache}。**纯确定**：同一份 journal 状态恒给出同一张表。
  *
  * 三道门按序（先门后建：门不过时一行都不必读）：
  *   1. 前驱不存在 → `run_not_found`；
@@ -189,17 +220,23 @@ export async function buildImportedCache(
   // 最有用——脚本真失败（修 bug 保缓存）与 completed（温启动扩展分析）。两个集合各说各的。
   if (!TERMINAL_RUN_STATUSES.has(run.status)) return { ok: false, reason: "not_amendable" };
 
-  const nodes = journal.listNodes(predecessorRunId);
+  const nodes = journal.listNodes(predecessorRunId, {
+    kinds: IMPORTED_NODE_KINDS,
+    withResult: true,
+  });
   if (!completedAsksHaveBoundaries(nodes)) return { ok: false, reason: "missing_boundaries" };
 
+  // ask 行按 actor 分组**一次**：此前每个候选 actor 都把整张节点表扫一遍（O(actor × 行)）。
+  const asksByActor = groupAsksByActor(nodes);
   const actors = new Map<string, ImportedActorCandidate>();
-  for (const record of namedUniqueActors(journal.listActors(predecessorRunId), logger)) {
+  const records = journal.listActors(predecessorRunId, { withPersona: true });
+  for (const record of namedUniqueActors(records, logger)) {
     const name = record.name!;
     const candidate = await buildActorCandidate({
       actor: record,
       journal,
       ...(logger === undefined ? {} : { logger }),
-      nodes,
+      asks: asksByActor.get(actorKey(record.siteId, record.ordinal)) ?? [],
       predecessorRunId,
       ...(options?.quietSessions === undefined ? {} : { quietSessions: options.quietSessions }),
       ...(transcripts === undefined ? {} : { transcripts }),
@@ -258,19 +295,20 @@ async function buildActorCandidate(input: {
   actor: ActorRecord;
   journal: ImportedCacheJournalReader;
   logger?: Logger;
-  nodes: NodeRecord[];
+  /** 该 actor 的 ask 行（已按 actor 分好组，见 {@link groupAsksByActor}）。 */
+  asks: readonly NodeRecord[];
   predecessorRunId: string;
   quietSessions?: ReadonlySet<string>;
   transcripts?: ActorTranscriptStore;
 }): Promise<ImportedActorCandidate | undefined> {
-  const { actor, journal, logger, nodes, predecessorRunId, quietSessions, transcripts } = input;
+  const { actor, asks, journal, logger, predecessorRunId, quietSessions, transcripts } = input;
   const name = actor.name!;
 
   // persona 是引擎在 createActor 时同步落的冻结身份，所以正常必在场；缺席只可能是被外力
   // 改写过的行。运行期比对没有比对物就无从谈起 persona 一致性——弃候选而不是拿 `{}` 顶。
   if (actor.persona === undefined) return undefined;
 
-  const { entries, next } = completedAskPrefix(nodes, actor);
+  const { entries, next } = completedAskPrefix(asks);
   // 既没有完结前缀、前缀后面也没有在飞的 ask：这个 actor 确实一点可导入的东西都没有。
   // 早退省掉下面的链行走与一次转录读。
   if (entries.length === 0 && next?.status !== "running") return undefined;
@@ -335,7 +373,7 @@ async function buildActorCandidate(input: {
 }
 
 /**
- * 前驱停下时**还在飞**的那条 ask。五个条件缺一不可：
+ * 前驱停下时**还在飞**的那条 ask（`docs/execution-engine.md`「What is imported」）。五个条件缺一不可：
  *
  *   1. 紧接前缀的那个位置上有一行，且它是 `running`——被取消的 ask 保留 running 行，所以停掉的
  *      run 也有；`failed` 与序号空洞都不是「还在飞」，它们只是前缀停下的另外两种理由；
@@ -393,20 +431,18 @@ function resolveInFlightAsk(input: {
  * 前缀在第一个非 completed 处停死，三种停法同一处理：失败、崩溃中（running）、序号空洞。
  * 失败的 ask 对新 run **无约束力**（模型有随机性，修订常常就是为了越过一次失败），所以它自己
  * 不导入；但跳过它去导入其后的条目会走私上下文——被跳过那一轮的问答仍在源会话转录里，
- * 而缓存却声称它没发生过。停在第一个非 completed 处是唯一自洽的读法。
+ * 而缓存却声称它没发生过。停在第一个非 completed 处是唯一自洽的读法（spec 的「What is imported」）。
  *
  * `next` 就是**让前缀停下的**那一行（空洞时缺席）。它与前缀同来同走，因为「在飞的那条 ask」
  * 按定义正是这一行：另起一次遍历去找 `actorSeq === entries.length` 的行，等于把「紧接前缀」
  * 这个坐标在两处各算一次。
  */
-function completedAskPrefix(
-  nodes: NodeRecord[],
-  actor: ActorRecord,
-): { entries: ImportedAskEntry[]; next?: NodeRecord } {
+function completedAskPrefix(asks: readonly NodeRecord[]): {
+  entries: ImportedAskEntry[];
+  next?: NodeRecord;
+} {
   const bySeq = new Map<number, NodeRecord>();
-  for (const node of nodes) {
-    if (node.kind !== "ask") continue;
-    if (node.actorSiteId !== actor.siteId || node.actorOrdinal !== actor.ordinal) continue;
+  for (const node of asks) {
     if (node.actorSeq === undefined) continue;
     bySeq.set(node.actorSeq, node);
   }
@@ -452,7 +488,9 @@ function resolveTranscriptSource(input: {
 
   while (runId !== undefined && !seen.has(runId)) {
     seen.add(runId);
-    const matches = journal.listActors(runId).filter((actor) => actor.name === actorName);
+    // 按名取行下推 SQL、不读 persona：此前每个候选 actor 在链的每一代都把整张 actor 表（连同
+    // 每段 system prompt）读出来再按名过滤。
+    const matches = journal.listActors(runId, { name: actorName, withPersona: false });
     // 0 = 这一代根本没有这个 actor（链对该名字断了）；>1 = 重名，按名取会话是掷骰子。
     // 两种都停在这里而不是继续上溯：上一代的会话不是**这段**转录的源。
     if (matches.length !== 1) return undefined;
@@ -471,12 +509,18 @@ function resolveTranscriptSource(input: {
 /**
  * 源会话此刻的消息条数；读失败回 `undefined`。
  *
- * 两个读者共用这一次读取（见 {@link buildActorCandidate}）：
- * - 检查源会话是否达到已完成前缀的边界。条数不足或无法读取时，构建器丢弃该候选，
- *   让后继重新执行；driver 复制转录时仍会拒绝短于边界的源，防止写入不完整的上下文。
- * - 计算未完成 ask 的接续位置（见 {@link resolveInFlightAsk}）。
+ * 两个读者共用这一次读（见 {@link buildActorCandidate}）：
  *
- * 条数口径必须与 driver 记账及 core 历史恢复一致，均使用同一消息存储接口。
+ *   - **源诚实性检查**（条数 ≥ 前缀边界）。它把 driver 的**大声失败**语义与 spec 的**降级**
+ *     语义接在一起：driver 的 `seedActorTranscript` 对短会话抛 `DriverError`（corruption 级，
+ *     见那边的性质 3），而 spec 说缺转录该静默降级为全新重跑。两者都对，但作用域不同——
+ *     **可预见的**缺料（会话被清理 / 被截断）应当在构建期就把候选弃掉，driver 那一侧的失败
+ *     因此退化成真正不该发生时的兜底。
+ *   - **在飞 ask 的接续位置**（见 {@link resolveInFlightAsk}）。
+ *
+ * 读失败按「兑现不了」处理：构建器不为会话存储的错误分类负责，而任何读不到的源都不是可用的源。
+ * 条数口径必须与 driver 的记账、core 的重水化一致——三个读者同一个存取面，见
+ * workflow-actor-transcript.ts 的文件头。
  */
 async function countSource(
   transcripts: ActorTranscriptStore,
@@ -500,7 +544,27 @@ async function countSource(
  * world-run 与 world-read 同表——导入 world-run 是**安全特性**而不是优化：修订续跑绝不静默
  * 重放一次已 journal 的效应（部署脚本跑两次）。
  */
-function buildWorldQueues(nodes: NodeRecord[]): ReadonlyMap<string, ImportedWorldEntry[]> {
+/** actor 坐标键（与引擎的 `refToString` 同形）。 */
+function actorKey(siteId: string, ordinal: number): string {
+  return `${siteId}@${ordinal}`;
+}
+
+/** 前驱的 ask 行按 actor 分组，组内保持 journal 顺序。 */
+function groupAsksByActor(nodes: readonly NodeRecord[]): Map<string, NodeRecord[]> {
+  const groups = new Map<string, NodeRecord[]>();
+  for (const node of nodes) {
+    if (node.kind !== "ask" || node.actorSiteId === undefined || node.actorOrdinal === undefined) {
+      continue;
+    }
+    const key = actorKey(node.actorSiteId, node.actorOrdinal);
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, [node]);
+    else group.push(node);
+  }
+  return groups;
+}
+
+function buildWorldQueues(nodes: readonly NodeRecord[]): ReadonlyMap<string, ImportedWorldEntry[]> {
   const world = new Map<string, ImportedWorldEntry[]>();
   for (const node of nodes) {
     if (node.kind !== "world-read" && node.kind !== "world-run") continue;

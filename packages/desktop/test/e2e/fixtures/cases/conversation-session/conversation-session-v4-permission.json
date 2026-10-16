@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-permission.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-permission.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-v4-permission/write-output.txt",
+      "source": "created-by-provider-tool",
+      "description": "spec 创建父目录，fixture 驱动 Write 工具创建目标文件以完成权限审批回合。"
+    },
+    {
+      "path": ".zcode-e2e/conversation-session-v4-permission/allow-feedback-output.txt",
+      "source": "created-by-provider-tool",
+      "description": "允许路径的 Write 工具输出；用于确认 Allow once 不携带反馈。"
+    },
+    {
+      "path": ".zcode-e2e/conversation-session-v4-permission/deny-blank-output.txt",
+      "source": "created-by-provider-tool",
+      "description": "空白反馈拒绝路径的目标文件；应始终不存在。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "v4-permission-title",
+      "description": "E2E_V4_PERMISSION_WRITE 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_PERMISSION_WRITE 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-permission-write-call",
+      "description": "M4 resolveInteraction 门禁：Write tool_use，默认模式下触发权限弹窗。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Write 是需要审批的破坏性工具，用于验证 v4 前向 resolveInteraction 命令收口反向权限请求。"
+    },
+    {
+      "id": "v4-permission-final",
+      "description": "M4 resolveInteraction 门禁：批准后 tool_result 回灌 → 最终文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "权限批准后工具执行成功，模型据 tool_result 给出终态文本。"
+    },
+    {
+      "id": "v4-permission-allow-feedback-title",
+      "description": "Allow once 携带反馈 case 的标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "独立 prompt marker 隔离允许路径。"
+    },
+    {
+      "id": "v4-permission-allow-feedback-call",
+      "description": "Allow once 携带反馈 case 首发的 Write tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证填写反馈不改变 allow decision。"
+    },
+    {
+      "id": "v4-permission-allow-feedback-final",
+      "description": "Allow once 携带反馈后的终态响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证允许路径继续执行且不回灌 feedback。"
+    },
+    {
+      "id": "v4-permission-deny-title",
+      "description": "Deny with feedback case 的标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Deny with feedback 使用独立 prompt marker，避免与批准路径复用 provider fixture。"
+    },
+    {
+      "id": "v4-permission-deny-call",
+      "description": "Deny with feedback case 首发的 Write tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Write 权限请求用于验证反馈拒绝不会执行工具。"
+    },
+    {
+      "id": "v4-permission-deny-final",
+      "description": "Deny with feedback 后 provider-visible denied tool_result 的收口响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "反馈必须与同一个 denied tool_result 一起进入 provider continuation。"
+    },
+    {
+      "id": "v4-permission-deny-blank-title",
+      "description": "空白反馈拒绝 case 的标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "独立 prompt marker 隔离空白反馈路径。"
+    },
+    {
+      "id": "v4-permission-deny-blank-call",
+      "description": "空白反馈拒绝 case 首发的 Write tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证空白反馈回退基础 Deny 文案。"
+    },
+    {
+      "id": "v4-permission-deny-blank-final",
+      "description": "空白反馈拒绝后的基础 Deny 文案收口响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "provider-visible tool_result 不应包含 feedback suffix。"
+    }
+  ]
+}

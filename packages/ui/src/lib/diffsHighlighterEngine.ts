@@ -12,7 +12,7 @@ import type { BundledTheme } from "shiki";
  */
 export const DIFFS_PREFERRED_HIGHLIGHTER: HighlighterTypes = "shiki-wasm";
 
-interface DiffsHighlighterThemeSettings {
+export interface DiffsHighlighterThemeSettings {
   lightTheme: BundledTheme;
   darkTheme: BundledTheme;
 }

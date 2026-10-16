@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-answer-visible",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-answer-visible.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-answer-visible.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-user-question-answer-visible-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 AskUserQuestion 单题等待态，避免真实模型是否提问影响 UI 投影复现。"
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-answer-visible-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只证明问答回答已被 agent 消费，核心断言在 UI 是否保留用户可见记录。"
+    }
+  ]
+}

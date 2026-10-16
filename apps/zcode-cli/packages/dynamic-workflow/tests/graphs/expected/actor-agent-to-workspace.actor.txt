@@ -1,0 +1,9 @@
+actor-node source
+actor-node workspace
+actor-node actor#1 "namer" @6:15
+actor-node actor#2 "reader" @9:16
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge workspace -> actor#2 exact count=1 types="string"
+actor-edge actor#1 -> workspace exact count=1 types="string"
+actor-edge actor#2 -> sink exact count=1 types="string"

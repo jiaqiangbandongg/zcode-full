@@ -5,7 +5,9 @@ import { collectFacadeMisuse } from "./facade-misuse.js";
 import { collectWorldRunCommands } from "./world-run.js";
 import { collectArtifactDeclarations, type DeclaredArtifact } from "./artifacts.js";
 import { collectPhaseMarkerDiagnostics } from "./phases.js";
+import { collectHoleDiagnostics } from "./hole-sites.js";
 import { collectDuplicateActorNames, FANOUT_ACTOR_NAME_CODE } from "./actor-names.js";
+import { collectActorModels, type ModelReference } from "./actor-models.js";
 import { interpret } from "./interpret.js";
 import { projectSiteGraph } from "./graph.js";
 import { projectCausalityGraph, type CausalityGraph } from "./causality-graph.js";
@@ -48,6 +50,13 @@ export interface AnalyzeResult {
    * 与图不同，它在诊断非空时**照常给出**（它是从站点表直接读的事实，不依赖解释）。
    */
   declaredArtifacts: DeclaredArtifact[];
+  /**
+   * 脚本能交给子代理的每个模型名，每处出现一条（docs/dynamic-workflow/authoring.md「Choosing a
+   * model per subagent」）。launch 工具在确认窗之前把它们对着宿主的模型目录解析
+   * （docs/dynamic-workflow/launch.md「Models the script names」）。与 `declaredArtifacts` 同规：
+   * 编译不过时是空数组，authoring 诊断在场时照常给出。
+   */
+  modelReferences: ModelReference[];
 }
 
 /**
@@ -66,11 +75,15 @@ export function analyzeWorkflowScript(scriptText: string): AnalyzeResult {
   const diagnostics = collectDiagnostics(workflow.program);
   // 编译不过 / facade 逃逸时连站点表都不可信，产物清单只能是空的（缺省而不是缺席：读者
   // 拿到的永远是一个数组，不必在每个消费点分辨"没有产物"与"没能分析"）。
-  if (diagnostics.length > 0) return { declaredArtifacts: [], diagnostics, ok: false };
+  if (diagnostics.length > 0) {
+    return { declaredArtifacts: [], diagnostics, modelReferences: [], ok: false };
+  }
 
   const table = collectSites(workflow);
   const misuse = collectFacadeMisuse(workflow, table);
-  if (misuse.length > 0) return { declaredArtifacts: [], diagnostics: misuse, ok: false };
+  if (misuse.length > 0) {
+    return { declaredArtifacts: [], diagnostics: misuse, modelReferences: [], ok: false };
+  }
 
   // world.run 的字面量 cmd 检查与 misuse 同席：一个运行期才成形的命令没有可展示的授权
   // 对象（确认窗展示的命令集在编译期闭合），所以它和「facade 调用必须有站点」一样是
@@ -83,10 +96,16 @@ export function analyzeWorkflowScript(scriptText: string): AnalyzeResult {
   // 产物的编译期规则同席：id 是编译期字面量、标签指向一个
   // 已声明的预置、同 id 不横跨两种成员——三条都是「运行期才炸不如现在就教改写」的那一类。
   const artifacts = collectArtifactDeclarations(workflow, table);
+  // 子代理模型名集合的封闭性（9010）同席：一个运行期才成形的模型名没有可在确认窗之前解析、
+  // 展示的对象（docs/dynamic-workflow/authoring.md「Choosing a model per subagent」）。
+  const models = collectActorModels(workflow, table);
   const authoring = [
     ...worldRun.diagnostics,
     ...artifacts.diagnostics,
+    ...models.diagnostics,
     ...collectPhaseMarkerDiagnostics(workflow, table),
+    // 留白的编译期规则（9012）同席（docs/dynamic-workflow/authoring.md「Holes」）。
+    ...collectHoleDiagnostics(workflow, table),
     ...collectDuplicateActorNames(workflow, table),
   ];
   // fan-out 里的静态 actor 名（9006）是这批里唯一**不扣下图**的一条：它说的是这个脚本跑起来
@@ -96,7 +115,12 @@ export function analyzeWorkflowScript(scriptText: string): AnalyzeResult {
   // 编译期诊断会让它自己的形状在语料里变得不可表达。
   const withholding = authoring.filter((d) => d.code !== FANOUT_ACTOR_NAME_CODE);
   if (withholding.length > 0) {
-    return { declaredArtifacts: artifacts.declaredArtifacts, diagnostics: authoring, ok: false };
+    return {
+      declaredArtifacts: artifacts.declaredArtifacts,
+      diagnostics: authoring,
+      modelReferences: models.references,
+      ok: false,
+    };
   }
 
   // One interpretation feeds everything: the core carries the taint facts AND the
@@ -112,6 +136,7 @@ export function analyzeWorkflowScript(scriptText: string): AnalyzeResult {
     flow: projectControlFlow(core),
     graph,
     handoff: projectHandoffGraph(core, causality, graph),
+    modelReferences: models.references,
     ok: authoring.length === 0,
   };
 }

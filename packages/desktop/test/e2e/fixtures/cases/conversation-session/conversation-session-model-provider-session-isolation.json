@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-session-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-session-isolation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-session-isolation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-provider-session-isolation-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "model-provider-session-isolation-a",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 Session A primary 请求 body/model/thought；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "model-provider-session-isolation-b",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 Session B secondary 请求 body/model/thought；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "model-provider-session-isolation-a-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 B 配置不会污染 A follow-up 请求；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "model-provider-session-isolation-b-follow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 A 恢复不会污染 B follow-up 请求；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

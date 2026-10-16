@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-effective-selection",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-effective-selection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-effective-selection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "sr87-effective-selection-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证实际请求身份、档位及接纳写入边界；模型文本固定收口，不调用真实套餐。"
+    }
+  ]
+}

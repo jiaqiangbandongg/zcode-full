@@ -11,14 +11,16 @@
 export const DEFAULT_ROW_HEIGHT_ESTIMATE_PX = 72;
 
 /** 缓存上限：超长会话防内存膨胀；淘汰最久未写入的行（写入序 ≈ 行序，旧行先淘汰）。 */
-const MAX_ROW_HEIGHT_CACHE_ENTRIES = 4000;
+export const MAX_ROW_HEIGHT_CACHE_ENTRIES = 4000;
 
-type TimelineRowHeightCacheKey = string | number;
+export type TimelineRowHeightCacheKey = string | number;
 
 export class TimelineRowHeightCache {
   private readonly sizes = new Map<TimelineRowHeightCacheKey, number>();
 
-  constructor(private readonly maxEntries: number = MAX_ROW_HEIGHT_CACHE_ENTRIES) {}
+  constructor(
+    private readonly maxEntries: number = MAX_ROW_HEIGHT_CACHE_ENTRIES,
+  ) {}
 
   get size(): number {
     return this.sizes.size;

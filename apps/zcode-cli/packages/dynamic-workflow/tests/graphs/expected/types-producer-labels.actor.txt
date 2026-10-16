@@ -1,0 +1,12 @@
+actor-node source
+actor-node workspace
+actor-node actor#1 "scanner" @16:21
+actor-node actor#2 "planner" @17:23
+actor-node actor#3 "consumer" @20:19
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#2 exact count=1
+actor-edge workspace -> actor#3 exact count=2 types="string[]","string"
+actor-edge actor#1 -> actor#3 exact count=1 types="Flaky"
+actor-edge actor#2 -> actor#3 exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

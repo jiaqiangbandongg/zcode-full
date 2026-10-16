@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-cold-start-membership",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-cold-start-membership.test.ts",
+  "fixtures": [
+    {
+      "id": "fork-cold-start-project-row-title",
+      "description": "TSL19 parent 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是本 case 产品语义；固定响应只为冷启动列表提供稳定可读标题。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_FORK_COLD_START_PROJECT_ROW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "fork-cold-start-project-row-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Fork Cold Start E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "fork-cold-start-project-row-parent",
+      "description": "TSL19 parent completed assistant，提供稳定 fork target。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 parented fork 的冷启动 membership；provider 只需稳定形成 completed assistant。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_FORK_COLD_START_PROJECT_ROW"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "fork-cold-start-project-row-parent",
+          "inputTokens": 96,
+          "outputTokens": 12,
+          "text": "FORK_COLD_START_PROJECT_ROW_OK"
+        }
+      }
+    }
+  ]
+}

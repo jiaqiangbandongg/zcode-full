@@ -250,5 +250,55 @@
     "license": "MIT",
     "scope": "Vendored React/Next.js guidance and local adaptations; local README preserves Shu Ding / Vercel attribution.",
     "reviewRequired": "Pinned upstream README and skill declare MIT, but a complete original copyright/license notice has not been obtained."
+  },
+  {
+    "id": "Knip documentation mirror",
+    "referenceRevision": "d5d20e5e21d64590c0e735c6bc840295cda665cd",
+    "source": "https://raw.githubusercontent.com/webpro-nl/knip/d5d20e5e21d64590c0e735c6bc840295cda665cd/license",
+    "file": "docs/knip/docs/LICENSE",
+    "roots": ["docs/knip/docs"],
+    "license": "ISC",
+    "provenance": "All 169 files in the original local import have identical Git blob SHA-1 hashes to packages/docs at this reference revision (Knip 6.0.6). The original import did not record a revision; this establishes a matching snapshot, not a unique original import commit.",
+    "scope": "Knip-authored source and documentation. Bundled Source Sans Pro and Hack fonts retain their separately registered licenses; local mirror notes and added license materials are not attributed to Knip.",
+    "importRevision": null,
+    "sha256": "ef3e637bb6cc9fa34bacda2f2d31a794ca65abfe3109c150e00bb10dca25e431"
+  },
+  {
+    "id": "Source Sans Pro 2.020 in Knip docs",
+    "referenceRevision": "778e10a3656a899e0bc9f8a54d50a1ab4ba55308",
+    "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/778e10a3656a899e0bc9f8a54d50a1ab4ba55308/LICENSE.txt",
+    "file": "docs/knip/docs/licenses/SourceSansPro-2.020-LICENSE.txt",
+    "roots": ["docs/knip/docs/public/fonts/SourceSansPro-Regular.otf"],
+    "license": "OFL-1.1",
+    "provenance": "Bundled font name table identifies Source Sans Pro version 2.020, Adobe copyright 2010, 2012, 2014, and SIL OFL 1.1. License reference is the upstream 2.020R-ro/1.075R-it release.",
+    "importRevision": null,
+    "sha256": "653aaf9819e33cf1e2b3523c5d4d6c3dae925d770cb4563030f96655321ca2e9"
+  },
+  {
+    "id": "Source Sans Pro 2.045 and 1.095 in Knip docs",
+    "referenceRevision": "ce77773581f4d454f0fa985c073bb25c721bfcf5",
+    "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/ce77773581f4d454f0fa985c073bb25c721bfcf5/LICENSE.txt",
+    "file": "docs/knip/docs/licenses/SourceSansPro-2.045-1.095-LICENSE.txt",
+    "roots": [
+      "docs/knip/docs/src/fonts/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7lujVj9w.woff2",
+      "docs/knip/docs/src/fonts/6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZYokSds18S0xR41.woff2",
+      "docs/knip/docs/src/fonts/6xKwdSBYKcSV-LCoeQqfX1RYOo3qPZZMkids18S0xR41.woff2",
+      "docs/knip/docs/src/fonts/6xKydSBYKcSV-LCoeQqfX1RYOo3ik4zwlxdu3cOWxw.woff2"
+    ],
+    "license": "OFL-1.1",
+    "provenance": "Bundled WOFF2 name tables identify Source Sans Pro 2.045 (roman) and 1.095 (italic), Adobe copyright 2010-2018, and SIL OFL. License reference is the matching upstream 2.045R-ro/1.095R-it release.",
+    "importRevision": null,
+    "sha256": "e1d1fdcefb57985226c06fa9500d29caacfa2b1f8b8c74db911f13c6cad186a1"
+  },
+  {
+    "id": "Hack 3.003 in Knip docs",
+    "referenceRevision": "b47d21f808fbf4784565feccde2213ef2af924b3",
+    "source": "https://raw.githubusercontent.com/source-foundry/Hack/b47d21f808fbf4784565feccde2213ef2af924b3/LICENSE.md",
+    "file": "docs/knip/docs/licenses/Hack-3.003-LICENSE.md",
+    "roots": ["docs/knip/docs/src/fonts/hack-regular-subset.woff2"],
+    "license": "MIT AND Bitstream-Vera",
+    "provenance": "Bundled font name table identifies Hack 3.003 and retains Source Foundry, Bitstream Vera, and DejaVu license statements. The upstream v3.003 license is retained verbatim, including the DejaVu public-domain statement.",
+    "importRevision": null,
+    "sha256": "1f61bb7c790c59b4b0ecdf304628b94e42ae4c8020094a8c3da73381ab212623"
   }
 ]

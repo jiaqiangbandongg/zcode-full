@@ -55,3 +55,9 @@ export const TID_WORKFLOW_ARTIFACT_CHIP = "workflow-run-artifact-chip";
 /** 会话里终态通知行折叠头部上的 chip——与中枢那枚**刻意不同 id**：两处的载荷来源不同，
  *  e2e 要能分别指到「通知行上出现了 chips」和「中枢历史行上出现了 chips」。 */
 export const TID_CHAT_WORKFLOW_ARTIFACT_CHIP = "workflow-notification-artifact-chip";
+
+// 动态工作流模式设置行与中枢跳转（docs/dynamic-workflow/launch.md「The user's choice」）。
+export const TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER = "settings-dynamic-workflow-mode-trigger";
+/** 动态后缀为模式（disabled / onDemand / alwaysOn）。 */
+export const TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_ITEM = "settings-dynamic-workflow-mode-item";
+export const TID_WORKFLOWS_OPEN_SETTINGS = "workflows-open-settings";

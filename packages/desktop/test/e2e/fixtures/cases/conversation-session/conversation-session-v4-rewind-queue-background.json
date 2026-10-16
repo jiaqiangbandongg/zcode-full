@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-rewind-queue-background",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-rewind-queue-background.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-rewind-queue-background.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "pv4-20-title",
+      "description": "PV4-20 held queue case-local 标题。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不参与 queue 守恒。"
+    },
+    {
+      "id": "pv4-20-original",
+      "description": "PV4-20 compact 覆盖前 latest query 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "编辑后应退出 active branch。"
+    },
+    {
+      "id": "pv4-20-compact-interrupted",
+      "description": "PV4-20 首次 compact 保持 running，期间排入 future intents 与第二个 compact。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定运行窗口后 stop，建立当前产品可达的 held queue。"
+    },
+    {
+      "id": "pv4-20-compact-stable",
+      "description": "PV4-20 held queue 中 send-now 的第二个 compact 成功覆盖 latest query。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 stable compact 后 edit 仍保留另外两个 held future intents。"
+    },
+    {
+      "id": "pv4-20-edited",
+      "description": "PV4-20 queue 保持后 edited intent 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "新请求只消费 edited intent，不 drain held queue。"
+    },
+    {
+      "id": "pv4-20-queue-one",
+      "description": "PV4-20 rewind 后显式消费保留的第一条 queue item。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 queue 身份和顺序保留后只消费一次。"
+    },
+    {
+      "id": "pv4-20-queue-two",
+      "description": "PV4-20 rewind 后显式消费保留的第二条 queue item。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 queue 身份和顺序保留后只消费一次。"
+    },
+    {
+      "id": "pv4-23-title",
+      "description": "PV4-23 background generation case-local 标题。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不参与后台 task generation。"
+    },
+    {
+      "id": "pv4-23-background-tool",
+      "description": "PV4-23 原 turn 启动长时后台 Bash。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "保持 running 直到 edit 的 stop barrier 取消它。"
+    },
+    {
+      "id": "pv4-23-background-final",
+      "description": "PV4-23 后台分离后原 turn 结束回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "主轮稳定后仍保留 running task，供 edit 取消。"
+    },
+    {
+      "id": "pv4-23-background-edited",
+      "description": "PV4-23 旧 Bash 取消后的 edited intent 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "新 branch 只启动一次 provider request。"
+    }
+  ]
+}

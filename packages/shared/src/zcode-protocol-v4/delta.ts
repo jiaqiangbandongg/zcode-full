@@ -1,4 +1,5 @@
-// ConversationDelta：七个操作，封闭集合。
+import { mcpAppInstanceSchema } from "../mcp-apps/instance.js";
+// ConversationDelta：快照增量与插件 UI 的 live-only 通知，操作集合封闭（10-protocol-spec §4.5）。
 // 没有 row.inserted（中间插入）、没有 row.moved、没有字段级 JSON patch——
 // 凡此模型表达不了的结构变化，服务端一律发 snapshot resync，刻意压缩客户端错误面。
 //
@@ -61,10 +62,19 @@ export const statePatchSchema = z.object({
 });
 export type StatePatch = z.infer<typeof statePatchSchema>;
 
+export const pluginUiResourceSubscriberSchema = z
+  .object({
+    scopeId: z.string(),
+    generation: z.number().int().nonnegative(),
+    instance: mcpAppInstanceSchema,
+  })
+  .strict();
+
 /**
  * run 的 **header** = `workflowRunSchema` 减去 actors / nodes 两张按实例增量同步的表。
  *
- * 使用 `.omit` 从同一 schema 派生，避免独立维护的字段表不一致导致订阅解析失败。小集合（reports / artifacts / phases / pendingQuestions…）留在 header 里整键替换——
+ * `.omit` 派生而不是手抄一份字段表：2026-09-04 的那次订阅永久失效就是「两处各写一份 run 词汇表」
+ * 的后果。小集合（reports / artifacts / phases / pendingQuestions…）留在 header 里整键替换——
  * 它们的上界都是几十条，为它们再开一套增量语法只会多一套能写错的东西。
  */
 export const workflowRunHeaderSchema = workflowRunSchema.omit({ actors: true, nodes: true });
@@ -106,6 +116,40 @@ export const conversationDeltaSchema = z.discriminatedUnion("op", [
     append: z.string(),
   }),
   z.object({ op: z.literal("state.updated"), patch: statePatchSchema }),
+  // 插件 UI 订阅的 MCP 资源通知。live-only：不改快照（apply 为 no-op）、不进冷恢复；
+  // renderer 按 subscribers 派发给对应沙箱实例。
+  z.object({
+    op: z.literal("pluginUi.resourceUpdated"),
+    pluginId: z.string(),
+    serverName: z.string(),
+    uri: z.string(),
+    subscribers: z.array(pluginUiResourceSubscriberSchema),
+  }),
+  z.object({
+    op: z.literal("pluginUi.resourceListChanged"),
+    pluginId: z.string(),
+    serverName: z.string(),
+    subscribers: z.array(pluginUiResourceSubscriberSchema),
+  }),
+  z.object({
+    op: z.literal("pluginUi.instanceClosed"),
+    pluginId: z.string(),
+    serverName: z.string(),
+    subscribers: z.array(pluginUiResourceSubscriberSchema),
+  }),
+  // App-Provided Tools 的"实例信箱"：模型发起的页面工具调用，live-only 投递给唯一实例（subscribers 恰一项）；
+  // 渲染端认领后页面 tools/call，结果经 mcp/uiResolveAppToolCall 回传。不改快照、不进冷恢复。
+  z.object({
+    op: z.literal("pluginUi.appToolCall"),
+    activity: z.boolean().optional(),
+    cancelled: z.boolean().optional(),
+    pluginId: z.string(),
+    serverName: z.string(),
+    subscribers: z.array(pluginUiResourceSubscriberSchema),
+    callId: z.string(),
+    toolName: z.string(),
+    arguments: z.record(z.string(), z.unknown()),
+  }),
   /**
    * 一条 dwf run 的键级增量。`revision` 是**这次变化之后**的 `workflowRuns.revision`（绝对值）；
    * 一条引擎事件最多产生一条本 op（节点相位、派生的 actor 状态、用量、水位一起落地，原子）。
@@ -143,5 +187,15 @@ export const conversationDeltaSchema = z.discriminatedUnion("op", [
   }),
 ]);
 export type ConversationDelta = z.infer<typeof conversationDeltaSchema>;
+export type PluginUiResourceDelta = Extract<
+  ConversationDelta,
+  { op: "pluginUi.resourceUpdated" | "pluginUi.resourceListChanged" }
+>;
+export type PluginUiAppToolCallDelta = Extract<ConversationDelta, { op: "pluginUi.appToolCall" }>;
+/** 按沙箱实例投递的全部 live-only 增量。 */
+export type PluginUiInstanceDelta =
+  | Extract<ConversationDelta, { op: "pluginUi.instanceClosed" }>
+  | PluginUiResourceDelta
+  | PluginUiAppToolCallDelta;
 export type WorkflowRunUpdatedDelta = Extract<ConversationDelta, { op: "workflowRun.updated" }>;
 export type WorkflowRunRemovedDelta = Extract<ConversationDelta, { op: "workflowRun.removed" }>;

@@ -64,7 +64,7 @@ function readActualThought(
 }
 
 /** switchCollaborationMode 命令值域（command.ts z.enum 同源；auto 非用户可切不在内）。 */
-const SWITCHABLE_MODES: ReadonlySet<string> = new Set(["build", "edit", "plan", "yolo"]);
+const SWITCHABLE_MODES: ReadonlySet<string> = new Set(["build", "edit", "plan", "yolo", "guarded"]);
 
 /**
  * switchModelConfig：切换会话模型选型。跨模型时 app.setModel 换 provider client + 模型，

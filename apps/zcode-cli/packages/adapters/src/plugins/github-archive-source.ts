@@ -16,19 +16,19 @@ import {
 const GITHUB_HOSTS = new Set(["github.com", "www.github.com"]);
 const GITHUB_REPOSITORY_SEGMENT = /^[A-Za-z0-9_.-]+$/u;
 
-interface PublicGitHubRepository {
+export interface PublicGitHubRepository {
   owner: string;
   repo: string;
 }
 
-interface ResolveGitHubArchiveSourceInput {
+export interface ResolveGitHubArchiveSourceInput {
   path?: string;
   pin?: string;
   signal?: AbortSignal;
   url: string;
 }
 
-class GitHubArchiveRequiresGitError extends Error {
+export class GitHubArchiveRequiresGitError extends Error {
   readonly reason: string;
 
   constructor(reason: string) {
@@ -38,7 +38,7 @@ class GitHubArchiveRequiresGitError extends Error {
   }
 }
 
-function parsePublicGitHubRepositoryUrl(value: string): PublicGitHubRepository | null {
+export function parsePublicGitHubRepositoryUrl(value: string): PublicGitHubRepository | null {
   let url: URL;
   try {
     url = new URL(value);
@@ -74,7 +74,7 @@ function parsePublicGitHubRepositoryUrl(value: string): PublicGitHubRepository |
   return { owner, repo };
 }
 
-function buildGitHubArchiveUrl(repository: PublicGitHubRepository, pin = "HEAD"): string {
+export function buildGitHubArchiveUrl(repository: PublicGitHubRepository, pin = "HEAD"): string {
   const normalizedPin = pin.trim() || "HEAD";
   return `https://api.github.com/repos/${repository.owner}/${repository.repo}/zipball/${encodeURIComponent(normalizedPin)}`;
 }

@@ -16,12 +16,15 @@ export function createModelExecutionContext(
         }
       : {}),
     ...(input.subagents ? { subagents: input.subagents } : {}),
+    ...(input.selectionFallback ? { selectionFallback: input.selectionFallback } : {}),
   };
 }
 
 function freezeRequestAuth(input: ModelRequestAuth): ModelRequestAuth {
   return Object.freeze({
+    ...(input.accountScope ? { accountScope: input.accountScope } : {}),
     ...(input.apiKey ? { apiKey: input.apiKey } : {}),
+    ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}),
     ...(input.headers ? { headers: Object.freeze({ ...input.headers }) } : {}),
   });
 }

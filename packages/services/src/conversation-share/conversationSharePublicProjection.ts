@@ -4,7 +4,7 @@ import type { ArtifactRow, ConversationRow } from "@zcode/shared/zcode-protocol-
 
 import { ConversationShareServiceError } from "./conversationShare.js";
 
-interface ConversationSharePublicProjection {
+export interface ConversationSharePublicProjection {
   rows: ConversationRow[];
   selectedProductTurnIds: string[];
   artifacts: ConversationSharePublicArtifact[];
@@ -412,7 +412,7 @@ function assertUnique(values: string[], label: string): void {
   }
 }
 
-function assertConversationSharePublicProjection(input: {
+export function assertConversationSharePublicProjection(input: {
   rows: ConversationRow[];
   selectedProductTurnIds: string[];
 }): void {

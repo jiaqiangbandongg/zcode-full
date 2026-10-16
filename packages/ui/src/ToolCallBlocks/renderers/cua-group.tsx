@@ -16,11 +16,11 @@ import type { ConversationCuaGroupEvent } from "@/v4/conversationCuaGroups.js";
 const TERMINAL_CUA_STATUSES = new Set(["completed", "failed", "stopped"]);
 const STICK_TO_BOTTOM_THRESHOLD_PX = 8;
 
-function scrollCuaGroupToBottom(viewport: Pick<HTMLElement, "scrollHeight" | "scrollTop">) {
+export function scrollCuaGroupToBottom(viewport: Pick<HTMLElement, "scrollHeight" | "scrollTop">) {
   viewport.scrollTop = viewport.scrollHeight;
 }
 
-function isCuaGroupViewportAtBottom(
+export function isCuaGroupViewportAtBottom(
   viewport: Pick<HTMLElement, "clientHeight" | "scrollHeight" | "scrollTop">,
 ) {
   return (

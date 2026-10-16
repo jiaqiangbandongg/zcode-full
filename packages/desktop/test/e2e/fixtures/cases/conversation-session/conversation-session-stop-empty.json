@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-stop-empty",
+  "spec": "./test/e2e/conversation-session/conversation-session-stop-empty.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-stop-empty.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-stop-empty-running-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "stop 空队列语义只依赖当前轮保持 running；真实 provider 可能过快完成导致 stop 按钮窗口消失。"
+    },
+    {
+      "id": "upstream-stop-empty-next-fast-text",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 stop 后 queue=0 不阻塞下一轮；响应只需稳定完成。"
+    },
+    {
+      "id": "upstream-stop-empty-toolcall-bash",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "tool call 运行中 stop 后再发需要稳定制造本地工具执行窗口，真实模型可能选择纯文本或过快完成。"
+    },
+    {
+      "id": "upstream-stop-empty-toolcall-next-fast-text",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言是 tool call stop 后 queue=0 不阻塞下一轮；响应只需稳定完成。"
+    }
+  ]
+}

@@ -1,93 +1,72 @@
-import type { ProviderFamilyDomain } from "@zcode/shared";
-import type { AccountProviderCredentialStore } from "./accountProviderCredentialStore.js";
-import { accountProviderCredentialKey } from "./accountProviderCredentialKey.js";
+import type { ProviderFamilyDomain, ProjectAccessTokenMaterial } from "@zcode/shared";
+import { createServiceLogger } from "../logger/serviceLogger.js";
 
+const log = createServiceLogger("account-project-token");
 interface AccountProviderCredentialServiceOptions {
-  readonly credentialStore: Pick<
-    AccountProviderCredentialStore,
-    "loadApiKey" | "saveApiKey" | "deleteApiKey"
-  >;
   readonly loadOAuthAccessToken: (family: ProviderFamilyDomain) => Promise<string | null>;
-  readonly resolveProviderApiKey: (
+  readonly resolveProviderMaterial: (
     family: ProviderFamilyDomain,
     accessToken: string,
-  ) => Promise<string | null>;
+    accountIdentity: string,
+    rejectedProjectTokenFingerprint?: string,
+  ) => Promise<ProjectAccessTokenMaterial | null>;
 }
-
 interface LoadCodingPlanApiKeyInput {
   readonly providerId: string;
   readonly family: ProviderFamilyDomain;
   readonly accountIdentity: string;
   readonly forceRefresh?: boolean;
+  readonly rejectedProjectTokenFingerprint?: string;
 }
-
-interface AccountProviderCredentialService {
+export interface AccountProviderCredentialService {
   loadCodingPlanApiKey(input: LoadCodingPlanApiKeyInput): Promise<string | null>;
+  loadCodingPlanMaterial(
+    input: LoadCodingPlanApiKeyInput,
+  ): Promise<ProjectAccessTokenMaterial | null>;
 }
 
-/**
- * 管理 Personal Coding Plan 的账号级请求凭据。
- *
- * 账号身份只在这里生成 Credential Store 私有 key；远端解析、缓存和并发合并都留在服务内。
- */
+/** 旧方法名兼容私有调用契约；返回值现在是请求期 Token，绝不读写长期 Key 缓存。 */
 export function createAccountProviderCredentialService(
   options: AccountProviderCredentialServiceOptions,
 ): AccountProviderCredentialService {
-  const inFlight = new Map<string, Promise<string | null>>();
-
+  const pending = new Map<string, Promise<ProjectAccessTokenMaterial | null>>();
   return {
-    loadCodingPlanApiKey(input) {
-      const credentialKey = accountProviderCredentialKey({
-        providerId: input.providerId,
-        planKind: "individual-coding-plan",
-        accountIdentity: input.accountIdentity,
-      });
-      const operationKey = `${input.forceRefresh ? "refresh" : "load"}:${credentialKey}`;
-      const current = inFlight.get(operationKey);
-      if (current) return current;
-
-      const operation = loadCodingPlanApiKey({
-        credentialKey,
-        family: input.family,
-        forceRefresh: input.forceRefresh === true,
-        options,
-      });
-      inFlight.set(operationKey, operation);
-      const clearOperation = () => {
-        if (inFlight.get(operationKey) === operation) {
-          inFlight.delete(operationKey);
+    async loadCodingPlanApiKey(input) {
+      return (await this.loadCodingPlanMaterial(input))?.token ?? null;
+    },
+    async loadCodingPlanMaterial(input) {
+      const loginToken = (await options.loadOAuthAccessToken(input.family))?.trim();
+      if (!loginToken) return null;
+      // Map 仅存进程内并发状态；登录态变化不能加入旧账号请求。
+      const key = JSON.stringify([
+        input.family,
+        input.accountIdentity,
+        loginToken,
+        input.rejectedProjectTokenFingerprint,
+      ]);
+      const existing = pending.get(key);
+      if (existing) return existing;
+      const operation = (async () => {
+        const token = await options.resolveProviderMaterial(
+          input.family,
+          loginToken,
+          input.accountIdentity,
+          input.rejectedProjectTokenFingerprint,
+        );
+        if ((await options.loadOAuthAccessToken(input.family))?.trim() !== loginToken) {
+          log.warn(undefined, "项目 Token 签发期间登录态变化，丢弃结果", {
+            family: input.family,
+          });
+          throw new Error("project_token_scope_invalidated");
         }
-      };
-      void operation.then(clearOperation, clearOperation);
-      return operation;
+        return token ?? null;
+      })();
+      pending.set(key, operation);
+      try {
+        return await operation;
+      } finally {
+        if (pending.get(key) === operation) pending.delete(key);
+      }
     },
   };
-}
-
-async function loadCodingPlanApiKey(params: {
-  readonly credentialKey: string;
-  readonly family: ProviderFamilyDomain;
-  readonly forceRefresh: boolean;
-  readonly options: AccountProviderCredentialServiceOptions;
-}): Promise<string | null> {
-  if (!params.forceRefresh) {
-    const cached = normalizeSecret(
-      await params.options.credentialStore.loadApiKey(params.credentialKey),
-    );
-    if (cached) return cached;
-  }
-
-  const accessToken = normalizeSecret(await params.options.loadOAuthAccessToken(params.family));
-  if (!accessToken) return null;
-  const apiKey = normalizeSecret(
-    await params.options.resolveProviderApiKey(params.family, accessToken),
-  );
-  if (!apiKey) return null;
-  await params.options.credentialStore.saveApiKey(params.credentialKey, apiKey);
-  return apiKey;
-}
-
-function normalizeSecret(value: string | null | undefined): string | null {
-  const normalized = value?.trim() ?? "";
-  return normalized || null;
 }

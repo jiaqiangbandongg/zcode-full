@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-cron-relative",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-cron-relative.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-automation-cron-relative.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-automation-cron-relative-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于定时任务产品语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-relative-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择相对时间参数；本响应固定 delayMinutes 一次性入参，专门验证 host 换算调度与一次性任务的卡片展示语义。"
+    },
+    {
+      "id": "upstream-conversation-automation-cron-relative-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "CronCreate tool_result 进入历史后结束 case，真实 provider 回复内容不影响产品语义。"
+    }
+  ]
+}

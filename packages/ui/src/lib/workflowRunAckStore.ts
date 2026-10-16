@@ -9,11 +9,11 @@ interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
-const WORKFLOW_RUN_ACK_STORAGE_KEY = "zcode-workflow-run-acknowledged";
+export const WORKFLOW_RUN_ACK_STORAGE_KEY = "zcode-workflow-run-acknowledged";
 /** 集合上限；满了淘汰最早确认的。256 远大于任何会话列表里同时挂着的已结束 run 数。 */
-const WORKFLOW_RUN_ACK_LIMIT = 256;
+export const WORKFLOW_RUN_ACK_LIMIT = 256;
 
-interface WorkflowRunAckStore {
+export interface WorkflowRunAckStore {
   isAcknowledged(runId: string): boolean;
   acknowledge(runIds: readonly string[]): void;
   subscribe(listener: () => void): () => void;
@@ -34,7 +34,7 @@ function readStored(storage: StorageLike | null): string[] {
   }
 }
 
-function createWorkflowRunAckStore(storage: StorageLike | null): WorkflowRunAckStore {
+export function createWorkflowRunAckStore(storage: StorageLike | null): WorkflowRunAckStore {
   // 插入序 = 确认序；Set 的迭代序保证淘汰最早的。
   const acknowledged = new Set<string>(readStored(storage).slice(-WORKFLOW_RUN_ACK_LIMIT));
   const listeners = new Set<() => void>();
@@ -90,6 +90,11 @@ let defaultStore: WorkflowRunAckStore | null = null;
 export function getWorkflowRunAckStore(): WorkflowRunAckStore {
   defaultStore ??= createWorkflowRunAckStore(getBrowserStorage());
   return defaultStore;
+}
+
+/** 测试用：换掉单例（含 `null` 复位）。 */
+export function setWorkflowRunAckStoreForTesting(store: WorkflowRunAckStore | null): void {
+  defaultStore = store;
 }
 
 /** 订阅确认集合的版本；返回的谓词随版本变化换引用，调用方据此重算行选择。 */

@@ -1,0 +1,6 @@
+phase unphased
+participant unphased:workspace steps=world-read#1
+participant unphased:actor#1 "a" many steps=ask#1
+participant unphased:actor#2 "b" many steps=ask#2
+handoff unphased:workspace -> unphased:actor#1 types="string[]"
+handoff unphased:actor#1 -> unphased:actor#2 types="string"

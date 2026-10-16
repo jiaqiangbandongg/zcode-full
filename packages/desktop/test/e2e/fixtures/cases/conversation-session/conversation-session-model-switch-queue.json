@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-switch-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-switch-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-switch-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-model-switch-held-running-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "模型切换 held queue 需要当前轮保持 streaming，真实模型可能过快完成。"
+    },
+    {
+      "id": "upstream-model-switch-held-send-now-secondary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在请求 capture 的 model/thought，响应只需稳定完成。"
+    },
+    {
+      "id": "upstream-model-switch-queue-running-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "queued text 消费前切模型需要当前轮保持 streaming，真实模型可能过快完成。"
+    },
+    {
+      "id": "upstream-model-switch-queue-auto-drain-secondary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在请求 capture 的 model/thought，响应只需稳定完成。"
+    },
+    {
+      "id": "upstream-model-switch-slow-marker-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "用于让 fixture check 明确覆盖 spec 中的通用 E2E_SLOW_STREAM marker。"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-dynamic-workflow-gray-disabled",
+  "spec": "./test/e2e/conversation-session/conversation-session-dynamic-workflow-gray-disabled.test.ts",
+  "providerRequestPolicy": "none",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-dynamic-workflow-gray-disabled.json"
+  ],
+  "fileFixtures": [],
+  "requests": []
+}

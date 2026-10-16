@@ -1,0 +1,23 @@
+phase phase#1 "open"
+phase phase#2 "close"
+node phase#1@1 mark phase=phase#1
+node world-read#1@1 issue site=world-read#1 phase=phase#1
+node phase#2@1 mark phase=phase#2
+node ask#1@1 issue site=ask#1 phase=phase#2
+node world-read#1@2 issue site=world-read#1 phase=phase#2
+edge entry -> phase#1@1 next
+edge phase#1@1 -> world-read#1@1 fork
+edge phase#1@1 -> phase#2@1 next
+edge world-read#1@1 -> phase#2@1 join via=return
+edge phase#2@1 -> ask#1@1 next
+edge ask#1@1 -> phase#1@1 loop
+edge ask#1@1 -> world-read#1@2 fork
+edge ask#1@1 -> sink exit
+edge world-read#1@2 -> phase#1@1 loop
+edge world-read#1@2 -> sink join via=return
+phase-edge entry -> phase#1 next
+phase-edge phase#1 -> phase#2 join via=return
+phase-edge phase#1 -> phase#2 next
+phase-edge phase#2 -> phase#1 loop
+phase-edge phase#2 -> sink exit
+phase-edge phase#2 -> sink join via=return

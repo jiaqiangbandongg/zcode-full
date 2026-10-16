@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "e2e-plugin-mcp-ping@e2e-fixture",
+      "name": "e2e-plugin-mcp-ping",
+      "marketplace": "e2e-fixture",
+      "version": "0.0.0",
+      "installPath": "__INSTALL_PATH__",
+      "installedAt": "2026-07-01T00:00:00.000Z",
+      "updatedAt": "2026-07-01T00:00:00.000Z",
+      "scope": "user"
+    }
+  ]
+}

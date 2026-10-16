@@ -15,7 +15,7 @@ import { parseModule, type ESTree } from "meriyah";
  */
 
 /** parseReplCode 结果：成功携带 AST，失败携带 parseError（不 throw，交调用方回退）。 */
-type ParseReplCodeResult = { ast: ESTree.Program } | { parseError: Error };
+export type ParseReplCodeResult = { ast: ESTree.Program } | { parseError: Error };
 
 /**
  * 解析 REPL 代码为 ESTree AST。封装 meriyah.parseModule（parser 换实现只动这里 = A-ready 接缝）。
@@ -99,7 +99,26 @@ function collectStatementBindingNames(node: ESTree.Node): string[] {
  * vm.Script 默认不能直接执行 import expression，因此执行器使用宿主 loader，并只替换
  * AST 中真正的 ImportExpression；字符串、注释和 import.meta 不受影响。
  */
-function rewriteDynamicImports(code: string, ast: ESTree.Program): string {
+export function collectTopLevelBindingNames(ast: ESTree.Program): string[] {
+  const names: string[] = [];
+  for (const stmt of ast.body) {
+    for (const name of collectStatementBindingNames(stmt)) {
+      names.push(name);
+    }
+  }
+  // 去重（同名重复声明或多语句同名只需一次赋值）。
+  return [...new Set(names)];
+}
+
+/**
+ * 把 cell 里的动态 `import(...)` 改写为注入的 `importModule(...)`。
+ *
+ * Node 的 vm.Script 只有配置 vm module loader 才能直接执行 import expression，而 desktop/SEA
+ * Agent 不能稳定携带 `--experimental-vm-modules`。旧合同因此要求模型写 ZCode 私有
+ * `importModule(...)`，与 skill 里通用的标准 `await import(...)` 写法不一致。AST 定位只替换真正的
+ * ImportExpression，字符串、注释和 `import.meta` 均不受影响。
+ */
+export function rewriteDynamicImports(code: string, ast: ESTree.Program): string {
   const starts: number[] = [];
   const seen = new Set<object>();
   const visit = (value: unknown): void => {

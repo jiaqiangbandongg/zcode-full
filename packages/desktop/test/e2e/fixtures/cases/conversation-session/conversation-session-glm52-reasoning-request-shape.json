@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-glm52-reasoning-request-shape",
+  "spec": "./test/e2e/conversation-session/conversation-session-glm52-reasoning-request-shape.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-glm52-reasoning-request-shape.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "glm52-reasoning-request-shape-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定响应同时守住 title sidecar 的 GLM-5.2 关闭思考请求字段，防止重新继承 max。"
+    },
+    {
+      "id": "glm52-reasoning-max-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 provider/model 身份、OpenAI-compatible transport 和 GLM-5.2 max 请求 body；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "glm52-reasoning-nothink-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在同一 provider/model 下后续请求切换 nothink 后的 GLM-5.2 专属请求 body；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

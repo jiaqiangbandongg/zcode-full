@@ -133,6 +133,54 @@ function runBootstrapServerBuild() {
   );
 }
 
+function runBootstrapE2eReportBuild() {
+  const e2eReportDir = resolve(rootDir, "packages/e2e-report");
+  // Bugfix: bootstrap:with-remote 的最终构建不能再嵌套 pnpm build:node。
+  // 低内存环境中 pnpm shim + tsc 会被 SIGKILL；这里只在 bootstrap runner 中直接执行等价入口。
+  runCommand(
+    process.execPath,
+    [resolve(rootDir, "node_modules/typescript/bin/tsc"), "-p", "tsconfig.json"],
+    {
+      cwd: e2eReportDir,
+      env: {
+        ...process.env,
+        ...bootstrapWithRemoteEnv,
+      },
+    },
+  );
+  runCommand(process.execPath, [resolve(rootDir, "node_modules/vite/bin/vite.js"), "build"], {
+    cwd: e2eReportDir,
+    env: {
+      ...process.env,
+      ...bootstrapWithRemoteEnv,
+    },
+  });
+}
+
+function runBootstrapStreamAnimateBuild() {
+  const streamAnimateDir = resolve(rootDir, "packages/stream-animate");
+  // Bugfix: bootstrap:with-remote 串行最终构建时，继续通过 pnpm 执行 stream-animate 的 tsc
+  // 仍可能命中 shim 被 SIGKILL；这里仅在 bootstrap runner 中直接执行等价入口。
+  runCommand(
+    process.execPath,
+    [resolve(rootDir, "node_modules/typescript/bin/tsc"), "-p", "tsconfig.server.json"],
+    {
+      cwd: streamAnimateDir,
+      env: {
+        ...process.env,
+        ...bootstrapWithRemoteEnv,
+      },
+    },
+  );
+  runCommand(process.execPath, [resolve(rootDir, "node_modules/vite/bin/vite.js"), "build"], {
+    cwd: streamAnimateDir,
+    env: {
+      ...process.env,
+      ...bootstrapWithRemoteEnv,
+    },
+  });
+}
+
 function runBootstrapDesktopBuild() {
   const desktopDir = resolve(rootDir, "packages/desktop");
   // bootstrap:with-remote 的目标是完成远程资源和本地 runtime 初始化。
@@ -154,6 +202,8 @@ function runBootstrapWithRemoteBuild() {
     // remote assets 已经占过一轮内存峰值，这里显式串行包构建，且不改变 build:bootstrap/CI 命令。
     runPnpm(["--filter", filter, "build"]);
   }
+  runBootstrapE2eReportBuild();
+  runBootstrapStreamAnimateBuild();
   runBootstrapServerBuild();
   runBootstrapDesktopBuild();
 }

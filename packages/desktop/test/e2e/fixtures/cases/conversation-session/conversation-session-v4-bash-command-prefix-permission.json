@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-bash-command-prefix-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-bash-command-prefix-permission.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-bash-command-prefix-permission.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-v4-bash-command-prefix-permission/package.json",
+      "source": "created-by-spec",
+      "description": "spec 创建只含 lint/test 的最小 package scripts，不访问 npm registry。"
+    },
+    {
+      "path": ".zcode-e2e/conversation-session-v4-bash-command-prefix-permission/bin/pnpm",
+      "source": "created-by-spec",
+      "description": "beforeSession 安装 case-owned pnpm shim 并仅向本 spec 的 PATH 前置，隔离全局 pnpm store/启动状态。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "bpr-prefix-title",
+      "description": "BPR 首发标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "用首发 marker 隔离标题请求。"
+    },
+    {
+      "id": "bpr-prefix-first-call",
+      "description": "首次 pnpm lint Bash tool_use，触发项目权限。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash command，验证 prefix suggestion。"
+    },
+    {
+      "id": "bpr-prefix-first-final",
+      "description": "首次项目允许后的终态。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明首次工具执行收口。"
+    },
+    {
+      "id": "bpr-prefix-same-call",
+      "description": "同 lint script 不同 transient args。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证已持久 prefix 自动允许。"
+    },
+    {
+      "id": "bpr-prefix-same-final",
+      "description": "同 script 自动允许后的终态。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "无权限弹窗时仍需稳定完成 turn。"
+    },
+    {
+      "id": "bpr-prefix-sibling-call",
+      "description": "sibling test script Bash tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 lint prefix 不扩权到 sibling script。"
+    },
+    {
+      "id": "bpr-prefix-sibling-final",
+      "description": "sibling 获准一次后的终态。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "清理 pending broker 并稳定收口。"
+    }
+  ]
+}

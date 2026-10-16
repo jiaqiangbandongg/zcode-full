@@ -1,0 +1,31 @@
+flowchart LR
+  entry(["entry"])
+  phase_1["preflight"]
+  phase_2["attempt"]
+  phase_3["gate"]
+  phase_4["checkpoint"]
+  phase_5["recover"]
+  phase_6["wrap-up"]
+  sink(["sink"])
+  abort(["abort"])
+  entry --> phase_1
+  phase_1 -->|"branch, join (return)"| phase_2
+  phase_1 -->|"exit, join (return)"| phase_5
+  phase_1 -->|"exit, join (return)"| phase_6
+  phase_1 -->|"throw"| abort
+  phase_2 --> phase_3
+  phase_3 -->|"loop, loop (continue)"| phase_2
+  phase_3 -->|"branch, join (return)"| phase_4
+  phase_3 -->|"exit, join (return), loop"| phase_5
+  phase_3 -->|"exit, join (return)"| phase_6
+  phase_4 -->|"loop"| phase_2
+  phase_4 -->|"exit, loop"| phase_5
+  phase_4 -->|"exit"| phase_6
+  phase_4 -->|"throw"| abort
+  phase_5 -->|"loop"| phase_2
+  phase_5 -->|"loop"| phase_5
+  phase_5 -->|"exit"| phase_6
+  phase_5 -->|"throw"| abort
+  phase_6 -->|"jump (return)"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class entry,sink,abort endpoint;

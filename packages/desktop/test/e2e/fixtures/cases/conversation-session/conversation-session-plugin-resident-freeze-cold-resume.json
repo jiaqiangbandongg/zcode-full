@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-resident-freeze-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-resident-freeze-cold-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-resident-freeze-cold-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "resident-enabled-title",
+      "description": "resident S1 标题 sidecar 稳定返回。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 Plugin 生命周期语义；固定返回避免后台 title retry 干扰 cold resume。"
+    },
+    {
+      "id": "new-session-disabled-title",
+      "description": "新 Session S2 标题 sidecar 稳定返回。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 Plugin 生命周期语义；固定返回避免后台 title retry 干扰 Desktop 重启。"
+    },
+    {
+      "id": "resident-enabled-tool-call",
+      "description": "resident S1 广告 Workspace Plugin MCP tool 并调用。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定 resident tool_use，证明创建时 catalog 保留。"
+    },
+    {
+      "id": "resident-enabled-final",
+      "description": "resident S1 工具调用完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 resident 最终响应。"
+    },
+    {
+      "id": "new-session-disabled-final",
+      "description": "新 Session S2 不广告 Plugin MCP tool。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定新 Session disabled 最终响应。"
+    },
+    {
+      "id": "cold-resume-disabled-final",
+      "description": "S1 cold resume 后不广告 Plugin MCP tool。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 cold resume disabled 最终响应。"
+    }
+  ]
+}

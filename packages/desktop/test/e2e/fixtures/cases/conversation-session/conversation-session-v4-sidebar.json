@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-sidebar",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-sidebar.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-sidebar.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-sidebar-title",
+      "description": "E2E_V4_SIDEBAR_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_SIDEBAR_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-sidebar-seed",
+      "description": "M5 ② 侧栏数据源门禁：首轮固定回复建立会话，随后重命名/删除均为本地命令。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证侧栏列表数据源已换 sessions-index：建→现→改名→更新→删→消失。"
+    }
+  ]
+}

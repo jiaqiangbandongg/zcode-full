@@ -1,0 +1,26 @@
+node source
+node ask#1 "scanner" @14:41 actors=actor#1 type="Flaky"
+node ask#2 "planner" @22:30 actors=actor#2 type="string"
+node ask#3 "reviewer" @23:33 actors=actor#3 type="Review"
+node join#1 "join" @28:32 type="Review[]"
+node fan-out#1 "fan-out" @29:3 type="Review[]"
+node ask#4 "judge" @29:47 actors=actor#4 within=fan-out#1 type="Review"
+node sink
+actor actor#1 "scanner" @14:24
+actor actor#2 "planner" @17:17
+actor actor#3 "reviewer" @18:18
+actor actor#4 "judge" @29:32 within=fan-out#1
+edge source -> ask#1 data exact
+edge ask#1 -> join#1 data exact type="Flaky"
+edge ask#1 -> fan-out#1 data exact type="Flaky"
+edge ask#1 -> ask#4 data exact type="Flaky"
+edge ask#1 -> sink data exact type="Flaky"
+edge ask#2 -> ask#3 data exact type="string"
+edge ask#2 -> sink data exact type="string"
+edge ask#3 -> ask#2 data exact type="Review"
+edge join#1 -> sink data exact type="Review[]"
+edge fan-out#1 -> join#1 data exact type="Review[]"
+edge fan-out#1 -> ask#4 data exact type="Review[]"
+edge fan-out#1 -> sink data exact type="Review[]"
+edge ask#4 -> join#1 data exact type="Review"
+edge ask#4 -> sink data exact type="Review"

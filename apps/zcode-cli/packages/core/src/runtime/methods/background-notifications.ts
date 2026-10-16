@@ -105,7 +105,7 @@ export async function persistBackgroundTaskNotificationCommand(
   return persisted.messageId;
 }
 
-interface PersistedBackgroundTaskNotificationBatch {
+export interface PersistedBackgroundTaskNotificationBatch {
   /** 仅整批来源一致时存在；混合/缺失来源不能从代表任务推断。 */
   backgroundSource?: BackgroundResultOriginMeta["backgroundSource"];
   messageId: MessageId;
@@ -127,7 +127,7 @@ function resolveBackgroundTaskNotificationSource(
   return source;
 }
 
-function resolveBackgroundTaskNotificationOriginMeta(
+export function resolveBackgroundTaskNotificationOriginMeta(
   commands: readonly [TaskNotificationRuntimeCommand, ...TaskNotificationRuntimeCommand[]],
 ): BackgroundResultOriginMeta | undefined {
   // 单条：originMeta 整体透传，workflowNotification 载荷免费搭车（manifest 渲染的唯一数据源）。

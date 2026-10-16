@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-hook-trust",
+  "spec": "./test/e2e/conversation-session/conversation-session-hook-trust.test.ts",
+  "fixtures": [
+    {
+      "id": "hook-trust-first",
+      "description": "HK05 soft-gate turn: pending hooks are skipped without blocking the reply.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The turn only proves the soft gate does not block; hook behavior is asserted from executions.jsonl on disk."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOK_TRUST: reply with ok"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hook-trust-first",
+          "inputTokens": 60,
+          "outputTokens": 6,
+          "text": "ok"
+        }
+      }
+    },
+    {
+      "id": "hook-trust-second",
+      "description": "HK07 same-task turn after trusting UserPromptSubmit: the trusted hook runs without backfilling SessionStart.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Execution evidence lives in executions.jsonl; the model reply only needs to complete the turn."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOK_TRUST second prompt: reply with ok"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hook-trust-second",
+          "inputTokens": 80,
+          "outputTokens": 6,
+          "text": "ok"
+        }
+      }
+    },
+    {
+      "id": "hook-trust-new-task",
+      "description": "HK07 new-task turn: natural SessionStart runs the trusted declaration once.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "New-task cold start loads persisted Trust; SessionStart evidence is asserted from executions.jsonl."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_HOOK_TRUST new task: reply with ok"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-hook-trust-new-task",
+          "inputTokens": 70,
+          "outputTokens": 6,
+          "text": "ok"
+        }
+      }
+    }
+  ]
+}

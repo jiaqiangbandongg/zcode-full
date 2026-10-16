@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-provider-retry-status",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-provider-retry-status.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-provider-retry-title",
+      "description": "Subagent retry case 固定标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于本 case，只需稳定返回。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SUBAGENT_PROVIDER_RETRY_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-provider-retry-title",
+          "text": "{\"title\":\"Subagent Provider Retry\"}"
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-retry-main-first-429",
+      "description": "Main 首个请求延迟返回可重试 429。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "首个 Main 请求返回可重试 429，验证主会话当前 turn 的 apiRetry 展示。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_PARENT"],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "0"
+        },
+        "body": "{\"error\":{\"code\":\"AccountRateLimitExceeded\",\"message\":\"retry once for the E2E main session\",\"type\":\"TooManyRequests\"}}"
+      }
+    },
+    {
+      "id": "subagent-provider-retry-main-second-429",
+      "description": "Main 第二次请求继续返回可重试 429，保持早期 retry 仍按 loading 展示。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "第二次 Main retry 仍失败，确保 attempt=2 不显示计数。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_PARENT"],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "0"
+        },
+        "body": "{\"error\":{\"code\":\"AccountRateLimitExceeded\",\"message\":\"retry twice for the E2E main session\",\"type\":\"TooManyRequests\"}}"
+      }
+    },
+    {
+      "id": "subagent-provider-retry-main-third-429",
+      "description": "Main 第三次请求继续返回可重试 429，随后进入可见的 3/10 retry。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "第三次 Main retry 仍失败，确保 attempt=3 达到 UI 显示阈值。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_PARENT"],
+        "lastUserMessageExcludes": ["<task-notification>"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "0"
+        },
+        "body": "{\"error\":{\"code\":\"AccountRateLimitExceeded\",\"message\":\"retry three times for the E2E main session\",\"type\":\"TooManyRequests\"}}"
+      }
+    },
+    {
+      "id": "subagent-provider-retry-parent-launch",
+      "description": "Main 第三次 retry 后延迟成功并启动一个 background Agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "delayed-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "延迟 Main 第三次 retry 后的首个有效工具进展，为主会话 3/10 UI 留出稳定观察窗口，然后创建 background child。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE"
+        ],
+        "bodyExcludes": ["Async agent launched successfully", "Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 4000,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_provider_retry_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Exercise child provider retry",
+            "prompt": "E2E_SUBAGENT_PROVIDER_RETRY_CHILD: make one provider request and then finish normally.",
+            "run_in_background": true,
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-retry-parent-ack",
+      "description": "父模型在 background Agent launch ACK 后结束当前轮。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父轮先收口，child retry 继续由 child session 独立展示。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "Async agent launched successfully",
+          "toolu_e2e_subagent_provider_retry_agent"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-provider-retry-ack",
+          "text": "subagent-provider-retry-launched"
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-retry-child-first-429",
+      "description": "child 首个请求延迟返回可重试 429。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "首个 child 请求返回可重试 429，产生 apiRetry 内存态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_CHILD"]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "0"
+        },
+        "body": "{\"error\":{\"code\":\"AccountRateLimitExceeded\",\"message\":\"retry once for the E2E child\",\"type\":\"TooManyRequests\"}}"
+      }
+    },
+    {
+      "id": "subagent-provider-retry-child-success",
+      "description": "child 第二次请求延迟返回正文成功。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "delayed-text",
+        "source": "synthetic",
+        "syntheticReason": "第二次请求延迟成功，为 UI 留出观察 retry 的窗口，并用正文进展清除状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROVIDER_RETRY_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 4000,
+        "text": {
+          "id": "upstream-e2e-subagent-provider-retry-child-success",
+          "text": "E2E_SUBAGENT_PROVIDER_RETRY_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-retry-parent-auto-compact",
+      "description": "父会话消费 completed child notification 前的自动 compact sidecar。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E 完整 system prompt 会在 child completion notification 前触发自动 compact；固定摘要并保留后续 notification matcher 所需事实。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "toolu_e2e_subagent_provider_retry_agent",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-provider-retry-auto-compact",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>E2E_SUBAGENT_PROVIDER_RETRY_PARENT: background Agent toolu_e2e_subagent_provider_retry_agent was launched. Continue processing its completion notification and finish with E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE.</summary>"
+        }
+      }
+    },
+    {
+      "id": "subagent-provider-retry-parent-notification",
+      "description": "父模型消费 completed background Agent notification。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "证明 child retry 成功后完成通知仍正常回到父会话。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROVIDER_RETRY_PARENT",
+          "E2E_SUBAGENT_PROVIDER_RETRY_CHILD_DONE",
+          "toolu_e2e_subagent_provider_retry_agent"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-provider-retry-parent-done",
+          "text": "E2E_SUBAGENT_PROVIDER_RETRY_PARENT_DONE"
+        }
+      }
+    }
+  ]
+}

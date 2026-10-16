@@ -1,0 +1,31 @@
+{
+  "name": "e2e-plugin-mcp-ping",
+  "version": "0.0.0",
+  "description": "E2E fixture plugin: exposes one read-only MCP tool (ping) for plugin-MCP-skill lifecycle assertions.",
+  "skills": "skills",
+  "userConfig": {
+    "label": {
+      "type": "string",
+      "title": "Workspace label",
+      "default": "user-default"
+    },
+    "secret": {
+      "type": "string",
+      "title": "Workspace secret",
+      "sensitive": true,
+      "default": "E2E_USER_PLUGIN_SECRET"
+    }
+  },
+  "author": { "name": "ZCode E2E" },
+  "license": "MIT",
+  "mcpServers": {
+    "ping": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/server.mjs"],
+      "env": {
+        "E2E_PLUGIN_RUNTIME_SECRET": "${user_config.secret}"
+      }
+    }
+  }
+}

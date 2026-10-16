@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-guarded-batch-delete",
+  "spec": "./test/e2e/conversation-session/conversation-session-guarded-batch-delete.test.ts",
+  "fixtures": [
+    {
+      "id": "batch-delete-title",
+      "description": "Case-local title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离标题 sidecar，不依赖真实模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_GUARDED_DELETE_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "batch-delete-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Batch deletion E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_RECURSIVE-call",
+      "description": "Batch deletion tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_RECURSIVE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DELETE_RECURSIVE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DELETE_RECURSIVE",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded-batch-delete/E2E_GUARDED_DELETE_RECURSIVE && echo executed > executed && rm -r target"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_RECURSIVE-final",
+      "description": "Batch deletion provider continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_RECURSIVE", "toolu_E2E_GUARDED_DELETE_RECURSIVE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DELETE_RECURSIVE-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DELETE_RECURSIVE_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_BATCH-call",
+      "description": "Batch deletion tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_BATCH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DELETE_BATCH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DELETE_BATCH",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded-batch-delete/E2E_GUARDED_DELETE_BATCH && echo executed > executed && rm one.txt two.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_BATCH-final",
+      "description": "Batch deletion provider continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_BATCH", "toolu_E2E_GUARDED_DELETE_BATCH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DELETE_BATCH-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DELETE_BATCH_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_GLOB-call",
+      "description": "Batch deletion tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_GLOB"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DELETE_GLOB"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DELETE_GLOB",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded-batch-delete/E2E_GUARDED_DELETE_GLOB && echo executed > executed && rm *.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_GLOB-final",
+      "description": "Batch deletion provider continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_GLOB", "toolu_E2E_GUARDED_DELETE_GLOB"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DELETE_GLOB-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DELETE_GLOB_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_FIND-call",
+      "description": "Batch deletion tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_FIND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DELETE_FIND"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DELETE_FIND",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded-batch-delete/E2E_GUARDED_DELETE_FIND && echo executed > executed && find target -type f -delete"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_FIND-final",
+      "description": "Batch deletion provider continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_FIND", "toolu_E2E_GUARDED_DELETE_FIND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DELETE_FIND-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DELETE_FIND_DONE"
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_CLEAN-call",
+      "description": "Batch deletion tool call",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_CLEAN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_GUARDED_DELETE_CLEAN"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_E2E_GUARDED_DELETE_CLEAN",
+          "name": "Bash",
+          "input": {
+            "command": "cd .zcode-e2e/conversation-session-guarded-batch-delete/E2E_GUARDED_DELETE_CLEAN && echo executed > executed && git clean -f"
+          }
+        }
+      }
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_CLEAN-final",
+      "description": "Batch deletion provider continuation",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_GUARDED_DELETE_CLEAN", "toolu_E2E_GUARDED_DELETE_CLEAN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "E2E_GUARDED_DELETE_CLEAN-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_GUARDED_DELETE_CLEAN_DONE"
+        }
+      }
+    }
+  ]
+}

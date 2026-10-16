@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-provider-retry-status",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-provider-retry-status.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-provider-retry-status.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "subagent-provider-retry-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于本 case，只需稳定返回。"
+    },
+    {
+      "id": "subagent-provider-retry-main-first-429",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "首个 Main 请求返回可重试 429，验证主会话当前 turn 的 apiRetry 展示。"
+    },
+    {
+      "id": "subagent-provider-retry-main-second-429",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "第二次 Main retry 仍失败，确保 attempt=2 不显示计数。"
+    },
+    {
+      "id": "subagent-provider-retry-main-third-429",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "第三次 Main retry 仍失败，确保 attempt=3 达到 UI 显示阈值。"
+    },
+    {
+      "id": "subagent-provider-retry-parent-launch",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "delayed-tool-use",
+      "syntheticReason": "延迟 Main 第三次 retry 后的首个有效工具进展，为主会话 3/10 UI 留出稳定观察窗口，然后创建 background child。"
+    },
+    {
+      "id": "subagent-provider-retry-parent-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父轮先收口，child retry 继续由 child session 独立展示。"
+    },
+    {
+      "id": "subagent-provider-retry-child-first-429",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "首个 child 请求返回可重试 429，产生 apiRetry 内存态。"
+    },
+    {
+      "id": "subagent-provider-retry-child-success",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "第二次请求延迟成功，为 UI 留出观察 retry 的窗口，并用正文进展清除状态。"
+    },
+    {
+      "id": "subagent-provider-retry-parent-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E 完整 system prompt 会在 child completion notification 前触发自动 compact；固定摘要并保留后续 notification matcher 所需事实。"
+    },
+    {
+      "id": "subagent-provider-retry-parent-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "证明 child retry 成功后完成通知仍正常回到父会话。"
+    }
+  ]
+}

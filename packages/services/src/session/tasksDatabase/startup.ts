@@ -18,7 +18,7 @@ import {
   markTasksStoragePrepared,
 } from "#src/session/tasksDatabase/prepared.js";
 
-type TasksStoragePhase =
+export type TasksStoragePhase =
   | "checking"
   | "waiting_for_lock"
   | "migrating"

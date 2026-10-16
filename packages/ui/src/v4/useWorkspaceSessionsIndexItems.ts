@@ -33,7 +33,7 @@ export interface WorkspaceSessionsIndexScope {
   agentService?: SessionsIndexAgentService;
 }
 
-interface WorkspaceSessionsIndexItemsResult {
+export interface WorkspaceSessionsIndexItemsResult {
   /** 聚合会话 meta（running 置顶；其余按 updatedAt 降序；tick 驱动重算，引用稳定）。 */
   items: ZCodeTaskMeta[];
   /**

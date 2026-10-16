@@ -127,7 +127,7 @@ export function selectCheckpointsForMessages(
     );
 }
 
-function selectCheckpointForMessages(
+export function selectCheckpointForMessages(
   events: readonly SessionEvent[],
   targetMessageIds: Iterable<MessageId>,
 ): CheckpointCreatedPayload | undefined {
@@ -206,6 +206,22 @@ export function buildRewindEvaluationItems(
   return items;
 }
 
+export function formatConversationRewindNoticeBody(options: {
+  keptMessageCount: number;
+  preview?: string;
+  rewindId: string;
+  targetMessageId: MessageId;
+}): string {
+  return sanitizeSystemReminderBody([
+    "Conversation rewind applied.",
+    `rewindId: ${options.rewindId}`,
+    `targetMessageId: ${options.targetMessageId}`,
+    `keptMessageCount: ${options.keptMessageCount}`,
+    options.preview ? `rewoundPromptPreview: ${options.preview}` : undefined,
+    "Continue from the conversation state before the target user message. Do not assume messages after that target happened in this active branch.",
+  ].filter((line): line is string => typeof line === "string" && line.length > 0));
+}
+
 export function formatWorkspaceRewindNoticeBody(options: {
   checkpoint: CheckpointCreatedPayload;
   evaluation: RewindTargetEvaluation;
@@ -213,17 +229,15 @@ export function formatWorkspaceRewindNoticeBody(options: {
   rewindId: string;
 }): string {
   const fileLines = options.restoredFiles.map((file) => `${file.action} ${file.path}`).join("\n");
-  return sanitizeSystemReminderBody(
-    [
-      "Workspace rewind applied.",
-      `rewindId: ${options.rewindId}`,
-      `checkpointId: ${options.checkpoint.checkpointId}`,
-      `strategy: ${options.evaluation.strategy}`,
-      `restoredFiles: ${options.restoredFiles.length}`,
-      fileLines,
-      "Conversation history was not rewritten by this file restore.",
-    ].filter((line) => line.length > 0),
-  );
+  return sanitizeSystemReminderBody([
+    "Workspace rewind applied.",
+    `rewindId: ${options.rewindId}`,
+    `checkpointId: ${options.checkpoint.checkpointId}`,
+    `strategy: ${options.evaluation.strategy}`,
+    `restoredFiles: ${options.restoredFiles.length}`,
+    fileLines,
+    "Conversation history was not rewritten by this file restore.",
+  ].filter((line) => line.length > 0));
 }
 
 export function formatWorkspaceForkNoticeBody(options: {
@@ -232,18 +246,16 @@ export function formatWorkspaceForkNoticeBody(options: {
   restoredFiles: WorkspaceRewindRestoredFile[];
 }): string {
   const fileLines = options.restoredFiles.map((file) => `${file.action} ${file.path}`).join("\n");
-  return sanitizeSystemReminderBody(
-    [
-      "This session was forked from a previous session checkpoint.",
-      `parentSessionId: ${options.parentSessionId}`,
-      `checkpointId: ${options.checkpoint.checkpointId}`,
-      `targetMessageId: ${options.checkpoint.messageId}`,
-      `restoredSnapshotRef: ${options.checkpoint.snapshotRef}`,
-      `restoredFiles: ${options.restoredFiles.length}`,
-      fileLines,
-      "Continue from this fork. Do not assume messages after the fork point happened in this session.",
-    ].filter((line) => line.length > 0),
-  );
+  return sanitizeSystemReminderBody([
+    "This session was forked from a previous session checkpoint.",
+    `parentSessionId: ${options.parentSessionId}`,
+    `checkpointId: ${options.checkpoint.checkpointId}`,
+    `targetMessageId: ${options.checkpoint.messageId}`,
+    `restoredSnapshotRef: ${options.checkpoint.snapshotRef}`,
+    `restoredFiles: ${options.restoredFiles.length}`,
+    fileLines,
+    "Continue from this fork. Do not assume messages after the fork point happened in this session.",
+  ].filter((line) => line.length > 0));
 }
 
 export function formatWorkspaceForkAtMessageNoticeBody(options: {
@@ -253,18 +265,16 @@ export function formatWorkspaceForkAtMessageNoticeBody(options: {
   undoneCheckpointCount: number;
 }): string {
   const fileLines = options.restoredFiles.map((file) => `${file.action} ${file.path}`).join("\n");
-  return sanitizeSystemReminderBody(
-    [
-      "This session was forked from a previous session message.",
-      `parentSessionId: ${options.parentSessionId}`,
-      `targetMessageId: ${options.targetMessageId}`,
-      `undoneCheckpointCount: ${options.undoneCheckpointCount}`,
-      `restoredFiles: ${options.restoredFiles.length}`,
-      fileLines,
-      "Workspace files changed after the fork point were restored to their state at the fork point.",
-      "Continue from this fork. Do not assume messages after the fork point happened in this session.",
-    ].filter((line) => line.length > 0),
-  );
+  return sanitizeSystemReminderBody([
+    "This session was forked from a previous session message.",
+    `parentSessionId: ${options.parentSessionId}`,
+    `targetMessageId: ${options.targetMessageId}`,
+    `undoneCheckpointCount: ${options.undoneCheckpointCount}`,
+    `restoredFiles: ${options.restoredFiles.length}`,
+    fileLines,
+    "Workspace files changed after the fork point were restored to their state at the fork point.",
+    "Continue from this fork. Do not assume messages after the fork point happened in this session.",
+  ].filter((line) => line.length > 0));
 }
 
 export function formatConversationForkNoticeBody(options: {

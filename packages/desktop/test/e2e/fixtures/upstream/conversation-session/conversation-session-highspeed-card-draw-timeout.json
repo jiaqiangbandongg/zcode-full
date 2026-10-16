@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-highspeed-card-draw-timeout",
+  "spec": "./test/e2e/conversation-session/conversation-session-highspeed-card-draw-timeout.test.ts",
+  "fixtures": [
+    {
+      "id": "highspeed-draw-timeout-turn-1",
+      "description": "HS-E2E-02 draw 超出 1s 预算后普通发送的首轮固定响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只需固定响应让 E2E 收口，核心断言是抽卡结果对输入框与 Highspeed 标识的影响；经 Coding Plan 数据面代理回放，不调用真实套餐。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HIGHSPEED_DRAW_TIMEOUT_TURN_1"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"highspeed-draw-timeout-turn-1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"glm-e2e\",\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":128,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hs-draw-timeout-turn-1-done\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":12}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "highspeed-draw-timeout-turn-2",
+      "description": "HS-E2E-02 迟到卡落地后同 Task 下一轮加速发送的固定响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只需固定响应让 E2E 收口，核心断言是抽卡结果对输入框与 Highspeed 标识的影响；经 Coding Plan 数据面代理回放，不调用真实套餐。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HIGHSPEED_DRAW_TIMEOUT_TURN_2"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"highspeed-draw-timeout-turn-2\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"glm-e2e\",\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":128,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hs-draw-timeout-turn-2-done\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":12}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

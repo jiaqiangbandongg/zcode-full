@@ -1,0 +1,8 @@
+actor-node workspace
+actor-node actor#1 "fast" @4:14
+actor-node actor#2 "slow" @5:14
+actor-node sink
+actor-edge workspace -> actor#1 inexact count=1 types="string[]"
+actor-edge workspace -> actor#2 inexact count=1 types="string[]"
+actor-edge actor#1 -> sink inexact count=1 types="string"
+actor-edge actor#2 -> sink inexact count=1 types="string"

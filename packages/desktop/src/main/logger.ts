@@ -91,6 +91,28 @@ function write(level: LogLevel, source: string, ...args: unknown[]) {
   }
 }
 
+function writeDedicated(filePrefix: string, level: LogLevel, source: string, ...args: unknown[]) {
+  const now = new Date();
+  const ts = formatTimestamp(now);
+  const pid = process.pid;
+  const message = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+  const line = `[${ts}] [${level}] [pid:${pid}] [${source}] ${message}\n`;
+  const logDir = getLogDir();
+  mkdirSync(logDir, { recursive: true });
+  // Bugfix: 远控 relay trace 与主日志混放时，目录内文件会快速增多，人工排查不直观。
+  // 这里把高频 trace 分流到 logs 子目录，避免影响主日志浏览与导出定位。
+  const dedicatedDir = join(logDir, "web-remote-control");
+  mkdirSync(dedicatedDir, { recursive: true });
+  const filePath = join(dedicatedDir, `${filePrefix}-${formatDate(now)}.log`);
+
+  try {
+    maybeThrowInjectedFsFault({ operation: "appendFile", path: filePath });
+    appendFileSync(filePath, line);
+  } catch {
+    // 日志写入失败不应影响应用运行
+  }
+}
+
 /**
  * main 进程日志，默认写入 ~/.zcode/v2/logs/YYYY-MM-DD.log；E2E 测试使用 worker 专属目录。
  * 同时保留 console 输出方便开发调试
@@ -108,4 +130,17 @@ export const logger = {
 
   /** renderer 日志通过 IPC 传入后调用此方法写入同一文件 */
   fromRenderer: (level: LogLevel, args: unknown[]) => write(level, "renderer", ...args),
+};
+
+/**
+ * Web remote control relay message trace 专用日志。
+ * 仅用于高频链路排障，独立落盘避免淹没主日志文件。
+ */
+export const webRemoteControlRelayLogger = {
+  info: (...args: unknown[]) =>
+    writeDedicated("web-remote-control-relay", "info", "web-remote-control-relay", ...args),
+  warn: (...args: unknown[]) =>
+    writeDedicated("web-remote-control-relay", "warn", "web-remote-control-relay", ...args),
+  error: (...args: unknown[]) =>
+    writeDedicated("web-remote-control-relay", "error", "web-remote-control-relay", ...args),
 };

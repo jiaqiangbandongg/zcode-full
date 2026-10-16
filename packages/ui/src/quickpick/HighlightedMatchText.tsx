@@ -40,7 +40,7 @@ function mergeRanges(ranges: TextMatchRange[]): TextMatchRange[] {
   return mergedRanges;
 }
 
-function findTextMatchRanges(text: string, query: string): TextMatchRange[] {
+export function findTextMatchRanges(text: string, query: string): TextMatchRange[] {
   const parts = getQueryParts(query);
   if (parts.length === 0 || text.length === 0) {
     return [];

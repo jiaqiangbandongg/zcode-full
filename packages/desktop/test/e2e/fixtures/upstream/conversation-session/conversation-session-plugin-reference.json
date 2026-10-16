@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-reference",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-reference.test.ts",
+  "fixtures": [
+    {
+      "id": "plugin-reference-title",
+      "description": "E2E_PLUGIN_REFERENCE 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发会触发默认 title sidecar；固定 case-local 标题响应并用首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_PLUGIN_REFERENCE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-reference-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Plugin Reference E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "plugin-reference-reminder-tool-call",
+      "description": "PLG01 wire 门禁：只有当请求 body 真正携带 identifiers-only 的 <plugin_reference> reminder（含 skill-creator stable id）时才放行，并驱动一次 Read 测试工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性验证 provider 收到 reminder：fixture 以 bodyIncludes <plugin_reference> 作为匹配门禁，不依赖真实模型的随机偏好。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_REFERENCE"],
+        "bodyIncludes": [
+          "<plugin_reference>",
+          "skill-creator@zcode-plugins-official"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "toolu_e2e_plugin_reference_read"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plugin_reference_read",
+          "messageId": "msg_e2e_plugin_reference_read",
+          "name": "Read",
+          "input": { "file_path": "plugin-reference-e2e/note.md" }
+        }
+      }
+    },
+    {
+      "id": "plugin-reference-final-reply",
+      "description": "Read 工具结果回灌后的收口回复，输出时间线断言 marker。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第二步以工具结果内容 + tool id 匹配，保证顺序确定性。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_REFERENCE",
+          "PLUGIN_REFERENCE_NOTE_BODY",
+          "toolu_e2e_plugin_reference_read"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-reference-final-reply",
+          "inputTokens": 120,
+          "outputTokens": 12,
+          "text": "PLUGIN_REFERENCE_REPLY_OK"
+        }
+      }
+    }
+  ]
+}

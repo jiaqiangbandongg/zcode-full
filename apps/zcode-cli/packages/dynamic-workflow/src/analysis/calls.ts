@@ -19,6 +19,7 @@ import {
 } from "./domain.js";
 import type { EvalContext, Evaluator } from "./taint.js";
 import type { ApplicationVia } from "./state.js";
+import type { HoleSite } from "./sites.js";
 import { applySuperCall } from "./classes.js";
 import { handleArrayMethod } from "./array-methods.js";
 import { handlePromiseReject, isPromiseReject } from "./promise-ops.js";
@@ -49,6 +50,9 @@ export function evalCall(ev: Evaluator, node: ts.CallExpression, ctx: EvalContex
 
   const askId = ev.s.askByCall.get(node);
   if (askId !== undefined) return handleAsk(ev, node, askId, ctx);
+
+  const hole = ev.s.holeByCall.get(node);
+  if (hole !== undefined) return handleHole(ev, node, hole, ctx);
 
   const world = ev.s.worldByCall.get(node);
   if (world !== undefined) return handleWorldRead(ev, world.id, world.args, ctx);
@@ -101,6 +105,37 @@ export function evalCall(ev: Evaluator, node: ts.CallExpression, ctx: EvalContex
   }
 
   return handleGenericCall(ev, node, ctx);
+}
+
+/**
+ * 留白（docs/analysis.md「Sites」的 Hole sites 段）。开放的留白：提示是 sink（如 ask 的
+ * instructions），返回值是一个来自 run 之外的、以留白站点为标签的不透明值（类型 T）。已补全的
+ * 留白：函数体在原地被 cell 调用，所以这里把它当一次**直接**应用——记成 `argument` 应用（时序
+ * 走查据此在调用点内联函数体），返回值就是函数体的返回摘要（无实参，exactness 不清：调用是
+ * 确定的，不是间接分派）。已补全的留白**不是**图里的节点，所以它的提示不进 sink 表。
+ */
+function handleHole(
+  ev: Evaluator,
+  node: ts.CallExpression,
+  site: HoleSite,
+  ctx: EvalContext,
+): AbstractValue {
+  ev.s.markFacade(ctx.regionStack);
+  if (site.body === undefined) {
+    if (site.prompt !== undefined) {
+      ev.s.mergeSink(ev.s.holePrompt, site.id, collapse(ev.evalExpr(site.prompt, ctx)));
+    }
+    return singleOcc(site.id, true);
+  }
+  if (site.prompt !== undefined) ev.evalExpr(site.prompt, ctx);
+  const out = emptyValue();
+  for (const fn of ev.evalExpr(site.body, ctx).fns) {
+    const id = ev.s.fnId.get(fn);
+    if (id === undefined) continue;
+    recordCall(ev, id, ctx.regionStack, [], undefined, { site: node, via: "argument" });
+    mergeInto(out, substitute(ev.s.summaryOf(id), id, [], false));
+  }
+  return out;
 }
 
 function handleGenericCall(ev: Evaluator, node: ts.CallExpression, ctx: EvalContext): AbstractValue {

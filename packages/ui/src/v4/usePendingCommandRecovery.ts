@@ -5,7 +5,7 @@ import { pendingCommandRegistry, type PendingCommandEntry } from "@/v4/pendingCo
 import { isPendingCommandForWorkspace } from "@/v4/pendingCommandWorkspace.js";
 import type { SessionDataLayer } from "@/v4/sessionDataLayer.js";
 
-interface UsePendingCommandRecoveryOptions {
+export interface UsePendingCommandRecoveryOptions {
   layer: SessionDataLayer;
   sessionId: string | null;
   snapshot: ConversationSnapshot | null;

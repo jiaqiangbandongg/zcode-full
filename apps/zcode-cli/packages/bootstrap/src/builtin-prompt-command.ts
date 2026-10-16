@@ -7,21 +7,34 @@ import {
 const BUILTIN_PROMPT_COMMAND_PATTERN = /^\/([^\s]+)(?:\s+([\s\S]*))?$/;
 const INIT_COMMAND_NAME = "init";
 
-interface ResolveZCodeBuiltinPromptCommandOptions {
+export interface ResolveZCodeBuiltinPromptCommandOptions {
   /**
-   * 动态工作流开关：只有显式 false 才禁止展开 `/workflow`。
-   * TUI 使用默认开启策略；headless 按本次 `--enable-workflow` 显式传入 true/false，默认 false。
-   * 关闭时返回 undefined；`workflow` 是保留名，自定义命令解析也不会展开它，原文作为普通 prompt
-   * 交给模型。这与命令目录隐藏该入口的规则一致。
+   * 动态工作流灰度门（docs/dynamic-workflow/launch.md「Gray release」）。**只有显式 false 才挡下**
+   * `/workflow`：TUI / headless 从不设置该字段，那里的功能始终开启。挡下时返回 undefined，
+   * 与「命令不存在」同形——`workflow` 是保留名，后续的自定义命令解析同样拒绝展开，于是原文作为
+   * 普通 prompt 交给模型，与目录侧剔除它的结论一致（DWG-03）。
    */
   dynamicWorkflowEnabled?: boolean;
   workingDirectory?: string;
+}
+
+export interface ResolvedZCodeBuiltinPromptCommand {
+  /** 命中的内置命令名（`init` / `workflow`），调用方据此挂命令特有的副作用（如 onDemand 激活）。 */
+  name: string;
+  prompt: string;
 }
 
 export function resolveZCodeBuiltinPromptCommand(
   input: string,
   options: ResolveZCodeBuiltinPromptCommandOptions = {},
 ): string | undefined {
+  return resolveZCodeBuiltinPromptCommandInvocation(input, options)?.prompt;
+}
+
+export function resolveZCodeBuiltinPromptCommandInvocation(
+  input: string,
+  options: ResolveZCodeBuiltinPromptCommandOptions = {},
+): ResolvedZCodeBuiltinPromptCommand | undefined {
   const invocation = parseBuiltinPromptCommandInvocation(input);
   if (!invocation) {
     return undefined;
@@ -29,18 +42,24 @@ export function resolveZCodeBuiltinPromptCommand(
 
   if (invocation.name === INIT_COMMAND_NAME) {
     const workingDirectory = options.workingDirectory ?? process.cwd();
-    return buildInitAgentsPrompt({
-      args: invocation.args,
-      targetPath: join(workingDirectory, "AGENTS.md"),
-      workingDirectory,
-    });
+    return {
+      name: INIT_COMMAND_NAME,
+      prompt: buildInitAgentsPrompt({
+        args: invocation.args,
+        targetPath: join(workingDirectory, "AGENTS.md"),
+        workingDirectory,
+      }),
+    };
   }
 
   if (invocation.name === BUILTIN_WORKFLOW_COMMAND_NAME) {
     if (options.dynamicWorkflowEnabled === false) {
       return undefined;
     }
-    return expandBuiltinWorkflowCommandPrompt(invocation.args);
+    return {
+      name: BUILTIN_WORKFLOW_COMMAND_NAME,
+      prompt: expandBuiltinWorkflowCommandPrompt(invocation.args),
+    };
   }
 
   return undefined;
@@ -63,9 +82,13 @@ function buildInitAgentsPrompt(params: {
   workingDirectory: string;
 }): string {
   const additionalInstructions = params.args
-    ? ["", "Additional user instructions supplied with /init:", "```text", params.args, "```"].join(
-        "\n",
-      )
+    ? [
+        "",
+        "Additional user instructions supplied with /init:",
+        "```text",
+        params.args,
+        "```",
+      ].join("\n")
     : "";
 
   return [

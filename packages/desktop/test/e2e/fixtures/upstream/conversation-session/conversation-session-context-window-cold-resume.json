@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-context-window-cold-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-context-window-cold-resume.test.ts",
+  "fixtures": [
+    {
+      "id": "cw-create-history",
+      "description": "真实创建 1M 目标会话并持久化一轮正文。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "通过真实 UI 请求创建目标会话，替代直接写 sqlite 的伪冷历史。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_CW_CREATE_HISTORY"],
+        "bodyIncludes": ["E2E_CW_CREATE_HISTORY", "\"max_completion_tokens\":64000", "model-1m"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-create-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-create-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cw-history-created-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-create-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":42,\"completion_tokens\":4,\"total_tokens\":46}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "cw-create-parking",
+      "description": "真实创建第二个 parking 会话并保持其为重启时选中项。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确保目标会话在重启后首次点击前仍未被 Agent 恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_CW_PARKING"],
+        "bodyIncludes": ["E2E_CW_PARKING", "\"max_completion_tokens\":64000", "model-1m"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-create-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-create-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cw-parking-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-create-parking\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":24,\"completion_tokens\":4,\"total_tokens\":28}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "cw-high-usage-tool-call",
+      "description": "1M 模型首轮返回 157762 provider input usage 和 readonly Bash(pwd) 工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性复现用户日志中的 157762 provider usage，无需生成真实 15 万 token 历史。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_CW_HIGH_USAGE_TOOL"],
+        "bodyIncludes": ["E2E_CW_HIGH_USAGE_TOOL", "\"max_completion_tokens\":64000", "model-1m"],
+        "bodyExcludes": ["call_cw_pwd", "Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_cw_pwd\",\"type\":\"function\",\"function\":{\"name\":\"Bash\",\"arguments\":\"{\\\"command\\\":\\\"pwd\\\",\\\"description\\\":\\\"Read current workspace path\\\"}\"}}]},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-tool\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":157762,\"completion_tokens\":0,\"total_tokens\":157762}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "cw-tool-result-followup",
+      "description": "Bash tool_result 后直接进入同一 product turn 的第二个 main_turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定证明高 usage 后没有错误插入 Compact，而是直接消费 readonly tool result。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_CW_HIGH_USAGE_TOOL"],
+        "bodyIncludes": [
+          "E2E_CW_HIGH_USAGE_TOOL",
+          "call_cw_pwd",
+          "\"max_completion_tokens\":64000",
+          "model-1m"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-tool-followup\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-tool-followup\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cw-tool-followup-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-tool-followup\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":157900,\"completion_tokens\":8,\"total_tokens\":157908}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "cw-literal-continue",
+      "description": "用户在同一冷恢复 session 输入字面量“继续”后直接进入第三个 main_turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "复现用户日志中的“继续”恢复链路，并让任何意外 Compact 因无 fixture 而 fail-closed。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["继续"],
+        "bodyIncludes": [
+          "E2E_CW_HIGH_USAGE_TOOL",
+          "继续",
+          "\"max_completion_tokens\":64000",
+          "model-1m"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-continue\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-continue\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"cw-continue-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-continue\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":158000,\"completion_tokens\":8,\"total_tokens\":158008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "cw-manual-compact-summary",
+      "description": "CW04 手动 compact 返回固定 summary，供热态与冷恢复 usage 水位对比。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 compact summary 并保留高 provider usage，使 CW04 可确定性验证冷恢复读取压缩后 boundary，而不是压缩前 assistant usage。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_CW_HIGH_USAGE_TOOL",
+          "cw-continue-ok",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true",
+          "model-1m"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-cw-manual-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-manual-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>CW04 compacted the target session after a high-usage tool turn and a literal continue turn. No further business turn followed the compact operation.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-cw-manual-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"model-1m\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":180000,\"completion_tokens\":64,\"total_tokens\":180064}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

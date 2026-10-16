@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-runtime-communication-performance",
+  "spec": "./test/e2e/conversation-session/conversation-session-runtime-communication-performance.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-runtime-communication-performance.json"
+  ],
+  "fileFixtures": [],
+  "videoCaptureMode": "electron_capture_page",
+  "requests": [
+    {
+      "id": "runtime-perf-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本性能复现的通信压力来源，只需稳定返回。"
+    },
+    {
+      "id": "runtime-perf-parent-tool-a",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "PERF02 需要稳定触发子智能体，父请求只负责产生 Agent tool。"
+    },
+    {
+      "id": "runtime-perf-child-stream-a",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要稳定的 child subagent streaming 窗口。"
+    },
+    {
+      "id": "runtime-perf-parent-final-a",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要父会话 continuation 也保持 streaming。"
+    },
+    {
+      "id": "runtime-perf-parent-tool-b",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "PERF02 需要稳定触发子智能体，父请求只负责产生 Agent tool。"
+    },
+    {
+      "id": "runtime-perf-child-stream-b",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要稳定的 child subagent streaming 窗口。"
+    },
+    {
+      "id": "runtime-perf-parent-final-b",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要父会话 continuation 也保持 streaming。"
+    },
+    {
+      "id": "runtime-perf-parent-tool-c",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "PERF02 需要稳定触发子智能体，父请求只负责产生 Agent tool。"
+    },
+    {
+      "id": "runtime-perf-child-stream-c",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要稳定的 child subagent streaming 窗口。"
+    },
+    {
+      "id": "runtime-perf-parent-final-c",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要父会话 continuation 也保持 streaming。"
+    },
+    {
+      "id": "runtime-perf-parent-tool-d",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "PERF02 需要稳定触发子智能体，父请求只负责产生 Agent tool。"
+    },
+    {
+      "id": "runtime-perf-child-stream-d",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要稳定的 child subagent streaming 窗口。"
+    },
+    {
+      "id": "runtime-perf-parent-final-d",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "recorded-stream",
+      "syntheticReason": "性能复现需要父会话 continuation 也保持 streaming。"
+    }
+  ]
+}

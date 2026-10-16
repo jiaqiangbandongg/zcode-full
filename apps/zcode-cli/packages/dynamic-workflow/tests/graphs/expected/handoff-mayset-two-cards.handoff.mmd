@@ -1,0 +1,12 @@
+flowchart LR
+  subgraph phase_1["triage"]
+    phase_1_workspace[("workspace<br/>world-read#1")]
+    phase_1_actor_1["fast<br/>ask#1~actor#1"]
+    phase_1_actor_2["slow<br/>ask#1~actor#2"]
+  end
+  phase_1_workspace -->|"string[]"| phase_1_actor_1
+  phase_1_workspace -->|"string[]"| phase_1_actor_2
+  phase_1_actor_1 -.-> phase_1_actor_2
+  phase_1_actor_2 -.-> phase_1_actor_1
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  class phase_1_workspace world;

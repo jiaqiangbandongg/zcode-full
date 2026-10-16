@@ -1,0 +1,353 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-runtime-catalog-reasoning",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-runtime-catalog-reasoning.test.ts",
+  "fixtures": [
+    {
+      "id": "claude-catalog-title",
+      "description": "Claude runtime catalog case 的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需稳定返回。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"claude-catalog-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-4-8\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Claude Subagent Catalog\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "claude-catalog-general-parent-tool",
+      "description": "父 agent 首轮触发 general-purpose。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父请求只需稳定触发 general-purpose；请求本身由 capture 和 model-io 验证 low。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_GENERAL_PARENT"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_GENERAL_PARENT", "general-purpose"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_claude_catalog_general",
+          "name": "Agent",
+          "input": {
+            "description": "Run the built-in general-purpose agent",
+            "prompt": "E2E_CLAUDE_CATALOG_GENERAL_CHILD: Reply with exactly \"E2E_CLAUDE_CATALOG_GENERAL_CHILD_OK\" and no other text.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-general-child",
+      "description": "general-purpose child 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 响应只需稳定完成；请求本身验证 high/16000。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_GENERAL_CHILD"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_GENERAL_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-general-child-response",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_CLAUDE_CATALOG_GENERAL_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-general-parent-final",
+      "description": "父 agent 消费 general-purpose child tool_result。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明父会话消费 child tool_result 并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CLAUDE_CATALOG_GENERAL_PARENT",
+          "E2E_CLAUDE_CATALOG_GENERAL_CHILD_OK"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-general-parent-final-response",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "claude-catalog-general-done"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-cold-auto-compact",
+      "description": "连续场景间可能触发的自动 compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "若连续场景触发自动 compact，固定摘要以免阻断目标链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CLAUDE_CATALOG_GENERAL_PARENT",
+          "claude-catalog-general-done",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title", "E2E_CLAUDE_CATALOG_EXPLORE_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "claude-catalog-auto-compact-response",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>The Claude general-purpose E2E scenario completed. Continue with the next request.</summary>"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-explore-parent-tool",
+      "description": "父 agent 首轮触发 Explore。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父请求只需稳定触发 Explore；请求本身由 capture 和 model-io 验证 low。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_EXPLORE_PARENT"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_EXPLORE_PARENT", "Explore"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_claude_catalog_explore",
+          "name": "Agent",
+          "input": {
+            "description": "Run the built-in Explore agent",
+            "prompt": "E2E_CLAUDE_CATALOG_EXPLORE_CHILD: Reply with exactly \"E2E_CLAUDE_CATALOG_EXPLORE_CHILD_OK\" and no other text.",
+            "subagent_type": "Explore"
+          }
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-explore-child",
+      "description": "Explore child 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 响应只需稳定完成；请求本身验证 xhigh catalog 32000、provider-visible 31999 和 Explore 工具限制。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_EXPLORE_CHILD"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_EXPLORE_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-explore-child-response",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_CLAUDE_CATALOG_EXPLORE_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-explore-auto-compact",
+      "description": "Explore child 后可能触发的自动 compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "若 Explore continuation 前触发自动 compact，固定摘要以保留当前请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CLAUDE_CATALOG_EXPLORE_PARENT",
+          "claude-catalog-explore-done",
+          "CRITICAL: Respond with TEXT ONLY",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "claude-catalog-explore-auto-compact-response",
+          "inputTokens": 256,
+          "outputTokens": 32,
+          "text": "<summary>The Claude Explore E2E request must finish with claude-catalog-explore-done.</summary>"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-explore-parent-final",
+      "description": "父 agent 消费 Explore child tool_result。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明父会话消费 Explore child tool_result 并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_CLAUDE_CATALOG_EXPLORE_PARENT",
+          "E2E_CLAUDE_CATALOG_EXPLORE_CHILD_OK"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-explore-parent-final-response",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "claude-catalog-explore-done"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-custom-parent-tool",
+      "description": "父 agent 首轮触发 custom Claude catalog agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "父请求只需稳定触发已保存的 custom agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_CUSTOM_PARENT"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_CUSTOM_PARENT", "e2e-claude-catalog-reviewer"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_claude_catalog_custom",
+          "name": "Agent",
+          "input": {
+            "description": "Run the custom Claude catalog reviewer",
+            "prompt": "E2E_CLAUDE_CATALOG_CUSTOM_CHILD: Reply with exactly \"E2E_CLAUDE_CATALOG_CUSTOM_CHILD_OK\" and no other text.",
+            "subagent_type": "e2e-claude-catalog-reviewer"
+          }
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-custom-child",
+      "description": "custom Claude catalog child 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 响应只需稳定完成；请求本身验证 medium/8000。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CLAUDE_CATALOG_CUSTOM_CHILD"],
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_CUSTOM_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-custom-child-response",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_CLAUDE_CATALOG_CUSTOM_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "claude-catalog-custom-parent-final",
+      "description": "父 agent 消费 custom child tool_result。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明父会话消费 custom child tool_result 并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_CLAUDE_CATALOG_CUSTOM_PARENT", "E2E_CLAUDE_CATALOG_CUSTOM_CHILD_OK"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "claude-catalog-custom-parent-final-response",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "claude-catalog-custom-done"
+        }
+      }
+    }
+  ]
+}

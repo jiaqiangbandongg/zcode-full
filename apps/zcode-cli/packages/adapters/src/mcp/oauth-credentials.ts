@@ -4,8 +4,8 @@ import type { OAuthClientInformationMixed, OAuthTokens } from "@modelcontextprot
 import type { SharedZCodeCredentialStore } from "../auth/shared-credentials.js";
 
 export const MCP_OAUTH_CANONICAL_CREDENTIALS_KEY = "authorization_credentials";
-const MCP_OAUTH_LEGACY_CLIENT_KEY = "client_information";
-const MCP_OAUTH_LEGACY_TOKENS_KEY = "tokens";
+export const MCP_OAUTH_LEGACY_CLIENT_KEY = "client_information";
+export const MCP_OAUTH_LEGACY_TOKENS_KEY = "tokens";
 export const MCP_OAUTH_CREDENTIALS_VERSION = 2;
 export const MCP_OAUTH_SUPPORTED_CREDENTIAL_VERSIONS = new Set([1, MCP_OAUTH_CREDENTIALS_VERSION]);
 
@@ -51,7 +51,7 @@ export function mcpOAuthCredentialKey(keyPrefix: string, name: string): string {
   return `${keyPrefix}:${name}`;
 }
 
-function createCredentialGeneration(): string {
+export function createCredentialGeneration(): string {
   return randomBytes(16).toString("hex");
 }
 
@@ -59,7 +59,10 @@ function createCredentialGeneration(): string {
  * 迁移期 baseline：旧记录没有 `generation`，用 canonical 原始内容的稳定 hash 代替。
  * 内容变化即 generation 变化，足以支撑 follower 的「是否换代」判断。
  */
-function resolveCredentialGeneration(canonical: McpOAuthCanonicalCredentials, raw: string): string {
+export function resolveCredentialGeneration(
+  canonical: McpOAuthCanonicalCredentials,
+  raw: string,
+): string {
   if (typeof canonical.generation === "string" && canonical.generation.length > 0) {
     return canonical.generation;
   }
@@ -114,7 +117,7 @@ export async function loadCanonicalCredentials(
   };
 }
 
-interface PublishCanonicalCredentialsInput {
+export interface PublishCanonicalCredentialsInput {
   clientInformation: OAuthClientInformationMixed;
   issuer?: string;
   obtainedAt?: number;
@@ -122,7 +125,7 @@ interface PublishCanonicalCredentialsInput {
   tokens: OAuthTokens;
 }
 
-interface PublishedCanonicalCredentials {
+export interface PublishedCanonicalCredentials {
   canonical: McpOAuthCanonicalCredentials;
   generation: string;
   legacyClientRaw: string;
@@ -174,7 +177,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** access token 临期判定的安全余量。 */
-const MCP_OAUTH_EXPIRY_SKEW_MS = 30_000;
+export const MCP_OAUTH_EXPIRY_SKEW_MS = 30_000;
 
 /**
  * 是否需要在把 token 交给请求头之前先刷新。
@@ -191,7 +194,7 @@ export function isCanonicalTokenNearExpiry(
   return now >= snapshot.expiresAt - skewMs;
 }
 
-type CanonicalInvalidationScope = "tokens" | "all";
+export type CanonicalInvalidationScope = "tokens" | "all";
 
 /**
  * 按 canonical 快照做条件失效。

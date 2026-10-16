@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-conversation-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-conversation-workspace.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-conversation-workspace.json"
+  ],
+  "fileFixtures": [],
+  "noProviderRequests": true,
+  "providerRequestPolicy": "none",
+  "requests": []
+}

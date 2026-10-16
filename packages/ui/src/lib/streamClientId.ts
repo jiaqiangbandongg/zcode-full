@@ -11,6 +11,24 @@ import { createUuid } from "@zcode/shared";
 let cachedStreamClientId: string | null = null;
 
 /**
+ * 获取稳定的设备 ID。
+ *
+ * 桌面端：deviceMid（进程内单例）
+ * 手机端：物理属性指纹（browserPlatform | screen.width | screen.height | colorDepth）
+ */
+export function getStreamClientId(): string {
+  if (cachedStreamClientId) {
+    return cachedStreamClientId;
+  }
+  // Bugfix: 之前每个 hook 实例各自生成 streamClientId，同一台设备在不同页面/实例下
+  // 可能用不同 clientId 发消息，切回任务时会被误判成"另一台设备"。
+  // 这里改成 renderer 进程内单例，确保本设备所有 task 共用同一个 clientId。
+  // 对于手机端，使用物理属性指纹而非随机 UUID，换浏览器/网络/语言/时区均保持稳定。
+  cachedStreamClientId = `renderer:${createUuid()}`;
+  return cachedStreamClientId;
+}
+
+/**
  * 设置稳定的设备 ID（由 platform.getDeviceId() 提供）。
  * 必须在首次调用 getStreamClientId() 之前调用。
  */

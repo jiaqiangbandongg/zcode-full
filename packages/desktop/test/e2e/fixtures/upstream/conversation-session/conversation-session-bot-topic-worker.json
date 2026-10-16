@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bot-topic-worker",
+  "spec": "./test/e2e/conversation-session/conversation-session-bot-topic-worker.test.ts",
+  "fixtures": [
+    {
+      "id": "topic-slow",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BOT_TOPIC_SLOW"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_BOT_TOPIC_NEXT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"slow\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"e2e-bot-model\", \"content\": [], \"usage\": {\"input_tokens\": 20, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOPIC_RUNNING\"}}\n\n"
+          },
+          {
+            "offsetMs": 90000,
+            "text": "event: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \" E2E_TOPIC_OLD_FINAL\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 10}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "topic-next",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BOT_TOPIC_NEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_TOPIC_NEXT_DONE"
+        }
+      }
+    },
+    {
+      "id": "topic-resource-tool",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BOT_TOPIC_RESOURCE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "call_resource",
+          "name": "ReadSessionContext",
+          "input": {
+            "strategy": "topic",
+            "query": "read archived file",
+            "attachment": {
+              "messageId": "om_archive",
+              "index": 0
+            }
+          }
+        }
+      },
+      "maxMatches": 1
+    },
+    {
+      "id": "topic-resource-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离平台 HTTP，通过真实 CLI 证明停止续接与历史附件工具回查。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "bodyIncludes": [
+          "E2E_BOT_TOPIC_RESOURCE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_RESOURCE_DONE"
+        }
+      }
+    }
+  ]
+}

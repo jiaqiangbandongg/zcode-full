@@ -18,14 +18,14 @@ export interface WindowsCuaRuntime {
   commandEnv: Record<string, string>;
 }
 
-interface WindowsCuaRuntimeFileSystem {
+export interface WindowsCuaRuntimeFileSystem {
   stat(path: string): Promise<Pick<Stats, "isDirectory" | "isFile">>;
   lstat?(path: string): Promise<Pick<Stats, "isDirectory" | "isFile" | "isSymbolicLink">>;
   realpath?(path: string): Promise<string>;
   readFile(path: string, encoding?: "utf8"): Promise<string | Uint8Array>;
 }
 
-interface WindowsCuaRuntimeResolveOptions {
+export interface WindowsCuaRuntimeResolveOptions {
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
   resourcesPath?: string;
@@ -35,7 +35,7 @@ interface WindowsCuaRuntimeResolveOptions {
   hashBytes?: (bytes: string | Uint8Array) => Promise<string>;
 }
 
-type WindowsCuaDevRuntimeResolutionReason =
+export type WindowsCuaDevRuntimeResolutionReason =
   | "unsupported-platform"
   | "development-root-not-absolute"
   | "development-root-not-found"

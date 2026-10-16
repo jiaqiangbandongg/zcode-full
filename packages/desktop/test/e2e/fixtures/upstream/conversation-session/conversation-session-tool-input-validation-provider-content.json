@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-input-validation-provider-content",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-input-validation-provider-content.test.ts",
+  "fixtures": [
+    {
+      "id": "tool-input-validation-title",
+      "description": "为本 case 的首轮 session title generation 提供固定辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成与 tool input validation 无关，但必须独立收口，避免抢占或阻塞主链路 fixture。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_INPUT_VALIDATION_PROVIDER_CONTENT"],
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"e2e-tool-input-validation-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"e2e-model\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Tool Input Validation E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":32,\"output_tokens\":8}}"
+      }
+    },
+    {
+      "id": "tool-input-validation-malformed-call",
+      "description": "首轮返回 malformed AskUserQuestion arguments，触发首次模型输入 schema failure。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "常规 toolUse fixture 会 JSON.stringify input；必须使用 raw SSE 才能稳定覆盖 final tool-call malformed arguments。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_INPUT_VALIDATION_PROVIDER_CONTENT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_e2e_tool_input_validation\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"e2e-model\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":128,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_e2e_tool_input_validation\",\"name\":\"AskUserQuestion\",\"input\":{}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"not-json-E2E_TOOL_INPUT_VALIDATION_RAW_SHOULD_NOT_LEAK\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":128,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":16,\"service_tier\":\"standard\"}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "tool-input-validation-live-continuation",
+      "description": "首次 schema failure 的精确 error tool_result 进入 live continuation 后固定收口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应正文只用于稳定结束首轮；核心证据是请求中的归一化 tool_use 和精确 error tool_result。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "<tool_use_error>InputValidationError: AskUserQuestion failed due to the following issue:",
+          "The required parameter `questions` is missing</tool_use_error>"
+        ],
+        "bodyIncludes": [
+          "E2E_TOOL_INPUT_VALIDATION_PROVIDER_CONTENT",
+          "toolu_e2e_tool_input_validation"
+        ],
+        "bodyExcludes": [
+          "E2E_TOOL_INPUT_VALIDATION_RAW_SHOULD_NOT_LEAK",
+          "Tool input failed inputSchema validation",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e-tool-input-validation-live-final",
+          "inputTokens": 192,
+          "outputTokens": 12,
+          "text": "E2E_TOOL_INPUT_VALIDATION_LIVE_OK"
+        }
+      }
+    },
+    {
+      "id": "tool-input-validation-cold-followup",
+      "description": "完整 CLI cold restart 后发送下一轮，固定回复用于捕获 hydration 后的 provider history。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应正文只用于稳定结束 cold follow-up；核心证据是历史 tool_result content 与 live continuation 字节一致。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_INPUT_VALIDATION_COLD_REPLAY"],
+        "bodyIncludes": [
+          "E2E_TOOL_INPUT_VALIDATION_PROVIDER_CONTENT",
+          "toolu_e2e_tool_input_validation",
+          "<tool_use_error>InputValidationError: AskUserQuestion failed due to the following issue:",
+          "The required parameter `questions` is missing</tool_use_error>"
+        ],
+        "bodyExcludes": [
+          "E2E_TOOL_INPUT_VALIDATION_RAW_SHOULD_NOT_LEAK",
+          "Tool input failed inputSchema validation",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "e2e-tool-input-validation-cold-final",
+          "inputTokens": 224,
+          "outputTokens": 12,
+          "text": "E2E_TOOL_INPUT_VALIDATION_COLD_OK"
+        }
+      }
+    }
+  ]
+}

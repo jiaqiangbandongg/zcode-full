@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-model-switch-usage",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-model-switch-usage.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-running-model-switch-usage.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "running-model-switch-usage-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 provider 响应速度不确定，无法稳定保证模型切换 ACK 早于最终 usage 到达。"
+    }
+  ]
+}

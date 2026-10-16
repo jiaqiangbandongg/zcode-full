@@ -1,4 +1,5 @@
 import { parse } from "unbash";
+import { literalPosixWord, type CommandWord } from "./guarded/word.js";
 import type {
   AndOr,
   Command,
@@ -25,6 +26,7 @@ export interface BashCommandRedirect {
 }
 
 export interface BashCommandInvocation {
+  readonly words: CommandWord[];
   readonly argv: string[];
   readonly commandText: string;
   readonly envAssignments: BashCommandEnvAssignment[];
@@ -155,11 +157,27 @@ function collectAndOrCommands(source: string, node: AndOr, context: CollectConte
 }
 
 function collectPipelineCommands(source: string, node: Pipeline, context: CollectContext): void {
+  const firstCommandIndex = context.analysis.commands.length;
   for (let index = 0; index < node.commands.length; index += 1) {
     collectNodeCommands(source, node.commands[index]!, {
       ...context,
       operatorBefore: index === 0 ? context.operatorBefore : node.operators[index - 1],
     });
+  }
+  // unbash 将 time 关键字从 argv 提升为 Pipeline.time；恢复这个已定位的 wrapper，
+  // 否则 time -o file 的参数会被误当成 executable，漏掉后续真实命令。
+  const first = context.analysis.commands[firstCommandIndex];
+  if (node.time && first) {
+    const prefix = source.slice(node.pos, first.words[0]?.start);
+    const time = /\btime\b/.exec(prefix);
+    if (time)
+      first.words.unshift({
+        value: "time",
+        dynamic: false,
+        hasUnquotedGlob: false,
+        start: node.pos + time.index,
+        end: node.pos + time.index + 4,
+      });
   }
 }
 
@@ -183,6 +201,17 @@ function collectSimpleCommand(source: string, command: Command, context: Collect
 
   const name = command.name ? wordValue(command.name) : "";
   context.analysis.commands.push({
+    words: words.map((word) => {
+      const fact = literalPosixWord(word.text, word.pos, word.end);
+      // 只取顶层字面片段的 glob；变量/命令替换/brace 的载荷不是删除目标的词面证据。
+      if (word.parts)
+        fact.hasUnquotedGlob = word.parts.some(
+          (part) =>
+            part.type === "Literal" &&
+            literalPosixWord(part.text, 0, part.text.length).hasUnquotedGlob,
+        );
+      return fact;
+    }),
     argv,
     commandText: source.slice(command.pos, command.end),
     envAssignments,

@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bot-channel-worker",
+  "spec": "./test/e2e/conversation-session/conversation-session-bot-channel-worker.test.ts",
+  "fixtures": [
+    {
+      "id": "first-tool",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发真实 CLI ReplyToChannel 与客户端续聊，外部飞书 HTTP 被隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BOT_CHANNEL_FIRST"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "call_first",
+          "name": "ReplyToChannel",
+          "input": {
+            "parts": [
+              {
+                "type": "mention",
+                "refId": "om_first:m1"
+              },
+              {
+                "type": "text",
+                "text": " E2E_NATIVE_first"
+              }
+            ]
+          }
+        }
+      },
+      "maxMatches": 1
+    },
+    {
+      "id": "first-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发真实 CLI ReplyToChannel 与客户端续聊，外部飞书 HTTP 被隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_BOT_CHANNEL_FOLLOWUP"
+        ],
+        "bodyIncludes": [
+          "E2E_BOT_CHANNEL_FIRST"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_CHANNEL_DONE_first"
+        }
+      }
+    },
+    {
+      "id": "followup-tool",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发真实 CLI ReplyToChannel 与客户端续聊，外部飞书 HTTP 被隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BOT_CHANNEL_FOLLOWUP"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "call_followup",
+          "name": "ReplyToChannel",
+          "input": {
+            "parts": [
+              {
+                "type": "mentionName",
+                "name": "目录目标"
+              },
+              {
+                "type": "text",
+                "text": " E2E_NATIVE_followup"
+              }
+            ]
+          }
+        }
+      },
+      "maxMatches": 1
+    },
+    {
+      "id": "followup-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发真实 CLI ReplyToChannel 与客户端续聊，外部飞书 HTTP 被隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "bodyIncludes": [
+          "E2E_BOT_CHANNEL_FOLLOWUP"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_CHANNEL_DONE_followup"
+        }
+      }
+    }
+  ]
+}

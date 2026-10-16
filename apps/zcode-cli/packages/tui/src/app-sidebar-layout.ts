@@ -33,7 +33,7 @@ type SidebarController = {
   toggleSidebar: () => boolean;
 };
 
-const DEFAULT_SIDEBAR_STATE: SidebarControllerState = {
+export const DEFAULT_SIDEBAR_STATE: SidebarControllerState = {
   narrowOverlayOpen: false,
   preference: "auto",
   sections: {
@@ -78,7 +78,7 @@ export function useSidebarController(): SidebarController {
   };
 }
 
-function sidebarLayoutForTerminal(
+export function sidebarLayoutForTerminal(
   terminalWidth: number,
   state: SidebarControllerState,
 ): SidebarLayout {
@@ -94,7 +94,7 @@ function sidebarLayoutForTerminal(
   };
 }
 
-function toggleSidebarState(
+export function toggleSidebarState(
   state: SidebarControllerState,
   terminalWidth: number,
 ): SidebarControllerState {
@@ -118,7 +118,7 @@ function isWideSidebarTerminal(terminalWidth: number): boolean {
   return Math.floor(terminalWidth) > SIDEBAR_AUTO_VISIBLE_BREAKPOINT;
 }
 
-function toggleSidebarSectionState(
+export function toggleSidebarSectionState(
   sections: SidebarSectionExpansion,
   section: SidebarSectionId,
 ): SidebarSectionExpansion {

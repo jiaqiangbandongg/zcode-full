@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-compact-interrupted",
+  "spec": "./test/e2e/conversation-session/conversation-session-compact-interrupted.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-compact-interrupted.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "prepareConversationE2E 写入的只读工具输入文件，用于构造 completed assistant + tool_result 历史。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-compact-interrupted-prep-one-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第一轮只需要形成 completed 历史，真实文案不影响 compact 语义。"
+    },
+    {
+      "id": "upstream-compact-interrupted-readonly-tool-call",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只读 Read tool_use 覆盖 interrupted compact 前含工具历史的投影。"
+    },
+    {
+      "id": "upstream-compact-interrupted-readonly-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二轮只需要形成 completed tool history，真实文案不影响 compact 语义。"
+    },
+    {
+      "id": "upstream-compact-interrupted-running-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "需要 stop 当前 running 轮得到 interrupted 状态，真实模型可能过快完成。"
+    },
+    {
+      "id": "upstream-compact-interrupted-manual-compact-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "手动 compact 的核心断言是允许在 interrupted 且 queue=0 时执行并完成 marker。"
+    },
+    {
+      "id": "upstream-compact-interrupted-slow-marker-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "用于让 fixture check 明确覆盖 spec 中的通用 E2E_SLOW_STREAM marker。"
+    }
+  ]
+}

@@ -40,7 +40,7 @@
       ],
       "sourceUrl": "repository:packages/desktop/build/icons/128x128.png",
       "sourceOwner": "Z.AI",
-      "normalization": "Byte-for-byte copy of the existing 128x128 ZCode application PNG. No extra Dock padding, redraw, inversion or added outline."
+      "normalization": "Byte-for-byte copy of the existing 128x128 ZCode application PNG. No extra Dock padding, redraw, inversion or added outline. User decision corrected in Todo148 on 2026-09-15."
     },
     {
       "brand": "BigModel",

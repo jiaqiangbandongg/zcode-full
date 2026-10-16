@@ -1,0 +1,214 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-mode-capabilities",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-mode-capabilities.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plan-mode-deny-enter-plan-call",
+      "description": "首轮请求稳定返回 EnterPlanMode 工具调用，制造 plan mode 审批前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_MODE_DENY_STOPS_TURN"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_DENY_STOPS_TURN",
+          "E2E_PLAN_MODE_DENY_ENTER_PLAN",
+          "E2E_PLAN_MODE_DENY_EXIT_PLAN"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mode_deny_enter_plan_mode",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-deny-exit-plan-call",
+      "description": "进入 plan mode 后返回 ExitPlanMode 工具调用，触发审批弹窗。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定触发 ExitPlanMode 审批弹窗，避免模型输出文本而跳过工具。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_DENY_EXIT_PLAN",
+          "toolu_e2e_plan_mode_deny_enter_plan_mode"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mode_deny_exit_plan_mode",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "E2E_PLAN_MODE_DENY_PLAN_BODY: 1. Inspect current implementation. 2. Wait for user approval before edits."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-deny-follow-up-final",
+      "description": "无反馈拒绝 ExitPlanMode 后，下一条用户输入仍带 plan mode reminder 并可完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要断言 deny without feedback 停止当前 turn，但不退出 plan mode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_MODE_DENY_NEXT_INPUT"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_DENY_NEXT_INPUT",
+          "Plan mode is active",
+          "MUST NOT make any edits"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    },
+    {
+      "id": "upstream-plan-mode-boundary-enter-plan-call",
+      "description": "工具边界 case 首轮请求稳定返回 EnterPlanMode。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_MODE_TOOL_BOUNDARY"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_TOOL_BOUNDARY",
+          "E2E_PLAN_MODE_TOOL_BOUNDARY_ENTER",
+          "E2E_PLAN_MODE_TOOL_BOUNDARY_MIXED"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_mode_boundary_enter_plan_mode",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-mode-boundary-mixed-tools-call",
+      "description": "同一 assistant 回复里返回 Write 与 Read；Write 应被 plan mode 拒绝，Read 仍执行。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造同一回复内先写后读的工具组，证明普通拒绝不阻断后续只读工具。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_TOOL_BOUNDARY_MIXED",
+          "toolu_e2e_plan_mode_boundary_enter_plan_mode"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_e2e_plan_mode_boundary_write",
+            "name": "Write",
+            "input": {
+              "file_path": "{{e2eRuntimeRoot}}/conversation-session-plan-mode-capabilities/zcode-e2e-plan-mode-denied-write.txt",
+              "content": "this file must not be written in plan mode\n"
+            }
+          },
+          {
+            "id": "toolu_e2e_plan_mode_boundary_read",
+            "name": "Read",
+            "input": {
+              "file_path": "{{e2eRuntimeRoot}}/shared/readonly-tool.txt"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-plan-mode-boundary-final",
+      "description": "provider-visible 请求同时包含写拒绝和只读 Read 结果后返回固定文本。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心合同是同一 continuation 中同时出现写拒绝 tool_result 与真实 Read tool_result。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_MODE_TOOL_BOUNDARY_MIXED",
+          "toolu_e2e_plan_mode_boundary_write",
+          "toolu_e2e_plan_mode_boundary_read",
+          "Plan mode only allows read-only, non-destructive tools",
+          "E2E_READONLY_TOOL_FILE_CONTENT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

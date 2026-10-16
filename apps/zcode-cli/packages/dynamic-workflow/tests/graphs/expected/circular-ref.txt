@@ -1,0 +1,5 @@
+node source
+node ask#1 "w" @10:28 actors=actor#1 type="string"
+node sink
+actor actor#1 "w" @10:17
+edge source -> ask#1 data exact

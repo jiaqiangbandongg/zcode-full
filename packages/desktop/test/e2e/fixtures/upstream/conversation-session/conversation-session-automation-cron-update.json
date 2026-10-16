@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-cron-update",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-cron-update.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-automation-cron-update-title",
+      "description": "CronUpdate case 的标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 CronUpdate 产品语义，只需稳定返回。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_AUTOMATION_CRON_UPDATE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-automation-cron-update-title",
+          "inputTokens": 100,
+          "outputTokens": 12,
+          "text": "{\"title\":\"Automation Cron Update E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-list-tool",
+      "description": "首段响应固定调用 CronList，要求后续 CronUpdate 使用真实查询结果中的 automationId。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定先调用 CronList；本响应固定查询顺序以验证真实 ID 传递。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AUTOMATION_CRON_UPDATE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_CRON_UPDATE_ORIGINAL_PROMPT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_automation_cron_list",
+          "messageId": "msg_e2e_automation_cron_list",
+          "name": "CronList",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-tool",
+      "description": "CronList 结果进入历史后，用动态注入的真实 automationId 更新标题、prompt 和每 200 天 10:30 的 interval carrier。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "动态 ID 来自真实 CronList tool_result，固定 200 天 interval carrier patch 用于验证原地更新和详情回显。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AUTOMATION_CRON_UPDATE",
+          "E2E_CRON_UPDATE_ORIGINAL_PROMPT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_CRON_UPDATE_UPDATED_PROMPT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_automation_cron_update",
+          "messageId": "msg_e2e_automation_cron_update",
+          "name": "CronUpdate",
+          "input": {
+            "id": "{{latestAutomationId}}",
+            "cron": "30 10 * * *",
+            "intervalUnit": "daily",
+            "interval": 200,
+            "title": "E2E_CRON_UPDATE_UPDATED",
+            "prompt": "E2E_CRON_UPDATE_UPDATED_PROMPT"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-compact",
+      "description": "工具结果触发自动 compact 时返回保留 case marker 与更新定义的摘要，让主轮继续完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "CronList 输出会显著增加上下文并触发真实自动 compact；固定摘要用于稳定保留最终 matcher 所需事实。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AUTOMATION_CRON_UPDATE",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-automation-cron-update-compact",
+          "inputTokens": 256,
+          "outputTokens": 40,
+          "text": "<analysis>CronList and CronUpdate completed successfully.</analysis>\n\n<summary>E2E_AUTOMATION_CRON_UPDATE updated the existing automation to E2E_CRON_UPDATE_UPDATED with prompt E2E_CRON_UPDATE_UPDATED_PROMPT and an every-200-days schedule at 10:30.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-update-final",
+      "description": "CronUpdate 成功结果进入历史后返回简短普通文本，稳定完成整轮。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复只用于结束 case，并验证不生成 text fenced code block。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_AUTOMATION_CRON_UPDATE",
+          "E2E_CRON_UPDATE_UPDATED_PROMPT"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-automation-cron-update-final",
+          "inputTokens": 220,
+          "outputTokens": 8,
+          "text": "E2E_CRON_UPDATE_DONE"
+        }
+      }
+    }
+  ]
+}

@@ -1,7 +1,10 @@
-import type { CodeCommentPreview, CodeCommentRange } from "@/lib/codeCommentContext.js";
+import type {
+  CodeCommentPreview,
+  CodeCommentRange,
+} from "@/lib/codeCommentContext.js";
 import type { CodeReviewCodeViewerSource } from "@/lib/codeViewer.js";
 
-interface CodeReviewContentProjection {
+export interface CodeReviewContentProjection {
   focusedRange: CodeCommentRange | null;
   inlineComments: readonly CodeCommentPreview[];
   targetLineOutOfRange: boolean;

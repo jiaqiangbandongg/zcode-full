@@ -45,7 +45,7 @@ interface CrashArchiveCleanupResult {
   failedFiles: string[];
 }
 
-interface ArchivedCrashDumpRecord {
+export interface ArchivedCrashDumpRecord {
   dumpPath: string;
   archivedDumpPath: string;
   /** dump 里没有 V8 OOM 注解（例如 GPU / native 崩溃）时为 null。 */
@@ -61,7 +61,7 @@ function resolveCrashCapturePaths(): CrashCapturePaths {
   };
 }
 
-function resolveCrashReporterSourceDirs(
+export function resolveCrashReporterSourceDirs(
   stagingDir: string,
   platform: NodeJS.Platform = process.platform,
 ): string[] {
@@ -220,7 +220,7 @@ function pruneCrashDumpArchive(
   return { deletedFiles, failedFiles };
 }
 
-function archiveCrashDumps(
+export function archiveCrashDumps(
   paths: CrashCapturePaths,
   options?: {
     platform?: NodeJS.Platform;
@@ -386,7 +386,7 @@ export function initializeCrashCapture(
   return paths;
 }
 
-interface CrashEventMonitorHooks {
+export interface CrashEventMonitorHooks {
   onRenderProcessGone?: (
     webContents: WebContents,
     details: { reason: string; exitCode: number },
@@ -401,10 +401,10 @@ interface CrashEventMonitorHooks {
   onBrowserWindowCreated?: (win: BrowserWindow) => void;
 }
 
-function resolveProcessGoneLogLevel(reason: string): "info" | "warn" {
-  // Electron 也会为 clean-exit / killed 这类受控终止发送 gone 事件。
-  // 原始 gone 回调只记录生命周期事实，最终是否为 crash 交给稳定性分类；不能无条件打
-  // error，避免被日志采集当成异常统计。
+export function resolveProcessGoneLogLevel(reason: string): "info" | "warn" {
+  // Bug 原因：Electron 也会为 clean-exit / killed 这类受控终止发送 gone 事件。
+  // 原始 gone 回调只记录生命周期事实，最终是否为 crash 交给稳定性分类；旧实现无条件打
+  // error，随后被 ARMS console collector 当作异常，污染错误统计。
   return reason === "clean-exit" || reason === "killed" ? "info" : "warn";
 }
 

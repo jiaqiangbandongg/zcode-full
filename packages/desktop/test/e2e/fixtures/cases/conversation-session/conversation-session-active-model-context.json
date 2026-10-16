@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-active-model-context",
+  "spec": "./test/e2e/conversation-session/conversation-session-active-model-context.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-active-model-context.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "active-model-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+    },
+    {
+      "id": "active-model-step-0",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+    },
+    {
+      "id": "active-model-step-1",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+    },
+    {
+      "id": "active-model-step-2",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+    },
+    {
+      "id": "active-model-step-3",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只验证每次切换后的首请求身份，不验证生成质量；固定快速文本响应避免外部模型依赖。"
+    }
+  ]
+}

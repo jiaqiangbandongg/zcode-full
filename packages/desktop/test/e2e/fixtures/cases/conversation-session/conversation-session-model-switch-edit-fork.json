@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-switch-edit-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-switch-edit-fork.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-switch-edit-fork.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-switch-edit-fork-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "model-switch-edit-source-primary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在请求 capture 的 primary model/thought 和后续 edit 重跑配置；响应只需稳定完成。"
+    },
+    {
+      "id": "model-switch-edit-rerun-secondary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 edit rerun 请求 capture 的 secondary model/thought，响应只需稳定完成。"
+    },
+    {
+      "id": "model-switch-fork-source-primary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 fork 前 source 请求和后续派生 session 配置；响应只需稳定完成并展示 fork 入口。"
+    },
+    {
+      "id": "model-switch-fork-followup-secondary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 fork follow-up 请求 capture 的 secondary model/thought，响应只需稳定完成。"
+    }
+  ]
+}

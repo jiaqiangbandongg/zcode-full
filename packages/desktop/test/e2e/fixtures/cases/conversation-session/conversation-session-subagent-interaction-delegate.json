@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-interaction-delegate",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-interaction-delegate.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-interaction-delegate.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "subagent-hitl-yolo-parent-agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造父 Agent tool_use，核心语义是 child AskUserQuestion 必须代理回父 task。"
+    },
+    {
+      "id": "subagent-hitl-yolo-child-ask",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 child AskUserQuestion 等待态，验证 yolo 下仍代理到父 task 而不是被 deny broker 吞掉。"
+    },
+    {
+      "id": "subagent-hitl-yolo-child-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明 AskUserQuestion 回答已进入 child provider-visible 请求，child 可继续完成。"
+    },
+    {
+      "id": "subagent-hitl-yolo-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并正常收口。"
+    },
+    {
+      "id": "subagent-hitl-permission-parent-agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造父 Agent tool_use，核心语义是 child Bash permission 必须代理回父 task。"
+    },
+    {
+      "id": "subagent-hitl-permission-child-bash",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 child Bash permission 等待态，验证权限请求代理回父 task。"
+    },
+    {
+      "id": "subagent-hitl-permission-child-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明 Bash 输出已进入 child provider-visible 请求，child 可继续完成。"
+    },
+    {
+      "id": "subagent-hitl-permission-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并正常收口。"
+    }
+  ]
+}

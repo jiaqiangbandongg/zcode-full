@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-dynamic-workflow-gray-always-on-user-choice",
+  "spec": "./test/e2e/conversation-session/conversation-session-dynamic-workflow-gray-always-on-user-choice.test.ts",
+  "providerRequestPolicy": "none",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-dynamic-workflow-gray-always-on-user-choice.json"
+  ],
+  "fileFixtures": [],
+  "requests": []
+}

@@ -54,7 +54,7 @@ export function buildImportedClaudeTaskFile(
     workspacePath: source.workspacePath,
     createdAt,
     updatedAt: Math.max(createdAt, updatedAt),
-    mode: "build",
+    mode: "default",
     migrationSource: "claudeCode",
     status: "completed",
     ...(source.model ? { model: source.model } : {}),

@@ -18,6 +18,14 @@ export function shouldFallbackWorkspacePathToCodeViewer(target: WorkspacePathOpe
   return target.serviceScope !== "base-local";
 }
 
+export function requestWorkspacePathOpen(target: WorkspacePathOpenRequest): void {
+  window.dispatchEvent(
+    new CustomEvent<WorkspacePathOpenRequest>(WORKSPACE_PATH_OPEN_REQUEST_EVENT, {
+      detail: target,
+    }),
+  );
+}
+
 export function addWorkspacePathOpenRequestListener(
   listener: (target: WorkspacePathOpenRequest) => void,
 ): () => void {

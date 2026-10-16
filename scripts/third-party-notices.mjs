@@ -121,8 +121,10 @@ export async function readNativeSearchNotices(root = repositoryRoot, { verify = 
 export async function stageNativeSearchNotices(
   plan,
   root = repositoryRoot,
-  { builtFromSource = false } = {},
+  { builtFromSource = false, origin } = {},
 ) {
+  // 内网镜像与仓库归档是同一 SHA-256 的输入字节，来源标签由调用方如实记录；默认仍为仓库归档。
+  const binaryOrigin = origin ?? (builtFromSource ? "source-build" : "repository-archive");
   const { inventory, bytes } = await readNativeSearchNotices(root);
   for (const artifact of plan.artifacts) {
     const directory = dirname(artifact.binaryPath);
@@ -139,7 +141,7 @@ export async function stageNativeSearchNotices(
             toolId: artifact.toolId,
             version: artifact.version,
             sha256: hash(await readFile(artifact.binaryPath)),
-            origin: builtFromSource ? "source-build" : "repository-archive",
+            origin: binaryOrigin,
             ...(!builtFromSource ? { sourceArchiveSha256: artifact.archiveSha256 } : {}),
           },
         },

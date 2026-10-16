@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-development-p0",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-development-p0.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-development-p0.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "SSH-P0-DEV-01/02/03 通过真实远端 file/tree/preview、Terminal 和 Git UI 验证 workspace 服务路由，不启动模型请求。远端数据由 case 在 workspace 的 .zcode-e2e 隔离目录下创建并清理。",
+  "requests": []
+}

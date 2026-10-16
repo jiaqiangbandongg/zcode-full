@@ -17,23 +17,31 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { NodeRecord } from "@zcode/dynamic-workflow";
-import { decodeNode, type DwfEventRow, type DwfNodeRow } from "./dwf-journal-codecs.js";
+import { decodeNode, type DwfNodeRow } from "./dwf-journal-codecs.js";
+import { listArtifactFieldItems } from "./dwf-journal-fields.js";
+import { pageEventRows } from "./dwf-journal-pages.js";
 
-/** {@link listArtifactItems} 的分页袋（游标 = journal sequence）。 */
+/**
+ * {@link listArtifactItems} 的分页袋（游标 = journal sequence）。两道界的规则见
+ * dwf-journal-pages.ts：条数到 `limit`、或再加一条就超过 `maxBytes` 时收尾，第一条总是带上。
+ *
+ * 两者都**必填**，且存储层精确兑现、不加自己的天花板：页大小的缺省与钳制归网关，一条无界的
+ * 取数查询是这里唯一不该有的形状。`hasMore` 由这里判定（收尾处后面还有没有行），调用方不必
+ * 再靠「多取一条」去猜。
+ */
 export interface DwfArtifactItemsQuery {
   /**
    * 只返回 sequence **严格大于**该值的条目。游标是「已读到的最后一个 sequence」而不是偏移量，
    * 与 `listEvents` 逐字同一套语义——看板 hook 用的正是它已经在用的那个游标。
    */
   afterSequence?: number;
-  /**
-   * 单页条数上限，**必填**。存储层不替调用方猜默认值：一条无界的取数查询是这里唯一不该有的形状。
-   *
-   * 但**别在这里加自己的天花板**（如 `Math.min(500, limit)`）。调用方合法地传「钳制上限 + 1」
-   * 来判定 `hasMore`（多取的那条不进页）——一个硬顶会把探测行悄悄吃掉，于是 `hasMore` 在
-   * 恰好 limit = 上限时永久缺席。与 `DwfListRunsQuery.limit` 的截断探测行同一条论证。
-   */
   limit: number;
+  maxBytes: number;
+  /**
+   * 只取这些字段路径（dwf-journal-fields.ts），每个值至多 `maxValueBytes`；给了它，条目带
+   * `fields` 而不带 `item`，`maxBytes` 按取出的字段值计。缺省 = 整条 item。
+   */
+  fields?: { paths: readonly string[]; maxValueBytes: number };
 }
 
 /**
@@ -44,8 +52,10 @@ export interface DwfArtifactItemsQuery {
  * 揭示动画要一个跨重取稳定的 React key，而 sequence 与坐标都满足。
  */
 export interface DwfArtifactItem {
-  /** 被报告的 item 原值（任意 JSON；`REPORT_CAPS` 在写入侧已保证有界）。 */
-  item: unknown;
+  /** 被报告的 item 原值（任意 JSON；`REPORT_CAPS` 在写入侧已保证有界）。只取字段时缺席。 */
+  item?: unknown;
+  /** 只取字段时：路径 → 值，走不通的路径不在表里。 */
+  fields?: Record<string, unknown>;
   ordinal: number;
   sequence: number;
   siteId: string;
@@ -70,6 +80,25 @@ export function listArtifactRows(db: DatabaseSync, runId: string): NodeRecord[] 
 }
 
 /**
+ * 每个预置产物被打了多少条标签 report（看板的数据量，`itemCount`）。`group by` 下推 SQLite，
+ * `dwf_node_artifact_idx (run_id, artifact_id)` 正是这个形状——行一条都不读出来。此前宿主把整张
+ * 节点表（连同每条 report item）读进内存再在 JS 里数，一个报了 65,536 条的 run 每查一次清单就
+ * 解码一遍全部 item（docs/execution-engine.md「Reading the journal」）。
+ */
+export function countTaggedReports(db: DatabaseSync, runId: string): ReadonlyMap<string, number> {
+  const rows = db
+    .prepare(
+      `
+      select artifact_id, count(*) as total from dwf_node
+      where run_id = ? and kind = 'report' and artifact_id is not null
+      group by artifact_id
+      `,
+    )
+    .all(runId) as unknown as { artifact_id: string; total: number | bigint }[];
+  return new Map(rows.map((row) => [row.artifact_id, Number(row.total)]));
+}
+
+/**
  * 喂给某个预置产物的 `report` 条目，按 journal sequence 升序分页（看板的取数面）。
  *
  * 取数源是 **dwf_event 而不是 dwf_node**，尽管两张表都记了同一批标签 report。理由是游标：
@@ -90,30 +119,21 @@ export function listArtifactItems(
   runId: string,
   artifactId: string,
   query: DwfArtifactItemsQuery,
-): DwfArtifactItem[] {
-  // limit ≤ 0 是空页（`listEvents` 的 `limit -1` 全量惯用法在这条查询上不适用——看板的
-  // 取数面永远是有界的）。地板在这里，天花板不在：见 {@link DwfArtifactItemsQuery}.limit。
-  if (query.limit <= 0) return [];
-  const after = query.afterSequence;
-  const cursor = after === undefined ? "" : " and sequence > ?";
-  const rows = db
-    .prepare(
-      `
-      select sequence, payload_json from dwf_event
-      where run_id = ?
-        and type = 'report'
-        and json_extract(payload_json, '$.artifactId') = ?${cursor}
-      order by sequence
-      limit ?
-      `,
-    )
-    .all(
-      runId,
-      artifactId,
-      ...(after === undefined ? [] : [after]),
-      query.limit,
-    ) as unknown as Pick<DwfEventRow, "payload_json" | "sequence">[];
-  return rows.map((row) => {
+): { items: DwfArtifactItem[]; hasMore: boolean } {
+  if (query.fields !== undefined) {
+    return listArtifactFieldItems(db, runId, artifactId, {
+      ...(query.afterSequence === undefined ? {} : { afterSequence: query.afterSequence }),
+      fields: query.fields.paths,
+      limit: query.limit,
+      maxBytes: query.maxBytes,
+      maxValueBytes: query.fields.maxValueBytes,
+    });
+  }
+  const { rows, hasMore } = pageEventRows(db, runId, query, {
+    sql: " and type = 'report' and json_extract(payload_json, '$.artifactId') = ?",
+    params: [artifactId],
+  });
+  const items = rows.map((row) => {
     // payload 是被 appendEvent 原样 stringify 的 `RunEvent`，因此这里的窄形状与
     // `{ type: "report"; instance: InstanceRef; item: unknown; artifactId?: string }` 同源。
     const payload = JSON.parse(row.payload_json) as {
@@ -127,4 +147,5 @@ export function listArtifactItems(
       item: payload.item,
     };
   });
+  return { items, hasMore };
 }

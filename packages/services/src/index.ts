@@ -57,6 +57,8 @@ export {
 // File service — IFileService is both a type (interface) and value (descriptor)
 export { IFileService } from "./file/file.js";
 export { IMediaPreviewService } from "./media-preview/mediaPreview.js";
+export { ICloudContentService } from "#src/cloud-content/cloudContent.js";
+export { IMarketingTouchService } from "#src/marketing-touch/marketingTouch.js";
 export type { MediaPreviewPreparation } from "./media-preview/mediaPreview.js";
 
 // Git service — IGitService is both a type (interface) and value (descriptor)
@@ -173,6 +175,7 @@ export type {
   ZCodeAgentRuntimeLifecycleEvent,
   ZCodeAgentRuntimePolicy,
   ZCodeAgentReadSessionParams,
+  ZCodeAgentRespondProviderRuntimeHeadersParams,
   ZCodeAgentResumeSessionParams,
   ZCodeAgentRunAutomationNowResult,
   ZCodeAgentSavedWorkflowTarget,
@@ -226,6 +229,8 @@ export {
 } from "./memory/memory.js";
 export type { ProjectMemoryFileSummary, ProjectMemoryWorkspaceSummary } from "./memory/memory.js";
 
+// OutputStyle service — IOutputStyleService is both a type (interface) and value (descriptor).
+export { IOutputStyleService } from "./output-style/outputStyle.js";
 export type { SessionRealtimePort } from "./session/sessionRealtimePort.js";
 
 // FileWatcher service — IFileWatcherService is both a type (interface) and value (descriptor)
@@ -317,4 +322,48 @@ export type {
   FeedbackTicketSummary,
   FeedbackTicketType,
 } from "@zcode/shared";
+
+// 插件 UI 桥：描述符、参数类型与工厂；App-Provided Tools 另有独立描述符。
+export {
+  createPluginUiBridgeService,
+  createPluginUiAppToolsService,
+  createPluginUiSamplingService,
+  IPluginUiSamplingService,
+  type PluginUiSamplingParams,
+  type PluginUiCancelSamplingParams,
+  PluginUiBridgeError,
+  IPluginUiAppToolsService,
+  type PluginUiAppToolInstanceParams,
+  type PluginUiAppToolCallParams,
+  type PluginUiAppToolAcceptedResult,
+  type PluginUiRegisterAppToolsParams,
+  type PluginUiRegisterAppToolsResult,
+  type PluginUiResolveAppToolCallParams,
+} from "./plugin-ui-bridge/index.js";
+export {
+  IPluginUiBridgeService,
+  type PluginUiCallToolParams,
+  type PluginUiCallToolResult,
+  type PluginUiPrepareSandboxParams,
+  type PluginUiReadResourceParams,
+  type PluginUiReadResourceResult,
+  type PluginUiPluginScope,
+  type PluginUiListResourcesParams,
+  type PluginUiListResourcesResult,
+  type PluginUiListResourceTemplatesResult,
+  type PluginUiResourceSubscriptionParams,
+  type PluginUiSurfaceEntry,
+  type PluginUiWorkspaceTarget,
+} from "./plugin-ui-bridge/contract.js";
 export { IClientConfigService } from "./client-config/clientConfig.js";
+
+export { IHighspeedCardService } from "./highspeed/highspeedCard.js";
+export {
+  HighspeedCardService,
+  createHighspeedHttpTransport,
+  buildHighspeedTurnExecution,
+} from "./highspeed/highspeedCardService.js";
+export { createHighspeedMockTransport } from "./highspeed/highspeedMockTransport.js";
+
+export { IGenUiService } from "./gen-ui/contract.js";
+export type { GenUiPrepareParams } from "./gen-ui/contract.js";

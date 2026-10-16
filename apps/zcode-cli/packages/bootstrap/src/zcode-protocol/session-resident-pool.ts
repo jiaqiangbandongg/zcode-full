@@ -4,9 +4,9 @@
 // 安全事实和去激活执行面；pool 只维护 idle TTL、LRU touch、operation lease 与
 // deactivation gate。
 
-const DEFAULT_SESSION_RESIDENT_TARGET_COUNT = 8;
+export const DEFAULT_SESSION_RESIDENT_TARGET_COUNT = 8;
 export const DEFAULT_SESSION_RESIDENT_HIGH_WATER_COUNT = 16;
-const DEFAULT_SESSION_RESIDENT_IDLE_TIMEOUT_MS = 10 * 60 * 1_000;
+export const DEFAULT_SESSION_RESIDENT_IDLE_TIMEOUT_MS = 10 * 60 * 1_000;
 
 export type SessionDeactivationReason = "high_water_lru" | "idle_timeout";
 
@@ -94,17 +94,22 @@ export class SessionResidentPool {
    * 获取协议请求租约。全进程计数防跨 session 的 async workspace 操作与 sampler
    * 回收并发；按 session 计数表达精确所有权并参与该 session 的 eligibility。
    */
-  async acquireOperation(sessionIdsInput?: string | readonly string[]): Promise<() => void> {
+  async acquireOperation(
+    sessionIdsInput?: string | readonly string[],
+  ): Promise<() => void> {
     const sessionIds = [
       ...new Set(
-        (typeof sessionIdsInput === "string" ? [sessionIdsInput] : (sessionIdsInput ?? [])).filter(
+        (typeof sessionIdsInput === "string" ? [sessionIdsInput] : sessionIdsInput ?? []).filter(
           (sessionId) => sessionId.length > 0,
         ),
       ),
     ];
     this.activeOperationCount += 1;
     for (const sessionId of sessionIds) {
-      this.operationLeaseCounts.set(sessionId, (this.operationLeaseCounts.get(sessionId) ?? 0) + 1);
+      this.operationLeaseCounts.set(
+        sessionId,
+        (this.operationLeaseCounts.get(sessionId) ?? 0) + 1,
+      );
     }
 
     let released = false;

@@ -9,6 +9,15 @@
  * `phaseNames` 的下标空间，没有 display 图。
  */
 
+/**
+ * 一条阶段流（docs/dynamic-workflow/presentation.md「Streams」）：`from` 站在两者都在跑时把东西交给
+ * `to` 站。只有下标，与 `alongside` 同一个下标空间。
+ */
+export interface StreamSpec {
+  from: number;
+  to: number;
+}
+
 /** 一条带：闭区间 `[from, to]` 上的所有站；`tracks[0]` 是主线。 */
 export interface PhaseBand {
   from: number;
@@ -25,10 +34,14 @@ export interface PhaseBand {
  *    （鲁棒起见——没有循环时不会出现）。
  * 3. 轨道是区间图的贪心着色，按**声明序**：每个成员落到「道上没有与它并行的成员」的最低一道，
  *    否则另开一道。第一个成员因此总在轨道 0 上。
+ * 4. 有流时（`streams`），着色只把「谁也够不着谁」的两站当并行：一个阶段与它下游的每个阶段是
+ *    同一条线上的活，跑得再同时也该在一条轨道上。所有成员都落在一条轨道上的带**解散**——它不是
+ *    带，站回到主线上，由流轨连起来（spec「Bands and tracks」）。侧栏的迷你运行线不传流。
  */
 export function foldPhaseBands(
   count: number,
   alongside: readonly (readonly number[])[],
+  streams: readonly StreamSpec[] = [],
 ): PhaseBand[] {
   const near = Array.from({ length: Math.max(0, count) }, () => new Set<number>());
   for (let i = 0; i < near.length; i += 1) {
@@ -68,16 +81,41 @@ export function foldPhaseBands(
     else merged.push({ ...span });
   }
 
-  return merged.map((span) => {
+  const reach = streamReach(near.length, streams);
+  const apart = (i: number, j: number): boolean =>
+    near[i]!.has(j) && !reach[i]!.has(j) && !reach[j]!.has(i);
+  return merged.flatMap((span) => {
     const tracks: number[][] = [];
     for (let i = span.from; i <= span.to; i += 1) {
-      const free = tracks.find((members) => !members.some((member) => near[i]!.has(member)));
+      const free = tracks.find((members) => !members.some((member) => apart(i, member)));
       if (free === undefined) tracks.push([i]);
       else free.push(i);
     }
-    return { from: span.from, to: span.to, tracks };
+    return tracks.length > 1 ? [{ from: span.from, to: span.to, tracks }] : [];
   });
 }
+
+/** 沿流可达：`reach[i]` = 从第 i 站顺着流走得到的站（越界与自指的流当没说）。 */
+function streamReach(count: number, streams: readonly StreamSpec[]): Set<number>[] {
+  const next = Array.from({ length: count }, () => [] as number[]);
+  for (const stream of streams) {
+    if (!inRange(stream.from, count) || !inRange(stream.to, count)) continue;
+    if (stream.from !== stream.to) next[stream.from]!.push(stream.to);
+  }
+  return next.map((_, start) => {
+    const reached = new Set<number>();
+    const stack = [...next[start]!];
+    while (stack.length > 0) {
+      const i = stack.pop()!;
+      if (reached.has(i)) continue;
+      reached.add(i);
+      stack.push(...next[i]!);
+    }
+    return reached;
+  });
+}
+
+const inRange = (i: number, count: number): boolean => Number.isInteger(i) && i >= 0 && i < count;
 
 /** 第 i 站所在的带；带外 undefined。 */
 export function bandOf<T extends PhaseBand>(bands: readonly T[], i: number): T | undefined {
@@ -90,8 +128,8 @@ export function trackOf(bands: readonly PhaseBand[], i: number): number {
   return track === undefined || track < 0 ? 0 : track;
 }
 
-/** 轨道段的种类；缺席 = 一条轨道上的普通段。 */
-export type TimelineRailKind = "fork" | "merge" | "twin";
+/** 轨道段的种类；缺席 = 一条轨道上的普通段；`stream` = 同一条轨道上相邻两站之间的阶段流。 */
+export type TimelineRailKind = "fork" | "merge" | "twin" | "stream";
 
 export interface RailSpec {
   from: number;
@@ -104,6 +142,8 @@ export interface ArcSpec {
   to: number;
   /** 画在哪条轨道的空中：带内同轨道的弧用那条轨道的空，其余一律用最上面那条的空。 */
   air: number;
+  /** 不相邻的阶段流：画成弧，但它说的是「喂给」，不是回环也不是控制跳转。 */
+  stream?: true;
 }
 
 /** 带 + 它在画面上的两个端点：分叉所在的前驱站与汇合所在的后继站。 */
@@ -142,13 +182,22 @@ function bindBands(
   });
 }
 
-/** 带内自己长出来的轨道段：同轨道的相邻成员（**无条件**，一条轨道就是一条 strand）、分叉、汇合、双线段。 */
-function bandRails(bands: readonly BoundBand[]): RailSpec[] {
+/**
+ * 带内自己长出来的轨道段：同轨道的相邻成员（**无条件**，一条轨道就是一条 strand；两者之间有流时
+ * 是流轨）、分叉、汇合、双线段。
+ */
+function bandRails(bands: readonly BoundBand[], streamed: ReadonlySet<string>): RailSpec[] {
   const rails: RailSpec[] = [];
   for (const band of bands) {
     band.tracks.forEach((members, track) => {
       for (let k = 1; k < members.length; k += 1) {
-        rails.push({ from: members[k - 1]!, to: members[k]! });
+        const from = members[k - 1]!;
+        const to = members[k]!;
+        rails.push({
+          from,
+          ...(streamed.has(`${from}>${to}`) ? { kind: "stream" as const } : {}),
+          to,
+        });
       }
       if (band.pred !== undefined) {
         rails.push({
@@ -182,11 +231,36 @@ export function foldPhaseEdges(
   count: number,
   folded: readonly PhaseBand[],
   edges: readonly { from: number; to: number }[],
+  streams: readonly StreamSpec[] = [],
 ): PhaseEdgeFold {
   const bands = bindBands(count, folded, edges);
   const top = Math.max(1, ...bands.map((band) => band.tracks.length)) - 1;
-  const rails = bandRails(bands);
+  const streamed = new Set(
+    streams
+      .filter((stream) => inRange(stream.from, count) && inRange(stream.to, count))
+      .map((stream) => `${stream.from}>${stream.to}`),
+  );
+  const rails = bandRails(bands, streamed);
   const arcs: ArcSpec[] = [];
+  // 流（spec「Rails」第 6 类与其后一段）：同一条轨道上相邻的是流轨（带内的已由 bandRails 画出），
+  // 不相邻的是流弧；带内跨轨道的流不画——分叉与汇合已经说了两者同时在跑。
+  for (const key of streamed) {
+    const [from, to] = key.split(">").map(Number) as [number, number];
+    if (from === to) continue;
+    const source = bandOf(bands, from);
+    const target = bandOf(bands, to);
+    if (source === undefined && target === undefined) {
+      if (to === from + 1) rails.push({ from, kind: "stream", to });
+      else arcs.push({ air: top, from, stream: true, to });
+      continue;
+    }
+    if (source === undefined || source !== target) continue;
+    const track = trackOf(bands, from);
+    if (track !== trackOf(bands, to)) continue;
+    const members = source.tracks[track]!;
+    if (members[members.indexOf(from) + 1] !== to)
+      arcs.push({ air: track, from, stream: true, to });
+  }
   for (const edge of edges) {
     const source = bandOf(bands, edge.from);
     const target = bandOf(bands, edge.to);
@@ -220,10 +294,18 @@ export function foldPhaseEdges(
     }
     arcs.push({ air: top, from, to });
   }
+  // 流轨顶替同一对站的普通段：一对站之间只画一条轨道，流说得比普通段多。
+  const streamRails = new Set(
+    rails.filter((rail) => rail.kind === "stream").map((rail) => `${rail.from}>${rail.to}`),
+  );
   return {
-    arcs: dedupe(arcs, (arc) => `${arc.air}:${arc.from}>${arc.to}`),
+    arcs: dedupe(arcs, (arc) => `${arc.air}:${arc.from}>${arc.to}:${arc.stream ? "s" : ""}`),
     bands,
-    rails: order(rails),
+    rails: order(
+      rails.filter(
+        (rail) => rail.kind !== undefined || !streamRails.has(`${rail.from}>${rail.to}`),
+      ),
+    ),
   };
 }
 

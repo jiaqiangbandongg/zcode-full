@@ -1,0 +1,6 @@
+phase unphased
+participant unphased:actor#1 "analyst" steps=ask#1,ask#2
+participant unphased:actor#2 "builder" steps=ask#3
+participant unphased:actor#3 "reviewer" steps=ask#4
+handoff unphased:actor#1 -> unphased:actor#3 types="string"
+handoff unphased:actor#2 -> unphased:actor#3 types="string"

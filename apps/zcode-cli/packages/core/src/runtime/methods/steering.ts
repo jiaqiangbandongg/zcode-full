@@ -4,6 +4,7 @@ import {
   recoverPendingPermissionGrant,
 } from "../permission-grant-recovery.js";
 import { runtimeInputMetadata } from "../../agent/runtime-input-presentation.js";
+import { withConversationQuotes } from "../helpers/conversation-quotes.js";
 import {
   CoreErrorType,
   SessionEventType,
@@ -50,8 +51,12 @@ import {
 } from "../../agent/message-history.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 
-function hasSteerInput(request: Pick<TurnSteerInput, "attachments" | "input">): boolean {
-  return request.input.trim().length > 0 || Boolean(request.attachments?.length);
+function hasSteerInput(request: Pick<TurnSteerInput, "attachments" | "input" | "intent">): boolean {
+  return (
+    request.input.trim().length > 0 ||
+    Boolean(request.attachments?.length) ||
+    Boolean(request.intent?.conversationQuotes?.length)
+  );
 }
 
 export async function steerTurn(
@@ -868,7 +873,7 @@ export async function editPendingInputById(
         inputPreview: previewInput(options.newText),
         inputSize: measureUtf8Bytes(options.newText),
         ...(held.commandKind ? { commandKind: held.commandKind } : {}),
-        ...(held.intent ? { intent: held.intent } : {}),
+        ...(held.intent ? { intent: { ...held.intent, text: options.newText } } : {}),
         ...(held.toolDisallowlist ? { toolDisallowlist: held.toolDisallowlist } : {}),
         queueLength: projection.pendingSteerInputs.length,
         targetTurnId: held.targetTurnId,
@@ -883,6 +888,8 @@ export async function editPendingInputById(
   }
   await persistSessionInputUpdates(this, [{ id: pendingInput.id, text: options.newText }]);
   pendingInput.input = options.newText;
+  // 编辑正文后必须同步 canonical text，否则结构化引用恢复时会显示旧正文。
+  if (pendingInput.intent) pendingInput.intent = { ...pendingInput.intent, text: options.newText };
   const event = createSessionEvent(
     SessionEventType.TurnSteerQueued,
     this.sessionId,
@@ -1214,7 +1221,14 @@ async function drainPendingInputUnlocked(
         ? parseRuntimeInputPresentation(pendingInput.inputPresentation)
         : undefined;
     const runtimeEntry = createRuntimeUserEntry(
-      buildUserContentFromTurn(pendingInput.input, resolvedAttachments),
+      buildUserContentFromTurn(
+        withConversationQuotes(
+          pendingInput.input,
+          pendingInput.intent?.conversationQuotes,
+          pendingInput.intent?.botGroupSource,
+        ),
+        resolvedAttachments,
+      ),
       runtimeInputMetadata(inputPresentation) ?? realUserRuntimeMetadata(),
     );
     this.messageHistory.addEntries([runtimeEntry]);

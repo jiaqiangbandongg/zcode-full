@@ -1,0 +1,11 @@
+{
+  "name": "zcode-memory-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "pnpm run test && node --import tsx run.mjs",
+    "e2e:build": "pnpm --filter @zcode/cli^... build && pnpm run e2e && pnpm run e2e:bench",
+    "e2e:bench": "node --import tsx --test memory-bench.test.mjs",
+    "test": "node --test memory-e2e-evidence.test.mjs"
+  }
+}

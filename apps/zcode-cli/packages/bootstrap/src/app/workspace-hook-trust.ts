@@ -1,4 +1,6 @@
-import { createDefaultFileWorkspaceHookTrustStore } from "@zcode/adapters/storage";
+import {
+  createDefaultFileWorkspaceHookTrustStore,
+} from "@zcode/adapters/storage";
 import {
   InMemoryWorkspaceHookPolicyProvider,
   WorkspaceHookTrustCoordinator,
@@ -32,7 +34,7 @@ import {
 import { createWorkspaceHookReviewMutationPort } from "./workspace-hook-review-mutation.js";
 import type { WorkspaceHookReviewHostContext } from "./types.js";
 
-interface WorkspaceHookRuntimeSecurity {
+export interface WorkspaceHookRuntimeSecurity {
   admission: WorkspaceHookRuntimeAdmissionPort;
   snapshot: WorkspaceHookBundleSnapshot;
   /**
@@ -116,25 +118,28 @@ export function createWorkspaceHookRuntimeSecurity(input: {
   let controller: WorkspaceHookReviewController | undefined;
   // 软门禁:onAdmissionStateChanged → 发射 WorkspaceHookAdmissionUpdated 会话事件。
   // activate() 完成 evaluate 后、replaceSnapshot 后均会触发,供投影层写入 snapshot 字段。
-  const onAdmissionStateChanged: ((state: WorkspaceHookAdmissionState) => void) | undefined =
-    input.emitAdmissionEvent
-      ? (state) => {
-          void input.emitAdmissionEvent!({
-            type: SessionEventType.WorkspaceHookAdmissionUpdated,
-            payload: {
-              pendingCount: state.pendingCount,
-              bundleDigest: state.bundleDigest,
-              ...(state.workspaceIdentity ? { workspaceIdentity: state.workspaceIdentity } : {}),
-            },
-          }).catch((error: unknown) => {
-            input.logger.warn("Failed to emit WorkspaceHookAdmissionUpdated", {
-              errorType: error instanceof Error ? error.name : typeof error,
-              event: "workspace_hook.admission_event_emit_failed",
-              module: "bootstrap.workspace_hook_trust",
-            });
+  const onAdmissionStateChanged:
+    | ((state: WorkspaceHookAdmissionState) => void)
+    | undefined = input.emitAdmissionEvent
+    ? (state) => {
+        void input.emitAdmissionEvent!({
+          type: SessionEventType.WorkspaceHookAdmissionUpdated,
+          payload: {
+            pendingCount: state.pendingCount,
+            bundleDigest: state.bundleDigest,
+            ...(state.workspaceIdentity
+              ? { workspaceIdentity: state.workspaceIdentity }
+              : {}),
+          },
+        }).catch((error: unknown) => {
+          input.logger.warn("Failed to emit WorkspaceHookAdmissionUpdated", {
+            errorType: error instanceof Error ? error.name : typeof error,
+            event: "workspace_hook.admission_event_emit_failed",
+            module: "bootstrap.workspace_hook_trust",
           });
-        }
-      : undefined;
+        });
+      }
+    : undefined;
   const admission = createWorkspaceHookRuntimeAdmission({
     coordinator,
     enabled: trustEnabled,
@@ -184,7 +189,9 @@ export function createWorkspaceHookRuntimeSecurity(input: {
       await admission.activate("resume");
     },
     requestReview: (target) =>
-      controller ? controller.requestReview(target) : Promise.resolve(unavailable()),
+      controller
+        ? controller.requestReview(target)
+        : Promise.resolve(unavailable()),
     respond: (target, decision) =>
       controller ? controller.respond(target, decision) : Promise.resolve(unavailable()),
     toggle: (target, reviewItemId, enabled) =>

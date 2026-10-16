@@ -1,0 +1,14 @@
+phase phase#1 "refine"
+node phase#1@1 mark phase=phase#1
+node ask#1@1 issue site=ask#1 phase=phase#1
+node ask#2@1 issue site=ask#2 phase=phase#1
+edge entry -> phase#1@1 next
+edge phase#1@1 -> ask#1@1 next
+edge ask#1@1 -> ask#2@1 next
+edge ask#2@1 -> ask#1@1 loop
+edge ask#2@1 -> sink exit
+edge ask#2@1 -> sink jump via=return
+phase-edge entry -> phase#1 next
+phase-edge phase#1 -> phase#1 loop
+phase-edge phase#1 -> sink exit
+phase-edge phase#1 -> sink jump via=return

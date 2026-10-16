@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-approval-primary-submit",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-approval-primary-submit.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plan-approval-primary-submit-enter-plan-call",
+      "description": "首轮请求稳定返回 EnterPlanMode 工具调用，制造计划审批前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLAN_APPROVAL_PRIMARY_SUBMIT"],
+        "bodyIncludes": [
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT",
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_ENTER_PLAN",
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_EXIT_PLAN"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_approval_primary_submit_enter",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-approval-primary-submit-exit-plan-call",
+      "description": "进入 plan mode 后返回 ExitPlanMode 工具调用，触发只有批准选项的审批弹窗。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定触发 ExitPlanMode 审批弹窗，确保 E2E 只验证 footer 主提交路径。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_EXIT_PLAN",
+          "toolu_e2e_plan_approval_primary_submit_enter"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_approval_primary_submit_exit",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_PLAN_BODY: verify footer submit approves an unchanged plan."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-approval-primary-submit-auto-compact",
+      "description": "审批通过后的 mid-turn auto compact 返回稳定摘要，让主 turn 继续。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E 模型使用极小 context window，ExitPlanMode 批准后会稳定触发 mid-turn auto compact；本响应只用于让审批主路径继续。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_ENTER_PLAN",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-plan-approval-primary-submit-auto-compact",
+          "inputTokens": 192,
+          "outputTokens": 48,
+          "text": "<analysis>Summarized the approved plan transition.</analysis>\n\n<summary>User has approved your plan. E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_PLAN_BODY: verify footer submit approves an unchanged plan.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-approval-primary-submit-final",
+      "description": "footer 主提交批准计划后返回固定文本，让审批轮稳定完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心合同是主提交产生 approved tool result；最终回复只需稳定结束当前轮。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_e2e_plan_approval_primary_submit_exit",
+          "E2E_PLAN_APPROVAL_PRIMARY_SUBMIT_PLAN_BODY",
+          "User has approved your plan"
+        ],
+        "bodyExcludes": [
+          "The plan was not approved by the user.",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

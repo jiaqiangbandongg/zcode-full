@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-file-compact-continuity",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-file-compact-continuity.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plan-file-compact-enter-plan-call",
+      "description": "首轮请求稳定返回 EnterPlanMode 工具调用，制造 plan mode 审批前置状态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_FILE_COMPACT_CONTINUITY"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_FILE_COMPACT_CONTINUITY",
+          "E2E_PLAN_FILE_COMPACT_ENTER_PLAN",
+          "E2E_PLAN_FILE_COMPACT_EXIT_PLAN"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_file_compact_enter_plan_mode",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-file-compact-exit-plan-call",
+      "description": "进入 plan mode 后返回 ExitPlanMode 工具调用，触发审批弹窗并携带唯一 plan marker。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "需要稳定触发 ExitPlanMode 审批弹窗，并让已批准 plan 内容可在文件和 compact 后请求中被追踪。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLAN_FILE_COMPACT_EXIT_PLAN",
+          "toolu_e2e_plan_file_compact_enter_plan_mode"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_plan_file_compact_exit_plan_mode",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "E2E_PLAN_FILE_COMPACT_PLAN_BODY: 1. Persist the approved plan under .zcode/plans. 2. Preserve the plan through manual compact via plan_file_reference."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-file-compact-approval-final",
+      "description": "用户批准 plan 后返回固定文本，让审批轮进入 completed。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "审批通过后的回复内容不是本 case 核心，只需要稳定结束当前轮并保留 provider-visible approved plan。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_e2e_plan_file_compact_exit_plan_mode",
+          "User has approved your plan",
+          "E2E_PLAN_FILE_COMPACT_PLAN_BODY"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-plan-file-compact-approval-final",
+          "inputTokens": 192,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-file-compact-checkpoint-final",
+      "description": "审批后追加一轮普通消息，使手动 compact 具备两轮以上可压缩历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "当前 compact 策略会跳过过短历史，checkpoint 只用于稳定满足 compact 入口条件。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_FILE_COMPACT_CHECKPOINT"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_FILE_COMPACT_CHECKPOINT",
+          "E2E_PLAN_FILE_COMPACT_PLAN_BODY"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-plan-file-compact-checkpoint-final",
+          "inputTokens": 224,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-file-compact-summary-success",
+      "description": "手动 /compact 成功的 streaming Anthropic-compatible 响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "本 case 关注 compact 后 plan_file_reference 重新注入；summary 文案只需稳定完成 compact。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_PLAN_FILE_COMPACT_PLAN_BODY",
+          "E2E_PLAN_FILE_COMPACT_CHECKPOINT",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 200,
+        "text": {
+          "id": "upstream-e2e-plan-file-compact-summary-success",
+          "inputTokens": 256,
+          "outputTokens": 64,
+          "text": "<analysis>Manual compact summarized the approved plan and checkpoint turn.</analysis>\n\n<summary>The user approved E2E_PLAN_FILE_COMPACT_PLAN_BODY and then sent E2E_PLAN_FILE_COMPACT_CHECKPOINT before manual compact.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-plan-file-compact-post-compact-final",
+      "description": "compact 完成后的普通请求必须重新包含 plan_file_reference 与完整 plan marker。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心合同是 provider-visible 请求内容，回复文本只需稳定结束后续轮。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLAN_FILE_COMPACT_AFTER"
+        ],
+        "bodyIncludes": [
+          "E2E_PLAN_FILE_COMPACT_AFTER",
+          "A plan file exists from plan mode at:",
+          "Plan contents:",
+          ".zcode/plans/plan-",
+          "E2E_PLAN_FILE_COMPACT_PLAN_BODY",
+          "If this plan is relevant to the current work and not already complete, continue working on it."
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-plan-file-compact-post-compact-final",
+          "inputTokens": 256,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

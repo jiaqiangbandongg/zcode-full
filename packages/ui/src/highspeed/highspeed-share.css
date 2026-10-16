@@ -1,0 +1,634 @@
+/* Highspeed 分享卡（左下角侧栏卡）与分享弹窗的样式与动效，视觉迁移自 ui/highspeed 分支。
+ * 主题 token 与结构解耦：Light 在 :root，Dark 在 .dark/.theme-zai-dark 覆盖。 */
+:root {
+  --highspeed-sidebar-model-icon: #6041ff;
+  --highspeed-sidebar-model-gradient: linear-gradient(90deg, #4830c8 0%, #6041ff 50%, #8955db 100%);
+  --highspeed-sidebar-card-surface: #fafafa;
+  --highspeed-sidebar-card-outline: var(--color-border);
+  --highspeed-share-card-light-background-opacity: 1;
+  --highspeed-share-card-dark-background-opacity: 0;
+  --color-highspeed-share-card-view-border: rgb(0 0 0 / 18%);
+  --color-highspeed-share-card-view-start: rgb(255 255 255 / 6%);
+  --color-highspeed-share-card-view-end: rgb(153 153 153 / 6%);
+  --color-highspeed-share-foreground: #161518;
+  --color-highspeed-share-foreground-subtle: rgb(0 0 0 / 80%);
+  --color-highspeed-share-control-hover: rgb(13 13 13 / 4%);
+  --color-highspeed-share-dialog-surface: #ffffff;
+  --color-highspeed-share-dialog-border: rgb(0 0 0 / 10%);
+  --highspeed-share-dialog-box-shadow:
+    0 22px 6px rgb(0 0 0 / 0%), 0 14px 6px rgb(0 0 0 / 1%), 0 8px 5px rgb(0 0 0 / 5%),
+    0 3px 3px rgb(0 0 0 / 9%), 0 1px 2px rgb(0 0 0 / 10%);
+  --color-highspeed-share-dialog-foreground: #161518;
+  --color-highspeed-share-dialog-muted: rgb(0 0 0 / 58%);
+  --color-highspeed-share-dialog-noise-dark-opacity: 0;
+  --color-highspeed-share-dialog-noise-light-opacity: 0.06;
+  --color-highspeed-share-dialog-noise-opacity: 1;
+  --color-highspeed-share-dialog-control-hover: rgb(0 0 0 / 7%);
+  --color-highspeed-share-dialog-download-surface: #000000;
+  --color-highspeed-share-dialog-download-hover-surface: #1f1f1f;
+  --color-highspeed-share-dialog-download-foreground: #ffffff;
+  --color-highspeed-share-dialog-stats-border: rgb(0 0 0 / 10%);
+  --color-highspeed-share-dialog-bars-start: #ed6c70;
+  --color-highspeed-share-dialog-bars-mid: #f0c76e;
+  --color-highspeed-share-dialog-bars-end: #80d68d;
+  --color-highspeed-share-dialog-marker-glow: rgb(107 215 125 / 60%);
+  --color-highspeed-share-dialog-logo-surface: #2d2d2d;
+  --color-highspeed-share-dialog-logo-border: rgb(255 255 255 / 12%);
+  --color-highspeed-share-dialog-benefit-text: #5c5c5c;
+  --color-highspeed-share-dialog-pill-text: #5c5c5c;
+  --color-highspeed-share-dialog-input-border: rgb(0 0 0 / 10%);
+  --color-highspeed-share-dialog-bars-baseline: rgb(13 13 13 / 5%);
+}
+
+.dark,
+.theme-zai-dark {
+  --highspeed-sidebar-model-icon: #b09aff;
+  --highspeed-sidebar-model-gradient: linear-gradient(90deg, #9b85ff 0%, #b09aff 50%, #ceacff 100%);
+  --highspeed-sidebar-card-surface: transparent;
+  --highspeed-sidebar-card-outline: transparent;
+  --highspeed-share-card-light-background-opacity: 0;
+  --highspeed-share-card-dark-background-opacity: 1;
+  --color-highspeed-share-card-view-border: rgb(255 255 255 / 44%);
+  --color-highspeed-share-foreground: #e7e4ed;
+  --color-highspeed-share-foreground-subtle: #c8c2d2;
+  --color-highspeed-share-control-hover: rgb(255 255 255 / 10%);
+  --color-highspeed-share-dialog-surface: #101010;
+  --color-highspeed-share-dialog-border: rgb(255 255 255 / 12%);
+  --highspeed-share-dialog-box-shadow:
+    0 63px 18px rgb(0 0 0 / 0%), 0 41px 16px rgb(0 0 0 / 1%), 0 23px 14px rgb(0 0 0 / 5%),
+    0 10px 10px rgb(0 0 0 / 9%), 0 3px 6px rgb(0 0 0 / 10%);
+  --color-highspeed-share-dialog-foreground: #f7f5fa;
+  --color-highspeed-share-dialog-muted: rgb(231 228 237 / 64%);
+  --color-highspeed-share-dialog-noise-dark-opacity: 0.06;
+  --color-highspeed-share-dialog-noise-light-opacity: 0;
+  --color-highspeed-share-dialog-noise-opacity: 1;
+  --color-highspeed-share-dialog-control-hover: rgb(255 255 255 / 10%);
+  --color-highspeed-share-dialog-stats-border: rgb(255 255 255 / 10%);
+  --color-highspeed-share-dialog-bars-start: #ef6f72;
+  --color-highspeed-share-dialog-bars-mid: #f1c86f;
+  --color-highspeed-share-dialog-bars-end: #82d990;
+  --color-highspeed-share-dialog-marker-glow: rgb(115 221 132 / 60%);
+  --color-highspeed-share-dialog-benefit-text: #adadad;
+  --color-highspeed-share-dialog-pill-text: #adadad;
+  --color-highspeed-share-dialog-input-border: rgb(255 255 255 / 10%);
+  --color-highspeed-share-dialog-bars-baseline: rgb(255 255 255 / 18%);
+}
+
+.highspeed-sidebar-share-card-frame {
+  /* 与营销 Banner 共用槽位尺寸，避免宽侧栏下固定宽度和外层留白造成内缩。 */
+  width: 100%;
+  height: 96px;
+  flex: none;
+  align-self: center;
+}
+
+.highspeed-sidebar-share-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: 100%;
+  height: 96px;
+  overflow: visible;
+  border: 0;
+  /* 圆角与新底图 SVG 的 rx=12 对齐，避免容器与图层圆角不一致。 */
+  border-radius: 12px;
+  background: var(--highspeed-sidebar-card-surface);
+  box-shadow: inset 0 0 0 1px var(--highspeed-sidebar-card-outline);
+}
+
+.highspeed-sidebar-share-card__background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  user-select: none;
+  object-fit: cover;
+}
+
+.highspeed-sidebar-share-card__background--light {
+  /* 底图原尺寸为 230x96；随槽位等比裁切并保持圆角，前景内容不缩放。 */
+  opacity: var(--highspeed-share-card-light-background-opacity);
+}
+
+.highspeed-sidebar-share-card__background--dark {
+  opacity: var(--highspeed-share-card-dark-background-opacity);
+}
+
+.highspeed-sidebar-share-card__content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  color: var(--color-highspeed-share-foreground);
+}
+
+.highspeed-sidebar-share-card__title {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  color: var(--color-highspeed-share-foreground);
+}
+
+.highspeed-sidebar-share-card__wordmark {
+  display: block;
+  width: 52px;
+  height: auto;
+  opacity: 0.6;
+}
+
+.highspeed-sidebar-share-card__model {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  top: 34px;
+  right: 12px;
+  left: 12px;
+  overflow: hidden;
+  color: var(--color-highspeed-share-foreground);
+  font-size: var(--text-ui-lg);
+  font-weight: 600;
+  line-height: 22px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.highspeed-sidebar-share-card__model-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--highspeed-sidebar-model-icon);
+}
+
+.highspeed-sidebar-share-card__model-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .highspeed-sidebar-share-card__model-text {
+    /* 渐变按文字宽度铺开，深浅主题分别保持紫色文字的可读性。 */
+    width: fit-content;
+    background: var(--highspeed-sidebar-model-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+}
+
+.highspeed-sidebar-share-card__description {
+  position: absolute;
+  right: 84px;
+  bottom: 12px;
+  left: 12px;
+  overflow: hidden;
+  color: var(--color-highspeed-share-foreground-subtle);
+  font-size: var(--text-ui-base);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.highspeed-sidebar-share-card__view {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  height: 24px;
+  gap: 4px;
+  align-items: center;
+  padding: 1px 6px;
+  border: 0.4px solid var(--color-highspeed-share-card-view-border);
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-highspeed-share-card-view-start),
+    var(--color-highspeed-share-card-view-end)
+  );
+  color: var(--color-highspeed-share-foreground-subtle);
+  font-size: var(--text-ui-base);
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.highspeed-sidebar-share-card__view:hover {
+  background: var(--color-highspeed-share-control-hover);
+  color: var(--color-highspeed-share-foreground);
+}
+
+.highspeed-share-dialog__content {
+  display: block !important;
+  width: calc(100% - 2rem) !important;
+  max-width: 436px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Bug 原因：Radix 等退出动画 animationend 才卸载且无超时兜底；Electron 窗口不可见时
+ * compositor 停摆事件永不触发，bg-black/60 遮罩滞留把界面罩灰并吞掉点击。
+ * 关闭态强制无动画（入场动画保留），Radix 检测不到动画名即同步卸载。 */
+.highspeed-share-dialog__overlay[data-state="closed"],
+.highspeed-share-dialog__content[data-state="closed"] {
+  animation: none !important;
+}
+
+.highspeed-share-dialog__card {
+  /* 远程 Dialog 已提供统一 mask；卡片只负责自身层级，避免再把页面整体洗白。 */
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--color-highspeed-share-dialog-border);
+  border-radius: 20px;
+  background: var(--color-highspeed-share-dialog-surface);
+  color: var(--color-highspeed-share-dialog-foreground);
+  box-shadow: var(--highspeed-share-dialog-box-shadow);
+  padding: 24px;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.highspeed-share-dialog__noise {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background-position: top left;
+  background-repeat: repeat;
+  background-size: 145.4023px 145.4023px;
+  opacity: var(--color-highspeed-share-dialog-noise-opacity);
+}
+
+.highspeed-share-dialog__noise--dark {
+  opacity: var(--color-highspeed-share-dialog-noise-dark-opacity);
+}
+
+.highspeed-share-dialog__noise--light {
+  mix-blend-mode: exclusion;
+  opacity: var(--color-highspeed-share-dialog-noise-light-opacity);
+}
+
+.highspeed-share-dialog__header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 标题行改为品牌组：Z logo 方块 + 权益文案 + HighSpeed 胶囊（Figma 6403:11193）。 */
+.highspeed-share-dialog__brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  animation: highspeed-share-dialog-fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+.highspeed-share-dialog__logo {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 0.53px solid var(--color-highspeed-share-dialog-logo-border);
+  border-radius: 3.2px;
+  background: var(--color-highspeed-share-dialog-logo-surface);
+}
+
+.highspeed-share-dialog__logo img {
+  width: 12.8px;
+  height: 12.8px;
+  object-fit: cover;
+}
+
+.highspeed-share-dialog__benefit {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-highspeed-share-dialog-benefit-text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.highspeed-share-dialog__pill {
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 18px;
+  align-items: center;
+  padding: 1px 6px;
+  border: 0.4px solid var(--color-highspeed-share-dialog-muted);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--color-highspeed-share-dialog-pill-text);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.highspeed-share-dialog__close {
+  margin: -6px -6px 0 0;
+  color: var(--color-highspeed-share-dialog-muted) !important;
+}
+
+.highspeed-share-dialog__close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.highspeed-share-dialog__close:hover {
+  background: var(--color-highspeed-share-dialog-control-hover) !important;
+  color: var(--color-highspeed-share-dialog-foreground) !important;
+}
+
+.highspeed-share-dialog__metric {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 12px;
+  animation: highspeed-share-dialog-fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) 230ms both;
+}
+
+.highspeed-share-dialog__metric-value {
+  color: var(--color-highspeed-share-dialog-foreground);
+  font-size: 52px;
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.09em;
+  transform: translateY(4px);
+}
+
+/* 设计稿中 x 后缀小于数字（52:24 比例），跟随基线排布。 */
+.highspeed-share-dialog__metric-suffix {
+  font-size: 24px;
+  letter-spacing: normal;
+}
+
+.highspeed-share-dialog__metric-label {
+  align-self: flex-end;
+  color: var(--color-highspeed-share-dialog-muted);
+  font-size: 13px;
+  font-weight: 300;
+  text-transform: lowercase;
+}
+
+.highspeed-share-dialog__stats {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  border-top: 1px solid var(--color-highspeed-share-dialog-stats-border);
+  padding-top: 24px;
+  animation: highspeed-share-dialog-fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both;
+}
+
+.highspeed-share-dialog__stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-highspeed-share-dialog-muted);
+}
+
+.highspeed-share-dialog__stats-label,
+.highspeed-share-dialog__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.highspeed-share-dialog__stats-label {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.highspeed-share-dialog__stats-label svg {
+  width: 15px;
+  height: 15px;
+  color: var(--color-success);
+}
+
+.highspeed-share-dialog__saved {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.highspeed-share-dialog__chart {
+  position: relative;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 1px;
+}
+
+.highspeed-share-dialog__chart-bars {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 1px;
+  clip-path: inset(0 0 0 0);
+}
+
+.highspeed-share-dialog__chart-bars--baseline {
+  background: var(--color-highspeed-share-dialog-bars-baseline);
+}
+
+.highspeed-share-dialog__chart-bars--fast {
+  width: var(--highspeed-share-fast-width, 28%);
+  background: linear-gradient(
+    90deg,
+    var(--color-highspeed-share-dialog-bars-start),
+    var(--color-highspeed-share-dialog-bars-mid) 52%,
+    var(--color-highspeed-share-dialog-bars-end)
+  );
+  animation: highspeed-share-dialog-fill-grow 1200ms cubic-bezier(0.33, 0, 0.16, 1) 520ms both;
+}
+
+.highspeed-share-dialog__chart-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  /* 指针落点由组件按加速耗时占常规耗时的比例写入 CSS 变量。 */
+  left: var(--highspeed-share-marker-left, calc(72% + 1px));
+  width: 4px;
+  border-radius: 1px;
+  background: #00a640;
+  box-shadow: 0 0 12px var(--color-highspeed-share-dialog-marker-glow);
+  /* 与填充条使用相同时间轴，保持动态耗时比例下的视觉同步。 */
+  animation:
+    highspeed-share-dialog-marker-sweep 1200ms cubic-bezier(0.33, 0, 0.16, 1) 520ms both,
+    highspeed-share-dialog-marker-rise 1200ms cubic-bezier(0.33, 0, 0.16, 1) 520ms both;
+}
+
+.highspeed-share-dialog__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  animation: highspeed-share-dialog-fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) 420ms both;
+}
+
+.highspeed-share-dialog__url,
+.highspeed-share-dialog__download {
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--color-highspeed-share-dialog-input-border);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.highspeed-share-dialog__url {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  overflow: hidden;
+  background: transparent;
+  color: var(--color-highspeed-share-dialog-muted);
+  padding: 0 6px 0 12px;
+  text-align: left;
+}
+
+.highspeed-share-dialog__url span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.highspeed-share-dialog__url svg {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--color-highspeed-share-dialog-muted);
+  transition: color 160ms ease;
+}
+
+.highspeed-share-dialog__url:hover svg,
+.highspeed-share-dialog__url:focus-visible svg {
+  color: var(--color-highspeed-share-dialog-foreground);
+}
+
+.highspeed-share-dialog__url:hover,
+.highspeed-share-dialog__url:focus-visible {
+  background: var(--color-highspeed-share-dialog-control-hover);
+}
+
+.highspeed-share-dialog__download {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-color: transparent;
+  background: var(--color-highspeed-share-dialog-download-surface);
+  color: var(--color-highspeed-share-dialog-download-foreground);
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.highspeed-share-dialog__download svg {
+  width: 16px;
+  height: 16px;
+}
+
+.highspeed-share-dialog__download:hover,
+.highspeed-share-dialog__download:focus-visible {
+  background: var(--color-highspeed-share-dialog-download-hover-surface);
+}
+
+@keyframes highspeed-share-dialog-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 进度填充只显示到当前高速段终点，颜色渐变保持稳定，避免动画过程中渐变比例被压缩。 */
+@keyframes highspeed-share-dialog-fill-grow {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Bug 原因：旧关键帧在 78% 冲过落点 6% 再弹回，绿色指针看起来会"超出又回弹"。
+ * 改为单调推进，且与填充条同时长同缓动，指针始终贴在绿色填充的右边缘。 */
+@keyframes highspeed-share-dialog-marker-rise {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.72);
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes highspeed-share-dialog-marker-sweep {
+  from {
+    left: 0;
+  }
+
+  to {
+    left: var(--highspeed-share-marker-left, calc(72% + 1px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highspeed-share-dialog__brand,
+  .highspeed-share-dialog__metric,
+  .highspeed-share-dialog__stats,
+  .highspeed-share-dialog__chart-bars,
+  .highspeed-share-dialog__chart-marker,
+  .highspeed-share-dialog__actions {
+    animation: none !important;
+    clip-path: none;
+  }
+
+  .highspeed-share-dialog__chart-marker {
+    left: var(--highspeed-share-marker-left, calc(72% + 1px));
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .highspeed-share-dialog__card {
+    padding: 16px;
+  }
+
+  .highspeed-share-dialog__metric {
+    gap: 8px;
+  }
+
+  .highspeed-share-dialog__stats {
+    margin-top: 22px;
+    padding-top: 12px;
+  }
+}

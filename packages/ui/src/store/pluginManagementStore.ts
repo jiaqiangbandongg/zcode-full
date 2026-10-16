@@ -8,6 +8,7 @@ import type {
   ZCodePluginScope,
   ZCodePluginsDescribeResult,
 } from "@zcode/shared";
+import { CLAUDE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
 import type { IPluginManagementService } from "@zcode/services";
 import { logger } from "@/logger.js";
 import { loadInto, runWorkspaceOperation } from "@/store/pluginManagementStoreLoading.js";
@@ -216,7 +217,9 @@ export const usePluginManagementStore = create<PluginManagementState>((set, get)
         // 并返回 true，桌面与手机 Web 都会把旧快照误报成刷新成功。先记住错误，reload 后再写入
         // 共用 store 的可见错误态，同时返回 false，让所有入口获得一致的部分失败语义。
         const blockingDiagnostic = result.diagnostics?.find(
-          (diagnostic) => diagnostic.severity === "error",
+          (diagnostic) =>
+            diagnostic.severity === "error" &&
+            diagnostic.pluginId !== CLAUDE_OFFICIAL_PLUGIN_MARKETPLACE_ID,
         );
         if (blockingDiagnostic) {
           refreshError = blockingDiagnostic.message;

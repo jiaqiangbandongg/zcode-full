@@ -1,0 +1,3662 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-cross-host",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-cross-host.test.ts",
+  "fixtures": [
+    {
+      "id": "shi-a-title",
+      "description": "shi-a-title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHI_A_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Host A",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-title",
+      "description": "shi-b-title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHI_B_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Host B",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-a-seed",
+      "description": "shi-a-seed",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_A_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_A_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-seed-tool",
+      "description": "shi-b-seed-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shi_b_seed",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "SEED",
+            "prompt": "E2E_SHI_B_SEED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shi-b-seed-child",
+      "description": "shi-b-seed-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_SEED_CHILD"],
+        "bodyIncludes": ["E2E_SHI_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHI_B_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_SEED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-seed-final",
+      "description": "shi-b-seed-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shi_b_seed", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-hold-tool",
+      "description": "shi-b-hold-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_HOLD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shi_b_hold",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "HOLD",
+            "message": "E2E_SHI_B_HOLD_CHILD"
+          }
+        },
+        "delayMs": 40000
+      }
+    },
+    {
+      "id": "shi-b-hold-child",
+      "description": "shi-b-hold-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_HOLD_CHILD"],
+        "bodyIncludes": ["E2E_SHI_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHI_B_HOLD:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_HOLD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-hold-final",
+      "description": "shi-b-hold-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shi_b_hold\""],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_HOLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-resume-tool",
+      "description": "shi-b-resume-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_RESUME:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shi_b_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "RESUME",
+            "message": "E2E_SHI_B_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "shi-b-resume-child",
+      "description": "shi-b-resume-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_RESUME_CHILD"],
+        "bodyIncludes": ["E2E_SHI_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHI_B_RESUME:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_RESUME_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-resume-final",
+      "description": "shi-b-resume-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shi_b_resume\""],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_RESUME_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-spawn-tool",
+      "description": "shi-b-spawn-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_SPAWN:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shi_b_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "SPAWN",
+            "prompt": "E2E_SHI_B_SPAWN_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shi-b-spawn-child",
+      "description": "shi-b-spawn-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_B_SPAWN_CHILD"],
+        "bodyIncludes": ["E2E_SHI_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHI_B_SPAWN:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_SPAWN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-spawn-final",
+      "description": "shi-b-spawn-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shi_b_spawn", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_SPAWN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-hold-notification",
+      "description": "shi-b-hold-notification",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "<tool-use-id>toolu_shi_b_hold</tool-use-id>",
+          "E2E_SHI_B_HOLD_CHILD_DONE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_HOLD_SETTLED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-b-resume-notification",
+      "description": "shi-b-resume-notification",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": [
+          "<task-notification>",
+          "<tool-use-id>toolu_shi_b_resume</tool-use-id>",
+          "E2E_SHI_B_RESUME_CHILD_DONE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_B_RESUME_SETTLED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-a-next-tool",
+      "description": "shi-a-next-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_A_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shi_a_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "SPAWN",
+            "prompt": "E2E_SHI_A_NEXT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shi-a-next-child",
+      "description": "shi-a-next-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHI_A_NEXT_CHILD"],
+        "bodyIncludes": ["E2E_SHI_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHI_A_NEXT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_A_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shi-a-next-final",
+      "description": "shi-a-next-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shi_a_next", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHI_A_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-reverse-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_REVERSE:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_reverse_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "reverse",
+            "prompt": "E2E_SHB_REVERSE_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-reverse-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_REVERSE:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_REVERSE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_REVERSE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-reverse-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_reverse_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_REVERSE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-add-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_ADD:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_add_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-added",
+            "description": "add",
+            "prompt": "E2E_SHB_ADD_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-add-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_ADD:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_ADD_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_ADD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-add-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_add_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_ADD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-update-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_UPDATE:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_update_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-added",
+            "description": "update",
+            "prompt": "E2E_SHB_UPDATE_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-update-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_UPDATE:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_UPDATE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_UPDATE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-update-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_update_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_UPDATE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-disabled-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DISABLED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_disabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-added",
+              "description": "disabled",
+              "prompt": "E2E_SHB_DISABLED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_disabled_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_DISABLED_RESUME",
+              "summary": "disabled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-disabled-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_disabled_resume\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DISABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-renamed_disabled-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_RENAMED_DISABLED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_renamed_disabled_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-renamed",
+              "description": "renamed_disabled",
+              "prompt": "E2E_SHB_RENAMED_DISABLED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_renamed_disabled_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_RENAMED_DISABLED_RESUME",
+              "summary": "renamed_disabled"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-renamed_disabled-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_renamed_disabled_resume\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_RENAMED_DISABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-reenabled-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_REENABLED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_reenabled_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-renamed",
+            "description": "reenabled",
+            "prompt": "E2E_SHB_REENABLED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-reenabled-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_REENABLED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_REENABLED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_REENABLED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-reenabled-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_reenabled_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_REENABLED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-renamed_old-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_RENAMED_OLD:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_renamed_old_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-renamed",
+              "description": "renamed_old",
+              "prompt": "E2E_SHB_RENAMED_OLD_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_renamed_old_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_RENAMED_OLD_RESUME",
+              "summary": "renamed_old"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-renamed_old-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_renamed_old_resume\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_RENAMED_OLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-renamed_new-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_RENAMED_NEW:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_renamed_new_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-final",
+            "description": "renamed_new",
+            "prompt": "E2E_SHB_RENAMED_NEW_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-renamed_new-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_RENAMED_NEW:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_RENAMED_NEW_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_RENAMED_NEW_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-renamed_new-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_renamed_new_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_RENAMED_NEW_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-deleted-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DELETED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_deleted_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-final",
+              "description": "deleted",
+              "prompt": "E2E_SHB_DELETED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_deleted_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_DELETED_RESUME",
+              "summary": "deleted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-deleted-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_deleted_resume\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DELETED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-override_explore-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_OVERRIDE_EXPLORE:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_override_explore_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "Explore",
+            "description": "override_explore",
+            "prompt": "E2E_SHB_OVERRIDE_EXPLORE_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-override_explore-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_OVERRIDE_EXPLORE:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_OVERRIDE_EXPLORE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_OVERRIDE_EXPLORE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-override_explore-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_override_explore_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_OVERRIDE_EXPLORE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-clear_explore-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_CLEAR_EXPLORE:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_clear_explore_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "Explore",
+            "description": "clear_explore",
+            "prompt": "E2E_SHB_CLEAR_EXPLORE_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-clear_explore-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_CLEAR_EXPLORE:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_CLEAR_EXPLORE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CLEAR_EXPLORE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-clear_explore-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_clear_explore_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CLEAR_EXPLORE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-override_plugin-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_OVERRIDE_PLUGIN:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_override_plugin_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-subagent-refresh:reviewer",
+            "description": "override_plugin",
+            "prompt": "E2E_SHB_OVERRIDE_PLUGIN_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-override_plugin-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_OVERRIDE_PLUGIN:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_OVERRIDE_PLUGIN_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_OVERRIDE_PLUGIN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-override_plugin-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_override_plugin_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_OVERRIDE_PLUGIN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-clear_plugin-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_CLEAR_PLUGIN:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_clear_plugin_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-subagent-refresh:reviewer",
+            "description": "clear_plugin",
+            "prompt": "E2E_SHB_CLEAR_PLUGIN_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-clear_plugin-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_CLEAR_PLUGIN:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_CLEAR_PLUGIN_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CLEAR_PLUGIN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-clear_plugin-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_clear_plugin_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CLEAR_PLUGIN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-save_failed-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_SAVE_FAILED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_save_failed_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "save_failed",
+            "prompt": "E2E_SHB_SAVE_FAILED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-save_failed-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_SAVE_FAILED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_SAVE_FAILED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_SAVE_FAILED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-save_failed-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_save_failed_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_SAVE_FAILED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-duplicated-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DUPLICATED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_duplicated_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "duplicated",
+            "prompt": "E2E_SHB_DUPLICATED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-duplicated-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_DUPLICATED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_DUPLICATED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DUPLICATED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-duplicated-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_duplicated_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DUPLICATED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_ok_a-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_OK_A:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_read_ok_a_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "read_ok_a",
+            "prompt": "E2E_SHB_READ_OK_A_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-read_ok_a-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_READ_OK_A:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_OK_A_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_OK_A_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_ok_a-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_read_ok_a_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_OK_A_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_retried_b-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_RETRIED_B:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_read_retried_b_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "read_retried_b",
+            "prompt": "E2E_SHB_READ_RETRIED_B_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-read_retried_b-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_READ_RETRIED_B:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_RETRIED_B_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_RETRIED_B_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_retried_b-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_read_retried_b_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_RETRIED_B_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_RESOLVE:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_stale_resolve_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "stale_resolve",
+            "prompt": "E2E_SHB_STALE_RESOLVE_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STALE_RESOLVE:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_RESOLVE_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_RESOLVE_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_stale_resolve_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_RESOLVE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_REJECT:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_stale_reject_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "stale_reject",
+            "prompt": "E2E_SHB_STALE_REJECT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STALE_REJECT:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_REJECT_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_REJECT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_stale_reject_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_REJECT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_ok_a-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_OK_A:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_directory_ok_a_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "directory_ok_a",
+            "prompt": "E2E_SHB_DIRECTORY_OK_A_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-directory_ok_a-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_DIRECTORY_OK_A:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_OK_A_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_OK_A_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_ok_a-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_directory_ok_a_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_OK_A_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_retried_b-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_RETRIED_B:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_directory_retried_b_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "directory_retried_b",
+            "prompt": "E2E_SHB_DIRECTORY_RETRIED_B_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-directory_retried_b-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_DIRECTORY_RETRIED_B:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_RETRIED_B_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_RETRIED_B_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_retried_b-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_directory_retried_b_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_RETRIED_B_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_ok_a-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_OK_A:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_state_ok_a_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "state_ok_a",
+            "prompt": "E2E_SHB_STATE_OK_A_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-state_ok_a-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STATE_OK_A:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_OK_A_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_OK_A_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_ok_a-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_state_ok_a_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_OK_A_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_retried_b-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_RETRIED_B:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_state_retried_b_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "state_retried_b",
+            "prompt": "E2E_SHB_STATE_RETRIED_B_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-state_retried_b-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STATE_RETRIED_B:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_RETRIED_B_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_RETRIED_B_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_retried_b-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_state_retried_b_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_RETRIED_B_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-cache_hit-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_CACHE_HIT:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_cache_hit_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "cache_hit",
+            "prompt": "E2E_SHB_CACHE_HIT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-cache_hit-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_CACHE_HIT:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_CACHE_HIT_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CACHE_HIT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-cache_hit-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_cache_hit_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_CACHE_HIT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-unrelated_b-tool",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_UNRELATED_B:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_unrelated_b_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "unrelated_b",
+            "prompt": "E2E_SHB_UNRELATED_B_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-unrelated_b-child",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_UNRELATED_B:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_UNRELATED_B_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_UNRELATED_B_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-unrelated_b-final",
+      "maxMatches": 2,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_unrelated_b_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_UNRELATED_B_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-cold_start-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_COLD_START:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_cold_start_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "cold_start",
+            "prompt": "E2E_SHB_COLD_START_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-cold_start-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_COLD_START:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_COLD_START_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_COLD_START_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-cold_start-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_cold_start_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_COLD_START_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-cold-title",
+      "description": "shb-cold-title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHB_COLD_START"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Host A",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve_published-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_RESOLVE_PUBLISHED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_stale_resolve_published_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "stale_resolve_published",
+            "prompt": "E2E_SHB_STALE_RESOLVE_PUBLISHED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve_published-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STALE_RESOLVE_PUBLISHED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_RESOLVE_PUBLISHED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_RESOLVE_PUBLISHED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_resolve_published-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_stale_resolve_published_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_RESOLVE_PUBLISHED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject_published-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_REJECT_PUBLISHED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shb_stale_reject_published_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-host-reviewer",
+            "description": "stale_reject_published",
+            "prompt": "E2E_SHB_STALE_REJECT_PUBLISHED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject_published-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STALE_REJECT_PUBLISHED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STALE_REJECT_PUBLISHED_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_REJECT_PUBLISHED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-stale_reject_published-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_stale_reject_published_spawn\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STALE_REJECT_PUBLISHED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_failed-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_FAILED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_read_failed_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-reviewer",
+              "description": "read_failed",
+              "prompt": "E2E_SHB_READ_FAILED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_read_failed_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_READ_FAILED_RESUME",
+              "summary": "read_failed"
+            }
+          },
+          {
+            "id": "toolu_shb_read_failed_builtin",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "Explore",
+              "description": "read_failed",
+              "prompt": "E2E_SHB_READ_FAILED_BUILTIN_CHILD",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-read_failed-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_READ_FAILED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_READ_FAILED_BUILTIN_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_FAILED_BUILTIN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-read_failed-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_read_failed_builtin\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_READ_FAILED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_failed-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_FAILED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_directory_failed_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-reviewer",
+              "description": "directory_failed",
+              "prompt": "E2E_SHB_DIRECTORY_FAILED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_directory_failed_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_DIRECTORY_FAILED_RESUME",
+              "summary": "directory_failed"
+            }
+          },
+          {
+            "id": "toolu_shb_directory_failed_builtin",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "Explore",
+              "description": "directory_failed",
+              "prompt": "E2E_SHB_DIRECTORY_FAILED_BUILTIN_CHILD",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-directory_failed-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_DIRECTORY_FAILED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_DIRECTORY_FAILED_BUILTIN_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_FAILED_BUILTIN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-directory_failed-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_directory_failed_builtin\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_DIRECTORY_FAILED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_failed-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_FAILED:"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_shb_state_failed_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-host-reviewer",
+              "description": "state_failed",
+              "prompt": "E2E_SHB_STATE_FAILED_CHILD",
+              "run_in_background": false
+            }
+          },
+          {
+            "id": "toolu_shb_state_failed_resume",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "message": "E2E_SHB_STATE_FAILED_RESUME",
+              "summary": "state_failed"
+            }
+          },
+          {
+            "id": "toolu_shb_state_failed_builtin",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "Explore",
+              "description": "state_failed",
+              "prompt": "E2E_SHB_STATE_FAILED_BUILTIN_CHILD",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "shb-state_failed-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHB_STATE_FAILED:"
+        ],
+        "lastUserMessageIncludes": ["E2E_SHB_STATE_FAILED_BUILTIN_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_FAILED_BUILTIN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shb-state_failed-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["\"tool_use_id\":\"toolu_shb_state_failed_builtin\""]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHB_STATE_FAILED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-title",
+      "description": "SHR22 a title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHP_A_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Path Host a",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-seed",
+      "description": "SHR22 a seed",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-next-tool",
+      "description": "SHR22 a next-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_a_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_A_NEXT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-a-next-child",
+      "description": "SHR22 a next-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_NEXT_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_A_NEXT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-next-final",
+      "description": "SHR22 a next-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_a_next", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-title",
+      "description": "SHR22 b title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SHP_B_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Path Host b",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-seed",
+      "description": "SHR22 b seed",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-next-tool",
+      "description": "SHR22 b next-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_b_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_B_NEXT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-b-next-child",
+      "description": "SHR22 b next-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_NEXT_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_B_NEXT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-next-final",
+      "description": "SHR22 b next-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_b_next", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-created-tool",
+      "description": "SHR22 a project directory created tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_CREATED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_a_created",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_A_CREATED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-a-created-child",
+      "description": "SHR22 a project directory created child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_CREATED_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_A_CREATED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_CREATED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-created-final",
+      "description": "SHR22 a project directory created final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_a_created", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_CREATED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-created-tool",
+      "description": "SHR22 b project directory created tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_CREATED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_b_created",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_B_CREATED_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-b-created-child",
+      "description": "SHR22 b project directory created child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_CREATED_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_B_CREATED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_CREATED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-created-final",
+      "description": "SHR22 b project directory created final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_b_created", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_CREATED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-rebuilt-tool",
+      "description": "SHR22 a project directory rebuilt tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_REBUILT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_a_rebuilt",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_A_REBUILT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-a-rebuilt-child",
+      "description": "SHR22 a project directory rebuilt child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_A_REBUILT_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_A_REBUILT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_REBUILT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-a-rebuilt-final",
+      "description": "SHR22 a project directory rebuilt final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_a_rebuilt", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_A_REBUILT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-rebuilt-tool",
+      "description": "SHR22 b project directory rebuilt tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_REBUILT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_shp_b_rebuilt",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-path-reviewer",
+            "description": "Path refresh",
+            "prompt": "E2E_SHP_B_REBUILT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "shp-b-rebuilt-child",
+      "description": "SHR22 b project directory rebuilt child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHP_B_REBUILT_CHILD"],
+        "bodyIncludes": ["E2E_SHP_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SHP_B_REBUILT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_REBUILT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "shp-b-rebuilt-final",
+      "description": "SHR22 b project directory rebuilt final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_shp_b_rebuilt", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SHP_B_REBUILT_DONE",
+          "inputTokens": 32
+        }
+      }
+    }
+  ]
+}

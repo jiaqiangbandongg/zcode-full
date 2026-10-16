@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "provider-readiness-agent-startup",
+  "spec": "./test/e2e/provider-readiness-agent-startup.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "cli-session-seed",
+      "path": "~/.zcode/cli/db/db.sqlite",
+      "purpose": "只预置 interactive Agent 历史；tasks-index 由冷启动 sessions-index baseline 自行补齐。"
+    }
+  ],
+  "requests": []
+}

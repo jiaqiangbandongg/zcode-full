@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-IL-01",
+  "classification": "synthetic",
+  "syntheticReason": "The case injects deterministic streaming and plan-approval events because model replay cannot control the exact blocking-interaction boundary and Feishu card update timing.",
+  "promptMarker": "E2E_BOT_INTERACTION_CARD_LIFECYCLE",
+  "timing": "controlled-stream"
+}

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-video-preview",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-video-preview.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-video-preview.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-video-preview-send",
+      "description": "VI06/VI07：空正文与一张图片、四个 video 附件的首发请求。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "五个媒体文件名同时出现，约束共享 gallery 场景的图片与视频都进入媒体能力投影。"
+    },
+    {
+      "id": "v4-video-preview-edit",
+      "description": "VI06：删除第一个 video 后，保留图片与其余三个 video 的 branch-cut 请求。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "bodyIncludes 剩余图片与三个 video 且排除被删除 video，约束 branch-cut 后的附件投影。"
+    }
+  ]
+}

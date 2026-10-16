@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-worker-effective-selection",
+  "spec": "./test/e2e/conversation-session/conversation-session-worker-effective-selection.test.ts",
+  "fixtures": [
+    {
+      "id": "w99-explicit-parent-tool",
+      "description": "父会话通过真正 Agent 工具触发显式个人套餐意图。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发子执行；验证真实 Worker 解析和请求，不测试模型自主决策。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_W99_EXPLICIT_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_w99_explicit",
+          "name": "Agent",
+          "input": {
+            "description": "Run account reviewer",
+            "subagent_type": "e2e-worker-account-reviewer",
+            "prompt": "E2E_W99_EXPLICIT_CHILD: Reply with the requested marker."
+          }
+        }
+      }
+    },
+    {
+      "id": "w99-explicit-parent-final",
+      "description": "消费真实子代理结果后结束父会话。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Account 子请求由既有隔离 Coding Plan 数据面返回固定文本；父结果仅证明工具完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_W99_EXPLICIT_PARENT", "coding-plan-e2e-ok"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "w99-parent-final",
+          "text": "E2E_W99_PARENT_DONE",
+          "inputTokens": 160,
+          "outputTokens": 12
+        }
+      }
+    }
+  ]
+}

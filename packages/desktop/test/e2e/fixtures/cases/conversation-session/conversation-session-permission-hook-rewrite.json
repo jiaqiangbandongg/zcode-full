@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-hook-rewrite",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-hook-rewrite.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-permission-hook-rewrite.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-permission-hook-rewrite/hook.mjs",
+      "source": "created-by-spec",
+      "description": "从 case-local fs fixture 复制真实 Hook；配置仅写入隔离 E2E HOME，测试后恢复。"
+    },
+    {
+      "path": ".zcode-e2e/conversation-session-permission-hook-rewrite/B-after-hook.txt",
+      "source": "created-by-provider-tool",
+      "description": "仅批准 B 后由真实 Write handler 创建，A 不得存在；PostToolUse trace 验证执行一次。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "permission-hook-rewrite-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+    },
+    {
+      "id": "permission-hook-rewrite-setup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+    },
+    {
+      "id": "permission-hook-rewrite-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+    },
+    {
+      "id": "permission-hook-rewrite-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-fork.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-fork-basic-source-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "基础 fork case 只需要稳定形成 completed assistant 消息；真实 provider 文案不影响 fork 边界语义。"
+    },
+    {
+      "id": "upstream-conversation-fork-goal-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "seed turn 只用于形成可 fork 的稳定 assistant 历史，后续 goal target 通过 sqlite 注入。"
+    },
+    {
+      "id": "upstream-conversation-fork-goal-source-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 的核心语义是 fork child 继承父 target 且不复制父 queue；source turn 只负责完成一次 snapshot 同步，真实 provider 文案不影响断言。"
+    },
+    {
+      "id": "upstream-conversation-fork-goal-held-queue-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 queued prompt 的产品语义是停留在父 session held queue，fork child 不复制它；运行时若命中该 fixture 反而说明 queue guard 失效。"
+    },
+    {
+      "id": "upstream-conversation-fork-edit-old-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "原始分支只用于随后 edit/rewind；真实 provider 文案不影响 active branch fork 断言。"
+    },
+    {
+      "id": "upstream-conversation-fork-edit-active-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只需要稳定形成编辑后的 active assistant turn，用于证明 fork child 不复制旧分支。"
+    }
+  ]
+}

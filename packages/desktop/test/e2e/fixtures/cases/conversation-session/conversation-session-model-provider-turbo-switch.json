@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-turbo-switch",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-turbo-switch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-turbo-switch.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "requests": []
+}

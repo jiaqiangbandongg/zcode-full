@@ -1,17 +1,17 @@
 import type { IPlatformService, TelemetryEventPayload } from "@zcode/shared";
 import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
 
-const PROMPT_TEMPLATE_CLICK_EVENT_NAME = "prompt_template_ck";
+export const PROMPT_TEMPLATE_CLICK_EVENT_NAME = "prompt_template_ck";
 const PROMPT_TEMPLATE_EVENT_REGION = "app.session";
 const PROMPT_TEMPLATE_EVENT_TYPE = "ck";
 
-interface PromptTemplateClickTelemetryParams {
+export interface PromptTemplateClickTelemetryParams {
   templateId: string;
   templateName: string;
   templatePrompt: string;
 }
 
-function buildPromptTemplateClickTelemetryPayload(
+export function buildPromptTemplateClickTelemetryPayload(
   params: PromptTemplateClickTelemetryParams,
 ): TelemetryEventPayload {
   return {

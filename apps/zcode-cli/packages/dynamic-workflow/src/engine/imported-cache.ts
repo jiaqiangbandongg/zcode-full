@@ -10,6 +10,7 @@
  */
 
 import { canonicalJson } from "./hash.js";
+import { personaIdentity } from "./persona.js";
 import type {
   ActorRef,
   ActorSessionSeed,
@@ -76,6 +77,20 @@ export class ImportedActorState {
     }
     this.consumed = seq + 1;
     return entry;
+  }
+
+  /**
+   * 该 seq 的 ask 的答案是否**读自前驱的转录**：是则返回持有它的会话，否则 undefined。
+   *
+   * 成立当且仅当此刻仍未分歧、且游标已越过该 seq——分歧单调、准入按 seq 升序，所以这恰好是
+   * 「这一条被导入消费了」。两条路径各在判定之后立刻问：fresh ask 在 {@link take} 命中之后，
+   * 修订 run 的 resume 在 {@link reconcileRecorded} 之后（结算次序闸可能把事件推迟到同一个
+   * actor 更后的行已经置了分歧的时候，那时再问就会把一条导入行说成本 run 自己跑的）。
+   */
+  sourceSessionAt(seq: number): string | undefined {
+    return !this.diverged && seq < this.consumed
+      ? this.candidate.transcriptSourceSessionId
+      : undefined;
   }
 
   /** 该 seq 的 ask 是否续跑了前驱的在飞 ask（调度器据此决定 stats 记不记 worldToolCalls）。 */
@@ -170,8 +185,7 @@ export class ImportedActorState {
       sourceSessionId: this.candidate.transcriptSourceSessionId,
       messageCount,
     };
-    if (this.candidate.resolvedModel !== undefined)
-      seed.resolvedModel = this.candidate.resolvedModel;
+    if (this.candidate.resolvedModel !== undefined) seed.resolvedModel = this.candidate.resolvedModel;
     return seed;
   }
 }
@@ -218,7 +232,9 @@ export function matchImportedActor(
   if (name === undefined || name === "") return undefined;
   const candidate = cache.actors.get(name);
   if (candidate === undefined) return undefined;
-  if (canonicalJson(spec) !== canonicalJson(candidate.persona)) return undefined;
+  if (canonicalJson(personaIdentity(spec)) !== canonicalJson(personaIdentity(candidate.persona))) {
+    return undefined;
+  }
   return new ImportedActorState(candidate);
 }
 

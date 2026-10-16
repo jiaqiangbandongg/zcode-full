@@ -18,7 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
-function resolveReorderedModelIds(params: {
+export function resolveReorderedModelIds(params: {
   activeModelId: string;
   overModelId: string;
   modelIds: readonly string[];
@@ -41,7 +41,7 @@ class ModelRowPointerSensor extends PointerSensor {
   ];
 }
 
-function isInteractiveModelDragTarget(target: EventTarget | null): boolean {
+export function isInteractiveModelDragTarget(target: EventTarget | null): boolean {
   return (
     target instanceof Element &&
     target.closest(
@@ -50,7 +50,7 @@ function isInteractiveModelDragTarget(target: EventTarget | null): boolean {
   );
 }
 
-function resolveSortableProviderModelRowClassName({
+export function resolveSortableProviderModelRowClassName({
   isDragging,
   isLast,
 }: {
@@ -99,7 +99,7 @@ function SortableProviderModelRow({
         if (!isInteractiveModelDragTarget(event.target)) listeners?.onKeyDown?.(event);
       }}
     >
-      {/* useSortable 会给本行添加 role=button。旧传感器把最近的
+      {/* Bug 原因：useSortable 会给本行添加 role=button。旧传感器把最近的
           [role=button] 当成交互控件，导致从模型名称或空白处永远无法启动拖拽。 */}
       {children}
     </div>

@@ -40,63 +40,63 @@ npx ai-elements@latest add package-info
 
 ### `<PackageInfo />`
 
-| Prop             | Type                                   | Default  | Description                  |
-| ---------------- | -------------------------------------- | -------- | ---------------------------- |
-| `name`           | `string`                               | Required | Package name.                |
-| `currentVersion` | `string`                               | -        | Current installed version.   |
-| `newVersion`     | `string`                               | -        | New version being installed. |
-| `changeType`     | `unknown`                              | -        | Type of version change.      |
-| `...props`       | `React.HTMLAttributes<HTMLDivElement>` | -        | Spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | Required | Package name. |
+| `currentVersion` | `string` | - | Current installed version. |
+| `newVersion` | `string` | - | New version being installed. |
+| `changeType` | `unknown` | - | Type of version change. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the container div. |
 
 ### `<PackageInfoHeader />`
 
-| Prop       | Type                                   | Default | Description               |
-| ---------- | -------------------------------------- | ------- | ------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the header div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the header div. |
 
 ### `<PackageInfoName />`
 
-| Prop       | Type                                   | Default | Description                                             |
-| ---------- | -------------------------------------- | ------- | ------------------------------------------------------- |
-| `children` | `React.ReactNode`                      | -       | Custom name content. Defaults to the name from context. |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the container div.                            |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom name content. Defaults to the name from context. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the container div. |
 
 ### `<PackageInfoChangeType />`
 
-| Prop       | Type                                   | Default | Description                                                        |
-| ---------- | -------------------------------------- | ------- | ------------------------------------------------------------------ |
-| `children` | `React.ReactNode`                      | -       | Custom change type label. Defaults to the changeType from context. |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the Badge component.                                     |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom change type label. Defaults to the changeType from context. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the Badge component. |
 
 ### `<PackageInfoVersion />`
 
-| Prop       | Type                                   | Default | Description                                                     |
-| ---------- | -------------------------------------- | ------- | --------------------------------------------------------------- |
-| `children` | `React.ReactNode`                      | -       | Custom version content. Defaults to version transition display. |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the container div.                                    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom version content. Defaults to version transition display. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the container div. |
 
 ### `<PackageInfoDescription />`
 
-| Prop       | Type                                         | Default | Description              |
-| ---------- | -------------------------------------------- | ------- | ------------------------ |
-| `...props` | `React.HTMLAttributes<HTMLParagraphElement>` | -       | Spread to the p element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLParagraphElement>` | - | Spread to the p element. |
 
 ### `<PackageInfoContent />`
 
-| Prop       | Type                                   | Default | Description                  |
-| ---------- | -------------------------------------- | ------- | ---------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the container div. |
 
 ### `<PackageInfoDependencies />`
 
-| Prop       | Type                                   | Default | Description                  |
-| ---------- | -------------------------------------- | ------- | ---------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the container div. |
 
 ### `<PackageInfoDependency />`
 
-| Prop       | Type                                   | Default  | Description            |
-| ---------- | -------------------------------------- | -------- | ---------------------- |
-| `name`     | `string`                               | Required | Dependency name.       |
-| `version`  | `string`                               | -        | Dependency version.    |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -        | Spread to the row div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | Required | Dependency name. |
+| `version` | `string` | - | Dependency version. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Spread to the row div. |

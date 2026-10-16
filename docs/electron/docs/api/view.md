@@ -1,0 +1,138 @@
+# View
+
+> Create and layout native views.
+
+Process: [Main](../glossary.md#main-process)
+
+This module cannot be used until the `ready` event of the `app`
+module is emitted.
+
+```js
+const { BaseWindow, View } = require('electron')
+
+const win = new BaseWindow()
+const view = new View()
+
+view.setBackgroundColor('red')
+view.setBounds({ x: 0, y: 0, width: 100, height: 100 })
+win.contentView.addChildView(view)
+```
+
+## Class: View
+
+> A basic native view.
+
+Process: [Main](../glossary.md#main-process)
+
+`View` is an [EventEmitter][event-emitter].
+
+> [!WARNING]
+> Electron's built-in classes cannot be subclassed in user code.
+> For more information, see [the FAQ](../faq.md#class-inheritance-does-not-work-with-electron-built-in-modules).
+
+### `new View()`
+
+Creates a new `View`.
+
+### Instance Events
+
+Objects created with `new View` emit the following events:
+
+#### Event: 'bounds-changed'
+
+Emitted when the view's bounds have changed in response to being laid out. The
+new bounds can be retrieved with [`view.getBounds()`](#viewgetbounds).
+
+### Instance Methods
+
+Objects created with `new View` have the following instance methods:
+
+#### `view.addChildView(view[, index])`
+
+* `view` View - Child view to add.
+* `index` Integer (optional) - Index at which to insert the child view.
+  Defaults to adding the child at the end of the child list.
+
+If the same View is added to a parent which already contains it, it will be reordered such that
+it becomes the topmost view.
+
+#### `view.removeChildView(view)`
+
+* `view` View - Child view to remove.
+
+If the view passed as a parameter is not a child of this view, this method is a no-op.
+
+#### `view.setBounds(bounds[, options])`
+
+* `bounds` [Rectangle](structures/rectangle.md) - New bounds of the View.
+* `options` Object (optional) - Options for setting the bounds.
+  * `animate` boolean | Object (optional) - If true, the bounds change will be animated. If an object is passed, it can contain the following properties:
+    * `duration` Integer (optional) - Duration of the animation in milliseconds. Default is `250`.
+    * `easing` string (optional) - Easing function for the animation. Default is `linear`.
+      * `linear`
+      * `ease-in`
+      * `ease-out`
+      * `ease-in-out`
+
+#### `view.getBounds()`
+
+Returns [`Rectangle`](structures/rectangle.md) - The bounds of this View, relative to its parent.
+
+#### `view.setBackgroundColor(color)`
+
+* `color` string - Color in Hex, RGB, ARGB, HSL, HSLA or named CSS color format. The alpha channel is
+  optional for the hex type.
+
+Examples of valid `color` values:
+
+* Hex
+  * `#fff` (RGB)
+  * `#ffff` (ARGB)
+  * `#ffffff` (RRGGBB)
+  * `#ffffffff` (AARRGGBB)
+* RGB
+  * `rgb\(([\d]+),\s*([\d]+),\s*([\d]+)\)`
+    * e.g. `rgb(255, 255, 255)`
+* RGBA
+  * `rgba\(([\d]+),\s*([\d]+),\s*([\d]+),\s*([\d.]+)\)`
+    * e.g. `rgba(255, 255, 255, 1.0)`
+* HSL
+  * `hsl\((-?[\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\)`
+    * e.g. `hsl(200, 20%, 50%)`
+* HSLA
+  * `hsla\((-?[\d.]+),\s*([\d.]+)%,\s*([\d.]+)%,\s*([\d.]+)\)`
+    * e.g. `hsla(200, 20%, 50%, 0.5)`
+* Color name
+  * Options are listed in [SkParseColor.cpp](https://source.chromium.org/chromium/chromium/src/+/main:third_party/skia/src/utils/SkParseColor.cpp;l=11-152;drc=eea4bf52cb0d55e2a39c828b017c80a5ee054148)
+  * Similar to CSS Color Module Level 3 keywords, but case-sensitive.
+    * e.g. `blueviolet` or `red`
+
+> [!NOTE]
+> Hex format with alpha takes `AARRGGBB` or `ARGB`, _not_ `RRGGBBAA` or `RGB`.
+
+#### `view.setBorderRadius(radius)`
+
+* `radius` Integer - Border radius size in pixels.
+
+> [!NOTE]
+> The area cutout of the view's border still captures clicks.
+
+#### `view.setVisible(visible)`
+
+* `visible` boolean - If false, the view will be hidden from display.
+
+#### `view.getVisible()`
+
+Returns `boolean` - Whether the view should be drawn. Note that this is
+different from whether the view is visible on screen—it may still be obscured
+or out of view.
+
+### Instance Properties
+
+Objects created with `new View` have the following properties:
+
+#### `view.children` _Readonly_
+
+A `View[]` property representing the child views of this view.
+
+[event-emitter]: https://nodejs.org/api/events.html#events_class_eventemitter

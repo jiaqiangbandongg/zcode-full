@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-publish-import",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-publish-import.test.ts",
+  "fixtures": [
+    {
+      "id": "conversation-share-local-main",
+      "description": "Local share publish uses a deterministic completed response.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_LOCAL_V1"],
+        "bodyIncludes": ["share-local-ready"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-local-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "share-local-ready"
+        }
+      }
+    },
+    {
+      "id": "conversation-share-local-main-second",
+      "description": "Second completed turn for share selection (share-local-ready-second).",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_LOCAL_V1"],
+        "bodyIncludes": ["share-local-ready-second"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-local-main-second",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "share-local-ready-second"
+        }
+      }
+    },
+    {
+      "id": "conversation-share-local-session-b",
+      "description": "Session B independent prompt reply (share-session-b-ready).",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Share UI assertions only need a completed terminal turn before publication."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_LOCAL_V1"],
+        "bodyIncludes": ["share-session-b-ready"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-local-session-b",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "share-session-b-ready"
+        }
+      }
+    },
+    {
+      "id": "conversation-share-error-main",
+      "description": "Share error case returns an unsafe local file URL in a completed assistant response.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The case validates actionable share error details, not provider behavior."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_ERROR_V1"],
+        "bodyIncludes": ["file:///workspace/not-shareable.pdf"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-error-main",
+          "inputTokens": 64,
+          "outputTokens": 16,
+          "text": "file:///workspace/not-shareable.pdf"
+        }
+      }
+    },
+    {
+      "id": "conversation-share-preview-main",
+      "description": "Share candidate case returns one PDF preview, three media previews, and non-candidate paths.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "The case verifies share candidate discovery and warning projection."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_PREVIEW_V1"],
+        "bodyIncludes": ["prepared preview-card paths"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "conversation-share-preview-main",
+          "inputTokens": 64,
+          "outputTokens": 64,
+          "text": "~/Code/vibe/shows/deliver/晨报_2026-09-08_早会版.pdf\n.zcode-e2e/conversation-share-preview/晨报_2026-09-08_早会版.pdf\nbuild_mn/qa/layout-review.md\n.zcode-e2e/conversation-share-preview/condensed.mp4\n.zcode-e2e/conversation-share-preview/纵横四海_电影解说.mp4\n.zcode-e2e/conversation-share-preview/final_subtitled.mp4"
+        }
+      }
+    }
+  ]
+}

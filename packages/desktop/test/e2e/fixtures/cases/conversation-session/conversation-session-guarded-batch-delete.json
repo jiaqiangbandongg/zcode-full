@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-guarded-batch-delete",
+  "spec": "./test/e2e/conversation-session/conversation-session-guarded-batch-delete.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-guarded-batch-delete.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-guarded-batch-delete",
+      "source": "created-by-spec",
+      "description": "独立 Git 仓库和受保护文件；after 清理。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "batch-delete-title",
+      "description": "Case-local title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "隔离标题 sidecar，不依赖真实模型。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_RECURSIVE-call",
+      "description": "Batch deletion tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_RECURSIVE-final",
+      "description": "Batch deletion provider continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_BATCH-call",
+      "description": "Batch deletion tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_BATCH-final",
+      "description": "Batch deletion provider continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_GLOB-call",
+      "description": "Batch deletion tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_GLOB-final",
+      "description": "Batch deletion provider continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_FIND-call",
+      "description": "Batch deletion tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_FIND-final",
+      "description": "Batch deletion provider continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_CLEAN-call",
+      "description": "Batch deletion tool call",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    },
+    {
+      "id": "E2E_GUARDED_DELETE_CLEAN-final",
+      "description": "Batch deletion provider continuation",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 case 自有目录内的删除命令；真实 broker 拒绝并向 provider 返回结果，不依赖模型随机行为。"
+    }
+  ]
+}

@@ -1,0 +1,443 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-output-token-preflight-smoke",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-output-token-preflight-smoke.test.ts",
+  "fixtures": [
+    {
+      "id": "otb11-title",
+      "description": "OTB11 首轮标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于预算语义，只隔离其请求，避免干扰逐轮 main request 计数。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "otb-preflight-smoke-64k-48k"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Mixed Context Budget\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-1",
+      "description": "OTB11 第一轮真实发送并建立 8K provider usage 锚点。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定首轮 usage，使后续混合长度消息在小窗口内可复现地跨过 cap 起点。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_1"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-1-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":8000,\"completion_tokens\":8,\"total_tokens\":8008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-2",
+      "description": "OTB11 第二轮仍处于 48K baseline 区间。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 14K usage，作为下一轮进入 preflight cap 区间的 provider 锚点。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_2"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-2-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":14000,\"completion_tokens\":8,\"total_tokens\":14008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-3",
+      "description": "OTB11 第一次在剩余窗口小于 48K 后缩小 max_completion_tokens。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "18.5K usage 锚点让后续请求继续位于 cap 区间，同时保持低于 30K compact threshold。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_3"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-3-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":18500,\"completion_tokens\":8,\"total_tokens\":18508}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-4",
+      "description": "OTB11 第二次按更高 usage 单调缩小 max_completion_tokens。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "23.5K usage 锚点稳定形成第二个不同的 cap，验证不是单一边界样例。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_4"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-4-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":23500,\"completion_tokens\":8,\"total_tokens\":23508}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-5",
+      "description": "OTB11 第三次缩小 max_completion_tokens，并把 provider usage 推近 30K threshold。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "28.5K usage 锚点结合固定 seed 的第六条消息，确定性触发下一轮 Auto Compact。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_5"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-5-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":28500,\"completion_tokens\":8,\"total_tokens\":28508}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-auto-compact",
+      "description": "OTB11 第六轮先执行 Auto Compact summary。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "成功 summary 固定 compact 边界，验证 30K threshold 后原 pending message 的执行顺序。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB11_TURN_5",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-preflight-smoke-64k-48k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB11 retained the first five mixed-length turns.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":30754,\"completion_tokens\":32,\"total_tokens\":30786}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb11-turn-6-after-compact",
+      "description": "OTB11 Auto Compact 后继续原第六轮消息。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "短成功响应证明 pending message 未丢失，且此前动态 cap 没有持久化到压缩后的主请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB11_TURN_6"],
+        "bodyIncludes": ["otb-preflight-smoke-64k-48k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb11-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb11-turn-6-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb11-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-64k-48k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2500,\"completion_tokens\":8,\"total_tokens\":2508}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-title",
+      "description": "OTB12 首轮标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于预算语义，只隔离其请求，避免干扰逐轮 main request 计数。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "otb-preflight-smoke-200k-128k"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Large Context Budget\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-1",
+      "description": "OTB12 第一轮真实发送并建立 45K provider usage 锚点。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定首轮 usage，使 200K/128K 场景先证明未达到 71K cap 起点时仍发送 baseline。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_1"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-1-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":45000,\"completion_tokens\":8,\"total_tokens\":45008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-2",
+      "description": "OTB12 第二轮仍处于 128K baseline 区间。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 70K usage，作为下一轮跨过 71K preflight cap 起点的 provider 锚点。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_2"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-2-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-2\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":70000,\"completion_tokens\":8,\"total_tokens\":70008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-3",
+      "description": "OTB12 第一次跨过 71K 后缩小 max_completion_tokens。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "100K usage 锚点让后续请求继续位于大窗口 cap 区间，同时保持低于 166K threshold。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_3"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-3-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-3\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100000,\"completion_tokens\":8,\"total_tokens\":100008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-4",
+      "description": "OTB12 第二次按更高 usage 单调缩小 max_completion_tokens。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "135K usage 锚点形成第二个明显不同的 cap，证明 128K baseline 下仍按相同公式缩放。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_4"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-4-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-4\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":135000,\"completion_tokens\":8,\"total_tokens\":135008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-5",
+      "description": "OTB12 第三次缩小 max_completion_tokens，并把 provider usage 推近 166K threshold。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "164K usage 锚点让后续两条较短消息在 Compact 前形成约 34.3K、33.1K 的临界 cap。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_5"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-5-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-5\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":164000,\"completion_tokens\":8,\"total_tokens\":164008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-6",
+      "description": "OTB12 第四次缩小 max_completion_tokens，以较短消息推进到约 34.3K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "165.1K usage 锚点让下一条较短消息继续逼近 33K 临界 cap，但仍保持低于 166K threshold。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_6"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-6-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-6\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":165092,\"completion_tokens\":8,\"total_tokens\":165100}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-7",
+      "description": "OTB12 第五次缩小 max_completion_tokens，以约 33.1K 覆盖 Compact 前最后的主请求边界。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "165.8K usage 锚点结合最后一条短消息，使下一轮刚跨过 166K threshold 并确定性进入 Auto Compact。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_7"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-7\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-7\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-7-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-7\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":165792,\"completion_tokens\":8,\"total_tokens\":165800}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-auto-compact",
+      "description": "OTB12 第八轮刚跨过 166K threshold 后先执行 Auto Compact summary。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "成功 summary 固定 166K compact 边界，验证大窗口下原 pending message 的执行顺序。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB12_TURN_7",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-preflight-smoke-200k-128k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB12 retained the first seven mixed-length turns.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":166024,\"completion_tokens\":32,\"total_tokens\":166056}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb12-turn-8-after-compact",
+      "description": "OTB12 Auto Compact 后继续原第八轮消息。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "短成功响应证明 pending message 未丢失，且 128K baseline 在压缩后重新计算而非沿用旧 cap。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB12_TURN_8"],
+        "bodyIncludes": ["otb-preflight-smoke-200k-128k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb12-turn-8\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-8\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb12-turn-8-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb12-turn-8\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-smoke-200k-128k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3500,\"completion_tokens\":8,\"total_tokens\":3508}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

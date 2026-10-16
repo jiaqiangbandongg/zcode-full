@@ -2,10 +2,10 @@
 // 这是协议语义的一部分：coalesce 的「语义保持」就以本函数为裁判——
 // applyAll(s, coalesce(ds)) 必须与 applyAll(s, ds) 逐字节一致（黄金测试）。
 // 客户端 store 的 apply 逻辑是本函数的宿主化改写，不得引入额外分支。
-import type { ConversationDelta } from "./delta.js";
-import type { ConversationSnapshot } from "./snapshot.js";
-import type { ConversationRow } from "./rows.js";
 import type { StreamablePath } from "./core.js";
+import type { ConversationDelta } from "./delta.js";
+import type { ConversationRow } from "./rows.js";
+import type { ConversationSnapshot } from "./snapshot.js";
 import { applyWorkflowRunRemoved, applyWorkflowRunUpdated } from "./workflow-runs-delta.js";
 
 /**
@@ -34,9 +34,13 @@ export function createMutableConversationSnapshotAccumulator(
   };
 }
 
-// row.delta 只允许作用于流式态行（不变量，服务端保证）。
-// 本函数按协议语义实现为：路径不存在/行不存在时 no-op（patch 命中未加载行 = no-op）。
-function appendToRow(row: ConversationRow, path: StreamablePath, append: string): ConversationRow {
+// row.delta 只允许作用于流式态行（§4.4.4 不变量，服务端保证）。
+// 本函数按协议语义实现为：路径不存在/行不存在时 no-op（§4.3：patch 命中未加载行 = no-op）。
+function appendToRow(
+  row: ConversationRow,
+  path: StreamablePath,
+  append: string,
+): ConversationRow {
   switch (path) {
     case "text":
       if (row.kind === "assistantText" || row.kind === "reasoning") {
@@ -81,15 +85,19 @@ export function applyConversationDelta(
         },
       };
     case "row.upserted": {
-      const index = snapshot.rows.window.findIndex((row) => row.rowId === delta.row.rowId);
-      // 未加载 rowId = no-op（被逐出的行只能经 rows/range 取回）。
+      const index = snapshot.rows.window.findIndex(
+        (row) => row.rowId === delta.row.rowId,
+      );
+      // §4.3：未加载 rowId = no-op（被逐出的行只能经 rows/range 取回）。
       if (index === -1) return snapshot;
       const window = [...snapshot.rows.window];
       window[index] = delta.row;
       return { ...snapshot, rows: { ...snapshot.rows, window } };
     }
     case "row.removed": {
-      const window = snapshot.rows.window.filter((row) => row.rowId < delta.fromRowId);
+      const window = snapshot.rows.window.filter(
+        (row) => row.rowId < delta.fromRowId,
+      );
       const removed = snapshot.rows.window.length - window.length;
       const removesEntireActiveBranch =
         snapshot.rows.firstRowId !== null && delta.fromRowId <= snapshot.rows.firstRowId;
@@ -109,7 +117,9 @@ export function applyConversationDelta(
       };
     }
     case "row.delta": {
-      const index = snapshot.rows.window.findIndex((row) => row.rowId === delta.rowId);
+      const index = snapshot.rows.window.findIndex(
+        (row) => row.rowId === delta.rowId,
+      );
       const target = snapshot.rows.window[index];
       if (index === -1 || target === undefined) return snapshot;
       const window = [...snapshot.rows.window];
@@ -119,6 +129,12 @@ export function applyConversationDelta(
     case "state.updated":
       // 键级整体替换：patch 中在场的键覆盖，绝不深合并。
       return { ...snapshot, ...delta.patch };
+    case "pluginUi.resourceUpdated":
+    case "pluginUi.resourceListChanged":
+    case "pluginUi.instanceClosed":
+    case "pluginUi.appToolCall":
+      // live-only 通知 / 信箱投递：不改变快照，由 renderer 另行派发。
+      return snapshot;
     // workflowRuns 是唯一开了增量口子的状态键（delta.ts 的注释讲了为什么）。规则整份住在
     // workflow-runs-delta.ts：两个 twin 都只转调它，两边的语义因此没有走散的余地。
     case "workflowRun.updated":
@@ -198,6 +214,9 @@ export function applyConversationDeltaMutable(
     case "state.updated":
       // 与不可变实现相同：patch 在场键整体替换，不能深合并。
       Object.assign(snapshot, delta.patch);
+      return;
+    case "pluginUi.resourceUpdated":
+    case "pluginUi.resourceListChanged":
       return;
     // 与不可变实现调同一个纯函数：workflowRuns 是状态键不是 rows 窗口，没有「原地追加」可优化，
     // 而 accumulator.snapshot 本来就是候选快照自己的对象，赋一个新容器不会碰到已发布的快照。

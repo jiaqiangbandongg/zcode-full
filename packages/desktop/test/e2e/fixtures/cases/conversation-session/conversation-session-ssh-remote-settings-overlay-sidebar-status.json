@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-settings-overlay-sidebar-status",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-settings-overlay-sidebar-status.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-settings-overlay-sidebar-status.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    { "id": "ssh-settings-overlay-title", "description": "SSH settings overlay 标题辅助响应。", "kind": "common", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "标题内容不属于侧栏状态断言，只需稳定 task row。" },
+    { "id": "ssh-settings-overlay-a-first", "description": "workspace A 首发响应。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "稳定创建远程 task 并让首发回到 idle。" },
+    { "id": "ssh-settings-overlay-a-follow", "description": "workspace A 续发响应；延迟 15s 给用例留出「运行中打开并关闭设置页」的窗口。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "复现用户在任务运行中开关设置页，随后任务完成的时序。" }
+  ]
+}

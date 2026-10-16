@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-cron-relative",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-cron-relative.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-automation-cron-relative-title",
+      "description": "相对时间定时任务 case 的标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于定时任务产品语义，只需稳定返回，避免标题请求误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_AUTOMATION_CRON_RELATIVE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-automation-cron-relative-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Automation Cron Relative E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":20,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-relative-tool",
+      "description": "首段响应：返回相对时间 CronCreate tool_use（delayMinutes、无 cron、一次性），host 用真实时钟换算调度，供聊天卡片、详情只读摘要与列表卡片“自定义”断言。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择相对时间参数；本响应固定 delayMinutes 一次性入参，专门验证 host 换算调度与一次性任务的卡片展示语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AUTOMATION_CRON_RELATIVE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_CRON_RELATIVE_ONESHOT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_automation_cron_relative",
+          "messageId": "msg_e2e_automation_cron_relative",
+          "name": "CronCreate",
+          "input": {
+            "delayMinutes": 5,
+            "recurring": false,
+            "title": "E2E_CRON_RELATIVE_ONESHOT",
+            "prompt": "Send the user a one-shot reminder to drink water."
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-automation-cron-relative-final",
+      "description": "收尾响应：CronCreate tool_result 进入历史后返回结束文本，稳定完成 case。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "CronCreate tool_result 进入历史后结束 case，真实 provider 回复内容不影响产品语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_AUTOMATION_CRON_RELATIVE", "E2E_CRON_RELATIVE_ONESHOT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-automation-cron-relative-final",
+          "inputTokens": 200,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

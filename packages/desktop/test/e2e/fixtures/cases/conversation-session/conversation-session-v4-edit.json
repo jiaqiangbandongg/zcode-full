@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-edit",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-edit.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-edit.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-edit-title",
+      "description": "E2E_V4_EDIT_ORIGINAL 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_EDIT_ORIGINAL 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-edit-original",
+      "description": "M4 editUserQuery 门禁：原始 turn 回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "edit 前的原始回复，编辑后应被新 query 的回复替换。"
+    },
+    {
+      "id": "v4-edit-compact",
+      "description": "PV4-11：覆盖原始 turn 的 stable manual compact summary。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "先建立 compact coverage，再验证 edit 使用 same-session branch cut。"
+    },
+    {
+      "id": "v4-edit-new",
+      "description": "M4 editUserQuery 门禁：编辑后 newText 的回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "editUserQuery 用 newText 重跑，产出新回复。"
+    }
+  ]
+}

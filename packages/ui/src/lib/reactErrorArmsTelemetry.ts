@@ -6,16 +6,16 @@ import {
 import { logger } from "@/logger.js";
 
 /** ARMS 自定义事件名：React 错误边界捕获的渲染层异常 */
-const REACT_ERROR_ARMS_EVENT_NAME = "perf_react_error";
+export const REACT_ERROR_ARMS_EVENT_NAME = "perf_react_error";
 /** ARMS 业务分组 */
-const REACT_ERROR_ARMS_GROUP = "react_error";
+export const REACT_ERROR_ARMS_GROUP = "react_error";
 
 /**
  * stack / componentStack 截断上限。
  * 原因：React 组件堆栈与错误栈可能很长，ARMS 单字段过长会被截断/拒绝，
  * 主动截断到上限保证关键头部（最近的抛错组件）一定上得去。
  */
-const REACT_ERROR_STACK_MAX_LEN = 4000;
+export const REACT_ERROR_STACK_MAX_LEN = 4000;
 
 type ArmsReporter = Pick<IPlatformService, "reportArmsCustomEvent">;
 
@@ -30,6 +30,10 @@ let armsReporter: ArmsReporter | null = null;
  */
 export function setReactErrorArmsReporter(reporter: ArmsReporter | null): void {
   armsReporter = reporter;
+}
+
+export function clearReactErrorArmsReporterForTest(): void {
+  armsReporter = null;
 }
 
 /**

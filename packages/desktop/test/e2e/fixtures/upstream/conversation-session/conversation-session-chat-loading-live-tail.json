@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-chat-loading-live-tail",
+  "spec": "./test/e2e/conversation-session/conversation-session-chat-loading-live-tail.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-chat-loading-live-tail-controlled-stream",
+      "description": "先输出足够长的可折叠思考历史，再以 550ms 间隔输出长正文，稳定覆盖终态折叠与离底滚动权。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "CHL05/CHL07/CHL08/P08 需要稳定制造可折叠 assistant history、长正文、持续 loading，以及 following、用户上滚和手动折叠的滚动权竞争。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_CHAT_LOADING_REAL_LINES"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": ["E2E_CHAT_LOADING_REAL_LINES"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"upstream-e2e-chat-loading-live-tail\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":128,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 100,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 450,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"CHAT_LOADING_REASONING_HISTORY 这是一段专门用于终态折叠回归的长思考历史。它不依赖模型遵守换行指令，而是通过连续、足量、能够自然换行的文字稳定撑高工作历史区域。第一部分反复说明：running 阶段 live tail 处于普通文档流，terminal 阶段同一轮会迁入虚拟历史；如果只看 scrollTop 的回退，就会把 virtualizer 的测高补偿误认成用户上滚。第二部分继续说明：工作历史由打开的工作中区域承载，主轮结束后自动折叠为已工作，折叠高度、虚拟列表估算高度和真实测量高度可能在不同帧到达，因此吸底意图必须独立于瞬时几何。第三部分继续增加足够多的文字，确保思考区域明显高于一个普通桌面窗口：用户没有滚动时应该持续跟随，用户已经向上滚动时则必须保持阅读位置，任何 terminal 回调都不能无条件调用滚动到底部。第四部分记录同样的产品边界：wheel、touch、键盘和滚动条属于用户输入，内容增长、折叠动画、ResizeObserver 与 virtualizer 补偿属于布局输入；同一帧发生时用户输入优先。第五部分仍然使用自然段长度而不是依赖很多显式换行，避免数据生成过程忽略换行后样本高度不足。第六部分补充更多说明文字，让折叠前后的高度差足够大，可以在运行时采样中观察 live tail 消失、history open 从 true 变为 false，以及 scrollHeight 明显收敛。第七部分强调最终正文也会保持足够长，因此用户主动离底后，即使思考历史折叠，页面仍有足够滚动范围，不会因为内容短到一屏而被浏览器自然钳到最底部。第八部分再次重复状态机不变量：FOLLOWING 遇到布局变化仍 FOLLOWING，DETACHED 遇到布局变化仍 DETACHED，只有真实用户滚回底部或点击回到底部按钮才恢复 FOLLOWING。\"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 520,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"upstream-e2e-chat-loading-terminal-collapse-signature\"}}\n\n"
+          },
+          {
+            "sequence": 4,
+            "offsetMs": 580,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "sequence": 5,
+            "offsetMs": 650,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 6,
+            "offsetMs": 1000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"CHAT_LOADING_LINE_21 这一段最终正文包含足够多的自然文字，用来确保即使没有显式换行，Markdown 容器也会因为正常的自动换行而稳定增高。它同时保留清晰 marker，便于 E2E 在 live tail 内确认当前流式进度，而不是误命中上一轮已经完成的历史内容。\"}}\n\n"
+          },
+          {
+            "sequence": 7,
+            "offsetMs": 1550,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_22 第二段继续增加真实排版高度，说明跟随态只代表用户是否愿意继续看最新输出。只要用户没有离开底部，每个流式增量、测高修正和终态收口都应该让视口保持在最新消息附近。\"}}\n\n"
+          },
+          {
+            "sequence": 8,
+            "offsetMs": 2100,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_23 第三段继续写入较长文字，避免只依赖模型生成很多空行。浏览器会在消息列宽度内自然折行，因此每个受控增量都能制造可测量的 live tail 高度增长，并触发 ResizeObserver 的真实布局路径。\"}}\n\n"
+          },
+          {
+            "sequence": 9,
+            "offsetMs": 2650,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_24 第四段用于观察 loading 槽位是否下移再回弹。正确实现会在绘制前完成吸底，错误实现则会先让新增正文把底部反馈推出原位置，下一帧才把 scrollTop 补回来。\"}}\n\n"
+          },
+          {
+            "sequence": 10,
+            "offsetMs": 3200,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_25 第五段继续保持长文本。终态时思考历史会被折叠，但这些最终正文不会被折叠，所以页面在收口后仍然保持明显溢出，为用户离底后不被强拉到底提供稳定可验证的空间。\"}}\n\n"
+          },
+          {
+            "sequence": 11,
+            "offsetMs": 3750,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_26 第六段明确区分两类事件：模型输出和终态折叠属于内容布局，wheel 与 touch 属于用户意图。任何实现都不能因为两类事件最后都表现为 scrollTop 变化，就把它们当作同一个状态来源。\"}}\n\n"
+          },
+          {
+            "sequence": 12,
+            "offsetMs": 4300,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_27 第七段继续铺设足够的内容高度，并保留受控时间间隔。测试可以在输出过程中稳定发起一次向上滚动，再等待剩余增量和终态事件到达，从而验证后续布局不会夺回滚动权。\"}}\n\n"
+          },
+          {
+            "sequence": 13,
+            "offsetMs": 4850,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_28 第八段说明回到底部是显式恢复动作。用户滚回 48 像素容差以内，或点击回到底部按钮，才重新进入 FOLLOWING；单纯因为内容收缩后几何暂时靠近底部，不应抹掉 DETACHED 意图。\"}}\n\n"
+          },
+          {
+            "sequence": 14,
+            "offsetMs": 5400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_29 第九段把最终正文继续撑高。即便工作历史在结束时缩短很多，这些仍然可见的文字也足以让 detached 场景保持大于底部容差的距离，避免测试把浏览器自然钳制误报成强制吸底。\"}}\n\n"
+          },
+          {
+            "sequence": 15,
+            "offsetMs": 5950,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_30 第十段继续输出并等待测试观察。此时 live tail 应经由 normal flow 持续增长，following=true 的场景仍在底部，following=false 的场景则保持用户选择的历史阅读位置。\"}}\n\n"
+          },
+          {
+            "sequence": 16,
+            "offsetMs": 6500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_31 第十一段是用户上滚窗口的稳定 marker。测试在它出现后发送向上的 wheel 事件并把视口移离底部，随后仍有五个正文增量和 terminal 收口，能够覆盖最危险的相邻时序。\"}}\n\n"
+          },
+          {
+            "sequence": 17,
+            "offsetMs": 7050,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_32 第十二段继续延长正文。后续增量仍须严格遵守此前的 FOLLOWING 或 DETACHED 滚动权，直到主轮进入 terminal、live tail 消失并迁入虚拟历史，工作中状态自动折叠为已工作。\"}}\n\n"
+          },
+          {
+            "sequence": 18,
+            "offsetMs": 7600,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_33 第十三段继续保留实质性正文，确保断言观察到的不只是很多换行，而是浏览器对完整自然语言段落进行自动折行之后产生的真实布局增长。该增量到达时，跟随态仍应同步推进 scrollTop，离底态则不改变用户的滚动所有权。\"}}\n\n"
+          },
+          {
+            "sequence": 19,
+            "offsetMs": 8150,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_34 第十四段让溢出后的连续测高次数覆盖充足样本。ResizeObserver、React commit 与虚拟列表测量可能交错执行，但它们都属于布局来源，不应独自改变 FOLLOWING 或 DETACHED 状态。\"}}\n\n"
+          },
+          {
+            "sequence": 20,
+            "offsetMs": 8700,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_35 第十五段专门延长用户上滚后的竞争窗口。用户输入一旦声明离底，后续正文、思考区折叠和 live tail 迁移都只能维护当前位置，不能因为某一帧的几何恰好接近底部就重新夺回控制权。\"}}\n\n"
+          },
+          {
+            "sequence": 21,
+            "offsetMs": 9250,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nCHAT_LOADING_LINE_36 第十六段结束这份长正文，并给 E2E 一个明确的完成 marker。下一步只发生内容块结束、消息终止和工作历史自动折叠，因此终态样本可以直接判断布局变化是否错误修改了滚动意图。\"}}\n\n"
+          },
+          {
+            "sequence": 22,
+            "offsetMs": 9700,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n"
+          },
+          {
+            "sequence": 23,
+            "offsetMs": 9800,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":128,\"output_tokens\":1024,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "sequence": 24,
+            "offsetMs": 9900,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    }
+  ]
+}

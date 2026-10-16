@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-full-access",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-full-access.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-permission-full-access.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-permission-full-access/output.txt",
+      "source": "created-by-provider-tool",
+      "description": "完全访问批准后真实 Write 的输出。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "pa158-title",
+      "description": "E2E_PA158_MAIN 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "E2E_PA158_MAIN 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "pa158-write-call",
+      "description": "M4 resolveInteraction 门禁：Write tool_use，默认模式下触发权限弹窗。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "PA158 在真实 Write 审批前保留受控窗口，通过 UI 排入混合 Plan 队列并暂停自动消费。"
+    },
+    {
+      "id": "pa158-final",
+      "description": "M4 resolveInteraction 门禁：批准后 tool_result 回灌 → 最终文本。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "权限批准后工具执行成功，模型据 tool_result 给出终态文本。"
+    }
+  ]
+}

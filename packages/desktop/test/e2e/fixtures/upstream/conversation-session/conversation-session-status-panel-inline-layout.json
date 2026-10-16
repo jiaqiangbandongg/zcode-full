@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-status-panel-inline-layout",
+  "spec": "./test/e2e/conversation-session/conversation-session-status-panel-inline-layout.test.ts",
+  "fixtures": [
+    {
+      "id": "status-panel-inline-layout-empty-task-response",
+      "description": "SP02: 普通 completed task 没有 goal/todo/running 内容时，不应挂载 status panel 或预留 inline offset。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 验证 renderer 布局合同；主回复只需要稳定完成并避免引入 goal/todo/running 内容。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_STATUS_PANEL_EMPTY"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_STATUS_PANEL_EMPTY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-status-panel-empty-task",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "status-panel-inline-layout-goal-response",
+      "description": "SP03-SP07: goal target 为 status panel 提供内容，用于验证 inline offset、宽度收敛、手动收起/展开和 resize 切换。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 case 只需要稳定制造带 target 的 task；模型正文内容不参与断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_STATUS_PANEL_GOAL"
+        ],
+        "lastUserMessageIncludes": [
+          "E2E_STATUS_PANEL_GOAL"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-status-panel-goal-task",
+          "inputTokens": 128,
+          "outputTokens": 8,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

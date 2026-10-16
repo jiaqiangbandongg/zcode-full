@@ -9,7 +9,7 @@ See THIRD-PARTY-NOTICES.md in the repository root for license and provenance.
 
 Displays AI-generated images from the AI SDK.
 
-The `Image` component displays AI-generated images from the AI SDK. It accepts a `Experimental_GeneratedImage` object from the AI SDK's `generateImage` function and automatically renders it as an image.
+The `Image` component displays AI-generated images from the AI SDK. It accepts a [`Experimental_GeneratedImage`](/docs/reference/ai-sdk-core/generate-image) object from the AI SDK's `generateImage` function and automatically renders it as an image.
 
 See `scripts/image.tsx` for this example.
 
@@ -86,7 +86,10 @@ const ImageDemo = () => {
           {isLoading && <Spinner />}
         </div>
 
-        <PromptInput onSubmit={handleSubmit} className="mt-4 w-full max-w-2xl mx-auto relative">
+        <PromptInput
+          onSubmit={handleSubmit}
+          className="mt-4 w-full max-w-2xl mx-auto relative"
+        >
           <PromptInputTextarea
             value={prompt}
             placeholder="Describe the image you want to generate..."
@@ -143,8 +146,8 @@ export async function POST(req: Request) {
 
 ### `<Image />`
 
-| Prop        | Type                          | Default | Description                                           |
-| ----------- | ----------------------------- | ------- | ----------------------------------------------------- |
-| `alt`       | `string`                      | -       | Alternative text for the image.                       |
-| `className` | `string`                      | -       | Additional CSS classes to apply to the image.         |
-| `...props`  | `Experimental_GeneratedImage` | -       | The image data to display, as returned by the AI SDK. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `alt` | `string` | - | Alternative text for the image. |
+| `className` | `string` | - | Additional CSS classes to apply to the image. |
+| `...props` | `Experimental_GeneratedImage` | - | The image data to display, as returned by the AI SDK. |

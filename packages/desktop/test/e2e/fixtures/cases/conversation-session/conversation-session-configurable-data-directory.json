@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-configurable-data-directory",
+  "spec": "./test/e2e/conversation-session/conversation-session-configurable-data-directory.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-configurable-data-directory.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "cdd01-before-migration-title",
+      "description": "迁移前任务的稳定标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "使用 CDD01 marker 隔离标题请求，避免标题生成影响主路径回放。"
+    },
+    {
+      "id": "cdd01-before-migration-main",
+      "description": "迁移前完成一轮普通 conversation，形成可恢复的历史任务。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定迁移前 completed assistant marker，避免依赖真实模型文本。"
+    },
+    {
+      "id": "cdd01-after-migration-main",
+      "description": "冷重启后在同一任务中完成 follow-up。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定迁移后 completed assistant marker，证明新 App 根下原任务仍可继续。"
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import type { ReadFileStateEntry, ReadFileStateMap } from "./types.js";
 
 type ReadFileStatePlatform = NodeJS.Platform;
 
-function createReadFileStatePathKey(
+export function createReadFileStatePathKey(
   filePath: string,
   platform: ReadFileStatePlatform = currentPlatform,
 ): string {
@@ -26,6 +26,18 @@ export function createReadFileStateKey(
     String(offset ?? 1),
     limit === undefined ? "" : String(limit),
   ].join("\0");
+}
+
+export function findStrictFullReadFileState(
+  readFileState: ReadFileStateMap | undefined,
+  filePath: string,
+  platform: ReadFileStatePlatform = currentPlatform,
+): ReadFileStateEntry | undefined {
+  if (!readFileState) return undefined;
+
+  return findLatestReadFileStateByPath(readFileState, filePath, platform, (entry) =>
+    isStrictFullReadState(entry),
+  );
 }
 
 export function findEditableReadFileState(
@@ -72,4 +84,9 @@ function findLatestReadFileStateByPath(
     latestReadAt = readAt;
   }
   return latest;
+}
+
+function isStrictFullReadState(entry: ReadFileStateEntry): boolean {
+  if (entry.isPartialView) return false;
+  return (entry.offset ?? 1) <= 1 && entry.limit === undefined;
 }

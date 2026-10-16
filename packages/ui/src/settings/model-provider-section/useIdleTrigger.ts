@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS = 1_200;
+export const MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS = 1_200;
 
 /**
  * Provider 文本保存与 Model Config Resolution 共用的“停止输入后执行”调度器。

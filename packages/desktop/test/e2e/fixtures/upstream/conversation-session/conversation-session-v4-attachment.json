@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-attachment",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-attachment.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-attachment-only-send",
+      "description": "T06：空正文与两个 ready AttachmentRef 经 createSession.firstInput 到达 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "两个文件名 placeholder 同时出现，证明 attachment-only 首发没有被空正文校验拦截。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "[Attached image/png: e2e-remove-me.png]",
+          "[Attached image/png: e2e-keep-me.png]"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-only-send",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_ONLY_SEND_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-attachment-edit-one",
+      "description": "D12：same-session edit 删除第一个 ref 后，provider 只看到剩余附件。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "bodyIncludes kept placeholder 且 bodyExcludes removed placeholder，直接约束 branch-cut 后 provider-visible attachments。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["[Attached image/png: e2e-keep-me.png]"],
+        "bodyExcludes": [
+          "[Attached image/png: e2e-remove-me.png]",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-edit-one",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_EDIT_ONE_OK"
+        }
+      }
+    }
+  ]
+}

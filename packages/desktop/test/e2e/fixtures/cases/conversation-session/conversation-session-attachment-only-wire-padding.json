@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-attachment-only-wire-padding",
+  "spec": "./test/e2e/conversation-session/conversation-session-attachment-only-wire-padding.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-attachment-only-wire-padding.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "attachment-only-wire-padding",
+      "description": "T06W：附件-only provider wire 的空 user content padding。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文本附件内容定位唯一主请求，network capture 结构化断言 user content parts 含精确 wire 空格。"
+    }
+  ]
+}

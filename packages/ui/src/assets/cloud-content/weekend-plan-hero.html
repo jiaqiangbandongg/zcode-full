@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weekend Plan Hero</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ticket-background: #f8f8f8;
+        --ticket-foreground: #0d0d0d;
+        --ticket-secondary: rgba(13, 13, 13, 0.62);
+        --ticket-accent: #4099ff;
+      }
+
+      :root[data-theme="light"] {
+        --ticket-background: #0d0d0d;
+        --ticket-foreground: #f8f8f8;
+        --ticket-secondary: rgba(248, 248, 248, 0.62);
+        --ticket-accent: #80beff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: white;
+        background: #081532;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .hero {
+        position: relative;
+        display: flex;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 20px 64px;
+        background:
+          radial-gradient(
+            ellipse at 50% 48%,
+            rgba(71, 132, 224, 0.68) 0%,
+            rgba(24, 57, 121, 0.82) 36%,
+            rgba(8, 24, 59, 0.94) 70%,
+            #061127 100%
+          ),
+          radial-gradient(ellipse at 72% 18%, rgba(56, 189, 248, 0.24), transparent 36%),
+          radial-gradient(ellipse at 18% 82%, rgba(124, 58, 237, 0.2), transparent 40%);
+      }
+
+      .galaxy {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: min(544px, 112vw);
+        height: 192px;
+        opacity: 0.9;
+        transform: translate(-50%, -50%) rotate(-12deg);
+        background: conic-gradient(
+          from 18deg at 50% 50%,
+          transparent 0deg,
+          rgba(96, 165, 250, 0.04) 24deg,
+          rgba(186, 230, 253, 0.36) 47deg,
+          transparent 72deg,
+          transparent 142deg,
+          rgba(129, 140, 248, 0.08) 170deg,
+          rgba(125, 211, 252, 0.3) 202deg,
+          transparent 232deg,
+          transparent 308deg,
+          rgba(196, 181, 253, 0.22) 334deg,
+          transparent 360deg
+        );
+        mask-image: radial-gradient(
+          ellipse at center,
+          #000 0%,
+          rgba(0, 0, 0, 0.96) 22%,
+          rgba(0, 0, 0, 0.62) 54%,
+          transparent 76%
+        );
+        animation: galaxy-drift 18s ease-in-out infinite alternate;
+      }
+
+      .galaxy-core {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 256px;
+        height: 112px;
+        border-radius: 50%;
+        transform: translate(-50%, -50%) rotate(-12deg);
+        background: radial-gradient(
+          ellipse at center,
+          rgba(255, 255, 255, 0.8) 0%,
+          rgba(186, 230, 253, 0.48) 9%,
+          rgba(96, 165, 250, 0.2) 28%,
+          transparent 70%
+        );
+        filter: blur(2px);
+        mix-blend-mode: screen;
+      }
+
+      .vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 46%, rgba(0, 0, 0, 0.42) 100%);
+      }
+
+      .star,
+      .ray {
+        position: absolute;
+        pointer-events: none;
+      }
+
+      .star {
+        border-radius: 999px;
+      }
+
+      .ray {
+        top: 50%;
+        left: 50%;
+        height: 1px;
+        transform-origin: left;
+      }
+
+      .ray::after {
+        display: block;
+        width: 100%;
+        height: 1px;
+        border-radius: 999px;
+        background: white;
+        box-shadow: 0 0 5px rgba(125, 211, 252, 0.85);
+        content: "";
+        animation: star-warp var(--duration) cubic-bezier(0.18, 0.42, 0.16, 1) var(--delay) infinite;
+      }
+
+      .replay {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        z-index: 4;
+        display: grid;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        place-items: center;
+        border: 0;
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.7);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .replay:hover,
+      .replay:focus-visible {
+        color: white;
+        background: rgba(255, 255, 255, 0.1);
+        outline: 2px solid rgba(255, 255, 255, 0.5);
+        outline-offset: 2px;
+      }
+
+      .replay svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .ticket-shell {
+        position: relative;
+        z-index: 3;
+        width: 100%;
+        max-width: 352px;
+        cursor: default;
+        perspective: 900px;
+        transform: perspective(900px) translateZ(var(--ticket-depth, 0px))
+          rotateX(var(--ticket-rx, 0deg)) rotateY(var(--ticket-ry, 0deg))
+          scale(var(--ticket-scale, 1));
+        filter: drop-shadow(
+          var(--ticket-shadow-x, 0px) var(--ticket-shadow-y, 18px) 22px rgba(0, 0, 0, 0.38)
+        );
+        transition:
+          transform var(--ticket-transition-duration, 200ms) ease-out,
+          filter var(--ticket-transition-duration, 200ms) ease-out;
+        will-change: transform, filter;
+      }
+
+      .ticket-flip {
+        position: relative;
+        width: 100%;
+        transform-style: preserve-3d;
+      }
+
+      .ticket-flip.is-entering {
+        animation: ticket-enter 900ms ease-in-out both;
+      }
+
+      .ticket-face {
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px;
+        color: var(--ticket-foreground);
+        background: var(--ticket-background);
+        backface-visibility: hidden;
+        transform: translateZ(0.5px);
+      }
+
+      /* 正反面必须共用票券缺口，翻转后不能退回完整矩形背板。 */
+      .ticket-face,
+      .ticket-back,
+      .ticket-entrance-back {
+        mask-image:
+          linear-gradient(#000 0 0),
+          radial-gradient(circle at 0 calc(100% - 48px), #000 0 11px, transparent 11.5px),
+          radial-gradient(circle at 100% calc(100% - 48px), #000 0 11px, transparent 11.5px);
+        mask-composite: exclude;
+      }
+
+      .ticket-face::before {
+        position: absolute;
+        top: -208px;
+        right: -160px;
+        width: 420px;
+        height: 420px;
+        border-radius: 999px;
+        background: radial-gradient(
+          closest-side,
+          color-mix(in srgb, var(--ticket-accent) 45%, transparent),
+          transparent 70%
+        );
+        content: "";
+      }
+
+      .ticket-highlight {
+        position: absolute;
+        inset: 0;
+        opacity: 0.6;
+        pointer-events: none;
+        background: radial-gradient(
+          circle at var(--ticket-x, 50%) var(--ticket-y, 50%),
+          rgba(255, 255, 255, 0.28),
+          transparent 38%
+        );
+      }
+
+      .ticket-content {
+        position: relative;
+        padding: 16px 20px;
+      }
+
+      .ticket-heading {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        border-radius: 6px;
+        color: white;
+        background: linear-gradient(180deg, #000, #151718);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+      }
+
+      .brand-mark svg {
+        width: 11px;
+        height: auto;
+      }
+
+      .plan-name {
+        min-width: 0;
+        margin-left: auto;
+        overflow: hidden;
+        color: var(--ticket-accent);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .amount {
+        display: flex;
+        margin-top: 20px;
+        align-items: baseline;
+        gap: 6px;
+        line-height: 1;
+      }
+
+      .amount-value {
+        font-size: clamp(20px, 5.2vw, 24px);
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .amount-unit {
+        color: var(--ticket-secondary);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .benefits {
+        display: flex;
+        min-width: 0;
+        margin-top: 8px;
+        flex-direction: column;
+        gap: 4px;
+        color: var(--ticket-secondary);
+        font-size: 14px;
+      }
+
+      .benefit {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .benefit-icon {
+        flex: none;
+        width: 12px;
+        height: 12px;
+        color: var(--ticket-accent);
+      }
+
+      .benefit-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ticket-divider {
+        height: 1px;
+        margin: 0 14px;
+        background-image: repeating-linear-gradient(
+          90deg,
+          color-mix(in srgb, currentcolor 18%, transparent) 0 12px,
+          transparent 12px 18px
+        );
+      }
+
+      .ticket-expiry {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 12px 20px 16px;
+        font-size: 12px;
+        line-height: 20px;
+      }
+
+      .expiry-prefix {
+        color: var(--ticket-secondary);
+      }
+
+      .expiry-value {
+        overflow: hidden;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ticket-back {
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        background: var(--ticket-background);
+        backface-visibility: hidden;
+        transform: rotateY(180deg) translateZ(0.5px);
+      }
+
+      .ticket-entrance-back {
+        position: absolute;
+        inset: 0;
+        visibility: hidden;
+        border-radius: 12px;
+        background: var(--ticket-background);
+        backface-visibility: visible;
+        transform: translateZ(1px);
+      }
+
+      .ticket-flip.is-entering .ticket-face {
+        animation: ticket-front-visibility 900ms steps(1, end);
+      }
+
+      .ticket-flip.is-entering .ticket-entrance-back {
+        animation: ticket-back-visibility 900ms steps(1, end);
+      }
+
+      .ticket-flip.is-entering .ticket-back {
+        /* 只在入场关键帧隐藏；永久隐藏会让后续 Y 轴翻转丢失背板。 */
+        animation: ticket-native-back-visibility 900ms steps(1, end);
+      }
+
+      @keyframes ticket-enter {
+        from {
+          transform: translateZ(-900px) rotateX(0deg) scale(0.24);
+        }
+        to {
+          transform: translateZ(0) rotateX(720deg) scale(1);
+        }
+      }
+
+      @keyframes ticket-front-visibility {
+        0%,
+        24.603% {
+          visibility: visible;
+        }
+        24.604%,
+        42.649% {
+          visibility: hidden;
+        }
+        42.65%,
+        57.349% {
+          visibility: visible;
+        }
+        57.35%,
+        75.395% {
+          visibility: hidden;
+        }
+        75.396%,
+        100% {
+          visibility: visible;
+        }
+      }
+
+      @keyframes ticket-back-visibility {
+        0%,
+        24.603% {
+          visibility: hidden;
+        }
+        24.604%,
+        42.649% {
+          visibility: visible;
+        }
+        42.65%,
+        57.349% {
+          visibility: hidden;
+        }
+        57.35%,
+        75.395% {
+          visibility: visible;
+        }
+        75.396%,
+        100% {
+          visibility: hidden;
+        }
+      }
+
+      @keyframes ticket-native-back-visibility {
+        from,
+        to {
+          visibility: hidden;
+        }
+      }
+
+      @keyframes galaxy-drift {
+        from {
+          transform: translate(-50%, -50%) rotate(-12deg) scale(0.96);
+        }
+        to {
+          transform: translate(-50%, -50%) rotate(-7deg) scale(1.05);
+        }
+      }
+
+      @keyframes star-warp {
+        0% {
+          opacity: 0;
+          transform: translateX(10px) scaleX(0.08);
+        }
+        16% {
+          opacity: 0.12;
+        }
+        62% {
+          opacity: 0.58;
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(340px) scaleX(2.5);
+        }
+      }
+
+      :root[data-reduced-motion="true"] .galaxy,
+      :root[data-reduced-motion="true"] .ray::after,
+      :root[data-reduced-motion="true"] .ticket-flip,
+      :root[data-reduced-motion="true"] .ticket-face,
+      :root[data-reduced-motion="true"] .ticket-back,
+      :root[data-reduced-motion="true"] .ticket-entrance-back {
+        animation: none;
+      }
+
+      :root[data-visible="false"] * {
+        animation-play-state: paused !important;
+      }
+
+      @media (max-width: 420px) {
+        .hero {
+          padding-right: 40px;
+          padding-left: 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="hero">
+      <div class="galaxy" aria-hidden="true"></div>
+      <div class="galaxy-core" aria-hidden="true"></div>
+      <div id="stars" aria-hidden="true"></div>
+      <div id="rays" aria-hidden="true"></div>
+      <div class="vignette" aria-hidden="true"></div>
+      <button id="replay" class="replay" type="button">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+      </button>
+      <div id="ticket" class="ticket-shell" data-idle-pressure="waiting-for-entry">
+        <div id="ticket-flip" class="ticket-flip">
+          <section class="ticket-face">
+            <div class="ticket-highlight" aria-hidden="true"></div>
+            <div class="ticket-content">
+              <div class="ticket-heading">
+                <span class="brand">
+                  <span class="brand-mark">
+                    <svg viewBox="0 0 256 218" fill="currentColor" aria-hidden="true">
+                      <path d="M134.4.13 116.48 25.6A15 15 0 0 1 104.06 32H6.4V0Z" />
+                      <path d="M256 .13 102.4 217.73H0L153.6.13Z" />
+                      <path d="m121.6 217.73 18.05-25.6a15 15 0 0 1 12.42-6.4h97.54v32Z" />
+                    </svg>
+                  </span>
+                  <span>ZCODE</span>
+                </span>
+                <span id="plan-name" class="plan-name"></span>
+              </div>
+              <div class="amount">
+                <span id="amount-value" class="amount-value"></span>
+                <span id="amount-unit" class="amount-unit"></span>
+              </div>
+              <div id="benefits" class="benefits"></div>
+            </div>
+            <div class="ticket-divider" aria-hidden="true"></div>
+            <div class="ticket-expiry">
+              <span id="expiry-prefix" class="expiry-prefix"></span>
+              <time id="expiry-value" class="expiry-value"></time>
+            </div>
+          </section>
+          <div class="ticket-back" aria-hidden="true"></div>
+          <div class="ticket-entrance-back" aria-hidden="true"></div>
+        </div>
+      </div>
+    </main>
+    <template id="benefit-icon-template">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="benefit-icon lucide lucide-gift"
+        aria-hidden="true"
+      >
+        <path d="M12 7v14" />
+        <path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8" />
+        <path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5" />
+        <rect x="3" y="7" width="18" height="4" rx="1" />
+      </svg>
+    </template>
+    <script>
+      (() => {
+        "use strict";
+
+        const CHANNEL = "zcode-cloud-hero-v1";
+        const ENTER_DURATION = 900;
+        const CORNERS = [
+          [-0.88, -0.88],
+          [0.88, -0.88],
+          [0.88, 0.88],
+          [-0.88, 0.88],
+        ];
+        const ticket = document.getElementById("ticket");
+        const ticketFlip = document.getElementById("ticket-flip");
+        const replay = document.getElementById("replay");
+        let instanceId = "";
+        let reducedMotion = false;
+        let hovered = false;
+        let pressed = false;
+        let animationFrame = 0;
+        let idleStartsAt = performance.now() + ENTER_DURATION;
+
+        function seededRandomFactory() {
+          let seed = 0x5a17c9e3;
+          return () => {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 0x100000000;
+          };
+        }
+
+        function createStars() {
+          const stars = document.getElementById("stars");
+          const random = seededRandomFactory();
+          for (let index = 0; index < 48; index += 1) {
+            const star = document.createElement("span");
+            const size = 0.5 + random() * 1.25;
+            const cool = random() > 0.58;
+            star.className = "star";
+            Object.assign(star.style, {
+              left: `${random() * 100}%`,
+              top: `${random() * 100}%`,
+              width: `${size}px`,
+              height: `${size}px`,
+              opacity: String(0.18 + random() * 0.62),
+              backgroundColor: cool ? "rgb(125 211 252)" : "white",
+            });
+            stars.append(star);
+          }
+
+          const rays = document.getElementById("rays");
+          for (let index = 0; index < 28; index += 1) {
+            const ray = document.createElement("span");
+            ray.className = "ray";
+            ray.style.width = `${8 + ((index * 7) % 18)}px`;
+            ray.style.transform = `rotate(${(index * 137.5 + 11) % 360}deg)`;
+            ray.style.setProperty("--delay", `${-((index * 0.37) % 3.6)}s`);
+            ray.style.setProperty("--duration", `${2.1 + ((index * 17) % 13) / 10}s`);
+            rays.append(ray);
+          }
+        }
+
+        function setText(id, value) {
+          document.getElementById(id).textContent = typeof value === "string" ? value : "";
+        }
+
+        function renderData(data) {
+          setText("plan-name", data.planName);
+          setText("amount-value", data.amountValue || data.amountLabel);
+          setText("amount-unit", data.amountUnit);
+          setText("expiry-prefix", data.endsAtPrefix);
+          setText("expiry-value", data.endsAtLabel || "—");
+          replay.setAttribute("aria-label", data.replayLabel || "Replay");
+          const benefits = document.getElementById("benefits");
+          benefits.replaceChildren();
+          const values = Array.isArray(data.benefits) ? data.benefits : [];
+          values.forEach((value) => {
+            if (typeof value !== "string") return;
+            const row = document.createElement("div");
+            row.className = "benefit";
+            // 原字符占位不等同于权益图标；只克隆包内固定 SVG，不解析远端 HTML。
+            const icon = document
+              .getElementById("benefit-icon-template")
+              .content.firstElementChild.cloneNode(true);
+            const text = document.createElement("span");
+            text.className = "benefit-text";
+            text.textContent = value;
+            row.append(icon, text);
+            benefits.append(row);
+          });
+        }
+
+        function setPressure(x, y, down) {
+          ticket.style.setProperty("--ticket-transition-duration", "140ms");
+          ticket.style.setProperty("--ticket-rx", `${-y * 4}deg`);
+          ticket.style.setProperty("--ticket-ry", `${x * 5}deg`);
+          ticket.style.setProperty("--ticket-x", `${((x + 1) / 2) * 100}%`);
+          ticket.style.setProperty("--ticket-y", `${((y + 1) / 2) * 100}%`);
+          ticket.style.setProperty("--ticket-depth", down ? "-12px" : "-5px");
+          ticket.style.setProperty("--ticket-scale", down ? "0.98" : "0.995");
+          ticket.style.setProperty("--ticket-shadow-x", `${-x * 8}px`);
+          ticket.style.setProperty("--ticket-shadow-y", `${18 - y * 3}px`);
+        }
+
+        function resetPressure() {
+          hovered = false;
+          pressed = false;
+          ticket.style.setProperty("--ticket-rx", "0deg");
+          ticket.style.setProperty("--ticket-ry", "0deg");
+          ticket.style.setProperty("--ticket-x", "50%");
+          ticket.style.setProperty("--ticket-y", "50%");
+          ticket.style.setProperty("--ticket-depth", "0px");
+          ticket.style.setProperty("--ticket-scale", "1");
+          ticket.style.setProperty("--ticket-shadow-x", "0px");
+          ticket.style.setProperty("--ticket-shadow-y", "18px");
+          ticket.style.setProperty("--ticket-transition-duration", "280ms");
+        }
+
+        function replayHero(emitAction = true) {
+          ticketFlip.getAnimations().forEach((animation) => animation.cancel());
+          resetPressure();
+          idleStartsAt = performance.now() + ENTER_DURATION;
+          ticket.dataset.idlePressure = "waiting-for-entry";
+          ticketFlip.classList.remove("is-entering");
+          void ticketFlip.offsetWidth;
+          if (!reducedMotion) ticketFlip.classList.add("is-entering");
+          const galaxy = document.querySelector(".galaxy");
+          galaxy.style.animation = "none";
+          void galaxy.offsetWidth;
+          galaxy.style.animation = "";
+          if (instanceId && emitAction) {
+            parent.postMessage({ channel: CHANNEL, type: "action", instanceId, id: "replay" }, "*");
+          }
+        }
+
+        function animateIdle(now) {
+          animationFrame = 0;
+          if (!reducedMotion && now >= idleStartsAt && !hovered) {
+            ticket.dataset.idlePressure = "active";
+            const raw = ((now - idleStartsAt) / 5200) * CORNERS.length;
+            const progress = ((raw % CORNERS.length) + CORNERS.length) % CORNERS.length;
+            const index = Math.floor(progress);
+            const next = (index + 1) % CORNERS.length;
+            const rawOffset = progress - index;
+            const offset = rawOffset * rawOffset * (3 - 2 * rawOffset);
+            const x = CORNERS[index][0] + (CORNERS[next][0] - CORNERS[index][0]) * offset;
+            const y = CORNERS[index][1] + (CORNERS[next][1] - CORNERS[index][1]) * offset;
+            ticket.style.setProperty("--ticket-transition-duration", "80ms");
+            ticket.style.setProperty("--ticket-rx", `${-y * 8}deg`);
+            ticket.style.setProperty("--ticket-ry", `${x * 10}deg`);
+            ticket.style.setProperty("--ticket-x", `${((x + 1) / 2) * 100}%`);
+            ticket.style.setProperty("--ticket-y", `${((y + 1) / 2) * 100}%`);
+            ticket.style.setProperty("--ticket-depth", `${-10 - Math.abs(x * y) * 2}px`);
+            ticket.style.setProperty("--ticket-scale", "0.975");
+            ticket.style.setProperty("--ticket-shadow-x", `${-x * 22}px`);
+            ticket.style.setProperty("--ticket-shadow-y", `${20 - y * 11}px`);
+          }
+          scheduleIdle();
+        }
+
+        function scheduleIdle() {
+          if (
+            !animationFrame &&
+            instanceId &&
+            !reducedMotion &&
+            document.documentElement.dataset.visible !== "false" &&
+            !document.hidden
+          ) {
+            animationFrame = requestAnimationFrame(animateIdle);
+          }
+        }
+
+        function updateVisibility() {
+          cancelAnimationFrame(animationFrame);
+          animationFrame = 0;
+          const visible = document.documentElement.dataset.visible !== "false" && !document.hidden;
+          ticketFlip.getAnimations().forEach((animation) => {
+            if (!visible) animation.pause();
+            else if (animation.playState === "paused") animation.play();
+          });
+          scheduleIdle();
+        }
+
+        ticketFlip.addEventListener("animationend", (event) => {
+          if (event.target === ticketFlip && event.animationName === "ticket-enter") {
+            ticketFlip.classList.remove("is-entering");
+          }
+        });
+        document.addEventListener("visibilitychange", updateVisibility);
+
+        ticket.addEventListener("pointerenter", () => {
+          hovered = true;
+        });
+        ticket.addEventListener("pointermove", (event) => {
+          if (reducedMotion) return;
+          const bounds = ticket.getBoundingClientRect();
+          if (!bounds.width || !bounds.height) return;
+          const x = Math.max(
+            -1,
+            Math.min(1, ((event.clientX - bounds.left) / bounds.width) * 2 - 1),
+          );
+          const y = Math.max(
+            -1,
+            Math.min(1, ((event.clientY - bounds.top) / bounds.height) * 2 - 1),
+          );
+          setPressure(x, y, pressed);
+        });
+        ticket.addEventListener("pointerdown", () => {
+          if (reducedMotion) return;
+          pressed = true;
+          ticket.style.setProperty("--ticket-depth", "-12px");
+          ticket.style.setProperty("--ticket-scale", "0.98");
+        });
+        ticket.addEventListener("pointerup", () => {
+          if (reducedMotion) return;
+          pressed = false;
+          ticket.style.setProperty("--ticket-depth", "-5px");
+          ticket.style.setProperty("--ticket-scale", "0.995");
+        });
+        ticket.addEventListener("pointerleave", resetPressure);
+        ticket.addEventListener("pointercancel", resetPressure);
+        ticket.addEventListener("click", (event) => {
+          if (reducedMotion || typeof ticketFlip.animate !== "function") return;
+          ticketFlip.getAnimations().forEach((animation) => animation.cancel());
+          // 入场被点击打断不会触发 animationend，也必须恢复原生背面。
+          ticketFlip.classList.remove("is-entering");
+          const bounds = ticket.getBoundingClientRect();
+          const direction = event.clientX < bounds.left + bounds.width / 2 ? -1 : 1;
+          ticketFlip.animate(
+            [{ transform: "rotateY(0deg)" }, { transform: `rotateY(${direction * 360}deg)` }],
+            { duration: 720, easing: "cubic-bezier(0.22, 0.72, 0.18, 1)" },
+          );
+        });
+        replay.addEventListener("click", () => replayHero());
+
+        window.addEventListener("message", (event) => {
+          if (event.source !== parent) return;
+          const message = event.data;
+          if (!message || message.channel !== CHANNEL || typeof message.instanceId !== "string") {
+            return;
+          }
+          if (message.type === "init") {
+            instanceId = message.instanceId;
+            document.documentElement.dataset.theme = message.theme === "dark" ? "dark" : "light";
+            document.documentElement.lang =
+              typeof message.locale === "string" ? message.locale : "en";
+            reducedMotion = message.reducedMotion === true;
+            document.documentElement.dataset.reducedMotion = String(reducedMotion);
+            renderData(message.data || {});
+            replayHero(false);
+            updateVisibility();
+            parent.postMessage({ channel: CHANNEL, type: "ready", instanceId }, "*");
+            return;
+          }
+          if (!instanceId || message.instanceId !== instanceId) return;
+          if (message.type === "theme") {
+            document.documentElement.dataset.theme = message.theme === "dark" ? "dark" : "light";
+          } else if (message.type === "visibility") {
+            document.documentElement.dataset.visible = String(message.visible);
+            updateVisibility();
+          } else if (message.type === "destroy") {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+            document.documentElement.dataset.visible = "false";
+            ticketFlip.getAnimations().forEach((animation) => animation.cancel());
+            ticketFlip.classList.remove("is-entering");
+            instanceId = "";
+          }
+        });
+
+        createStars();
+      })();
+    </script>
+  </body>
+</html>

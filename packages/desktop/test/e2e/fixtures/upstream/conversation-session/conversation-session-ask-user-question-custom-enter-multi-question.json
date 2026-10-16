@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-multi-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-multi-question.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-multi-question-call",
+      "description": "AskUserQuestion custom Enter repro: 首轮返回两题问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 AskUserQuestion 多题等待态，复现 custom input Enter 不能提前提交整个问答。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_CUSTOM_ENTER_MULTI"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_CUSTOM_ENTER_MULTI",
+          "E2E_ASK_USER_QUESTION_ENTER_MULTI_TOOL"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_ask_user_question_custom_enter_multi",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_ASK_USER_QUESTION_ENTER_FIRST: choose the first answer?",
+                "header": "E2E 1",
+                "options": [
+                  {
+                    "label": "Use first default",
+                    "description": "Continue the e2e run with the first default answer."
+                  },
+                  {
+                    "label": "Use first fallback",
+                    "description": "Continue the e2e run with the first fallback answer."
+                  }
+                ]
+              },
+              {
+                "question": "E2E_ASK_USER_QUESTION_ENTER_SECOND: choose the second answer?",
+                "header": "E2E 2",
+                "options": [
+                  {
+                    "label": "Use second default",
+                    "description": "Continue the e2e run with the second default answer."
+                  },
+                  {
+                    "label": "Use second fallback",
+                    "description": "Continue the e2e run with the second fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-multi-question-final",
+      "description": "AskUserQuestion custom Enter repro: 两题回答都进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只证明多题回答已被 agent 消费，核心断言在 Enter 是否错误提前提交。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_ENTER_FIRST_ANSWER",
+          "E2E_ASK_USER_QUESTION_ENTER_SECOND_ANSWER",
+          "E2E_ASK_USER_QUESTION_ENTER_MULTI_TOOL",
+          "toolu_e2e_ask_user_question_custom_enter_multi"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

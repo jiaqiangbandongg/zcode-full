@@ -1,0 +1,14 @@
+phase phase#1
+participant phase#1:workspace steps=world-read#1~phase#1,world-read#2,world-read#3
+phase phase#2
+participant phase#2:actor#1 "optimizer" steps=ask#1
+phase phase#3
+participant phase#3:workspace steps=world-read#1~phase#3,world-read#4
+phase phase#4
+participant phase#4:workspace steps=world-read#5
+phase phase#5
+participant phase#5:workspace steps=world-read#6
+participant phase#5:actor#2 "consultant" steps=ask#2
+phase phase#6
+participant phase#6:workspace steps=world-read#7
+handoff phase#5:workspace -> phase#5:actor#2

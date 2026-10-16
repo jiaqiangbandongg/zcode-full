@@ -1,0 +1,190 @@
+% ═══════════════════════════════════════════════════════════
+% AltaCV-Style Creative Resume Template
+% Based on AltaCV by LianTze Lim, adapted for Tectonic
+% ═══════════════════════════════════════════════════════════
+\documentclass[10pt,a4paper]{article}
+
+% ── Packages ──
+\usepackage[margin=1.25cm,columnsep=1.2cm]{geometry}
+\usepackage{paracol}          % dual-column that breaks across pages
+\usepackage[fixed]{fontawesome5}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{dashrule}
+\usepackage[colorlinks=true,urlcolor=accent,linkcolor=accent,bookmarks=false]{hyperref}
+
+% ── Colour System (change these to retheme) ──
+\definecolor{accent}{HTML}{3B82F6}       % blue — primary accent
+\definecolor{emphasis}{HTML}{2E2E2E}     % near-black — job titles, strong text
+\definecolor{heading}{HTML}{1E293B}      % dark slate — section headings
+\definecolor{headingrule}{HTML}{3B82F6}  % matches accent
+\definecolor{body}{HTML}{4B5563}         % gray-600 — body text
+\definecolor{tagbg}{HTML}{EFF6FF}        % light blue — tag background
+\definecolor{subheading}{HTML}{3B82F6}   % matches accent
+
+% ── Fonts ──
+\usepackage[rm]{roboto}
+\usepackage[defaultsans]{lato}
+\renewcommand{\familydefault}{\sfdefault}
+
+% ── List Settings ──
+\setlist{leftmargin=*,labelsep=0.5em,nosep,itemsep=0.25\baselineskip,after=\vspace{0.25\baselineskip}}
+\setlist[itemize]{label={\small\textbullet}}
+
+\setlength{\parindent}{0pt}
+
+% ── Custom Commands ──
+
+% Divider (dashed line between entries)
+\newcommand{\divider}{\textcolor{body!30}{\hdashrule{\linewidth}{0.6pt}{0.5ex}}\medskip}
+
+% Section heading with rule
+\newcommand{\cvsection}[1]{%
+  \nointerlineskip\bigskip%
+  {\color{heading}\Large\bfseries\MakeUppercase{#1}}\\[-1ex]%
+  {\color{headingrule}\rule{\linewidth}{2pt}\par}\medskip
+}
+
+% Experience entry: {title}{company}{dates}{location}
+\newcommand{\cvevent}[4]{%
+  {\large\color{emphasis}\bfseries #1\par}%
+  \smallskip\normalsize
+  \ifx&#2&\else{\textbf{\color{accent}#2}\par\smallskip}\fi%
+  \ifx&#3&\else{%
+    \small\makebox[0.5\linewidth][l]{\faCalendar[regular]~#3}%
+  }\fi%
+  \ifx&#4&\else{%
+    \small\makebox[0.5\linewidth][l]{\faMapMarker~#4}%
+  }\fi\par%
+  \medskip\normalsize
+}
+
+% Skill rating dots: {name}{level 1-5, supports X.5}
+\newcommand{\cvskill}[2]{%
+  \textcolor{emphasis}{\textbf{#1}}\hfill
+  \foreach \x in {1,...,5}{%
+    \ifdimgreater{\x pt}{#2 pt}{\color{body!30}}{\color{accent}}\faCircle
+  }\par%
+}
+
+% Tag label (rounded rectangle)
+\newcommand{\cvtag}[1]{%
+  \tikz[baseline]\node[anchor=base,draw=body!30,rounded corners,inner xsep=1ex,inner ysep=0.75ex,text height=1.5ex,text depth=.25ex]{#1};%
+}
+
+% Achievement: {icon}{title}{description}
+\newcommand{\cvachievement}[3]{%
+  \begin{tabular}{@{}p{2em} @{\hspace{1ex}} p{\dimexpr\linewidth-3em}@{}}
+  {\Large\color{accent}#1} & \textbf{\color{emphasis}#2}\\
+  & {\small #3}
+  \end{tabular}%
+  \smallskip
+}
+
+% ═══════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Header ──
+\begin{center}
+{\Huge\bfseries\color{heading} YOUR NAME}\par\medskip
+{\large\bfseries\color{accent} Full-Stack Engineer | Open Source Contributor}\par\medskip
+{\footnotesize\bfseries
+\faAt~\href{mailto:name@email.com}{name@email.com}\hspace{2em}
+\faPhone~+86 138-0000-0000\hspace{2em}
+\faGithub~\href{https://github.com/username}{username}\hspace{2em}
+\faLinkedin~\href{https://linkedin.com/in/username}{username}\hspace{2em}
+\faMapMarker~Shanghai, China
+}\par
+\end{center}
+
+\medskip
+
+% ── Two Columns ──
+\columnratio{0.62}
+\begin{paracol}{2}
+
+% ════════ LEFT COLUMN (Experience + Projects) ════════
+\cvsection{Experience}
+
+\cvevent{Senior Software Engineer}{Zhipu AI}{Jan 2022 -- Present}{Beijing}
+\begin{itemize}
+\item Architected real-time inference pipeline serving 10M+ daily requests with p99 latency < 50ms
+\item Led migration from monolith to microservices, reducing deployment cycle from weekly to hourly
+\item Designed A/B testing framework enabling 30\% faster feature iteration across 5 product teams
+\end{itemize}
+
+\divider
+
+\cvevent{Software Engineer}{Acme Tech}{Jul 2019 -- Dec 2021}{Beijing}
+\begin{itemize}
+\item Built recommendation engine (collaborative filtering + deep learning) improving CTR by 25\%
+\item Implemented distributed training pipeline on 64-GPU cluster, reducing training time by 60\%
+\end{itemize}
+
+\cvsection{Projects}
+
+\cvevent{Open Source Project}{\href{https://github.com/user/project}{github.com/user/project}}{}{}
+\begin{itemize}
+\item High-performance async HTTP framework — 5,000+ GitHub stars
+\item Featured in Awesome-Go and HackerNews front page
+\end{itemize}
+
+% ════════ RIGHT COLUMN (Education + Skills + Languages) ════════
+\switchcolumn
+
+\cvsection{Education}
+
+\cvevent{M.Sc. Computer Science}{Tsinghua University}{2017 -- 2019}{}
+Thesis: Distributed Graph Processing\\
+GPA: 3.8/4.0
+
+\divider
+
+\cvevent{B.Eng. Software Engineering}{Zhejiang University}{2013 -- 2017}{}
+
+\cvsection{Skills}
+
+\cvskill{Python}{5}
+\divider
+\cvskill{Go / Rust}{4}
+\divider
+\cvskill{System Design}{4.5}
+\divider
+\cvskill{Machine Learning}{3.5}
+
+\medskip
+
+\cvtag{Kubernetes}
+\cvtag{Docker}
+\cvtag{Kafka}\\
+\cvtag{PostgreSQL}
+\cvtag{Redis}
+\cvtag{gRPC}\\
+\cvtag{React}
+\cvtag{TypeScript}
+\cvtag{Terraform}
+
+\cvsection{Languages}
+
+\cvskill{English}{4.5}
+\divider
+\cvskill{Chinese (Native)}{5}
+
+\cvsection{Highlights}
+
+\cvachievement{\faTrophy}{ACM ICPC Regional Gold}{2016 Asia Regional Contest}
+\divider
+\cvachievement{\faGithub}{5,000+ Stars OSS}{Maintainer of popular async framework}
+
+\end{paracol}
+
+% ── PDF Metadata ──
+\hypersetup{
+    pdftitle={Resume - Your Name},
+    pdfauthor={Z.ai},
+    pdfsubject={Professional Resume},
+}
+
+\end{document}

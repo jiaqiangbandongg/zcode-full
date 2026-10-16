@@ -49,10 +49,36 @@ export interface BotProviderAcknowledgeResult {
 }
 
 export interface BotProviderAdapter {
+  readTopicResourceMessage?(
+    bot: BotConfig,
+    target: { messageId: string; chatId: string; threadId: string },
+    signal?: AbortSignal,
+  ): Promise<import("#src/bots/topicResource.js").TopicResourceMessage>;
+  resolveTopic?(
+    bot: BotConfig,
+    actor: BotActor,
+  ): Promise<{ threadId: string; rootMessageId: string; topicTitle: string; topicUrl?: string }>;
+  readTopicHistory?(
+    bot: BotConfig,
+    request: import("@zcode/shared").BotTopicHistoryRequest,
+  ): Promise<import("@zcode/shared").BotTopicHistoryBatch>;
+  getGroupMemberNames?(bot: BotConfig, chatId: string): Promise<Record<string, string>>;
+  getGroupInfo?(
+    bot: BotConfig,
+    chatId: string,
+  ): Promise<{ name: string; chatMode?: "group" | "topic" }>;
   test(bot: BotConfig): Promise<{ ok: boolean; message: string }>;
   resolveName?(bot: BotConfig): Promise<string | null>;
   syncCommands?(bot: BotConfig): Promise<void>;
-  send(bot: BotConfig, message: BotOutboundMessage): Promise<void>;
+  send(
+    bot: BotConfig,
+    message: BotOutboundMessage,
+  ): Promise<void | BotTransientInteractionCardHandle>;
+  updateInputReaction?(
+    bot: BotConfig,
+    messageId: string,
+    state: import("#src/bots/providers/groupInputReaction.js").GroupInputReaction,
+  ): Promise<void>;
   sendTyping?(bot: BotConfig, target: BotTypingTarget): Promise<void>;
   startTyping?(bot: BotConfig, target: BotTypingTarget): Promise<void>;
   stopTyping?(bot: BotConfig, target: BotTypingTarget): Promise<void>;
@@ -75,9 +101,7 @@ export interface BotProviderAdapter {
     state: BotStreamingReplyCardState,
     signal?: AbortSignal,
   ): Promise<void>;
-  splitStreamingReplyCardStates?(
-    state: BotStreamingReplyCardState,
-  ): BotStreamingReplyCardState[];
+  splitStreamingReplyCardStates?(state: BotStreamingReplyCardState): BotStreamingReplyCardState[];
   createTransientInteractionCard?(
     bot: BotConfig,
     message: BotOutboundMessage,
@@ -92,11 +116,15 @@ export interface BotProviderAdapter {
     handle: BotTransientInteractionCardHandle,
   ): Promise<void>;
   prepareCallbackPayload?(bot: BotConfig, payload: unknown): Promise<unknown>;
-  handleCallbackResponse?(bot: BotConfig, payload: unknown): Promise<Pick<BotProviderCallbackResult, "responseBody" | "status"> | null>;
+  handleCallbackResponse?(
+    bot: BotConfig,
+    payload: unknown,
+  ): Promise<Pick<BotProviderCallbackResult, "responseBody" | "status"> | null>;
   downloadAttachment?(
     bot: BotConfig,
     attachment: BotInboundAttachment,
     actor?: BotActor,
+    signal?: AbortSignal,
   ): Promise<BotProviderDownloadedAttachment | null>;
   parseCallback(payload: unknown): BotInboundMessage[];
 }

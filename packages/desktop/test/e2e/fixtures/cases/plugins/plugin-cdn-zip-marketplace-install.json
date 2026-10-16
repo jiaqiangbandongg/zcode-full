@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "caseName": "plugin-cdn-zip-marketplace-install",
+  "spec": "./test/e2e/plugins/plugin-cdn-zip-marketplace-install.test.ts",
+  "providerFixtures": [],
+  "providerRequestPolicy": "none",
+  "fileFixtures": ["loopback official CDN manifest and ZIP seeded before Electron startup"],
+  "requests": []
+}

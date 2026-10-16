@@ -113,6 +113,45 @@ async function resolveTurnAttachment(
     };
   }
 
+  if (
+    attachment.content &&
+    (attachment.sourceKind === "topic-history" || attachment.sourceKind === "clipboard-text")
+  ) {
+    // 上传后的文本材料在所属 runtime 落盘，禁止解码后当正文注入，也不使用 Host 本机路径。
+    const inline = await readInlineAttachmentContent(attachment, options);
+    const write = options.artifactStore?.writeToolResultBinaryArtifact?.bind(options.artifactStore);
+    if (!inline || !write || !options.sessionId)
+      throw new Error("Text attachment materialization unavailable");
+    const encoded = /^data:text\/plain(?:;charset=utf-8)?;base64,([A-Za-z0-9+/]*={0,2})$/.exec(
+      inline.dataUrl,
+    );
+    if (!encoded) throw new Error("Invalid text attachment encoding");
+    const data = Buffer.from(encoded[1]!, "base64");
+    const file = await write(
+      {
+        sessionId: options.sessionId,
+        turnId: options.turnId,
+        trace: options.traceContext,
+        toolCallId: `text-attachment-${index}`,
+        toolName: "prompt-attachment:text",
+        content: data,
+        contentType: "text/plain",
+        extension: "txt",
+        retention: "session",
+      },
+      { signal: options.abortSignal },
+    );
+    if (!file.path) throw new Error("Text attachment path unavailable");
+    return resolvedPathReferenceAttachment({ ...attachment, path: file.path }, file.path, {
+      filename: attachment.filename,
+      mime: "text/plain",
+      sizeBytes: data.length,
+      reason:
+        attachment.sourceKind === "topic-history"
+          ? "deferred_topic_history"
+          : "deferred_clipboard_text",
+    });
+  }
   if (attachment.content) {
     if (attachment.type === "pdf" && !isDataOrArtifactUrl(attachment.content)) {
       // PDF 曾沿用普通 file 的 inline 文本分支，损坏或伪造的正文会被 UTF-8
@@ -242,7 +281,7 @@ async function resolveLocalFileAttachment(
       });
     }
 
-    if (attachment.sourceKind === "clipboard-text") {
+    if (attachment.sourceKind === "clipboard-text" || attachment.sourceKind === "topic-history") {
       // 长粘贴文本已经落成临时文件，预读会重新把正文塞进 prompt_attachment 系统提示。
       // 这里只交付真实本地附件引用，等模型明确需要时再通过文件读取工具进入上下文。
       return resolvedPathReferenceAttachment(attachment, attachment.path!, {
@@ -250,7 +289,10 @@ async function resolveLocalFileAttachment(
         mime,
         sizeBytes: stat.sizeBytes,
         source,
-        reason: "deferred_clipboard_text",
+        reason:
+          attachment.sourceKind === "topic-history"
+            ? "deferred_topic_history"
+            : "deferred_clipboard_text",
       });
     }
 

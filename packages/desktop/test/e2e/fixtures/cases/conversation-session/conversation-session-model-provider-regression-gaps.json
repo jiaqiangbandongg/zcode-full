@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-regression-gaps",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-regression-gaps.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-provider-regression-gaps.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-provider-regression-gaps-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "目录缺口用例需要确定性的 provider/model 请求和完成态。"
+    },
+    {
+      "id": "model-provider-regression-gaps-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "退出和 Queue 用例需要稳定的在途请求窗口。"
+    }
+  ]
+}

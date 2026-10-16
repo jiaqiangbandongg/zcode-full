@@ -1,0 +1,8 @@
+phase phase#1
+participant phase#1:actor#1[0] member=0/3 steps=ask#1
+participant phase#1:actor#1[1] member=1/3 steps=ask#1
+participant phase#1:actor#1[2] member=2/3 steps=ask#1
+participant phase#1:actor#2 "reviewer" steps=ask#2
+handoff phase#1:actor#1[0] -> phase#1:actor#2 types="Draft"
+handoff phase#1:actor#1[1] -> phase#1:actor#2 types="Draft"
+handoff phase#1:actor#1[2] -> phase#1:actor#2 types="Draft"

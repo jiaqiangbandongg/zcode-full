@@ -2,7 +2,7 @@ import { DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS } from "@zcode/contracts";
 
 export { DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS } from "@zcode/contracts";
 
-const MODEL_STREAM_IDLE_TIMEOUT_RETRY_INCREMENT_MS = 30_000;
+export const MODEL_STREAM_IDLE_TIMEOUT_RETRY_INCREMENT_MS = 30_000;
 
 export function resolveModelStreamIdleTimeoutMs(options: {
   baseTimeoutMs?: number;
@@ -49,7 +49,8 @@ export function isModelStreamIdleTimeoutError(
 
   const record = error as Record<string, unknown>;
   return (
-    record.code === "MODEL_STREAM_IDLE_TIMEOUT" || record.name === "ModelStreamIdleTimeoutError"
+    record.code === "MODEL_STREAM_IDLE_TIMEOUT" ||
+    record.name === "ModelStreamIdleTimeoutError"
   );
 }
 

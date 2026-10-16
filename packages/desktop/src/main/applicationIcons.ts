@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, win32 } from "node:path";
+import { posix, win32 } from "node:path";
 import type {
   ApplicationIconInfo,
   ApplicationIconRequest,
@@ -51,9 +51,11 @@ async function buildApplicationPathIndex(
   dependencies: ApplicationPathDependencies,
 ): Promise<Map<string, string>> {
   const deadline = dependencies.now() + FALLBACK_SCAN_BUDGET_MS;
+  // darwin 路径拼接固定用 posix 分隔符：node:path 的 join 会跟随运行平台，
+  // Windows 上跑单测时产出反斜杠路径，导致兜底索引与 Spotlight 的 POSIX 口径不一致。
   const roots = [
     "/Applications",
-    join(dependencies.homeDirectory, "Applications"),
+    posix.join(dependencies.homeDirectory, "Applications"),
     "/System/Applications",
     "/System/Applications/Utilities",
   ];
@@ -62,7 +64,9 @@ async function buildApplicationPathIndex(
     try {
       const entries = await dependencies.listDirectory(root);
       appPaths.push(
-        ...entries.filter((entry) => entry.endsWith(".app")).map((entry) => join(root, entry)),
+        ...entries
+          .filter((entry) => entry.endsWith(".app"))
+          .map((entry) => posix.join(root, entry)),
       );
     } catch {
       // 标准目录可能不存在或不可读，继续扫描其余目录。
@@ -80,7 +84,7 @@ async function buildApplicationPathIndex(
         const bundleId = (
           await dependencies.execute(
             "/usr/libexec/PlistBuddy",
-            ["-c", "Print :CFBundleIdentifier", join(appPath, "Contents", "Info.plist")],
+            ["-c", "Print :CFBundleIdentifier", posix.join(appPath, "Contents", "Info.plist")],
             Math.min(PLIST_READ_TIMEOUT_MS, remainingMs),
           )
         ).trim();
@@ -113,7 +117,7 @@ function readFallbackApplicationPath(
   return indexPromise.then((index) => index.get(bundleId.toLowerCase()) ?? null);
 }
 
-async function resolveDarwinApplicationPath(
+export async function resolveDarwinApplicationPath(
   bundleId: string,
   dependencies: ApplicationPathDependencies = defaultApplicationPathDependencies,
 ): Promise<string | null> {
@@ -202,7 +206,7 @@ async function readFileIcon(
   return iconDataUrl ? { iconDataUrl } : null;
 }
 
-function createApplicationIconLoader(dependencies: ApplicationIconLoaderDependencies) {
+export function createApplicationIconLoader(dependencies: ApplicationIconLoaderDependencies) {
   return async (request: string | ApplicationIconRequest): Promise<ApplicationIconInfo | null> => {
     const normalized = normalizedRequest(request, dependencies.platform);
     if (!normalized) return null;

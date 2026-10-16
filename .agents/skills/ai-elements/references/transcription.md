@@ -36,23 +36,23 @@ npx ai-elements@latest add transcription
 
 Root component that provides context and manages transcript state. Uses render props pattern for rendering segments.
 
-| Prop          | Type                                                          | Default | Description                                                           |
-| ------------- | ------------------------------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `segments`    | `TranscriptionSegment[]`                                      | -       | Array of transcription segments from AI SDK transcribe() function.    |
-| `currentTime` | `number`                                                      | `0`     | Current playback time in seconds (controlled).                        |
-| `onSeek`      | `(time: number) => void`                                      | -       | Callback fired when a segment is clicked or when currentTime changes. |
-| `children`    | `(segment: TranscriptionSegment, index: number) => ReactNode` | -       | Render function that receives each segment and its index.             |
-| `...props`    | `Omit<React.ComponentProps<`                                  | -       | Any other props are spread to the root div element.                   |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `segments` | `TranscriptionSegment[]` | - | Array of transcription segments from AI SDK transcribe() function. |
+| `currentTime` | `number` | `0` | Current playback time in seconds (controlled). |
+| `onSeek` | `(time: number) => void` | - | Callback fired when a segment is clicked or when currentTime changes. |
+| `children` | `(segment: TranscriptionSegment, index: number) => ReactNode` | - | Render function that receives each segment and its index. |
+| `...props` | `Omit<React.ComponentProps<` | - | Any other props are spread to the root div element. |
 
 ### `<TranscriptionSegment />`
 
 Individual segment button with automatic state styling and click-to-seek functionality.
 
-| Prop       | Type                    | Default | Description                                       |
-| ---------- | ----------------------- | ------- | ------------------------------------------------- |
-| `segment`  | `TranscriptionSegment`  | -       | The transcription segment data.                   |
-| `index`    | `number`                | -       | The segment index.                                |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the button element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `segment` | `TranscriptionSegment` | - | The transcription segment data. |
+| `index` | `number` | - | The segment index. |
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the button element. |
 
 ## Behavior
 

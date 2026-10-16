@@ -9,12 +9,12 @@ import { buildPersistentAgentMemoryPrompt } from "./persistent-memory-prompt.js"
 
 const PERSISTENT_MEMORY_TOOLS = ["Write", "Edit"] as const;
 
-function sanitizePersistentAgentMemoryKey(agentName: string): string {
+export function sanitizePersistentAgentMemoryKey(agentName: string): string {
   const key = agentName.replace(/[^a-zA-Z0-9_-]/g, "-");
   return key === "" ? "unknown" : key;
 }
 
-function resolvePersistentAgentMemoryRoot(input: {
+export function resolvePersistentAgentMemoryRoot(input: {
   agentName: string;
   scope: AgentMemoryScope;
   storageRoot: string;
@@ -62,7 +62,7 @@ export function projectPersistentAgentMemoryTools(config: AgentRuntimeConfig): A
   };
 }
 
-interface PersistentAgentMemory {
+export interface PersistentAgentMemory {
   rootDir: string;
   prompt: string;
 }

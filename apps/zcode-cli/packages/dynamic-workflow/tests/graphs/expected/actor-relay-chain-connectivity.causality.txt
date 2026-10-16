@@ -1,0 +1,11 @@
+lane actor#1 "producer" @6:21
+lane actor#2 "mid" @7:33 families=fanout#1
+lane actor#3 "consumer" @9:19
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @7:15 label="map"
+step ask#1 ask "producer" @6:39 lane=actor#1 region=seq#1 always
+step ask#2 ask "mid" @7:46 lane=actor#2 region=fanout#1 maybe stack
+step ask#3 ask "consumer" @9:37 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#2 data maybe exact
+edge ask#2 -> ask#3 data maybe exact
+sink ask#3

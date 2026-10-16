@@ -1,6 +1,9 @@
-import type { ZCodeAutomationRunOutcome, ZCodeAutomationTrigger } from "@zcode/shared";
+import type {
+  ZCodeAutomationRunOutcome,
+  ZCodeAutomationTrigger,
+} from "@zcode/shared";
 
-interface CronRunLifecycleRepo {
+export interface CronRunLifecycleRepo {
   ensureRunClaimed(params: {
     runId: string;
     automationId: string;
@@ -8,7 +11,11 @@ interface CronRunLifecycleRepo {
     scheduledAt: number | null;
     trigger: ZCodeAutomationTrigger;
   }): Promise<void>;
-  markRunOutcome(runId: string, outcome: ZCodeAutomationRunOutcome, error?: string): Promise<void>;
+  markRunOutcome(
+    runId: string,
+    outcome: ZCodeAutomationRunOutcome,
+    error?: string,
+  ): Promise<void>;
   markRunDispatch(params: {
     runId: string;
     dispatchStatus: "failed_to_dispatch";
@@ -18,7 +25,7 @@ interface CronRunLifecycleRepo {
   releaseManualClaim(automationId: string, workspaceKey: string): Promise<void>;
 }
 
-interface CronRunLifecycleIdentity {
+export interface CronRunLifecycleIdentity {
   runId: string;
   automationId: string;
   workspaceKey: string;
@@ -69,7 +76,7 @@ export async function recordCronRunOutcomeBestEffort(
   }
 }
 
-async function releaseManualClaimBestEffort(
+export async function releaseManualClaimBestEffort(
   params: Pick<CronRunLifecycleIdentity, "automationId" | "runId" | "workspaceKey"> & {
     repo: Pick<CronRunLifecycleRepo, "releaseManualClaim">;
     logWarn: LogWarn;

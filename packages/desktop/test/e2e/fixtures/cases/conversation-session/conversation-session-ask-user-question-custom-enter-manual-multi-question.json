@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-custom-enter-manual-multi-question",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-custom-enter-manual-multi-question.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ask-user-question-custom-enter-manual-multi-question.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-manual-multi-question-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造三题 AskUserQuestion 等待态，避免真实模型生成非法选项数量或题目结构漂移影响 Enter 答案采集复现。"
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-custom-enter-manual-multi-question-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明三题 Enter 提交后的自定义回答已被 agent 消费，核心断言在答案采集和 UI 已回答记录。"
+    }
+  ]
+}

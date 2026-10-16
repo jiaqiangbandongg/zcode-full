@@ -166,7 +166,8 @@ export interface TurnAttachment {
   path?: string;
   content?: string;
   /** clipboard-text 是 UI 长粘贴落盘生成的临时附件，模型请求中只保留路径引用。 */
-  sourceKind?: "clipboard-text";
+  sourceKind?: "clipboard-text" | "topic-history";
+  messageCount?: number;
   // 展示元信息（协议边界保真透传，TurnStarted 事件/v4 投影展示用；
   // 缺省时由 basename/扩展名推断兜底）。不参与内容解析。
   filename?: string;

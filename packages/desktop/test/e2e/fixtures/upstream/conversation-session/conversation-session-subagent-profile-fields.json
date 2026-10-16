@@ -1,0 +1,710 @@
+{
+  "version": 1,
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-profile-fields.test.ts",
+  "fixtures": [
+    {
+      "id": "spf-title",
+      "description": "spf-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SPF_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Single field profile refresh",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-seed-tool",
+      "description": "spf-seed-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_seed",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "SEED",
+            "prompt": "E2E_SPF_SEED_CHILD",
+            "subagent_type": "e2e-profile-fields",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-seed-child",
+      "description": "spf-seed-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_SEED_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_SEED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-seed-final",
+      "description": "spf-seed-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_spf_seed", "agentId: agent_", "E2E_SPF_SEED_CHILD_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-effort-resume-tool",
+      "description": "spf-effort-resume-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_EFFORT_RESUME:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_effort_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "effort only refresh",
+            "message": "E2E_SPF_EFFORT_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-effort-resume-child",
+      "description": "spf-effort-resume-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_EFFORT_RESUME_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_EFFORT_RESUME_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "spf-effort-resume-final",
+      "description": "spf-effort-resume-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_effort_resume",
+          "resumed it in the background",
+          "E2E_SPF_EFFORT_RESUME"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_EFFORT_RESUME_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-effort-notification",
+      "description": "spf-effort-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SPF_EFFORT_RESUME_CHILD_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_EFFORT_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-effort-spawn-tool",
+      "description": "spf-effort-spawn-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_EFFORT_SPAWN:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_effort_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "EFFORT_SPAWN",
+            "prompt": "E2E_SPF_EFFORT_SPAWN_CHILD",
+            "subagent_type": "e2e-profile-fields",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-effort-spawn-child",
+      "description": "spf-effort-spawn-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_EFFORT_SPAWN_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_EFFORT_SPAWN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-effort-spawn-final",
+      "description": "spf-effort-spawn-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_effort_spawn",
+          "agentId: agent_",
+          "E2E_SPF_EFFORT_SPAWN_CHILD_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_EFFORT_SPAWN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-resume-tool",
+      "description": "spf-prompt-resume-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_PROMPT_RESUME:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_prompt_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "prompt only refresh",
+            "message": "E2E_SPF_PROMPT_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-resume-child",
+      "description": "spf-prompt-resume-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_PROMPT_RESUME_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_PROMPT_RESUME_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "spf-prompt-resume-final",
+      "description": "spf-prompt-resume-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_prompt_resume",
+          "resumed it in the background",
+          "E2E_SPF_PROMPT_RESUME"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_PROMPT_RESUME_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-notification",
+      "description": "spf-prompt-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SPF_PROMPT_RESUME_CHILD_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_PROMPT_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-spawn-tool",
+      "description": "spf-prompt-spawn-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_PROMPT_SPAWN:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_prompt_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "PROMPT_SPAWN",
+            "prompt": "E2E_SPF_PROMPT_SPAWN_CHILD",
+            "subagent_type": "e2e-profile-fields",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-spawn-child",
+      "description": "spf-prompt-spawn-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_PROMPT_SPAWN_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_PROMPT_SPAWN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-prompt-spawn-final",
+      "description": "spf-prompt-spawn-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_prompt_spawn",
+          "agentId: agent_",
+          "E2E_SPF_PROMPT_SPAWN_CHILD_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_PROMPT_SPAWN_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-tools-resume-tool",
+      "description": "spf-tools-resume-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_TOOLS_RESUME:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_tools_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "tools only refresh",
+            "message": "E2E_SPF_TOOLS_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-tools-resume-child",
+      "description": "spf-tools-resume-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_TOOLS_RESUME_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_TOOLS_RESUME_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 2000
+      }
+    },
+    {
+      "id": "spf-tools-resume-final",
+      "description": "spf-tools-resume-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_tools_resume",
+          "resumed it in the background",
+          "E2E_SPF_TOOLS_RESUME"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_TOOLS_RESUME_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-tools-notification",
+      "description": "spf-tools-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SPF_TOOLS_RESUME_CHILD_DONE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_TOOLS_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-tools-spawn-tool",
+      "description": "spf-tools-spawn-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_TOOLS_SPAWN:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_spf_tools_spawn",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "description": "TOOLS_SPAWN",
+            "prompt": "E2E_SPF_TOOLS_SPAWN_CHILD",
+            "subagent_type": "e2e-profile-fields",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "spf-tools-spawn-child",
+      "description": "spf-tools-spawn-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPF_TOOLS_SPAWN_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SPF_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_TOOLS_SPAWN_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "spf-tools-spawn-final",
+      "description": "spf-tools-spawn-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅在 provider fixture 固定模型响应，真实 Settings 只修改一个字段；验证 completed resume 与 spawn 的请求、原历史和模型变更记录，不向生产逻辑注入测试状态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "toolu_spf_tools_spawn",
+          "agentId: agent_",
+          "E2E_SPF_TOOLS_SPAWN_CHILD_DONE"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SPF_TOOLS_SPAWN_DONE",
+          "inputTokens": 32
+        }
+      }
+    }
+  ],
+  "caseName": "conversation-session-subagent-profile-fields"
+}

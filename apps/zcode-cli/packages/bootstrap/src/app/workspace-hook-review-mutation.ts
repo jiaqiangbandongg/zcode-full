@@ -15,7 +15,7 @@ import {
 } from "@zcode/shared/workspace-hook-mutation";
 import type { WorkspaceHookReviewMutationPort } from "./workspace-hook-review-controller.js";
 
-interface WorkspaceHookReviewMutationPortOptions {
+export interface WorkspaceHookReviewMutationPortOptions {
   workingDirectory: string;
   workspaceIdentity: string;
   projectConfigPath?: string;

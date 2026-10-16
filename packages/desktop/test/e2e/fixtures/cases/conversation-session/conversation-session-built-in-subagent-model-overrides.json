@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-built-in-subagent-model-overrides",
+  "spec": "./test/e2e/conversation-session/conversation-session-built-in-subagent-model-overrides.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-built-in-subagent-model-overrides.json"
+  ],
+  "fileFixtures": [
+    {
+      "kind": "app-config",
+      "path": "~/.zcode/v2/agents-state.json",
+      "description": "冷启动前写入 builtin model/effort 初始值，验证 Settings 修正、组合落盘、bootstrap 注入与 child provider-visible request。",
+      "source": "created-by-helper"
+    },
+    {
+      "kind": "app-config",
+      "path": "~/.zcode/agents/e2e-reasoning-reviewer.md",
+      "description": "写入带非法 thoughtLevel 的 custom agent，验证阻止保存、切模清除、合法值落盘与冷启动 child request。",
+      "source": "created-by-helper"
+    }
+  ],
+  "requests": [
+    {
+      "id": "built-in-subagent-model-overrides-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "built-in-subagent-general-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是 Agent schema 已不声明 model，历史版本额外参数不能覆盖内置 general-purpose profile；父请求只需要稳定触发 legacy shape 的 Agent tool_use。"
+    },
+    {
+      "id": "built-in-subagent-general-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+    },
+    {
+      "id": "built-in-subagent-general-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+    },
+    {
+      "id": "built-in-subagent-model-overrides-cold-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "进程级冷启动会恢复完整父会话，并在下一轮前触发自动 compact；固定摘要避免 sidecar 阻断目标链路。"
+    },
+    {
+      "id": "built-in-subagent-explore-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心验证点是内置 Explore child request 使用覆盖模型且工具面按 effective model 计算；父请求只需要稳定触发 Agent tool_use。"
+    },
+    {
+      "id": "built-in-subagent-explore-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+    },
+    {
+      "id": "built-in-subagent-model-overrides-explore-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "完整 E2E system prompt 会让 Explore turn 在消费 child tool_result 前再次触发自动 compact；固定摘要以保留当前请求语义。"
+    },
+    {
+      "id": "built-in-subagent-explore-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复只用于证明 Agent tool_result 被父会话继续消费并回到 idle。"
+    },
+    {
+      "id": "custom-subagent-reasoning-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父请求只需稳定触发 Settings 已保存的 custom agent，核心证据由后续 child provider request 提供。"
+    },
+    {
+      "id": "custom-subagent-reasoning-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 请求用于验证 custom Markdown 中 model 与 thoughtLevel 经冷启动后实际进入 provider request。"
+    },
+    {
+      "id": "custom-subagent-reasoning-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复只用于证明 custom Agent tool_result 被父会话继续消费并回到 idle。"
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import {
   resolveAmendScript,
 } from "./amend-workflow-source.js";
 import { resolveModelReference } from "./model-reference.js";
+import { withScriptModelBindings } from "./workflow-script-models.js";
 import { workflowRunNotFoundFailure } from "./workflow-run-introspection.js";
 
 export {
@@ -79,7 +80,7 @@ export async function resolveAmendWorkflowInput(
     void _forged;
     void _model;
     void _offset;
-    // 没有端口就既没有前驱也没有天花板：`null`（解除）与「沿用」都塌成缺席，数原样过。
+    // 没有端口就既没有前驱也没有默认并发：`null`（解除）与「沿用」都塌成缺席，数原样过。
     // 归一化后的入参此后永远只有「一个数或没有」这一种形状。
     const subagentModel = resolveAmendSubagentModel(
       parsed.data.subagent_model,
@@ -96,12 +97,16 @@ export async function resolveAmendWorkflowInput(
     if (!script.result) return script;
     return {
       result: true,
-      input: {
-        ...rest,
-        ...script.fields,
-        ...(typeof requested === "number" ? { max_concurrency: requested } : {}),
-        ...subagentModel.field,
-      },
+      // 没有端口就没有前驱可沿用：脚本点名的模型一律对着目录重新解析。
+      input: withScriptModelBindings(
+        {
+          ...rest,
+          ...script.fields,
+          ...(typeof requested === "number" ? { max_concurrency: requested } : {}),
+          ...subagentModel.field,
+        },
+        context.modelCatalogPort,
+      ),
     };
   }
   const snapshot = await port.getTask(parsed.data.run_id);
@@ -151,18 +156,19 @@ export async function resolveAmendWorkflowInput(
   const resolved: AmendWorkflowInput = {
     ...rest,
     ...script.fields,
-    ...resolveAmendMaxConcurrency(
-      parsed.data.max_concurrency,
-      snapshot.maxConcurrency,
-      port.concurrencyCeiling?.(),
-    ),
+    ...resolveAmendMaxConcurrency(parsed.data.max_concurrency, snapshot.maxConcurrency),
     ...subagentModel.field,
     predecessor: {
       ...predecessor,
       ...(script.inherited ? { script_inherited: true as const } : {}),
     },
   };
-  return { result: true, input: resolved };
+  // 脚本点名的模型：同名沿用前驱 run-launched 上的绑定（用户在前驱确认窗里换过的模型因此留得住），
+  // 新名字对着目录解析（docs/dynamic-workflow/launch.md「The `AmendWorkflow` tool」）。
+  return {
+    result: true,
+    input: withScriptModelBindings(resolved, context.modelCatalogPort, snapshot.modelBindings),
+  };
 }
 
 /**

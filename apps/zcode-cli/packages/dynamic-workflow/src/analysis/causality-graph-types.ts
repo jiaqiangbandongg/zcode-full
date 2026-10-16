@@ -7,11 +7,14 @@ import type { SiteLoc, NamePattern } from "./types.js";
 // Fact 拆到本文件；公开面仍从 causality-graph.ts 导出（那里原样再导出）。本文件不 import
 // `typescript`，浏览器端的 `./projections` 桶可安全到达。
 
-export type StepKind = "ask" | "world-read";
+/** `hole`: an OPEN `hole<T>()` — the script waits there for the main agent's fill. */
+export type StepKind = "ask" | "world-read" | "hole";
 export type Certainty = "always" | "maybe";
 
 /** The single lane every `files.*` read runs in. */
 export const WORKSPACE_LANE = "workspace";
+/** The main agent's lane: where every open hole waits (docs/analysis.md「Sites」). */
+export const MAIN_LANE = "main";
 /** Lane of an ask whose receiver the analysis could not resolve to any actor site. */
 export const UNKNOWN_LANE = "unknown";
 /** The terminal marker: the artifact the script returns. */
@@ -61,6 +64,12 @@ export interface Step {
    * the repeating region settles it, or when a fixed actor's mailbox serializes it.
    */
   repeat?: "stack" | "serial";
+  /**
+   * The filled hole whose body wrote this step: the `hole#<hash>/` prefix of its site id, or,
+   * for an open hole (whose id is a bare name key), the site table's `fill`. Absent outside
+   * every fill.
+   */
+  fill?: string;
 }
 
 export interface Region {
@@ -108,6 +117,8 @@ export interface Phase {
   id: string;
   name?: string;
   loc?: SiteLoc;
+  /** The filled hole whose body wrote this phase (a filled hole's own phase names itself). */
+  fill?: string;
 }
 
 export interface CausalityGraph {

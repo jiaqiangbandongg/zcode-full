@@ -1,0 +1,11 @@
+node source
+node join#1 "join" @12:28 type="[{ f: string; }]"
+node ask#1 "writer" @13:30 actors=actor#1 type="string"
+node ask#2 "reader" @14:24 actors=actor#2 type="string"
+node sink
+actor actor#1 "writer" @13:14
+actor actor#2 "reader" @14:8
+edge source -> ask#1 data exact
+edge ask#1 -> join#1 data inexact port=0 type="string"
+edge ask#1 -> ask#2 data inexact type="string"
+edge ask#2 -> sink data exact type="string"

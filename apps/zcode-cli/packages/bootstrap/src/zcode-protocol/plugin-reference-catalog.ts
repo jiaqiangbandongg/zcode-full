@@ -14,6 +14,7 @@ import {
 import type { PluginReferenceCatalogEntry } from "@zcode/contracts";
 import { buildPluginReferenceCatalog } from "@zcode/core";
 import {
+  enrichCachedClaudeMarketplaceIconsForOverview,
   getZCodePluginsOverview,
   resolveZCodePlugins,
   updateZCodePluginMarketplace,
@@ -237,6 +238,7 @@ interface PluginReferenceListingDisplay {
 function resolveReferenceListingDisplayByPluginId(
   workspacePath: string,
 ): Map<string, PluginReferenceListingDisplay> {
+  enrichCachedClaudeMarketplaceIconsForOverview({ workingDirectory: workspacePath });
   const overview = getZCodePluginsOverview({ workingDirectory: workspacePath });
   const displayByPluginId = new Map<string, PluginReferenceListingDisplay>();
   for (const plugin of [

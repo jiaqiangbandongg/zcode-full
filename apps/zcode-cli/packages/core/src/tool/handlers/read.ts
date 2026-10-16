@@ -138,7 +138,7 @@ function stringifyReadOutputFallback(output: unknown): string {
   return JSON.stringify(output) ?? "";
 }
 
-const readHandler: ToolHandler = async (input, context) => {
+export const readHandler: ToolHandler = async (input, context) => {
   const { file_path, offset, limit, pages } = parseReadInput(input);
   const fileSystemPort = context.fileSystemPort;
 

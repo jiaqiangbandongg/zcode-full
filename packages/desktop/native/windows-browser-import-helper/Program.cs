@@ -116,7 +116,7 @@ internal static class Program
         }
         catch
         {
-            // broker 初始化异常不能统一落到 helper_failed：需要区分输入/控制管道尚未建立的失败阶段。
+            // Bugfix 原因：broker 初始化异常原先统一落到 helper_failed，无法区分输入/控制管道尚未建立的失败阶段。
             WriteError("broker_initialization_failed");
             return;
         }

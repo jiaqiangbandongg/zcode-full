@@ -1,0 +1,27 @@
+actor actor#1 "fast" @4:14 order=0
+actor actor#2 "slow" @5:14 order=1
+world-read world-read#1 "glob *.log" @7:26 order=2 type="string[]"
+fan-out fan-out#1 "fan-out" @9:1 order=3
+ask ask#1 "who" @11:38 order=4 within=fan-out#1 type="string"
+fact ask-data ask#1 <- world-read#1 exact
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-actor ask#1 <- actor#2 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact fan-out-in fan-out#1 <- world-read#1 exact
+fact return <- ask#1 exact
+region seq#1 seq entered
+region loop#1 loop parent=seq#1 @9:1
+region choice#1 choice parent=loop#1 @10:15 entered exhaustive
+region branch#1 branch parent=choice#1 @10:40
+region branch#2 branch parent=choice#1 @10:47
+spawn actor#1 in=seq#1
+spawn actor#2 in=seq#1
+mark phase#1 in=seq#1
+issue world-read#1 in=seq#1 phase=phase#1
+settle world-read#1 in=seq#1
+issue ask#1 in=seq#1>loop#1 phase=phase#1
+settle ask#1 in=seq#1>loop#1
+jump return seq#1 in=seq#1 phase=phase#1
+control branch#1 by=world-read#1
+control branch#2 by=world-read#1
+phase phase#1 "triage" @6:1

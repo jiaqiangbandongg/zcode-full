@@ -1,0 +1,4 @@
+interface:
+  display_name: "E2E Case Lifecycle"
+  short_description: "Plan, write, and promote E2E cases"
+  default_prompt: "Use $e2e-case-lifecycle to promote this reviewed E2E case."

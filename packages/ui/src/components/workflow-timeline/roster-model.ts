@@ -155,7 +155,7 @@ export function rosterRestCounts(roster: StationRoster): RosterCounts {
   return addUnlisted(rosterCounts(roster.rest), roster.unlisted);
 }
 
-/** 卡上「还有 n 个」那一行的内容。 */
+/** 卡上「还有 n 个」那一行的内容（追记「五枚药丸与一扇门」）。 */
 export interface RosterMore {
   /** 没被钉住的参与者数（表外的也算——它们同样在这一行后面）。 */
   count: number;

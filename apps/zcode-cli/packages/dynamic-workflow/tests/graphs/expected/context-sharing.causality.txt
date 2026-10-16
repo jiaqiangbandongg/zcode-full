@@ -1,0 +1,15 @@
+lane actor#1 "shared" @11:16
+lane actor#2 "loner" @15:15
+lane actor#3 "ephemeral" @18:23
+region seq#1 seq
+step ask#1 ask "who" @8:14 lane=actor#1 region=seq#1 always
+step ask#2 ask "shared" @12:28 lane=actor#1 region=seq#1 always
+step ask#3 ask "shared" @13:29 lane=actor#1 region=seq#1 always
+step ask#4 ask "loner" @16:27 lane=actor#2 region=seq#1 always
+step ask#5 ask "ephemeral" @18:42 lane=actor#3 region=seq#1 always
+edge ask#2 -> ask#3 fifo always
+edge ask#3 -> ask#4 seq always
+edge ask#3 -> ask#1 fifo always
+edge ask#4 -> ask#5 seq always
+edge ask#5 -> ask#1 seq always
+sink ask#2,ask#3,ask#4,ask#5,ask#1

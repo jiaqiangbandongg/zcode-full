@@ -1,0 +1,10 @@
+actor-node source
+actor-node actor#1 "h" @19:16
+actor-node actor#2 "m" @23:19
+actor-node actor#3 "l" @24:14
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#2 exact count=1
+actor-edge actor#1 -> actor#3 exact count=1 types="string"
+actor-edge actor#2 -> actor#3 exact count=1 types="string"
+actor-edge actor#3 -> sink exact count=1 types="string"

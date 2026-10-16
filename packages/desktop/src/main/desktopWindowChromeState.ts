@@ -3,7 +3,7 @@ import type { DesktopWindowChromeState } from "@zcode/shared";
 
 const WINDOWS_11_FIRST_BUILD = 22000;
 
-function resolveMacOSMajorVersion(
+export function resolveMacOSMajorVersion(
   platform: NodeJS.Platform,
   platformRelease: string,
 ): number | null {
@@ -16,7 +16,7 @@ function resolveMacOSMajorVersion(
   return darwinMajor >= 25 ? darwinMajor + 1 : darwinMajor - 9;
 }
 
-function supportsNativeWindowsRoundedCorners(
+export function supportsNativeWindowsRoundedCorners(
   platform: NodeJS.Platform,
   platformRelease: string,
 ): boolean {

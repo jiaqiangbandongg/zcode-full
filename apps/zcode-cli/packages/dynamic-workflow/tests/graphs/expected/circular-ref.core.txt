@@ -1,0 +1,8 @@
+ask ask#1 "w" @10:28 order=0 type="string"
+actor actor#1 "w" @10:17 order=1
+fact ask-actor ask#1 <- actor#1 exact
+region seq#1 seq entered
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

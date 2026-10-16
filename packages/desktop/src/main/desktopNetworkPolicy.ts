@@ -89,7 +89,7 @@ export async function applyDesktopChromiumNetworkPolicies(
   );
 }
 
-async function applyDesktopSessionNetworkPolicy(
+export async function applyDesktopSessionNetworkPolicy(
   targetSession: Session,
   settings: DesktopNetworkPolicySettings,
   logger: DesktopNetworkPolicyLogger,
@@ -122,13 +122,13 @@ async function applyDesktopSessionNetworkPolicy(
  * 仅供内置浏览器 partition 使用：自签名证书的内网测试站点在 Electron `<webview>` 里
  * 拿不到 Chrome 的安全插页，被拒后只剩一张空的 chrome-error 页，用户无从放行。
  */
-function createInsecureCertificateVerifyProc(): CertificateVerifyProc {
+export function createInsecureCertificateVerifyProc(): CertificateVerifyProc {
   return (_request, callback) => {
     callback(ACCEPT_CERTIFICATE);
   };
 }
 
-function buildElectronProxyConfig(
+export function buildElectronProxyConfig(
   httpProxy: string | undefined,
   noProxy?: string | undefined,
   fallbackMode: ProxyFallbackMode = "direct",
@@ -150,7 +150,7 @@ function buildElectronProxyConfig(
   return proxyConfig;
 }
 
-function createCustomCaCertificateVerifyProcFromFile(
+export function createCustomCaCertificateVerifyProcFromFile(
   caCertPath: string | undefined,
   logger: Pick<DesktopNetworkPolicyLogger, "warn">,
 ): CertificateVerifyProc | null {
@@ -160,7 +160,9 @@ function createCustomCaCertificateVerifyProcFromFile(
   }
 
   try {
-    const trustedFingerprints = readCustomCaFingerprintsFromPem(readFileSync(trimmed, "utf8"));
+    const trustedFingerprints = readCustomCaFingerprintsFromPem(
+      readFileSync(trimmed, "utf8"),
+    );
     if (trustedFingerprints.size === 0) {
       logger.warn(`[desktop-network] custom CA file contains no certificates: ${trimmed}`);
       return null;
@@ -172,7 +174,7 @@ function createCustomCaCertificateVerifyProcFromFile(
   }
 }
 
-function createCustomCaCertificateVerifyProc(
+export function createCustomCaCertificateVerifyProc(
   trustedFingerprints: ReadonlySet<string>,
 ): CertificateVerifyProc | null {
   if (trustedFingerprints.size === 0) {
@@ -199,10 +201,9 @@ function createCustomCaCertificateVerifyProc(
   };
 }
 
-function readCustomCaFingerprintsFromPem(pem: string): Set<string> {
+export function readCustomCaFingerprintsFromPem(pem: string): Set<string> {
   const fingerprints = new Set<string>();
-  const certBlocks =
-    pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) ?? [];
+  const certBlocks = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) ?? [];
 
   for (const block of certBlocks) {
     fingerprints.add(normalizeFingerprint(new X509Certificate(block).fingerprint256));
@@ -210,7 +211,7 @@ function readCustomCaFingerprintsFromPem(pem: string): Set<string> {
   return fingerprints;
 }
 
-function certificateChainMatchesCustomCa(
+export function certificateChainMatchesCustomCa(
   certificate: CertificateLike,
   trustedFingerprints: ReadonlySet<string>,
 ): boolean {
@@ -242,7 +243,9 @@ function normalizeProxyRules(value: string | undefined): string | undefined {
   const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
   try {
     const url = new URL(candidate);
-    const auth = url.username ? `${url.username}${url.password ? `:${url.password}` : ""}@` : "";
+    const auth = url.username
+      ? `${url.username}${url.password ? `:${url.password}` : ""}@`
+      : "";
     return `${url.protocol}//${auth}${url.host}`;
   } catch {
     return undefined;

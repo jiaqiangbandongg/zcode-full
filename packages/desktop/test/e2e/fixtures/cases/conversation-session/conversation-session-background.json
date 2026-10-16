@@ -1,0 +1,865 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background",
+  "spec": "./test/e2e/conversation-session/conversation-session-background.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-background.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-background/bg08-launcher.cjs",
+      "source": "created-by-spec",
+      "description": "BG08 由 spec 写入 launcher，真实启动跨 PGID worker 并留下 fresh PID marker。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-background-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 background runtime task 语义；同一 spec 还包含 foreground 对照组，因此按通用 E2E marker 稳定返回，避免标题请求重试阻塞业务请求。"
+    },
+    {
+      "id": "upstream-background-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 Agent(run_in_background=true)，验证 background Agent notification wake。"
+    },
+    {
+      "id": "upstream-background-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型在 async launch tool result 后结束当前 turn。"
+    },
+    {
+      "id": "upstream-background-agent-child-delayed-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "延迟子 agent 完成，稳定制造 parent idle wake。"
+    },
+    {
+      "id": "upstream-background-agent-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 provider-visible request 消费 <task-notification>。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-bash-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 Bash(run_in_background=true)。"
+    },
+    {
+      "id": "upstream-background-bash-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型在 backgrounded Bash tool result 后结束当前 turn。"
+    },
+    {
+      "id": "upstream-background-bash-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 Bash completion notification 进入父模型请求。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-bash-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 main idle 但 background task 仍 running 的窗口，验证后续用户普通消息不会进入 queued prompt。"
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 main 回到 idle，但统一 background control UI 仍有 running Bash task。"
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-received",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 background task running 不会把用户普通消息放入 queue，而是立即进入 provider request。"
+    },
+    {
+      "id": "upstream-background-direct-user-prompt-stop-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "测试结束前收口长时间 background Bash，避免留下后台进程，同时验证 stop notification 仍走标准链路。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-compact-after-idle-bash-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 main idle 但 background task running 的窗口，验证此时允许 manual compact。"
+    },
+    {
+      "id": "upstream-background-compact-after-idle-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 main 回到 idle，后续手动 compact 不应被 background running 阻塞。"
+    },
+    {
+      "id": "upstream-background-compact-after-idle-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-json",
+      "syntheticReason": "给 background completion notification 的后续请求留下可断言的 compact 后摘要 marker。"
+    },
+    {
+      "id": "upstream-background-compact-after-idle-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 compact 后 background completion notification 仍进入父模型请求，且请求上下文来自 compact 后摘要。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 foreground Bash timeout auto-background，验证没有显式 run_in_background 时也能进入 background task control UI。"
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 UI 在 Bash 自然完成前展示 auto-background 后的 running control row。"
+    },
+    {
+      "id": "upstream-background-auto-timeout-bash-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 auto-background Bash 自然完成后 provider-visible notification 和 UI control row cleanup。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定验证 explicit background commit 后 input timeout 不再终止进程。"
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "保留 input timeout 后仍可见的 running control row 窗口。"
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-auto-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Bash prompt 变长后该轮会先自动 compact；固定 summary 以继续验证 completion notification，而不是让 replay 缺 fixture。"
+    },
+    {
+      "id": "upstream-bg37-explicit-timeout-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 explicit Bash 越过 input timeout 后自然完成且只通知一次。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-bg38-parent-abort-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "后台命令先写 started marker，再由测试停止仍 active 的 parent turn。"
+    },
+    {
+      "id": "upstream-bg38-parent-abort-launch-running",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "延迟 launch response，稳定制造 task 已 commit 但 parent turn 仍 active 的 abort 窗口。"
+    },
+    {
+      "id": "upstream-bg38-parent-abort-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 parent abort 不会杀死已 commit Bash，且不会产生重复 notification。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-bg39-sleep-hard-timeout-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定验证首 token sleep 沿用 foreground hard timeout，不进入 auto-background。"
+    },
+    {
+      "id": "upstream-bg39-sleep-hard-timeout-completed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 provider-visible result 为 foreground timeout，且没有 background notification。"
+    },
+    {
+      "id": "upstream-background-cancel-bash-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发由 Bash job control 构造的跨 PGID launcher/worker 子树，用于验证统一 background control UI 的 stop 杀树路径。"
+    },
+    {
+      "id": "upstream-background-cancel-bash-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 UI 在 idle 状态展示 running background Bash control，随后由测试点击 stop。"
+    },
+    {
+      "id": "upstream-background-cancel-bash-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 UI stop Bash 仍走 background task notification，而不是只在 UI 本地消失。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-cancel-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 running local_agent task，验证统一 background control UI 能停止 subagent。"
+    },
+    {
+      "id": "upstream-background-cancel-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 UI 在 idle 状态展示 running background Agent control，随后由测试点击 stop。"
+    },
+    {
+      "id": "upstream-background-cancel-agent-child-delayed-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "保持 child provider request 运行，验证 stop 会 abort running background Agent。"
+    },
+    {
+      "id": "upstream-background-cancel-agent-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 UI stop subagent 复用 local_agent task notification 链路。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-taskstop-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 running local_agent task，后续 provider replay 用 TaskStop 停止它。"
+    },
+    {
+      "id": "upstream-background-taskstop-agent-tool-stop",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "验证 provider-visible TaskStop tool 会复用 runtime background stop dispatcher。"
+    },
+    {
+      "id": "upstream-background-taskstop-agent-child-delayed-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "保持 child provider request 运行，验证 TaskStop 会 abort running background Agent。"
+    },
+    {
+      "id": "upstream-background-taskstop-agent-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 TaskStop tool result 和 stopped notification 在同一 runtime queue/active-loop 链路中收口。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-active-loop-bash-tool-calls",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 active-loop background notification intake：Bash 先因短 timeout 转后台，命令随即完成并在后续 provider request 前入队 notification。"
+    },
+    {
+      "id": "upstream-background-active-loop-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证同一次 provider request 同时包含上一轮 Bash tool result 与 <task-notification>，而不是等 idle wake 单独开一轮。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-goal-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "V4 /goal 需要已有 session；首轮仅建立 BG34 的稳定会话边界。"
+    },
+    {
+      "id": "upstream-background-goal-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "goal continuation 中启动 background Agent。"
+    },
+    {
+      "id": "upstream-background-goal-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "goal continuation 的当前 turn 在子任务完成前先结束。"
+    },
+    {
+      "id": "upstream-background-goal-direct-prompt",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定证明 active goal 的 background-only 状态不等于 main busy，用户输入不经过 future queue。"
+    },
+    {
+      "id": "upstream-background-goal-child-delayed-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "延迟子 agent 完成，证明 verifier 会等 notification。"
+    },
+    {
+      "id": "upstream-background-goal-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "goal notification turn 消费子结果。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-goal-verifier-passed",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "验证 verifier 只在 notification 后执行并通过，并稳定留出 future queue admission 窗口。"
+    },
+    {
+      "id": "upstream-background-goal-verifier-queue-drained",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定验证 TargetChanged(complete) 本身会重新评估 CLI queue gate 并自动提升队首。"
+    },
+    {
+      "id": "upstream-background-send-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 Agent(run_in_background=true)，后续用 SendMessage 验证 running child steer。"
+    },
+    {
+      "id": "upstream-background-send-message-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "根据 Agent tool result 中的 agentId 调用 SendMessage，验证父 agent 能 steer running child。"
+    },
+    {
+      "id": "upstream-background-send-message-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型收到 SendMessage tool result 后结束当前 turn，等待 background notification。"
+    },
+    {
+      "id": "upstream-background-send-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "子 agent 首轮立即释放 provider 连接，但通过 build mode 可直接允许且不会自动后台化的 sleep foreground Bash 保持 active turn，稳定覆盖 running child steer。"
+    },
+    {
+      "id": "upstream-background-send-child-steered-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证子 agent 的 provider-visible request 收到完整 coordinator 中途提示。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-send-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 SendMessage steer 后的子 agent completion 仍走 background notification。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-foreground-long-bash-loading-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造普通 foreground Bash running 窗口，验证 background event 豁免没有误伤前台 loading。"
+    },
+    {
+      "id": "upstream-foreground-long-bash-loading-completed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 foreground Bash 完成后仍正常进入 provider continuation 并回到 idle。"
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 foreground Agent，让 child Bash 运行期间验证 parent loading 仍按原语义显示。"
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "用真实 child Bash tool update 覆盖 foreground mirrored subagent event 的 streaming 保留分支。"
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 foreground Agent 正常完成并把结果回传父 turn。"
+    },
+    {
+      "id": "upstream-foreground-child-tool-streaming-completed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 foreground subagent child tool running 窗口后，父 turn 正常收口。"
+    },
+    {
+      "id": "upstream-background-child-tool-idle-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 background Agent，让 child Bash 运行期间验证 parent idle UI 不显示 fake loading。"
+    },
+    {
+      "id": "upstream-background-child-tool-idle-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn，制造 parent idle + child tool running 窗口。"
+    },
+    {
+      "id": "upstream-background-child-tool-idle-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "用真实 child Bash tool update 覆盖 mirrored background subagent event 的 UI streaming 保护。"
+    },
+    {
+      "id": "upstream-background-child-tool-idle-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 background Agent 正常完成并产生 parent notification。"
+    },
+    {
+      "id": "upstream-background-child-tool-idle-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 child tool running 窗口后，Agent completion 仍走标准 task-notification 链路。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 background Agent 已启动、父会话已 idle、后续主回复已完成后 child tool update 才到达的 live 聚合窗口。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父会话先回 idle，随后用户可发送第二条主消息。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-follow-up",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "在 child tool update 到达前创建新的主 assistant 回复，用来复现 live child tool 被错误挂到最新回复下的问题。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-tool-use",
+      "syntheticReason": "延迟 child Bash tool_use，稳定验证 mirrored child tool update 必须按 parentToolUseId 回挂原 Agent message。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 background Agent 正常完成并产生 parent notification。"
+    },
+    {
+      "id": "upstream-background-child-tool-parent-anchor-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 child tool placement 修复不影响标准 task-notification 收口。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-session-switch-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 background Agent + child Bash tool 已出现，随后切走父 session 的窗口。"
+    },
+    {
+      "id": "upstream-background-session-switch-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父会话先回 idle，随后测试切到其他 session/draft。"
+    },
+    {
+      "id": "upstream-background-session-switch-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-tool-use",
+      "syntheticReason": "先让 child Bash running card 进入父 renderer store；命令等待文件 barrier，由测试在父 session 隐藏后释放。"
+    },
+    {
+      "id": "upstream-background-session-switch-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 hidden/tombstoned terminal tool update 和 Agent completion notification 都完成。"
+    },
+    {
+      "id": "upstream-background-session-switch-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证切回后 UI 从 store/snapshot 恢复 terminal child tool 投影。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-switch-back-running-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 background Agent + child Bash tool 已出现且切回时仍 running 的窗口。"
+    },
+    {
+      "id": "upstream-background-switch-back-running-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父会话先回 idle，随后测试切到其他 session/draft 后立即切回。"
+    },
+    {
+      "id": "upstream-background-switch-back-running-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-tool-use",
+      "syntheticReason": "先让 child Bash running card 进入父 renderer store，并保持足够长时间覆盖切回时仍 running 的窗口。"
+    },
+    {
+      "id": "upstream-background-switch-back-running-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证切回可见状态后 child Bash terminal update 仍会 patch 同一 tool card。"
+    },
+    {
+      "id": "upstream-background-switch-back-running-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证切回后后续 Agent completion notification 仍按标准链路消费。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定制造 main idle + background-only child tool running + held queue 的窗口，复现 queued prompt Send now 不应 stop background task。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn，制造 parent idle + child tool running 窗口。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "用文件 barrier 控制真实 child Bash 生命周期，让父侧 raw runtime streaming 但 mainActive=false；点击 Send now 后再释放，避免固定 sleep 受全量负载影响。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-hold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "使用真实主 turn 与 composer queue 替代已删除的 renderer store 注入，稳定构造 stop 后 background-only + paused queue。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-prompt-received",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 background-only running 下 queued prompt Send now 直接触发 provider request，而不是先 stop background task。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 Send now 没有停止 background Agent；child Bash 自然完成后 Agent 继续产生 completion notification。"
+    },
+    {
+      "id": "upstream-background-send-now-queue-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 queued Send now 后 background Agent completion 仍走标准 task-notification 链路。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-queue-drain-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定启动真实 background Agent；后续 delayed launch ack 再制造 main running + background running 的 queue 窗口。"
+    },
+    {
+      "id": "upstream-background-queue-drain-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "延迟父模型 launch ack，稳定制造 background Agent 已 running、main turn 仍 active 时用户消息进入 renderer queue。"
+    },
+    {
+      "id": "upstream-background-queue-drain-child-delayed-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "延迟 background Agent completion，避免 notification 抢在 queued prompt drain 验证前进入父会话。"
+    },
+    {
+      "id": "upstream-background-queue-drain-first-queued-prompt",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "延迟 Q2 响应，稳定验证 launch ack 前已入队的 Q3/Q4 不会在 Q2 drain 后丢失。"
+    },
+    {
+      "id": "upstream-background-queue-drain-second-queued-prompt",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "延迟 Q3 响应，稳定观察 Q3 已渲染为 user message 且 Q4 仍留在 queue 的 UI 窗口。"
+    },
+    {
+      "id": "upstream-background-queue-drain-third-queued-prompt",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "延迟 Q4 响应，稳定观察 Q4 drain 后已渲染为 user message。"
+    },
+    {
+      "id": "upstream-background-queue-drain-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 queued prompt drain 不会丢失后续 background Agent completion notification。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-nested-agent-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 background Agent 内部启动 background Bash，验证 parent surface 只消费 Agent completion。"
+    },
+    {
+      "id": "upstream-background-nested-agent-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父模型在 async Agent launch tool result 后结束当前 turn。"
+    },
+    {
+      "id": "upstream-background-nested-child-bash-tool-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定触发 child runtime 内部 Bash(run_in_background=true)。"
+    },
+    {
+      "id": "upstream-background-nested-child-stops-after-bash-launch",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 parent Agent completion 不等待 nested Bash terminal。"
+    },
+    {
+      "id": "upstream-background-nested-notification-consumed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "验证 parent surface 只消费 Agent completion notification。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-snapshot-control-ready",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定启动两个 background Bash：第一个先完成，第二个保持 running，用真实右上角 background control 面板复现闪没场景。"
+    },
+    {
+      "id": "upstream-background-snapshot-control-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 main 回到 idle，同时右上角 background control 面板仍有两个 running Bash row。"
+    },
+    {
+      "id": "upstream-background-snapshot-control-first-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "消费第一个 background Bash completion notification，并保持第二个 running row 可见。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-snapshot-control-second-stopped",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "消费第二个 background Bash stop notification，避免长 running task 泄漏到后续测试。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-ready",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "稳定启动四个 background Agent：三个 zcode Agent 依次完成，cc Agent 保持 running，用真实右上角 background control 面板复现 Agent row 闪没场景。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-cc-child-keepalive-tool",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "让 cc Agent 进入不会自行完成的 child Bash，保持 running，证明另一个 Agent completion notification 不会清掉它的 control row。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-one-child-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "短延迟完成第一个 zcode background Agent，稳定触发 parent task-notification。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-two-child-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "短延迟完成第二个 zcode background Agent，稳定触发 parent task-notification。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-three-child-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "短延迟完成第三个 zcode background Agent，复现真实场景中第三个 completion notification 触发 UI 闪没。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让 main 回到 idle，同时右上角 background control 面板仍有多个 running Agent row。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-one-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "先消费第一个 zcode Agent completion notification，复现真实场景中多个 zcode Agent 依次完成。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-two-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "再消费第二个 zcode Agent completion notification，复现真实场景中多个 zcode Agent 依次完成。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-zcode-three-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "复现真实场景：main 处理第三个 Agent completion notification 时先执行 TodoWrite，覆盖 notification turn 内部状态更新。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-after-todo",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "复现真实场景：TodoWrite 之后 main notification turn 仍在处理，另一个 still-running Agent row 不能从右上角闪没。"
+    },
+    {
+      "id": "upstream-background-agent-control-preserve-cc-stopped",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "task-notification",
+      "syntheticReason": "测试结束前收口仍 running 的 cc Agent，避免长 running task 泄漏到后续测试。 验证来源提示及非用户授权边界。"
+    },
+    {
+      "id": "upstream-agent-composition-mixed-launch",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "同一 main turn 启动 foreground/background Agent，验证两类结果在同一 provider request 消费后生成 main_plus_fg_bg。"
+    },
+    {
+      "id": "upstream-agent-composition-mixed-foreground-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-tool-use",
+      "syntheticReason": "用 child Bash 文件 barrier 等待 background response 完成，再释放 foreground child，稳定制造同一 main turn 的 mixed 消费窗口。"
+    },
+    {
+      "id": "upstream-agent-composition-mixed-foreground-child-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件 barrier 释放 foreground child 后返回最终结果，确保 main active-loop 仍可消费已完成的 background notification。"
+    },
+    {
+      "id": "upstream-agent-composition-mixed-background-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "先完成 background child，确保其结构化 subagent notification 在 foreground child 收口前可被 active loop 消费。"
+    },
+    {
+      "id": "upstream-agent-composition-mixed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "provider-visible request 同时包含 foreground tool result 与 background subagent notification，验证 mixed composition。 验证来源提示及非用户授权边界。"
+    }
+  ]
+}

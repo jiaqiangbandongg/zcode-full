@@ -2,6 +2,7 @@ import { ChevronLeftIcon, ChevronRightIcon, RefreshCwIcon, XIcon } from "lucide-
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { DesktopOverlayWindowControls } from "@/DesktopOverlayWindowControls.js";
 
 export function EmbeddedWebsiteHeader({
   title,
@@ -25,6 +26,7 @@ export function EmbeddedWebsiteHeader({
   const { intl } = useZCodeIntl();
   return (
     <header className="bg-background px-6 py-4 pb-0 max-sm:px-4">
+      <DesktopOverlayWindowControls />
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex shrink-0 items-center gap-1">

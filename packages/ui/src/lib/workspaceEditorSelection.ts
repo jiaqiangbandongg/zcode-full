@@ -4,9 +4,9 @@ import { sortInstalledEditorsForOpenWith } from "@/lib/openWithEditors.js";
 const REMOTE_SSH_EDITOR_IDS = ["vscode", "vscode-insiders"];
 const REMOTE_WSL_EDITOR_IDS = ["vscode", "vscode-insiders", "explorer"];
 
-type WorkspaceEditorSelectionKind = "preferred" | "fallback" | "empty" | "explicit";
+export type WorkspaceEditorSelectionKind = "preferred" | "fallback" | "empty" | "explicit";
 
-interface WorkspaceEditorSelectionState {
+export interface WorkspaceEditorSelectionState {
   availableEditors: EditorInfo[];
   selectedEditor: EditorInfo | null;
   selectionKind: Exclude<WorkspaceEditorSelectionKind, "explicit">;
@@ -62,7 +62,7 @@ export function resolveWorkspaceEditorSelection({
   const preferredEditor =
     selectedEditorId === null
       ? null
-      : (availableEditors.find((editor) => editor.id === selectedEditorId) ?? null);
+      : availableEditors.find((editor) => editor.id === selectedEditorId) ?? null;
   const fallbackEditor = availableEditors[0] ?? null;
 
   if (preferredEditor) {

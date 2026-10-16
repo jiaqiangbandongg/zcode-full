@@ -30,6 +30,16 @@ export function hasAutomationFailureState(automation: AutomationFailureLike): bo
   );
 }
 
+/** 派发失败进入退避队列时，失败态旁展示真实的重试排队信息。 */
+export function hasAutomationRetryQueueState(automation: AutomationFailureLike): boolean {
+  return (
+    hasAutomationFailureState(automation) &&
+    automation.dispatchStatus === "failed_to_dispatch" &&
+    (automation.dispatchAttempts ?? 0) > 0 &&
+    typeof automation.retryAt === "number"
+  );
+}
+
 /** 定时任务生命周期展示状态：终态优先，其次 paused/enabled，最后 active。 */
 export function resolveAutomationStatusKind(
   automation: AutomationStatusLike,
@@ -75,6 +85,14 @@ export function isSessionCreatedAutomation(
   automation: { targetTaskId?: string } | null | undefined,
 ): boolean {
   return Boolean(automation?.targetTaskId?.trim());
+}
+
+export function buildAutomationEditCronExpr(
+  state: CronBuilderState,
+  automation: { cronExpr: string; targetTaskId?: string } | null | undefined,
+): string {
+  // Bugfix: 会话内创建的 cron 可能超出 UI builder 的表达能力，编辑其他字段时必须原样保留。
+  return isSessionCreatedAutomation(automation) ? automation!.cronExpr : buildCronExpr(state);
 }
 
 /** 组装 cron builder 状态 → 5 段 cron 表达式（分 时 日 月 周）。 */

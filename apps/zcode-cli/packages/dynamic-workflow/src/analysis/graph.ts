@@ -68,6 +68,8 @@ export function projectSiteGraph(core: AnalysisCore): SiteGraph {
     ...sites.worldReads.map((site) => plainNode(site, "world-read", types)),
     ...sites.joins.map((site) => plainNode(site, "join", types)),
     ...fanoutNodes,
+    // 开放的留白是一个节点：名字是标签，类型实参是它的产物类型（docs/analysis.md「Sites」）。
+    ...sites.holes.map((site) => plainNode({ ...site, label: site.name }, "hole", types)),
   ].sort((a, b) => a.order - b.order);
 
   const edges: SiteEdge[] = [];
@@ -99,9 +101,14 @@ export function projectSiteGraph(core: AnalysisCore): SiteGraph {
 
   // 1. Data edges into every sink.
   for (const [askId, occs] of facts.askData) for (const occ of occs) dataEdge(occ.site, askId, occ);
-  for (const [worldId, occs] of facts.worldReadData) for (const occ of occs) dataEdge(occ.site, worldId, occ);
-  for (const [joinId, occs] of facts.joinIn) for (const occ of occs) dataEdge(occ.site, joinId, occ, true);
-  for (const [fanoutId, occs] of facts.fanoutIn) for (const occ of occs) dataEdge(occ.site, fanoutId, occ);
+  for (const [worldId, occs] of facts.worldReadData)
+    for (const occ of occs) dataEdge(occ.site, worldId, occ);
+  for (const [joinId, occs] of facts.joinIn)
+    for (const occ of occs) dataEdge(occ.site, joinId, occ, true);
+  for (const [fanoutId, occs] of facts.fanoutIn)
+    for (const occ of occs) dataEdge(occ.site, fanoutId, occ);
+  for (const [holeId, occs] of facts.holeData)
+    for (const occ of occs) dataEdge(occ.site, holeId, occ);
   for (const occ of facts.returnData) dataEdge(occ.site, "sink", occ);
 
   // 2. Context edges: pairwise over asks whose actor sets intersect, earlier -> later.
@@ -156,7 +163,11 @@ export function projectSiteGraph(core: AnalysisCore): SiteGraph {
   return { actors, edges: deduped, nodes };
 }
 
-function plainNode(site: CoreSimpleSite, kind: "world-read" | "join", types: CoreTypes): OrderedNode {
+function plainNode(
+  site: CoreSimpleSite,
+  kind: "world-read" | "join" | "hole",
+  types: CoreTypes,
+): OrderedNode {
   const artifactType = types.siteType.get(site.id);
   return {
     id: site.id,

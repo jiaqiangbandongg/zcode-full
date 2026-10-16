@@ -1,0 +1,15 @@
+flowchart TD
+  entry(["entry"])
+  ask_1_1["ask#1@1"]
+  ask_2_1["ask#2@1"]
+  ask_3_1["ask#3@1"]
+  sink(["sink"])
+  abort(["abort"])
+  entry --> ask_1_1
+  ask_1_1 --> ask_2_1
+  ask_2_1 -->|"may-throw"| ask_3_1
+  ask_2_1 -->|"jump (return)"| sink
+  ask_3_1 -->|"jump (return)"| sink
+  ask_3_1 -->|"throw"| abort
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class entry,sink,abort endpoint;

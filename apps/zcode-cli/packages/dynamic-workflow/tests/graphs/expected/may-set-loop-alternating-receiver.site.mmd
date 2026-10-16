@@ -1,0 +1,10 @@
+flowchart TD
+  source(["source"])
+  ask_1["ask<br/>ask#1"]
+  sink(["sink"])
+  ask_1 -->|"string"| ask_1
+  ask_1 -->|"string"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  classDef relay fill:#fff2cc,stroke:#d6b656;
+  class source,sink endpoint;

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZCode Plugin Sandbox</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+      #root iframe {
+        display: block;
+        border: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #error {
+        font:
+          12px system-ui,
+          sans-serif;
+        color: #8a4b08;
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="error" hidden></div>
+    <script type="module" src="./src/plugin-sandbox/main.ts"></script>
+  </body>
+</html>

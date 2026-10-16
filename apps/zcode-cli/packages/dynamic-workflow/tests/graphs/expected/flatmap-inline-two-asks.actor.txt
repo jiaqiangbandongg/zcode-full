@@ -1,0 +1,8 @@
+actor-node workspace
+actor-node actor#1 "a" @6:3 family=fan-out#1
+actor-node actor#2 "b" @7:3 family=fan-out#1
+actor-node sink
+actor-edge workspace -> actor#1 exact count=1 types="string[]"
+actor-edge workspace -> actor#2 exact count=1 types="string[]"
+actor-edge actor#1 -> sink exact count=1 types="string"
+actor-edge actor#2 -> sink exact count=1 types="string"

@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-mixed-media-path-strip",
+  "spec": "./test/e2e/conversation-session/conversation-session-mixed-media-path-strip.test.ts",
+  "fixtures": [
+    {
+      "id": "mixed-media-path-title",
+      "description": "VI05 mixed-media 会话的标题生成固定响应，避免标题 sidecar 消费功能请求 fixture。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不属于媒体 path/strip 合同，只需与主请求隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_MIXED_MEDIA_PATH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-mixed-media-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Mixed Media Path\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "mixed-media-path-supported",
+      "description": "VI05 media-capable 首轮同时发送 image/video blocks，并在同一 user content 末尾保留两个 absolute path texts。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只稳定收口；E2E 对真实捕获 requestJson 断言 mixed-media block/path 的数量、顺序和 MCS 边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_MIXED_MEDIA_PATH_SUPPORTED"],
+        "bodyIncludes": [
+          "E2E_MIXED_MEDIA_PATH_SUPPORTED",
+          "e2e-mixed-media-model",
+          "data:image/png;base64",
+          "data:video/mp4;base64",
+          "[Image: source:",
+          "[Video: source:"
+        ],
+        "bodyExcludes": [
+          "does not support image input",
+          "does not support video input",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-mixed-media-supported\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-mixed-media-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-supported\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-mixed-media-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_MIXED_MEDIA_PATH_SUPPORTED_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-supported\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-mixed-media-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":180,\"completion_tokens\":12,\"total_tokens\":192}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "mixed-media-path-text-only",
+      "description": "VI05 切到明确 text-only 后，历史 image/video 都变为 omitted 文本且原 path 保持不变。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "响应只稳定收口；fixture 与结构化抓包共同要求请求无 media data/block，并保留双 omitted + 双 path。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_MIXED_MEDIA_PATH_TEXT_ONLY"],
+        "bodyIncludes": [
+          "E2E_MIXED_MEDIA_PATH_TEXT_ONLY",
+          "deepseek-v4-flash",
+          "Media omitted from provider request because the selected model does not support image input.",
+          "Media omitted from provider request because the selected model does not support video input.",
+          "[Image: source:",
+          "[Video: source:"
+        ],
+        "bodyExcludes": [
+          "data:image",
+          "data:video",
+          "video_url",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-mixed-media-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_MIXED_MEDIA_PATH_TEXT_ONLY_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-mixed-media-text-only\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":210,\"completion_tokens\":12,\"total_tokens\":222}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+node source
+node ask#1 "slow" @10:28 actors=actor#1 type="string"
+node join#1 "join" @11:30 type="[string, string]"
+node ask#2 "fresh" @11:56 actors=actor#2 type="string"
+node ask#3 "after" @12:36 actors=actor#3 type="string"
+node sink
+actor actor#1 "slow" @10:14
+actor actor#2 "fresh" @11:41
+actor actor#3 "after" @12:21
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> ask#3 data exact
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> sink data exact type="string"
+edge join#1 -> sink data exact port=0 type="string"
+edge join#1 -> sink data exact port=1 type="string"
+edge ask#2 -> join#1 data exact port=1 type="string"
+edge ask#2 -> sink data exact type="string"
+edge ask#3 -> sink data exact type="string"

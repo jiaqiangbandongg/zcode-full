@@ -81,7 +81,7 @@ function formatEditModelContent(output: unknown): string {
   return `The file ${filePath} has been updated successfully${modifiedNote}.${freshnessSuffix}`;
 }
 
-const editHandler: ToolHandler = async (input, context) => {
+export const editHandler: ToolHandler = async (input, context) => {
   const { file_path, old_string, new_string, replace_all } = EditInputSchema.parse(
     input,
   ) as EditInput;

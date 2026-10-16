@@ -26,7 +26,6 @@ type CompactSummaryModelRequest = {
   maxOutputTokens?: number;
   messages: Parameters<Model["generateText"]>[0]["messages"];
   modelCall?: ModelInvocationContext["modelCall"];
-  modelRequestSessionType?: ModelInvocationContext["modelRequestSessionType"];
   metadata?: ModelInvocationContext["metadata"];
   preserveProviderStreamBoundaries?: boolean;
   statusSink?: ModelInvocationContext["statusSink"];
@@ -323,7 +322,6 @@ function invocationContext(request: CompactSummaryModelRequest) {
   return {
     metadata: request.metadata,
     modelCall: request.modelCall,
-    modelRequestSessionType: request.modelRequestSessionType,
     statusSink: request.statusSink,
     traceContext: request.traceContext,
     preserveProviderStreamBoundaries: request.preserveProviderStreamBoundaries,

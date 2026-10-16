@@ -100,10 +100,10 @@ function denied(reasonCode: string): ActionAvailability {
   return { allowed: false, reasonCode };
 }
 
-// guard 派生的输入面（与投影同源）。compacting/goalVerifying 不是独立 phase
-// （phase 封闭枚举），从 activeWorks / goal.status 派生后传入。
-// queueLength/autoDrain 用于 held 派生。
-interface AvailabilityContext {
+// guard 派生的输入面（与投影同源，P5-3）。compacting/goalVerifying 不是独立 phase
+// （10 §4.2.1 phase 封闭枚举），从 activeWorks / goal.status 派生后传入。
+// queueLength/autoDrain 用于 held 派生（heldQueueInputRequiresChoice，2026-07-05 裁决）。
+export interface AvailabilityContext {
   phase: SessionControl["phase"];
   goalStatus: GoalState["status"] | null;
   compacting: boolean;
@@ -211,6 +211,11 @@ export function deltaBumpsRevision(delta: ConversationDelta): boolean {
       return false;
     case "state.updated":
       return REVISION_BEARING_PATCH_KEYS.some((key) => delta.patch[key] !== undefined);
+    case "pluginUi.resourceUpdated":
+    case "pluginUi.resourceListChanged":
+    case "pluginUi.instanceClosed":
+    case "pluginUi.appToolCall":
+    // live-only 通知不改快照，不记账。
     // 键级增量与整键 `workflowRuns` patch 同一条豁免（见上面的注释）：它们表达的就是那个键的变化，
     // 换个编码不该换记账规则——列入会让一条在飞的 run 每次节点迁移都抖动 conversation revision。
     case "workflowRun.updated":

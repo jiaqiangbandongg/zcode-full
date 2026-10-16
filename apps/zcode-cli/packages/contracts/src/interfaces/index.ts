@@ -1,4 +1,5 @@
 // Ports - interface definitions for adapters
+export * from "./provider-endpoint-routing.port.js";
 export * from "./execution.port.js";
 export * from "./file-system.port.js";
 export * from "./context-source.port.js";

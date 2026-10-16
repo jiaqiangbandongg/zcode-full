@@ -39,7 +39,7 @@ import {
 
 import { ModelEditorAdvanced } from "@/settings/model-provider-section/ModelEditorAdvanced.js";
 
-function selectFocusedInputText(event: Pick<FocusEvent<HTMLInputElement>, "currentTarget">) {
+export function selectFocusedInputText(event: Pick<FocusEvent<HTMLInputElement>, "currentTarget">) {
   event.currentTarget.select();
 }
 

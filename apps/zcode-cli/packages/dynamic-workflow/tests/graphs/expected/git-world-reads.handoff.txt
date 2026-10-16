@@ -1,0 +1,4 @@
+phase unphased
+participant unphased:workspace steps=world-read#1,world-read#2,world-read#3,world-read#4
+participant unphased:actor#1 "reviewer" steps=ask#1
+handoff unphased:workspace -> unphased:actor#1 types="GitStatus,string[],GitCommit[],string"

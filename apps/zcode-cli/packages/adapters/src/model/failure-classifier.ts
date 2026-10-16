@@ -46,7 +46,7 @@ export interface ClassifiedModelFailure {
   statusCode?: number;
 }
 
-interface ProviderFailureDetails {
+export interface ProviderFailureDetails {
   providerErrorCode?: string;
   providerErrorMessage?: string;
   providerRequestId?: string;

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-send-message-resume-stop",
+  "spec": "./test/e2e/conversation-session/conversation-session-send-message-resume-stop.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-send-message-resume-stop.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "send-message-resume-stop-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题生成不属于 SAT12 语义；固定响应避免隐藏请求重试阻塞主 turn。"
+    },
+    {
+      "id": "send-message-resume-stop-parent-agent",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "固定 foreground Agent 启动，避免 live 模型改变 SAT12 前置状态。"
+    },
+    {
+      "id": "send-message-resume-stop-foreground-child",
+      "kind": "subagent",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "稳定形成可由 SendMessage resume 的 terminal local agent。"
+    },
+    {
+      "id": "send-message-resume-stop-parent-foreground-idle",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "在 SendMessage 前形成稳定 idle 边界，供 E2E 固化原 foreground identity。"
+    },
+    {
+      "id": "send-message-resume-stop-parent-send-message",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "使用 replay 注入的真实 agentId，固定触发 terminal resume。"
+    },
+    {
+      "id": "send-message-resume-stop-parent-idle",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 SendMessage 成功后的 parent idle 边界，避免 live 模型额外调用 TaskOutput。"
+    },
+    {
+      "id": "send-message-resume-stop-stop-notification",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "为 Stop 后的后台 completion notification turn 提供唯一完成屏障。"
+    },
+    {
+      "id": "send-message-resume-stop-foreground-compact",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "E2E 默认模型窗口会在 foreground tool result 后 compact；固定 summary 保留第二个 turn 所需 identity。"
+    },
+    {
+      "id": "send-message-resume-stop-resume-pending-compact",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "SendMessage tool call/result 位于 compact 保留段；summary 只保留当前用户请求和原 agent identity。"
+    },
+    {
+      "id": "send-message-resume-stop-resumed-compact",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "父 turn 结束后的 compact 必须保留真实 SendMessage 成功结果，供 Stop notification turn 继续。"
+    },
+    {
+      "id": "send-message-resume-stop-child-bash",
+      "kind": "subagent",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定 resumed child running 窗口，以验证 Stop 可见和 accepted cancel。"
+    }
+  ]
+}

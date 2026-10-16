@@ -1,0 +1,2 @@
+phase unphased
+participant unphased:actor#1 "a" steps=ask#1,ask#2

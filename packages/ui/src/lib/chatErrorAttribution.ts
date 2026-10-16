@@ -1,3 +1,4 @@
+import { requestVerificationErrorAttribution } from "@/request-security-edition/errors.js";
 import {
   MEDIA_BUDGET_CURRENT_ATTACHMENT_TOO_LARGE_ERROR_CODE,
   MEDIA_BUDGET_CURRENT_IMAGE_TOO_LARGE_ERROR_CODE,
@@ -82,6 +83,7 @@ const STABLE_ERROR_ATTRIBUTION: Readonly<
     source: "provider",
     reason: "rate_limited",
   },
+  ...requestVerificationErrorAttribution,
 };
 
 const NETWORK_FAILURE_REASONS = new Set([

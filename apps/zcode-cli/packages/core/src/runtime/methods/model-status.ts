@@ -9,6 +9,8 @@ import type {
 import type { AgentRuntimeInternal } from "../internal.js";
 
 interface ModelStatusSinkOptions {
+  /** Sampling 不投影到主会话；保留网络日志和内存用量事件。 */
+  persist?: boolean;
   onStatus?: (event: ModelNetworkStatusEvent) => void;
   streamRecovery?: ModelStreamRecoveryStatus;
 }
@@ -31,7 +33,7 @@ export function createModelStatusSink(
         eventPayload,
         traceContext,
       );
-      await this.appendEvent(event, traceContext);
+      if (options.persist !== false) await this.appendEvent(event, traceContext);
       events.push(event);
     },
   };

@@ -1,0 +1,12 @@
+flowchart LR
+  actor_1["black"]
+  actor_2["white"]
+  sink(["sink"])
+  actor_1 -.->|"string"| actor_1
+  actor_1 -.->|"string"| actor_2
+  actor_1 -.->|"string"| sink
+  actor_2 -.->|"string"| actor_1
+  actor_2 -.->|"string"| actor_2
+  actor_2 -.->|"string"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

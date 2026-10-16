@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bash-read-state",
+  "spec": "./test/e2e/conversation-session/conversation-session-bash-read-state.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-bash-read-state-title",
+      "description": "Bash read-state case 的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 Bash read-state 产品语义，只需要稳定返回，避免标题请求误命中主流程 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BASH_READ_STATE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-bash-read-state-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Bash Read State E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-cat-call",
+      "description": "O08 首段响应：返回 Bash cat tool_use，制造 Bash read-state producer 输入。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "真实 provider 不一定稳定选择 Bash cat；本响应固定触发 Bash read-state producer，专门验证后续 Edit read-before-write guard。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BASH_READ_STATE", "cat bash-read-state-e2e/target.txt"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "has been updated successfully",
+          "Call Read before editing"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bash_read_state_cat",
+          "messageId": "msg_e2e_bash_read_state_cat",
+          "name": "Bash",
+          "input": {
+            "command": "cat bash-read-state-e2e/target.txt",
+            "description": "Read target through Bash cat"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-edit-call",
+      "description": "O08 第二段响应：Bash cat tool_result 进入历史后调用 Edit。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应验证 Bash cat 已回填 read-state，使后续 Edit 不再触发未读 guard。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BASH_READ_STATE", "alpha", "beta"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "has been updated successfully",
+          "Call Read before editing"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bash_read_state_edit",
+          "messageId": "msg_e2e_bash_read_state_edit",
+          "name": "Edit",
+          "input": {
+            "file_path": "bash-read-state-e2e/target.txt",
+            "old_string": "alpha",
+            "new_string": "gamma"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-format-call",
+      "description": "O08 第三段响应：Edit 成功后运行 formatter Bash，制造 stale hint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应固定触发带 --fix marker 的 Bash 写类命令，验证已读文件被 Bash 改写后的 stale hint。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BASH_READ_STATE",
+          "has been updated successfully"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Call Read before editing"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_bash_read_state_format",
+          "messageId": "msg_e2e_bash_read_state_format",
+          "name": "Bash",
+          "input": {
+            "command": "node bash-read-state-e2e/overwrite-target.mjs --fix",
+            "description": "Rewrite the previously read target file"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-final",
+      "description": "O08 最终回复：formatter Bash tool_result 后，provider-visible 历史必须包含 stale hint。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只在 stale hint 已进入 provider-visible 请求后结束 case，真实 provider 回复内容不影响产品语义。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BASH_READ_STATE",
+          "formatted target",
+          "Call Read before editing"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "File has not been read yet. Read it first before writing to it."
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-bash-read-state-final",
+          "inputTokens": 240,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

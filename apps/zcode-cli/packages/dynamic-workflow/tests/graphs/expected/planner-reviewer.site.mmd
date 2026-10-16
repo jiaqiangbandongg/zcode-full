@@ -1,0 +1,36 @@
+flowchart TD
+  subgraph actor_1["scanner (actor#1)"]
+    ask_1["scanner<br/>ask#1"]
+  end
+  subgraph actor_2["planner (actor#2)"]
+    ask_2["planner<br/>ask#2"]
+  end
+  subgraph actor_3["reviewer (actor#3)"]
+    ask_3["reviewer<br/>ask#3"]
+  end
+  subgraph actor_4["judge (actor#4)  ×N per fan-out#1"]
+    ask_4["judge<br/>ask#4"]
+  end
+  source(["source"])
+  join_1{{"join#1"}}
+  fan_out_1{{"fan-out#1"}}
+  sink(["sink"])
+  ask_3 -->|"Review"| ask_2
+  ask_2 -->|"string"| ask_3
+  ask_1 -->|"Flaky"| ask_4
+  fan_out_1 -->|"Review[]"| ask_4
+  ask_4 -->|"Review"| join_1
+  ask_1 -->|"Flaky"| join_1
+  fan_out_1 -->|"Review[]"| join_1
+  ask_1 -->|"Flaky"| fan_out_1
+  ask_2 -->|"string"| sink
+  ask_4 -->|"Review"| sink
+  ask_1 -->|"Flaky"| sink
+  join_1 -->|"Review[]"| sink
+  fan_out_1 -->|"Review[]"| sink
+  source --> ask_1
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  classDef world fill:#e8f0fe,stroke:#4285f4;
+  classDef relay fill:#fff2cc,stroke:#d6b656;
+  class source,sink endpoint;
+  class join_1,fan_out_1 relay;

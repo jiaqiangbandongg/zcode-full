@@ -1,4 +1,8 @@
-import type { BrowserWindow, MessageBoxReturnValue } from "electron";
+import type {
+  AboutPanelOptionsOptions,
+  BrowserWindow,
+  MessageBoxReturnValue,
+} from "electron";
 import { existsSync, readFileSync } from "node:fs";
 import { arch, hostname, platform, release, type, version as osVersion } from "node:os";
 import { join } from "node:path";
@@ -190,14 +194,14 @@ export function formatAboutDetail(snapshot: AboutSnapshot): string {
   ].join("\n");
 }
 
-function formatAboutCopyright(
+export function formatAboutCopyright(
   year = new Date().getFullYear(),
   locale: Locale = DEFAULT_LOCALE,
 ): string {
   return getAboutMessages(locale).copyright(year);
 }
 
-function formatAboutOptimizationLine(
+export function formatAboutOptimizationLine(
   snapshot: Pick<AboutSnapshot, "osPlatform" | "osArch">,
   locale: Locale = DEFAULT_LOCALE,
 ): string {
@@ -206,6 +210,23 @@ function formatAboutOptimizationLine(
   }
 
   return "";
+}
+
+export function createSystemAboutPanelOptions(
+  snapshot: AboutSnapshot,
+  year = new Date().getFullYear(),
+  locale: Locale = DEFAULT_LOCALE,
+): AboutPanelOptionsOptions {
+  const messages = getAboutMessages(locale);
+  const credits = formatAboutOptimizationLine(snapshot, locale);
+  return {
+    applicationName: ABOUT_APPLICATION_NAME,
+    applicationVersion: `${messages.versionLabel} ${snapshot.appVersion}`,
+    copyright: formatAboutCopyright(year, locale),
+    // 设计原因：macOS About Panel 的 credits 区最接近参考图里的硬件优化说明位置。
+    // 保持信息交给系统级面板渲染，避免自绘窗口和原生关于弹窗风格割裂。
+    ...(credits ? { credits } : {}),
+  };
 }
 
 function resolveAboutIconPath(isPackaged: boolean): string {

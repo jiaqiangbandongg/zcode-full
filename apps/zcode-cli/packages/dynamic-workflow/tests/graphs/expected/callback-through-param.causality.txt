@@ -1,0 +1,10 @@
+phase phase#1 "work" @5:1
+phase phase#2 "check" @10:1
+lane actor#1 "worker" @9:33
+lane actor#2 "checker" @11:17
+region seq#1 seq
+step ask#1 ask "worker" @9:49 lane=actor#1 phase=phase#1 region=seq#1 always
+step ask#2 ask "checker" @11:34 lane=actor#2 phase=phase#2 region=seq#1 always
+edge ask#1 -> ask#2 data always exact
+phase-edge phase#1 -> phase#2 data always
+sink ask#2

@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-bash-output",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-bash-output.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-background-bash-output.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/background-bash-output/中文 空格/writer.cjs",
+      "source": "created-by-spec",
+      "description": "case-local Node writer，文件 barrier 驱动实时窗口。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "bgv-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "EXPLICIT-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "EXPLICIT-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "AUTO-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "AUTO-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "PAUSE-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "PAUSE-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "SCOPE_A-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "SCOPE_A-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "SCOPE_B-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "SCOPE_B-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "ERROR-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "ERROR-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "STOP-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "STOP-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "PARENT-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "PARENT-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "CHILD-call",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 Bash tool call 和主轮收尾，实际进程及 canonical 文件由 barrier 控制；UI 查询不调用模型。"
+    },
+    {
+      "id": "CHILD-done",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "child Bash 在真实后台运行时保持 child 模型请求在途，以验证现有子会话条目及 Stop。"
+    }
+  ]
+}

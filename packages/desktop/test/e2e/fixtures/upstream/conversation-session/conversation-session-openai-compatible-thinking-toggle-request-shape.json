@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-openai-compatible-thinking-toggle-request-shape",
+  "spec": "./test/e2e/conversation-session/conversation-session-openai-compatible-thinking-toggle-request-shape.test.ts",
+  "fixtures": [
+    {
+      "id": "openai-compatible-thinking-toggle-title",
+      "description": "I65 首轮请求触发的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需避免误命中四条 toggle fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "\"enable_thinking\":false"],
+        "bodyExcludes": ["extra_body", "chat_template_kwargs", "reasoning_effort"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-thinking-toggle-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thinking-toggle-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Thinking Toggle\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-thinking-toggle-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":64,\"completion_tokens\":8,\"total_tokens\":72}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "qwen-thinking-enabled-main",
+      "description": "Qwen enabled direct enable_thinking 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_QWEN_THINKING_ENABLED"],
+        "bodyIncludes": ["E2E_QWEN_THINKING_ENABLED", "upstream-e2e-ok", "qwen3.5-plus"],
+        "bodyExcludes": ["Generate a concise title", "extra_body", "chat_template_kwargs"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-qwen-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-qwen-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-qwen-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":128,\"completion_tokens\":12,\"total_tokens\":140}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "qwen-thinking-disabled-main",
+      "description": "Qwen disabled direct enable_thinking 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_QWEN_THINKING_DISABLED"],
+        "bodyIncludes": ["E2E_QWEN_THINKING_DISABLED", "upstream-e2e-ok", "qwen3.5-plus"],
+        "bodyExcludes": ["Generate a concise title", "extra_body", "chat_template_kwargs"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-qwen-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-qwen-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-qwen-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"qwen3.5-plus\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":132,\"completion_tokens\":12,\"total_tokens\":144}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "kimi-thinking-enabled-main",
+      "description": "Kimi enabled direct thinking.type 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_KIMI_THINKING_ENABLED"],
+        "bodyIncludes": ["E2E_KIMI_THINKING_ENABLED", "upstream-e2e-ok", "kimi-k2.6"],
+        "bodyExcludes": ["Generate a concise title", "extra_body", "chat_template_kwargs"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-kimi-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-kimi-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-kimi-enabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":136,\"completion_tokens\":12,\"total_tokens\":148}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "kimi-thinking-disabled-main",
+      "description": "Kimi disabled direct thinking.type 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是 replay server 捕获的 provider-visible request body。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_KIMI_THINKING_DISABLED"],
+        "bodyIncludes": ["E2E_KIMI_THINKING_DISABLED", "upstream-e2e-ok", "kimi-k2.6"],
+        "bodyExcludes": ["Generate a concise title", "extra_body", "chat_template_kwargs"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-kimi-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-kimi-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-kimi-disabled\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"kimi-k2.6\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":140,\"completion_tokens\":12,\"total_tokens\":152}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

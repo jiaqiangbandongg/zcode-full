@@ -1,0 +1,13 @@
+world-read world-read#1 "read config.json" @2:28 order=0 type="string"
+ask ask#1 "summarizer" @3:43 order=1 type="string"
+actor actor#1 "summarizer" @3:23 order=2
+fact ask-data ask#1 <- world-read#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact return <- ask#1 exact
+region seq#1 seq entered
+issue world-read#1 in=seq#1 phase=unphased
+settle world-read#1 in=seq#1
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

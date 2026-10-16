@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-output-limit-continue-ui",
+  "spec": "./test/e2e/conversation-session/conversation-session-output-limit-continue-ui.test.ts",
+  "fixtures": [
+    {
+      "id": "output-limit-continue-ui-title",
+      "description": "OTC08 标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是 Continue UI 现状探针的产品语义；固定响应避免干扰三次主请求。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_OUTPUT_LIMIT_CONTINUE_UI"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "output-limit-continue-ui-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Continue UI Probe\"}"
+        }
+      }
+    },
+    {
+      "id": "output-limit-continue-ui-partial-p1",
+      "description": "第一次主请求在同一自然段的句中位置返回 p1 并以 max_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性制造无标题、无换段的第一段句中截断正文，观察 Continue 后的 Desktop 投影。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_UI"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-ui-partial-p1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"当一个回答因为输出上限被截断时，用户真正关心的并不是底层又发起了几次模型请求，而是阅读体验能否保持连贯。理想情况下，系统会保留已经生成的内容，在本轮内部补充一条继续指令，并让模型从刚才停下的位置直接往后写；从用户视角看，这一切应该仍然是一段自然展开的说明，即使底层已经\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":12,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "output-limit-continue-ui-partial-p2",
+      "description": "第二次主请求直接接续 p1，并在同一自然段的另一句中位置再次以 max_tokens 截断。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性制造无标题、无换段且直接接续 p1 的第二段句中截断正文，观察相邻 partial 的 Desktop 分块。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_UI"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-ui-partial-p2\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":20,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"发起了新的 provider 请求，页面也不应该出现重新问候、重复总结或额外的 Continue 提示，而应该无缝接上前面的主语和谓语，继续解释剩余部分。为了确认这种连续性在多次触顶时也成立，这个测试还会让第二次输出继续写一段，然后故意在另一个尚未结束的短语中停住，例如这里再让句子停在\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":20,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "output-limit-continue-ui-final-p3",
+      "description": "第三次主请求直接接续 p2、补完同一自然段并正常 end_turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "以无标题、无换段且直接接续 p2 的正文正常结束恢复链，供 Desktop 展示最终 assistant 段。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_OUTPUT_LIMIT_CONTINUE_UI"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"output-limit-continue-ui-final-p3\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":28,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"一个尚未完成的位置，最后一次请求则从这个宾语开始补全句意，并自然收束整个回答。若最终页面读起来仍像一次完整输出，而不是三次独立回复，就说明 Continue 已经被正确限制在 agent loop 内部，外部只需感知一条持续增长的 assistant 内容。\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":28,\"output_tokens\":8}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

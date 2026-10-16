@@ -1,6 +1,11 @@
-// Dynamic Workflow Run Port：工作区操作记录的读取类型。
-// 包含 `files.*`、`git.*` 和 `world.run` 调用的清单行与正文，
-// 由 dynamic-workflow-run.port.ts 统一再导出，调用方通过 `@zcode/contracts` 使用。
+// ============================================================
+// Dynamic Workflow Run Port：工作区 transcript 的读面类型
+// ============================================================
+// docs/dynamic-workflow/transcript-and-notifications.md。与情势截面
+// （dynamic-workflow-run-roster.port.ts）、retune（dynamic-workflow-run-retune.port.ts）同一条
+// 拆分理由：dynamic-workflow-run.port.ts 顶到 oxlint max-lines 上限（400 行），而这六个类型
+// 自成一组（一次 `files.*` / `git.*` / `world.run` 调用的清单行与正文）。公开面不变——那边
+// 原样再导出，`@zcode/contracts` 的导入路径一字不改。
 
 // 结构化失败的形状留在主文件上（本组的两个字段引用它），所以这里反向 import 一个类型：
 // 纯类型、无运行时边，两个文件各自只描述自己那一组。

@@ -1,10 +1,12 @@
-interface ManualClaimReleaseRepo {
-  get(automationId: string): Promise<{ workspaceKey: string } | null>;
+export interface ManualClaimReleaseRepo {
+  get(
+    automationId: string,
+  ): Promise<{ workspaceKey: string } | null>;
   getRun(runId: string): Promise<{ workspaceKey: string } | null>;
   releaseManualClaim(automationId: string, workspaceKey: string): Promise<void>;
 }
 
-interface ManualClaimReleaseParams {
+export interface ManualClaimReleaseParams {
   repo: ManualClaimReleaseRepo;
   automationId: string;
   runId: string;
@@ -12,7 +14,9 @@ interface ManualClaimReleaseParams {
   logError: (message: string) => void;
 }
 
-async function releaseManualClaimForSettledRun(params: ManualClaimReleaseParams): Promise<void> {
+export async function releaseManualClaimForSettledRun(
+  params: ManualClaimReleaseParams,
+): Promise<void> {
   const releaseWorkspaceKey =
     params.workspaceKey ??
     (await params.repo.getRun(params.runId).then((run) => run?.workspaceKey)) ??

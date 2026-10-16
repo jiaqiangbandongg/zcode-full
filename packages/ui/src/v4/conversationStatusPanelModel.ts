@@ -7,8 +7,13 @@ import type {
   ToolCallRow,
   WorkflowRunState,
 } from "@zcode/shared/zcode-protocol-v4";
-import { workflowRunStepCounts } from "@zcode/shared/zcode-protocol-v4";
+import type { SessionWorkflowPhaseSummary } from "@zcode/shared/zcode-protocol-v4";
+import {
+  deriveSessionWorkflowPhases,
+  workflowRunStepCounts,
+} from "@zcode/shared/zcode-protocol-v4";
 import { extractPlanToolCallContent, getPlanDirectoryTitle } from "@/lib/planToolCall.js";
+import { workflowRunParallelPhaseLabel } from "@/lib/workflowRunLine.js";
 
 export interface ConversationStatusPanelGitModel {
   branchName: string | null;
@@ -65,6 +70,12 @@ export interface ConversationStatusPanelWorkflowRun {
   nodesSettled?: number;
   nodesTotal?: number;
   /**
+   * 站点表（声明序）与当前站，与侧栏运行行同一条推导（shared 的 `deriveSessionWorkflowPhases`）。
+   * 与 `status` 同簇：有 run 支撑才有；降级行没有。空数组 = 脚本没声明阶段。
+   */
+  phases?: SessionWorkflowPhaseSummary[];
+  currentPhase?: string;
+  /**
    * 展示名。**`title ≡ workId` 即「未命名」**，渲染层据此换成 i18n 兜底名：core 的
    * `workflowTaskSubject` 兜底链最终落到 taskId（≡ runId ≡ workId），而投影把非空
    * description 原样抄进 title——所以「题名恰好等于 id」是唯一可靠的未命名信号。
@@ -117,7 +128,7 @@ export interface ConversationStatusPanelModel {
   runningWorkflowRuns: ConversationStatusPanelWorkflowRun[];
 }
 
-interface BuildConversationStatusPanelModelInput {
+export interface BuildConversationStatusPanelModelInput {
   isOfficeMode?: boolean;
   gitSummary?: GitRepositorySummary | null;
   gitDirtyFileCount?: number;
@@ -251,6 +262,8 @@ function buildRunningWorkflowRuns(
       status: run.status,
       nodesSettled: steps.settled,
       nodesTotal: steps.total,
+      phases: deriveSessionWorkflowPhases(run),
+      ...(run.currentPhase === undefined ? {} : { currentPhase: run.currentPhase }),
       ...(work ? { title: work.title, startedAt: work.startedAt } : {}),
       ...(work?.status === "running"
         ? {
@@ -273,6 +286,36 @@ function buildRunningWorkflowRuns(
     });
   }
   return rows;
+}
+
+/**
+ * 一条 run「此刻在做什么」的词（docs/dynamic-workflow/presentation.md「Other places a run appears」），
+ * run 行第二行与胶囊共用这一条规则：
+ * - pending → 状态词；
+ * - 没声明阶段 → 步数（这是步数唯一还露面的地方）；
+ * - 不止一站在烧 → 这些站名以 ` ∥ ` 相连（并行时谁都不比谁更当前）；
+ * - 否则当前站；连当前站都没有（进了 run、还没进第一个 phase）→ 状态词；
+ * - 降级行（无 status）→ null：不知道状态，就什么都不说。
+ * 模型只给结构，文案（状态词、步数 key）由渲染层按 i18n 拼。
+ */
+export type ConversationStatusPanelWorkflowRunWords =
+  | { kind: "status"; status: "pending" | "running" }
+  | { kind: "steps"; done: number; total: number }
+  | { kind: "phases"; text: string };
+
+export function workflowRunWords(
+  run: ConversationStatusPanelWorkflowRun,
+): ConversationStatusPanelWorkflowRunWords | null {
+  if (run.status === undefined) return null;
+  if (run.status === "pending") return { kind: "status", status: "pending" };
+  const phases = run.phases ?? [];
+  if (phases.length === 0) {
+    return { kind: "steps", done: run.nodesSettled ?? 0, total: run.nodesTotal ?? 0 };
+  }
+  const parallel = workflowRunParallelPhaseLabel(phases);
+  if (parallel !== undefined) return { kind: "phases", text: parallel };
+  if (run.currentPhase !== undefined) return { kind: "phases", text: run.currentPhase };
+  return { kind: "status", status: "running" };
 }
 
 /**

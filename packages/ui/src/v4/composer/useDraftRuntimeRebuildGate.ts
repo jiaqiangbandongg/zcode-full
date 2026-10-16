@@ -5,9 +5,9 @@ import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
  * 重建窗口上限。实测 agent start→ready 约 550-650ms，createSession 再数百 ms，5s 有充分余量。
  * 超时只解除门禁，不取消重建——迟到的 binding 仍会正常更新 effectiveSessionId 并唤醒附件重传。
  */
-const DRAFT_RUNTIME_REBUILD_TIMEOUT_MS = 5000;
+export const DRAFT_RUNTIME_REBUILD_TIMEOUT_MS = 5000;
 
-interface DraftRuntimeRebuildGateState {
+export interface DraftRuntimeRebuildGateState {
   rebuilding: boolean;
   /** 换代发生时的预热会话 id；出现与之不同的非空 id 即视为重建完成。 */
   pendingFrom: string | null;
@@ -15,18 +15,18 @@ interface DraftRuntimeRebuildGateState {
   epoch: number;
 }
 
-type DraftRuntimeRebuildGateEvent =
+export type DraftRuntimeRebuildGateEvent =
   | { type: "runtimeRestart"; prewarmSessionId: string | null }
   | { type: "prewarmSessionChanged"; prewarmSessionId: string | null }
   | { type: "rebuildTimeout" };
 
-const DRAFT_RUNTIME_REBUILD_GATE_IDLE: DraftRuntimeRebuildGateState = {
+export const DRAFT_RUNTIME_REBUILD_GATE_IDLE: DraftRuntimeRebuildGateState = {
   epoch: 0,
   pendingFrom: null,
   rebuilding: false,
 };
 
-function reduceDraftRuntimeRebuildGate(
+export function reduceDraftRuntimeRebuildGate(
   state: DraftRuntimeRebuildGateState,
   event: DraftRuntimeRebuildGateEvent,
 ): DraftRuntimeRebuildGateState {
@@ -49,7 +49,7 @@ function reduceDraftRuntimeRebuildGate(
   }
 }
 
-interface DraftRuntimeRebuildGate {
+export interface DraftRuntimeRebuildGate {
   /** 预热会话正在重建；true 时必须禁止发送，否则附件会挂在已消失的会话上。 */
   rebuilding: boolean;
 }

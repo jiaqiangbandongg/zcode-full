@@ -3,7 +3,7 @@ import { Check, Globe, Info, Lock, UserRoundPen } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
-type ConversationSharePermission = "private" | "link-viewer" | "link-editor";
+export type ConversationSharePermission = "private" | "link-viewer" | "link-editor";
 
 const PERMISSION_OPTIONS = [
   {
@@ -43,7 +43,7 @@ export function ConversationSharePermissionPicker({
       data-variant={variant}
       className={cn("flex flex-col", compact ? "min-w-0 gap-1" : "gap-1.5")}
     >
-      {/* compact 变体曾把字段标签降到 text-ui-xs，导致它和同一确认表单的分享标题层级不一致。*/}
+      {/* 修复原因：compact 变体曾把字段标签降到 text-ui-xs，导致它和同一确认表单的分享标题层级不一致。 */}
       <span
         data-testid="conversation-share-permission-label"
         className={cn(compact ? "text-ui-sm" : "text-ui-base", "text-foreground-subtle")}

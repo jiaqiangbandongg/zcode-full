@@ -7,7 +7,7 @@ import type { ConversationRowRenderContext } from "@/v4/conversationRowContext.j
 import { toolCallRowToLegacyNode } from "@/v4/toolCallRowAdapter.js";
 import { runUserAction } from "@/lib/userActionTelemetry.js";
 
-function openSubagentSessionFromSummary({
+export function openSubagentSessionFromSummary({
   backgrounded: _backgrounded = false,
   childSessionId,
   context,

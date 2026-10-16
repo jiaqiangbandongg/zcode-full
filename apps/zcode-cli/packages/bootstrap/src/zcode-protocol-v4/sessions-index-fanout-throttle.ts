@@ -1,13 +1,14 @@
-// sessions-index fan-out 的高频事件节流。
+// sessions-index fan-out 的高频事件节流（docs/v4-refactor/14-sessions-index.md「事件 fan-out 节奏」）。
 // 纯调度：窗口状态与定时器在这里，publish 由调用方注入，网关只保留调用点。
 //
-// Workflow 进度事件会更新 record.updatedAt；若每条都立即发布摘要，Host 和 renderer 会按
-// 引擎事件频率重算任务列表。因此合并窗口内的进度更新，控制任务索引的发布频率。
+// 根因备忘：一次工作流运行的引擎事件以 DynamicWorkflowRunProgress 回到父会话，实测 8s 内 4000 条。
+// 每条都 bump record.updatedAt，摘要因此条条有变化 → 旧实现条条 flush 一帧 sessions-index 增量
+// → 宿主重算 task 行 → renderer 按事件频率重拉任务列表。ModelStreaming 早已因同样的理由被排除。
 
 /** 工作流进度事件的 fan-out 窗口：窗内的进度合并为窗末一次发布（侧栏运行行 ≤4Hz）。 */
 export const WORKFLOW_PROGRESS_INDEX_FANOUT_MS = 250;
 
-/** 定时器句柄对调度逻辑不透明：默认使用 setTimeout，也允许调用方提供实现。 */
+/** 定时器句柄对调度逻辑不透明：生产用 setTimeout，测试可注入任意实现。 */
 export type FanoutTimerHandle = unknown;
 
 export interface SessionsIndexFanoutThrottleOptions {

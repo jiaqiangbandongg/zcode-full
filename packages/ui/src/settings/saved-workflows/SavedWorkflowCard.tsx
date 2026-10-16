@@ -31,7 +31,7 @@ import { savedWorkflowRunBadgeKind } from "@/settings/saved-workflows/savedWorkf
 const MAX_ARG_CHIPS = 3;
 
 /** 卡片「上次运行」徽标：四态 + 尚未运行。沿用定时任务卡的徽标形状（rounded-lg，20px 图标槽）。 */
-function SavedWorkflowLastRunBadge({
+export function SavedWorkflowLastRunBadge({
   run,
   now,
 }: {

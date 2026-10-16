@@ -1,0 +1,384 @@
+@import "tailwindcss" source(".");
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--color-background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@theme {
+  --color-background: var(--color-neutral-50);
+  --color-background-alt: var(--color-neutral-100);
+  --color-brand: var(--color-sky-500);
+  --color-accent: var(--color-sky-50);
+  --color-border: color-mix(in oklab, var(--color-neutral-950) 10%, transparent);
+  --color-border-hover: color-mix(in oklab, var(--color-neutral-950) 20%, transparent);
+  --color-header: var(--color-neutral-100);
+  --color-surface: color-mix(in oklab, var(--color-neutral-950) 3%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--color-neutral-950) 5%, transparent);
+  --color-card: var(--color-white);
+  --color-card-selected: var(--color-neutral-100);
+  --color-card-border: var(--color-border);
+  --color-input: var(--color-white);
+  --color-input-focused: var(--color-neutral-50);
+  --color-input-border: var(--color-border);
+  --color-input-border-focused: var(--color-brand);
+  --color-menu-hover: var(--color-neutral-100);
+  --color-primary: var(--color-neutral-950);
+  --color-primary-foreground: var(--color-neutral-50);
+  --color-foreground: var(--color-neutral-800);
+  --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-800) 62%, transparent);
+  --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-800) 42%, transparent);
+  --color-foreground-inverse: var(--color-white);
+  --color-selected: color-mix(in oklab, var(--color-sky-500) 12%, transparent);
+  --color-tag: var(--color-neutral-100);
+  --color-warning: var(--color-amber-500);
+  --color-file-node: color-mix(in oklab, var(--color-sky-500) 16%, transparent);
+  --color-file-node-hover: color-mix(in oklab, var(--color-sky-500) 26%, transparent);
+  --color-file-node-foreground: var(--color-sky-700);
+  --color-skill-node: color-mix(in oklab, var(--color-violet-500) 14%, transparent);
+  --color-skill-node-hover: color-mix(in oklab, var(--color-violet-500) 24%, transparent);
+  --color-skill-node-foreground: var(--color-violet-700);
+  --color-command-node: color-mix(in oklab, var(--color-amber-500) 16%, transparent);
+  --color-command-node-hover: color-mix(in oklab, var(--color-amber-500) 28%, transparent);
+  --color-command-node-foreground: var(--color-amber-800);
+  --color-relation-state: var(--color-violet-600);
+  --color-relation-runtime: var(--color-sky-600);
+  --color-relation-shared: var(--color-teal-600);
+  --color-relation-delivery: var(--color-amber-600);
+  --color-relation-invariant: var(--color-rose-600);
+}
+
+.dark {
+  --color-background: var(--color-neutral-950);
+  --color-background-alt: var(--color-neutral-900);
+  --color-brand: var(--color-sky-400);
+  --color-accent: color-mix(in oklab, var(--color-sky-950) 48%, transparent);
+  --color-border: color-mix(in oklab, var(--color-neutral-50) 12%, transparent);
+  --color-border-hover: color-mix(in oklab, var(--color-neutral-50) 28%, transparent);
+  --color-header: var(--color-neutral-950);
+  --color-surface: color-mix(in oklab, var(--color-white) 5%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--color-white) 9%, transparent);
+  --color-card: var(--color-neutral-900);
+  --color-card-selected: var(--color-neutral-800);
+  --color-card-border: var(--color-border);
+  --color-input: var(--color-neutral-900);
+  --color-input-focused: var(--color-neutral-950);
+  --color-input-border: var(--color-border);
+  --color-input-border-focused: var(--color-brand);
+  --color-menu-hover: var(--color-neutral-800);
+  --color-primary: var(--color-neutral-50);
+  --color-primary-foreground: var(--color-neutral-950);
+  --color-foreground: var(--color-neutral-100);
+  --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-100) 64%, transparent);
+  --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-100) 38%, transparent);
+  --color-foreground-inverse: var(--color-neutral-950);
+  --color-selected: color-mix(in oklab, var(--color-sky-400) 18%, transparent);
+  --color-tag: var(--color-neutral-800);
+  --color-warning: var(--color-amber-400);
+  --color-file-node: color-mix(in oklab, var(--color-sky-400) 18%, transparent);
+  --color-file-node-hover: color-mix(in oklab, var(--color-sky-400) 30%, transparent);
+  --color-file-node-foreground: var(--color-sky-300);
+  --color-skill-node: color-mix(in oklab, var(--color-violet-400) 18%, transparent);
+  --color-skill-node-hover: color-mix(in oklab, var(--color-violet-400) 30%, transparent);
+  --color-skill-node-foreground: var(--color-violet-300);
+  --color-command-node: color-mix(in oklab, var(--color-amber-400) 18%, transparent);
+  --color-command-node-hover: color-mix(in oklab, var(--color-amber-400) 30%, transparent);
+  --color-command-node-foreground: var(--color-amber-300);
+  --color-relation-state: var(--color-violet-400);
+  --color-relation-runtime: var(--color-sky-400);
+  --color-relation-shared: var(--color-teal-400);
+  --color-relation-delivery: var(--color-amber-400);
+  --color-relation-invariant: var(--color-rose-400);
+}
+
+.capability-map-canvas {
+  height: calc(100dvh - 188px);
+  min-height: 680px;
+}
+
+.capability-map-canvas .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-card);
+  box-shadow: none;
+}
+
+.capability-map-canvas .react-flow__controls-button {
+  border-color: var(--color-border);
+  background: var(--color-card);
+  color: var(--color-foreground);
+}
+
+.capability-map-canvas .react-flow__controls-button:hover {
+  background: var(--color-surface-hover);
+}
+
+.capability-map-canvas .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.capability-map-handle {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+}
+
+.capability-map-canvas .react-flow__edge-path.capability-map-edge {
+  stroke: var(--relation-color);
+  stroke-width: 1.6;
+  opacity: 0.08;
+  transition:
+    opacity 140ms ease,
+    stroke-width 140ms ease;
+}
+
+.capability-map-canvas .react-flow__edge-path.capability-map-edge.is-intra-group {
+  opacity: 0.28;
+}
+
+.capability-map-canvas .react-flow__edge-path.capability-map-edge.is-highlighted {
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.capability-map-canvas .react-flow__edge-path.capability-map-edge.is-dimmed {
+  opacity: 0.008;
+}
+
+.capability-map-edge--state {
+  --relation-color: var(--color-relation-state);
+}
+
+.capability-map-edge--runtime {
+  --relation-color: var(--color-relation-runtime);
+}
+
+.capability-map-edge--shared {
+  --relation-color: var(--color-relation-shared);
+}
+
+.capability-map-edge--delivery {
+  --relation-color: var(--color-relation-delivery);
+}
+
+.capability-map-edge--invariant {
+  --relation-color: var(--color-relation-invariant);
+}
+
+path.capability-map-edge--shared {
+  stroke-dasharray: 8 5;
+}
+
+path.capability-map-edge--delivery {
+  stroke-dasharray: 3 5;
+}
+
+path.capability-map-edge--invariant {
+  stroke-dasharray: 12 5 3 5;
+}
+
+.capability-relation-swatch {
+  width: 20px;
+  height: 0;
+  border-top: 2px solid var(--relation-color);
+}
+
+.capability-relation-swatch.capability-map-edge--shared {
+  border-top-style: dashed;
+}
+
+.capability-relation-swatch.capability-map-edge--delivery {
+  border-top-style: dotted;
+}
+
+.capability-relation-swatch.capability-map-edge--invariant {
+  border-top-style: dashed;
+}
+
+.capability-relation-dot--state {
+  background: var(--color-relation-state);
+}
+
+.capability-relation-dot--runtime {
+  background: var(--color-relation-runtime);
+}
+
+.capability-relation-dot--shared {
+  background: var(--color-relation-shared);
+}
+
+.capability-relation-dot--delivery {
+  background: var(--color-relation-delivery);
+}
+
+.capability-relation-dot--invariant {
+  background: var(--color-relation-invariant);
+}
+
+.feature-boundary-graph-canvas {
+  height: calc(100dvh - 224px);
+  min-height: 720px;
+}
+
+.feature-boundary-graph-canvas .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-card);
+  box-shadow: none;
+}
+
+.feature-boundary-graph-canvas .react-flow__controls-button {
+  border-color: var(--color-border);
+  background: var(--color-card);
+  color: var(--color-foreground);
+}
+
+.feature-boundary-graph-canvas .react-flow__controls-button:hover {
+  background: var(--color-surface-hover);
+}
+
+.feature-boundary-graph-canvas .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.feature-boundary-graph-canvas .react-flow__edge-path.feature-boundary-edge {
+  stroke: var(--color-foreground-subtlest);
+  stroke-width: 1.2;
+  opacity: 0.26;
+  transition:
+    opacity 140ms ease,
+    stroke-width 140ms ease;
+}
+
+.feature-boundary-graph-canvas .react-flow__edge-path.feature-boundary-edge.is-highlighted {
+  stroke: var(--color-brand);
+  stroke-width: 2.4;
+  opacity: 1;
+}
+
+.feature-boundary-graph-canvas .react-flow__edge-path.feature-boundary-edge.is-dimmed {
+  opacity: 0.04;
+}
+
+.feature-boundary-node {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25rem;
+  overflow: hidden;
+  border: 1px solid var(--color-card-border);
+  border-left: 3px solid var(--feature-boundary-kind-color);
+  border-radius: 0.6rem;
+  background: var(--color-card);
+  padding: 0.55rem 0.75rem;
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--color-neutral-950) 5%, transparent);
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.feature-boundary-node:hover,
+.feature-boundary-node.is-selected,
+.feature-boundary-node.is-search-match {
+  border-color: var(--color-brand);
+  background: var(--color-card-selected);
+}
+
+.feature-boundary-node.is-selected {
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-brand) 26%, transparent);
+}
+
+.feature-boundary-node.is-dimmed {
+  opacity: 0.16;
+}
+
+.feature-boundary-node-kind {
+  color: var(--feature-boundary-kind-color);
+}
+
+.feature-boundary-node-label {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-foreground);
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.feature-boundary-node--capability {
+  --feature-boundary-kind-color: var(--color-sky-600);
+}
+
+.feature-boundary-node--ui-surface {
+  --feature-boundary-kind-color: var(--color-teal-600);
+}
+
+.feature-boundary-node--service {
+  --feature-boundary-kind-color: var(--color-amber-600);
+}
+
+.feature-boundary-node--state-owner {
+  --feature-boundary-kind-color: var(--color-rose-600);
+}
+
+.feature-boundary-node--persistence {
+  --feature-boundary-kind-color: var(--color-violet-600);
+}
+
+.feature-boundary-node--delivery-boundary {
+  --feature-boundary-kind-color: var(--color-green-600);
+}
+
+.feature-boundary-node--shared-ui {
+  --feature-boundary-kind-color: var(--color-sky-700);
+}
+
+.feature-boundary-node--evidence {
+  --feature-boundary-kind-color: var(--color-foreground-subtlest);
+}
+
+.feature-boundary-node--boundary {
+  --feature-boundary-kind-color: var(--color-foreground);
+}
+
+.feature-boundary-node--unresolved {
+  --feature-boundary-kind-color: var(--color-warning);
+}
+
+.feature-boundary-handle {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+}
+
+@media (max-width: 1279px) {
+  .capability-map-canvas {
+    height: 720px;
+    min-height: 720px;
+  }
+
+  .feature-boundary-graph-canvas {
+    height: 720px;
+    min-height: 720px;
+  }
+}

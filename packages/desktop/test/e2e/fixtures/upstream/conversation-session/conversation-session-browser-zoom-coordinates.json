@@ -1,0 +1,488 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-zoom-coordinates",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-zoom-coordinates.test.ts",
+  "fixtures": [
+    {
+      "id": "zoom-title",
+      "description": "Browser Use case 内固定标题响应，避免异步标题请求污染主链 matcher。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是本用例产品语义，只需稳定返回并与 Browser tool continuation 隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_BROWSER_ZOOM_COORDINATES"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-browser-use-iab-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Browser Use IAB\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":64,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":8,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "zoom-action-0",
+      "description": "缩放回归第 0 轮截图与固定坐标点击",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_ROUND_0"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_0",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.new();\nawait tab.goto('{{browserFixtureUrl}}');\nawait tab.setViewportSize({ width: 1280, height: 720 });\nawait new Promise(resolve => setTimeout(resolve, 1200));\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nfor (const point of [{x:300,y:200},{x:600,y:400},{x:1000,y:600}]) await tab.cua.click(point);\nconst page = await tab.playwright.evaluate(() => ({ events: window.zoomEvents, width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}result/0', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), page, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_RESULT_0', e2eBrowserTabId: tab.id });",
+            "title": "缩放坐标回归 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-final-0",
+      "description": "第 0 轮正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_0",
+          "E2E_ZOOM_RESULT_0"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_DONE_0"
+      }
+    },
+    {
+      "id": "zoom-action-1",
+      "description": "缩放回归第 1 轮截图与固定坐标点击",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_ROUND_1"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_1",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nfor (const point of [{x:300,y:200},{x:600,y:400},{x:1000,y:600}]) await tab.cua.click(point);\nconst page = await tab.playwright.evaluate(() => ({ events: window.zoomEvents, width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}result/1', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), page, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_RESULT_1', e2eBrowserTabId: tab.id });",
+            "title": "缩放坐标回归 1"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-final-1",
+      "description": "第 1 轮正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_1",
+          "E2E_ZOOM_RESULT_1"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_DONE_1"
+      }
+    },
+    {
+      "id": "zoom-action-2",
+      "description": "缩放回归第 2 轮截图与固定坐标点击",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_ROUND_2"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_2",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nfor (const point of [{x:300,y:200},{x:600,y:400},{x:1000,y:600}]) await tab.cua.click(point);\nconst page = await tab.playwright.evaluate(() => ({ events: window.zoomEvents, width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}result/2', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), page, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_RESULT_2', e2eBrowserTabId: tab.id });",
+            "title": "缩放坐标回归 2"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-final-2",
+      "description": "第 2 轮正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_2",
+          "E2E_ZOOM_RESULT_2"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_DONE_2"
+      }
+    },
+    {
+      "id": "zoom-action-3",
+      "description": "缩放回归第 3 轮截图与固定坐标点击",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_ROUND_3"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_3",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nfor (const point of [{x:300,y:200},{x:600,y:400},{x:1000,y:600}]) await tab.cua.click(point);\nconst page = await tab.playwright.evaluate(() => ({ events: window.zoomEvents, width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}result/3', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), page, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_RESULT_3', e2eBrowserTabId: tab.id });",
+            "title": "缩放坐标回归 3"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-final-3",
+      "description": "第 3 轮正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_3",
+          "E2E_ZOOM_RESULT_3"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_DONE_3"
+      }
+    },
+    {
+      "id": "zoom-action-4",
+      "description": "缩放回归第 4 轮截图与固定坐标点击",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_ROUND_4"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_4",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nfor (const point of [{x:300,y:200},{x:600,y:400},{x:1000,y:600}]) await tab.cua.click(point);\nconst page = await tab.playwright.evaluate(() => ({ events: window.zoomEvents, width: innerWidth, height: innerHeight, dpr: devicePixelRatio }));\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}result/4', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), page, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_RESULT_4', e2eBrowserTabId: tab.id });",
+            "title": "缩放坐标回归 4"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-final-4",
+      "description": "第 4 轮正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_4",
+          "E2E_ZOOM_RESULT_4"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_DONE_4"
+      }
+    },
+    {
+      "id": "zoom-natural-action",
+      "description": "普通前台缩小后的自然 viewport、media query、截图像素及 trusted click",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_NATURAL"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_natural",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nawait tab.goto('{{browserFixtureUrl}}natural');\nawait new Promise(resolve => setTimeout(resolve, 400));\nconst before = await tab.playwright.evaluate(() => window.arm());\nconst png = await tab.screenshot();\nawait nodeRepl.emitImage(png);\nawait new Promise(resolve => setTimeout(resolve, 250));\nconst after = await tab.playwright.evaluate(() => window.facts());\nawait tab.cua.click({x:Math.round(before.target.x), y:Math.round(before.target.y)});\nconst events = await tab.playwright.evaluate(() => window.events);\nconst { request } = await import('node:http');\nawait new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}natural-result', { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify({ png: Buffer.from(png).toString('base64'), before, after, events, tabId: tab.id })); });\n({ marker: 'E2E_ZOOM_NATURAL_RESULT', e2eBrowserTabId: tab.id });",
+            "title": "自然 viewport 截图回归"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-natural-final",
+      "description": "自然 viewport 回归正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_natural",
+          "E2E_ZOOM_NATURAL_RESULT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_NATURAL_DONE"
+      }
+    },
+    {
+      "id": "zoom-recovery-action",
+      "description": "110% 后台截图后暂停工具，真实 guest 重建后继续点击自然 viewport",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用与故障时序，后台截图、guest 崩溃重建和鼠标输入使用真实 Electron 产品链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "E2E_ZOOM_RECOVERY"
+        ],
+        "bodyIncludes": [
+          "mcp__node_repl__js"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_zoom_recovery",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const { Buffer } = await import('node:buffer');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst root = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nconst { setupBrowserRuntime } = await import(pathToFileURL(join(root, 'scripts', 'browser-client.mjs')).href);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.get('{{latestBrowserTabId}}');\nconst png = await tab.screenshot();\nconst before = await tab.playwright.evaluate(() => window.facts());\nconst { request } = await import('node:http');\nconst post = (path, data) => new Promise((resolve, reject) => { const req = request('{{browserFixtureUrl}}' + path, { method: 'POST' }, res => { res.resume(); res.on('end', resolve); }); req.on('error', reject); req.end(JSON.stringify(data)); });\nawait post('recovery-prepare', { png: Buffer.from(png).toString('base64'), before, tabId: tab.id });\nawait tab.cua.click({x:100, y:200});\nconst after = await tab.playwright.evaluate(() => window.facts());\nconst events = await tab.playwright.evaluate(() => window.events);\nawait post('recovery-result', { after, events, tabId: tab.id });\n({ marker: 'E2E_ZOOM_RECOVERY_RESULT', e2eBrowserTabId: tab.id });",
+            "title": "guest 换代坐标回归"
+          }
+        }
+      }
+    },
+    {
+      "id": "zoom-recovery-final",
+      "description": "guest 换代坐标回归正常完成",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型工具调用与故障时序，后台截图、guest 崩溃重建和鼠标输入使用真实 Electron 产品链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_ZOOM_COORDINATES",
+          "toolu_zoom_recovery",
+          "E2E_ZOOM_RECOVERY_RESULT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_ZOOM_RECOVERY_DONE"
+      }
+    }
+  ]
+}

@@ -40,7 +40,7 @@ Run `npm run bootstrap` after cloning the repository. It checks the local Node.j
 
 ## Plugin Development
 
-zcode plugins are local bundles that can contribute skills, custom commands, and MCP servers.
+zcode plugins are local bundles that can contribute skills, custom commands, and MCP servers. The plugin surface is compatible with the Claude Code plugin layout, so existing plugin content can be reused with minimal changes.
 
 Plugin state lives under `~/.zcode/cli/plugins`:
 
@@ -69,9 +69,16 @@ For local plugin development, put the plugin in any directory, then add it to th
 }
 ```
 
-### Plugin Manifest
+### Manifest Compatibility
 
-MCP config can live directly in `.zcode-plugin/plugin.json` through `mcpServers`. A plugin may provide both `.mcp.json` and manifest `mcpServers`; when the same server name appears in both places, `mcpServers` from the selected manifest wins.
+zcode discovers the first manifest that exists:
+
+1. `.zcode-plugin/plugin.json`
+2. `.claude-plugin/plugin.json`
+
+`.zcode-plugin/plugin.json` uses the same field names as Claude Code. Use it only when zcode needs different metadata or runtime wiring. If the Claude manifest already works, a plugin can ship only `.claude-plugin/plugin.json`.
+
+MCP config can live directly in `.zcode-plugin/plugin.json` through `mcpServers`. This is useful when the Claude-compatible `.mcp.json` points at a different runtime, such as Bun source files, while zcode should run a built Node.js server from `dist/`. A plugin may provide both `.mcp.json` and manifest `mcpServers`; when the same server name appears in both places, `mcpServers` from the selected manifest wins.
 
 Supported fields in the current zcode plugin surface:
 
@@ -109,13 +116,28 @@ Example `.zcode-plugin/plugin.json` with inline MCP config:
 }
 ```
 
+zcode also reads plugin `.mcp.json` using Claude Code's wrapper shape. Use this when the same MCP config should be shared by Claude Code and zcode:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/mcp/server.js"]
+    }
+  }
+}
+```
+
+Unsupported Claude plugin fields are ignored with diagnostics rather than executed. This includes `hooks`, `agents`, `outputStyles`, `lspServers`, `channels`, and `dependencies`.
+
 ### Variables
 
-Plugin MCP config can use these variable names:
+Plugin MCP config can use both zcode and Claude-compatible variable names:
 
-- `${ZCODE_PLUGIN_ROOT}`
-- `${ZCODE_PLUGIN_DATA}`
-- `${ZCODE_PROJECT_DIR}`
+- `${ZCODE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_ROOT}`
+- `${ZCODE_PLUGIN_DATA}` and `${CLAUDE_PLUGIN_DATA}`
+- `${ZCODE_PROJECT_DIR}` and `${CLAUDE_PROJECT_DIR}`
 - `${user_config.key}`
 - `${ZCODE_SOME_ENV}`
 
@@ -125,6 +147,7 @@ Only environment variables with the `ZCODE_` prefix are expanded. Missing variab
 
 ```txt
 my-plugin/
+  .claude-plugin/plugin.json
   .zcode-plugin/plugin.json
   .mcp.json
   skills/
@@ -134,7 +157,7 @@ my-plugin/
   src/
 ```
 
-For MCP servers, prefer Node's normal package build and `bin` output when targeting zcode-cli, and keep all process/file/network side effects inside the MCP server boundary.
+Keep reusable content in Claude-compatible locations. Add a `.zcode-plugin/plugin.json` only for zcode-specific package names, built artifacts, or command paths. For MCP servers, prefer Node's normal package build and `bin` output when targeting zcode-cli, and keep all process/file/network side effects inside the MCP server boundary.
 
 ## MCP Configuration
 

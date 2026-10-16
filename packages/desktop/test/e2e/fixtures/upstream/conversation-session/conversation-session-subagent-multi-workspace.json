@@ -1,0 +1,656 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-multi-workspace",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-multi-workspace.test.ts",
+  "fixtures": [
+    {
+      "id": "smw-a-title",
+      "description": "smw-a-title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SMW_A_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Workspace a",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-seed",
+      "description": "smw-a-seed",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_A_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-hold-tool",
+      "description": "smw-a-hold-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_A_HOLD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_a_hold",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "hold",
+            "prompt": "E2E_SMW_A_HOLD_CHILD",
+            "run_in_background": false
+          }
+        },
+        "delayMs": 45000
+      }
+    },
+    {
+      "id": "smw-a-hold-child",
+      "description": "smw-a-hold-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_A_HOLD_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_A_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_HOLD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-hold-final",
+      "description": "smw-a-hold-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_a_hold", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_HOLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-next-tool",
+      "description": "smw-a-next-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_A_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_a_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "next",
+            "prompt": "E2E_SMW_A_NEXT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "smw-a-next-child",
+      "description": "smw-a-next-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_A_NEXT_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_A_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-next-final",
+      "description": "smw-a-next-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_a_next", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-title",
+      "description": "smw-b-title",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SMW_B_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Workspace b",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-seed",
+      "description": "smw-b-seed",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_B_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-hold-tool",
+      "description": "smw-b-hold-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_B_HOLD:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_b_hold",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "hold",
+            "prompt": "E2E_SMW_B_HOLD_CHILD",
+            "run_in_background": false
+          }
+        },
+        "delayMs": 45000
+      }
+    },
+    {
+      "id": "smw-b-hold-child",
+      "description": "smw-b-hold-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_B_HOLD_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_B_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_HOLD_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-hold-final",
+      "description": "smw-b-hold-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_b_hold", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_HOLD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-next-tool",
+      "description": "smw-b-next-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_B_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_b_next",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "next",
+            "prompt": "E2E_SMW_B_NEXT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "smw-b-next-child",
+      "description": "smw-b-next-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_B_NEXT_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_B_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-next-final",
+      "description": "smw-b-next-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_b_next", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-project-tool",
+      "description": "smw-a-project-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_A_PROJECT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_a_project",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "next",
+            "prompt": "E2E_SMW_A_PROJECT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "smw-a-project-child",
+      "description": "smw-a-project-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_A_PROJECT_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_A_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_PROJECT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-a-project-final",
+      "description": "smw-a-project-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_a_project", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_A_PROJECT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-project-tool",
+      "description": "smw-b-project-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_B_PROJECT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_b_project",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "next",
+            "prompt": "E2E_SMW_B_PROJECT_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "smw-b-project-child",
+      "description": "smw-b-project-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SMW_B_PROJECT_CHILD", "E2E_SMW_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SMW_B_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_PROJECT_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-project-final",
+      "description": "smw-b-project-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "通过真实 UI 打开两个 workspace，provider fixture 延迟父请求；测试 stdio 代理仅记录真实 CLI pid/session 配置读取，不替换业务执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_b_project", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_PROJECT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "smw-b-fallback-tool",
+      "description": "smw-b-fallback-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "B 项目读取失败时自定义 Agent 明确失败且不创建 child；A 保存/执行正常，B 恢复后重新消费用户配置。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SMW_B_FALLBACK:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_smw_b_fallback",
+          "name": "Agent",
+          "inputTokens": 32,
+          "input": {
+            "subagent_type": "e2e-workspace-reviewer",
+            "description": "next",
+            "prompt": "E2E_SMW_B_FALLBACK_CHILD",
+            "run_in_background": false
+          }
+        }
+      }
+    },
+    {
+      "id": "smw-b-fallback-final",
+      "description": "smw-b-fallback-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "B 项目读取失败时自定义 Agent 明确失败且不创建 child；A 保存/执行正常，B 恢复后重新消费用户配置。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_smw_b_fallback", "agentId: agent_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SMW_B_FALLBACK_DONE",
+          "inputTokens": 32
+        }
+      }
+    }
+  ]
+}

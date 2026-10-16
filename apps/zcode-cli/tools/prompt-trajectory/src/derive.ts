@@ -36,14 +36,12 @@ export interface DerivedTrajectoryResult {
   trajectories: DerivedTrajectory[];
 }
 
-async function deriveTrajectoriesFromJsonlFile(
-  inputPath: string,
-): Promise<DerivedTrajectoryResult> {
+export async function deriveTrajectoriesFromJsonlFile(inputPath: string): Promise<DerivedTrajectoryResult> {
   return deriveTrajectoriesFromEntries(await readTrajectoryJsonl(inputPath));
 }
 
 export async function writeDerivedTrajectories(input: {
-  referenceRequestPath?: string;
+  ccRequestPath?: string;
   inputPath: string;
   outDir: string;
 }): Promise<DerivedTrajectoryResult> {
@@ -70,14 +68,11 @@ export async function writeDerivedTrajectories(input: {
     "utf8",
   );
 
-  if (input.referenceRequestPath) {
+  if (input.ccRequestPath) {
     const rawDir = join(input.outDir, "raw");
     await mkdir(rawDir, { recursive: true });
-    const raw = await readFile(input.referenceRequestPath, "utf8");
-    await writeFile(
-      join(rawDir, "reference-request-body.raw.json"),
-      raw.endsWith("\n") ? raw : `${raw}\n`,
-    );
+    const raw = await readFile(input.ccRequestPath, "utf8");
+    await writeFile(join(rawDir, "cc-request-body.raw.json"), raw.endsWith("\n") ? raw : `${raw}\n`);
   }
 
   return result;
@@ -262,10 +257,8 @@ function createOpenAiRequestBody(
 export function createAnthropicRequestBody(
   trajectory: DerivedTrajectory | MutableTrajectory,
 ): JsonObject & { messages: OpenAiMessage[] } {
-  const sourceBody =
-    "requestBody" in trajectory ? trajectory.requestBody : trajectory.bodyWithoutMessages;
-  const sourceMessages =
-    "requestBody" in trajectory ? trajectory.requestBody.messages : trajectory.messages;
+  const sourceBody = "requestBody" in trajectory ? trajectory.requestBody : trajectory.bodyWithoutMessages;
+  const sourceMessages = "requestBody" in trajectory ? trajectory.requestBody.messages : trajectory.messages;
   const bodyWithoutMessages = cloneJsonObject(sourceBody);
   const {
     model,

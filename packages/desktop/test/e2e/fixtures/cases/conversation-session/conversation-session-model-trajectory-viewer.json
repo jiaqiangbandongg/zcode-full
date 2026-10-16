@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-trajectory-viewer",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-trajectory-viewer.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-trajectory-viewer.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode/cli/debug/model-io-<runtime-task-id>.jsonl",
+      "source": "created-by-spec",
+      "description": "spec 按真实 task id 写入 80 条确定性 model-io 记录，覆盖投影、错误、虚拟列表、搜索与窄布局。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "model-trajectory-viewer-title",
+      "description": "轨迹 case 的固定标题回复。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是轨迹交互的产品语义，只需稳定完成。"
+    },
+    {
+      "id": "model-trajectory-viewer-task-seed",
+      "description": "建立真实 task/session，并用带 thinking 的真实 provider stream 验证 CLI model-io 落盘。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 thinking/text stream 使 CLI model-io 的 reasoningText 与正文落盘可被稳定断言；其余 UI 状态由 case-local 记录驱动。"
+    }
+  ]
+}

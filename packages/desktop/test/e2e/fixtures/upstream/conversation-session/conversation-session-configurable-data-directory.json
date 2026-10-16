@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-configurable-data-directory",
+  "spec": "./test/e2e/conversation-session/conversation-session-configurable-data-directory.test.ts",
+  "fixtures": [
+    {
+      "id": "cdd01-before-migration-title",
+      "description": "迁移前任务的稳定标题响应。",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "使用 CDD01 marker 隔离标题请求，避免标题生成影响主路径回放。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_CDD01_BEFORE_MIGRATION"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "cdd01-before-migration-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Data Directory Migration\"}"
+        }
+      }
+    },
+    {
+      "id": "cdd01-before-migration-main",
+      "description": "迁移前完成一轮普通 conversation，形成可恢复的历史任务。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定迁移前 completed assistant marker，避免依赖真实模型文本。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CDD01_BEFORE_MIGRATION"],
+        "bodyExcludes": ["Generate a concise title", "E2E_CDD01_AFTER_MIGRATION"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "cdd01-before-migration-main",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "CDD01_BEFORE_MIGRATION_DONE"
+        }
+      }
+    },
+    {
+      "id": "cdd01-after-migration-main",
+      "description": "冷重启后在同一任务中完成 follow-up。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定迁移后 completed assistant marker，证明新 App 根下原任务仍可继续。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_CDD01_AFTER_MIGRATION"],
+        "bodyIncludes": ["CDD01_BEFORE_MIGRATION_DONE"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "cdd01-after-migration-main",
+          "inputTokens": 128,
+          "outputTokens": 8,
+          "text": "CDD01_AFTER_MIGRATION_DONE"
+        }
+      }
+    }
+  ]
+}

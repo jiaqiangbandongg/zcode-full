@@ -1,0 +1,17 @@
+node source
+node world-read#1 "git-changed-files" @5:27 type="string[]"
+node world-read#2 "git-log" @7:27 type="GitCommit[]"
+node world-read#3 "git-status" @8:26 type="GitStatus"
+node world-read#4 "git-diff HEAD" @9:24 type="string"
+node ask#1 "reviewer" @12:32 actors=actor#1 type="string"
+node sink
+actor actor#1 "reviewer" @11:18
+edge source -> world-read#1 data exact
+edge source -> world-read#2 data exact
+edge source -> world-read#3 data exact
+edge source -> world-read#4 data exact
+edge world-read#1 -> ask#1 data exact type="string[]"
+edge world-read#2 -> ask#1 data exact type="GitCommit[]"
+edge world-read#3 -> ask#1 data exact type="GitStatus"
+edge world-read#4 -> ask#1 data exact type="string"
+edge ask#1 -> sink data exact type="string"

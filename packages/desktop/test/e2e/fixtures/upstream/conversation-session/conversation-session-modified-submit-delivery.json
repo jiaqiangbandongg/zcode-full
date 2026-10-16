@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-modified-submit-delivery",
+  "spec": "./test/e2e/conversation-session/conversation-session-modified-submit-delivery.test.ts",
+  "fixtures": [
+    {
+      "id": "modified-submit-key-base",
+      "description": "M06k 快捷键前的 pre-output running turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 provider 已接收但 assistant 尚未输出的运行窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOLD_STREAM", "E2E_MODIFIED_KEY_BASE_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_MODIFIED_KEY_BASE_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "modified-submit-key-base",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "should-be-interrupted"
+        }
+      }
+    },
+    {
+      "id": "modified-submit-key-selected",
+      "description": "M06k 快捷键直接发送的新 turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 Cmd/Ctrl+Enter 抢占后只启动一次新请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_MODIFIED_KEY_"],
+        "bodyExcludes": [
+          "E2E_MODIFIED_KEY_BASE_",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageIncludes": ["E2E_MODIFIED_KEY_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "modified-submit-key-selected",
+          "inputTokens": 90,
+          "outputTokens": 8,
+          "text": "modified-key-ok"
+        }
+      }
+    },
+    {
+      "id": "modified-submit-guide-base",
+      "description": "M06n guide 反向入队前的 pre-output running turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证 guide 模式下修饰键反向入队且不抢占。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_HOLD_STREAM", "E2E_MODIFIED_GUIDE_BASE_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_MODIFIED_GUIDE_BASE_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "modified-submit-guide-base",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "guide-base-ok"
+        }
+      }
+    },
+    {
+      "id": "modified-submit-guide-queued-not-sent",
+      "description": "M06n future queue 项不得提前请求 provider。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "maxMatches=0 将 guide 反向投递不得新增 provider 请求纳入 ledger。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_MODIFIED_GUIDE_QUEUE_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "modified-submit-guide-should-not-send",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "should-not-send"
+        }
+      }
+    },
+    {
+      "id": "modified-submit-tool-read",
+      "description": "M06k 双能力工具结果后抢占：read。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定完整工具结果后的抢占窗口，按 MCS 开关验证新轮 human reminder 的角色、全文和原始 UI。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MODIFIED_TOOL_BASE_"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_READONLY_TOOL_FILE_CONTENT",
+          "E2E_MODIFIED_TOOL_SELECTED_"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_modified_read",
+          "messageId": "msg_modified_read",
+          "name": "Read",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/shared/readonly-tool.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "modified-submit-tool-hold",
+      "description": "M06k 双能力工具结果后抢占：hold。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定完整工具结果后的抢占窗口，按 MCS 开关验证新轮 human reminder 的角色、全文和原始 UI。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MODIFIED_TOOL_BASE_",
+          "E2E_READONLY_TOOL_FILE_CONTENT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_MODIFIED_TOOL_SELECTED_"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 60000,
+        "text": {
+          "id": "modified-tool-hold",
+          "inputTokens": 120,
+          "outputTokens": 8,
+          "text": "should-be-interrupted"
+        }
+      }
+    },
+    {
+      "id": "modified-submit-tool-selected",
+      "description": "M06k 双能力工具结果后抢占：selected。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定完整工具结果后的抢占窗口，按 MCS 开关验证新轮 human reminder 的角色、全文和原始 UI。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MODIFIED_TOOL_BASE_",
+          "E2E_READONLY_TOOL_FILE_CONTENT",
+          "E2E_MODIFIED_TOOL_SELECTED_",
+          "The user sent a new message while you were working:",
+          "Address the message above as you continue this turn."
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "modified-tool-selected",
+          "inputTokens": 160,
+          "outputTokens": 8,
+          "text": "modified-tool-ok"
+        }
+      }
+    }
+  ]
+}

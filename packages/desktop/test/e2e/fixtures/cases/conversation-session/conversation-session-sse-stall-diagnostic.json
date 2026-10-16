@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-sse-stall-diagnostic",
+  "spec": "./test/e2e/conversation-session/conversation-session-sse-stall-diagnostic.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-sse-stall-diagnostic.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "ensureReadonlyToolFixtureFile 写入固定内容，SSE-ST-05/06 用真实 Read 成功结果验证工具提交边界和 stall 恢复不重复执行。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "sse-stall-diagnostic-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 diagnostic 的验证目标，只需稳定收口。"
+    },
+    {
+      "id": "sse-stall-prelude-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "在 retry-safe prelude 边界制造真实 SSE stall。"
+    },
+    {
+      "id": "sse-stall-prelude-recovered",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 retry-safe prelude 能通过真实第二次 provider request 收口。"
+    },
+    {
+      "id": "sse-stall-thinking-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "在 reasoning-only visible boundary 制造真实 SSE stall。"
+    },
+    {
+      "id": "sse-stall-thinking-recovered",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 S02-R1 的真实 Desktop recovery 请求。"
+    },
+    {
+      "id": "sse-stall-text-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "在用户可见正文边界制造真实 SSE stall，采样 S03 当前行为。"
+    },
+    {
+      "id": "sse-stall-text-recovered",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "允许 diagnostic 区分当前实现是恢复还是直接进入 terminal。"
+    },
+    {
+      "id": "sse-stall-tool-input-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "验证未 commit 的工具输入不会在 stall/recovery 中被执行。"
+    },
+    {
+      "id": "sse-stall-tool-input-recovered",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明未提交工具不会阻止安全恢复。"
+    },
+    {
+      "id": "sse-stall-tool-committed-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "在 tool content block 完整但 message 未 terminal 的边界制造 stall，诊断是否执行、恢复和重复。"
+    },
+    {
+      "id": "sse-stall-tool-committed-continuation",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 content_block_stop 已提交并执行工具，成功结果成为恢复锚点且同一工具不会重放。"
+    },
+    {
+      "id": "sse-stall-post-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "构造工具已经成功执行、tool_result 已进入下一次模型请求的真实前置状态。"
+    },
+    {
+      "id": "sse-stall-post-tool-continuation-stalled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "把 stall 放在已成功执行工具之后，验证恢复不会重放工具。"
+    },
+    {
+      "id": "sse-stall-post-tool-continuation-recovered",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明 post-tool continuation 只重试模型请求，不重复执行工具。"
+    }
+  ]
+}

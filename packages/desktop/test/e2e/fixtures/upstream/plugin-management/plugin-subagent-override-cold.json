@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "caseName": "plugin-subagent-override-cold",
+  "spec": "./test/e2e/plugins/plugin-subagent-override-cold.test.ts",
+  "fixtures": [
+    {
+      "id": "plugin-override-cold-parent",
+      "description": "父请求只负责触发已配置的官方 judge。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性触发插件 child，模型与档位以实际请求为证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLUGIN_OVERRIDE_COLD_PARENT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_plugin_override_cold",
+          "name": "Agent",
+          "input": {
+            "description": "Check plugin model override",
+            "subagent_type": "document-skills:judge",
+            "prompt": "E2E_PLUGIN_OVERRIDE_COLD_CHILD: Reply with exactly E2E_PLUGIN_OVERRIDE_COLD_RESULT and no other text."
+          }
+        }
+      }
+    },
+    {
+      "id": "plugin-override-cold-child",
+      "description": "插件 child 确定性返回。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "检查 child 的真实模型和 high 参数，不依赖模型输出随机性。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_PLUGIN_OVERRIDE_COLD_CHILD"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-override-cold-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_PLUGIN_OVERRIDE_COLD_RESULT"
+        }
+      }
+    },
+    {
+      "id": "plugin-override-cold-final",
+      "description": "父请求消费 child 结果后完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证子结果回到父执行，父 continuation 不继承 child 模型或档位。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_PLUGIN_OVERRIDE_COLD_PARENT",
+          "E2E_PLUGIN_OVERRIDE_COLD_RESULT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-override-cold-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "plugin-override-cold-done"
+        }
+      }
+    }
+  ]
+}

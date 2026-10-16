@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-open-existing-only",
+  "spec": "./test/e2e/conversation-session/conversation-session-open-existing-only.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-open-existing-only.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-session-open-existing-only-reply",
+      "description": "草稿首发返回固定文本，建立可离开后重开的正式 Session。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心合同是新建首次绑定零 session-open、重开已有 Session 一组配对事件；固定回复只用于稳定结束首轮。"
+    }
+  ]
+}

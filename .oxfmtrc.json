@@ -1,10 +1,14 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": [
+    "packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js",
+    "apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/**",
     "THIRD-PARTY-NOTICES.md",
     "third-party/inventory.json",
     "third-party/upstream/**",
     "third-party/native-search/licenses/**",
-    "third-party/runtime/*.txt"
+    "third-party/runtime/*.txt",
+    "docs/knip/docs/LICENSE",
+    "docs/knip/docs/licenses/**"
   ]
 }

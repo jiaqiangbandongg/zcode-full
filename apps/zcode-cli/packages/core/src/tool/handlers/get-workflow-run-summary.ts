@@ -18,7 +18,7 @@ import {
 } from "./workflow-run-introspection.js";
 
 /** 摘要要读的事实 = 整份输出减去摘要自己（handler 先铸出输出，再拿它拼这一句）。 */
-type WorkflowRunSummaryFacts = Omit<GetWorkflowRunOutput, "summary">;
+export type WorkflowRunSummaryFacts = Omit<GetWorkflowRunOutput, "summary">;
 
 /** 终态三词：run 已经没有下一步动作了（与端口的终态判定同集）。 */
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "errored", "stopped"]);
@@ -38,6 +38,7 @@ export function buildWorkflowRunSummary(run: WorkflowRunSummaryFacts): string {
   const optional = [
     failureClause(run),
     questionsClause(run),
+    holesClause(run),
     progressClause(run, now, terminal),
     deliverableClause(run),
     ownershipClause(run),
@@ -137,6 +138,13 @@ function questionsClause(run: WorkflowRunSummaryFacts): string | undefined {
   const count = run.pendingQuestions?.length ?? 0;
   if (count === 0) return undefined;
   return `${count} question${count === 1 ? "" : "s"} awaiting your answer.`;
+}
+
+/** 等着的留白（docs/dynamic-workflow/launch.md「The `FillWorkflowHole` tool」）：与待答问题同一种「等你」。 */
+function holesClause(run: WorkflowRunSummaryFacts): string | undefined {
+  const count = (run.holes ?? []).filter((hole) => hole.state === "waiting").length;
+  if (count === 0) return undefined;
+  return `${count} hole${count === 1 ? "" : "s"} awaiting your code.`;
 }
 
 /** 最后一次被观察到在动是什么时候；停滞了就把这个词说出来。 */

@@ -2,9 +2,9 @@ import { create } from "zustand";
 import type { ConversationShareAccessMode } from "@zcode/shared";
 import type { ConversationShareFailureIssue } from "@zcode/services";
 
-type ConversationShareScope = "all" | "partial";
-type ConversationShareSelectionView = "selection" | "timeline";
-type ConversationShareSelectionStage = "selection" | "configuration";
+export type ConversationShareScope = "all" | "partial";
+export type ConversationShareSelectionView = "selection" | "timeline";
+export type ConversationShareSelectionStage = "selection" | "configuration";
 export const DEFAULT_CONVERSATION_SHARE_ACCESS_MODE: ConversationShareAccessMode =
   "public_importable";
 
@@ -19,6 +19,10 @@ export interface ConversationShareDisplayError {
   issueCount: number;
   omittedIssueCount?: number;
   requestId?: string;
+  clientRequestId?: string;
+  operationId?: string;
+  status?: number;
+  code?: number;
   /** 没有服务端 issues 时展示的、按错误类型解析出的可行动文案。 */
   messageId?: string;
 }
@@ -32,7 +36,7 @@ export interface ConversationShareDisplayWarnings {
 
 export type ConversationShareProgressPhase = "collecting" | "uploading" | "checking";
 
-interface ConversationShareSelectionDraft {
+export interface ConversationShareSelectionDraft {
   scope: ConversationShareScope;
   stage: ConversationShareSelectionStage;
   view: ConversationShareSelectionView;
@@ -42,7 +46,7 @@ interface ConversationShareSelectionDraft {
   accessMode: ConversationShareAccessMode;
 }
 
-interface ConversationShareDockState {
+export interface ConversationShareDockState {
   title?: string;
   disclosureAccepted: boolean;
   publishing: boolean;
@@ -102,11 +106,28 @@ export const DEFAULT_CONVERSATION_SHARE_DOCK_STATE: ConversationShareDockState =
   attempt: null,
 });
 
+const SESSION_SWITCH_REOPEN_KEY = "__zcodeConversationShareReopenAfterTaskSwitch";
+
+type ConversationShareWindow = Window & Partial<Record<typeof SESSION_SWITCH_REOPEN_KEY, boolean>>;
+
+export function markConversationSharePopoverForSessionSwitch(): void {
+  if (typeof window === "undefined") return;
+  (window as ConversationShareWindow)[SESSION_SWITCH_REOPEN_KEY] = true;
+}
+
+export function consumeConversationSharePopoverSessionSwitch(): boolean {
+  if (typeof window === "undefined") return false;
+  const runtimeWindow = window as ConversationShareWindow;
+  const shouldReopen = runtimeWindow[SESSION_SWITCH_REOPEN_KEY] === true;
+  delete runtimeWindow[SESSION_SWITCH_REOPEN_KEY];
+  return shouldReopen;
+}
+
 function normalizeRowIds(rowIds: readonly number[]): number[] {
   return [...new Set(rowIds.filter(Number.isSafeInteger))].sort((left, right) => left - right);
 }
 
-function getConversationShareDraft(
+export function getConversationShareDraft(
   state: Pick<ConversationShareSelectionState, "drafts">,
   taskId: string,
 ): ConversationShareSelectionDraft {

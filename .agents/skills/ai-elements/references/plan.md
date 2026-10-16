@@ -35,52 +35,52 @@ npx ai-elements@latest add plan
 
 ### `<Plan />`
 
-| Prop          | Type                                       | Default | Description                                                                                  |
-| ------------- | ------------------------------------------ | ------- | -------------------------------------------------------------------------------------------- |
-| `isStreaming` | `boolean`                                  | `false` | Whether content is currently streaming. Enables shimmer animations on title and description. |
-| `defaultOpen` | `boolean`                                  | -       | Whether the plan is expanded by default.                                                     |
-| `...props`    | `React.ComponentProps<typeof Collapsible>` | -       | Any other props are spread to the Collapsible component.                                     |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `isStreaming` | `boolean` | `false` | Whether content is currently streaming. Enables shimmer animations on title and description. |
+| `defaultOpen` | `boolean` | - | Whether the plan is expanded by default. |
+| `...props` | `React.ComponentProps<typeof Collapsible>` | - | Any other props are spread to the Collapsible component. |
 
 ### `<PlanHeader />`
 
-| Prop       | Type                                      | Default | Description                                             |
-| ---------- | ----------------------------------------- | ------- | ------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CardHeader>` | -       | Any other props are spread to the CardHeader component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CardHeader>` | - | Any other props are spread to the CardHeader component. |
 
 ### `<PlanTitle />`
 
-| Prop       | Type                                            | Default | Description                                                               |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------------------------- |
-| `children` | `string`                                        | -       | The title text. Displays with shimmer animation when isStreaming is true. |
-| `...props` | `Omit<React.ComponentProps<typeof CardTitle>, ` | -       | Any other props (except children) are spread to the CardTitle component.  |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `string` | - | The title text. Displays with shimmer animation when isStreaming is true. |
+| `...props` | `Omit<React.ComponentProps<typeof CardTitle>, ` | - | Any other props (except children) are spread to the CardTitle component. |
 
 ### `<PlanDescription />`
 
-| Prop       | Type                                                  | Default | Description                                                                     |
-| ---------- | ----------------------------------------------------- | ------- | ------------------------------------------------------------------------------- |
-| `children` | `string`                                              | -       | The description text. Displays with shimmer animation when isStreaming is true. |
-| `...props` | `Omit<React.ComponentProps<typeof CardDescription>, ` | -       | Any other props (except children) are spread to the CardDescription component.  |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `string` | - | The description text. Displays with shimmer animation when isStreaming is true. |
+| `...props` | `Omit<React.ComponentProps<typeof CardDescription>, ` | - | Any other props (except children) are spread to the CardDescription component. |
 
 ### `<PlanTrigger />`
 
-| Prop       | Type                                              | Default | Description                                                                                            |
-| ---------- | ------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | -       | Any other props are spread to the CollapsibleTrigger component. Renders as a Button with chevron icon. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | - | Any other props are spread to the CollapsibleTrigger component. Renders as a Button with chevron icon. |
 
 ### `<PlanContent />`
 
-| Prop       | Type                                       | Default | Description                                              |
-| ---------- | ------------------------------------------ | ------- | -------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CardContent>` | -       | Any other props are spread to the CardContent component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CardContent>` | - | Any other props are spread to the CardContent component. |
 
 ### `<PlanFooter />`
 
-| Prop       | Type                    | Default | Description                                    |
-| ---------- | ----------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.ComponentProps<` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<` | - | Any other props are spread to the div element. |
 
 ### `<PlanAction />`
 
-| Prop       | Type                                      | Default | Description                                             |
-| ---------- | ----------------------------------------- | ------- | ------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof CardAction>` | -       | Any other props are spread to the CardAction component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof CardAction>` | - | Any other props are spread to the CardAction component. |

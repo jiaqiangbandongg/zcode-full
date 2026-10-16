@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-TP-03",
+  "classification": "synthetic",
+  "syntheticReason": "Deterministic task interaction events and recorded provider HTTP reproduce topic card routing without sending to a real tenant; this does not verify native Feishu or Agent execution.",
+  "timing": "controlled-stream",
+  "promptMarker": "E2E_TOPIC_INTERACTION"
+}

@@ -1,7 +1,14 @@
 import { isActivePersonalCodingPlan } from "#src/bigmodel/codingPlanEntitlement.js";
 import type { UsageQuotaLimit, UsageQuotaUsageDetail } from "@zcode/shared";
 
-interface BigModelSubscriptionListItem {
+export interface BigModelSubscriptionListEnvelope {
+  code?: number;
+  msg?: string;
+  success?: boolean;
+  data?: BigModelSubscriptionListItem[] | null;
+}
+
+export interface BigModelSubscriptionListItem {
   productId?: string;
   productName?: string;
   status?: string;
@@ -69,6 +76,15 @@ export function pickPrimaryLimit(limits: UsageQuotaLimit[]): UsageQuotaLimit | n
     limits[0] ??
     null
   );
+}
+
+export function formatPlanName(level: string): string {
+  const normalized = level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+  return `GLM Coding ${normalized}`;
+}
+
+export function isNoPlanMessage(message: string): boolean {
+  return message.includes("不存在coding plan") || message.includes("没有资格");
 }
 
 export function pickCurrentSubscriptionFromList(

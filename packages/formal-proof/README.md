@@ -13,3 +13,5 @@ pnpm --filter @zcode/formal-proof dev
 ```text
 http://127.0.0.1:4176/
 ```
+
+核心 spec 见 `docs/conversation-product-state-space.md`。

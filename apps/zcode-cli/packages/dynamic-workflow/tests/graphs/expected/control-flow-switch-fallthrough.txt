@@ -1,0 +1,9 @@
+node source
+node ask#1 "judge" @2:38 actors=actor#1 type="string"
+node ask#2 "act" @14:21 actors=actor#2 type="string"
+node sink
+actor actor#1 "judge" @2:23
+actor actor#2 "act" @14:8
+edge source -> ask#1 data exact
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

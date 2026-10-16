@@ -1,0 +1,30 @@
+node source
+node world-read#1 "run ./target/release/bench" @22:29 type="WorldRunResult"
+node world-read#2 "run git" @27:28 type="WorldRunResult"
+node world-read#3 "run cargo" @29:27 type="WorldRunResult"
+node ask#1 "optimizer" @41:34 actors=actor#1 type="Attempt"
+node world-read#4 "run cargo" @44:31 type="WorldRunResult"
+node world-read#5 "run git" @52:34 type="WorldRunResult"
+node world-read#6 "run git" @65:34 type="WorldRunResult"
+node ask#2 "consultant" @67:37 actors=actor#2 type="Advice"
+node world-read#7 "run git" @73:26 type="WorldRunResult"
+node sink
+actor actor#1 "optimizer" @33:19
+actor actor#2 "consultant" @34:20
+edge source -> world-read#1 data exact
+edge source -> world-read#2 data exact
+edge source -> world-read#3 data exact
+edge source -> world-read#4 data exact
+edge source -> world-read#6 data exact
+edge source -> world-read#7 data exact
+edge world-read#1 -> ask#1 data exact type="WorldRunResult"
+edge world-read#1 -> ask#2 data exact type="WorldRunResult"
+edge world-read#1 -> sink data exact type="WorldRunResult"
+edge ask#1 -> ask#1 data exact type="Attempt"
+edge ask#1 -> world-read#5 data exact type="Attempt"
+edge ask#1 -> ask#2 data exact type="Attempt"
+edge world-read#4 -> ask#1 data exact type="WorldRunResult"
+edge world-read#4 -> ask#2 data exact type="WorldRunResult"
+edge ask#2 -> ask#1 data exact type="Advice"
+edge ask#2 -> ask#2 data exact type="Advice"
+edge world-read#7 -> sink data exact type="WorldRunResult"

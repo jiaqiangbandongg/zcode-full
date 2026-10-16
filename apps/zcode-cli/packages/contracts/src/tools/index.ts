@@ -34,6 +34,7 @@ export * from "./create-workflow.js";
 // 修订入口：名字常量被 core 的
 // 分派、权限服务的 owner 规则、bootstrap 的 actor 禁用名单与 TUI/headless 旁路读走。
 export * from "./amend-workflow.js";
+export * from "./workflow-settings.js";
 export * from "./saved-workflow.js";
 export * from "./save-workflow.js";
 export * from "./list-saved-workflows.js";
@@ -51,6 +52,9 @@ export * from "./resume-workflow-run.js";
 // 名单读走，漏掉这两行会让那两处静默失效（照 resume-workflow-run 的同款注释）。
 export * from "./escalate.js";
 export * from "./resolve-workflow-question.js";
+// 留白补全（docs/dynamic-workflow/launch.md「The `FillWorkflowHole` tool」）：名字常量被 core 的注册、
+// 权限服务的 owner 规则、workflow child 的禁用名单与 display 分派读走。
+export * from "./fill-workflow-hole.js";
 export * from "./workflow-observation-display.js";
 export * from "./tool-result-metadata.js";
 export * from "./performance.js";

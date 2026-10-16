@@ -1,6 +1,7 @@
 import type { RuntimeInputPresentation } from "@zcode/contracts";
 import { createModelId, createModelProviderId } from "@zcode/contracts";
 import { SessionEventType, createPartId, traceContextToLogContext } from "../deps.js";
+import { withConversationQuotes } from "../helpers/conversation-quotes.js";
 import type {
   EnvInfo,
   MessageId,
@@ -105,6 +106,7 @@ export async function persistUserPrompt(
               ? { inputClientId: options?.intent?.clientId ?? options?.clientId }
               : {}),
             ...(options?.executionKind ? { executionKind: options.executionKind } : {}),
+            ...(options?.intent?.highspeed ? { highspeed: options.intent.highspeed } : {}),
             ...(options?.epilogueStart === undefined
               ? {}
               : { epilogueStart: options.epilogueStart }),
@@ -118,7 +120,11 @@ export async function persistUserPrompt(
       sessionID: this.sessionId,
       messageID,
       type: "text",
-      text: input,
+      text: withConversationQuotes(
+        input,
+        options?.intent?.conversationQuotes,
+        options?.intent?.botGroupSource,
+      ),
       time: {
         start: created,
         end: created,

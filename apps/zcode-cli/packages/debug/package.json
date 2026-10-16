@@ -6,13 +6,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.server.json && vite build",
     "dev": "tsx scripts/dev.ts",
-    "lint": "oxlint src server scripts",
-    "lint:fix": "oxlint --write src server scripts",
+    "lint": "oxlint src server scripts tests",
+    "lint:fix": "oxlint --write src server scripts tests",
     "start": "node dist-server/server/index.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.4",
+    "@zcode/shared": "workspace:*",
     "hono": "^4.10.7",
     "http-mitm-proxy": "^1.1.0",
     "lucide-react": "^1.17.0",
@@ -27,6 +29,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^4.1.5"
   }
 }

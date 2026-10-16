@@ -1,0 +1,316 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-output-token-preflight",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-output-token-preflight.test.ts",
+  "fixtures": [
+    {
+      "id": "model-output-token-preflight-title",
+      "description": "Preflight case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于预算策略语义，只需避免干扰主请求和 Compact 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb-preflight-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb-preflight-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Preflight Budget\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb-preflight-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb08-history",
+      "description": "OTB08 建立可压缩的第一轮历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第一轮仅建立 Auto Compact 所需历史，并确认 preflight-v1 在低 usage 时仍发送 64K。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB08_HISTORY"],
+        "bodyIncludes": [
+          "E2E_OTB08_HISTORY",
+          "\"max_completion_tokens\":64000",
+          "otb-preflight-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb08-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb08-history-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb08-seed",
+      "description": "OTB08 返回 94K provider usage，驱动下一轮按 preflight-v1 threshold Auto Compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "受控 94K usage 用于证明 128K context、21K reserve、13K buffer 的 94K 阈值。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB08_SEED"],
+        "bodyIncludes": ["E2E_OTB08_SEED", "\"max_completion_tokens\":64000", "otb-preflight-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb08-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb08-seed-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":94000,\"completion_tokens\":8,\"total_tokens\":94008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb08-auto-compact",
+      "description": "OTB08 Auto Compact summary 继续使用 20K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "成功 summary 请求体与 compact.auto.started 日志共同验证 preflight-v1 的 reserve 与 summary 预算。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB08_SEED",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-preflight-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb08-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB08 retained the preflight strategy history.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":256,\"completion_tokens\":32,\"total_tokens\":288}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb08-post-compact",
+      "description": "OTB08 Compact 后主请求重新使用 canonical 64K baseline。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 Compact 清空旧 usage 锚点，preflight cap 不持久化到后续 model step。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB08_POST"],
+        "bodyIncludes": ["E2E_OTB08_POST", "\"max_completion_tokens\":64000", "otb-preflight-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb08-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb08-post-compact-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb08-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":320,\"completion_tokens\":8,\"total_tokens\":328}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb09-seed",
+      "description": "OTB09 建立 inputTokens=1 的 provider usage 锚点。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 provider base 为 1；provider usage 已覆盖上一轮 assistant，结合共享 /3 estimator 与精确长度的下一轮消息稳定得到 estimatedCurrentUsage=85,329。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB09_SEED"],
+        "bodyIncludes": ["E2E_OTB09_SEED", "\"max_completion_tokens\":64000", "otb-preflight-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb09-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb09-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb09-seed-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb09-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":0,\"total_tokens\":1}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb09-exact-cap",
+      "description": "OTB09 estimatedCurrentUsage=85,329 时发送 max_tokens=41,671。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "请求体是共享 /3 estimator 下 preflight 公式 128,000 - 85,329 - 1,000 = 41,671 的端到端证据。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB09_CAP"],
+        "bodyIncludes": ["E2E_OTB09_CAP", "\"max_completion_tokens\":41671", "otb-preflight-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb09-cap\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb09-cap\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb09-preflight-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb09-cap\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":85329,\"completion_tokens\":8,\"total_tokens\":85337}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb10-history",
+      "description": "OTB10 建立 reactive compact 可总结的第一轮历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "第一轮只满足既有 reactive compact 的历史前置条件。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB10_HISTORY"],
+        "bodyIncludes": [
+          "E2E_OTB10_HISTORY",
+          "\"max_completion_tokens\":64000",
+          "otb-preflight-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb10-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb10-history-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-history\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":192,\"completion_tokens\":8,\"total_tokens\":200}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb10-seed",
+      "description": "OTB10 建立 64K provider usage 锚点，使下一轮先执行 preflight cap。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "受控 usage 用于稳定证明错误发生前请求已被裁剪，而不是直接发送 64K baseline。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB10_SEED"],
+        "bodyIncludes": ["E2E_OTB10_SEED", "\"max_completion_tokens\":64000", "otb-preflight-64k"],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb10-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb10-seed-ready\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":64000,\"completion_tokens\":8,\"total_tokens\":64008}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb10-capped-context-error",
+      "description": "OTB10 裁剪后的主请求仍由 provider 返回现有可识别的 context_length_exceeded。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "immediate-error",
+        "source": "synthetic",
+        "syntheticReason": "故障只用于进入项目既有 reactive compact；本需求不新增或修改错误识别语料。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB10_REACTIVE"],
+        "bodyIncludes": ["E2E_OTB10_REACTIVE", "otb-preflight-64k"],
+        "bodyExcludes": [
+          "\"max_completion_tokens\":64000",
+          "Generate a concise title",
+          "create a detailed summary"
+        ]
+      },
+      "response": {
+        "statusCode": 400,
+        "statusMessage": "Bad Request",
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"error\":{\"message\":\"This model's maximum context length is 128000 tokens. Please reduce the length of the messages.\",\"type\":\"invalid_request_error\",\"code\":\"context_length_exceeded\"}}"
+      }
+    },
+    {
+      "id": "otb10-reactive-compact",
+      "description": "OTB10 既有 reactive compact summary 使用 20K。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 capped failure 不产生 reduction retry，而是直接进入既有 reactive compact summary。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": [
+          "E2E_OTB10_SEED",
+          "create a detailed summary",
+          "\"max_completion_tokens\":20000",
+          "otb-preflight-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb10-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<summary>OTB10 retained enough context to retry the original turn.</summary>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-compact\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":256,\"completion_tokens\":32,\"total_tokens\":288}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "otb10-post-reactive-compact",
+      "description": "OTB10 reactive compact 后原请求恢复 64K baseline 并成功。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "成功请求证明裁剪值未持久化；与首个 error model-io 合计恰好两次 main 请求。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OTB10_REACTIVE"],
+        "bodyIncludes": [
+          "E2E_OTB10_REACTIVE",
+          "\"max_completion_tokens\":64000",
+          "otb-preflight-64k"
+        ],
+        "bodyExcludes": ["Generate a concise title", "create a detailed summary"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"chatcmpl-otb10-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"otb10-reactive-compact-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-otb10-post\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"otb-preflight-64k\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":320,\"completion_tokens\":8,\"total_tokens\":328}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

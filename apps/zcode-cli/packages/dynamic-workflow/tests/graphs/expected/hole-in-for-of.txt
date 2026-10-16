@@ -1,0 +1,15 @@
+node source
+node world-read#1 "glob src/**/*.ts" @10:27 type="string[]"
+node fan-out#1 "fan-out" @12:1
+node ask#1 "ask" @13:42 actors=actor#1 within=fan-out#1 type="string"
+node hole#2e33cec5 "决定修法" @14:21 within=fan-out#1 type="Fix"
+node sink
+actor actor#1 @13:22 within=fan-out#1
+edge source -> world-read#1 data exact
+edge world-read#1 -> fan-out#1 data exact type="string[]"
+edge world-read#1 -> ask#1 data exact type="string[]"
+edge world-read#1 -> hole#2e33cec5 data exact type="string[]"
+edge fan-out#1 -> ask#1 data exact
+edge fan-out#1 -> hole#2e33cec5 data exact
+edge ask#1 -> hole#2e33cec5 data exact type="string"
+edge hole#2e33cec5 -> sink data exact type="Fix"

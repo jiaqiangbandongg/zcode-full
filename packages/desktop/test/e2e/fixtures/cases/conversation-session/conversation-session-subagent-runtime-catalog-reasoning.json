@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-runtime-catalog-reasoning",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-runtime-catalog-reasoning.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-runtime-catalog-reasoning.json"
+  ],
+  "fileFixtures": [
+    {
+      "kind": "app-config",
+      "path": "~/.zcode/v2/agents-state.json",
+      "description": "写入 Claude builtin model/effort 初始值，验证 runtime catalog 展示、非法值修正、切模清除和冷启动 child 请求。",
+      "source": "created-by-helper"
+    },
+    {
+      "kind": "app-config",
+      "path": "~/.zcode/agents/e2e-claude-catalog-reviewer.md",
+      "description": "写入带非法 thoughtLevel 的 Claude custom agent，验证阻止保存、合法修正、切模清除和冷启动 child 请求。",
+      "source": "created-by-helper"
+    }
+  ],
+  "requests": [
+    {
+      "id": "claude-catalog-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需稳定返回。"
+    },
+    {
+      "id": "claude-catalog-general-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父请求只需稳定触发 general-purpose；请求本身由 capture 和 model-io 验证 low。"
+    },
+    {
+      "id": "claude-catalog-general-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 响应只需稳定完成；请求本身验证 high/16000。"
+    },
+    {
+      "id": "claude-catalog-general-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明父会话消费 child tool_result 并回到 idle。"
+    },
+    {
+      "id": "claude-catalog-cold-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "若连续场景触发自动 compact，固定摘要以免阻断目标链路。"
+    },
+    {
+      "id": "claude-catalog-explore-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父请求只需稳定触发 Explore；请求本身由 capture 和 model-io 验证 low。"
+    },
+    {
+      "id": "claude-catalog-explore-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 响应只需稳定完成；请求本身验证 xhigh catalog 32000、provider-visible 31999 和 Explore 工具限制。"
+    },
+    {
+      "id": "claude-catalog-explore-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "若 Explore continuation 前触发自动 compact，固定摘要以保留当前请求。"
+    },
+    {
+      "id": "claude-catalog-explore-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明父会话消费 Explore child tool_result 并回到 idle。"
+    },
+    {
+      "id": "claude-catalog-custom-parent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "父请求只需稳定触发已保存的 custom agent。"
+    },
+    {
+      "id": "claude-catalog-custom-child",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "child 响应只需稳定完成；请求本身验证 medium/8000。"
+    },
+    {
+      "id": "claude-catalog-custom-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明父会话消费 custom child tool_result 并回到 idle。"
+    }
+  ]
+}

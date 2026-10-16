@@ -1,0 +1,52 @@
+join join#1 "join" @24:30 order=0 type="string[]"
+fan-out fan-out#1 "fan-out" @25:3 order=1 count=3 type="string[]"
+ask ask#1 "ask" head="研究员" @25:45 order=2 within=fan-out#1 type="string"
+actor actor#1 head="研究员" @25:24 order=3 within=fan-out#1
+ask ask#2 "ask" tail="-worker" @28:41 order=4 type="string"
+actor actor#2 tail="-worker" @28:17 order=5
+ask ask#3 "ask" head="a" tail="b" @29:33 order=6 type="string"
+actor actor#3 head="a" tail="b" @29:17 order=7
+ask ask#4 "ask" head="pre" tail="post" @30:45 order=8 type="string"
+actor actor#4 head="pre" tail="post" @30:17 order=9
+ask ask#5 "ask" @31:34 order=10 type="string"
+actor actor#5 @31:17 order=11
+ask ask#6 "ask" @32:32 order=12 type="string"
+actor actor#6 @32:17 order=13
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#2 <- join#1 exact
+fact ask-data ask#2 <- fan-out#1 exact
+fact ask-data ask#3 <- ask#2 exact
+fact ask-data ask#4 <- ask#3 exact
+fact ask-data ask#5 <- ask#4 exact
+fact ask-data ask#6 <- ask#5 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact ask-actor ask#4 <- actor#4 exact
+fact ask-actor ask#5 <- actor#5 exact
+fact ask-actor ask#6 <- actor#6 exact
+fact join-in join#1 <- ask#1 exact
+fact join-in join#1 <- fan-out#1 exact
+fact return <- ask#6 exact
+region seq#1 seq entered
+region fanout#1 fanout parent=seq#1 @25:3 label="map"
+spawn actor#1 in=seq#1>fanout#1
+issue ask#1 in=seq#1>fanout#1 phase=unphased
+settle ask#1 in=seq#1
+spawn actor#2 in=seq#1
+issue ask#2 in=seq#1 phase=unphased
+settle ask#2 in=seq#1
+spawn actor#3 in=seq#1
+issue ask#3 in=seq#1 phase=unphased
+settle ask#3 in=seq#1
+spawn actor#4 in=seq#1
+issue ask#4 in=seq#1 phase=unphased
+settle ask#4 in=seq#1
+spawn actor#5 in=seq#1
+issue ask#5 in=seq#1 phase=unphased
+settle ask#5 in=seq#1
+spawn actor#6 in=seq#1
+issue ask#6 in=seq#1 phase=unphased
+settle ask#6 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

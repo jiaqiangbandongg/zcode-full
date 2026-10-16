@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-rewind-files",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-rewind-files.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-rewind-files.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "v4-rewind-files-e2e/safe.txt",
+      "source": "created-by-helper",
+      "description": "PV4-21 测试内创建 safe-before，Write 后由组合 rewind 恢复。"
+    },
+    {
+      "path": "v4-rewind-files-e2e/conflict.txt",
+      "source": "created-by-helper",
+      "description": "PV4-22 测试内创建并外部修改，验证 blocked 与降级。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "v4-rewind-files-title",
+      "description": "PV4-21/22 文件 rewind case-local 标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不参与 workspace rewind 语义，用通用 marker 隔离两条 case。"
+    },
+    {
+      "id": "v4-rewind-files-safe-read",
+      "description": "PV4-21 先 Read safe.txt，建立 Write 前 read state。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定产生可安全回滚的已有文件 checkpoint。"
+    },
+    {
+      "id": "v4-rewind-files-safe-write",
+      "description": "PV4-21 Write safe.txt 并产生安全 checkpoint。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "实际改文件，供组合 rewind 恢复 beforeContent。"
+    },
+    {
+      "id": "v4-rewind-files-safe-final",
+      "description": "PV4-21 文件写入后的原分支回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "给 branch cut 提供可见旧回复证据。"
+    },
+    {
+      "id": "v4-rewind-files-safe-edited",
+      "description": "PV4-21 文件恢复 + branch cut 后的编辑回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "确认组合命令只重发编辑后 intent。"
+    },
+    {
+      "id": "v4-rewind-files-conflict-read",
+      "description": "PV4-22 先 Read conflict.txt，建立 checkpoint。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后续外部改写将使 preview 返回 external_modified。"
+    },
+    {
+      "id": "v4-rewind-files-conflict-write",
+      "description": "PV4-22 Write conflict.txt 并产生 checkpoint。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "在 edit 前由测试外部改写，触发 fail-closed。"
+    },
+    {
+      "id": "v4-rewind-files-conflict-final",
+      "description": "PV4-22 外部修改前的原分支回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "blocked 期间必须继续可见。"
+    },
+    {
+      "id": "v4-rewind-files-conflict-edited",
+      "description": "PV4-22 仅重置对话降级命令的回复。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明新 commandId preserve 只发起一次新请求。"
+    }
+  ]
+}

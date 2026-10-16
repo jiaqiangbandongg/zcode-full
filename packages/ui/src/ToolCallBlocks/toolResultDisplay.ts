@@ -13,14 +13,14 @@ import {
   type ToolCallSavedWorkflowListDisplay,
 } from "@zcode/shared/zcode-protocol-v4";
 
-interface LocalAgentMessageToolResultDisplay {
+export interface LocalAgentMessageToolResultDisplay {
   kind: "local_agent_message";
   status: "success" | "failed";
   error?: string;
   message?: string;
 }
 
-interface TaskStopToolResultDisplay {
+export interface TaskStopToolResultDisplay {
   kind: "task_stop";
   taskId: string;
   taskType: string;
@@ -29,7 +29,7 @@ interface TaskStopToolResultDisplay {
   truncated?: boolean;
 }
 
-interface TaskOutputToolResultDisplay {
+export interface TaskOutputToolResultDisplay {
   kind: "task_output";
   retrievalStatus: "success" | "not_ready" | "timeout";
   taskStatus?: string;
@@ -37,12 +37,12 @@ interface TaskOutputToolResultDisplay {
   truncated?: true;
 }
 
-interface RespondToCoordinatorToolResultDisplay {
+export interface RespondToCoordinatorToolResultDisplay {
   kind: "respond_to_coordinator";
   status: "success" | "failed";
 }
 
-interface CuaToolResultDisplay {
+export interface CuaToolResultDisplay {
   kind: "cua";
   schemaVersion: 1;
   toolName: string;
@@ -91,7 +91,8 @@ const WORKFLOW_DISPLAY_PARSERS_BY_KIND: Record<
   (value: Record<string, unknown>) => ToolResultDisplay | undefined
 > = {
   get_workflow_run: (value) => parseWorkflowDisplay(toolCallGetWorkflowRunDisplaySchema, value),
-  list_workflow_runs: (value) => parseWorkflowDisplay(toolCallListWorkflowRunsDisplaySchema, value),
+  list_workflow_runs: (value) =>
+    parseWorkflowDisplay(toolCallListWorkflowRunsDisplaySchema, value),
   eval_workflow_snippet: (value) =>
     parseWorkflowDisplay(toolCallEvalWorkflowSnippetDisplaySchema, value),
   saved_workflow_list: (value) =>

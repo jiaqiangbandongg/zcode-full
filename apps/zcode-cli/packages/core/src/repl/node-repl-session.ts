@@ -324,9 +324,8 @@ export class NodeReplSession {
     if (!this.currentSink) return;
     const currentSurface = this.currentSink.responseMeta["zcode/toolSurface"];
     const nextSurface = meta["zcode/toolSurface"];
-
-    // cell 结束时附加最后一次成功副作用的 openTabIds/sessionEnded；自动 preview 与后续
-    // title/url/domSnapshot 读取不能把先前动作 meta 覆盖掉。
+    // 工具结果需保留同一 cell 内最后一次成功 side-effect 的 openTabIds/sessionEnded。ZCode 不做
+    // 自动 preview，但同一 cell 后续 title/url/domSnapshot 读取不能把先前动作 meta 覆盖掉。
     if (
       currentSurface &&
       typeof currentSurface === "object" &&

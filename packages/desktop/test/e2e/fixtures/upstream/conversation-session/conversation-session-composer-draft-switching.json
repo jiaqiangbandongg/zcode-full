@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-composer-draft-switching",
+  "spec": "./test/e2e/conversation-session/conversation-session-composer-draft-switching.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-composer-draft-completed-seed-final",
+      "description": "R01 completed task 草稿作用域的 seed turn 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只需要稳定形成 completed task，后续断言聚焦 composer 草稿正文和附件的 taskId 作用域恢复。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_COMPOSER_DRAFT_COMPLETED_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_COMPOSER_DRAFT_COMPLETED_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-composer-draft-completed-seed-final",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-composer-draft-running-seed-slow-stream",
+      "description": "R02 running task 草稿作用域的慢流响应，稳定制造 task 切换窗口。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "running task 草稿恢复必须在 assistant 仍可能 streaming 时验证；真实 provider 可能过快完成，导致无法稳定覆盖 inactive stream 更新。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SLOW_STREAM", "E2E_COMPOSER_DRAFT_RUNNING_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "lastUserMessageIncludes": ["E2E_COMPOSER_DRAFT_RUNNING_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"upstream-e2e-composer-draft-running-seed-slow-stream\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 8000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"deep\"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 16000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"seek\"}}\n\n"
+          },
+          {
+            "sequence": 4,
+            "offsetMs": 24000,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"-e2e-ok\"}}\n\n"
+          },
+          {
+            "sequence": 5,
+            "offsetMs": 90000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "sequence": 6,
+            "offsetMs": 90100,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":120,\"output_tokens\":12,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "sequence": 7,
+            "offsetMs": 90200,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "upstream-composer-draft-completed-text-should-not-send",
+      "description": "R01 completed task 的未发送 composer 草稿正文不应触发 provider 请求。",
+      "metadata": {
+        "kind": "ignore",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "composer 草稿正文只应保存在本地 draft scope；切换 task 不应把草稿内容作为 user prompt 发送给 provider。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_COMPOSER_DRAFT_COMPLETED_TEXT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-composer-draft-completed-text-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-composer-draft-running-text-should-not-send",
+      "description": "R02 running task 的未发送 composer 草稿正文不应触发 provider 请求。",
+      "metadata": {
+        "kind": "ignore",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "running task 切换期间 composer 草稿正文只应保存在本地 draft scope；inactive stream 更新不应把草稿内容发送给 provider。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_COMPOSER_DRAFT_RUNNING_TEXT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-composer-draft-running-text-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "upstream-composer-draft-unsent-text-should-not-send",
+      "description": "R03 未发送 new task 草稿正文不应触发 provider 请求。",
+      "metadata": {
+        "kind": "ignore",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "未发送的新 task 草稿只应保存在 __draft__ scope；切换到已有 task 再返回不应触发 provider 请求。"
+      },
+      "maxMatches": 0,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_COMPOSER_DRAFT_UNSENT_TEXT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-composer-draft-unsent-text-should-not-send",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

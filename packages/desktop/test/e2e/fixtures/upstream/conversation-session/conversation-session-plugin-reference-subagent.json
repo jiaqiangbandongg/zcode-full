@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-reference-subagent",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-reference-subagent.test.ts",
+  "fixtures": [
+    {
+      "id": "plugin-reference-subagent-title",
+      "description": "PLG16 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发会触发默认 title sidecar；固定标题响应，避免标题请求命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_PLUGIN_REFERENCE_SUBAGENT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-reference-subagent-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Plugin Subagent Reference\"}"
+        }
+      }
+    },
+    {
+      "id": "plugin-reference-subagent-reminder",
+      "description": "PLG16 wire 门禁：请求必须携带 inline Plugin stable ID 与 canonical Subagent identifier。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "确定性验证 provider 收到 reminder 中的 Subagent identifier，不依赖真实模型是否主动选择 Agent。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_REFERENCE_SUBAGENT"],
+        "bodyIncludes": [
+          "<plugin_reference>",
+          "e2e-inline-lifecycle@inline",
+          "subagents: [\"e2e-inline-lifecycle:inline-reviewer\"]"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "plugin-reference-subagent-reply",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "PLUGIN_REFERENCE_SUBAGENT_REPLY_OK"
+        }
+      }
+    }
+  ]
+}

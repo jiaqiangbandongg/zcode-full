@@ -9,7 +9,7 @@ export { BROWSER_VIEWPORT_ZOOM_OPTIONS, DEFAULT_BROWSER_VIEWPORT_ZOOM };
 export type { BrowserViewportZoom };
 
 /** Fit 的画布内边距与 ResponsiveBrowserViewport 的 `p-4` 保持一致。 */
-const RESPONSIVE_BROWSER_CANVAS_PADDING_PX = 16;
+export const RESPONSIVE_BROWSER_CANVAS_PADDING_PX = 16;
 
 export function resolveBrowserViewportScale({
   canvasSize,

@@ -5,7 +5,7 @@ import type { MemoryManifestEntry } from "./recall/types.js";
 
 const MINIMUM_USER_WORDS = 3;
 
-type MemoryExtractionExecutionStatus = "success" | "no-op" | "error" | "aborted";
+export type MemoryExtractionExecutionStatus = "success" | "no-op" | "error" | "aborted";
 
 export interface MemoryExtractionSnapshot {
   boundaryMessageId: MessageId;
@@ -15,7 +15,7 @@ export interface MemoryExtractionSnapshot {
   workspaceRoot: string;
 }
 
-type MemoryExtractionDecision =
+export type MemoryExtractionDecision =
   | { decision: "run"; messageCount: number }
   | {
       decision: "skip";
@@ -23,7 +23,7 @@ type MemoryExtractionDecision =
       reason: "direct-memory-write" | "no-user-prose";
     };
 
-interface MemoryExtractionExecutionInput {
+export interface MemoryExtractionExecutionInput {
   abortSignal: AbortSignal;
   messageCount: number;
   snapshot: MemoryExtractionSnapshot;
@@ -65,7 +65,7 @@ export function buildMemoryExtractionPrompt(input: {
   ].join("\n");
 }
 
-function evaluateMemoryExtraction(
+export function evaluateMemoryExtraction(
   snapshot: MemoryExtractionSnapshot,
   cursor: MessageId | undefined,
 ): MemoryExtractionDecision {

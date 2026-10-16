@@ -12,55 +12,45 @@
  * 单个换行开头结尾，段间拼接自然形成原有的空行分隔。
  */
 
+import { FACADE_MODEL_DECLARATIONS } from "./dts-model.js";
+import { FACADE_STREAM_SEGMENT } from "./dts-stream.js";
+import { FACADE_HOLE_SEGMENT } from "./dts-hole.js";
+
 export const FACADE_FILE_NAME = "workflow-facade.d.ts";
 
-/** actor 族：Node / AgentPersona / Agent / agent()。snippet 刻意不含。 */
+/** actor 族：Node / ModelRef / model() / AgentPersona / Agent / agent()。snippet 刻意不含。 */
 const FACADE_ACTOR_SEGMENT = String.raw`
-/**
- * A node: one task assigned to an actor, producing a typed result.
- * Thenable — await it, or combine with Promise.all for joins.
- */
+/** The pending result of one ask. Await it, or pass it to Promise.all with others. */
 declare interface Node<T> extends PromiseLike<T> {}
 
-/**
- * Persona of an actor: identity, fixed at creation (frozen for the actor's lifetime). Every
- * actor has the regular working tools (reading, searching, editing, running commands); what
- * it may do with them is said in the ask.
- */
+${FACADE_MODEL_DECLARATIONS}
+/** Persona of a subagent, fixed when agent() creates it. Every subagent has the same working tools. */
 declare interface AgentPersona {
   /** System prompt describing the actor's role. */
   system?: string;
+  /** Model id literal or ModelRef; omitted = the run's subagent model. */
+  model?: ModelRef | string;
 }
 
 /**
- * An actor: a persistent conversational context that executes tasks serially.
- * Context accumulates across asks; concurrent asks on one actor queue FIFO.
+ * A subagent: one conversation that keeps its context across asks. Asks issued while it is
+ * busy wait their turn, first in, first out.
  */
 declare interface Agent {
   /**
-   * Assign one task. T is the task's output value: an interface you define in
-   * this script with a plain "interface" declaration (no "declare" modifier; the
-   * harness synthesizes its runtime schema from the type), or the final response
-   * text when the type argument is omitted.
+   * Give the subagent one task. With a type argument, the answer is a value of type T,
+   * validated against a schema built from it: T is an interface you define in this script
+   * with a plain "interface" declaration (no "declare" modifier). Without one, the answer is
+   * the subagent's final reply text.
    */
   ask<T = string>(instructions: string): Node<T>;
 }
 
 /**
- * Create a fresh actor. Every call creates a new context; sharing context means
- * sharing this reference.
- *
- * The name is optional, but a non-empty one is an identity, not a label. It must be
- * unique within the run: two actors under the same name fail the whole run. It is
- * also the key a revised re-run matches its cache on (AmendWorkflow imports the
- * finished work of each named actor), so stable, meaningful
- * names carry work across script revisions. Anonymous actors are legal and never
- * reuse imported work.
- *
- * In a fan-out or a loop each iteration is a separate actor, so a single static name
- * there is the duplicate case: give each one its own name (agent("reviewer-" + file))
- * or leave them all anonymous. A literal name in a loop is reported when the script
- * is compiled; a computed one fails at run time.
+ * Create a subagent. Every call starts a new, empty conversation; to share one, share the
+ * returned value. A non-empty name is an identity: unique within the run (a literal duplicate
+ * is a compile error, a computed one fails the run) and the key AmendWorkflow matches cached
+ * work by. Unnamed subagents are allowed and never reuse cached work.
  */
 declare function agent(name?: string, persona?: string | AgentPersona): Agent;
 `;
@@ -74,31 +64,17 @@ declare function log(message: string): void;
 /** 渐进产物：report()。journal 化、run 面板 Results 区；snippet 刻意不含。 */
 const FACADE_REPORT_SEGMENT = String.raw`
 /**
- * Publish one intermediate result while the run is still going. Like log() it
- * returns nothing and there is nothing to await — a finding has no reply.
+ * Publish one intermediate result while the run is going; returns nothing. Items are
+ * recorded: a resumed run never shows one twice, and they reach the completion notification
+ * even when the run fails. The item must be JSON-serializable (plain objects, arrays, strings,
+ * numbers, booleans, null); functions, class instances, Date and promises are compile
+ * errors. Caps fail the whole run, not the call: 65,536 items per run, 1 MiB per serialized
+ * item, 1 GiB per run.
  *
- * Unlike log() it is journaled: a resumed run never shows the same item twice, and
- * the items are delivered with the completion notification even when the run ends in
- * failure. That is the point of it — a run that dies on its twelfth of forty tasks
- * still did eleven tasks' worth of work, and reported items are how that work
- * survives.
- *
- * Two caps, and both fail the whole run rather than the call (there is no rejection
- * channel in a void return): at most 256 items per run, and at most 32KB per
- * serialized item. They are generous on purpose — report findings, not chatter.
- *
- * The item must be JSON-serializable: plain objects, arrays, strings, numbers,
- * booleans, null. Functions, class instances, Date and promises are rejected when
- * the script is compiled.
- *
- * The optional second argument routes the item to a dashboard artifact: pass the id
- * of a preset declared with artifact.chart / table / metrics / board, and this item
- * becomes one more point, row, tile value or card on it — the dashboard is nothing
- * but the items tagged with its id. The tag must be a compile-time string literal
- * naming a preset the script declares (anywhere in the text, but the declaration must
- * have executed by the time this call runs); a tag that names nothing, or names a
- * file/markdown artifact, fails the run. An untagged report is unchanged: it goes to
- * the run's Results, and a tagged one goes to both.
+ * artifactId routes the item to a dashboard: a compile-time literal naming a preset
+ * (artifact.chart / table / metrics / board) whose declaration has executed by then. The
+ * item becomes one point, row, tile value or card there and still lands in the run's
+ * Results. A tag naming nothing, or a file/markdown artifact, fails the run.
  */
 declare function report(item: unknown, artifactId?: string): void;
 `;
@@ -119,7 +95,7 @@ declare interface ArtifactRef { id: string; version: number }
 declare interface ArtifactOptions {
   /** Shown as the card title; defaults to the id. In the user's language. */
   title?: string;
-  /** A sentence or two, shown beside the title when this artifact leads the card. */
+  /** A sentence or two, shown beside the title when this artifact is the run's primary. */
   description?: string;
   /** The run's deliverable: the card and the run pane lead with it. At most one id per run; once set it stays set for later versions. */
   primary?: boolean;
@@ -159,44 +135,24 @@ declare interface BoardSpec extends ArtifactOptions {
   detail?: ArtifactField[];
 }
 /**
- * Publish what the user should see: the run's own deliverable surface, kept after it ends.
- * Two habits. (1) EVERY RUN PUBLISHES ITS DELIVERABLE, whatever the user asked for: a webpage
- * or PDF a subagent wrote goes out via file(); an answer (findings, a review) goes out as the
- * long form of the facts the return summarises, usually via markdown(). Once, at the end;
- * skip it only when the whole answer is one line. When the run publishes more than one
- * artifact, mark the deliverable { primary: true }. (2) A DASHBOARD IS FOR THE PERSON WATCHING
- * THE RUN: declare one when there is state worth watching mid-run (the key number per round,
- * which items are done) and none when the run is over before anyone looks. Two tests keep it
- * to what matters: would the user open it on its own? does it repeat another artifact? A CSV
- * and a table of its rows: one of them is noise.
- *
- * Every id is a compile-time string literal (non-empty, at most 64 characters of
- * [A-Za-z0-9_.-]); the set a run can publish is fixed at submit time, so the compiler
- * rejects a computed one. Within one run an id belongs to exactly one member.
- * The two families are deliberately asymmetric, and the asymmetry is the whole design:
- * - CONTENT (file, markdown) are EFFECTS: async, resolve to an ArtifactRef, and REJECT
- *   catchably — missing file, not a file, path outside the workspace, over the size cap, no
- *   store. try { await artifact.file("book", "out/book.pdf") } catch { …ask a subagent to
- *   write it… } is the intended idiom. Bytes are copied at publish time, so later workspace
- *   edits never rewrite a version; republishing an id mints the NEXT version and keeps the
- *   old ones (at most 16 per id).
- * - PRESET (chart, table, metrics, board) are DECLARATIONS: synchronous, return nothing,
- *   never touch a file; they say how items tagged with their id are drawn. Declare each ONCE,
- *   at the top, then feed it with report(item, "<id>"). The same id with an identical spec is
- *   a no-op; a DIFFERENT or malformed spec fails the whole run — a void return has no
- *   rejection channel, exactly as with report().
+ * Publish what the user keeps: cards beside the run, kept after it ends. Every id is a
+ * compile-time string literal (non-empty, at most 64 characters of [A-Za-z0-9_.-]) and is
+ * used with one member only.
+ * - CONTENT (file, markdown) are effects: async, resolve to an ArtifactRef, and reject
+ *   catchably (missing file, not a file, outside the workspace, over the cap, or no artifact
+ *   store in this host).
+ *   Bytes are copied at publish time; republishing an id mints the next version and keeps
+ *   the old ones.
+ * - PRESET (chart, table, metrics, board) are declarations: synchronous and void, drawn from
+ *   the items tagged report(item, "<id>"). Declare each once, at the top level; an identical
+ *   re-declaration is a no-op, a different or malformed spec fails the whole run.
  * Caps: 32 ids per run, 16 versions per id, 20 MiB per file, 256 KB per markdown, 120
  * characters of title and 500 of description.
  */
 declare const artifact: {
-  /**
-   * Publish a file from the workspace. path is workspace-relative, resolved by the same
-   * resolver files.read() uses; the bytes are copied at publish time. The content type is
-   * read off the extension unless opts.contentType overrides it. Rejects (catchably)
-   * rather than publishing something empty.
-   */
+  /** Publish a workspace file, path resolved as in files.read(). The type comes from the extension unless opts.contentType sets it. */
   file(id: string, path: string, opts?: ArtifactFileOptions): Promise<ArtifactRef>;
-  /** Publish markdown text the script composed: the usual shape of a report deliverable, the long form of what the return summarises. */
+  /** Publish markdown text the script composed. */
   markdown(id: string, content: string, opts?: ArtifactOptions): Promise<ArtifactRef>;
   /** Declare a chart fed by report(item, id): each tagged item is one point. */
   chart(id: string, spec: ChartSpec): void;
@@ -217,41 +173,12 @@ declare const artifact: {
  */
 const FACADE_PHASE_SEGMENT = String.raw`
 /**
- * Mark the start of a phase: a short, human-readable name for the group of steps that
- * follow, shown as one node on the workflow graph the user reads and approves.
- * Presentation only — it starts nothing, waits for nothing, returns nothing.
- *
- * Required in every script you submit, not optional: the phase graph is how the user
- * experiences the workflow. Without markers they face one card per step and no story;
- * group the whole script, top to bottom.
- *
- * Name phases for the user, in the language the user is speaking in this session: a short
- * natural phrase saying what the stage accomplishes ("Research each changed file in parallel",
- * "汇总并产出最终报告"). Graph-building vocabulary the user never chose — "fan-out", "gate",
- * "aggregate" — is not a name; the user approves stages by what they do. Say it the way you
- * would tell a colleague what is happening: "确认测试仍然通过", not "执行测试验证任务".
- *
- * The scope is the rest of the enclosing block: the marker claims every step issued
- * from it to the end of the block it stands in — nested blocks and inlined helper
- * calls included — and the enclosing phase resumes once that block ends. A marker
- * inside an if-branch therefore groups that branch and does not leak past it. Two
- * markers with the same name are one phase: repeating a name continues that phase,
- * which is the opposite of an actor's name — that one has to be unique.
- *
- * Two rules the compiler enforces. The name must be a compile-time string literal
- * ("review the diff" or a no-substitution template) and non-empty, because the phase
- * names label the graph the user confirms before anything runs. And the call must
- * stand alone as its own statement: a marker in expression position has no
- * rest-of-block to claim.
- *
- * Every phase must contain at least one subagent ask or one world.run. A phase is a
- * stage the user watches progress through; plain script logic between two asks (reading
- * args, shaping a prompt, building the return) runs in a flash and shows no progress, so
- * it is not a stage. Fold it into the phase before or after it; never open a phase for
- * the setup at the top or the return at the bottom.
- *
- * Idiom: one marker at the head of each stage that does work — name the loop body and
- * its check where they start, name the close-out that asks or runs after the loop.
+ * Mark the start of a phase: a named group of the steps that follow, drawn as one node on
+ * the graph the user approves. Presentation only: it starts, waits for and returns nothing.
+ * Required. The name is a non-empty compile-time literal and the call a standalone
+ * statement. A marker covers every step from it to the end of the block it stands in
+ * (nested blocks and inlined helpers included); two markers with the same name are one
+ * phase. Every phase contains at least one ask or world.run.
  */
 declare function phase(name: string): void;
 `;
@@ -269,30 +196,18 @@ declare interface GrepMatch {
 }
 
 /**
- * Journaled read-only observations of the workspace, executed by the harness.
- * Replay returns the journal-recorded value. Prefer passing paths to agents and
- * letting them read files with their own tools; read() and grep() are for when the
- * script itself must shard or branch on content. There is no write — writing to the
- * world is an agent task.
+ * Read-only views of the workspace. Each result is recorded, so a resumed run gets the same
+ * answer back instead of reading again. There is no write: writing is a subagent's task.
  */
 declare const files: {
-  /**
-   * List workspace files matching a glob pattern, as workspace-relative paths sorted
-   * lexicographically. Capped at 2000 files: over the cap the call rejects instead of
-   * returning a partial view — narrow the pattern.
-   */
+  /** Workspace-relative paths matching a glob, sorted. Over 2000 files the call rejects. */
   glob(pattern: string): Promise<string[]>;
   /** Read one workspace file as UTF-8 text. Size-capped. */
   read(path: string): Promise<string>;
   /**
-   * Search file contents with a ripgrep-compatible regular expression, optionally
-   * narrowed to a glob over paths (the same syntax glob() takes: "*.ts", "src/**").
-   * Returns one entry per matching line, with workspace-relative paths and one-based
-   * line numbers.
-   *
-   * Capped at 2000 matches or 256KB of results, whichever comes first. Over the cap
-   * the call rejects instead of returning a partial view — a silently truncated search
-   * is the one result you cannot reason about — so narrow the pattern or add a glob.
+   * Search contents with a ripgrep-compatible regex, optionally narrowed by a glob over
+   * paths ("*.ts", "src/**"); one entry per matching line. Over 2000 matches or 256KB of
+   * results the call rejects.
    */
   grep(pattern: string, glob?: string): Promise<GrepMatch[]>;
 };
@@ -324,30 +239,17 @@ declare interface GitCommit {
 }
 
 /**
- * Journaled read-only git observations — the same bargain as files.*: executed by the
- * harness, recorded in the journal, and replayed from the record, so a resumed run
- * sees the repository as it was rather than as it is now.
- *
- * Read-only by construction rather than by permission: the harness builds a fixed
- * argument list for one allowlisted subcommand and never a shell string, so there is
- * no call this surface can express that writes. A base must name a single ref — no
- * ".." ranges in this version — and paths are workspace-relative.
- *
- * Observations are scoped to the workspace, which is the same world files.* observes:
- * every path you get back is relative to the workspace and safe to pass straight to
- * files.read(). If the workspace is a subdirectory of the repository, changes outside
- * it are not reported — the workspace is the world. git.log is the exception, because
- * commits are repository-wide objects rather than paths.
- *
- * Caps reject rather than truncate (diff at 512KB, log at 100 commits), for the same
- * reason grep does. Outside a git repository, or with no git available, every call
- * rejects with a catchable error, so the idiom is try/catch with a files.glob fallback.
+ * Read-only git views, recorded like files.* so a resumed run gets the same answer back; no
+ * call can write. A base names a single ref (no ".." ranges). Paths are workspace-relative, and
+ * changes outside the workspace are not reported; git.log alone is repository-wide. Caps
+ * reject rather than truncate: diff at 512KB, log at 100 commits. Outside a git repository,
+ * or without git, every call rejects catchably.
  */
 declare const git: {
   /**
-   * Workspace-relative paths that changed. With no base: files modified against HEAD
-   * plus untracked files, because a brand-new file is a change to anyone reading. With
-   * a base ref: files differing from that ref, tracked history only.
+   * Workspace-relative paths that changed. With no base: files modified against HEAD, plus
+   * untracked files. With a base ref: tracked files whose current state differs from that
+   * ref, uncommitted edits included, untracked files not.
    */
   changedFiles(base?: string): Promise<string[]>;
   /**
@@ -357,10 +259,7 @@ declare const git: {
   diff(base?: string, path?: string): Promise<string>;
   /** The current working-tree status, for the workspace. */
   status(): Promise<GitStatus>;
-  /**
-   * The most recent commits, newest first. Default 20, maximum 100. Unlike the other
-   * members this reads repository-wide history, not workspace paths.
-   */
+  /** The most recent commits, newest first. Default 20, maximum 100. */
   log(count?: number): Promise<GitCommit[]>;
 };
 `;
@@ -381,24 +280,13 @@ declare interface WorldRunResult {
 }
 
 /**
- * Journaled command execution — the effect primitive. Executed by the harness exactly
- * once per call site and iteration, recorded in the journal, and replayed from the
- * record on resume (resume is crash recovery, not re-verification).
- *
- * Deliberately unlike git.*: a completed process with a NONZERO exit code RESOLVES to
- * a WorldRunResult — a failing check is the gating loop's normal case and must not
- * travel exception control flow. The promise only rejects (catchably) when the
- * command could not run as an observation at all: spawn failure, or timeout (default
- * 300000ms, override per call via timeoutMs, no upper cap).
- *
- * cmd must be a compile-time string literal: the script's command set is shown to the
- * user when the run is confirmed, and only those commands are executable. Fixed argv,
- * never a shell — no pipes, no redirection, no variable expansion; compose with
- * multiple calls and plain code. cwd is the workspace. Idiom: model generates, code
- * gates — run the check here, parse its output with pure script logic, and hand
- * failures to an agent to fix. A helper that needs Node builtins can be inlined as
- * world.run("node", ["-e", code]) — the code string lives inside the script, so it is
- * pinned by the journal key like every other argument.
+ * Run a command. Each call runs once and its result is recorded: a resumed run reuses the
+ * recorded result instead of running the command again. A completed process RESOLVES,
+ * nonzero exit included; the promise rejects (catchably) only on spawn failure or timeout
+ * (default 300000ms, timeoutMs overrides, no upper cap). cmd is a compile-time string
+ * literal, shown to the user at confirmation. Fixed argv, never a shell: no pipes,
+ * redirection or expansion. cwd is the workspace. Node builtins are reachable as
+ * world.run("node", ["-e", code]).
  */
 declare const world: {
   run(cmd: string, args?: string[], opts?: { timeoutMs?: number }): Promise<WorldRunResult>;
@@ -408,18 +296,10 @@ declare const world: {
 /** 运行实参：saved workflow 的声明式参数。两个 facade 都含（snippet 里恒为 `{}`）。 */
 const FACADE_ARGS_SEGMENT = String.raw`
 /**
- * The run's arguments: the values supplied when this workflow was started.
- *
- * A workflow saved into the project declares its arguments (name, type, whether they
- * are required, defaults); the host validates the caller's values against that
- * declaration and fills in defaults before the run starts, so what lands here is
- * always a complete, checked bag. For an inline script — and inside a snippet — it is
- * simply empty.
- *
- * Always defined, so reading args.target is a plain property read rather than a crash.
- * The values are typed unknown on purpose: the compiler surface must not change from
- * one workflow to the next, so narrow them in the script -- String(args.target), or a
- * typeof guard -- exactly as you would any other external input.
+ * The run's arguments. For a saved workflow they are validated against its declared
+ * arguments, with defaults filled in, before the run starts; an inline script or a snippet
+ * gets {}. Always defined; the values are unknown, so narrow them (String(args.target), a
+ * typeof guard).
  */
 declare const args: Readonly<Record<string, unknown>>;
 `;
@@ -431,12 +311,17 @@ export const FACADE_DTS =
   FACADE_REPORT_SEGMENT +
   FACADE_ARTIFACT_SEGMENT +
   FACADE_PHASE_SEGMENT +
+  // 留白段只进完整 facade（docs/dynamic-workflow/authoring.md「Holes」）：片段没有 run，也就
+  // 没有可等主代理补全的东西，snippet 里的 `hole(...)` 得到 TS2304，教删除。
+  FACADE_HOLE_SEGMENT +
   FACADE_WORLD_SEGMENT +
-  FACADE_WORLD_RUN_SEGMENT;
+  FACADE_WORLD_RUN_SEGMENT +
+  FACADE_STREAM_SEGMENT;
 
 /**
  * snippet（EvalWorkflowSnippet）的 scratch facade：生产 facade 减去 actor 族 / report /
- * artifact / phase。留下的是脚本自己
+ * artifact / phase（channel / future 保留：流水线的纯逻辑正是片段要排练的东西）（docs/dynamic-workflow/authoring.md「The facade」，phase 见
+ * docs/dynamic-workflow/authoring.md「Phases」，artifact 见 docs/dynamic-workflow/authoring.md「Artifacts: what the user keeps」）。留下的是脚本自己
  * 能单测的那部分：世界读取 + world.run +
  * 纯计算 + log。`agent(...)` 在这份 facade 下是普通的 TS2304（Cannot find name），拒绝发生
  * 在编译期而不是运行期。
@@ -446,4 +331,8 @@ export const FACADE_DTS =
  * snippet 编译通过却什么都不做。
  */
 export const SNIPPET_FACADE_DTS =
-  FACADE_ARGS_SEGMENT + FACADE_LOG_SEGMENT + FACADE_WORLD_SEGMENT + FACADE_WORLD_RUN_SEGMENT;
+  FACADE_ARGS_SEGMENT +
+  FACADE_LOG_SEGMENT +
+  FACADE_WORLD_SEGMENT +
+  FACADE_WORLD_RUN_SEGMENT +
+  FACADE_STREAM_SEGMENT;

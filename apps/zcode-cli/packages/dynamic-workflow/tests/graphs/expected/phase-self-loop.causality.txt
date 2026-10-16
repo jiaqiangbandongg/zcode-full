@@ -1,0 +1,11 @@
+phase phase#1 "refine" @12:1
+lane actor#1 "planner" @13:17
+lane actor#2 "reviewer" @14:18
+region seq#1 seq
+region loop#1 loop parent=seq#1 @18:1 bound=3
+step ask#1 ask "planner" @19:24 lane=actor#1 phase=phase#1 region=loop#1 always serial
+step ask#2 ask "reviewer" @20:33 lane=actor#2 phase=phase#1 region=loop#1 always serial
+edge ask#1 -> ask#2 data always exact
+edge ask#2 -> ask#1 carry always
+phase-edge phase#1 -> phase#1 carry always
+sink ask#1

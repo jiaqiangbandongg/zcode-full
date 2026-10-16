@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "caseName": "feishu-group-runtime",
+  "spec": "./test/e2e/bots/manual-review/pending/feishu-group-runtime.test.ts",
+  "fixtures": [
+    {
+      "id": "group-runtime-title",
+      "description": "群输入真实 CLI 队列验证所需的受控模型响应",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定首轮运行窗口以验证 Bot admission、Desktop 队列及取消；不依赖真实模型节奏。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_GROUP_RUNTIME_SLOW"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\"}, \"finish_reason\": null}]}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"content\": \"{\\\"title\\\":\\\"Group Runtime E2E\\\"}\"}, \"finish_reason\": null}]}\n\n"
+          },
+          {
+            "offsetMs": 300,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-runtime-main",
+      "description": "群输入真实 CLI 队列验证所需的受控模型响应",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首轮运行窗口以验证 Bot admission、Desktop 队列及取消；不依赖真实模型节奏。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_GROUP_RUNTIME_SLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\"}, \"finish_reason\": null}]}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"content\": \"V4_QUEUE_STREAMING\"}, \"finish_reason\": null}]}\n\n"
+          },
+          {
+            "offsetMs": 60000,
+            "text": "data: {\"id\": \"chatcmpl-group-runtime\", \"object\": \"chat.completion.chunk\", \"created\": 0, \"model\": \"deepseek-v4-flash\", \"choices\": [{\"index\": 0, \"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+          }
+        ]
+      }
+    }
+  ]
+}

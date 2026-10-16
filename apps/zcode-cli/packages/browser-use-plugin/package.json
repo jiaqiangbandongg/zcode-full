@@ -4,13 +4,14 @@
   "version": "0.5.1",
   "private": true,
   "description": "作为官方 ZCode 内置插件发布的 Browser Use skill 与 client runtime；node_repl MCP server 由 @zcode/node-repl-host 提供。",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/mcp/server.js",
   "scripts": {
     "build": "tsc && node scripts/build.mjs",
     "clean": "node ../../scripts/clean-dist.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run test",
     "lint": "oxlint src --no-ignore"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@zcode/bootstrap": "workspace:*",
     "esbuild": "^0.25.0",
     "playwright-core": "1.59.1",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.5"
   }
 }

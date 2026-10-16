@@ -1,0 +1,6 @@
+phase phase#1
+participant phase#1:actor#1[0] member=0/3 steps=ask#1
+participant phase#1:actor#1[1] member=1/3 steps=ask#1
+participant phase#1:actor#1[2] member=2/3 steps=ask#1
+phase phase#2
+participant phase#2:actor#2 "b" steps=ask#2

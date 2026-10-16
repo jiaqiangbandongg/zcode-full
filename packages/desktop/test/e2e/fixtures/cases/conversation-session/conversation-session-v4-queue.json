@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-queue.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-queue-title",
+      "description": "E2E_V4_QUEUE_SLOW 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_QUEUE_SLOW 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-queue-slow-turn",
+      "description": "M4/B09 queue 门禁：保持 running 以验证权威删除、composer 恢复与重发新身份。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "queue 只在 running turn 期间存在；需稳定窗口验证 delete/reorder 回到 CLI 权威投影，以及撤回编辑只在 delete ACK 后恢复发起端 composer。"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+node world-read#1@1 issue site=world-read#1 phase=unphased
+node ask#1@1 issue site=ask#1 phase=unphased
+node ask#2@1 issue site=ask#2 phase=unphased
+node ask#3@1 issue site=ask#3 phase=unphased
+edge entry -> world-read#1@1 next
+edge world-read#1@1 -> ask#1@1 next
+edge ask#1@1 -> ask#2@1 next
+edge ask#2@1 -> ask#3@1 next
+edge ask#3@1 -> sink jump via=return

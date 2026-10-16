@@ -28,11 +28,11 @@ import {
   formatQuotaRemainingPercentage,
   formatQuotaResetTime,
   getQuotaRemainingPercentage,
-  isCodingPlanQuotaLimitFull,
   resolveMcpQuotaLimit,
 } from "@/lib/codingPlanQuotaPresentation.js";
 import {
   mergeCodingPlanQuotaResetOpportunityBadges,
+  resolveCodingPlanQuotaResetActionCompletedAt,
   resolveCodingPlanQuotaResetLimit,
 } from "@/lib/codingPlanQuotaResetUi.js";
 import { UsageChartLoadBoundary } from "@/settings/usage-stats/UsageChartLoadBoundary.js";
@@ -61,7 +61,7 @@ import {
 export { buildCodingPlanUsageSources, type CodingPlanUsageSource };
 
 /** Usage stats 独有的完整重置时刻格式；其它紧凑入口继续按各自规则展示。 */
-function formatUsageStatsQuotaResetTime(
+export function formatUsageStatsQuotaResetTime(
   locale: string,
   value: number | null | undefined,
 ): string | undefined {
@@ -91,6 +91,7 @@ const CODING_PLAN_DETAIL_SERIES_COLORS = [
 ] as const;
 const MAX_SELECTED_CODING_PLAN_DETAIL_SERIES = 3;
 const CODING_PLAN_USAGE_TRENDS_SECTION_ID = "coding-plan-usage-trends";
+const HIDDEN_CODING_PLAN_PROVIDER_NAMES = new Set(["BigModel - Coding Plan"]);
 type CodingPlanUsageTrendRange = Extract<CodingPlanUsageRange, "7d" | "30d">;
 
 export function CodingPlanUsagePanel({
@@ -274,6 +275,26 @@ export function CodingPlanUsagePanel({
   );
 }
 
+export function resolveCodingPlanUsageProviderName({
+  fallbackProviderName,
+  snapshot,
+  source,
+}: {
+  fallbackProviderName?: string;
+  snapshot: CodingPlanUsageSnapshot | null;
+  source: CodingPlanUsageSource | null;
+}): string | undefined {
+  // 修复原因：Team Plan 复用 BigModel Coding Plan provider，monitor 接口只知道通用 provider 名。
+  // 使用统计必须按当前 Team 连接的展示 key 取团队项目名，不能继续识别已删除的 team-plan key。
+  if (source?.id.startsWith("team:")) {
+    return source.label || snapshot?.sourceProvider.name || fallbackProviderName;
+  }
+  const providerName = snapshot?.sourceProvider.name ?? source?.label ?? fallbackProviderName;
+  return providerName && !HIDDEN_CODING_PLAN_PROVIDER_NAMES.has(providerName)
+    ? providerName
+    : undefined;
+}
+
 function CodingPlanRangeSelector({
   range,
   onRangeChange,
@@ -334,20 +355,19 @@ function CodingPlanQuotaCards({
     findCodingPlanQuotaLimit(limits, "TOKENS_LIMIT", 6),
     resetUi.week.entry,
   );
-  // 额度剩余 100% 时重置没有收益:隐藏重置按钮与机会徽标(纯展示,不影响发放与轮询)。
-  const fiveHourQuotaFull = isCodingPlanQuotaLimitFull(fiveHourLimit);
-  const weeklyQuotaFull = isCodingPlanQuotaLimitFull(weeklyLimit);
   // 五小时与周机会合并为一个徽标,次数累加,倒计时取最早到期的一档。
+  // Bugfix：曾用「剩余 100% 则重置无收益」隐藏徽标与按钮。核销会把剩余改写成 100%，
+  // 同类型余下的机会随即被藏掉，用户以为卡丢了。只要额度存在且有可用机会就展示。
   const opportunityBadge = mergeCodingPlanQuotaResetOpportunityBadges([
     {
       count: resetUi.entry?.opportunityCount ?? 0,
       expiresAt: resetUi.entry?.opportunityExpiresAt ?? null,
-      visible: Boolean(fiveHourLimit) && resetUi.opportunityVisible && !fiveHourQuotaFull,
+      visible: Boolean(fiveHourLimit) && resetUi.opportunityVisible,
     },
     {
       count: resetUi.week.entry?.opportunityCount ?? 0,
       expiresAt: resetUi.week.entry?.opportunityExpiresAt ?? null,
-      visible: Boolean(weeklyLimit) && resetUi.week.opportunityVisible && !weeklyQuotaFull,
+      visible: Boolean(weeklyLimit) && resetUi.week.opportunityVisible,
     },
   ]);
   const cards = [
@@ -402,7 +422,6 @@ function CodingPlanQuotaCards({
   const weeklyCardVisible = cards.some((card) => card.key === "weekly");
   const quotaResetDialog = buildCodingPlanQuotaResetDialogConfig({
     fiveHourEnabled: Boolean(fiveHourLimit),
-    fiveHourQuotaFull,
     resetUi,
     usageItems: cards.map((card) => ({
       color: card.progressColor,
@@ -413,7 +432,6 @@ function CodingPlanQuotaCards({
       value: formatQuotaRemainingPercentage(locale, card.limit),
     })),
     weekEnabled: Boolean(weeklyLimit),
-    weekQuotaFull: weeklyQuotaFull,
   });
 
   // Quota remaining 的响应式只允许整组纵向或整组横向。
@@ -487,21 +505,21 @@ function CodingPlanQuotaCards({
                 {/* 额度标题旁入口只打开统一弹窗；真正核销由弹窗内对应类型按钮触发。 */}
                 {card.key === "fiveHour" &&
                 resetUi.entry &&
-                ((resetUi.opportunityVisible && !fiveHourQuotaFull) ||
+                (resetUi.opportunityVisible ||
                   resetUi.processing ||
                   resetUi.entry.status === "completed") ? (
                   <LocalizedCodingPlanQuotaResetAction
-                    completedAt={resetUi.entry.completedAt}
+                    completedAt={resolveCodingPlanQuotaResetActionCompletedAt(resetUi)}
                     processing={resetUi.processing}
                     onOpenDialog={() => setQuotaResetDialogOpen(true)}
                   />
                 ) : card.key === "weekly" &&
                   resetUi.week.entry &&
-                  ((resetUi.week.opportunityVisible && !weeklyQuotaFull) ||
+                  (resetUi.week.opportunityVisible ||
                     resetUi.week.processing ||
                     resetUi.week.entry.status === "completed") ? (
                   <LocalizedCodingPlanQuotaResetAction
-                    completedAt={resetUi.week.entry.completedAt}
+                    completedAt={resolveCodingPlanQuotaResetActionCompletedAt(resetUi.week)}
                     processing={resetUi.week.processing}
                     resetType="WEEK"
                     onOpenDialog={() => setQuotaResetDialogOpen(true)}
@@ -847,7 +865,7 @@ function CodingPlanUsageDetailSection({ snapshot }: { snapshot: CodingPlanUsageS
   );
 }
 
-function hasCodingPlanCreditUsageData({
+export function hasCodingPlanCreditUsageData({
   summary,
   modelDataList,
   toolDataList,
@@ -879,7 +897,7 @@ function hasCodingPlanCreditUsageData({
   );
 }
 
-function shouldShowCodingPlanUsageDetailSummary({
+export function shouldShowCodingPlanUsageDetailSummary({
   summary,
   modelDataList,
   toolDataList,

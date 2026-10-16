@@ -1,7 +1,17 @@
 import { createHttpClientError } from "@zcode/contracts";
 
+/**
+ * 读正文所需的最小形状：原生 fetch 的 `Response` 与 adapter 自己读出的 `IncomingResponse` 都满足它。
+ * 不要求是 `Response`：后者表示不了 200–599 之外的状态码（network/incoming-response.ts）。
+ */
+export interface ResponseLike {
+  status: number;
+  headers: Headers;
+  body: ReadableStream<Uint8Array> | null;
+}
+
 export async function readResponseBody(
-  response: Response,
+  response: ResponseLike,
   maxResponseBytes: number,
   signal: AbortSignal,
   url: string,
@@ -28,18 +38,8 @@ export async function readResponseBody(
     }
   }
 
-  if (!response.body) {
-    const buffer = new Uint8Array(await response.arrayBuffer());
-    if (buffer.byteLength > maxResponseBytes) {
-      throw createHttpClientError({
-        code: "too_large",
-        url,
-        status: response.status,
-        message: `HTTP response is too large: bytes=${buffer.byteLength}, max=${maxResponseBytes}`,
-      });
-    }
-    return buffer;
-  }
+  // 没有正文流只发生在无正文状态（204 / 304 …）：正文就是空的。
+  if (!response.body) return new Uint8Array(0);
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];

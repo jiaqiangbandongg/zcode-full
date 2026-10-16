@@ -1,7 +1,13 @@
 /* eslint-disable max-lines -- Composer 用量入口集中维护多来源状态、弹层和重置交互；本阶段只迁移 Account Access，不拆分既有 UI 结构。 */
 import { type CodingPlanResetType } from "@zcode/shared";
 import { Loader2 } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   type CodingPlanUsageRemainingEntitlement,
   type CodingPlanUsageAvailableProvider,
@@ -20,10 +26,12 @@ import {
   formatQuotaRemainingPercentage,
   formatQuotaResetTime,
   getQuotaRemainingPercentage,
-  isCodingPlanQuotaLimitFull,
   resolveMcpQuotaLimit,
 } from "@/lib/codingPlanQuotaPresentation.js";
-import { resolveCodingPlanQuotaResetLimit } from "@/lib/codingPlanQuotaResetUi.js";
+import {
+  resolveCodingPlanQuotaResetActionCompletedAt,
+  resolveCodingPlanQuotaResetLimit,
+} from "@/lib/codingPlanQuotaResetUi.js";
 import { getContextQuotaMeterGridClass } from "@/chat-input-toolbar/contextQuotaMeterGrid.js";
 import { resolveChatCodingPlanResetOpportunityBadge } from "@/chat-input-toolbar/codingPlanResetOpportunityBadge.js";
 import { ChatCodingPlanMcpUsageMeter } from "@/chat-input-toolbar/ChatCodingPlanMcpUsageMeter.js";
@@ -43,7 +51,10 @@ export type ChatCodingPlanUsageRemainingConfig = {
 
 /** Composer 触发器 hover 展开面板后要求补播撒花的自动完成 used_at,按重置类型定位到对应额度条。
  *  五小时与周额度可能各自 arm,因此按类型分别记录,互不覆盖。 */
-export type CodingPlanQuotaResetAutoConfettiArms = Record<CodingPlanResetType, number | null>;
+export type CodingPlanQuotaResetAutoConfettiArms = Record<
+  CodingPlanResetType,
+  number | null
+>;
 
 export function hasChatCodingPlanUsageRemaining(
   config: ChatCodingPlanUsageRemainingConfig,
@@ -56,7 +67,7 @@ export function hasChatCodingPlanUsageRemaining(
   );
 }
 
-function shouldShowContextQuotaResetTime({
+export function shouldShowContextQuotaResetTime({
   availableWidth,
   contentWidth,
 }: {
@@ -130,7 +141,9 @@ function ChatCodingPlanUsageMeter({
       <div className="min-w-0 space-y-0.5 text-ui-sm">
         {/* min-h 与重置动作(h-5)对齐:没有动作的额度条也保持同高,避免同排数值/进度条错位。 */}
         <div className="flex min-h-5 min-w-0 items-center gap-1">
-          <span className="min-w-0 truncate text-foreground-subtle">{label}</span>
+          <span className="min-w-0 truncate text-foreground-subtle">
+            {label}
+          </span>
           {action ? <span className="shrink-0">{action}</span> : null}
         </div>
         <div
@@ -221,11 +234,11 @@ export function ChatCodingPlanUsageRemainingPanel({
   );
   const monthlyToolLimit = findCodingPlanQuotaLimit(limits, "TIME_LIMIT", 5, 1);
   const mcpQuotaLimit = resolveMcpQuotaLimit(state.visibleSnapshot);
-  // 额度剩余 100% 时重置没有收益:隐藏重置按钮与机会徽标(纯展示,不影响发放与轮询)。
-  const fiveHourQuotaFull = isCodingPlanQuotaLimitFull(fiveHourTokenLimit);
-  const weeklyQuotaFull = isCodingPlanQuotaLimitFull(weeklyTokenLimit);
   // 五小时与周机会合并为一个徽标,次数累加,倒计时取最早到期的一档。
-  const opportunityBadge = resolveChatCodingPlanResetOpportunityBadge(state, resetUi);
+  const opportunityBadge = resolveChatCodingPlanResetOpportunityBadge(
+    state,
+    resetUi,
+  );
   const fiveHourResetTime = fiveHourTokenLimit?.nextResetTime
     ? formatContextFiveHourResetTime({
         locale,
@@ -307,7 +320,6 @@ export function ChatCodingPlanUsageRemainingPanel({
   const quotaGridCount = Math.min(primaryQuotaMeters.length + (mcpQuotaMeter ? 1 : 0), 3);
   const quotaResetDialog = buildCodingPlanQuotaResetDialogConfig({
     fiveHourEnabled: Boolean(fiveHourTokenLimit),
-    fiveHourQuotaFull,
     resetUi,
     usageItems: quotaMeters.map((meter) => ({
       color: meter.color,
@@ -318,7 +330,6 @@ export function ChatCodingPlanUsageRemainingPanel({
       value: formatQuotaRemainingPercentage(locale, meter.limit),
     })),
     weekEnabled: Boolean(weeklyTokenLimit),
-    weekQuotaFull: weeklyQuotaFull,
   });
 
   return (
@@ -328,7 +339,8 @@ export function ChatCodingPlanUsageRemainingPanel({
           <span className="min-w-0 truncate text-ui-base font-medium text-foreground">
             {intl.formatMessage({ id: "sidebar.usage.plan.title" })}
           </span>
-          {(fiveHourTokenLimit && resetUi.entry) || (weeklyTokenLimit && resetUi.week.entry) ? (
+          {(fiveHourTokenLimit && resetUi.entry) ||
+          (weeklyTokenLimit && resetUi.week.entry) ? (
             <CodingPlanQuotaResetOpportunity
               count={opportunityBadge.count}
               dialog={quotaResetDialog}
@@ -392,24 +404,24 @@ export function ChatCodingPlanUsageRemainingPanel({
                 // 额度标题旁入口只打开统一弹窗；真正核销由弹窗内对应类型按钮触发。
                 meter.key === "fiveHour" &&
                 resetUi.entry &&
-                ((resetUi.opportunityVisible && !fiveHourQuotaFull) ||
+                (resetUi.opportunityVisible ||
                   resetUi.processing ||
                   resetUi.entry.status === "completed") ? (
                   <LocalizedCodingPlanQuotaResetAction
                     autoCelebrateCompletedAt={autoCelebrateArm?.FIVE_HOUR ?? null}
-                    completedAt={resetUi.entry.completedAt}
+                    completedAt={resolveCodingPlanQuotaResetActionCompletedAt(resetUi)}
                     processing={resetUi.processing}
                     onAutoCelebrated={onAutoCelebrated}
                     onOpenDialog={() => setQuotaResetDialogOpen(true)}
                   />
                 ) : meter.key === "weekly" &&
                   resetUi.week.entry &&
-                  ((resetUi.week.opportunityVisible && !weeklyQuotaFull) ||
+                  (resetUi.week.opportunityVisible ||
                     resetUi.week.processing ||
                     resetUi.week.entry.status === "completed") ? (
                   <LocalizedCodingPlanQuotaResetAction
                     autoCelebrateCompletedAt={autoCelebrateArm?.WEEK ?? null}
-                    completedAt={resetUi.week.entry.completedAt}
+                    completedAt={resolveCodingPlanQuotaResetActionCompletedAt(resetUi.week)}
                     processing={resetUi.week.processing}
                     resetType="WEEK"
                     onAutoCelebrated={onAutoCelebrated}

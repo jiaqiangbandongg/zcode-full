@@ -20,7 +20,10 @@ export function resolveWorkspaceTelemetryDetail(scope: {
 export type RemoteUsageRemoteKind = RemoteTarget["kind"];
 export type RemoteUsageWorkspaceKind = "local" | "remote";
 export type RemoteUsageResult = "success" | "failure";
+export type WebRemoteControlStartTelemetryResult = RemoteUsageResult | "cancelled";
 export type RemoteWorkspaceConnectTrigger = "new" | "reconnect" | "restore";
+export type WebRemoteControlPairKind = "initial" | "reconnect";
+export type WebRemoteControlEntryKind = "home" | "task";
 export type RemoteUsageErrorCategory =
   | "auth"
   | "connect"
@@ -29,6 +32,29 @@ export type RemoteUsageErrorCategory =
   | "attach"
   | "relay"
   | "unknown";
+
+function buildResultDetail(
+  result: WebRemoteControlStartTelemetryResult,
+  errorCategory?: RemoteUsageErrorCategory,
+): Record<string, string> {
+  return {
+    result,
+    error_category: result === "failure" ? (errorCategory ?? "unknown") : "",
+  };
+}
+
+function buildWebRemoteControlEvent(
+  elementName: string,
+  eventType: "result" | "view",
+  eventExtraDetail: Record<string, string>,
+): TelemetryEventPayload {
+  return {
+    elementName,
+    eventRegion: "web_remote_control",
+    eventType,
+    eventExtraDetail,
+  };
+}
 
 export function buildRemoteWorkspaceConnectResultTelemetry(input: {
   result: RemoteUsageResult;
@@ -47,6 +73,59 @@ export function buildRemoteWorkspaceConnectResultTelemetry(input: {
       error_category: input.result === "success" ? "" : (input.errorCategory ?? "unknown"),
     },
   };
+}
+
+export function buildWebRemoteControlEntryViewTelemetry(input: {
+  workspaceKind: RemoteUsageWorkspaceKind;
+  remoteKind?: RemoteUsageRemoteKind;
+}): TelemetryEventPayload {
+  return buildWebRemoteControlEvent("web_remote_control_entry_view", "view", {
+    workspace_kind: input.workspaceKind,
+    remote_kind: input.remoteKind ?? "",
+  });
+}
+
+export function buildWebRemoteControlStartResultTelemetry(input: {
+  result: WebRemoteControlStartTelemetryResult;
+  workspaceKind: RemoteUsageWorkspaceKind;
+  remoteKind?: RemoteUsageRemoteKind;
+  errorCategory?: RemoteUsageErrorCategory;
+}): TelemetryEventPayload {
+  return buildWebRemoteControlEvent("web_remote_control_start_result", "result", {
+    ...buildResultDetail(input.result, input.errorCategory),
+    workspace_kind: input.workspaceKind,
+    remote_kind: input.remoteKind ?? "",
+  });
+}
+
+export function buildWebRemoteControlPairResultTelemetry(input: {
+  result: RemoteUsageResult;
+  pairKind: WebRemoteControlPairKind;
+  workspaceKind: RemoteUsageWorkspaceKind;
+  remoteKind?: RemoteUsageRemoteKind;
+  errorCategory?: RemoteUsageErrorCategory;
+}): TelemetryEventPayload {
+  return buildWebRemoteControlEvent("web_remote_control_pair_result", "result", {
+    ...buildResultDetail(input.result, input.errorCategory),
+    pair_kind: input.pairKind,
+    workspace_kind: input.workspaceKind,
+    remote_kind: input.remoteKind ?? "",
+  });
+}
+
+export function buildWebRemoteControlBridgeResultTelemetry(input: {
+  result: RemoteUsageResult;
+  workspaceKind: RemoteUsageWorkspaceKind;
+  remoteKind?: RemoteUsageRemoteKind;
+  entryKind: WebRemoteControlEntryKind;
+  errorCategory?: RemoteUsageErrorCategory;
+}): TelemetryEventPayload {
+  return buildWebRemoteControlEvent("web_remote_control_bridge_result", "result", {
+    ...buildResultDetail(input.result, input.errorCategory),
+    workspace_kind: input.workspaceKind,
+    remote_kind: input.remoteKind ?? "",
+    entry_kind: input.entryKind,
+  });
 }
 
 function readErrorSearchText(error: unknown): string {

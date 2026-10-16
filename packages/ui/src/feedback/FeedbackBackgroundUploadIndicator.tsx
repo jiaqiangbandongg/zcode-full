@@ -28,7 +28,7 @@ interface FeedbackBackgroundUploadIndicatorProps {
   feedbackDialogOpen: boolean;
 }
 
-interface FeedbackBackgroundUploadIndicatorViewProps {
+export interface FeedbackBackgroundUploadIndicatorViewProps {
   status: FeedbackSubmissionJobStatus;
   progress: FeedbackSubmissionProgressState;
   ticketId?: string;
@@ -39,18 +39,18 @@ interface FeedbackBackgroundUploadIndicatorViewProps {
   defaultExpanded?: boolean;
 }
 
-function shouldOpenExistingFeedbackTicket(
+export function shouldOpenExistingFeedbackTicket(
   status: FeedbackSubmissionJobStatus,
   ticketId: string | undefined,
 ): ticketId is string {
   return Boolean(ticketId) && (status === "success" || status === "error");
 }
 
-type FeedbackBackgroundOpenTarget =
+export type FeedbackBackgroundOpenTarget =
   | { kind: "submission"; jobId: string }
   | { kind: "ticket"; ticketId: string };
 
-function getFeedbackBackgroundOpenTarget(
+export function getFeedbackBackgroundOpenTarget(
   job: Pick<FeedbackSubmissionJobSnapshot, "id" | "status" | "ticketId">,
 ): FeedbackBackgroundOpenTarget {
   if (shouldOpenExistingFeedbackTicket(job.status, job.ticketId)) {
@@ -141,7 +141,7 @@ function FeedbackBackgroundUploadJobCard({
   );
 }
 
-function FeedbackBackgroundUploadIndicatorView({
+export function FeedbackBackgroundUploadIndicatorView({
   status,
   progress,
   ticketId,
@@ -238,7 +238,7 @@ function FeedbackBackgroundUploadIndicatorView({
           >
             {expanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
           </Button>
-          {/* paused-log 只能继续上传；如果允许隐藏，会把等待用户动作的后台 job 变成不可恢复的悬挂状态。*/}
+          {/* Bugfix: paused-log 只能继续上传；如果允许隐藏，会把等待用户动作的后台 job 变成不可恢复的悬挂状态。 */}
           {!isPaused ? (
             <Button
               type="button"

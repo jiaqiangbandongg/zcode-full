@@ -1,0 +1,8 @@
+phase phase#1
+participant phase#1:actor#1 "勘察员" steps=ask#1
+phase phase#2
+participant phase#2:hole#21b40fca/actor#1 "烟测员" steps=hole#21b40fca/ask#1
+phase phase#3
+participant phase#3:hole#21b40fca/actor#2 "分组员" steps=hole#21b40fca/ask#2
+phase phase#4
+participant phase#4:actor#2 "执行者" steps=ask#2

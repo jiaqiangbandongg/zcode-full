@@ -1,7 +1,7 @@
 const SETTINGS_WRITE_QUEUE_TIMEOUT_MS = 30_000;
 const SETTINGS_WRITE_QUEUE_TIMEOUT_ENV = "ZCODE_SETTING_WRITE_QUEUE_TIMEOUT_MS";
 
-function getSettingsWriteQueueTimeoutMs(): number {
+export function getSettingsWriteQueueTimeoutMs(): number {
   const rawValue = process.env[SETTINGS_WRITE_QUEUE_TIMEOUT_ENV]?.trim();
   if (!rawValue) {
     return SETTINGS_WRITE_QUEUE_TIMEOUT_MS;
@@ -10,6 +10,12 @@ function getSettingsWriteQueueTimeoutMs(): number {
   return Number.isFinite(parsedValue) && parsedValue > 0
     ? parsedValue
     : SETTINGS_WRITE_QUEUE_TIMEOUT_MS;
+}
+
+export function buildSettingsTempFile(settingsFile: string): string {
+  return `${settingsFile}.tmp-${process.pid}-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2)}`;
 }
 
 export function withSettingsWriteQueueTimeout(
@@ -40,10 +46,14 @@ export function withSettingsWriteQueueTimeout(
       expireCurrentWrite();
       // 设置写入队列持有真实持久化顺序，Provider 层不 await 也无法释放这里的 pending。
       // 超时只允许发生在提交前阶段；进入 rename 提交后必须等临界区收口，避免旧写晚到覆盖新设置。
-      reject(new Error(`settingService update timed out after ${timeoutMs}ms`));
+      reject(
+        new Error(`settingService update timed out after ${timeoutMs}ms`),
+      );
     }, timeoutMs);
     timeoutHandle.unref?.();
   });
 
-  return Promise.race([runUpdate(enterCommitPhase), timeoutPromise]).finally(clearQueueTimeout);
+  return Promise.race([runUpdate(enterCommitPhase), timeoutPromise]).finally(
+    clearQueueTimeout,
+  );
 }

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-running-actions",
+  "spec": "./test/e2e/conversation-session/conversation-session-running-actions.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-running-actions.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "prepareConversationE2E 写入的只读工具输入文件，用于构造 completed assistant + tool_result 历史。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-readonly-tool-call",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通用只读 Read tool_use 让高/中优先级 conversation case 覆盖真实 tool_result 历史。"
+    },
+    {
+      "id": "upstream-conversation-readonly-running-actions-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只需要稳定产出 completed assistant 历史，供 running guard 断言定位历史 assistant message。"
+    },
+    {
+      "id": "upstream-conversation-running-actions-active-slow-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "running guard 必须在 assistant 正在流式回答时检查 fork/edit 入口；真实 provider 可能过快完成。"
+    }
+  ]
+}

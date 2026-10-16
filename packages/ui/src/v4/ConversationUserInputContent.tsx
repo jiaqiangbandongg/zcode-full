@@ -25,7 +25,7 @@ import { parseV4VisibleSlashCommand } from "@/v4/slashCommands.js";
 const GOAL_QUERY_TOKEN_PATTERN = /^(\s*)(\/(?:goal|target))(?=\s|$)([\s\S]*)$/i;
 const EMPTY_ATTACHMENTS: readonly unknown[] = [];
 
-interface V4UserInputGoalQueryDisplay {
+export interface V4UserInputGoalQueryDisplay {
   leadingText: string;
   commandText: string;
   trailingText: string;
@@ -36,7 +36,7 @@ interface V4UserInputGoalQueryDisplay {
  * 原因：用户消息展示不能仅凭包含 `/goal` 就重猜 command intent，否则上下文 prompt
  * 在隐藏附加块后会被误画成 goal 控制命令。
  */
-function parseV4UserInputGoalQuery(
+export function parseV4UserInputGoalQuery(
   text: string,
   attachments: readonly unknown[] = EMPTY_ATTACHMENTS,
   contextAttachmentCount = 0,
@@ -152,7 +152,7 @@ function V4UserInputMention({
       ) : (
         <SquareSlash aria-hidden="true" className="size-4 shrink-0" />
       )}
-      {/* authoritative goal 使用原始 slash token 回显，导致用户气泡重复暴露
+      {/* Bug 根因：authoritative goal 使用原始 slash token 回显，导致用户气泡重复暴露
           控制语法。标签保留 Goal 语义，只省略 `/`；复制、编辑和协议仍使用原始 row.text。 */}
       {part.label}
     </span>

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bash-read-state",
+  "spec": "./test/e2e/conversation-session/conversation-session-bash-read-state.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-bash-read-state.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "bash-read-state-e2e/target.txt",
+      "source": "created-by-spec",
+      "description": "spec 在默认工作区写入的目标文件；Bash cat 读取它，Edit 修改它，formatter Bash 再改写它。"
+    },
+    {
+      "path": "bash-read-state-e2e/overwrite-target.mjs",
+      "source": "created-by-spec",
+      "description": "spec 在默认工作区写入的 formatter 脚本；带 --fix marker 的 Bash 调用用于触发 stale hint。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-bash-read-state-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 Bash read-state 产品语义，只需要稳定返回，避免标题请求误命中主流程 fixture。"
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-cat-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 Bash cat；本响应固定触发 Bash read-state producer，专门验证后续 Edit read-before-write guard。"
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-edit-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应验证 Bash cat 已回填 read-state，使后续 Edit 不再触发未读 guard。"
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-format-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应固定触发带 --fix marker 的 Bash 写类命令，验证已读文件被 Bash 改写后的 stale hint。"
+    },
+    {
+      "id": "upstream-conversation-bash-read-state-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只在 stale hint 已进入 provider-visible 请求后结束 case，真实 provider 回复内容不影响产品语义。"
+    }
+  ]
+}

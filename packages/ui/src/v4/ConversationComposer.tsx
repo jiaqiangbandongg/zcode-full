@@ -27,6 +27,8 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/components/lib/utils.js";
+import { HighspeedComposerBackground } from "@/highspeed/HighspeedActivationVisual.js";
+import { useHighspeedComposerEntrance } from "@/highspeed/useHighspeedComposerEntrance.js";
 import {
   TID_CHAT_ATTACHMENT_BUTTON,
   TID_CHAT_ATTACHMENT_MENU_ITEM,
@@ -41,6 +43,7 @@ import {
   TID_V4_ATTACHMENT_UPLOAD_RETRY,
   TID_V4_STOP,
   testId,
+  type HighspeedCardSnapshot,
   type PlanIdentitySnapshot,
   type ZCodeProvider,
 } from "@zcode/shared";
@@ -105,7 +108,12 @@ import {
   type ChatComposerAttachment,
 } from "@/lib/chatAttachments.js";
 import { resolveChatPlaceholderKey } from "@/lib/chatPlaceholder.js";
-import { resolveChatEnterShortcut } from "@/lib/mobileTextInput.js";
+import {
+  resolveChatEnterShortcut,
+  resolveChatEnterSubmits,
+  shouldAvoidIosInputFocusZoom,
+  useIsMobileTextInputViewport,
+} from "@/lib/mobileTextInput.js";
 import { appendPromptHistoryEntry } from "@/lib/promptHistory.js";
 import {
   persistPromptHistoryEntries,
@@ -145,6 +153,11 @@ import {
 } from "@/v4/composer/composerPromptContexts.js";
 import { useCodeCommentContexts } from "@/v4/composer/useCodeCommentContexts.js";
 import { useWebElementContexts } from "@/v4/composer/useWebElementContexts.js";
+import {
+  PluginUiModelContextChip,
+  usePluginUiContextImages,
+  usePluginUiModelContexts,
+} from "@/plugin-ui/index.js";
 import { usePptxElementReferences } from "@/v4/composer/usePptxElementReferences.js";
 import { PptxElementReferenceChip } from "@/v4/composer/PptxElementReferenceChip.js";
 import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementReference.js";
@@ -182,11 +195,14 @@ export interface ConversationComposerSendOptions {
   attachments?: AttachmentRef[];
   /** Prompt 文本内携带的上下文附件数量；用于阻止 /goal 等本地命令误消费。 */
   contextAttachmentCount?: number;
+  conversationQuotes?: import("@zcode/shared").ConversationSelectionText[];
   /** renderer-only：ACK accepted 后由 SessionPane 绑定真实 commandId/sessionId。 */
   telemetrySeed?: ConversationPromptTelemetrySeed;
   /** 本次 busy input 的一次性投递覆盖，不改 session 偏好。 */
   requestedDelivery?: "startNow" | "queue" | "guide";
   sharedContextRefs?: Array<{ kind: "shared_context_import"; context_id: string }>;
+  /** 插件 UI 代发：随 sendText 持久化，用户消息卡片显示"来自插件 X"。 */
+  source?: import("@zcode/shared/zcode-protocol-v4").ConversationInputSource;
 }
 
 export type ConversationComposerSendResult = "sent" | "blocked" | "confirmationRequired";
@@ -199,14 +215,14 @@ function getComposerAttachmentTypeLabel(filename: string, mimeType: string): str
   return (mimeType.split("/").at(-1) ?? mimeType).toUpperCase();
 }
 
-interface ExternalTextInsertRequest {
+export interface ExternalTextInsertRequest {
   requestId: number;
   text: string;
   mention?: ComposerMentionPrefill;
   mode?: "replace" | "prepend-if-missing";
 }
 
-function restorePersistedComposerDraftIntoInput({
+export function restorePersistedComposerDraftIntoInput({
   draft,
   inputApi,
   onEditorStateError,
@@ -236,7 +252,7 @@ function restorePersistedComposerDraftIntoInput({
   return draft.text;
 }
 
-function applyExternalTextInsertRequestToComposer({
+export function applyExternalTextInsertRequestToComposer({
   appliedRequestId,
   inputApi,
   request,
@@ -301,7 +317,7 @@ export interface ComposerRestoreRequest {
   config?: Pick<V4ComposerDraft, "mode" | "planEnabled" | "modelSelection">;
 }
 
-function applyComposerRestoreRequestToComposer({
+export function applyComposerRestoreRequestToComposer({
   appliedRequestId,
   currentSessionId,
   currentWorkspaceKey,
@@ -352,7 +368,7 @@ function arePromptHistoryEntriesEqual(left: readonly string[], right: readonly s
   return left.length === right.length && left.every((entry, index) => entry === right[index]);
 }
 
-interface ConversationComposerProps {
+export interface ConversationComposerProps {
   snapshot: ConversationSnapshot | null;
   /** 草稿 scope（sessionId；draft 态 null → "__draft__" scope）。 */
   sessionId?: string | null;
@@ -386,12 +402,21 @@ interface ConversationComposerProps {
    */
   blockingRequestId?: string | null;
   disabled?: boolean;
+  /** 当前 Task 可用的 Highspeed 卡；只影响静态标识和模型锁定。 */
+  highspeedCard?: HighspeedCardSnapshot | null;
+  /**
+   * 发送路径 draw 新命中登记的一次性激活请求（值为 cardId）。
+   * 命中当前卡时才播放激活动效，composer 锁定入场方式后经回调消费；切回、恢复与重挂载不重播。
+   */
+  highspeedActivationCardId?: string | null;
+  onHighspeedActivationApplied?: (cardId: string) => void;
   /**
    * 是否在新建任务 / 切换会话 / 挂载后自动把光标聚焦到输入框（默认开）。
    * 竖切多 pane 时由宿主传入 SessionPane.focused，仅焦点 pane 聚焦、后台 pane 不抢焦点。
    */
   autoFocusEnabled?: boolean;
   /** 当前 composer 是否运行在手机 Web 远控壳中。 */
+  isWebRemoteControl?: boolean;
   workspacePath: string;
   workspaceIdentity?: string;
   remoteSessionId?: string;
@@ -497,7 +522,11 @@ function ConversationComposerImpl({
   centered = false,
   blockingRequestId = null,
   disabled = false,
+  highspeedCard = null,
+  highspeedActivationCardId = null,
+  onHighspeedActivationApplied,
   autoFocusEnabled = true,
+  isWebRemoteControl = false,
   workspacePath,
   workspaceIdentity,
   remoteSessionId,
@@ -549,6 +578,32 @@ function ConversationComposerImpl({
   const configPickerScopeKey = `${workspaceKey}\0${draftScopeId}`;
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
+  const [presentedHighspeedCardId, setPresentedHighspeedCardId] = useState<string | null>(null);
+  const [highspeedSweepActive, setHighspeedSweepActive] = useState(false);
+  const highspeedCardId = highspeedCard?.cardId ?? null;
+  const highspeedEntrance = useHighspeedComposerEntrance({
+    cardId: highspeedCardId,
+    activationCardId: highspeedActivationCardId,
+    onActivationApplied: onHighspeedActivationApplied,
+  });
+  const highspeedEntranceAnimated = highspeedEntrance === "activation";
+  // 恢复入场（切回 Task、快照恢复、重挂载）不经扩散交接，卡片出现即呈现模型与倒计时。
+  const highspeedPresented =
+    highspeedCardId !== null &&
+    (!highspeedEntranceAnimated || presentedHighspeedCardId === highspeedCardId);
+  const handleHighspeedModelTransitionStart = useCallback(() => {
+    // 只记录已完成视觉交接的卡片身份，不改变卡片有效性或发送状态。
+    setPresentedHighspeedCardId(highspeedCardId);
+  }, [highspeedCardId]);
+  useEffect(() => {
+    // 扫光属于激活动效，只在 draw 新命中的交接后播放一次。
+    if (!highspeedPresented || !highspeedEntranceAnimated) {
+      setHighspeedSweepActive(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setHighspeedSweepActive(true), 1_900);
+    return () => window.clearTimeout(timer);
+  }, [highspeedEntranceAnimated, highspeedPresented]);
   const [configPickerState, setConfigPickerState] = useState<{
     scopeKey: string;
     activePicker: V4ComposerConfigPicker | null;
@@ -603,9 +658,25 @@ function ConversationComposerImpl({
   const pendingShareContext = activeShareContext?.status === "pending" ? activeShareContext : null;
   const inputApiRef = useRef<LexicalChatInputHandle | null>(null);
   const reportedErrorKeysRef = useRef(new Set<string>());
+  const isMobileTextInputViewport = useIsMobileTextInputViewport();
   const primaryModifierPressed = usePrimaryFollowupModifier();
   const appleKeyboardPlatform = isAppleKeyboardPlatform();
-  const enterSubmits = true;
+  // Bugfix：M3 删除旧 ChatView 后，M5 只恢复了桌面端的 false 硬编码，已登记的手机远控
+  // 接线没有补回，导致 Enter 误发送。恢复旧语义：手机视口下 Enter 换行并用按钮发送；
+  // 桌面端仍由 resolveChatEnterSubmits 的视口门禁保持 Enter 发送。
+  const enterSubmits = resolveChatEnterSubmits({
+    isMobileTextInputViewport,
+    preferEnterNewline: isWebRemoteControl,
+  });
+  // 修复原因：旧 ChatView 删除后，iOS 防聚焦放大的接线没有迁到 v4 composer，
+  // 手机 Web 远控输入框会重新触发 Safari 的页面缩放。
+  const avoidIosInputFocusZoom = shouldAvoidIosInputFocusZoom({
+    isMobileTextInputViewport,
+    isWebRemoteControl,
+  });
+  // Bugfix：手机远控把完整能力说明放进绝对定位 placeholder 后，三行英文会越过
+  // 40px 编辑区并覆盖工具栏。手机端改用短文案并限制两行；桌面端继续保留完整提示。
+  const compactMobilePlaceholder = isWebRemoteControl && isMobileTextInputViewport;
   const sendShortcut = resolveChatEnterShortcut({ enterSubmits });
   const updateText = useCallback(
     (next: string) => {
@@ -720,6 +791,15 @@ function ConversationComposerImpl({
     listenAddToChatEvents: listenAddToChatEvents && !disabled,
     scopeId: draftScopeId,
   });
+  // 插件 UI 经 ui/update-model-context 附加的上下文；按 sessionId 接收，随发送清空。
+  const {
+    contexts: pluginUiContexts,
+    hasContexts: hasPluginUiContexts,
+    removeContext: removePluginUiContext,
+    clearContexts: clearPluginUiContexts,
+  } = usePluginUiModelContexts({ sessionId, workspacePath, workspaceIdentity });
+  // 上下文里的 image 块 → 本 composer 的图片附件，随下一回合发送。
+  usePluginUiContextImages(pluginUiContexts, attachmentsApi);
   const {
     references: pptxElementReferences,
     hasReferences: hasPptxElementReferences,
@@ -824,12 +904,12 @@ function ConversationComposerImpl({
   const focusOptsRef = useRef<ComposerAutoFocusOptions>({
     autoFocusEnabled,
     disabled,
-    isMobileViewport: false,
+    isMobileViewport: isMobileTextInputViewport,
   });
   focusOptsRef.current = {
     autoFocusEnabled,
     disabled,
-    isMobileViewport: false,
+    isMobileViewport: isMobileTextInputViewport,
   };
   const flushPendingFocus = useCallback(() => {
     if (!pendingFocusRef.current) return;
@@ -885,7 +965,8 @@ function ConversationComposerImpl({
           codeCommentContexts.length > 0 ||
           webElementContexts.length > 0 ||
           pptxElementReferences.length > 0 ||
-          conversationSelectionReferences.length > 0,
+          conversationSelectionReferences.length > 0 ||
+          pluginUiContexts.length > 0,
         inputApi: inputApiRef.current,
         request: composerRestoreRequest,
         requestFocus: requestComposerFocus,
@@ -927,6 +1008,7 @@ function ConversationComposerImpl({
     updateText,
     webElementContexts.length,
     pptxElementReferences.length,
+    pluginUiContexts.length,
     workspaceKey,
   ]);
 
@@ -1094,6 +1176,8 @@ function ConversationComposerImpl({
   const mode = snapshot?.inputRouting.mode ?? "startNow";
   const modifiedEnterSubmits = shouldEnableModifiedEnterSubmit({
     inputRoutingMode: mode,
+    isMobileTextInputViewport,
+    isWebRemoteControl,
   });
   const canStop = Boolean(snapshot?.control.canStop);
   const modifiedEnterReversesDelivery = modifiedEnterSubmits && canStop;
@@ -1105,6 +1189,7 @@ function ConversationComposerImpl({
     hasWebElementContexts ||
     hasPptxElementReferences ||
     hasConversationSelectionReferences ||
+    hasPluginUiContexts ||
     Boolean(pendingShareContext);
   const hasComposerDraftContent =
     text.length > 0 ||
@@ -1113,6 +1198,7 @@ function ConversationComposerImpl({
     hasWebElementContexts ||
     hasPptxElementReferences ||
     hasConversationSelectionReferences ||
+    hasPluginUiContexts ||
     Boolean(pendingShareContext);
   useEffect(() => {
     onDraftStateChange?.({
@@ -1154,6 +1240,8 @@ function ConversationComposerImpl({
       const hasPendingCodeCommentContexts = currentCodeCommentContexts.length > 0;
       const currentWebElementContexts = webElementContexts;
       const hasPendingWebElementContexts = currentWebElementContexts.length > 0;
+      const currentPluginUiContexts = pluginUiContexts;
+      const hasPendingPluginUiContexts = currentPluginUiContexts.length > 0;
       const currentPptxElementReferences = pptxElementReferences;
       const hasPendingPptxElementReferences = currentPptxElementReferences.length > 0;
       const currentConversationSelections = conversationSelectionReferences;
@@ -1173,6 +1261,7 @@ function ConversationComposerImpl({
           !hasPendingWebElementContexts &&
           !hasPendingPptxElementReferences &&
           !hasPendingConversationSelections &&
+          !hasPendingPluginUiContexts &&
           !submittedShareContext) ||
         pendingRef.current ||
         !submissionReady ||
@@ -1308,9 +1397,10 @@ function ConversationComposerImpl({
         // inputIntent.sharedContextRefs 注入，与正文无关。
         const promptText = serializeComposerPromptContexts(trimmed, {
           codeComments: currentCodeCommentContexts,
-          conversationSelections: currentConversationSelections,
+          conversationSelections: [],
           webElements: currentWebElementContexts,
           pptxElements: currentPptxElementReferences,
+          pluginUiContexts: currentPluginUiContexts,
         });
         const contextAttachmentCount =
           countComposerPromptContexts({
@@ -1318,6 +1408,7 @@ function ConversationComposerImpl({
             conversationSelections: currentConversationSelections,
             webElements: currentWebElementContexts,
             pptxElements: currentPptxElementReferences,
+            pluginUiContexts: currentPluginUiContexts,
           }) + (submittedShareContext ? 1 : 0);
         if (trimmed) {
           promptHistoryBeforeSend = readPromptHistoryEntries(workspacePath);
@@ -1344,6 +1435,20 @@ function ConversationComposerImpl({
         }
         const sendResult = await onSendText(promptText, {
           submission,
+          ...(currentConversationSelections.length
+            ? {
+                conversationQuotes: currentConversationSelections.map(
+                  ({ text, path, senderName, senderId, messageId, sentAt }) => ({
+                    text,
+                    path,
+                    senderName,
+                    senderId,
+                    messageId,
+                    sentAt,
+                  }),
+                ),
+              }
+            : {}),
           telemetrySeed,
           ...(requestedDelivery ? { requestedDelivery } : {}),
           ...(heldQueueDisposition ? { heldQueueDisposition } : {}),
@@ -1407,6 +1512,7 @@ function ConversationComposerImpl({
         // 与附件相同，只移除本次冻结的引用；等待期间新加入的引用属于下一条消息。
         currentCodeCommentContexts.forEach(removeCodeCommentContext);
         currentWebElementContexts.forEach((context) => removeWebElementContext(context.id));
+        currentPluginUiContexts.forEach((context) => removePluginUiContext(context.id));
         currentPptxElementReferences.forEach((reference) =>
           removePptxElementReference(reference.id),
         );
@@ -1455,6 +1561,8 @@ function ConversationComposerImpl({
       removeConversationSelectionReference,
       removePptxElementReference,
       removeWebElementContext,
+      removePluginUiContext,
+      pluginUiContexts,
       sessionId,
       snapshotDraftOfEditor,
       updateText,
@@ -1601,7 +1709,7 @@ function ConversationComposerImpl({
     id: resolveChatPlaceholderKey({
       hasHistoryMessages: (snapshot?.rows.totalCount ?? 0) > 0,
       isTaskProcessing: canStop,
-      compactNewTask: false,
+      compactNewTask: compactMobilePlaceholder,
     }),
   });
   const sendTooltipTitle = intl.formatMessage({
@@ -1692,7 +1800,8 @@ function ConversationComposerImpl({
       codeCommentContexts.length === 0 &&
       webElementContexts.length === 0 &&
       pptxElementReferences.length === 0 &&
-      conversationSelectionReferences.length === 0
+      conversationSelectionReferences.length === 0 &&
+      pluginUiContexts.length === 0
     ) {
       return null;
     }
@@ -1893,7 +2002,12 @@ function ConversationComposerImpl({
                           className="block truncate text-ui-base font-medium text-foreground"
                           title={attachment.filename}
                         >
-                          {attachment.filename}
+                          {attachment.sourceKind === "topic-history"
+                            ? intl.formatMessage(
+                                { id: "chat.attachments.topicHistory" },
+                                { count: attachment.messageCount ?? 0 },
+                              )
+                            : attachment.filename}
                         </span>
                         <span className="block truncate text-ui-sm font-normal text-foreground-subtle">
                           {getComposerAttachmentTypeLabel(attachment.filename, attachment.mimeType)}
@@ -1960,7 +2074,8 @@ function ConversationComposerImpl({
         {codeCommentContexts.length > 0 ||
         webElementContexts.length > 0 ||
         pptxElementReferences.length > 0 ||
-        conversationSelectionReferences.length > 0 ? (
+        conversationSelectionReferences.length > 0 ||
+        pluginUiContexts.length > 0 ? (
           <div
             className="flex max-w-full flex-wrap items-center gap-2"
             data-composer-context-attachments-row="true"
@@ -1974,6 +2089,11 @@ function ConversationComposerImpl({
               contexts={webElementContexts}
               onRemove={removeWebElementContext}
               onRemoveAll={clearWebElementContexts}
+            />
+            <PluginUiModelContextChip
+              contexts={pluginUiContexts}
+              onRemove={removePluginUiContext}
+              onRemoveAll={clearPluginUiContexts}
             />
             <PptxElementReferenceChip
               references={pptxElementReferences}
@@ -1996,6 +2116,7 @@ function ConversationComposerImpl({
     clearCodeCommentContexts,
     clearConversationSelectionReferences,
     clearWebElementContexts,
+    clearPluginUiContexts,
     clearPptxElementReferences,
     codeCommentContexts,
     composerAttachments,
@@ -2006,10 +2127,12 @@ function ConversationComposerImpl({
     removeCodeCommentContext,
     removeConversationSelectionReference,
     removeWebElementContext,
+    removePluginUiContext,
     removePptxElementReference,
     conversationSelectionReferences,
     pendingShareContext,
     webElementContexts,
+    pluginUiContexts,
     pptxElementReferences,
     onOpenCodeViewer,
     openPptxElementReference,
@@ -2048,10 +2171,18 @@ function ConversationComposerImpl({
             sessionId={sessionId ?? null}
             phase={composerPhase}
             provider={provider}
+            isWebRemoteControl={isWebRemoteControl}
+            isMobileViewport={isMobileTextInputViewport}
             draftMode={draftMode}
             draftConfig={draftConfig}
             usage={composerUsage}
             disabled={disabled}
+            modelLocked={highspeedCard !== null}
+            highspeedPresented={highspeedPresented}
+            highspeedEntranceAnimated={highspeedEntranceAnimated}
+            highspeedSweepActive={highspeedSweepActive}
+            highspeedExpiresAt={highspeedCard?.expiresAt}
+            highspeedModel={highspeedCard?.model}
             activeConfigPicker={activeConfigPicker}
             onConfigPickerOpenChange={handleConfigPickerOpenChange}
             onSelectModel={handleSelectModelTrace}
@@ -2109,6 +2240,11 @@ function ConversationComposerImpl({
       handleStopClick,
       handleSendButtonClick,
       handleConfigPickerOpenChange,
+      highspeedCard,
+      highspeedEntranceAnimated,
+      highspeedPresented,
+      highspeedSweepActive,
+      isWebRemoteControl,
       mode,
       handleSelectModelTrace,
       modelSelectionReload,
@@ -2149,12 +2285,13 @@ function ConversationComposerImpl({
           onConfigPickerOpenChange={handleConfigPickerOpenChange}
           onSwitchMode={onSwitchMode}
         />
-        {/* 附件画廊重构曾整段覆盖 leadingActions，误删 CUA 常驻入口。
+        {/* Bug 原因：附件画廊 rebase 曾整段覆盖 leadingActions，误删 staging 的 CUA 常驻入口。
             入口自身继续负责平台、远程与设置可见性，不在 composer 重复判定。 */}
         <V4ComposerCuaEntry
           workspacePath={workspacePath}
           workspaceIdentity={workspaceIdentity}
           remoteSessionId={remoteSessionId}
+          isWebRemoteControl={isWebRemoteControl}
           currentSessionBusy={canStop}
         />
         <ConversationBackgroundWorkTrigger
@@ -2171,6 +2308,7 @@ function ConversationComposerImpl({
       disabled,
       draftConfig,
       handleConfigPickerOpenChange,
+      isWebRemoteControl,
       backgroundWorkOpenTarget,
       onOpenRunningBackgroundWorks,
       onSwitchMode,
@@ -2227,19 +2365,32 @@ function ConversationComposerImpl({
         </div>
       ) : null}
       <div
+        data-highspeed-composer={highspeedCard ? "true" : undefined}
+        data-highspeed-entrance={highspeedCard ? highspeedEntrance : undefined}
         className={cn(
-          "chat-composer-input-surface w-full",
+          "chat-composer-input-surface relative w-full",
           contextHeader && "rounded-2xl bg-surface shadow-xl/5",
+          highspeedCard && "highspeed-composer-surface",
+          highspeedPresented && "highspeed-placeholder-presented",
         )}
       >
+        {highspeedCard ? (
+          <HighspeedComposerBackground
+            key={highspeedCard.cardId}
+            animated={highspeedEntranceAnimated}
+            onModelTransitionStart={handleHighspeedModelTransitionStart}
+          />
+        ) : null}
         {contextHeader ? (
           // 旧 ChatViewComposer contextHeaderContent 同款包装（workspace 菜单 + Git 分支）。
-          <div className="p-1.5 flex min-w-0 flex-wrap items-center gap-0">{contextHeader}</div>
+          <div className="relative z-10 p-1.5 flex min-w-0 flex-wrap items-center gap-0">
+            {contextHeader}
+          </div>
         ) : null}
         {conversationSelectionLimitReason ? (
           <div
             role="alert"
-            className="mb-2 w-full rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-ui-base text-foreground"
+            className="relative z-10 mb-2 w-full rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-ui-base text-foreground"
           >
             {intl.formatMessage({
               id: `chat.selections.limit.${conversationSelectionLimitReason}`,
@@ -2262,7 +2413,8 @@ function ConversationComposerImpl({
             hasAttachments ||
             hasWebElementContexts ||
             hasPptxElementReferences ||
-            hasConversationSelectionReferences
+            hasConversationSelectionReferences ||
+            hasPluginUiContexts
           }
           enterSubmits={enterSubmits}
           onModifiedSubmit={modifiedEnterSubmits ? handleModifiedEditorSubmit : undefined}
@@ -2276,7 +2428,9 @@ function ConversationComposerImpl({
           inputTestId={TID_V4_COMPOSER_INPUT}
           inputApiRef={inputApiRef}
           promptHistory={promptHistory}
-          // 命令目录必须完整来自 CLI workspace slash catalog；UI 只在
+          avoidIosInputFocusZoom={avoidIosInputFocusZoom}
+          compactPlaceholder={compactMobilePlaceholder}
+          // Bugfix 原因：命令目录必须完整来自 CLI workspace slash catalog；UI 只在
           // secondary pane 按产品能力隐藏 goal，不再追加任何内建命令或别名。
           excludedSlashCommandNames={suppressGoalCommands ? ["goal"] : undefined}
           appSlashCommands={appSlashCommands}
@@ -2284,6 +2438,11 @@ function ConversationComposerImpl({
           leadingActions={leadingActionsNode}
           submitControl={submitControlNode}
           className="p-0"
+          shellClassName={
+            highspeedCard
+              ? "relative z-10 !rounded-none !border-0 !bg-transparent !transition-none hover:!border-transparent focus-within:!border-transparent focus-within:!bg-transparent"
+              : undefined
+          }
           onChange={handleEditorChange}
           onFocus={handleEditorFocus}
           onSubmit={handleEditorSubmit}

@@ -1,0 +1,34 @@
+ask ask#1 "a1" @8:29 order=0 type="string"
+actor actor#1 "a1" @8:17 order=1
+ask ask#2 "b1" @9:29 order=2 type="string"
+actor actor#2 "b1" @9:17 order=3
+ask ask#3 "c1" @12:29 order=4 type="string"
+actor actor#3 "c1" @12:17 order=5
+ask ask#4 "d1" @13:29 order=6 type="string"
+actor actor#4 "d1" @13:17 order=7
+fact ask-data ask#3 <- ask#1 exact
+fact ask-data ask#4 <- ask#2 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact ask-actor ask#4 <- actor#4 exact
+fact return <- ask#3 exact
+fact return <- ask#4 exact
+region seq#1 seq entered
+region call#1 call parent=seq#1 @10:12 entered label="relay"
+region call#2 call parent=seq#1 @11:12 entered label="relay"
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+spawn actor#2 in=seq#1
+issue ask#2 in=seq#1 phase=unphased
+settle ask#2 in=seq#1
+jump return call#1 in=seq#1>call#1 phase=unphased
+jump return call#2 in=seq#1>call#2 phase=unphased
+spawn actor#3 in=seq#1
+issue ask#3 in=seq#1 phase=unphased
+settle ask#3 in=seq#1
+spawn actor#4 in=seq#1
+issue ask#4 in=seq#1 phase=unphased
+settle ask#4 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased

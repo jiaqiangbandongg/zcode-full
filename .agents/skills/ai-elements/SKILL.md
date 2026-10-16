@@ -46,7 +46,11 @@ After installing AI Elements components, you can use them in your application li
 ```tsx title="conversation.tsx"
 "use client";
 
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
 import { useChat } from "@ai-sdk/react";
 
 const Example = () => {
@@ -60,7 +64,11 @@ const Example = () => {
             {parts.map((part, i) => {
               switch (part.type) {
                 case "text":
-                  return <MessageResponse key={`${role}-${i}`}>{part.text}</MessageResponse>;
+                  return (
+                    <MessageResponse key={`${role}-${i}`}>
+                      {part.text}
+                    </MessageResponse>
+                  );
               }
             })}
           </MessageContent>
@@ -86,12 +94,16 @@ After installation, no additional setup is needed. The component’s styles (Tai
 For example, if you'd like to remove the rounding on `Message`, you can go to `components/ai-elements/message.tsx` and remove `rounded-lg` as follows:
 
 ```tsx title="components/ai-elements/message.tsx" highlight="8"
-export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
+export const MessageContent = ({
+  children,
+  className,
+  ...props
+}: MessageContentProps) => (
   <div
     className={cn(
       "flex flex-col gap-2 text-sm text-foreground",
       "group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground group-[.is-user]:px-4 group-[.is-user]:py-3",
-      className,
+      className
     )}
     {...props}
   >
@@ -152,4 +164,4 @@ If none of these answers help, open an [issue on GitHub](https://github.com/verc
 
 ## Available Components
 
-See the `references/` folder for detailed documentation on each component. Paths beginning with `scripts/` in those references are examples relative to this skill directory, not repository-root scripts. They are component examples, not installed application features.
+See the `references/` folder for detailed documentation on each component.

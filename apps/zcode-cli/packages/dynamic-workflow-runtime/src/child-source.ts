@@ -14,7 +14,9 @@
  * 结构：
  *   - 外层 realm（{@link childMain} 自身）是普通 Node 代码：持有 stdio、readline、vm，负责传输。
  *   - 求值单元是 `vm.createContext(...)` 建的**独立 realm**：只含 ES intrinsics + 注入的 `__host`。
- *     裸 vm context 天然没有 `process`/`require`/`Buffer`/`fetch`；我们只补 `__host` 与运行期禁令。
+ *     裸 vm context 天然没有 `process`/`require`/`Buffer`/`fetch`，也没有定时器；我们只补 `__host`
+ *     与运行期禁令。channel / future 与停滞检测（docs/dynamic-workflow/authoring.md「Streams」）
+ *     都在 cell 内实现：前者是纯 promise 机制，后者正是靠「cell 内没有别的唤醒源」成立。
  *
  * 跨 realm 收敛（防原型泄漏 / prototype pollution）：脚本触及的一切（Promise、JSON 解析出的
  * host 结果、Error）都在 **context 内**构造；外层与 context 间仅有两种跨界值——一个 `__send(string)`
@@ -27,9 +29,11 @@
  *
  * ⚠ 本文件是 protocol.ts 线协议的**手写镜像**：入口文件里的 childMain 以内嵌字符串运行，无法 import
  * protocol.ts。改任一处必须同步另一处。故 {@link childMain} 只允许 import **类型**（编译期擦除），
- * 绝不引入运行期 package 依赖。
+ * 绝不引入运行期 package 依赖；本模块唯一的值 import（child-cell-streams.ts 的引导字符串）只被
+ * {@link renderChildEntry} 读取并内嵌进入口文件，childMain 自身通过 deps 拿到它。
  */
 
+import { CELL_STREAMS_BOOTSTRAP } from "./child-cell-streams.js";
 import type { ChildPayload } from "./protocol.js";
 
 /** {@link childMain} 用到的 `node:vm` 全部表面（窄到只有两个函数——这就是子进程的 vm 契约）。 */
@@ -60,6 +64,14 @@ export interface ChildMainDeps {
    * 字面量内嵌并原样递进来——不再经 argv、不再 base64。
    */
   payload: ChildPayload;
+  /**
+   * cell 的第二段引导脚本：channel / future 与停滞检测（child-cell-streams.ts 的
+   * {@link import("./child-cell-streams.js").CELL_STREAMS_BOOTSTRAP}）。与 payload 同路——
+   * 入口文件把它当字符串字面量内嵌、`start` 原样递进来——因为 childMain 的自包含约束不许它
+   * 引用模块作用域的绑定，而把它留在本文件里会顶穿单文件行数上限。它在 BOOTSTRAP 之后、
+   * lowered 体之前于同一 context 内运行，读写 BOOTSTRAP 用 `var` 建下的 context 全局。
+   */
+  streamsBootstrap: string;
 }
 
 /**
@@ -90,6 +102,8 @@ export function childMain(deps: ChildMainDeps): Promise<void> {
 var __nextLocal = 0;
 var __nextReq = 0;
 var __pending = new Map();
+// 本世已补全的留白：站点 id → 体的文本。同一站点再次到达（循环）时直接求值，不再过线。
+var __fills = new Map();
 
 function __emit(obj) {
   __send(JSON.stringify(obj));
@@ -116,6 +130,37 @@ function __worldRead(siteId, op, args) {
   return new Promise(function (resolve, reject) {
     __pending.set(id, { resolve: resolve, reject: reject });
     __emit({ kind: "request", id: id, type: "world-read", siteId: siteId, op: op, args: args });
+  });
+}
+
+function __evaluateFill(evaluate, code) {
+  // evaluate 是 lowering 在站点处发出的 (__src) => eval(__src)：直接 eval，闭包住作者代码在
+  // 那一点的全部绑定（__host 在内），求出 (async () => { … }) 这个函数；调它，结果即留白的值。
+  // 每次到达都新造一个 evaluate，循环里的留白因此看见各轮自己的绑定。求值失败（语法错）与体的
+  // 拒绝都在这条 promise 上冒出，落在站点处，脚本可以 catch。
+  return Promise.resolve().then(function () {
+    return evaluate(code)();
+  });
+}
+
+function __hole(siteId, name, prompt, evaluate, body) {
+  // 已补全（体就在脚本里）：直接调体，不过线。同步抛出转成拒绝，与 future 同规。
+  if (body !== undefined) {
+    try {
+      return Promise.resolve(body());
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+  var remembered = __fills.get(siteId);
+  if (remembered !== undefined) return __evaluateFill(evaluate, remembered);
+  var id = "r" + (++__nextReq);
+  return new Promise(function (resolve, reject) {
+    __pending.set(id, { resolve: resolve, reject: reject });
+    __emit({ kind: "request", id: id, type: "hole", siteId: siteId, name: name, prompt: prompt });
+  }).then(function (answer) {
+    __fills.set(siteId, answer.code);
+    return __evaluateFill(evaluate, answer.code);
   });
 }
 
@@ -170,6 +215,7 @@ globalThis.__host = {
   report: __report,
   log: __log,
   enterPhase: __enterPhase,
+  hole: __hole,
 };
 
 // —— 入站 response 消费（由外层 realm 以行字符串调用）——
@@ -193,7 +239,13 @@ globalThis.__deliver = function (line) {
   waiter.reject(err);
 };
 
+// run 是否已发出 complete。停滞检测（deps.streamsBootstrap 里的 __checkStalled）也读写它。
+var __settled = false;
+
 function __complete(ok, payload) {
+  // 幂等：停滞检测已经以 error-complete 结束 run 之后，脚本（理论上）再完成也不再发第二条。
+  if (__settled) return;
+  __settled = true;
   if (ok) {
     __emit({ kind: "complete", ok: true, value: payload });
     return;
@@ -267,12 +319,14 @@ Math.random = function () {
     __argsJson: string;
     __deliver: (line: string) => void;
     __execute: (runFn: unknown) => Promise<void>;
+    __checkStalled: () => boolean;
   };
   sandbox.__send = (line) => {
     deps.stdout.write(`${line}\n`);
   };
   deps.vm.createContext(sandbox, { name: "workflow-sandbox" });
   deps.vm.runInContext(BOOTSTRAP, sandbox, { filename: "workflow-bootstrap.js" });
+  deps.vm.runInContext(deps.streamsBootstrap, sandbox, { filename: "workflow-streams.js" });
 
   // 编译 lowered 函数体（context-native async fn；其 await 产生 context Promise，import() 无回调将抛错）。
   let runFn: unknown;
@@ -301,16 +355,32 @@ Math.random = function () {
 
   // stdin 持有事件循环存活；每行喂给 context 的 __deliver。
   const reader = deps.createInterface({ input: deps.stdin });
+  // 停滞检测（execution-engine.md「The vm cell」）：每条 response 投递后、以及脚本起步后，
+  // 各在 **setImmediate** 上问一次 cell「还有事可做吗」。setImmediate 排在本轮全部微任务
+  // 之后——response 能触发的每个 continuation 都已跑完——而 cell 内没有定时器与 I/O，所以
+  // 「无在飞请求且未完成」在这一刻成立就永远成立。命中时 cell 已发 error-complete；这里只
+  // 收 reader（__execute 永远不会兑现，收尾得由这条路来做）。setImmediate 是 Node 全局，
+  // 两条启动路（入口文件自启 / SEA 子命令）都在 Node 里，符合本函数的自包含约束。
+  // ⚠ 两处直接内联 setImmediate 而不是抽成 `const scheduleStallCheck = …`：一个能推导出名字的
+  // 内层函数会被 minify + keepNames 套上模块作用域的 `__name` helper（见函数上方那条注释），
+  // tests/child-source-bundled.test.ts 抓过这一条。
   reader.on("line", (line: string) => {
     if (!line.trim()) return;
     sandbox.__deliver(line);
+    setImmediate(() => {
+      if (sandbox.__checkStalled()) reader.close();
+    });
   });
 
   // 跑脚本；收尾时关 stdin，进程随空闲事件循环自然退出（父进程亦会在收到 complete 后 kill）。
-  return sandbox.__execute(runFn).then(
+  const execution = sandbox.__execute(runFn).then(
     () => reader.close(),
     () => reader.close(),
   );
+  setImmediate(() => {
+    if (sandbox.__checkStalled()) reader.close();
+  });
+  return execution;
 }
 
 /** 入口文件名里 runId 的安全字符集之外一律换成 `_`（文件名与头注释共用同一份净化）。 */
@@ -346,9 +416,12 @@ import vm from "node:vm";
 
 export const payload = ${JSON.stringify(payload)};
 
+// cell 的第二段引导脚本（channel / future / 停滞检测），与 payload 同样以字面量内嵌。
+export const streamsBootstrap = ${JSON.stringify(CELL_STREAMS_BOOTSTRAP)};
+
 const main = ${childMain.toString()};
 
-export const start = (deps) => main({ ...deps, payload });
+export const start = (deps) => main({ ...deps, payload, streamsBootstrap });
 
 if (
   typeof payload.maxOldSpaceSizeMb === "number" &&

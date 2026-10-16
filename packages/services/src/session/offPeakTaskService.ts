@@ -2,12 +2,12 @@
    轮询同步（offPeakTaskSync）、终态核销 outbox 与 3102 续跑重取号，稳定后再按职责拆分。 */
 /* off-peak 任务编排服务（host 域，仿 automationService 形态）。
    职责：
-   - 创建即取号（POST /ticket 成功才落库）；3103/3101 抛类型化错误给 UI
-   - 取消/暂停/继续/删除/编辑 的状态守卫编排
-   - offPeakTaskSync：有非终态任务才批量轮询 /ticket/status（轮询触发服务端晋级），
-     写回 schedulable/位次/next_poll_at；expired 且非 paused → 同 task_id 自动重取号
-   - 终态核销 outbox：终态即 settle、失败随轮询周期捎带补报、启动扫描
-   - 3102 续跑：host 终态回写识别标记后调 handleTicketExpiredDuringRun → 回队重取号 */
+   - 创建即取号（POST /ticket 成功才落库，§4.1）；3103/3101 抛类型化错误给 UI
+   - 取消/暂停/继续/删除/编辑 的状态守卫编排（D29-3/D30-7/D30-10）
+   - offPeakTaskSync：有非终态任务才批量轮询 /ticket/status（轮询触发服务端晋级，D25/D26），
+     写回 schedulable/位次/next_poll_at；expired 且非 paused → 同 task_id 自动重取号（D26/D27）
+   - 终态核销 outbox：终态即 settle、失败随轮询周期捎带补报、启动扫描（D22/§7.7）
+   - 3102 续跑：host 终态回写识别标记后调 handleTicketExpiredDuringRun → 回队重取号（§4.6） */
 import { randomUUID } from "node:crypto";
 import { ZodError } from "zod";
 import {
@@ -27,11 +27,11 @@ import { OffPeakServerError, type OffPeakServerClient } from "./offPeakServerCli
 import type { ModelSelection, ModelSelectionValidation } from "@zcode/provider";
 
 /** 轮询下限/上限与失败退避（服务端 next_poll_after 优先，钳制防打爆/防饿死）。 */
-const OFF_PEAK_SYNC_MIN_INTERVAL_MS = 5_000;
-const OFF_PEAK_SYNC_MAX_INTERVAL_MS = 5 * 60_000;
+export const OFF_PEAK_SYNC_MIN_INTERVAL_MS = 5_000;
+export const OFF_PEAK_SYNC_MAX_INTERVAL_MS = 5 * 60_000;
 const SYNC_FAILURE_BASE_MS = 10_000;
 
-interface OffPeakTaskServiceDeps {
+export interface OffPeakTaskServiceDeps {
   repo: OffPeakTaskRepo;
   client: OffPeakServerClient;
   /** 与 ticket/runtime 共用 resolver 后的脱敏结果，供 renderer 创建门控。 */
@@ -64,10 +64,15 @@ interface OffPeakTaskServiceDeps {
 }
 
 const VALID_CREATE_PERMISSION_MODES = new Set([
+  "default",
   "yolo",
+  "guarded",
   "plan",
   "edit",
+  "acceptEdits",
   "auto",
+  "dontAsk",
+  "bypassPermissions",
   "autoEdit",
   "build",
 ]);
@@ -85,7 +90,7 @@ function isValidCreateParams(params: ZCodeOffPeakTaskCreateParams): boolean {
   );
 }
 
-function classifyOffPeakCreateFailure(
+export function classifyOffPeakCreateFailure(
   error: unknown,
   failureStage: OffPeakTaskCreateFailureStage,
 ): Pick<

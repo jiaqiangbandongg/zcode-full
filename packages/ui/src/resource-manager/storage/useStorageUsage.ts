@@ -13,9 +13,9 @@ import type {
 } from "@zcode/shared";
 import { logger } from "@/logger.js";
 
-const STORAGE_SCAN_BLUR_CANCEL_MS = 60_000;
+export const STORAGE_SCAN_BLUR_CANCEL_MS = 60_000;
 
-interface StorageUsageState {
+export interface StorageUsageState {
   snapshot: StorageUsageSnapshot | null;
   scanning: boolean;
   rescan: () => Promise<void>;

@@ -1,0 +1,26 @@
+world-read world-read#1 "run git" @23:27 order=0 type="WorldRunResult"
+actor actor#1 "scout" @27:15 order=1
+ask ask#1 "scout" @36:28 order=2 type="string"
+fact ask-data ask#1 <- world-read#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact world-read-data world-read#1 <- ask#1 exact
+fact return <- world-read#1 exact
+region seq#1 seq entered
+region loop#1 loop parent=seq#1 @30:1 entered bound=3
+region call#1 call parent=loop#1 @33:25 entered label="probe" strand
+region call#2 call parent=loop#1 @37:19 entered label="probe" strand
+spawn actor#1 in=seq#1
+mark phase#1 in=seq#1>loop#1
+issue world-read#1 in=seq#1>loop#1>call#1 phase=phase#1
+settle world-read#1 in=seq#1>loop#1>call#1
+jump return call#1 in=seq#1>loop#1>call#1 phase=phase#1
+settle world-read#1 in=seq#1>loop#1 joins=call#1
+mark phase#2 in=seq#1>loop#1
+issue ask#1 in=seq#1>loop#1 phase=phase#2
+settle ask#1 in=seq#1>loop#1
+issue world-read#1 in=seq#1>loop#1>call#2 phase=phase#2
+jump return call#2 in=seq#1>loop#1>call#2 phase=phase#2
+settle in=seq#1>loop#1 joins=call#2
+jump return seq#1 in=seq#1 phase=unphased
+phase phase#1 "open" @31:3
+phase phase#2 "close" @35:3

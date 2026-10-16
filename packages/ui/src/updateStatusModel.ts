@@ -4,9 +4,17 @@ import type {
   UpdateStatePayload,
 } from "@zcode/shared";
 
-export type UpdateStatusDialogPhase = "before-download" | "downloading" | "downloaded";
+export type UpdateStatusDialogPhase =
+  | "before-download"
+  | "downloading"
+  | "downloaded";
 
-export type UpdateActionInFlight = "download" | "cancel" | "skip" | "restart" | null;
+export type UpdateActionInFlight =
+  | "download"
+  | "cancel"
+  | "skip"
+  | "restart"
+  | null;
 
 export type UpdateStatusViewModel = {
   dialogPhase: UpdateStatusDialogPhase;
@@ -28,7 +36,8 @@ export function deriveUpdateStatusViewModel({
   const isDownloadingUpdate = updateState?.kind === "download-progress";
   const readyVersion = resolveReadyVersion({ legacyReadyVersion, updateState });
   const progressVersion = isDownloadingUpdate ? updateState.version : null;
-  const availableVersion = updateState?.kind === "update-available" ? updateState.version : null;
+  const availableVersion =
+    updateState?.kind === "update-available" ? updateState.version : null;
   const displayVersion =
     readyVersion ??
     progressVersion ??
@@ -48,7 +57,8 @@ export function deriveUpdateStatusViewModel({
     progressValue: getUpdateDownloadProgressValue(updateState),
     releaseNotesPayload: getUpdateReleaseNotesPayload(updateState),
     skippableVersion:
-      updateState?.kind === "update-available" || updateState?.kind === "download-progress"
+      updateState?.kind === "update-available" ||
+      updateState?.kind === "download-progress"
         ? (updateState.version ?? null)
         : null,
     updateChannel:
@@ -69,7 +79,8 @@ export function isUpdateActionCompleted(
     // 这些状态不代表下载已经进入可观察阶段，不能释放按钮锁并触发弹窗卸载；
     // 只有真正进入下载进度或下载完成，才算下载命令完成。
     (action === "download" &&
-      (updateState?.kind === "download-progress" || updateState?.kind === "update-downloaded")) ||
+      (updateState?.kind === "download-progress" ||
+        updateState?.kind === "update-downloaded")) ||
     (action === "cancel" && updateState?.kind !== "download-progress") ||
     (action === "skip" &&
       updateState?.kind !== "update-available" &&
@@ -77,7 +88,9 @@ export function isUpdateActionCompleted(
   );
 }
 
-function getUpdateDownloadProgressLabel(updateState: UpdateStatePayload | null) {
+export function getUpdateDownloadProgressLabel(
+  updateState: UpdateStatePayload | null,
+) {
   if (updateState?.kind !== "download-progress") {
     return null;
   }
@@ -118,8 +131,12 @@ function resolveReadyVersion({
 
 function getUpdateDownloadProgressValue(updateState: UpdateStatePayload | null) {
   const rawProgressValue =
-    updateState?.kind === "download-progress" ? Number(updateState.progress) : 0;
-  return Number.isFinite(rawProgressValue) ? Math.max(0, Math.min(100, rawProgressValue)) : 0;
+    updateState?.kind === "download-progress"
+      ? Number(updateState.progress)
+      : 0;
+  return Number.isFinite(rawProgressValue)
+    ? Math.max(0, Math.min(100, rawProgressValue))
+    : 0;
 }
 
 function getUpdateReleaseNotesPayload(updateState: UpdateStatePayload | null) {

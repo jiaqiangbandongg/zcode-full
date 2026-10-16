@@ -25,14 +25,11 @@ export async function fetchReleaseJson<T>(
   }
 }
 
-export async function fetchReleaseCatalog(
-  url: string,
-  timeoutMs = 10_000,
-): Promise<ReleaseCatalog> {
+export async function fetchReleaseCatalog(url: string, timeoutMs = 10_000): Promise<ReleaseCatalog> {
   return await fetchReleaseJson(url, releaseCatalogSchema, timeoutMs, "Release catalog");
 }
 
-interface DownloadOptions {
+export interface DownloadOptions {
   url: string;
   destination: string;
   sha256: string;
@@ -62,8 +59,7 @@ class ReleaseDownloadHttpError extends Error {
 
 function defaultOverallTimeoutMs(expectedSizeBytes: number | undefined): number {
   if (expectedSizeBytes === undefined) return DEFAULT_DOWNLOAD_OVERALL_TIMEOUT_MS;
-  const transferBudgetMs =
-    Math.ceil(expectedSizeBytes / DEFAULT_DOWNLOAD_RATE_BYTES_PER_SECOND) * 1_000;
+  const transferBudgetMs = Math.ceil(expectedSizeBytes / DEFAULT_DOWNLOAD_RATE_BYTES_PER_SECOND) * 1_000;
   return Math.min(
     DEFAULT_DOWNLOAD_OVERALL_TIMEOUT_MS,
     Math.max(DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS, transferBudgetMs + 30_000),
@@ -77,12 +73,7 @@ function isRetryableDownloadError(error: unknown): boolean {
     return error.status === 408 || error.status === 429 || error.status >= 500;
   }
   const code = "code" in error && typeof error.code === "string" ? error.code : undefined;
-  return (
-    code === "ECONNRESET" ||
-    code === "ETIMEDOUT" ||
-    code === "EAI_AGAIN" ||
-    code === "UND_ERR_SOCKET"
-  );
+  return code === "ECONNRESET" || code === "ETIMEDOUT" || code === "EAI_AGAIN" || code === "UND_ERR_SOCKET";
 }
 
 async function waitBeforeRetry(delayMs: number): Promise<void> {
@@ -109,8 +100,7 @@ export class ReleaseDownloader {
     const temporary = `${options.destination}.part-${process.pid}-${randomUUID()}`;
     const controller = new AbortController();
     const idleTimeoutMs = options.timeoutMs ?? DEFAULT_DOWNLOAD_IDLE_TIMEOUT_MS;
-    const overallTimeoutMs =
-      options.overallTimeoutMs ?? defaultOverallTimeoutMs(options.expectedSizeBytes);
+    const overallTimeoutMs = options.overallTimeoutMs ?? defaultOverallTimeoutMs(options.expectedSizeBytes);
     let idleTimer: NodeJS.Timeout | undefined;
     const resetIdleTimer = (): void => {
       if (idleTimer) clearTimeout(idleTimer);
@@ -127,9 +117,11 @@ export class ReleaseDownloader {
       const onData = (): void => resetIdleTimer();
       body.on("data", onData);
       try {
-        await pipeline(body, createWriteStream(temporary, { flags: "w" }), {
-          signal: controller.signal,
-        });
+        await pipeline(
+          body,
+          createWriteStream(temporary, { flags: "w" }),
+          { signal: controller.signal },
+        );
       } finally {
         body.off("data", onData);
         if (idleTimer) clearTimeout(idleTimer);
@@ -137,18 +129,14 @@ export class ReleaseDownloader {
       if (options.expectedSizeBytes !== undefined) {
         const downloadedSize = (await stat(temporary)).size;
         if (downloadedSize !== options.expectedSizeBytes) {
-          throw new Error(
-            `Release archive size mismatch: expected ${options.expectedSizeBytes}, received ${downloadedSize}`,
-          );
+          throw new Error(`Release archive size mismatch: expected ${options.expectedSizeBytes}, received ${downloadedSize}`);
         }
       }
       const digest = createHash("sha256");
       for await (const chunk of createReadStream(temporary)) digest.update(chunk);
       const actual = digest.digest("hex");
       if (actual.toLowerCase() !== options.sha256.toLowerCase()) {
-        throw new Error(
-          `Release archive checksum mismatch: expected ${options.sha256}, received ${actual}`,
-        );
+        throw new Error(`Release archive checksum mismatch: expected ${options.sha256}, received ${actual}`);
       }
       const file = await import("node:fs/promises");
       await file.rename(temporary, options.destination);

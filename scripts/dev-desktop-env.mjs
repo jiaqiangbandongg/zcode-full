@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-
+import { dirname, join, resolve } from "node:path";
+import { isRealComputerUseProducerInstalled } from "../packages/desktop/scripts/computer-use-producer.mjs";
+import { resolveDevDesktopWindowsCuaEnv } from "./dev-desktop-cua-env.mjs";
 import { withPinnedNodePath } from "./mise-toolchain-env.mjs";
 import { quoteArgsForWindowsShell } from "./spawn-command.mjs";
 
@@ -14,6 +16,48 @@ if (requestedEnv !== "test" && requestedEnv !== "production") {
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+// Computer Use Helper 只由真实 producer 提供；开源占位包下不构建 Helper、不注入 Helper 环境。
+// 见 docs/desktop/computer-use-producer-detection.md。
+const hasComputerUseProducer = isRealComputerUseProducerInstalled({
+  desktopPackageRoot: join(repoRoot, "packages", "desktop"),
+});
+const computerUseDevEnv = hasComputerUseProducer ? await resolveComputerUseDevEnv() : {};
+
+async function resolveComputerUseDevEnv() {
+  const { DEV_HELPER_APP_NAME } = await import("@zcode/zcode-cua/broker/helperConstants");
+  const sourceBuiltCuaHelperVersion = JSON.parse(
+    readFileSync(join(repoRoot, "package.json"), "utf8"),
+  ).version;
+  if (typeof sourceBuiltCuaHelperVersion !== "string" || !sourceBuiltCuaHelperVersion.trim()) {
+    throw new Error("Root package.json must define the Dev Computer Use Helper version");
+  }
+  const sourceBuiltCuaHelperApp = join(
+    repoRoot,
+    "packages",
+    "desktop",
+    "dist-cua-helper",
+    DEV_HELPER_APP_NAME,
+  );
+  return {
+    // Standard dev launch must test the Helper built from this checkout.
+    // Falling back to ~/.zcode can silently reuse a same-version stale
+    // Helper and make native changes appear verified when they never ran.
+    ZCODE_CUA_BUNDLED_HELPER_APP_PATH: sourceBuiltCuaHelperApp,
+    ZCODE_CUA_HELPER_VERSION: sourceBuiltCuaHelperVersion,
+    // Keep Dev Desktop separate from signed Stable/Preview and standalone MCP installs.
+    ZCODE_CUA_HELPER_INSTALL_VARIANT: "dev-desktop",
+    // 修复原因：仅传 bundled path 不会进入 unsigned-local 的同版本内容刷新分支，
+    // 导致标准 dev 启动继续复用 ~/.zcode 中 native ABI 已过期的 Helper。
+    ...(process.platform === "darwin" ? { ZCODE_CUA_HELPER_ALLOW_UNSIGNED_LOCAL: "1" } : {}),
+    // Windows 侧对应物：缺省把 CUA runtime 绑到本 checkout 已安装的 producer，
+    // 否则 host 会去读 dev 下不存在的 resources/tools/cua-helper。见 dev-desktop-cua-env.mjs。
+    ...resolveDevDesktopWindowsCuaEnv({
+      platform: process.platform,
+      repoRoot,
+      env: process.env,
+    }),
+  };
+}
 
 function run(command, args) {
   return new Promise((resolveRun, rejectRun) => {
@@ -27,6 +71,7 @@ function run(command, args) {
           ...process.env,
           ZCODE_ENV: requestedEnv,
           ZCODE_DESKTOP_AGENT_BYTECODE: agentBytecode ? "1" : "0",
+          ...computerUseDevEnv,
         },
         process.execPath,
       ),
@@ -53,6 +98,12 @@ function run(command, args) {
 }
 
 try {
+  if (process.platform === "darwin" && hasComputerUseProducer) {
+    await run(process.execPath, [
+      resolve(repoRoot, "scripts/build-cua-helper-app.mjs"),
+      "--allow-unsigned-launcher-local-dev",
+    ]);
+  }
   // The public dev scripts delegate here instead of invoking the package's
   // `dev` lifecycle directly, so pnpm will not run `pre-dev` automatically.
   // Preserve its runtime-asset preparation and stale `out` cleanup explicitly

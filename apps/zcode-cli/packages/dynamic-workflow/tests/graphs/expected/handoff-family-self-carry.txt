@@ -1,0 +1,16 @@
+node source
+node join#1 "join" @15:31 type="{ key: string; result: ResearchResult; }[]"
+node fan-out#1 "fan-out" @16:3 type="{ key: string; result: ResearchResult; }[]"
+node ask#1 "ask" @18:59 actors=actor#1 within=fan-out#1 type="ResearchResult"
+node ask#2 "writer" @24:57 actors=actor#2 type="Report"
+node sink
+actor actor#1 @18:19 within=fan-out#1
+actor actor#2 "writer" @24:19
+edge source -> fan-out#1 data exact
+edge join#1 -> ask#2 data exact type="{ key: string; result: ResearchResult; }[]"
+edge fan-out#1 -> join#1 data exact type="{ key: string; result: ResearchResult; }[]"
+edge fan-out#1 -> ask#1 data exact type="{ key: string; result: ResearchResult; }[]"
+edge fan-out#1 -> ask#2 data exact type="{ key: string; result: ResearchResult; }[]"
+edge ask#1 -> join#1 data exact type="ResearchResult"
+edge ask#1 -> ask#2 data exact type="ResearchResult"
+edge ask#2 -> sink data exact type="Report"

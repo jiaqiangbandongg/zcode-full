@@ -23,8 +23,8 @@ import { logger } from "@/logger.js";
 
 type ChatToolbarShortcutKey = "m" | "ctrlShiftM" | "t" | null;
 
-/** 按 config category 解析工具条热键槽位。 */
-function getChatToolbarShortcutKey(
+/** 旧 chatInputControlShortcuts.getChatToolbarShortcutKey 原样恢复。 */
+export function getChatToolbarShortcutKey(
   category: ZCodeConfigOption["category"],
 ): ChatToolbarShortcutKey {
   switch (category) {
@@ -83,7 +83,7 @@ type ToolbarShortcutAction = "openModelMenu" | "cycleSessionMode" | "cycleThough
  * 对 "Ctrl+m" / "Ctrl+Shift+m" / "Ctrl+t" 的语义一致）；原 option 归属与 disabled
  * 门控保持不变。事件与生效表由调用方传入，纯函数可独立单测。
  */
-function resolveToolbarShortcutAction(
+export function resolveToolbarShortcutAction(
   event: ToolbarShortcutKeyboardEvent,
   effective: EffectiveShortcutBindings,
   {
@@ -137,10 +137,7 @@ function resolveToolbarShortcutAction(
     if (candidate.disabled) {
       continue;
     }
-    if (
-      !candidate.option ||
-      getChatToolbarShortcutKey(candidate.option.category) !== candidate.expectedKey
-    ) {
+    if (!candidate.option || getChatToolbarShortcutKey(candidate.option.category) !== candidate.expectedKey) {
       continue;
     }
     for (const binding of effective[candidate.commandId] ?? []) {

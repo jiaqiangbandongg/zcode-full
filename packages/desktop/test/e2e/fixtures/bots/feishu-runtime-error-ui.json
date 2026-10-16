@@ -1,0 +1,6 @@
+{
+  "caseId": "BOT-E2E-CF-01",
+  "classification": "synthetic",
+  "syntheticReason": "The isolated Desktop fixture omits the bound Feishu bot credential so the real host runtime enters a deterministic error state without depending on the public Feishu WebSocket service.",
+  "timing": "controlled-process"
+}

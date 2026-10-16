@@ -1,0 +1,457 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-memory",
+  "spec": "./test/e2e/conversation-session/conversation-session-memory.test.ts",
+  "fixtures": [
+    {
+      "id": "memory-window-title",
+      "description": "Memory WDIO 五个 session 的稳定标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于 Memory 验收，只用于避免标题 sidecar 干扰 case-local replay。"
+      },
+      "maxMatches": 5,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_MEMORY_WDIO_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"msg_memory_window_title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Memory WDIO E2E\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":32,\"output_tokens\":8}}"
+      }
+    },
+    {
+      "id": "memory-window-default-branch-boundary",
+      "description": "默认 Memory 分支的 Main 首请求返回只读 Bash，形成 continuation。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定真实工具边界，验证默认分支在 continuation 中仍保留 Main Memory 且不启动 Selector。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_DEFAULT_BRANCH"],
+        "bodyIncludes": [
+          "# Memory",
+          "After writing the file, add a one-line pointer in `MEMORY.md` (`- [Title](file.md) — hook`).",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases",
+          "E2E_MEMORY_WDIO_DEFAULT_BRANCH"
+        ],
+        "bodyExcludes": [
+          "You are selecting memories that will be useful",
+          "Retrieved for possible relevance",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 100,
+        "toolUse": {
+          "id": "memory_default_branch_boundary",
+          "name": "Bash",
+          "input": { "command": "pwd", "description": "Confirm workspace" }
+        }
+      }
+    },
+    {
+      "id": "memory-window-default-branch-final",
+      "description": "默认 Memory 分支 tool continuation 的前台可见回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定结束默认分支工具轮并提供 UI 终态 marker。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "# Memory",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases",
+          "E2E_MEMORY_WDIO_DEFAULT_BRANCH",
+          "memory_default_branch_boundary"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_memory_window_default_branch_done",
+          "text": "E2E_MEMORY_WDIO_DEFAULT_BRANCH_DONE"
+        }
+      }
+    },
+    {
+      "id": "memory-window-extraction-main",
+      "description": "第二个 Main turn 正常结束，随后触发后台 Extraction。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该 turn 不直接写 Memory，用于稳定触发既有 Extraction scheduler。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_EXTRACTION"],
+        "bodyIncludes": [
+          "E2E_MEMORY_WDIO_EXTRACTION",
+          "# Memory",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases"
+        ],
+        "bodyExcludes": [
+          "You are now acting as the memory extraction subagent",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_memory_window_extraction_main",
+          "text": "E2E_MEMORY_WDIO_EXTRACTION_DONE"
+        }
+      }
+    },
+    {
+      "id": "memory-window-extraction-write",
+      "description": "后台 Memory Agent 写入 deployment policy，并读取现有 MEMORY.md。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "generateText 非流式响应固定返回事实 Write 与索引 Read，验证 scheduler、受限执行面和落盘。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "You are now acting as the memory extraction subagent",
+          "E2E_MEMORY_WDIO_EXTRACTION"
+        ],
+        "bodyExcludes": ["E2E_MEMORY_WDIO_EXTRACTION_FILE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"msg_memory_window_extraction_write\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_e2e_memory_extraction_write\",\"name\":\"Write\",\"input\":{\"file_path\":\"{{memoryRoot}}/deployment-approval-policy.md\",\"content\":\"---\\nname: deployment-approval-policy\\ndescription: Deployment requires staging approval for an audit trail.\\nmetadata:\\n  type: project\\n---\\n\\nDeployment requires staging approval. E2E_MEMORY_WDIO_EXTRACTION_FILE\\n\\n**Why:** Release managers need an audit trail.\\n\\n**How to apply:** Require staging approval before deployment.\\n\"}},{\"type\":\"tool_use\",\"id\":\"toolu_e2e_memory_extraction_index_read\",\"name\":\"Read\",\"input\":{\"file_path\":\"{{memoryRoot}}/MEMORY.md\"}}],\"stop_reason\":\"tool_use\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"output_tokens\":32}}"
+      }
+    },
+    {
+      "id": "memory-window-extraction-index-edit",
+      "description": "后台 Memory Agent 将新事实 pointer 追加到已读取的 MEMORY.md。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定 Edit 已读取的 MEMORY.md，验证 Extraction 维护默认分支消费所需 pointer。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "You are now acting as the memory extraction subagent",
+          "toolu_e2e_memory_extraction_write",
+          "toolu_e2e_memory_extraction_index_read",
+          "E2E_MEMORY_WDIO_EXTRACTION_FILE",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases"
+        ],
+        "bodyExcludes": [
+          "- [Deployment approval policy](deployment-approval-policy.md) — staging approval required"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"msg_memory_window_extraction_index_edit\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_e2e_memory_extraction_index_edit\",\"name\":\"Edit\",\"input\":{\"file_path\":\"{{memoryRoot}}/MEMORY.md\",\"old_string\":\"- [Database test policy](database-test-policy.md) — integration tests use isolated databases\\n\",\"new_string\":\"- [Database test policy](database-test-policy.md) — integration tests use isolated databases\\n- [Deployment approval policy](deployment-approval-policy.md) — staging approval required\\n\"}}],\"stop_reason\":\"tool_use\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":96,\"output_tokens\":24}}"
+      }
+    },
+    {
+      "id": "memory-window-extraction-final",
+      "description": "Extraction 事实与索引更新完成后结束 Memory Agent loop。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定结束后台 loop，不扩展额外 Memory 行为。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "You are now acting as the memory extraction subagent",
+          "toolu_e2e_memory_extraction_index_edit",
+          "E2E_MEMORY_WDIO_EXTRACTION_FILE",
+          "- [Deployment approval policy](deployment-approval-policy.md) — staging approval required"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"msg_memory_window_extraction_final\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"Nothing to save.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":64,\"output_tokens\":4}}"
+      }
+    },
+    {
+      "id": "memory-window-extracted-default-main",
+      "description": "新 session 从默认 MEMORY.md source 消费 Extraction 新 pointer，不启动 Selector。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定证明新 session 从默认 MEMORY.md source 消费 Extraction 新 pointer，并由全局默认分支阻止 Selector。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_EXTRACTED_DEFAULT"],
+        "bodyIncludes": [
+          "# Memory",
+          "E2E_MEMORY_WDIO_EXTRACTED_DEFAULT",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases",
+          "- [Deployment approval policy](deployment-approval-policy.md) — staging approval required"
+        ],
+        "bodyExcludes": [
+          "You are selecting memories that will be useful",
+          "Retrieved for possible relevance",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_memory_window_extracted_default_done",
+          "text": "E2E_MEMORY_WDIO_EXTRACTED_DEFAULT_DONE"
+        }
+      }
+    },
+    {
+      "id": "memory-window-custom-parent-agent",
+      "description": "父 Main 调用声明 project Memory 的 custom agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定选择已 seed 的 custom profile。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_CUSTOM"],
+        "bodyIncludes": [
+          "E2E_MEMORY_WDIO_CUSTOM",
+          "# Memory",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases"
+        ],
+        "bodyExcludes": [
+          "# Persistent Agent Memory",
+          "You are now acting as the memory extraction subagent",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_memory_custom_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Persist review convention",
+            "prompt": "E2E_MEMORY_WDIO_CUSTOM_CHILD store the review convention in persistent project memory.",
+            "subagent_type": "memory-window-curator"
+          }
+        }
+      }
+    },
+    {
+      "id": "memory-window-custom-child-write",
+      "description": "custom child 收到 Persistent Agent Memory prompt 并写入自己的 project scope。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定 Write 以验证 prompt、tool projection、scope root 和 originSessionId。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_MEMORY_WDIO_CUSTOM_CHILD",
+          "# Persistent Agent Memory",
+          "Keep review findings evidence-first"
+        ],
+        "bodyExcludes": ["E2E_MEMORY_WDIO_CUSTOM_FILE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_memory_custom_write",
+          "name": "Write",
+          "input": {
+            "file_path": ".zcode/agent-memory/memory-window-curator/review-convention.md",
+            "content": "---\nname: review-convention\ndescription: Review findings should be grounded in first-hand evidence.\nmetadata:\n  type: feedback\n---\n\nGround review findings in first-hand evidence. E2E_MEMORY_WDIO_CUSTOM_FILE\n\n**Why:** It prevents speculative defects.\n\n**How to apply:** Reproduce or inspect the active path before reporting a finding.\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "memory-window-custom-child-final",
+      "description": "custom child 写入后完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定结束 child tool loop。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "# Persistent Agent Memory",
+          "toolu_e2e_memory_custom_write",
+          "E2E_MEMORY_WDIO_CUSTOM_FILE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_memory_window_custom_child_final",
+          "text": "E2E_MEMORY_WDIO_CUSTOM_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "memory-window-custom-parent-final",
+      "description": "父 Main 消费 child 结果并在窗口显示完成 marker。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定结束父 Agent tool turn并提供 UI 终态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "# Memory",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases",
+          "E2E_MEMORY_WDIO_CUSTOM",
+          "toolu_e2e_memory_custom_agent",
+          "E2E_MEMORY_WDIO_CUSTOM_CHILD_DONE"
+        ],
+        "bodyExcludes": ["You are now acting as the memory extraction subagent"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": { "id": "msg_memory_window_custom_done", "text": "E2E_MEMORY_WDIO_CUSTOM_DONE" }
+      }
+    },
+    {
+      "id": "memory-window-custom-extraction-noop",
+      "description": "custom parent 成功 turn 后的 project Extraction 明确 no-op。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "保持既有成功 Main turn 的 Extraction 调度，但不为此 case 新增 project fact。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "You are now acting as the memory extraction subagent",
+          "E2E_MEMORY_WDIO_CUSTOM"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"msg_memory_window_custom_extraction_noop\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"Nothing to save.\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":64,\"output_tokens\":4}}"
+      }
+    },
+    {
+      "id": "memory-window-active-after-disable",
+      "description": "Settings 关闭后当前 Session 仍保留创建时的 Memory 配置。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "设置关闭后继续当前 Session，确认已冻结 Runtime 不热更新。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_ACTIVE_AFTER_DISABLE"],
+        "bodyIncludes": [
+          "E2E_MEMORY_WDIO_ACTIVE_AFTER_DISABLE",
+          "# Memory",
+          "MEMORY.md (user's auto-memory, persists across conversations):",
+          "- [Database test policy](database-test-policy.md) — integration tests use isolated databases"
+        ],
+        "bodyExcludes": [
+          "You are selecting memories that will be useful",
+          "You are now acting as the memory extraction subagent",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "msg_memory_window_active_after_disable",
+          "text": "E2E_MEMORY_WDIO_ACTIVE_AFTER_DISABLE_DONE"
+        }
+      }
+    },
+    {
+      "id": "memory-window-disabled-main",
+      "description": "新 Session 在 Settings 关闭 Memory 时保持普通 Main 请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定提供 Settings disabled gate 的 UI 终态；matcher 同时拒绝任何 Memory prompt。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MEMORY_WDIO_DISABLED"],
+        "bodyIncludes": ["E2E_MEMORY_WDIO_DISABLED"],
+        "bodyExcludes": [
+          "# Memory",
+          "# Persistent Agent Memory",
+          "user's auto-memory, persists across conversations",
+          "You are selecting memories that will be useful",
+          "You are now acting as the memory extraction subagent",
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": { "id": "msg_memory_window_disabled", "text": "E2E_MEMORY_WDIO_DISABLED_DONE" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+node source
+node ask#1 "审阅者" @6:37 actors=actor#1 type="string"
+node hole#cd7e8315 "评判" @7:14 type="Verdict"
+node sink
+actor actor#1 "审阅者" @6:24
+edge source -> ask#1 data exact
+edge ask#1 -> hole#cd7e8315 data exact type="string"
+edge hole#cd7e8315 -> sink data exact type="Verdict"

@@ -38,19 +38,6 @@ import { commitTurnRequestEntries } from "./turn-output-token-continuation.js";
 const STREAMING_TOOL_CANCEL_DRAIN_TIMEOUT_MS = 250;
 const STREAMING_TOOL_EXECUTION_MODE = "readOnly";
 
-interface StreamingToolCoordinator {
-  accept(toolCall: ModelToolCall): void;
-  abandon(reason: "cancelled" | "model_failed"): Promise<void>;
-  drain(toolCalls: readonly ModelToolCall[]): Promise<StreamedToolExecutionResult[]>;
-  recordReasoningDelta(text: string): void;
-  recordTextDelta(text: string): void;
-  recoverFromModelFailure(
-    error: unknown,
-    assistantCreatedAt: number,
-    options?: { failedRequestId?: string },
-  ): Promise<boolean>;
-}
-
 export function createStreamingToolCoordinator(
   runtime: AgentRuntimeInternal,
   state: RegularTurnLoopState,
@@ -59,7 +46,7 @@ export function createStreamingToolCoordinator(
     model: Model;
     traceContext: TraceContext;
   },
-): StreamingToolCoordinator {
+) {
   const abortController = new AbortController();
   const handles = new Map<string, Promise<StreamedToolExecutionResult | undefined>>();
   const acceptedToolCalls = new Map<string, ModelToolCall>();
@@ -69,10 +56,58 @@ export function createStreamingToolCoordinator(
   const abortOnTurnCancel = () => abortController.abort();
   state.turnAbortSignal.addEventListener("abort", abortOnTurnCancel, { once: true });
 
+  const prepareAcceptedToolSettlement = async () => {
+    abortController.abort();
+    const toolCalls = Array.from(acceptedToolCalls.values());
+    const settledResults = await collectCompletedResults(handles, toolCalls);
+    const settledResultById = new Map(settledResults.map((result) => [result.toolCallId, result]));
+    return {
+      toolCalls,
+      streamedToolResults: toolCalls.map(
+        (toolCall) =>
+          settledResultById.get(toolCall.id as ToolCallId) ??
+          createSyntheticStreamedToolResult(
+            toolCall,
+            handles.has(toolCall.id) ? "unknown_execution_state" : "not_executed",
+          ),
+      ),
+    };
+  };
+
+  const commitAcceptedToolSettlement = async (
+    assistantCreatedAt: number,
+    providerMetadata: Record<string, unknown>,
+    settlement: Awaited<ReturnType<typeof prepareAcceptedToolSettlement>>,
+  ) => {
+    state.modelResponse = "";
+    state.modelStepCount += 1;
+    recordModelHistoryRound(state);
+    state.toolCallCount += settlement.streamedToolResults.length;
+    // 完整 tool_call 已建立配对义务；切换模型前必须让 live、durable ToolPart 与冷恢复看到同一组 call/result。
+    commitTurnRequestEntries(runtime, state.turnRequestState, [
+      createRuntimeAssistantEntry("", settlement.toolCalls, undefined, options.model),
+    ]);
+    state.turnMachine = new TurnMachineImpl(state.turnMachine.receiveModelResponse(""));
+    await executeToolCallsForModelStep.call(runtime, state, {
+      assistantCreatedAt,
+      assistantMessageId: options.assistantMessageId,
+      modelTraceContext: options.traceContext,
+      result: {
+        finishReason: "tool-calls",
+        providerMetadata,
+        text: "",
+        toolCalls: settlement.toolCalls,
+        usage: {},
+      },
+      streamedToolResults: settlement.streamedToolResults,
+      toolCalls: settlement.toolCalls,
+    });
+    state.turnAbortSignal.removeEventListener("abort", abortOnTurnCancel);
+  };
+
   return {
-    accept(toolCall) {
-      // model.ts 已完成 runtime admission。这里必须保留空名原值，使正常 finish
-      // 走 end-of-stream registry miss，同时让 finish 前断流保留 synthetic interrupted error。
+    accept(toolCall: ModelToolCall) {
+      // 保留 runtime admission 后的空名，使正常 finish 走 registry miss，断流则保留 synthetic interrupted error。
       const normalizedToolCall = { ...toolCall };
       if (normalizedToolCall.providerExecuted) return;
       acceptedToolCalls.set(normalizedToolCall.id, normalizedToolCall);
@@ -100,7 +135,7 @@ export function createStreamingToolCoordinator(
       handles.set(normalizedToolCall.id, promise);
     },
 
-    async abandon(reason) {
+    async abandon(reason: "cancelled" | "model_failed") {
       abortController.abort();
       const status = reason === "cancelled" ? "tool_cancelled" : "tool_abandoned";
       await Promise.all(
@@ -125,7 +160,7 @@ export function createStreamingToolCoordinator(
       state.turnAbortSignal.removeEventListener("abort", abortOnTurnCancel);
     },
 
-    async drain(toolCalls) {
+    async drain(toolCalls: readonly ModelToolCall[]) {
       const results: StreamedToolExecutionResult[] = [];
       for (const toolCall of toolCalls) {
         const handle = handles.get(toolCall.id);
@@ -137,15 +172,19 @@ export function createStreamingToolCoordinator(
       return results;
     },
 
-    recordReasoningDelta(text) {
+    recordReasoningDelta(text: string) {
       discardedReasoningBytes += new TextEncoder().encode(text).byteLength;
     },
 
-    recordTextDelta(text) {
+    recordTextDelta(text: string) {
       discardedTextBytes += new TextEncoder().encode(text).byteLength;
     },
 
-    async recoverFromModelFailure(error, assistantCreatedAt, recoveryOptions = {}) {
+    async recoverFromModelFailure(
+      error: unknown,
+      assistantCreatedAt: number,
+      recoveryOptions: { failedRequestId?: string } = {},
+    ) {
       if (state.turnAbortSignal.aborted || !hasStreamRecoveryBudget(state)) return false;
       const recoveryEventOptions = {
         ...options,
@@ -166,54 +205,36 @@ export function createStreamingToolCoordinator(
           turnAbortListener: abortOnTurnCancel,
         });
       }
-      abortController.abort();
       const recoveryAttempt = beginStreamRecoveryAttempt(state);
-      const toolCalls = Array.from(acceptedToolCalls.values());
-      const settledResults = await collectCompletedResults(handles, toolCalls);
-      const settledResultById = new Map(
-        settledResults.map((result) => [result.toolCallId, result]),
-      );
-      const streamedToolResults = toolCalls.map(
-        (toolCall) =>
-          settledResultById.get(toolCall.id as ToolCallId) ??
-          createSyntheticStreamedToolResult(
-            toolCall,
-            handles.has(toolCall.id) ? "unknown_execution_state" : "not_executed",
-          ),
-      );
+      const settlement = await prepareAcceptedToolSettlement();
       await emitStreamRecoveryStarted(runtime, state, recoveryEventOptions, error, recoveryAttempt);
-      state.modelResponse = "";
-      state.modelStepCount += 1;
-      recordModelHistoryRound(state);
-      state.toolCallCount += streamedToolResults.length;
-      // 合并修复：恢复请求依赖 assistant tool-call 与随后 tool result 成对出现。
-      // 因此必须同步推进本轮 request history，不能只更新 canonical history。
-      commitTurnRequestEntries(runtime, state.turnRequestState, [
-        createRuntimeAssistantEntry("", toolCalls, undefined, options.model),
-      ]);
-      state.turnMachine = new TurnMachineImpl(state.turnMachine.receiveModelResponse(""));
-      await executeToolCallsForModelStep.call(runtime, state, {
+      await commitAcceptedToolSettlement(
         assistantCreatedAt,
-        assistantMessageId: options.assistantMessageId,
-        modelTraceContext: options.traceContext,
-        result: {
-          finishReason: "tool-calls",
-          providerMetadata: { recoveredFromStreamFailure: true },
-          text: "",
-          toolCalls,
-          usage: {},
-        },
-        streamedToolResults,
-        toolCalls,
-      });
+        { recoveredFromStreamFailure: true },
+        settlement,
+      );
       await emitStreamRecoveryRetryEvents(runtime, state, recoveryEventOptions, {
         ...recoveryAttempt,
         discardedReasoningBytes,
         discardedTextBytes,
         reason: "latest_committed_tool_result",
-        toolCallIds: streamedToolResults.map((result) => result.toolCallId),
+        toolCallIds: settlement.streamedToolResults.map((result) => result.toolCallId),
       });
-      state.turnAbortSignal.removeEventListener("abort", abortOnTurnCancel);
+      return true;
+    },
+
+    async settleForModelFallback(assistantCreatedAt: number) {
+      if (acceptedToolCalls.size === 0) {
+        abortController.abort();
+        state.turnAbortSignal.removeEventListener("abort", abortOnTurnCancel);
+        return false;
+      }
+      const settlement = await prepareAcceptedToolSettlement();
+      await commitAcceptedToolSettlement(
+        assistantCreatedAt,
+        { recoveredFromExecutionModelFallback: true },
+        settlement,
+      );
       return true;
     },
   };

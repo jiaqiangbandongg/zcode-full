@@ -1,3 +1,13 @@
+import type { ZCodeEnv } from "@zcode/shared";
+
+export function shouldShowRemoteConnectionEntry(params: {
+  env: ZCodeEnv;
+  isIntranet: boolean;
+}): boolean {
+  void params;
+  return true;
+}
+
 export function useRemoteConnectionEntryVisibility(): boolean {
   // SSH 入口之前复用了 internal-only gate，生产态外网环境会被一并隐藏。
   // 但 SSH 是否可用取决于目标机器、网络链路和凭据，不应该依赖“当前客户端是否在内网”。

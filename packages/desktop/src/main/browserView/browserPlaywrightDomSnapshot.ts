@@ -109,8 +109,8 @@ function renderSnapshotTree(nodes: SnapshotTreeNode[], depth = 0): string {
   return lines.join("\n");
 }
 
-/** DOM snapshot 的公开结果归一化：删除内部 ref/cursor 并压平无语义容器。 */
-function normalizeBrowserDomSnapshot(snapshot: string): string {
+/** Playwright DOM snapshot 的公开结果归一化：删除内部 ref/cursor 并压平无语义容器。 */
+export function normalizeBrowserDomSnapshot(snapshot: string): string {
   if (!snapshot.startsWith("- ") && !snapshot.includes("\n- ") && !snapshot.includes("\n  - ")) {
     return snapshot;
   }

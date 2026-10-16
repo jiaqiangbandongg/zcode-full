@@ -1,4 +1,5 @@
 packages:
+  - apps/dev-docs
   - packages/*
   - apps/zcode-cli
   - apps/zcode-cli/packages/*

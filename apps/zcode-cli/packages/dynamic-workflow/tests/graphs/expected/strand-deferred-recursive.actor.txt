@@ -1,0 +1,4 @@
+actor-node actor#1 "r" @36:10
+actor-node sink
+actor-edge actor#1 -> actor#1 inexact count=1 types="string"
+actor-edge actor#1 -> sink exact count=1 types="string"

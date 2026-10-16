@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-fork-merged-assistant",
+  "spec": "./test/e2e/conversation-session/conversation-session-fork-merged-assistant.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-fork-merged-assistant.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "tmp/handoff/e2e-fork-merged-assistant.md",
+      "source": "created-by-provider-tool",
+      "description": "fixture 驱动 Write 工具在 DEFAULT_WORKSPACE 下创建 handoff 文件，spec 在 fork 前后读取并对账内容。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-fork-merged-assistant-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不属于 fork 历史边界语义，只需要稳定返回，避免标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "upstream-conversation-fork-merged-assistant-write-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不一定稳定选择 Write；本响应固定生成 workspace handoff 文件，专门复现 fork target 落到早段 raw assistant 的边界。"
+    },
+    {
+      "id": "upstream-conversation-fork-merged-assistant-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终 marker 必须位于 tool_result 之后，才能暴露 fork 只复制早段 raw assistant 时丢最后回复的问题。"
+    }
+  ]
+}

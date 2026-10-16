@@ -8,6 +8,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { Switch } from "@/components/ui/switch.js";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +41,7 @@ export interface PluginStoreActions {
   togglingPluginId: string | null;
 }
 
-function isItemBusy(item: StorePluginItem, actions: PluginStoreActions): boolean {
+export function isItemBusy(item: StorePluginItem, actions: PluginStoreActions): boolean {
   return (
     actions.operationId === `plugin:install:${item.name}@${item.marketplace}` ||
     actions.operationId === `plugin:restore:${item.id}` ||
@@ -80,6 +81,34 @@ export function PluginStorePaidPlanBadge({
         {badgeLabel}
       </span>
     </ControlHintTooltip>
+  );
+}
+
+/** 详情页与管理视图的插件级启停开关；紧凑商店卡片只保留「…」菜单。 */
+export function PluginStoreEnabledSwitch({
+  item,
+  actions,
+}: {
+  item: StorePluginItem;
+  actions: PluginStoreActions;
+}) {
+  const { intl } = useZCodeIntl();
+  if (!item.info || !actions.onSetEnabled) return null;
+  const enabled = item.info.enabled;
+  return (
+    <Switch
+      data-testid="plugin-store-enabled-switch"
+      data-plugin-id={item.id}
+      checked={enabled}
+      disabled={actions.togglingPluginId === item.id}
+      aria-label={
+        enabled
+          ? intl.formatMessage({ id: "settings.plugins.store.menu.disable" })
+          : intl.formatMessage({ id: "settings.plugins.store.menu.enable" })
+      }
+      onClick={(event) => event.stopPropagation()}
+      onCheckedChange={(checked) => actions.onSetEnabled?.(item.id, checked)}
+    />
   );
 }
 
@@ -345,7 +374,7 @@ export function PluginStoreCard({
         {item.installed ? (
           <>
             <PluginStoreUpdateButton item={item} actions={actions} />
-            {/* 旧版误写 suppression 后可能只剩安装记录、没有运行时 info；
+            {/* Bugfix：旧版误写 suppression 后可能只剩安装记录、没有运行时 info；
                 此时仍须保留卸载菜单，让用户能清理安装记录与脏 suppression。 */}
             <PluginStoreItemMenu item={item} actions={actions} />
           </>

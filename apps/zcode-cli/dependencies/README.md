@@ -15,9 +15,10 @@ macOS metadata (`__MACOSX`, `._*`, `.DS_Store`) is excluded.
 The corresponding license texts and version/source inventory are maintained in
 [`third-party/native-search`](../../../third-party/native-search) and included in
 the root third-party notices. Preparation also writes complete notices and a
-source manifest beside each binary, including cache hits. Newly produced tar/zip
-archives carry these files; do not redistribute the original input archives
-without the companion notices. See the [maintenance guide](../../../third-party/README.md).
+source manifest beside each binary, including cache hits. Producer archives keep
+only the binary so that they stay byte-identical to the pinned SHA-256; do not
+redistribute the original input archives without the companion notices. See the
+[maintenance guide](../../../third-party/README.md).
 
 The active releases and SHA-256 pins are defined in
 [`scripts/native-search-tools-config.mjs`](../../../scripts/native-search-tools-config.mjs)
@@ -35,10 +36,14 @@ Remote packaging uses `resolveRemoteNativeSearchPrebuiltPlan` to retain the
 deployed macOS rg13 contract. Its component versions come from the same plan as
 the extracted archives; the default Desktop / SEA / server-cli plan continues to use rg14.
 
-Desktop, CLI SEA, server-cli staging and remote asset packaging resolve these
+Desktop, CLI SEA, server-cli staging and remote asset packaging prepare native
+search tools through `scripts/prepare-native-search-tools.mjs`. When a dependency
+mirror is configured (`NATIVE_SEARCH_TOOLS_DOWNLOAD_BASE_URL`, or a resolvable
+`ZCODE_DEPS_BASE_URL` / `INTRANET_MACHINE_HOST`), it downloads the same archives
+from that mirror with the same SHA-256 checks. Otherwise it resolves these
 archives relative to the repository, independently of the current working
-directory. Native search preparation does not download archives or fall back to
-a mirror. Other build dependencies retain their own preparation steps.
+directory, and never downloads. The two sources are not fallbacks for each other.
+Other build dependencies retain their own preparation steps.
 Server-cli staging prepares its own checked cache instead of reusing remote tool
 directories, which may contain the macOS rg13 release.
 
@@ -54,8 +59,8 @@ node scripts/prepare-native-search-tools.mjs --platform linux --arch x64 --outpu
 # Package the CLI, including the prepared target tools.
 pnpm build:sea
 
-# Verify archives, server-cli staging, SEA assets, and remote component packaging.
-node --test scripts/native-search-tools.test.mjs
+# Verify archive extraction from this directory and the source selection.
+pnpm exec vitest run packages/desktop/test/prepare-native-search-tools.test.ts
 ```
 
 Preparation checks all selected archive hashes before reusing or replacing any

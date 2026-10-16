@@ -1,0 +1,9 @@
+phase phase#1 "draft" @9:1
+lane actor#1 name-head="writer-" @11:52 families=fanout#1
+lane actor#2 "reviewer" @12:18
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @11:34 label="map"
+step ask#1 ask "ask" label-head="writer-" @11:73 lane=actor#1 phase=phase#1 region=fanout#1 maybe stack
+step ask#2 ask "reviewer" @13:32 lane=actor#2 phase=phase#1 region=seq#1 always
+edge ask#1 -> ask#2 data maybe exact
+sink ask#2

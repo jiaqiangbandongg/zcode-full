@@ -1,0 +1,5 @@
+actor-node workspace
+actor-node actor#1 "dev" @6:20
+actor-node sink
+actor-edge workspace -> actor#1 exact count=2 types="string"
+actor-edge actor#1 -> sink exact count=1 types="string"

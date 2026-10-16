@@ -1,0 +1,936 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-cross-host",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-cross-host.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-cross-host.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "shi-a-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-a-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-seed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-seed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-seed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-hold-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-hold-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-hold-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-resume-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-resume-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-resume-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-spawn-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-spawn-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-spawn-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-hold-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-b-resume-notification",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-a-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-a-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shi-a-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shb-reverse-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-reverse-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-reverse-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-add-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-add-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-add-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-update-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-update-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-update-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-disabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-disabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_disabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_disabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-reenabled-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-reenabled-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-reenabled-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_old-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_old-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_new-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_new-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-renamed_new-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-deleted-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-deleted-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_explore-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_explore-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_explore-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_explore-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_explore-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_explore-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_plugin-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_plugin-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-override_plugin-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_plugin-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_plugin-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-clear_plugin-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-save_failed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-save_failed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-save_failed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-duplicated-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-duplicated-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-duplicated-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_ok_a-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_ok_a-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_ok_a-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_retried_b-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_retried_b-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-read_retried_b-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_resolve-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_resolve-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_resolve-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_reject-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_reject-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-stale_reject-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_ok_a-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_ok_a-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_ok_a-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_retried_b-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_retried_b-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-directory_retried_b-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_ok_a-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_ok_a-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_ok_a-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_retried_b-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_retried_b-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-state_retried_b-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cache_hit-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cache_hit-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cache_hit-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-unrelated_b-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-unrelated_b-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-unrelated_b-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cold_start-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cold_start-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cold_start-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实双 Host 的配置保存/原生文件监听/内存快照；同一 fixture 供 A/B 执行，文件故障仅在测试侧注入。"
+    },
+    {
+      "id": "shb-cold-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "仅测试侧触发既有第二窗口创建路径；真实 Host 文件监听、Settings 保存及 CLI spawn/resume，provider 固定响应以验证跨 Host 快照和历史。"
+    },
+    {
+      "id": "shb-stale_resolve_published-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-stale_resolve_published-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-stale_resolve_published-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-stale_reject_published-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-stale_reject_published-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-stale_reject_published-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台加载期间完成旧快照父子调用；后续发布新快照，迟到旧读取不得覆盖；仅测试侧控制文件边界。"
+    },
+    {
+      "id": "shb-read_failed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-read_failed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-read_failed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-directory_failed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-directory_failed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-directory_failed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-state_failed-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-state_failed-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shb-state_failed-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "文件读取失败后仅内置 Agent 可用；自定义 spawn/resume 明确失败，文件事件恢复后重新加载。故障注入仅在测试侧。"
+    },
+    {
+      "id": "shp-a-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-a-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-a-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-a-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-a-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-b-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-b-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-b-next-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-b-next-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-b-next-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：真实大小写不敏感目录、两个独立 Host、Settings 保存及下一轮 spawn；固定模型响应只调度工具，不替换配置读取，验收实际请求中的新 profile。"
+    },
+    {
+      "id": "shp-a-created-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-a-created-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-a-created-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-created-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-created-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-created-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-a-rebuilt-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-a-rebuilt-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-a-rebuilt-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-rebuilt-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-rebuilt-child",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    },
+    {
+      "id": "shp-b-rebuilt-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "SHR22：复用两个真实 Host 的已有 session，Settings 首次创建及重建项目 agents 目录，固定工具调度并验证实际 provider 配置与连续历史。"
+    }
+  ]
+}

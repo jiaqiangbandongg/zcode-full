@@ -244,6 +244,8 @@ export async function autoCompactIfNeeded(
     return "rapid_refill_blocked";
   }
 
+  // 跳过压缩时无需构建 listing 工具合同；读取失败仍向上抛出，不计入压缩失败。
+  const agentListingTools = context.getAgentListingTools?.();
   this.logger?.info("Auto compact started", {
     ...traceContextToLogContext(turnTraceContext),
     event: "compact.auto.started",
@@ -271,6 +273,7 @@ export async function autoCompactIfNeeded(
         compactReason: context.compactReason,
         phase: context.phase,
         trigger: CompactTrigger.Auto,
+        agentListingTools,
         activeEntries,
         ...(context.model ? { model: context.model } : {}),
       },
@@ -426,6 +429,7 @@ export async function reactiveCompactAfterContextExceeded(
         initialPromptTooLongCause: originalError,
         phase: CompactPhase.Reactive,
         trigger: CompactTrigger.Reactive,
+        agentListingTools: context.agentListingTools,
         activeEntries,
         model: context.model,
       },

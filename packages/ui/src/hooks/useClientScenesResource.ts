@@ -4,7 +4,7 @@ import type { ClientSceneConfig, IClientScenesService } from "@zcode/services";
 import { createClientScenesVisibilityRecovery } from "@/hooks/clientScenesVisibilityRecovery.js";
 
 const CLIENT_SCENES_RESOURCE_KEY = "client-scenes";
-const CLIENT_SCENES_DEDUPING_INTERVAL_MS = 10 * 60 * 1000;
+export const CLIENT_SCENES_DEDUPING_INTERVAL_MS = 10 * 60 * 1000;
 
 const EMPTY_SCENES: ClientSceneConfig[] = [];
 const serviceAuthorityIds = new WeakMap<IClientScenesService, number>();
@@ -40,7 +40,7 @@ function getClientScenesVisibilityRecovery() {
   return visibilityRecovery;
 }
 
-class ClientScenesBusinessError extends Error {
+export class ClientScenesBusinessError extends Error {
   readonly code: number;
   readonly responseMessage: string;
 

@@ -1,0 +1,10 @@
+node source
+node ask#1 "triage" @6:37 actors=actor#3 type="string"
+node ask#2 "ask" @7:58 actors=actor#1,actor#2 type="string"
+node sink
+actor actor#1 "fast" @4:14
+actor actor#2 "careful" @5:17
+actor actor#3 "triage" @6:21
+edge source -> ask#1 data exact
+edge ask#1 -> ask#2 data exact type="string"
+edge ask#2 -> sink data exact type="string"

@@ -1,0 +1,458 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-prompt-assembly",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-prompt-assembly.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-prompt-assembly-title",
+      "description": "Subagent prompt assembly case 内的标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-subagent-prompt-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Subagent Prompt Assembly\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-parent-tool",
+      "description": "父 agent 首轮请求返回 built-in general-purpose Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 child provider-visible prompt assembly；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_PARENT",
+          "general-purpose",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_prompt_assembly_builtin",
+          "name": "Agent",
+          "input": {
+            "description": "Verify built-in subagent prompt assembly",
+            "prompt": "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD: Reply with exactly \"E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD_OK\" and no other text.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-child",
+      "description": "general-purpose child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD",
+          "E2E_SUBAGENT_USER_AGENTS_INSTRUCTION",
+          "E2E_SUBAGENT_WORKSPACE_AGENTS_INSTRUCTION"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Available agent types for the Agent tool:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-builtin-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-builtin-parent-final",
+      "description": "父 agent 收到 built-in child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_PARENT",
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_BUILTIN_CHILD_OK",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-builtin-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "subagent-prompt-assembly-builtin-done"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-parent-tool",
+      "description": "父 agent 第二轮请求返回 built-in Explore Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 Explore child 省略父级 AGENTS.md；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_PARENT",
+          "Explore",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_prompt_assembly_explore",
+          "name": "Agent",
+          "input": {
+            "description": "Verify Explore omits inherited instructions",
+            "prompt": "E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD: Reply with exactly \"E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD_OK\" and no other text.",
+            "subagent_type": "Explore"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-child",
+      "description": "Explore child subagent 固定回复，并拒绝匹配携带 AGENTS marker 的请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Explore child 请求本身是省略 AGENTS.md 的 trajectory 证据；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD"],
+        "bodyIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD", "You are ZCode Explore"],
+        "bodyExcludes": [
+          "E2E_SUBAGENT_USER_AGENTS_INSTRUCTION",
+          "E2E_SUBAGENT_WORKSPACE_AGENTS_INSTRUCTION",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Available agent types for the Agent tool:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-explore-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-explore-parent-final",
+      "description": "父 agent 收到 Explore child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Explore 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_PARENT",
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_EXPLORE_CHILD_OK",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-explore-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "subagent-prompt-assembly-explore-done"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-parent-tool",
+      "description": "父 agent 第三轮请求返回缺省继承的 custom Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 custom child provider-visible prompt assembly；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_PARENT",
+          "e2e-prompt-assembly-reviewer",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_prompt_assembly_custom",
+          "name": "Agent",
+          "input": {
+            "description": "Verify custom subagent prompt assembly",
+            "prompt": "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD: Reply with exactly \"E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD_OK\" and no other text.",
+            "subagent_type": "e2e-prompt-assembly-reviewer"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-child",
+      "description": "custom child subagent 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "custom child 请求本身是本 case 的验证证据；响应只需稳定完成并返回子结果 token。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD",
+          "E2E_CUSTOM_PROMPT_ASSEMBLY_AGENT_BODY",
+          "E2E_SUBAGENT_USER_AGENTS_INSTRUCTION",
+          "E2E_SUBAGENT_WORKSPACE_AGENTS_INSTRUCTION"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Available agent types for the Agent tool:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-custom-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-custom-parent-final",
+      "description": "父 agent 收到 custom child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "custom 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_PARENT",
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_CUSTOM_CHILD_OK",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-custom-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "subagent-prompt-assembly-custom-done"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-parent-tool",
+      "description": "父 agent 第四轮请求返回显式关闭 AGENTS 继承的 custom Agent tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心验证点是 custom false child 省略父级 AGENTS.md；父请求只需要稳定触发 Agent tool_use。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_PARENT",
+          "e2e-prompt-assembly-isolated",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_prompt_assembly_isolated",
+          "name": "Agent",
+          "input": {
+            "description": "Verify custom subagent omits inherited instructions",
+            "prompt": "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD: Reply with exactly \"E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD_OK\" and no other text.",
+            "subagent_type": "e2e-prompt-assembly-isolated"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-child",
+      "description": "显式关闭继承的 custom child 固定回复，并拒绝匹配携带 AGENTS marker 的请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "custom false child 请求本身是省略 AGENTS.md 的 trajectory 证据；响应只需稳定完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD",
+          "E2E_ISOLATED_CUSTOM_PROMPT_ASSEMBLY_AGENT_BODY"
+        ],
+        "bodyExcludes": [
+          "E2E_SUBAGENT_USER_AGENTS_INSTRUCTION",
+          "E2E_SUBAGENT_WORKSPACE_AGENTS_INSTRUCTION",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Available agent types for the Agent tool:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-isolated-child",
+          "inputTokens": 128,
+          "outputTokens": 16,
+          "text": "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD_OK"
+        }
+      }
+    },
+    {
+      "id": "subagent-prompt-assembly-isolated-parent-final",
+      "description": "父 agent 收到显式关闭继承的 custom child tool_result 后的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "custom false 最终回复用于证明 Agent tool_result 被父会话 continuation 消费并回到 idle。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_PARENT",
+          "E2E_SUBAGENT_PROMPT_ASSEMBLY_ISOLATED_CHILD_OK",
+          "Available agent types for the Agent tool:",
+          "Available agent types are listed in <system-reminder> messages in the conversation.",
+          "Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
+          "Each agent type's model, reasoning effort, and tools come from its definition (`.zcode/agents/*.md` frontmatter)."
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-subagent-prompt-assembly-isolated-parent-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "subagent-prompt-assembly-isolated-done"
+        }
+      }
+    }
+  ]
+}

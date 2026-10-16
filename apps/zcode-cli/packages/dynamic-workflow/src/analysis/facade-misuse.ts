@@ -17,7 +17,7 @@ import { isFacadeDeclared, resolveSymbol, type SiteTable } from "./sites.js";
  * (those come from the checker); this marks an analysis diagnostic produced by
  * {@link collectFacadeMisuse}. Kept out of the TS code space to stay unambiguous.
  */
-const FACADE_SITING_CODE = 9001;
+export const FACADE_SITING_CODE = 9001;
 
 /** Depth cap for the structural facade-site walk; scripts nest shallowly, cyclic types converge. */
 const FACADE_SITE_DEPTH = 4;
@@ -119,10 +119,7 @@ export function collectFacadeMisuse(
       // renamed, nested, or parameter): the container is the binding pattern's type, and a
       // renamed element carries the source property name, a shorthand its own bound name.
       flagExtractedMember(node.propertyName ?? node.name, checker.getTypeAtLocation(node.parent));
-    } else if (
-      ts.isShorthandPropertyAssignment(node) &&
-      ts.isBinaryExpression(node.parent.parent)
-    ) {
+    } else if (ts.isShorthandPropertyAssignment(node) && ts.isBinaryExpression(node.parent.parent)) {
       // Destructuring ASSIGNMENT `({ ask } = planner)`: the object literal is the assignment
       // target (its LHS), and the source property lives on the right-hand side's type.
       const assign = node.parent.parent;
@@ -146,6 +143,8 @@ export function collectFacadeMisuse(
     // 所以已 site 的直接调用不得被误报，而收集漏掉的那一次必须被报出来。
     ...table.artifacts.map((site) => site.call),
     ...table.joins.map((site) => site.call),
+    // 留白同席：`hole` 产生站点（registry），已 site 的直接调用不得误报。
+    ...table.holes.map((site) => site.call),
   ]);
   const scanCalls = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && !sited.has(node)) {

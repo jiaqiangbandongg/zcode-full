@@ -12,9 +12,9 @@ import { CheckCircle2Icon, CircleAlertIcon, Loader2Icon, XIcon } from "lucide-re
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
 
-type ProviderDetailFeedbackState = "pending" | "success" | "failure";
+export type ProviderDetailFeedbackState = "pending" | "success" | "failure";
 
-interface ProviderDetailFeedbackInput {
+export interface ProviderDetailFeedbackInput {
   key: string;
   message: string;
   state: ProviderDetailFeedbackState;

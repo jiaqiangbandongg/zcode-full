@@ -82,7 +82,7 @@ export function InputComposerStatus({
   });
 }
 
-function inputActiveStatusRow(
+export function inputActiveStatusRow(
   copy: TuiCopy,
   frame?: string,
   options: { contentWidth?: number; contextUsage?: ContextUsage } = {},
@@ -123,7 +123,7 @@ function inputActiveStatusRow(
   );
 }
 
-function inputComposerStatusRow({
+export function inputComposerStatusRow({
   contentWidth,
   model,
   thoughtLevel,
@@ -158,7 +158,7 @@ function inputComposerStatusRow({
   );
 }
 
-function inputComposerStatusParts(
+export function inputComposerStatusParts(
   modelSelection: string,
   thoughtLevel: string,
   maxWidth?: number,
@@ -174,7 +174,7 @@ function inputComposerStatusParts(
   );
 }
 
-function inputContextUsageBadge(contextUsage?: ContextUsage): string | undefined {
+export function inputContextUsageBadge(contextUsage?: ContextUsage): string | undefined {
   const used = contextUsage?.contextUsed;
   if (!validContextTokenCount(used)) return undefined;
 

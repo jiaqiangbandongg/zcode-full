@@ -5,7 +5,7 @@ import { ZCODE_FILE_LOCK_TIMEOUT_ERROR_CODE } from "@zcode/shared";
 import type { SharedZCodeCredentialStore } from "../auth/shared-credentials.js";
 import { isRecord, mcpOAuthCredentialKey } from "./oauth-credentials.js";
 
-const MCP_OAUTH_PENDING_AUTHORIZATION_KEY = "pending_authorization";
+export const MCP_OAUTH_PENDING_AUTHORIZATION_KEY = "pending_authorization";
 
 /**
  * 授权 lease 的竞争等待预算。
@@ -19,7 +19,7 @@ const AUTHORIZATION_LEASE_MAX_WAIT_MS = 250;
 const AUTHORIZATION_LEASE_RETRY_DELAYS_MS = [25] as const;
 const AUTHORIZATION_LEASE_OWNERLESS_GRACE_MS = 100;
 
-interface McpOAuthAuthorizationLease {
+export interface McpOAuthAuthorizationLease {
   attemptId: string;
   release(): Promise<void>;
 }
@@ -30,7 +30,10 @@ interface McpOAuthAuthorizationLease {
  * basename 只允许 hash 与连字符：credential key prefix 形如 `mcp:oauth:<hash>`，冒号在
  * Windows 文件名中非法，直接拼进路径会让整个授权流程在 Windows 上失败。
  */
-function resolveAuthorizationLeasePath(credentialsFilePath: string, keyPrefix: string): string {
+export function resolveAuthorizationLeasePath(
+  credentialsFilePath: string,
+  keyPrefix: string,
+): string {
   return join(dirname(credentialsFilePath), `${sanitizeKeyPrefix(keyPrefix)}.authz`);
 }
 
@@ -68,7 +71,7 @@ export async function tryAcquireAuthorizationLease(input: {
   }
 }
 
-interface PendingAuthorizationRecord {
+export interface PendingAuthorizationRecord {
   attemptId: string;
   authorizationUrl: string;
   baselineGeneration?: string;

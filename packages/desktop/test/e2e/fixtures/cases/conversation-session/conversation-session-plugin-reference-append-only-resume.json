@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-reference-append-only-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-reference-append-only-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-reference-append-only-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "plugin-append-only-target-title",
+      "description": "目标 session 首发的确定性标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首发会异步触发 title sidecar；用目标首轮 marker 隔离并固定标题响应。"
+    },
+    {
+      "id": "plugin-append-only-u1",
+      "description": "U1 必须包含 canonical Plugin 引用产生的 plugin_reference reminder。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "以首轮 marker、stable id 与 reminder 标签作为 provider-wire 门禁，固定 A1 以供后续严格前缀比较。"
+    },
+    {
+      "id": "plugin-append-only-u2",
+      "description": "同一热 runtime 的无引用 U2 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 A2，使 Req2 能作为热恢复 Req3 的稳定前缀基线。"
+    },
+    {
+      "id": "plugin-append-only-parking-title",
+      "description": "parking session 首发的确定性标题响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "parking task 也会触发 title sidecar；固定响应避免借用共享 fixture。"
+    },
+    {
+      "id": "plugin-append-only-parking",
+      "description": "用于热切换与冷启动停留的独立 completed parking task。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定独立 parking task，确保热恢复经过 task 切换且冷启动不会自动打开目标 task。"
+    },
+    {
+      "id": "plugin-append-only-u3-hot",
+      "description": "同进程切走再打开目标 task 后的热恢复 U3 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 A3，使热恢复 Req3 成为冷恢复 Req4 的稳定前缀基线。"
+    },
+    {
+      "id": "plugin-append-only-u4-cold",
+      "description": "完整重启 Desktop/Host/CLI 后重新打开目标 task 的冷恢复 U4 响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 A4 并以全部历史 marker 放行，确保请求确实来自冷 hydration 后的目标 task。"
+    }
+  ]
+}

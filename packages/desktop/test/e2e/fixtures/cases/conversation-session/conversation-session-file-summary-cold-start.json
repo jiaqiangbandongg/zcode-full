@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-file-summary-cold-start",
+  "spec": "./test/e2e/conversation-session/conversation-session-file-summary-cold-start.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-file-summary-cold-start.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "file-summary-cold-start-e2e/summary.txt",
+      "source": "created-by-provider-tool",
+      "description": "fixture 驱动单次 Write 创建两行文件，产生 cold hydration 所需 workspace checkpoint。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "file-summary-cold-start-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不参与冷物化语义，只用 marker 隔离标题请求。"
+    },
+    {
+      "id": "file-summary-cold-start-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "真实 provider 不保证稳定选择单次 Write；固定两行内容用于精确断言 +2/-0。"
+    },
+    {
+      "id": "file-summary-cold-start-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终 marker，避免模型文本波动干扰冷启动摘要断言。"
+    }
+  ]
+}

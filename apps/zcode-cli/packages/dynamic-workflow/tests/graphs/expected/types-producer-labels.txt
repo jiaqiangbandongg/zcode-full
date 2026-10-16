@@ -1,0 +1,19 @@
+node source
+node ask#1 "scanner" @16:38 actors=actor#1 type="Flaky"
+node ask#2 "planner" @17:40 actors=actor#2 type="string"
+node world-read#1 "glob src/**/*.ts" @18:27 type="string[]"
+node world-read#2 "read config.json" @19:25 type="string"
+node ask#3 "consumer" @20:37 actors=actor#3 type="string"
+node sink
+actor actor#1 "scanner" @16:21
+actor actor#2 "planner" @17:23
+actor actor#3 "consumer" @20:19
+edge source -> ask#1 data exact
+edge source -> ask#2 data exact
+edge source -> world-read#1 data exact
+edge source -> world-read#2 data exact
+edge ask#1 -> ask#3 data exact type="Flaky"
+edge ask#2 -> ask#3 data exact type="string"
+edge world-read#1 -> ask#3 data exact type="string[]"
+edge world-read#2 -> ask#3 data exact type="string"
+edge ask#3 -> sink data exact type="string"

@@ -1,0 +1,14 @@
+lane actor#1 name-head="writer-" @10:50 families=fanout#1
+lane actor#2 name-head="critic-" @11:54 families=fanout#2
+lane actor#3 "echo" @12:52 families=fanout#3
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @10:34 label="map"
+region fanout#2 fanout parent=seq#1 @11:35 label="map"
+region fanout#3 fanout parent=seq#1 @12:34 label="map"
+step ask#1 ask "ask" label-head="writer-" @10:71 lane=actor#1 region=fanout#1 maybe stack
+step ask#2 ask "ask" label-head="critic-" @11:75 lane=actor#2 region=fanout#2 maybe stack
+step ask#3 ask "echo" @12:66 lane=actor#3 region=fanout#3 maybe stack
+edge ask#1 -> ask#2 data maybe exact
+edge ask#1 -> ask#3 data maybe exact
+edge ask#2 -> ask#3 seq maybe
+sink ask#2,ask#3

@@ -1,0 +1,11 @@
+node source
+node world-read#1 "glob src/**/*.ts" @7:27 type="string[]"
+node ask#1 "ask" @10:39 actors=actor#1 type="string"
+node hole#2e33cec5 "决定修法" @11:21 type="Fix"
+node sink
+actor actor#1 @10:22
+edge source -> world-read#1 data exact
+edge world-read#1 -> ask#1 data inexact type="string[]"
+edge world-read#1 -> hole#2e33cec5 data inexact type="string[]"
+edge ask#1 -> hole#2e33cec5 data exact type="string"
+edge hole#2e33cec5 -> sink data exact type="Fix"

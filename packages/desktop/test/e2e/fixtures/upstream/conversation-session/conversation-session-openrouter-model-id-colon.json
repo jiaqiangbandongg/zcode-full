@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-openrouter-model-id-colon",
+  "spec": "./test/e2e/conversation-session/conversation-session-openrouter-model-id-colon.test.ts",
+  "fixtures": [
+    {
+      "id": "openrouter-model-id-colon-title",
+      "description": "含冒号 OpenRouter modelId case 的标题固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于含冒号 modelId 的产品语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"openrouter-model-id-colon-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"nvidia/nemotron-3-ultra-550b-a55b:free\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"OpenRouter colon\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"openrouter-model-id-colon-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"nvidia/nemotron-3-ultra-550b-a55b:free\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "openrouter-model-id-colon-main",
+      "description": "I62 含冒号 modelId 的首发固定响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是完整 OpenRouter modelId 的 UI、V4 配置和请求传递，响应仅用于稳定收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_OPENROUTER_MODEL_ID_COLON"],
+        "bodyIncludes": [
+          "E2E_OPENROUTER_MODEL_ID_COLON",
+          "nvidia/nemotron-3-ultra-550b-a55b:free"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"openrouter-model-id-colon-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"nvidia/nemotron-3-ultra-550b-a55b:free\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"openrouter-model-id-colon-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"nvidia/nemotron-3-ultra-550b-a55b:free\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

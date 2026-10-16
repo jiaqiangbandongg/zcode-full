@@ -11,6 +11,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { NodeRecord, NodeRecordStatus, RunStatus, StoredEvent } from "@zcode/dynamic-workflow";
 import type { DwfArtifactItem, DwfArtifactItemsQuery } from "./dwf-journal-artifacts.js";
+import type { DwfEventPageQuery } from "./dwf-journal-pages.js";
 import {
   decodeEvent,
   decodeNode,
@@ -94,17 +95,26 @@ export interface DwfRunIntrospectionQueries {
     runId: string,
     artifactId: string,
     query: DwfArtifactItemsQuery,
-  ): DwfArtifactItem[];
+  ): { items: DwfArtifactItem[]; hasMore: boolean };
+  /** 事件日志的一页：条数与字节两道界（dwf-journal-pages.ts），`hasMore` 由存储层判定。 */
+  listEventPage(
+    runId: string,
+    query: DwfEventPageQuery,
+  ): { events: StoredEvent[]; hasMore: boolean };
   listArtifactRows(runId: string): NodeRecord[];
+  /** 每个预置产物的标签 report 条数（`group by artifact_id`，不读行）。 */
+  countTaggedReports(runId: string): ReadonlyMap<string, number>;
   listRecentLogEvents(runId: string, limit: number): StoredEvent[];
   listRuns(query: DwfListRunsQuery): DwfRunListItem[];
   /**
-   * 本 run 每一世的活动区间，按时序（完成卡的「时间」格）。一条 run 可以
+   * 本 run 每一世的活动区间，按时序（完成卡的「时间」格，见
+   * `docs/dynamic-workflow/transcript-and-notifications.md`「How long it took」）。一条 run 可以
    * 有多世（每次 resume 一世），而每一世的墙钟只有事件日志知道。
    */
   listRunLifeSpans(runId: string): DwfRunLifeSpan[];
   /**
-   * 本 run 的 world-read / world-run 行，按落库先后（`order by id`），带 journal 时间戳。**不取
+   * 本 run 的 world-read / world-run 行，按落库先后（`order by id`），带 journal 时间戳
+   * （docs/dynamic-workflow/transcript-and-notifications.md 的 `workflowRunWorkspace` 行）。**不取
    * `result_json`**：这条读面是清单（op / args / 状态 / 时间），正文另有按 (siteId, ordinal)
    * 的读面——一页 256 个节点把每个 256 KB 的 stdout 一起解出来，等于把整条 journal 读进内存。
    */
@@ -209,7 +219,8 @@ export function listRecentLogEvents(db: DatabaseSync, runId: string, limit: numb
 /**
  * 本 run 每一世的活动区间（`run-started` 的时刻 → 那一世最后一条事件的时刻），按时序。
  *
- * 完成卡的时长是 lineage 的**活动**时长之和，而一条 run 的每一世都要各算一段——世与世之间的空档
+ * 取数口径见 `docs/dynamic-workflow/transcript-and-notifications.md`「How long it took」：完成卡的
+ * 时长是 lineage 的**活动**时长之和，而一条 run 的每一世都要各算一段——世与世之间的空档
  * （进程已死、还没 resume）什么都没在跑，不能计入。
  *
  * 一条 SQL 做完，且**不解一个 payload**：`lead()` 把每一世的起点与下一世的起点配成区间，

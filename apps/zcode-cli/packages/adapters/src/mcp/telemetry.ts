@@ -11,7 +11,7 @@ const BUILTIN_NODE_REPL_SERVER_NAME = "node_repl";
 const MCP_ID_SAFE_CHARACTER_PATTERN = /^[A-Za-z0-9._~-]$/;
 const PLUGIN_MCP_NAMESPACE_PREFIX = "plugin:";
 
-type McpTelemetryEvent = ZCodeMcpTelemetryEvent;
+export type McpTelemetryEvent = ZCodeMcpTelemetryEvent;
 export type McpTelemetrySource = Extract<
   ZCodeMcpTelemetryEvent,
   { kind: "process_start" }
@@ -72,7 +72,7 @@ export interface McpTelemetryTracker {
   stop(): void;
 }
 
-interface CreateMcpTelemetryTrackerOptions {
+export interface CreateMcpTelemetryTrackerOptions {
   arch?: ZCodeMcpTelemetryEvent["arch"];
   idSalt: string;
   now?: () => number;

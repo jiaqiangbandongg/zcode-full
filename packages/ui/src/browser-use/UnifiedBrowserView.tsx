@@ -9,7 +9,9 @@ import { usePlatform } from "@/hooks/usePlatform.js";
 import { useWebElementPicker } from "@/hooks/useWebElementPicker.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
+import { BrowserSiteSettingsEntry } from "@/browser-use/BrowserSiteSettingsEntry.js";
 import { BrowserToolbar } from "@/EmbeddedBrowserPaneParts.js";
+import { EmbeddedBrowserPermissionPrompts } from "@/browser-use/EmbeddedBrowserPermissionPrompts.js";
 import { BrowserViewportSurface } from "@/browser-use/BrowserViewportSurface.js";
 import { BrowserViewportToolbar } from "@/browser-use/BrowserViewportToolbar.js";
 import { useBrowserResizeOperationWarning } from "@/browser-use/useBrowserResizeOperationWarning.js";
@@ -49,6 +51,7 @@ type PendingGuestNavigationCompletion = {
  */
 export function UnifiedBrowserView({
   browserKey,
+  onOpenPermissionSettings,
   isResidencyRestore = false,
   isVisible,
   isSelected = isVisible,
@@ -74,6 +77,8 @@ export function UnifiedBrowserView({
 }: {
   /** 受控视图 key（= tab.id / sessionId，agent 定位该 tab 用）。 */
   browserKey: string;
+  /** 地址栏站点设置入口：打开该站点的权限设置标签页。 */
+  onOpenPermissionSettings?: (origin: string) => void;
   /** 预算恢复时 guest 创建后立即撤销 bootstrap src，首次有效导航由 main 独占。 */
   isResidencyRestore?: boolean;
   /** pane 是否可见（激活 + 展开）。隐藏时仅从布局里移除，不卸载 webview，保住网页与历史。 */
@@ -129,6 +134,16 @@ export function UnifiedBrowserView({
   const [hasNavigated, setHasNavigated] = useState(hasInitialNavigation);
   const [webviewGeneration, setWebviewGeneration] = useState(0);
   const [webview, setWebview] = useState<ElectronWebviewTag | null>(null);
+  // 权限气泡的 tab 归属过滤：attach/dom-ready 后读取 guest webContents id；
+  // 读不到时保持 undefined（组件按「请求缺归属 id 则兜底渲染」处理）。
+  const [permissionGuestWebContentsId, setPermissionGuestWebContentsId] = useState<
+    number | undefined
+  >(undefined);
+  useEffect(() => {
+    if (!webview || typeof webview.getWebContentsId !== "function") return;
+    const id = safeWebviewCall(() => webview.getWebContentsId(), 0);
+    setPermissionGuestWebContentsId(id > 0 ? id : undefined);
+  }, [webview, browserState.isReady]);
   const [guestAttachRetryNonce, setGuestAttachRetryNonce] = useState(0);
   useBrowserScreenshotSurfaceReady({
     request: screenshotSurfaceRequest ?? null,
@@ -1011,6 +1026,14 @@ export function UnifiedBrowserView({
     }
   }, [logWebviewTeardown, shouldMountWebview]);
 
+  let permissionOrigin: string | null = null;
+  try {
+    const url = new URL(browserState.currentUrl);
+    if (["http:", "https:"].includes(url.protocol)) permissionOrigin = url.origin;
+  } catch {
+    /* 空白页没有站点权限。 */
+  }
+
   // inactive 的 display:none 会让 Electron 保留旧 compositor surface，后台截图会按旧表面平铺。
   // prepare 期间的 flex 只用于合成；外层 inert、pointer-events-none 和 aria-hidden 隔离交互与 a11y。
   return (
@@ -1021,12 +1044,20 @@ export function UnifiedBrowserView({
       }
       className={cn(
         isVisible || shouldComposeSurface ? "flex" : "hidden",
-        "h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background",
+        "relative h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background",
       )}
     >
       <BrowserToolbar
         addressValue={addressValue}
         browserState={browserState}
+        permissionControl={
+          permissionOrigin ? (
+            <BrowserSiteSettingsEntry
+              origin={permissionOrigin}
+              onOpenSettings={onOpenPermissionSettings}
+            />
+          ) : null
+        }
         formatMessage={intl.formatMessage}
         onAddressChange={setAddressValue}
         onGoBack={handleGoBack}
@@ -1040,6 +1071,11 @@ export function UnifiedBrowserView({
         isElementPickerActive={isWebElementPicking}
         isResponsiveMode={isResponsiveMode}
       />
+      {/* 权限弹窗层：只在可见 tab 挂载（多 tab 共享 store，避免重复渲染与
+          后台请求误显示）；permission 请求再按 guest 归属过滤到发起 tab。 */}
+      {isVisible ? (
+        <EmbeddedBrowserPermissionPrompts guestWebContentsId={permissionGuestWebContentsId} />
+      ) : null}
       {isResponsiveMode ? (
         <BrowserViewportToolbar
           isVisible={isVisible}

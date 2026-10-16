@@ -29,7 +29,7 @@ export interface AssistantCodeCommentCard extends AssistantCodeComment {
   path: string;
 }
 
-interface AssistantCodeCommentProjection {
+export interface AssistantCodeCommentProjection {
   comments: AssistantCodeComment[];
   visibleText: string;
 }
@@ -47,7 +47,7 @@ function parsePriority(value: string | undefined): AssistantCodeCommentPriority 
   return Number.parseInt(value, 10) as AssistantCodeCommentPriority;
 }
 
-function extractAssistantCodeComments(content: string): AssistantCodeComment[] {
+export function extractAssistantCodeComments(content: string): AssistantCodeComment[] {
   const protectedRanges = findMarkdownCodeRanges(content);
   return extractAssistantDirectives(content, CODE_COMMENT_DIRECTIVE_NAME).flatMap((directive) => {
     if (

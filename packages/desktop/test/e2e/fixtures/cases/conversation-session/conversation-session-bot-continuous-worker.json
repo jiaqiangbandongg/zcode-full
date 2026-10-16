@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-bot-continuous-worker",
+  "spec": "./test/e2e/conversation-session/conversation-session-bot-continuous-worker.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-bot-continuous-worker.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "queue-running",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "真实 CLI 顺序提升群聊队列与私聊持续订阅；模型与平台 HTTP 隔离。"
+    },
+    {
+      "id": "queue-next",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "真实 CLI 顺序提升群聊队列与私聊持续订阅；模型与平台 HTTP 隔离。"
+    },
+    {
+      "id": "private-first",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "真实 CLI 顺序提升群聊队列与私聊持续订阅；模型与平台 HTTP 隔离。"
+    },
+    {
+      "id": "private-next",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "真实 CLI 顺序提升群聊队列与私聊持续订阅；模型与平台 HTTP 隔离。"
+    }
+  ]
+}

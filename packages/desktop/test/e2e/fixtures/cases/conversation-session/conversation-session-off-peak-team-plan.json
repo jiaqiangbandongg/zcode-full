@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-off-peak-team-plan",
+  "spec": "./test/e2e/conversation-session/conversation-session-off-peak-team-plan.test.ts",
+  "providerFixtures": [],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "requests": []
+}

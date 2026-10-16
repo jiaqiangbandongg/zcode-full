@@ -8,7 +8,7 @@
 import { inputHash } from "./hash.js";
 import { REPORT_CAPS } from "../facade/report-caps.js";
 import { declaredPresetIds, isDeclaredPreset } from "./engine-artifacts.js";
-import { hashMismatch } from "./scheduler.js";
+import { hashMismatch } from "./hash-mismatch.js";
 import type { EngineState } from "./engine-state.js";
 import type { InstanceRef } from "./types.js";
 import { refToString, WorkflowError } from "./types.js";
@@ -26,7 +26,8 @@ import { refToString, WorkflowError } from "./types.js";
  *    纯度违约让 run 大声失败。这条比对是**防御性的**（一条报告派生自 journal 已经钉住的
  *    值），但它是免费的，而这里的偏移意味着整个 replay 不可靠——Results 面板的读者绝不
  *    应该在不知情的情况下看到那种东西。
- * 3. **上限先于落库**：条数与单条字节数任一超出即 `ReportCapExceeded` 失败整个 run。
+ * 3. **上限先于落库**：单条字节数、条数、run 级字节总数任一超出即 `ReportCapExceeded`
+ *    失败整个 run。
  *    run 级而非 node 级，因为 `report` 返回 `void`，没有可拒绝进去的地方。
  * 4. **一次写**：`completed`、无 actor 字段。
  */
@@ -48,7 +49,9 @@ export function publishReport(
   // InputHashMismatch——一次没有任何收益的破坏性载荷形变。
   const hash = inputHash(item);
 
-  const recorded = state.journal.getNode(state.runId, siteId, ordinal);
+  // 只比对哈希，不读 item（docs/execution-engine.md「Reading the journal」）：resume 重放一个
+  // 报了 65,536 条的脚本时，每一次命中都去解一条 ≤1 MiB 的 item 再扔掉，是按总字节数付的钱。
+  const recorded = state.journal.getNode(state.runId, siteId, ordinal, { withResult: false });
   if (recorded !== undefined) {
     if (recorded.inputHash !== hash) {
       state.failRun(hashMismatch(instance, recorded.inputHash, hash));
@@ -141,7 +144,12 @@ function probeReportItem(
   return serialized;
 }
 
-/** report 的两个上限（条数、单条字节数）。任一超出即 failRun 并返回 false。 */
+/**
+ * report 的三个上限（单条字节数、条数、run 级字节总数）。任一超出即 failRun 并返回 false。
+ *
+ * 顺序按「错在哪一条」：单条过大是这一条 item 的问题，与 run 攒了多少无关，所以先判；两个
+ * run 级上限在后，且都在计数之前——被拒的那条不进计数，失败信息里的数字才是真的。
+ */
 function reserveReport(state: EngineState, instance: InstanceRef, serialized: string): boolean {
   const bytes = utf8ByteLength(serialized);
   if (bytes > REPORT_CAPS.maxItemSerializedBytes) {
@@ -154,7 +162,8 @@ function reserveReport(state: EngineState, instance: InstanceRef, serialized: st
     );
     return false;
   }
-  if (state.reportCount() >= REPORT_CAPS.maxItemsPerRun) {
+  const tally = state.reportTally();
+  if (tally.count >= REPORT_CAPS.maxItemsPerRun) {
     state.failRun(
       new WorkflowError(
         "ReportCapExceeded",
@@ -164,7 +173,18 @@ function reserveReport(state: EngineState, instance: InstanceRef, serialized: st
     );
     return false;
   }
-  state.countReport();
+  if (tally.bytes + bytes > REPORT_CAPS.maxBytesPerRun) {
+    state.failRun(
+      new WorkflowError(
+        "ReportCapExceeded",
+        `report() item at ${refToString(instance)} would take this run's reports to ` +
+          `${tally.bytes + bytes} bytes, over the ${REPORT_CAPS.maxBytesPerRun}-byte limit per run. ` +
+          `Report summaries, and publish large results with artifact.file.`,
+      ),
+    );
+    return false;
+  }
+  state.countReport(bytes);
   return true;
 }
 

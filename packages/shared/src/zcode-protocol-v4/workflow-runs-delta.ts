@@ -14,7 +14,7 @@
 //      diff 的第一道闸是引用比较，深比较只发生在真正动过的那条 run 上。
 //   3. 正确性绝不依赖引用：引用相等只是快路径，不等时一律退回结构比较。
 //
-// 契约：对任意一对 reducer 产出的 (prior, next)，
+// 契约（被 property 测试钉住）：对任意一对 reducer 产出的 (prior, next)，
 // `JSON.stringify(applyAll(带 prior 的快照, diff(prior, next)).workflowRuns) === JSON.stringify(next)`
 // ——**逐字节**，不只是深相等。键序因此是本模块的一等公民，见 {@link canonicalWorkflowRun}。
 
@@ -42,7 +42,7 @@ import {
  * 重建 run 时没有那段历史。两边各自按这张表重排一次，序就对齐了——这也是为什么 reducer 的
  * 出口同样要走一遍本函数（那是一处，不是两处）。
  *
- * 键序从 schema 派生，避免独立维护字段表导致生产者和消费者使用不同的 run 结构。
+ * 从 schema 派生而不是手抄：手抄一份 run 字段表曾经酿成过事故（见 delta.ts 的 header 注释）。
  */
 const WORKFLOW_RUN_KEYS = Object.keys(workflowRunSchema.shape) as (keyof WorkflowRunState)[];
 const WORKFLOW_RUN_KEY_SET: ReadonlySet<string> = new Set<string>(WORKFLOW_RUN_KEYS);
@@ -412,7 +412,8 @@ function upsertWorkflowRunEntries<T extends { siteId: string; ordinal: number }>
  * 每次淘汰都让出一个位子，一个够宽的 flush 窗口里被删掉的不同键因此可以多于 1024 条。
  * 淘汰之前这不可能：表只增不减，一世之内被碰过的不同键最多就是表界那么多。
  *
- * 超界载荷会让整个 patch 解析失败、整帧被丢；publisher 的两道限制（500 op / 1 MiB）在这个
+ * 超界的载荷不会被剥掉一个键，它让整个 patch 解析失败、整帧被丢、那条订阅从此静默
+ * （workflow-runs.ts 记的那次事故的形状），而 publisher 的两道兜底（500 op / 1 MiB）在这个
  * 量级上都不会响。四张表都查是因为这道闸很便宜，而且不该依赖上面那条论证一直成立。
  *
  * 合并是**优化**，所以拒绝合并永远是安全的：两条 op 各自都在界内，逐条投递的终态一个字节都不差。
@@ -430,8 +431,8 @@ export function workflowRunUpdateWithinWireBounds(
 }
 
 /**
- * 条目表的容量上限，默认使用 {@link WORKFLOW_RUNS_LIMITS}。
- * 增量应用和合并必须使用一致的上限。
+ * 条目表的线上界。只为测试留的注入口（默认就是 {@link WORKFLOW_RUNS_LIMITS}）：真界是 1024，
+ * 而「合并被拒」这条路径在小界下才走得到，property 测试需要它真的被走到。
  */
 export interface WorkflowRunWireBounds {
   readonly maxActors: number;

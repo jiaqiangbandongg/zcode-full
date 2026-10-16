@@ -76,9 +76,7 @@ export function getToolCallErrorText(
   }
 
   const rawOutput = isRecord(toolCall.raw.rawOutput) ? toolCall.raw.rawOutput : null;
-  const rawOutputError = rawOutput
-    ? readFirstStringField(rawOutput, ["error", "message"])
-    : undefined;
+  const rawOutputError = rawOutput ? readFirstStringField(rawOutput, ["error", "message"]) : undefined;
   if (rawOutputError) {
     return rawOutputError;
   }
@@ -87,6 +85,16 @@ export function getToolCallErrorText(
   const taggedRawOutputError = readTaggedToolErrorText(toolCall.raw.rawOutput);
   if (taggedRawOutputError) {
     return taggedRawOutputError;
+  }
+
+  if (rawStatus === "failed") {
+    const rawOutputText = readNonEmptyString(toolCall.raw.rawOutput);
+    if (rawOutputText) {
+      // Bugfix: Write 失败时错误可能被包在 rawOutput 字符串里，
+      // 顶层 tool status 却可能仍然是 completed。这里优先按 raw.status 识别失败，
+      // 避免 edit/write 卡片拿不到真正的错误原因。
+      return normalizeWrappedErrorText(rawOutputText);
+    }
   }
 
   if (toolCall.status === "failed" || rawStatus === "failed") {

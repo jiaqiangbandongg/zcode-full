@@ -57,54 +57,54 @@ See `scripts/terminal-clear.tsx` for this example.
 
 ### `<Terminal />`
 
-| Prop          | Type         | Default | Description                                      |
-| ------------- | ------------ | ------- | ------------------------------------------------ |
-| `output`      | `string`     | -       | Terminal output text (supports ANSI codes).      |
-| `isStreaming` | `boolean`    | `false` | Show streaming indicator.                        |
-| `autoScroll`  | `boolean`    | `true`  | Auto-scroll to bottom on new output.             |
-| `onClear`     | `() => void` | -       | Callback to clear output (enables clear button). |
-| `className`   | `string`     | -       | Additional CSS classes.                          |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `output` | `string` | - | Terminal output text (supports ANSI codes). |
+| `isStreaming` | `boolean` | `false` | Show streaming indicator. |
+| `autoScroll` | `boolean` | `true` | Auto-scroll to bottom on new output. |
+| `onClear` | `() => void` | - | Callback to clear output (enables clear button). |
+| `className` | `string` | - | Additional CSS classes. |
 
 ### `<TerminalCopyButton />`
 
-| Prop      | Type                     | Default | Description                         |
-| --------- | ------------------------ | ------- | ----------------------------------- |
-| `onCopy`  | `() => void`             | -       | Callback after successful copy.     |
-| `onError` | `(error: Error) => void` | -       | Callback if copying fails.          |
-| `timeout` | `number`                 | `2000`  | Duration to show copied state (ms). |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `onCopy` | `() => void` | - | Callback after successful copy. |
+| `onError` | `(error: Error) => void` | - | Callback if copying fails. |
+| `timeout` | `number` | `2000` | Duration to show copied state (ms). |
 
 ### `<TerminalHeader />`
 
-| Prop       | Type                                   | Default | Description                                    |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the div element. |
 
 ### `<TerminalTitle />`
 
-| Prop       | Type                                   | Default | Description                                    |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the div element. |
 
 ### `<TerminalStatus />`
 
-| Prop       | Type                                   | Default | Description                                    |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the div element. |
 
 ### `<TerminalActions />`
 
-| Prop       | Type                                   | Default | Description                                    |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the div element. |
 
 ### `<TerminalClearButton />`
 
-| Prop       | Type                                  | Default | Description                                         |
-| ---------- | ------------------------------------- | ------- | --------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof Button>` | -       | Any other props are spread to the Button component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof Button>` | - | Any other props are spread to the Button component. |
 
 ### `<TerminalContent />`
 
-| Prop       | Type                                   | Default | Description                                    |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the div element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the div element. |

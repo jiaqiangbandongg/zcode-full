@@ -1,0 +1,15 @@
+ask ask#1 "审阅者" @6:37 order=0 type="string"
+actor actor#1 "审阅者" @6:24 order=1
+hole hole#cd7e8315 "评判" @7:14 order=2 type="Verdict" tail
+fact ask-actor ask#1 <- actor#1 exact
+fact hole-data hole#cd7e8315 <- ask#1 exact
+fact return <- hole#cd7e8315 exact
+region seq#1 seq entered
+spawn actor#1 in=seq#1
+issue ask#1 in=seq#1 phase=unphased
+settle ask#1 in=seq#1
+issue hole#cd7e8315 in=seq#1 phase=unphased
+mark hole#cd7e8315 in=seq#1
+settle hole#cd7e8315 in=seq#1
+jump return seq#1 in=seq#1 phase=unphased
+phase hole#cd7e8315 "评判" @7:14

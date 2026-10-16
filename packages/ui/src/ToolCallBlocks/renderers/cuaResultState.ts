@@ -86,7 +86,15 @@ export function readCuaResultBundleId(
   return readText(resultApp, "bundle_id") ?? readText(resultApp, "bundleId");
 }
 
-function readCuaInputApp(input: unknown): Record<string, unknown> | null {
+export function readCuaResultAppBundlePath(
+  toolCall: ToolCallBlockRenderContext["toolCallNode"]["toolCall"],
+): string | null {
+  const result = readCuaResultState(toolCall);
+  const resultApp = asRecord(result?.app) ?? asRecord(result?.owner) ?? result;
+  return readText(resultApp, "app_bundle_path") ?? readText(resultApp, "appBundlePath");
+}
+
+export function readCuaInputApp(input: unknown): Record<string, unknown> | null {
   const inputRecord = asRecord(input);
   return parseRecord(inputRecord?.app) ?? parseRecord(inputRecord?.app_ref);
 }

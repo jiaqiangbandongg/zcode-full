@@ -1,0 +1,688 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-cross-product",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-cross-product.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-tool-cross-product-read-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Read 工具，验证 completed 工具历史与 compact/fork/goal 的交互。"
+      },
+      "description": "Conversation tool cross product: Read tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_READ"],
+        "lastUserMessageExcludes": [
+          "E2E_TOOL_CROSS_PRODUCT_READ_SESSION_CONTEXT"
+        ],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_READ"],
+        "bodyExcludes": [
+          "E2E_TOOL_CROSS_PRODUCT_READ_SESSION_CONTEXT",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_read",
+          "name": "Read",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-cross-product/read-fixture.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-write-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Write 工具，验证写文件工具历史不会污染默认工作区。"
+      },
+      "description": "Conversation tool cross product: Write tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_WRITE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_WRITE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_write",
+          "name": "Write",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-cross-product/write-output.txt",
+            "content": "E2E_TOOL_RESULT_WRITE\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-edit-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Edit 工具，覆盖可写工具的 completed 历史入口。"
+      },
+      "description": "Conversation tool cross product: Edit tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_EDIT"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_EDIT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_edit",
+          "name": "Edit",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-tool-cross-product/edit-output.txt",
+            "old_string": "",
+            "new_string": "E2E_TOOL_RESULT_EDIT\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-bash-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Bash 工具，避免真实模型命令选择影响工具叉乘稳定性。"
+      },
+      "description": "Conversation tool cross product: Bash tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_BASH"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_BASH"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_bash",
+          "name": "Bash",
+          "input": {
+            "command": "printf 'E2E_TOOL_RESULT_BASH\\n'"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-glob-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Glob 工具，覆盖文件搜索工具的 completed 历史入口。"
+      },
+      "description": "Conversation tool cross product: Glob tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_GLOB"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_GLOB"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_glob",
+          "name": "Glob",
+          "input": {
+            "path": "{{e2eRuntimeRoot}}/conversation-session-tool-cross-product",
+            "pattern": "*.e2e"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-grep-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Grep 工具，覆盖内容搜索工具的 completed 历史入口。"
+      },
+      "description": "Conversation tool cross product: Grep tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_GREP"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_GREP"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_grep",
+          "name": "Grep",
+          "input": {
+            "path": "{{e2eRuntimeRoot}}/conversation-session-tool-cross-product",
+            "pattern": "E2E_TOOL_RESULT_GREP",
+            "output_mode": "content"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-webfetch-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 WebFetch 的可预期失败路径，覆盖外部请求工具历史。"
+      },
+      "description": "Conversation tool cross product: WebFetch controlled fast-fail tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_WEBFETCH"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_WEBFETCH"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_webfetch",
+          "name": "WebFetch",
+          "input": {
+            "url": "http://127.0.0.1:9/zcode-e2e-tool-cross-product",
+            "prompt": "Return E2E_TOOL_RESULT_WEBFETCH"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-todo-read-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 TodoRead 工具；空结果没有稳定可见卡片时，以 provider-visible 结构化工具历史证明保留。"
+      },
+      "description": "Conversation tool cross product: TodoRead tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_TODO_READ"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_TODO_READ"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_todo_read",
+          "name": "TodoRead",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-todo-write-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 TodoWrite 工具，覆盖 todo 状态写入后的工具历史。"
+      },
+      "description": "Conversation tool cross product: TodoWrite tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_TODO_WRITE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_TODO_WRITE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_todo_write",
+          "name": "TodoWrite",
+          "input": {
+            "todos": [
+              {
+                "content": "E2E_TOOL_RESULT_TODO_WRITE",
+                "status": "completed",
+                "priority": "low"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-goal-read-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 GoalRead 工具，覆盖目标读取工具历史。"
+      },
+      "description": "Conversation tool cross product: GoalRead tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_GOAL_READ"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_GOAL_READ"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_goal_read",
+          "name": "GoalRead",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-enter-plan-mode-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 EnterPlanMode 工具；V4 隐藏内部模式切换行时，以 provider-visible 结构化工具历史证明保留，并在 goal 前切回 Full access。"
+      },
+      "description": "Conversation tool cross product: EnterPlanMode tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_ENTER_PLAN_MODE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_ENTER_PLAN_MODE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_enter_plan_mode",
+          "name": "EnterPlanMode",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-exit-plan-mode-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 ExitPlanMode 工具，覆盖计划模式退出后的工具历史。"
+      },
+      "description": "Conversation tool cross product: ExitPlanMode fast-fail tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_EXIT_PLAN_MODE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_EXIT_PLAN_MODE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_exit_plan_mode",
+          "name": "ExitPlanMode",
+          "input": {
+            "plan": "E2E_TOOL_RESULT_EXIT_PLAN_MODE"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-ask-user-question-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 AskUserQuestion 工具，覆盖用户问询阻塞与自动选择路径。"
+      },
+      "description": "Conversation tool cross product: AskUserQuestion tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_e2e_tool_cross_product_ask_user_question"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_ask_user_question",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION: choose an answer?",
+                "header": "E2E",
+                "options": [
+                  {
+                    "label": "Use default",
+                    "description": "Continue the e2e run with the default answer."
+                  },
+                  {
+                    "label": "Use fallback",
+                    "description": "Continue the e2e run with the fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-read-session-context-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 ReadSessionContext 的可预期失败路径，覆盖会话读取工具历史。"
+      },
+      "description": "Conversation tool cross product: ReadSessionContext tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_TOOL_CROSS_PRODUCT_READ_SESSION_CONTEXT"
+        ],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_READ_SESSION_CONTEXT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_read_session_context",
+          "name": "ReadSessionContext",
+          "input": {
+            "sessionId": "sess_e2e_missing_tool_cross_product",
+            "query": "E2E_TOOL_RESULT_READ_SESSION_CONTEXT",
+            "strategy": "relevant"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-send-message-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 SendMessage 的可预期失败路径，覆盖跨 agent 消息工具历史。"
+      },
+      "description": "Conversation tool cross product: SendMessage conditional tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_SEND_MESSAGE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_SEND_MESSAGE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_sendmessage",
+          "name": "SendMessage",
+          "input": {
+            "to": "agent_e2e_missing_tool_cross_product",
+            "summary": "E2E_TOOL_RESULT_SEND_MESSAGE",
+            "message": "E2E_TOOL_RESULT_SEND_MESSAGE"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-agent-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Agent 的可预期失败路径，覆盖子 agent 工具历史。"
+      },
+      "description": "Conversation tool cross product: Agent fast-fail tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_AGENT"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_AGENT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_agent",
+          "name": "Agent",
+          "input": {
+            "description": "E2E fast fail",
+            "prompt": "E2E_TOOL_RESULT_AGENT",
+            "subagent_type": "Missing"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-skill-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Skill 的可预期失败路径，覆盖技能工具历史。"
+      },
+      "description": "Conversation tool cross product: Skill fast-fail tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_SKILL"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_SKILL"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_skill",
+          "name": "Skill",
+          "input": {
+            "skill": "zcode-e2e-missing-skill"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-workflow-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Workflow 的可预期失败路径，覆盖 workflow 工具历史。"
+      },
+      "description": "Conversation tool cross product: Workflow fast-fail tool_use.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_WORKFLOW"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_WORKFLOW"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_workflow",
+          "name": "Workflow",
+          "input": {}
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-fork-probe-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "隐藏工具行和空结果工具在 fork child 中通过 provider-visible continuation 的配对 tool_use/tool_result 证明历史已复制；child toolCallId 按 stable fork 合同重映射。"
+      },
+      "description": "Conversation tool cross product: fork child history probe.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_FORK_PROBE"],
+        "bodyIncludes": [
+          "E2E_TOOL_CROSS_PRODUCT_FORK_PROBE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-compact-success",
+      "metadata": {
+        "kind": "compact",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定响应 TX 显式触发的 manual compact，避免缺失 replay fixture 进入 provider retry。"
+      },
+      "description": "Conversation tool cross product: summarize an explicitly requested manual compact after a completed tool turn.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_TOOL_CROSS_PRODUCT",
+          "toolu_e2e_tool_cross_product",
+          "\"stream\":true"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-tool-cross-product-compact-success",
+          "inputTokens": 256,
+          "outputTokens": 48,
+          "text": "<analysis>Summarized the completed tool turn.</analysis>\n\n<summary>E2E_TOOL_CROSS_PRODUCT completed a tool call and returned upstream-e2e-ok before the user requested manual compact.</summary>"
+        }
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-tool-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "工具结果回填后稳定结束当前轮，真实 provider 文案不影响工具历史断言。"
+      },
+      "description": "Conversation tool cross product: final text after any tool_result.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_TOOL_CROSS_PRODUCT",
+          "toolu_e2e_tool_cross_product"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_TOOL_CROSS_PRODUCT_GOAL_OBJECTIVE"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    },
+    {
+      "id": "upstream-tool-cross-product-goal-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "goal continuation 只需稳定完成，真实 provider 文案不影响目标状态断言。"
+      },
+      "description": "Conversation tool cross product: final text for goal continuation.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TOOL_CROSS_PRODUCT_GOAL_OBJECTIVE"],
+        "bodyIncludes": ["E2E_TOOL_CROSS_PRODUCT_GOAL_OBJECTIVE"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

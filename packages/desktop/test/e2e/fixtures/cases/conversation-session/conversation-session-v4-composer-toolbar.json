@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-composer-toolbar",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-composer-toolbar.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-composer-toolbar.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "~/.zcode/commands/e2e-draft-catalog.md",
+      "source": "created-by-spec",
+      "description": "S02/S03 在隔离 E2E HOME 写入真实 user-scope 自定义命令，用于验证 completed task → draft 的独立水合，以及 draft → 已知 completed task 的 workspace 目录保留。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "v4-composer-toolbar-title",
+      "description": "E2E_V4_COMPOSER_TOOLBAR_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_COMPOSER_TOOLBAR_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-composer-toolbar-seed",
+      "description": "M5 composer 工具条门禁：首轮固定回复，建立可切模型/模式的 session（usage 投影随 ModelComplete 写入）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "工具条切换只需一个已存在 session；首轮文案固定。"
+    }
+  ]
+}

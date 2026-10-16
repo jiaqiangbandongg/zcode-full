@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-PS-01",
+  "classification": "synthetic",
+  "syntheticReason": "需要控制同一个任务的 IM、desktop、mobile 轮次终态，并在禁用后注入迟到事件，证明持续订阅和目标隔离而不依赖真实 IM 网络。",
+  "timing": "controlled-stream",
+  "promptMarker": "E2E_BOT_PRIVATE_SYNC"
+}

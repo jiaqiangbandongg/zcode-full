@@ -1,0 +1,672 @@
+{
+  "title": "ZCode 本地发送 TTFT",
+  "uid": "zcode-local-ttft-v1",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "ARMS Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "total_metric",
+        "type": "textbox",
+        "query": "zcode_local_ttft_duration",
+        "current": {
+          "text": "zcode_local_ttft_duration",
+          "value": "zcode_local_ttft_duration"
+        }
+      },
+      {
+        "name": "stage_metric",
+        "type": "textbox",
+        "query": "zcode_local_ttft_stage_duration",
+        "current": {
+          "text": "zcode_local_ttft_stage_duration",
+          "value": "zcode_local_ttft_stage_duration"
+        }
+      },
+      {
+        "name": "provider",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "model",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "app_version",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "os",
+        "type": "textbox",
+        "query": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "visibility",
+        "type": "custom",
+        "query": "foreground,background_returned,background",
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "foreground",
+          "value": "foreground"
+        }
+      },
+      {
+        "name": "send_mode",
+        "type": "custom",
+        "query": "idle,queued",
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "点击到首有效输出 P50/P95 (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le) (sum_over_time(${total_metric}_bucket{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[5m])))",
+          "legendFormat": "P50 {{stage}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (sum_over_time(${total_metric}_bucket{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[5m])))",
+          "legendFormat": "P95 {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "六主阶段 P50/P95 (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le,stage) (sum_over_time(${stage_metric}_bucket{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[5m])))",
+          "legendFormat": "P50 {{stage}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le,stage) (sum_over_time(${stage_metric}_bucket{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[5m])))",
+          "legendFormat": "P95 {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "主 TTFT 样本数",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum (sum_over_time(${total_metric}_count{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "各阶段样本数",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (stage) (sum_over_time(${stage_metric}_count{provider=~\"$provider\",model=~\"$model\",app_version=~\"$app_version\",os=~\"$os\",quality=\"complete\",visibility=~\"$visibility\",send_mode=~\"$send_mode\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "分桶精度与单消息关联",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 6
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "单位 ms；分桶边界：1,5,10,20,50,100,200,500,1000,2000,5000,10000,30000,60000,300000。P50/P95 是桶内插值；须同时读取样本数，不相加分位数。\n\n在 ARMS Trace Explorer 选择 service.name=zcode-local-ttft，按 observation_id 精确过滤，展开 local_ttft 及六阶段。trace ID 为 observation UUID 去掉连字符。Trace 数据源跳转地址需在目标租户验证后配置；当前未通过平台验收。"
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "准备子阶段 P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,stage) (sum_over_time(zcode_local_ttft_preparation_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P50 {{stage}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,stage) (sum_over_time(zcode_local_ttft_preparation_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P95 {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "准备子阶段 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 29,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (stage) (sum_over_time(zcode_local_ttft_preparation_duration_count{quality=\"complete\",visibility=\"foreground\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "开始执行后 TTFT P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,send_mode) (sum_over_time(zcode_local_ttft_execution_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P50 {{send_mode}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,send_mode) (sum_over_time(zcode_local_ttft_execution_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P95 {{send_mode}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "开始执行后 TTFT 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 36,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (send_mode) (sum_over_time(zcode_local_ttft_execution_duration_count{quality=\"complete\",visibility=\"foreground\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "扣除确认等待的 TTFT P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,send_mode) (sum_over_time(zcode_local_ttft_system_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P50 {{send_mode}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,send_mode) (sum_over_time(zcode_local_ttft_system_duration_bucket{quality=\"complete\",visibility=\"foreground\"}[5m])))",
+          "legendFormat": "P95 {{send_mode}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "扣除确认等待的 TTFT 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 43,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (send_mode) (sum_over_time(zcode_local_ttft_system_duration_count{quality=\"complete\",visibility=\"foreground\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "无首输出等待（明确结果） P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,outcome) (sum_over_time(zcode_local_ttft_no_output_wait_bucket[5m])))",
+          "legendFormat": "P50 {{outcome}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,outcome) (sum_over_time(zcode_local_ttft_no_output_wait_bucket[5m])))",
+          "legendFormat": "P95 {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "无首输出等待（明确结果） 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 50,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (sum_over_time(zcode_local_ttft_no_output_wait_count[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "物理 attempt（含准备） P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,role,outcome) (sum_over_time(zcode_local_ttft_attempt_duration_bucket[5m])))",
+          "legendFormat": "P50 {{role}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,role,outcome) (sum_over_time(zcode_local_ttft_attempt_duration_bucket[5m])))",
+          "legendFormat": "P95 {{role}}"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "物理 attempt（含准备） 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 57,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (role,outcome) (sum_over_time(zcode_local_ttft_attempt_duration_count[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "累计准备观察（不代表持续前台） P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,stage) (sum_over_time(zcode_local_ttft_preparation_observation_duration_bucket[5m])))",
+          "legendFormat": "P50 {{stage}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,stage) (sum_over_time(zcode_local_ttft_preparation_observation_duration_bucket[5m])))",
+          "legendFormat": "P95 {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "累计准备观察（不代表持续前台） 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 64,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (stage) (sum_over_time(zcode_local_ttft_preparation_observation_duration_count[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "诊断：前后台与质量 P50 / P95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 71,
+        "w": 16,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "targets": [
+        {
+          "refId": "P50",
+          "expr": "histogram_quantile(0.5, sum by (le,visibility,quality) (sum_over_time(zcode_local_ttft_duration_bucket[5m])))",
+          "legendFormat": "P50 {{visibility}}"
+        },
+        {
+          "refId": "P95",
+          "expr": "histogram_quantile(0.95, sum by (le,visibility,quality) (sum_over_time(zcode_local_ttft_duration_bucket[5m])))",
+          "legendFormat": "P95 {{visibility}}"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "诊断：前后台与质量 样本数",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 71,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (visibility,quality) (sum_over_time(zcode_local_ttft_duration_count[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "输入结果数量",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 78,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind,outcome) (sum_over_time(zcode_local_ttft_records{kind=~\"start|first_output|excluded\"}[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "首输出前结果比例",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 83,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (sum_over_time(zcode_local_ttft_records{kind=\"excluded\",outcome=~\"failed|cancelled|rejected|interrupted\"}[$__range])) / scalar(sum(sum_over_time(zcode_local_ttft_records{kind=\"start\"}[$__range])))"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "遥测资源丢弃",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (sum_over_time(zcode_local_ttft_dropped[$__range]))"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "text",
+      "title": "未收口与瀑布诊断",
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 24,
+        "h": 6
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "在 Trace Explorer 按 observation_id 关联 start、checkpoint 与 first_output/明确 excluded。只存在开始或部分阶段时标未收口，不能因查询窗口推断超时；跨窗口的开始/结果比例需按同批 observation join。阶段 .started 是开始点，不是零耗时成功。并行阶段按区间并集对账，检查 missing_stages、unattributed_ms、truncated 与 clock_source。\n\n主 TTFT=输入；stage/preparation=区间；attempt=物理请求。observation 系列是阶段观察当时的前后台状态，不用于默认持续前台体验。指标映射、瀑布链接、平台容量/费用/7天与30天保留仍待 ARMS 核验。"
+      }
+    }
+  ]
+}

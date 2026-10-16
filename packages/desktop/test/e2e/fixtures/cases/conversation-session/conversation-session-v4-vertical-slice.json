@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-vertical-slice",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-vertical-slice.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-vertical-slice.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-vertical-slice-title",
+      "description": "E2E_V4_SLICE_TURN1 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_SLICE_TURN1 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-slice-turn1-controlled-stream",
+      "description": "M3 竖切门禁 turn1：可控慢流，制造「agent 输出中刷新」窗口（首 delta 0.5s，完流 12s）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "刷新恢复断言需要稳定的 streaming 窗口；真实 provider 完流时间不可控。"
+    },
+    {
+      "id": "v4-slice-turn2-controlled-stream",
+      "description": "M3 竖切门禁 turn2：长尾慢流（45s 才完流），留出点 stop 的窗口；stop 后客户端 abort。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "stop 断言需要 running 窗口远大于点击耗时，避免时序抖动误报。"
+    }
+  ]
+}

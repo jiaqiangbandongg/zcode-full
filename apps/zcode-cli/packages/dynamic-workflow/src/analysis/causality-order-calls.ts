@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { callbackSemanticsOf, DEFAULT_CALLBACK_SEMANTICS } from "./callbacks.js";
+import type { HoleSite } from "./sites.js";
 import {
   functionName,
   resolveCallDeclaration,
@@ -77,6 +78,11 @@ export function walkCall(
     issue(state, ask, chain);
     return;
   }
+  const hole = state.holeByCall.get(node);
+  if (hole !== undefined) {
+    walkHole(state, node, hole, chain);
+    return;
+  }
   const read = state.readByCall.get(node);
   if (read !== undefined) {
     issue(state, read, chain);
@@ -84,7 +90,7 @@ export function walkCall(
   }
   const actor = state.actorByCall.get(node);
   if (actor !== undefined) {
-    state.events.push({ actor, at: "actor", regions: chain });
+    state.events.push({ actor, at: "actor", phase: state.currentPhase, regions: chain });
     return;
   }
   applyAt(state, node, chain, handled, receiverIssues);
@@ -177,6 +183,65 @@ export function applyAt(
     const arm = openRegion(state, "branch", choice, { entered: false, loc: locOf(state, fn) });
     inlineBody(state, fn, [...chain, choice, arm], node, options);
   }
+}
+
+/**
+ * 留白在时序走查里的样子（docs/analysis.md「Sites」的 Hole sites 段）。
+ *
+ * **开放的留白是一步，也是一个阶段。** 一步：`issue` 一次，落在它**所站的**阶段里（当前阶段），
+ * 于是 await 屏障、settle、控制依赖对它与对 ask 一视同仁。一个阶段：id 就是站点 id、名字是
+ * 字面量，**没有成员**——它只是一个站，轨道要在 run 之前就画出来。为了让它出现在控制流投影
+ * 的阶段表上并接上前后的边，走查在 issue 之后发一条 `mark`：先 issue 再 mark，于是商图里
+ * 是「所站阶段 → 留白 → 下一阶段」而不是一次回到所站阶段的往返。
+ *
+ * **已补全的留白不是一步，只是一个阶段。** 它的阶段认领函数体里第一个标记之前的站点；体内
+ * 的标记是站在它之后的阶段，各自带 `fill` 指回这个留白；留白自己的阶段带的 `fill` 是**包着
+ * 它的**留白（顶层没有）——嵌套关系只记在这里，id 里没有（hole-id.ts）。
+ *
+ * 它的阶段还有一个 mark 节点，与开放的留白一样。修复原因：2026-09-28 之前已补全的留白没有
+ * mark，函数体以 `phase()` 开头时留白自己的阶段没有成员，控制流投影就把它丢了——接龙的每一步
+ * 名字因此从阶段表、侧栏与 run 的 `phaseNames` 里消失，只剩时间轴的头还叫得出它。
+ *
+ * 函数体像 `future` 的一样是一个进入过的、once 的、不延迟的回调——taint 解释器把它记成调用点
+ * 上的 `argument` 应用，这里照神谕内联；它是 async 的，所以是一条 strand，外面的 `await` 在
+ * 屏障处 join 它。
+ */
+function walkHole(
+  state: TraceState,
+  node: ts.CallExpression,
+  site: HoleSite,
+  chain: readonly string[],
+): void {
+  const name = site.name ?? site.id;
+  const enclosing = state.fillStack[state.fillStack.length - 1];
+  if (site.body === undefined) {
+    issue(state, site.id, chain);
+    mintHolePhase(state, site, name, enclosing);
+    state.events.push({ at: "mark", phase: site.id, regions: chain });
+    return;
+  }
+  mintHolePhase(state, site, name, enclosing);
+  state.events.push({ at: "mark", phase: site.id, regions: chain });
+  const outer = state.currentPhase;
+  state.currentPhase = site.id;
+  state.fillStack.push(site.id);
+  for (const fn of applicationsAt(state, node, "argument")) {
+    inlineBody(state, fn, chain, node, { label: name });
+  }
+  state.fillStack.pop();
+  state.currentPhase = outer;
+}
+
+/** 留白的阶段按首次到达铸一次（helper 里的留白每次调用都到达，阶段只有一个）。 */
+function mintHolePhase(
+  state: TraceState,
+  site: HoleSite,
+  name: string,
+  fill: string | undefined,
+): void {
+  if (state.holePhases.has(site.id)) return;
+  state.holePhases.add(site.id);
+  state.phases.push({ id: site.id, loc: site.loc, name, ...(fill === undefined ? {} : { fill }) });
 }
 
 /** What a call site can say about the body it inlines, beyond where it sits. */

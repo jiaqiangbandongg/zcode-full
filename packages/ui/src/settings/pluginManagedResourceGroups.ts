@@ -13,7 +13,7 @@ import type {
 import { isPluginCommand, isUserCommand, ZCODE_COMMAND_AGENT_SOURCE } from "@zcode/shared";
 import type { PluginComponentDisplayGroup } from "@/settings/PluginComponentGroups.js";
 
-interface ResourceGroups<TLocal, TPlugin> {
+export interface ResourceGroups<TLocal, TPlugin> {
   local: TLocal[];
   plugin: TPlugin[];
 }
@@ -98,7 +98,7 @@ export interface PluginMcpServerItem {
   toolCount?: number;
 }
 
-interface PluginMcpServerGroup {
+export interface PluginMcpServerGroup {
   items: PluginMcpServerItem[];
   pluginId: string;
   pluginName: string;

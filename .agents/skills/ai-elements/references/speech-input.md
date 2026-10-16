@@ -38,12 +38,12 @@ npx ai-elements@latest add speech-input
 
 The component extends the shadcn/ui Button component, so all Button props are available.
 
-| Prop                    | Type                                   | Default | Description                                                                                                                                                                                |
-| ----------------------- | -------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `onTranscriptionChange` | `(text: string) => void`               | -       | Callback fired when final transcription text is available. Only fires for completed phrases, not interim results.                                                                          |
-| `onAudioRecorded`       | `(audioBlob: Blob) => Promise<string>` | -       | Callback for MediaRecorder fallback. Required for Firefox/Safari support. Receives recorded audio blob and should return transcribed text from an external service (e.g., OpenAI Whisper). |
-| `lang`                  | `string`                               | -       | Language for speech recognition.                                                                                                                                                           |
-| `...props`              | `React.ComponentProps<typeof Button>`  | -       | Any other props are spread to the Button component, including variant, size, disabled, etc.                                                                                                |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `onTranscriptionChange` | `(text: string) => void` | - | Callback fired when final transcription text is available. Only fires for completed phrases, not interim results. |
+| `onAudioRecorded` | `(audioBlob: Blob) => Promise<string>` | - | Callback for MediaRecorder fallback. Required for Firefox/Safari support. Receives recorded audio blob and should return transcribed text from an external service (e.g., OpenAI Whisper). |
+| `lang` | `string` | - | Language for speech recognition. |
+| `...props` | `React.ComponentProps<typeof Button>` | - | Any other props are spread to the Button component, including variant, size, disabled, etc. |
 
 ## Behavior
 
@@ -125,13 +125,16 @@ const handleAudioRecorded = async (audioBlob: Blob): Promise<string> => {
   formData.append("file", audioBlob, "audio.webm");
   formData.append("model", "whisper-1");
 
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: formData,
-  });
+  const response = await fetch(
+    "https://api.openai.com/v1/audio/transcriptions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: formData,
+    }
+  );
 
   const data = await response.json();
   return data.text;

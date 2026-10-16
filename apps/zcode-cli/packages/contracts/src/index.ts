@@ -8,6 +8,7 @@ export * from "./interfaces/execution.port.js";
 export * from "./interfaces/browser-control.port.js";
 export * from "./interfaces/file-system.port.js";
 export * from "./interfaces/context-source.port.js";
+export * from "./interfaces/provider-endpoint-routing.port.js";
 export * from "./interfaces/http-client.port.js";
 export * from "./interfaces/image-processor.port.js";
 export * from "./interfaces/pdf-document.port.js";
@@ -27,6 +28,7 @@ export * from "./interfaces/dynamic-workflow-snippet.port.js";
 export * from "./interfaces/model-catalog.port.js";
 export * from "./interfaces/automation.port.js";
 export * from "./interfaces/off-peak.port.js";
+export * from "./interfaces/topic-resource.port.js";
 export * from "./interfaces/mcp.port.js";
 
 export * from "./interfaces/runtime-input-presentation.js";

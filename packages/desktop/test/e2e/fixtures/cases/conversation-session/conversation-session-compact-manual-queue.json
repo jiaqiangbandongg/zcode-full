@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-compact-manual-queue",
+  "spec": "./test/e2e/conversation-session/conversation-session-compact-manual-queue.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-compact-manual-queue.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "prepareConversationE2E 写入的只读工具输入文件，用于构造 compact 前的 tool_result 历史。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-readonly-tool-call",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通用只读 Read tool_use 让 compact 前历史包含稳定 tool_result。"
+    },
+    {
+      "id": "upstream-compact-manual-queue-prep-one",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第一轮只用于形成可 compact 的普通历史，真实 provider 文案不影响 held queue 语义。"
+    },
+    {
+      "id": "upstream-compact-manual-queue-readonly-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二轮只用于构造含 readonly tool_result 的 compact 历史，工具业务由本地文件 fixture 决定。"
+    },
+    {
+      "id": "upstream-compact-manual-queue-summary-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只用于证明 manual compact marker 完成且 held queue 未被消费，不依赖真实 summary 内容。"
+    },
+    {
+      "id": "upstream-compact-manual-queue-held-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "held queue 在 manual compact 前后都必须保留；fixture 只覆盖 marker 合同。"
+    },
+    {
+      "id": "upstream-compact-manual-queue-append-contract",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "manual compact 完成后 queue 仍 held，追加文本应入队而不是触发 provider。"
+    }
+  ]
+}

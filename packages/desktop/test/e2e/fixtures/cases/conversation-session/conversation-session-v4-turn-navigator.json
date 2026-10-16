@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-turn-navigator",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-turn-navigator.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-turn-navigator.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/conversation-session-v4-turn-navigator/tool-secret.txt",
+      "source": "created-by-spec",
+      "description": "spec 写入固定 Read 工具结果，用于断言 turn navigator tooltip 不泄露工具正文。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "v4-turn-navigator-title",
+      "description": "Turn navigator case 内的标题生成固定响应，避免标题请求误命中主流程 fixture。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是 TN case 的产品语义，只需要稳定返回，防止 title 请求阻塞主消息流。"
+    },
+    {
+      "id": "v4-turn-navigator-tool-call",
+      "description": "TN02 第一轮先返回 Read tool_use，形成真实 tool result 历史，用于断言 tooltip 不泄露工具正文。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "TN02 需要真实工具历史，但 navigator 摘要只允许 user + assistant text。"
+    },
+    {
+      "id": "v4-turn-navigator-turn1-final",
+      "description": "TN02 第一轮 Read tool_result 后固定收尾文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "navigator 摘要需要稳定 assistant text excerpt。"
+    },
+    {
+      "id": "v4-turn-navigator-turn2-final",
+      "description": "TN01 第二轮固定长文本，达到 2+ 可导航 turn 后显示 rail。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "TN01/TN03 需要稳定的多轮可滚动历史。"
+    },
+    {
+      "id": "v4-turn-navigator-turn3-final",
+      "description": "TN03 第三轮固定长文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "TN03 需要点击非当前 bar 并滚动到目标 turn。"
+    },
+    {
+      "id": "v4-turn-navigator-turn4-final",
+      "description": "TN03 第四轮固定长文本，让当前视口停在底部后点击前序 bar。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "TN03 需要 4+ turn 构造非当前 bar 跳转。"
+    }
+  ]
+}

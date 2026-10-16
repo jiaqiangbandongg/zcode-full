@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-mixed-media-path-strip",
+  "spec": "./test/e2e/conversation-session/conversation-session-mixed-media-path-strip.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-mixed-media-path-strip.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "mixed-media-path-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题内容不属于媒体 path/strip 合同，只需与主请求隔离。"
+    },
+    {
+      "id": "mixed-media-path-supported",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只稳定收口；E2E 对真实捕获 requestJson 断言 mixed-media block/path 的数量、顺序和 MCS 边界。"
+    },
+    {
+      "id": "mixed-media-path-text-only",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只稳定收口；fixture 与结构化抓包共同要求请求无 media data/block，并保留双 omitted + 双 path。"
+    }
+  ]
+}

@@ -19,10 +19,10 @@ import { RemoteMcpSyncDialog } from "@/settings/RemoteMcpSyncDialog.js";
 import { RemotePluginSyncDialog } from "@/settings/RemotePluginSyncDialog.js";
 import { RemoteSkillSyncDialog } from "@/settings/RemoteSkillSyncDialog.js";
 
-type RemoteSyncClientMode = "desktop-continuous" | "web-remote-replayable";
-const REMOTE_SYNC_PREFLIGHT_TIMEOUT_MS = 15_000;
+export type RemoteSyncClientMode = "desktop-continuous" | "web-remote-replayable";
+export const REMOTE_SYNC_PREFLIGHT_TIMEOUT_MS = 15_000;
 
-class RemoteSyncPreflightTimeoutError extends Error {
+export class RemoteSyncPreflightTimeoutError extends Error {
   constructor(readonly timeoutMs: number) {
     super(`Remote sync preflight timed out after ${timeoutMs}ms`);
     this.name = "RemoteSyncPreflightTimeoutError";
@@ -60,13 +60,18 @@ export function shouldStartRemoteSyncOperation(params: {
   return !params.inFlight && params.selectedCount > 0;
 }
 
-export function useRemoteSyncDialogIntent(params: { rpcReady: boolean; targetKey: string }): {
+export function useRemoteSyncDialogIntent(params: {
+  rpcReady: boolean;
+  targetKey: string;
+}): {
   open: boolean;
   setOpen: (open: boolean) => void;
 } {
   const [openedTargetKey, setOpenedTargetKey] = useState<string | null>(null);
   const open =
-    params.rpcReady && params.targetKey.length > 0 && openedTargetKey === params.targetKey;
+    params.rpcReady &&
+    params.targetKey.length > 0 &&
+    openedTargetKey === params.targetKey;
 
   useEffect(() => {
     // 弹窗 open 曾只绑定 PluginList 组件生命周期，远端断连或切换目标时
@@ -82,7 +87,9 @@ export function useRemoteSyncDialogIntent(params: { rpcReady: boolean; targetKey
   const setOpen = useCallback(
     (nextOpen: boolean) => {
       setOpenedTargetKey(
-        nextOpen && params.rpcReady && params.targetKey.length > 0 ? params.targetKey : null,
+        nextOpen && params.rpcReady && params.targetKey.length > 0
+          ? params.targetKey
+          : null,
       );
     },
     [params.rpcReady, params.targetKey],
@@ -191,7 +198,12 @@ export function RemoteSyncDropdownButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="secondary" size="sm" className="gap-1">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="gap-1"
+        >
           <UploadCloud className="size-3.5" aria-hidden="true" />
           {intl.formatMessage({ id: "settings.remoteSync.open" })}
           <ChevronDown className="size-3.5 text-foreground-subtle" aria-hidden="true" />
@@ -270,7 +282,11 @@ export function RemoteSyncDialogs({
   onPluginsSynced?: () => Promise<void> | void;
 }) {
   const skillDialogProps =
-    canSyncSkills && skillOpen && remoteTarget && localSkillSyncService && remoteSkillSyncService
+    canSyncSkills &&
+    skillOpen &&
+    remoteTarget &&
+    localSkillSyncService &&
+    remoteSkillSyncService
       ? {
           localSkillSyncService,
           remoteSkillSyncService,
@@ -278,7 +294,11 @@ export function RemoteSyncDialogs({
         }
       : null;
   const mcpDialogProps =
-    canSyncMcp && mcpOpen && remoteTarget && localMcpSyncService && remoteMcpSyncService
+    canSyncMcp &&
+    mcpOpen &&
+    remoteTarget &&
+    localMcpSyncService &&
+    remoteMcpSyncService
       ? {
           localMcpSyncService,
           remoteMcpSyncService,

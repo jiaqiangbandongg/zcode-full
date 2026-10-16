@@ -1,0 +1,35 @@
+---
+import { readFile } from 'node:fs/promises';
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import type { PostResponse } from '../util/post.js';
+import Post from './Post.astro';
+
+const testimonials: PostResponse = JSON.parse(await readFile('src/assets/testimonials.json', 'utf-8'));
+---
+
+<div class="no-title-cards">
+  <CardGrid stagger>
+    {
+      testimonials.data.map(testimonial => {
+        return (
+          <Card title="">
+          <Post
+            data={{
+              ...testimonial,
+              user: testimonials.includes.users.find(
+                user => user.id === testimonial.author_id
+              ),
+              media: testimonials.includes.media?.filter(media =>
+                testimonial.entities.urls
+                  ?.map(url => url.media_key)
+                  .includes(media.media_key)
+              ),
+            }}
+          />
+        </Card>
+        );
+      })
+    }
+    <CardGrid />
+  </CardGrid>
+</div>

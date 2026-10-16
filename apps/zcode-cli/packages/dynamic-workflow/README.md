@@ -4,6 +4,11 @@ Self-contained library for the dynamic workflow feature: the TypeScript facade t
 main agent writes scripts against, and the compiler that recovers rigor from those
 scripts (typecheck, schema synthesis, dependency inference, site identity).
 
+**Spec / decision record:** `docs/dynamic-workflow.md` in the z-code app repo is the
+entry point. The facade, compiler options and authoring rules are decided in
+`docs/dynamic-workflow/authoring.md`; the analysis and the engine in this package's
+`docs/`. This package implements the spec; amend the spec first when behaviour changes.
+
 ## Boundaries
 
 - This package is **pure**: no session spawning, no storage, no disk or network
@@ -14,11 +19,21 @@ scripts (typecheck, schema synthesis, dependency inference, site identity).
   sibling package `@zcode/dynamic-workflow-runtime` — impure (node builtins) but
   still app-independent. The production driver (actor sessions, SQLite journal,
   tool wiring) lives in `@zcode/bootstrap`, evolving the existing
-  `script-workflow-*` substrate.
+  `script-workflow-*` substrate. Phasing: `docs/execution-engine.md`.
 
 ## Layout
 
 ```
+docs/
+  analysis.md             spec for the static analysis: site table, diagnostics,
+                          the taint fixpoint + temporal walk, and the four graphs
+                          (site, causality, control-flow, hand-off) projected from
+                          the analysis core (supersedes the parent spec's
+                          graph-model/dependency-inference sections)
+  execution-engine.md     spec for the execution engine: lowering + sandbox, host
+                          API, pure engine core / driver port split, ask lifecycle,
+                          journal + resume, terminal states, amend-resume,
+                          escalation, and the fault-matrix test bed
 src/
   facade/dts.ts       facade .d.ts as an embedded string asset (FACADE_DTS) —
                       the single source of truth for the model-facing API
@@ -139,11 +154,34 @@ diagnostics/schemas/graph output, implement until green.
   keeps dev and the bundled/SEA CLI identical: with no fallback to disk, a missing
   lib fails package tests too.
 
-## Site identity
+## Roadmap (step by step)
 
-Sites carry per-kind source-order ordinal ids (`ask#1` etc.), used as display and
-graph coordinates only. Nothing resolves a cached result by position: an ask's
-cache identity is (actor name, per-actor ask sequence) checked against the
-recorded `inputHash`, and a world node's is `{op, args}` content plus occurrence
-index. Structural AST-path hashes would only be needed if world nodes ever
-required a *positional* identity of their own.
+1. ~~Scaffold: facade + virtual-host typecheck~~ (done)
+2. ~~Schema synthesis: JSON Schema from `ask<T>` type arguments + JSDoc harvest,
+   non-serializable rejection diagnostics~~ (done; `src/schema/`)
+3. Site identity: structural AST-path hashes for ask/world-read/join/fan-out
+   sites — deferred; layers onto the existing site table later without changing
+   the graph shape (v1 ships per-kind source-order ordinal ids, `ask#1` etc.).
+   **Its motivation is gone (2026-08-31).** The one thing this step was for was
+   resume-after-edit, and amend-resume shipped that without it: cache identity for
+   an ask is (actor name, per-actor ask sequence) checked against the recorded
+   `inputHash`, and for a world node it is `{op, args}` content plus occurrence
+   index — neither is positional. Site ids stay display/graph coordinates. Step 3
+   survives only if world nodes ever need a *positional* identity of their own;
+   nothing asks for that today. See `docs/execution-engine.md` in the
+   app repo.
+4. ~~Analysis: taint-based may-flow site graph, then the causality, control-flow and
+   hand-off projections~~ (done; `docs/analysis.md` is the whole story).
+5. ~~Journal contracts + replay semantics (pure state machine, in-memory journal,
+   fake driver tests)~~ (done; `src/engine/`; see `docs/execution-engine.md`)
+6. ~~Lowering: type-strip + site-id instrumentation emit step~~ (done; `src/lowering/`)
+7. ~~Sandbox harness in sibling `@zcode/dynamic-workflow-runtime`: child process +
+   vm cell + NDJSON host bridge, end-to-end fixture runs against a fake driver~~
+   (done; outside this package but still app-free)
+8. ~~Real-runtime binding (outside this package): `submit_result` in `@zcode/core` +
+   the `AgentRuntime` driver in `@zcode/bootstrap`~~ (done; `docs/execution-engine.md`,
+   "The driver (Boundary B)")
+9. ~~Storage + app surfaces (outside this package): `dwf_*` SQLite journal passing
+   the contract suite, `CreateWorkflow` submit path, notification/status wiring~~
+   (done; `docs/execution-engine.md` "The journal", `docs/dynamic-workflow/launch.md`,
+   `docs/dynamic-workflow/transcript-and-notifications.md`)

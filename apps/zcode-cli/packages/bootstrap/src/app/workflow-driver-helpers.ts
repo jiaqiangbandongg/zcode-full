@@ -181,7 +181,7 @@ export function rejectWith(message: string): ContractsSubmitVerdict {
  * 的判定压在这个 0 上，关门之后每条缓存条目都会被当成纯的照常命中，恰好放掉关门要防的那一类。计数因此
  * 改由 driver 的工具活动面从**会话事件流**数（那里是工具调用真正现身的地方），按 ask 累加后传进来。
  */
-function statsFromTurn(result: TurnResult, toolCounts: ActorToolCounts): AskStats {
+export function statsFromTurn(result: TurnResult, toolCounts: ActorToolCounts): AskStats {
   const usage = result.usage;
   return {
     tokens: usage?.totalTokens ?? 0,

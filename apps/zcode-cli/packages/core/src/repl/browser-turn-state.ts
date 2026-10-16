@@ -1,6 +1,6 @@
-import type { SessionId, TurnId } from "@zcode/contracts";
+import type { BrowserResponseMeta, SessionId, TurnId } from "@zcode/contracts";
 
-interface BrowserTurnScreenshotCandidate {
+export interface BrowserTurnScreenshotCandidate {
   browserGeneration: number;
   browserId: string;
 }
@@ -22,6 +22,18 @@ function readState(sessionId: SessionId, turnId: TurnId): BrowserTurnState {
   const created: BrowserTurnState = {};
   states.set(key, created);
   return created;
+}
+
+export function recordBrowserTurnPageActivity(input: {
+  meta: BrowserResponseMeta;
+  sessionId: SessionId;
+  turnId?: TurnId;
+}): void {
+  if (!input.turnId || !input.meta.tabId) return;
+  readState(input.sessionId, input.turnId).candidate = {
+    browserGeneration: input.meta.browserGeneration,
+    browserId: input.meta.browserId,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

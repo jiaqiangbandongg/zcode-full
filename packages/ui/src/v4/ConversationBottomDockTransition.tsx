@@ -1,18 +1,18 @@
 import type { ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
-const CONVERSATION_BOTTOM_DOCK_TRANSITION_OFFSET_PX = 32;
-const CONVERSATION_BOTTOM_DOCK_ENTER_SCALE = 0.96;
-const CONVERSATION_BOTTOM_DOCK_EXIT_SCALE = 0.97;
-const CONVERSATION_BOTTOM_DOCK_ENTER_DURATION_SECONDS = 0.26;
-const CONVERSATION_BOTTOM_DOCK_EXIT_DURATION_SECONDS = 0.18;
-const CONVERSATION_BOTTOM_DOCK_TRANSITION_EASING = [0.23, 1, 0.32, 1] as const;
+export const CONVERSATION_BOTTOM_DOCK_TRANSITION_OFFSET_PX = 32;
+export const CONVERSATION_BOTTOM_DOCK_ENTER_SCALE = 0.96;
+export const CONVERSATION_BOTTOM_DOCK_EXIT_SCALE = 0.97;
+export const CONVERSATION_BOTTOM_DOCK_ENTER_DURATION_SECONDS = 0.26;
+export const CONVERSATION_BOTTOM_DOCK_EXIT_DURATION_SECONDS = 0.18;
+export const CONVERSATION_BOTTOM_DOCK_TRANSITION_EASING = [0.23, 1, 0.32, 1] as const;
 
 const CONVERSATION_BOTTOM_DOCK_VISIBLE_TRANSFORM = "translate3d(0, 0, 0) scale(1)";
 const CONVERSATION_BOTTOM_DOCK_ENTER_TRANSFORM = `translate3d(0, ${CONVERSATION_BOTTOM_DOCK_TRANSITION_OFFSET_PX}px, 0) scale(${CONVERSATION_BOTTOM_DOCK_ENTER_SCALE})`;
 const CONVERSATION_BOTTOM_DOCK_EXIT_TRANSFORM = `translate3d(0, ${CONVERSATION_BOTTOM_DOCK_TRANSITION_OFFSET_PX}px, 0) scale(${CONVERSATION_BOTTOM_DOCK_EXIT_SCALE})`;
 
-function resolveConversationBottomDockMotion(prefersReducedMotion: boolean) {
+export function resolveConversationBottomDockMotion(prefersReducedMotion: boolean) {
   if (prefersReducedMotion) {
     return {
       initial: false as const,
@@ -65,7 +65,7 @@ export function ConversationBottomDockTransition({
 
   return (
     <div data-testid="conversation-bottom-dock-transition" className="grid w-full">
-      {/* chat 与确认区高度不同；共享 grid 单元并底部对齐，避免父高度切换时退出层先跳位再动画。*/}
+      {/* Bugfix：chat 与确认区高度不同；共享 grid 单元并底部对齐，避免父高度切换时退出层先跳位再动画。 */}
       <AnimatePresence initial={false} mode="sync">
         <motion.div
           key={mode}

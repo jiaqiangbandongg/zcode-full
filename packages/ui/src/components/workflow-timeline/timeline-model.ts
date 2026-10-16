@@ -8,7 +8,7 @@ import {
   withImplicitPhase,
 } from "@/components/workflow-graph/participant-model.js";
 import { phaseBinder } from "@/components/workflow-graph/instance-phases.js";
-import { phaseNameMatches, type PhaseNaming } from "@/components/workflow-graph/phase-name.js";
+import type { PhaseNaming } from "@/components/workflow-graph/phase-name.js";
 import { phaseMembers } from "@/components/workflow-graph/phase-model.js";
 import { workflowRunOverlay } from "@/components/workflow-graph/run-status.js";
 import {
@@ -18,6 +18,23 @@ import {
   type WorkflowCausalityGraphData,
 } from "@/components/workflow-graph/types.js";
 import { sharedTimelineModel } from "./timeline-cache.js";
+import {
+  isCurrentPhase,
+  phaseStreamIndexes,
+  stageStatuses,
+  stationStatus,
+  streamInk,
+} from "./stage-lamps.js";
+import {
+  holeTable,
+  railTouchesHole,
+  stationFillOf,
+  tailStubOf,
+  timelineHoleGraph,
+  type HoleLabels,
+  type TimelineFill,
+  type TimelineHole,
+} from "./timeline-holes.js";
 import {
   observePhase,
   phaseEntryFor,
@@ -103,6 +120,12 @@ export interface TimelineStation {
   unlisted?: StationUnlisted;
   /** 流式草稿里尚未闭合的最后一站。 */
   typing?: true;
+  /** 这一站是一处留白（`timeline-holes.ts`）：虚线灯、类型徽标；等待时是当前站。 */
+  hole?: TimelineHole;
+  /** 这一站是某次补全写进来的（display 阶段上的 `fill`）：悬停时它所在的补全区域亮起。 */
+  fill?: string;
+  /** 补全行的草稿阶段线里的邻站：只作上下文，40% 墨。 */
+  ghost?: true;
 }
 
 /** 一条轨道上前后相接的两站之间的一段轨道；下标指向 `stations`。 */
@@ -110,8 +133,13 @@ export interface TimelineRail {
   from: number;
   to: number;
   ink: TimelineInk;
-  /** 缺席 = 一条轨道上的普通段；带的两端是 `fork` / `merge`，带内跨轨道的相邻两站是 `twin`。 */
+  /**
+   * 缺席 = 一条轨道上的普通段；带的两端是 `fork` / `merge`，带内跨轨道的相邻两站是 `twin`，同一条
+   * 轨道上相邻两站之间的阶段流是 `stream`（墨：两端都在跑 `march`，有东西过去过 `strong`）。
+   */
   kind?: TimelineRailKind;
+  /** 触到开着 / 等着的留白：画成虚线（那里还不是代码）。 */
+  dashed?: true;
 }
 
 /**
@@ -125,6 +153,8 @@ export interface TimelineArc {
   ink: TimelineInk;
   /** 画在哪条轨道的空中；分道按空各算各的，所以 `arcLaneCount` 要先按 `air` 筛。 */
   air: number;
+  /** 不相邻的阶段流：墨按流的规则，不行进，不让站上环。 */
+  stream?: true;
 }
 
 /** 带内的一条轨道；`stations` 是它的成员，声明序。 */
@@ -159,35 +189,12 @@ export interface WorkflowTimelineModel {
   live: boolean;
   /** 流式草稿：站由笔逐字写出，子代理只计数不画（`draft-scan.ts`）。分析器的模型没有它。 */
   draft?: { agents: number };
-}
-
-/** `currentPhase` 与一站的关联，与 `phaseEntryFor` 同一条名字规则。 */
-function isCurrentPhase(run: WorkflowRunState | undefined, name: string | undefined): boolean {
-  return phaseNameMatches(name, run?.currentPhase);
-}
-
-/**
- * 站的灯。成员节点先说话——running / failed 是硬事实；
- * 之后才轮到控制流：这一站是当前阶段且 run 还在跑，就是 running（第一个 ask 派发之前、最后
- * 一个 ask 结算之后下一个标记到来之前，控制流都在这一站）；一个节点都没观察到的站（零成员，
- * 或整站被跳过）只能靠进入记录点灯。`nodeStatus` 是折叠的结果，缺席（undefined）就是「没有
- * 节点」——折叠不会为控制流没走的站点造一个 pending。
- */
-function stationStatus(
-  run: WorkflowRunState | undefined,
-  nodeStatus: StepRunStatus | undefined,
-  current: boolean,
-  entered: boolean,
-): StepRunStatus | undefined {
-  if (run === undefined) return undefined;
-  if (nodeStatus === "running" || nodeStatus === "failed") return nodeStatus;
-  const live = run.status === "running" || run.status === "pending";
-  if (current && live) return "running";
-  // 当前阶段随 run 的终态收场：失败发生在这一站（不管它有没有节点）；cancelled 与节点的画法
-  // 一致，同样是 failed。
-  if (current) return run.status === "completed" ? "done" : "failed";
-  if (nodeStatus !== undefined) return nodeStatus;
-  return entered ? "done" : "pending";
+  /** 有阶段的补全留下的头（`timeline-holes.ts`），按 `from` 升序；没有补全时为空。 */
+  fills?: TimelineFill[];
+  /** 留白 id → 包着它的留白 id（`timeline-holes.ts` 的 holeParentsOf）；悬停时外层区域据此亮起。 */
+  holeParents?: Readonly<Record<string, string>>;
+  /** 末站是尾巴留白：`open` 画 40px 淡出的虚线残段，`filled` 只留 40px 余地。 */
+  tailStub?: "open" | "filled";
 }
 
 /**
@@ -198,18 +205,26 @@ function stationStatus(
 export function buildWorkflowTimeline(
   input: WorkflowCausalityGraphData,
   run: WorkflowRunState | undefined,
+  /**
+   * 补全过的留白的名与类型（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：没有 run 的
+   * 静态图（确认窗、补全行）从工具入参递进来。给了它就不走共享缓存——那张表是按 (graph, run) 键的。
+   */
+  holeLabels?: HoleLabels,
 ): WorkflowTimelineModel {
-  return sharedTimelineModel(input, run, () => computeWorkflowTimeline(input, run));
+  if (holeLabels !== undefined) return computeWorkflowTimeline(input, run, holeLabels);
+  return sharedTimelineModel(input, run, () => computeWorkflowTimeline(input, run, undefined));
 }
 
 function computeWorkflowTimeline(
   input: WorkflowCausalityGraphData,
   run: WorkflowRunState | undefined,
+  holeLabels: HoleLabels | undefined,
 ): WorkflowTimelineModel {
-  const graph = withImplicitPhase(input);
-  const phases = graph.phases ?? [];
+  // 头已代表的留白阶段不成站；父表从收缩之前的图算，嵌套才不断（timeline-holes.ts）。
+  const { graph, parents, phases } = timelineHoleGraph(withImplicitPhase(input));
   const index = new Map(phases.map((phase, i) => [phase.id, i]));
   const members = phaseMembers(graph);
+  const holes = holeTable(graph, phases, run, holeLabels, parents);
   const overlay = workflowRunOverlay(run, graph);
   const live = liveParticipantView(graph, run);
   const binder = phaseBinder(graph, run);
@@ -238,23 +253,23 @@ function computeWorkflowTimeline(
     seen.add(key);
     edges.push({ from, to });
   }
-  const folded = foldPhaseBands(
-    phases.length,
-    phases.map((phase) =>
-      (phase.alongside ?? []).flatMap((id) => {
-        const at = index.get(id);
-        return at === undefined ? [] : [at];
-      }),
-    ),
+  // 阶段流（spec「Streams」）：同样按下标去重；它们把一条线上的 stage 从带里拿出来。
+  const streams = phaseStreamIndexes(graph.phaseStreams, index);
+  const alongsideIndexes = phases.map((phase) =>
+    (phase.alongside ?? []).flatMap((id) => {
+      const at = index.get(id);
+      return at === undefined ? [] : [at];
+    }),
   );
-  const fold = foldPhaseEdges(phases.length, folded, edges);
+  const folded = foldPhaseBands(phases.length, alongsideIndexes, streams);
+  const fold = foldPhaseEdges(phases.length, folded, edges, streams);
   const arcPairs = [...fold.arcs].sort(
     (left, right) => Math.abs(left.from - left.to) - Math.abs(right.from - right.to),
   );
   // 回边的两端上环；端点在带里时整条带都上环——带是一个节点，再入的是整条带。
   const onLoop = new Set<number>();
   for (const arc of arcPairs) {
-    if (arc.to >= arc.from) continue;
+    if (arc.to >= arc.from || arc.stream) continue;
     for (const end of [arc.from, arc.to]) {
       const band = bandOf(folded, end);
       if (band === undefined) onLoop.add(end);
@@ -264,6 +279,9 @@ function computeWorkflowTimeline(
 
   // 名称哈希会碰撞；以实例身份分配连续编号，同一代理跨阶段保持同一头像。
   const avatarIndexes = new Map<string, number>();
+  const nodeStatuses: (StepRunStatus | undefined)[] = [];
+  const entered: boolean[] = [];
+  const hasMembers: boolean[] = [];
   const stations: TimelineStation[] = phases.map((phase, i) => {
     const memberSteps = members.get(phase.id) ?? [];
     const unlisted = stationUnlisted(run, binder, phase.id);
@@ -328,21 +346,27 @@ function computeWorkflowTimeline(
           : {}),
       };
     });
+    const nodeStatus = collapseStatuses(
+      memberSteps.map((step) => step.id),
+      overlay.statuses,
+    );
+    nodeStatuses.push(nodeStatus);
+    entered.push(observed.entered);
+    hasMembers.push(memberSteps.length > 0);
+    // 停在留白上的 run：那一站就是当前站（进入它的段行进、镜头对准它），灯的画法由 `hole` 说。
+    const hole = holes.byPhase.get(phase.id);
+    const waiting = hole?.state === "waiting";
     return {
       id: phase.id,
       naming: { id: phase.id, ...(phase.name === undefined ? {} : { name: phase.name }) },
       pills,
-      status: stationStatus(
-        run,
-        collapseStatuses(
-          memberSteps.map((step) => step.id),
-          overlay.statuses,
-        ),
-        isCurrentPhase(run, phase.name),
-        observed.entered,
-      ),
-      visited: observed.visited,
+      status: waiting
+        ? "running"
+        : stationStatus(run, nodeStatus, isCurrentPhase(run, phase.name), observed.entered),
+      visited: observed.visited || waiting,
       rounds: observed.rounds,
+      ...(hole === undefined ? {} : { hole }),
+      ...stationFillOf(phase, hole),
       onLoop: onLoop.has(i),
       track: trackOf(folded, i),
       ...(observed.observed === 0
@@ -350,6 +374,22 @@ function computeWorkflowTimeline(
         : { fraction: { observed: observed.observed, settled: observed.settled } }),
       ...(unlisted === undefined ? {} : { unlisted }),
     };
+  });
+
+  // stage 的灯（spec「Station status」）：并行或有流、且有成员 step 的站只看自己的节点与喂它的站。
+  const staged = stageStatuses({
+    alongside: alongsideIndexes,
+    entered,
+    hasMembers,
+    nodeStatuses,
+    run,
+    sequential: stations.map((station) => station.status),
+    streams,
+  });
+  // 等着补全的留白照旧是 running（run 停在它上面）：它在 future 里时也是并行站，不让 stage 规则
+  // 按「没有节点 → pending」把它改掉（dwf-recursive 与 dwf-pipeline-display 合并时对齐的两条规则）。
+  stations.forEach((station, i) => {
+    if (station.hole?.state !== "waiting") station.status = staged[i];
   });
 
   const visited = (i: number): boolean => stations[i]?.visited === true;
@@ -363,9 +403,15 @@ function computeWorkflowTimeline(
 
   const rails: TimelineRail[] = fold.rails.map((rail: RailSpec) => ({
     from: rail.from,
-    ink: visited(rail.from) && visited(rail.to) ? ("strong" as TimelineInk) : "faint",
+    ink:
+      rail.kind === "stream"
+        ? streamInk(stations[rail.from]!, stations[rail.to]!)
+        : visited(rail.from) && visited(rail.to)
+          ? ("strong" as TimelineInk)
+          : "faint",
     ...(rail.kind === undefined ? {} : { kind: rail.kind }),
     to: rail.to,
+    ...(railTouchesHole(stations, rail) ? { dashed: true as const } : {}),
   }));
   const lanes = assignAirLanes(arcPairs);
   const arcs: TimelineArc[] = arcPairs.map((arc, at) => {
@@ -376,8 +422,13 @@ function computeWorkflowTimeline(
     return {
       air: arc.air,
       from: arc.from,
-      ink: strong ? "strong" : "faint",
+      ink: arc.stream
+        ? streamInk(stations[arc.from]!, stations[arc.to]!)
+        : strong
+          ? "strong"
+          : "faint",
       lane: lanes[at] ?? 0,
+      ...(arc.stream ? { stream: true as const } : {}),
       to: arc.to,
     };
   });
@@ -388,9 +439,14 @@ function computeWorkflowTimeline(
   for (let r = 0; r < stations.length; r += 1) {
     if (stations[r]?.status !== "running") continue;
     const entry = bandOf(folded, r)?.from ?? r;
+    // 流轨与流弧不参与（spec「March」末段）：它们的墨已经说了有没有东西在过。
     const reentry = arcs.find(
       (arc) =>
-        arc.to === entry && arc.from > arc.to && visited(arc.from) && stations[r]!.rounds >= 2,
+        !arc.stream &&
+        arc.to === entry &&
+        arc.from > arc.to &&
+        visited(arc.from) &&
+        stations[r]!.rounds >= 2,
     );
     if (reentry !== undefined) {
       reentry.ink = "march";
@@ -398,13 +454,14 @@ function computeWorkflowTimeline(
     }
     // 双线段不是控制流走的路，它只说「这两站并行」，永不行进。
     const inbound = rails.filter(
-      (rail) => rail.to === r && rail.kind !== "twin" && visited(rail.from),
+      (rail) =>
+        rail.to === r && rail.kind !== "twin" && rail.kind !== "stream" && visited(rail.from),
     );
     if (inbound.length > 0) {
       for (const rail of inbound) rail.ink = "march";
       continue;
     }
-    const landing = arcs.find((arc) => arc.to === r && visited(arc.from));
+    const landing = arcs.find((arc) => !arc.stream && arc.to === r && visited(arc.from));
     if (landing !== undefined) landing.ink = "march";
   }
 
@@ -433,31 +490,16 @@ function computeWorkflowTimeline(
     }),
   }));
 
-  return { arcs, bands, live: run !== undefined, rails, runningIndex, stations };
-}
-
-/** 一枚药丸「正在做什么」：优先正在跑的 step 的 label，其次最后一个已结算的，再次第一个。 */
-export function pillActivity(
-  graph: WorkflowCausalityGraphData,
-  run: WorkflowRunState | undefined,
-  pill: TimelinePill,
-): { label: string; asks: number; reads: number } {
-  const stepsById = new Map(graph.steps.map((step) => [step.id, step]));
-  const statuses = run === undefined ? {} : workflowRunOverlay(run, graph).statuses;
-  let asks = 0;
-  let reads = 0;
-  let running: string | undefined;
-  let done: string | undefined;
-  let first: string | undefined;
-  for (const id of pill.stepIds) {
-    const step = stepsById.get(id);
-    if (step === undefined) continue;
-    if (step.kind === "world-read") reads += 1;
-    else asks += 1;
-    first ??= step.label;
-    const status = statuses[id];
-    if (status === "running") running ??= step.label;
-    else if (status === "done" || status === "failed") done = step.label;
-  }
-  return { asks, label: running ?? done ?? first ?? "", reads };
+  const tailStub = tailStubOf(stations);
+  return {
+    arcs,
+    bands,
+    fills: holes.fills,
+    ...(Object.keys(holes.parents).length === 0 ? {} : { holeParents: holes.parents }),
+    live: run !== undefined,
+    rails,
+    runningIndex,
+    stations,
+    ...(tailStub === undefined ? {} : { tailStub }),
+  };
 }

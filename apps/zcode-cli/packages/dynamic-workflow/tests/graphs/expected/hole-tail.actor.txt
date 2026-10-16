@@ -1,0 +1,3 @@
+actor-node source
+actor-node actor#1 "审阅者" @6:24
+actor-edge source -> actor#1 exact count=1

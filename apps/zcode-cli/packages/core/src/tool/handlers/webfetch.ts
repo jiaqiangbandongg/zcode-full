@@ -49,7 +49,7 @@ interface FreshWebFetchContent {
   preapprovedUrl: boolean;
 }
 
-const webFetchHandler: ToolHandler = async (input, context) => {
+export const webFetchHandler: ToolHandler = async (input, context) => {
   const parsed = WebFetchInputSchema.parse(input) as WebFetchInput;
   const startedAt = Date.now();
   const normalizedUrl = normalizeWebFetchUrl(parsed.url);

@@ -210,6 +210,15 @@ export function resolveCodingPlanUsageRemainingState(params: {
   };
 }
 
+export function hasCodingPlanUsageRemainingPanel(params: {
+  availableProviders: CodingPlanUsageAvailableProvider[];
+  entitlements: CodingPlanUsageRemainingEntitlement[];
+  modelProvidersLoading: boolean;
+  selectedProviderId?: SidebarUsageCodingPlanSourceId;
+}): boolean {
+  return Boolean(resolveCodingPlanUsageRemainingState(params));
+}
+
 export function CodingPlanUsageRemainingPanel({
   availableProviders,
   audience,
@@ -318,7 +327,7 @@ export function CodingPlanUsageRemainingPanel({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {/* 同一份 Usage Remaining 展示会出现在 sidebar 和输入框上下文菜单。
+            {/* 修复原因：同一份 Usage Remaining 展示会出现在 sidebar 和输入框上下文菜单。
                 详情入口必须由调用方传入，避免共享展示组件直接依赖 tab/store 导航。 */}
             {onUsageClick ? (
               <UsageDetailsButton

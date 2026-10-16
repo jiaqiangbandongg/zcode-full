@@ -19,14 +19,17 @@ import type {
 import { formatTaskRelativeTime } from "@/lib/taskListItemPresentation.js";
 import type { PaneWorkspaceScope } from "@/v4/paneLayoutStore.js";
 import type { SessionLease } from "@/v4/sessionDataLayer.js";
-import { V4PaneConversationProvider, useV4Conversation } from "@/v4/V4ConversationContext.js";
+import {
+  V4PaneConversationProvider,
+  useV4Conversation,
+} from "@/v4/V4ConversationContext.js";
 import { useConversationProjection } from "@/v4/useConversationProjection.js";
 
 type DirectoryItem = RunningSubagentSummary | ZCodeSessionEndedSubagent;
 
 const EMPTY_RUNNING: readonly RunningSubagentSummary[] = [];
 
-function buildSubagentDirectoryOpenRequest(
+export function buildSubagentDirectoryOpenRequest(
   tab: SubagentDirectorySidePaneTab,
   item: DirectoryItem,
 ): OpenScopedSubagentSideTabRequest {
@@ -118,7 +121,10 @@ export const SubagentDirectorySidePane = memo(function SubagentDirectorySidePane
   );
   return (
     <V4PaneConversationProvider scope={scope}>
-      <SubagentDirectoryContents tab={tab} onOpenSubagentSession={onOpenSubagentSession} />
+      <SubagentDirectoryContents
+        tab={tab}
+        onOpenSubagentSession={onOpenSubagentSession}
+      />
     </V4PaneConversationProvider>
   );
 });

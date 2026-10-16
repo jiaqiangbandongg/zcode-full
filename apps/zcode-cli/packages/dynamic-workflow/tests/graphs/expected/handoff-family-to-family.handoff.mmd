@@ -1,0 +1,14 @@
+flowchart LR
+  subgraph unphased["unphased"]
+    unphased_actor_1_0_["actor#1 [1/2]<br/>ask#1"]
+    unphased_actor_1_1_["actor#1 [2/2]<br/>ask#1"]
+    unphased_actor_2_0_["actor#2 [1/2]<br/>ask#2"]
+    unphased_actor_2_1_["actor#2 [2/2]<br/>ask#2"]
+    unphased_actor_3["echo ×N<br/>ask#3"]
+  end
+  unphased_actor_1_0_ -->|"Draft"| unphased_actor_2_0_
+  unphased_actor_1_0_ -->|"Draft"| unphased_actor_2_1_
+  unphased_actor_1_1_ -->|"Draft"| unphased_actor_2_0_
+  unphased_actor_1_1_ -->|"Draft"| unphased_actor_2_1_
+  unphased_actor_2_0_ --> unphased_actor_3
+  unphased_actor_2_1_ --> unphased_actor_3

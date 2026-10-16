@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-hooks-lifecycle",
+  "spec": "./test/e2e/conversation-session/conversation-session-hooks-lifecycle.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-hooks-lifecycle.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode/hooks-full-e2e-recorder.mjs",
+      "source": "created-by-spec",
+      "description": "Recorder shared by process and command Hooks across all four scenarios."
+    },
+    {
+      "path": ".zcode/config.json",
+      "source": "created-by-spec",
+      "description": "Project Hook configuration installed before each new session snapshot."
+    }
+  ],
+  "requests": [
+    {
+      "id": "hooks-full-chain-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-full-chain-write",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "A deterministic Write proves PreToolUse and PermissionRequest input effects."
+    },
+    {
+      "id": "hooks-full-chain-read",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The missing Read deterministically exercises PostToolUseFailure."
+    },
+    {
+      "id": "hooks-full-chain-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The final marker proves failure recovery context reached the model."
+    },
+    {
+      "id": "hooks-early-failures-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-early-pre-deny",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "A deterministic path selects the PreToolUse deny branch."
+    },
+    {
+      "id": "hooks-early-invalid-update",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "A deterministic path selects the invalid updatedInput branch."
+    },
+    {
+      "id": "hooks-early-permission-deny",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "A deterministic path selects the PermissionRequest deny branch."
+    },
+    {
+      "id": "hooks-early-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The final marker proves all early-return context reached the model."
+    },
+    {
+      "id": "hooks-stop-cap-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-stop-step-0",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+    },
+    {
+      "id": "hooks-stop-step-1",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+    },
+    {
+      "id": "hooks-stop-step-2",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+    },
+    {
+      "id": "hooks-stop-step-3",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Four deterministic assistant drafts prove the three-continuation cap."
+    },
+    {
+      "id": "hooks-prompt-block-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-prompt-error-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-prompt-error-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "The provider response isolates hook process failure from model transport."
+    },
+    {
+      "id": "hooks-compact-first-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Title generation is outside the Hooks runtime contract."
+    },
+    {
+      "id": "hooks-compact-first-follow-up",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Deterministic final text proves the SessionStart summary lands on the next real turn after /compact."
+    }
+  ]
+}

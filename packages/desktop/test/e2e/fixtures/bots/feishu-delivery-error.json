@@ -1,0 +1,6 @@
+{
+  "caseId": "BOT-E2E-DF-01",
+  "classification": "synthetic",
+  "syntheticReason": "Inject deterministic Feishu HTTP business rejection and recovery to verify delivery diagnostics without depending on a real tenant restriction.",
+  "timing": "fault-stream"
+}

@@ -5,7 +5,7 @@ export function isTransientScreenshotCaptureError(error: unknown): boolean {
   return message.includes("UnknownVizError");
 }
 
-interface ScreenshotTransientRetryContext {
+export interface ScreenshotTransientRetryContext {
   target: "owner" | "guest";
   windowId: number;
   webContentsId: number;

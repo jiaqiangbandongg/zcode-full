@@ -920,6 +920,37 @@ export function activateDetachedAgentStepTelemetry(input: {
   agentStepTelemetryByTask.set(input.taskId, createAgentStepTelemetryState());
 }
 
+export function rekeyQueuedPromptTelemetry(
+  taskId: string,
+  fromMessageId: string,
+  toMessageId: string,
+): void {
+  if (fromMessageId === toMessageId) {
+    return;
+  }
+
+  const queue = queuedPromptTelemetryByTask.get(taskId);
+  if (!queue || queue.length === 0) {
+    return;
+  }
+
+  const targetIndex = queue.findIndex((item) => item.messageId === fromMessageId);
+  if (targetIndex === -1) {
+    return;
+  }
+
+  const target = queue[targetIndex];
+  if (!target) {
+    return;
+  }
+
+  queue[targetIndex] = {
+    ...target,
+    messageId: toMessageId,
+  };
+  queuedPromptTelemetryByTask.set(taskId, queue);
+}
+
 export function recordPromptModelRequestStarted(
   taskId: string,
   event: Extract<ZCodeStreamEvent, { type: "task_network_debug_status" }>,
@@ -1321,6 +1352,15 @@ export function recordAgentStepTelemetryEvent(input: {
   }
 }
 
+export function recordPromptFirstToken(taskId: string, now = Date.now()): void {
+  const active = activePromptTelemetryByTask.get(taskId);
+  if (!active || active.firstTokenAt !== null) {
+    return;
+  }
+
+  active.firstTokenAt = now;
+}
+
 // 当前激活 prompt 的模型名,供 ARMS 镜像事件(stream_stall 等)补齐 model 维度;
 // 无激活 prompt 或未带 model_name 时返回 undefined,由调用方留空。
 export function getActivePromptModelName(taskId: string): string | undefined {
@@ -1480,6 +1520,13 @@ export function finalizePromptTelemetry(
       error_msg: errorMsg,
     },
   };
+}
+
+export function resetMessageTelemetryForTest(): void {
+  composerInputTimingByWorkspace.clear();
+  queuedPromptTelemetryByTask.clear();
+  activePromptTelemetryByTask.clear();
+  agentStepTelemetryByTask.clear();
 }
 
 /** workspace telemetry attachment 释放时只清自己的内部 task key，不影响其它 workspace。 */

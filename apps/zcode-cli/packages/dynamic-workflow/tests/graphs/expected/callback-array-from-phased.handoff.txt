@@ -1,0 +1,6 @@
+phase phase#1
+participant phase#1:workspace steps=world-read#1
+participant phase#1:actor#1 many steps=ask#1
+phase phase#2
+participant phase#2:actor#2 "fixer" many steps=ask#2
+handoff phase#1:workspace -> phase#1:actor#1 types="string[]"

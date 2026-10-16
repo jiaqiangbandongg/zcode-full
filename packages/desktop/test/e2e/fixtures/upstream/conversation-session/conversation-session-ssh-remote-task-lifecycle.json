@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-task-lifecycle",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-task-lifecycle.test.ts",
+  "fixtures": [
+    {
+      "id": "ssh-task-lifecycle-title",
+      "description": "SSH task lifecycle 标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不属于 lifecycle 断言，只需稳定 task row。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_P0_TASK_LIFECYCLE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"ssh-task-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH lifecycle\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-task-lifecycle-a-first",
+      "description": "workspace A 首发响应。",
+      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "稳定验证 A 首发和 task 创建。" },
+      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_TASK_LIFECYCLE_A_FIRST_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
+      "response": { "statusCode": 200, "delayMs": 1200, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-task-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_TASK_LIFECYCLE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+    },
+    {
+      "id": "ssh-task-lifecycle-b-first",
+      "description": "workspace B 首发响应。",
+      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "稳定验证 B 首发和 task 创建。" },
+      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_TASK_LIFECYCLE_B_FIRST_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
+      "response": { "statusCode": 200, "delayMs": 1200, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-task-b-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_TASK_LIFECYCLE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-b-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+    },
+    {
+      "id": "ssh-task-lifecycle-a-follow",
+      "description": "workspace A 重开后的续发响应。",
+      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "稳定验证 A 重开后仍命中原 task。" },
+      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_TASK_LIFECYCLE_A_FOLLOW_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
+      "response": { "statusCode": 200, "delayMs": 1200, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-task-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_TASK_LIFECYCLE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+    },
+    {
+      "id": "ssh-task-lifecycle-b-follow",
+      "description": "workspace B 续发响应。",
+      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "稳定验证 A 关闭期间 B 仍可继续工作。" },
+      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_TASK_LIFECYCLE_B_FOLLOW_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
+      "response": { "statusCode": 200, "delayMs": 1200, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-task-b-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_TASK_LIFECYCLE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-b-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+    }
+  ]
+}

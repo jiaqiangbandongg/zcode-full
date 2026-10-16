@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-use-iab-multitab-lifecycle",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-use-iab-multitab-lifecycle.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-browser-use-multitab-title",
+      "description": "固定多 tab lifecycle case 的异步标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于本用例语义，只需与 Browser tool continuation 隔离。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BROWSER_USE_MULTITAB_TURN_1"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "application/json; charset=utf-8" },
+        "body": "{\"id\":\"upstream-browser-use-multitab-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Browser 多标签生命周期\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":64,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":8,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-browser-use-multitab-create",
+      "description": "首轮在 fresh kernel 中初始化 Browser client，创建 A/B 两个真实 IAB tab，只把 A 标记为 handoff。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定驱动真实 BrowserControl lifecycle，验证 finalize omission 不关闭未列 tab。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN_1", "E2E_BROWSER_FIXTURE_URL:"],
+        "bodyIncludes": ["mcp__node_repl__js"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_browser_multitab_create",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "title": "创建两个 Browser tab",
+            "code": "const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nif (!browserPluginRoot) throw new Error('Browser plugin root is unavailable in the node_repl host');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst browserClientUrl = pathToFileURL(join(browserPluginRoot, 'scripts', 'browser-client.mjs')).href;\nconst { setupBrowserRuntime } = await import(browserClientUrl);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst multitabUrlA = new URL('/a', '{{browserFixtureUrl}}').href;\nconst multitabUrlB = new URL('/b', '{{browserFixtureUrl}}').href;\nconst multitabA = await browser.tabs.new();\nawait multitabA.goto(multitabUrlA);\nawait multitabA.playwright.getByLabel('State').fill('alpha-turn-1');\nconst multitabB = await browser.tabs.new();\nawait multitabB.goto(multitabUrlB);\nawait multitabB.playwright.getByLabel('State').fill('beta-turn-1');\nawait browser.tabs.finalize({ keep: [{ tab: multitabA, status: 'handoff' }] });\nconst tabsAfterFinalize = await browser.tabs.list();\nconst turnOneOk = tabsAfterFinalize.length === 2 && tabsAfterFinalize.some((info) => info.id === multitabA.id) && tabsAfterFinalize.some((info) => info.id === multitabB.id);\n({ marker: turnOneOk ? 'E2E_BROWSER_USE_MULTITAB_TURN1_OK' : 'E2E_BROWSER_USE_MULTITAB_TURN1_FAILED', aId: multitabA.id, bId: multitabB.id, tabsAfterFinalize });"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-browser-use-multitab-turn-one-final",
+      "description": "首轮正常完成，令 turnEnded 执行并保留两个 tab。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "形成真实跨 turn lifecycle 边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN_1", "toolu_e2e_browser_multitab_create"],
+        "lastUserMessageIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN1_OK"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "E2E_BROWSER_USE_MULTITAB_TURN1_DONE" }
+    },
+    {
+      "id": "upstream-browser-use-multitab-list",
+      "description": "第二轮在新的 fresh kernel 中重新初始化 Browser client，再独立返回完整 tabs.list 与 A/B 动态 stable id。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证模型可见 list；A/B stable id 必须从真实 tool result 动态注入下一次模型响应。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN_2", "E2E_BROWSER_FIXTURE_URL:"],
+        "bodyIncludes": ["mcp__node_repl__js"],
+        "bodyExcludes": ["toolu_e2e_browser_multitab_list", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_browser_multitab_list",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "title": "列出已有 Browser tab",
+            "code": "const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nif (!browserPluginRoot) throw new Error('Browser plugin root is unavailable in the node_repl host');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst browserClientUrl = pathToFileURL(join(browserPluginRoot, 'scripts', 'browser-client.mjs')).href;\nconst { setupBrowserRuntime } = await import(browserClientUrl);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tabs = await browser.tabs.list();\nconst matchesA = tabs.filter((info) => new URL(info.url).pathname === '/a');\nconst matchesB = tabs.filter((info) => new URL(info.url).pathname === '/b');\nif (matchesA.length !== 1 || matchesB.length !== 1) throw new Error('Expected one controlled A tab and one controlled B tab');\n({ marker: 'E2E_BROWSER_USE_MULTITAB_LIST_OK', e2eBrowserTabAId: matchesA[0].id, e2eBrowserTabBId: matchesB[0].id, tabs });"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-browser-use-multitab-action",
+      "description": "在新的 fresh kernel 中重新初始化 Browser client，使用上一条 tool result 的 A/B stable id 执行 get(A)、更新和 close(B)。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证跨 turn stable id 来自模型可见 tool result，而不是跨 cell JS binding，并覆盖 tabs.get 激活和 close 精确目标。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN_2", "toolu_e2e_browser_multitab_list"],
+        "lastUserMessageIncludes": ["E2E_BROWSER_USE_MULTITAB_LIST_OK", "e2eBrowserTabAId", "e2eBrowserTabBId", "/a", "/b"],
+        "bodyExcludes": ["toolu_e2e_browser_multitab_action", "Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_browser_multitab_action",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "title": "恢复 A 并关闭 B",
+            "code": "const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nif (!browserPluginRoot) throw new Error('Browser plugin root is unavailable in the node_repl host');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst browserClientUrl = pathToFileURL(join(browserPluginRoot, 'scripts', 'browser-client.mjs')).href;\nconst { setupBrowserRuntime } = await import(browserClientUrl);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst aInfo = { id: '{{latestBrowserTabAId}}' };\nconst bInfo = { id: '{{latestBrowserTabBId}}' };\nconst before = await browser.tabs.list();\nif (!before.some((info) => info.id === aInfo.id) || !before.some((info) => info.id === bInfo.id)) throw new Error('Tool-result stable tab ids no longer exist');\nconst multitabA = await browser.tabs.get(aInfo.id);\nconst stateBeforeA = await multitabA.playwright.getByRole('status').innerText();\nawait multitabA.playwright.getByLabel('State').fill('alpha-turn-2');\nconst multitabB = await browser.tabs.get(bInfo.id);\nawait multitabB.close();\nawait browser.tabs.get(aInfo.id);\nconst after = await browser.tabs.list();\nconst turnTwoOk = before.length === 2 && stateBeforeA === 'alpha-turn-1' && after.length === 1 && after[0]?.id === aInfo.id && after[0]?.active === true && !after.some((info) => info.id === bInfo.id);\n({ marker: turnTwoOk ? 'E2E_BROWSER_USE_MULTITAB_TURN2_OK' : 'E2E_BROWSER_USE_MULTITAB_TURN2_FAILED', beforeCount: before.length, afterCount: after.length, aId: aInfo.id, bId: bInfo.id, stateBeforeA, after });"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-browser-use-multitab-turn-two-final",
+      "description": "第二轮消费 lifecycle 结果并正常完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让 E2E 在 turnEnded 后检查 A 保留、B 销毁。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN_2", "toolu_e2e_browser_multitab_action"],
+        "lastUserMessageIncludes": ["E2E_BROWSER_USE_MULTITAB_TURN2_OK"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "E2E_BROWSER_USE_MULTITAB_DONE" }
+    }
+  ]
+}

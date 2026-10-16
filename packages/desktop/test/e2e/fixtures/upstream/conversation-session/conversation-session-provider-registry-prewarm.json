@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-provider-registry-prewarm",
+  "spec": "./test/e2e/conversation-session/conversation-session-provider-registry-prewarm.test.ts",
+  "fixtures": [
+    {
+      "id": "provider-registry-prewarm-title",
+      "description": "provider registry 冷启动 case 的标题固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于 provider registry 冷启动屏障语义。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"provider-registry-prewarm-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Provider prewarm\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"provider-registry-prewarm-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "provider-registry-prewarm-main",
+      "description": "I64 registry revision 屏障后的 custom GLM 首发固定响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言是冷启动首个预热会话与真实请求保持 custom GLM，响应仅用于稳定收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_PROVIDER_REGISTRY_PREWARM"],
+        "bodyIncludes": ["E2E_PROVIDER_REGISTRY_PREWARM", "GLM-5.2"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "body": "data: {\"id\":\"provider-registry-prewarm-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"upstream-e2e-ok\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"provider-registry-prewarm-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"GLM-5.2\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

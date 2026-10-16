@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-provider-session-isolation",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-provider-session-isolation.test.ts",
+  "fixtures": [
+    {
+      "id": "model-provider-session-isolation-title",
+      "description": "多 session 模型隔离 case 内的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-model-provider-session-isolation-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Session Model Isolation\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "model-provider-session-isolation-a",
+      "description": "I12 Session A primary 配置首轮普通发送固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 Session A primary 请求 body/model/thought；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_A"],
+        "bodyIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_A", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_MODEL_PROVIDER_SESSION_ISOLATION_A_FOLLOW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-provider-session-isolation-a",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-provider-session-isolation-b",
+      "description": "I12 Session B secondary 配置首轮普通发送固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 Session B secondary 请求 body/model/thought；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_B"],
+        "bodyIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_B", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_MODEL_PROVIDER_SESSION_ISOLATION_B_FOLLOW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-provider-session-isolation-b",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-provider-session-isolation-a-follow",
+      "description": "I12 切回 Session A 后 primary 配置 follow-up 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 B 配置不会污染 A follow-up 请求；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_A_FOLLOW"],
+        "bodyIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_A_FOLLOW", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-provider-session-isolation-a-follow",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    },
+    {
+      "id": "model-provider-session-isolation-b-follow",
+      "description": "I12 切回 Session B 后 secondary 配置 follow-up 固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在 A 恢复不会污染 B follow-up 请求；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_B_FOLLOW"],
+        "bodyIncludes": ["E2E_MODEL_PROVIDER_SESSION_ISOLATION_B_FOLLOW", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-model-provider-session-isolation-b-follow",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

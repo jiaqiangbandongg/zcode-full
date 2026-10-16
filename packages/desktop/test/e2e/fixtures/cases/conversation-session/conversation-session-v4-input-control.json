@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-input-control",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-input-control.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-input-control.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-input-control-title",
+      "description": "E2E_V4_INPUT_CONTROL_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_INPUT_CONTROL_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-input-control-seed",
+      "description": "M4 setAutoDrain/setFollowupMode 门禁：首轮固定回复，建立可绑定 pane 的 session。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "输入控制开关只需一个已存在 session 即可渲染；首轮文案固定。"
+    }
+  ]
+}

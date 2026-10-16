@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ttft-stages",
+  "spec": "./test/e2e/conversation-session/conversation-session-ttft-stages.test.ts",
+  "fixtures": [
+    {
+      "id": "ttft-text",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定正文首输出与模型等待，用最终 OTLP 验证阶段归因。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_STAGE_TEXT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ttft-text",
+          "inputTokens": 80,
+          "outputTokens": 10,
+          "text": "ttft-stage-text-ok"
+        }
+      }
+    },
+    {
+      "id": "ttft-stage-tool-call",
+      "description": "TDP08 真实 Read tool_use，验证工具 step、completion 汇总和 tool perf ARMS。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定工具类型和输入，确保旧版与 V4 执行同一个只读工具。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_STAGE_TOOL"],
+        "bodyExcludes": ["Generate a concise title", "E2E_TTFT_TOOL_FILE_CONTENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_telemetry_parity_read",
+          "name": "Read",
+          "inputTokens": 96,
+          "outputTokens": 12,
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/ttft/input.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "ttft-stage-tool-final",
+      "description": "TDP08 Read tool_result 后的固定 generation。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定结束工具轮，使 tool 和 generation 两个 step 可完整对账。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_TTFT_STAGE_TOOL",
+          "toolu_e2e_telemetry_parity_read",
+          "E2E_TTFT_TOOL_FILE_CONTENT"
+        ],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ttft-stage-tool-final",
+          "inputTokens": 144,
+          "outputTokens": 12,
+          "text": "ttft-stage-tool-ok"
+        }
+      }
+    },
+    {
+      "id": "ttft-stage-reasoning",
+      "description": "TDP07 固定 thought -> text 流，验证 reasoning/generation step 次序。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "真实模型是否输出 thought 不稳定，使用确定性 Anthropic SSE。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_STAGE_REASONING"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"ttft-stage-reasoning\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":100,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 250,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"telemetry parity reasoning\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 8000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"ttft-stage-reasoning-ok\"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 8500,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":100,\"output_tokens\":20}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    }
+  ]
+}

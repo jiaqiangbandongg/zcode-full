@@ -6,8 +6,10 @@ import type {
   ManagedCdpBrowserRuntimeOptions,
 } from "@zcode/adapters/browser";
 import type {
+  createDefaultProviderEndpointRoutingPort,
   createModelAdapter,
   createZCodeApp,
+  CreateDefaultProviderEndpointRoutingPortOptions,
   CreateModelAdapterOptions,
   configureCodingPlanApiKey,
   ConfigureCodingPlanApiKeyOptions,
@@ -55,6 +57,9 @@ export interface RunDependencies extends PluginsCommandOverrides {
   createModelAdapter?: (
     options?: CreateModelAdapterOptions,
   ) => ReturnType<typeof createModelAdapter>;
+  createProviderEndpointRoutingPort?: (
+    options: CreateDefaultProviderEndpointRoutingPortOptions,
+  ) => ReturnType<typeof createDefaultProviderEndpointRoutingPort>;
   createZCodeApp?: (
     options?: ZCodeAppOptions,
   ) => Awaited<ReturnType<typeof createZCodeApp>> | ReturnType<typeof createZCodeApp>;
@@ -114,7 +119,7 @@ export interface RunDependencies extends PluginsCommandOverrides {
   shutdownZCodeTelemetry?: typeof shutdownZCodeTelemetry;
 }
 
-export type CliPermissionMode = "build" | "plan" | "edit" | "yolo";
+export type CliPermissionMode = "build" | "plan" | "edit" | "yolo" | "guarded";
 export type CliRuntimeMode = CliPermissionMode | "auto";
 
 export interface CliModeState {

@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-permission-hook-rewrite",
+  "spec": "./test/e2e/conversation-session/conversation-session-permission-hook-rewrite.test.ts",
+  "fixtures": [
+    {
+      "id": "permission-hook-rewrite-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_PERMISSION_HOOK_REWRITE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "permission-hook-rewrite-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Hook 确认替换演示\"}"
+        }
+      }
+    },
+    {
+      "id": "permission-hook-rewrite-setup",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PERMISSION_HOOK_REWRITE_SETUP"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "permission-hook-rewrite-setup",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "E2E_PERMISSION_HOOK_REWRITE_READY"
+        }
+      }
+    },
+    {
+      "id": "permission-hook-rewrite-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PERMISSION_HOOK_REWRITE_RUN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_permission_hook_rewrite",
+          "name": "Write",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/conversation-session-permission-hook-rewrite/A-after-model.txt",
+            "content": "Original model input A\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "permission-hook-rewrite-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定一次 Write A 调用与 tool_result 后续响应；真实 Hook 使用文件屏障改写为 B，真实 UI 批准包延迟后原样投递，稳定观察确认替换与迟到响应隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_PERMISSION_HOOK_REWRITE_RUN", "toolu_e2e_permission_hook_rewrite"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "permission-hook-rewrite-final",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "E2E_PERMISSION_HOOK_REWRITE_DONE"
+        }
+      }
+    }
+  ]
+}

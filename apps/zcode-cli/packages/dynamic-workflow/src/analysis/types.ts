@@ -11,7 +11,7 @@ import type { ScriptLoc } from "../compiler/compile.js";
  * call sites. `fan-out` nodes are only emitted by the taint pass once an iteration
  * candidate is shown to reach a facade site — this substrate never produces them.
  */
-export type SiteKind = "ask" | "world-read" | "join" | "fan-out" | "source" | "sink";
+export type SiteKind = "ask" | "world-read" | "join" | "fan-out" | "hole" | "source" | "sink";
 
 /** A 1-based, prelude-stripped location in the author's script. */
 export type SiteLoc = ScriptLoc;
@@ -34,6 +34,8 @@ export interface NamePattern {
 
 /**
  * A graph node. The virtual `source`/`sink` carry no location and a fixed label;
+ * a `hole` node is an OPEN `hole<T>()` site (docs/analysis.md「Sites」): its label is the
+ * hole's name, its prompt is a sink and its result a value of type T from outside the run;
  * every other node is positioned at its facade call site. `actors` is populated for
  * `ask` nodes only: the may-set of actor site ids the ask's receiver resolves to
  * (the same set that drives the context relation), so the renderer can place the

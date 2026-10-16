@@ -1,0 +1,10 @@
+{
+  "name": "visualize",
+  "version": "0.1.0",
+  "description": "Create interactive explanations, charts and design previews in ZCode conversations.",
+  "author": {
+    "name": "ZCode"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills"
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-composer-prefix-routing",
+  "spec": "./test/e2e/conversation-session/conversation-session-composer-prefix-routing.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-composer-prefix-routing.json"
+  ],
+  "fileFixtures": [],
+  "noProviderRequests": true,
+  "providerRequestReason": "纯 UI composer prefix routing case，只验证提示分组和键盘写入 mention，不发送 prompt，也不触发 provider 请求。",
+  "requests": []
+}

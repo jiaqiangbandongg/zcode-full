@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZCode</string>
+    <string name="remote_launcher_title">ZCode 远程控制</string>
+    <string name="remote_launcher_description">打开桌面二维码里的远控链接。</string>
+    <string name="remote_url_label">远控链接</string>
+    <string name="remote_url_placeholder">https://zcode.z.ai/remote?sid=...</string>
+    <string name="remote_url_invalid">请输入 ZCode 远控链接。</string>
+    <string name="remote_open_button">打开远程控制</string>
+    <string name="remote_scan_button">扫码打开</string>
+    <string name="remote_scan_title">扫描桌面二维码</string>
+    <string name="remote_scan_hint">将摄像头对准 ZCode 远程控制二维码。</string>
+    <string name="remote_scan_invalid">这个二维码不是 ZCode 远控链接。</string>
+    <string name="remote_scan_permission_denied">需要相机权限才能扫描二维码。</string>
+    <string name="remote_scan_camera_failed">无法启动相机。</string>
+    <string name="remote_recent_title">最近打开</string>
+    <string name="remote_recent_clear">清空</string>
+    <string name="remote_screen_title">远程控制</string>
+    <string name="remote_reload_button">重载</string>
+    <string name="remote_close_button">关闭</string>
+    <string name="remote_retry_button">重试</string>
+    <string name="remote_load_failed_title">远程控制加载失败</string>
+    <string name="remote_keep_alive_title">ZCode 远程控制运行中</string>
+    <string name="remote_keep_alive_text">正在保持本次手机远控会话可恢复。</string>
+    <string name="remote_keep_alive_channel">远程控制</string>
+    <string name="remote_keep_alive_channel_description">ZCode 手机远控会话的连接状态。</string>
+</resources>

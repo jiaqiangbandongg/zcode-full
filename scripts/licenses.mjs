@@ -87,8 +87,25 @@ for (const r of installed.values()) r.bucket = classify(r.license);
 
 // ---------- 构建工具许可标识复核（不是二进制发行义务豁免） ----------
 const WEAK_ALLOW = [[/^lightningcss/, "当前仅构建依赖；进入生产图时需重新核对 MPL 源码提供义务"]];
+// ---------- 生产依赖的逐项复核结论：按包名登记并绑定许可类别，许可变化后重新阻断 ----------
+const PROD_REVIEWED = [
+  [
+    /^@img\/sharp-(libvips-|win32-)/,
+    "yellow-lgpl",
+    "libvips 以独立、可替换的共享库随 sharp 分发，仅真实 Computer Use 截图使用；声明附 LGPL-3.0 原文",
+  ],
+  [
+    /^elkjs$/,
+    "yellow-weak",
+    "仅内部开发文档站 apps/dev-docs 使用，不随产品分发、不部署；按 EPL-2.0 使用",
+  ],
+];
 function weakAllowReason(r) {
-  if (r.isProd) return null;
+  if (r.isProd) {
+    for (const [re, bucket, why] of PROD_REVIEWED)
+      if (re.test(r.name) && r.bucket === bucket) return why;
+    return null;
+  }
   for (const [re, why] of WEAK_ALLOW) if (re.test(r.name)) return why;
   return null;
 }
@@ -104,7 +121,9 @@ if (command === "check") {
     console.error(`✗ license 检查失败：${bad.length} 个包超出 allowlist：`);
     for (const r of bad.sort((a, b) => a.name.localeCompare(b.name)))
       console.error(`  [${r.bucket}] ${r.name}@${r.version} → ${r.license}`);
-    console.error("\n处置：替换依赖，或在 scripts/licenses.mjs 的 WEAK_ALLOW 登记人工复核结论。");
+    console.error(
+      "\n处置：替换依赖，或在 scripts/licenses.mjs 的 WEAK_ALLOW（构建依赖）/ PROD_REVIEWED（生产依赖）登记人工复核结论。",
+    );
     process.exit(1);
   }
   await readVerifiedNotices(ROOT, { requireComplete: process.argv.includes("--strict") });

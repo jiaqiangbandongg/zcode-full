@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-pasted-image-path-projection",
+  "spec": "./test/e2e/conversation-session/conversation-session-pasted-image-path-projection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-pasted-image-path-projection.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "pasted-image-path-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题内容不是本 case 语义；只需把它与 provider-visible 功能请求隔离。"
+    },
+    {
+      "id": "pasted-image-path-live",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；E2E 对捕获的 requestJson 做 content 数量、顺序、path 与 MCS 边界的结构化断言。"
+    },
+    {
+      "id": "pasted-image-path-parking",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "parking 只建立确定的 cold-resume 前置状态，不承载图片投影断言。"
+    },
+    {
+      "id": "pasted-image-path-cold-rebuild",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；E2E 在请求前删除真实派生文件，并在抓包后验证相同路径和文件已经重建。"
+    },
+    {
+      "id": "pasted-image-path-text-only",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只负责稳定收口；fixture 与结构化抓包共同要求请求无 data URL/image block，并保留 omitted + path。"
+    }
+  ]
+}

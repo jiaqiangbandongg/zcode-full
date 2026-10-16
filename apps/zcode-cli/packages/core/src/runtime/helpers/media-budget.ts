@@ -25,7 +25,7 @@ import {
 
 // 独立的视频预算无法约束请求总量；所有媒体统一按编码后的体积计入 40MiB，
 // 为正文等非媒体内容预留空间。单文件原始字节限制由附件输入/Read 层负责。
-const DEFAULT_MODEL_REQUEST_MEDIA_BUDGET_BYTES = 40 * 1024 * 1024;
+export const DEFAULT_MODEL_REQUEST_MEDIA_BUDGET_BYTES = 40 * 1024 * 1024;
 
 interface MediaBlockRef {
   blockIndex: number;
@@ -42,7 +42,7 @@ export interface MediaBudgetProjection {
   totalMediaBytes: number;
 }
 
-interface ModelMediaPolicyProjection {
+export interface ModelMediaPolicyProjection {
   capabilityProjection: MediaCapabilityProjection;
   mediaBudgetProjection: MediaBudgetProjection;
   messages: ModelInputMessage[];

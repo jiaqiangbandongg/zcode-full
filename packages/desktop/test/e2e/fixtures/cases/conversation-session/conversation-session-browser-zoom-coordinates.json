@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-zoom-coordinates",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-zoom-coordinates.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-browser-zoom-coordinates.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "zoom-title",
+      "description": "Browser Use case 内固定标题响应，避免异步标题请求污染主链 matcher。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不是本用例产品语义，只需稳定返回并与 Browser tool continuation 隔离。"
+    },
+    {
+      "id": "zoom-action-0",
+      "description": "缩放回归第 0 轮截图与固定坐标点击",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-final-0",
+      "description": "第 0 轮正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-action-1",
+      "description": "缩放回归第 1 轮截图与固定坐标点击",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-final-1",
+      "description": "第 1 轮正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-action-2",
+      "description": "缩放回归第 2 轮截图与固定坐标点击",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-final-2",
+      "description": "第 2 轮正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-action-3",
+      "description": "缩放回归第 3 轮截图与固定坐标点击",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-final-3",
+      "description": "第 3 轮正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-action-4",
+      "description": "缩放回归第 4 轮截图与固定坐标点击",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-final-4",
+      "description": "第 4 轮正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-natural-action",
+      "description": "普通前台缩小后的自然 viewport、media query、截图像素及 trusted click",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-natural-final",
+      "description": "自然 viewport 回归正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用，真实截图和鼠标事件仍经过 Node REPL、Host、Main 与 Chromium；排除视觉识别误差。"
+    },
+    {
+      "id": "zoom-recovery-action",
+      "description": "110% 后台截图后暂停工具，真实 guest 重建后继续点击自然 viewport",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用与故障时序，后台截图、guest 崩溃重建和鼠标输入使用真实 Electron 产品链路。"
+    },
+    {
+      "id": "zoom-recovery-final",
+      "description": "guest 换代坐标回归正常完成",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型工具调用与故障时序，后台截图、guest 崩溃重建和鼠标输入使用真实 Electron 产品链路。"
+    }
+  ]
+}

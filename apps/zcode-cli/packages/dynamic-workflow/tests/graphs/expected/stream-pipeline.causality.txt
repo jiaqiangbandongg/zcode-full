@@ -1,0 +1,24 @@
+phase phase#1 "Gather facts from three angles" @17:3
+phase phase#2 "Verify each fact as it arrives" @31:3
+phase phase#3 "Write the report" @43:1
+lane actor#1 name-head="researcher-" @21:29 families=fanout#1
+lane actor#2 name-head="verifier-" @35:25 families=fanout#2,loop#1
+lane actor#3 "writer" @44:8
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @20:7 label="map"
+region fanout#2 fanout parent=seq#1 @33:5 label="map"
+region loop#1 loop parent=fanout#2 @34:7
+step ask#1 ask "ask" label-head="researcher-" @21:58 lane=actor#1 phase=phase#1 region=fanout#1 maybe serial
+step ask#2 ask "ask" label-head="verifier-" @35:54 lane=actor#2 phase=phase#2 region=loop#1 maybe serial
+step ask#3 ask "writer" @44:24 lane=actor#3 phase=phase#3 region=seq#1 always
+edge ask#1 -> ask#1 carry maybe
+edge ask#1 -> ask#2 data maybe exact
+edge ask#1 -> ask#3 data maybe exact
+edge ask#2 -> ask#2 carry maybe
+edge ask#2 -> ask#3 seq maybe
+phase-edge phase#1 -> phase#1 carry maybe
+phase-edge phase#1 -> phase#2 data maybe
+phase-edge phase#1 -> phase#3 data maybe
+phase-edge phase#2 -> phase#2 carry maybe
+phase-edge phase#2 -> phase#3 seq maybe
+sink ask#3

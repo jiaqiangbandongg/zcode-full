@@ -15,7 +15,7 @@ import { ZCODE_AGENT_RUNTIME_UNAVAILABLE_CODE } from "@zcode/services";
 import { logger } from "@/logger.js";
 import type { SessionsIndexTransport } from "@/v4/agentSessionsIndexTransport.js";
 
-interface SessionsIndexState {
+export interface SessionsIndexState {
   /** workspaceId → 已知；null = 尚无 snapshot。 */
   workspaceId: string | null;
   logEpoch: string | null;
@@ -25,7 +25,7 @@ interface SessionsIndexState {
   sessions: Map<string, SessionSummary>;
 }
 
-const EMPTY_SESSIONS_INDEX_STATE: SessionsIndexState = {
+export const EMPTY_SESSIONS_INDEX_STATE: SessionsIndexState = {
   workspaceId: null,
   logEpoch: null,
   seq: 0,
@@ -84,7 +84,7 @@ async function unsubscribeIgnoringFailure(
   }
 }
 
-interface ApplySessionsIndexResult {
+export interface ApplySessionsIndexResult {
   state: SessionsIndexState;
   /** true = 帧区间断档（fromSeq 与水位不衔接），调用方应重订阅。 */
   gap: boolean;

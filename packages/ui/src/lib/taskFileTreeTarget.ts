@@ -3,14 +3,14 @@ import { getPathLeaf } from "@/lib/path.js";
 import { buildTaskWorkspaceKey } from "@/lib/taskQueryCache.js";
 import type { WorkspaceTabState } from "@/store/tabStore.js";
 
-interface TaskFileTreeTarget {
+export interface TaskFileTreeTarget {
   workspacePath: string;
   workspaceName: string;
   workspaceIdentity?: string;
   workspaceRemoteSessionId?: string;
 }
 
-function resolveTaskFileTreeTarget(
+export function resolveTaskFileTreeTarget(
   task: ZCodeTaskMeta,
   tab: WorkspaceTabState | undefined,
 ): TaskFileTreeTarget | null {

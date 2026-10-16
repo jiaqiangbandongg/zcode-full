@@ -1,0 +1,4 @@
+phase phase#1
+participant phase#1:actor#1 "gatekeeper" steps=ask#1
+phase phase#2
+participant phase#2:actor#2 "actor" steps=ask#2

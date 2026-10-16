@@ -29,7 +29,12 @@ Add the following component to your frontend:
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai-elements/sources";
+import {
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
+} from "@/components/ai-elements/sources";
 import {
   PromptInput,
   type PromptInputMessage,
@@ -41,7 +46,11 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
 import { useState } from "react";
 import { DefaultChatTransport } from "ai";
 
@@ -71,7 +80,11 @@ const SourceDemo = () => {
                   {message.role === "assistant" && (
                     <Sources>
                       <SourcesTrigger
-                        count={message.parts.filter((part) => part.type === "source-url").length}
+                        count={
+                          message.parts.filter(
+                            (part) => part.type === "source-url"
+                          ).length
+                        }
                       />
                       {message.parts.map((part, i) => {
                         switch (part.type) {
@@ -112,7 +125,10 @@ const SourceDemo = () => {
           </Conversation>
         </div>
 
-        <PromptInput onSubmit={handleSubmit} className="mt-4 w-full max-w-2xl mx-auto relative">
+        <PromptInput
+          onSubmit={handleSubmit}
+          className="mt-4 w-full max-w-2xl mx-auto relative"
+        >
           <PromptInputTextarea
             value={input}
             placeholder="Ask a question and search the..."
@@ -176,25 +192,25 @@ See `scripts/sources-custom.tsx` for this example.
 
 ### `<Sources />`
 
-| Prop       | Type                                   | Default | Description                                 |
-| ---------- | -------------------------------------- | ------- | ------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the root div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the root div. |
 
 ### `<SourcesTrigger />`
 
-| Prop       | Type                                              | Default  | Description                                                     |
-| ---------- | ------------------------------------------------- | -------- | --------------------------------------------------------------- |
-| `count`    | `number`                                          | Required | The number of sources to display in the trigger.                |
-| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | -        | Any other props are spread to the CollapsibleTrigger component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `count` | `number` | Required | The number of sources to display in the trigger. |
+| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | - | Any other props are spread to the CollapsibleTrigger component. |
 
 ### `<SourcesContent />`
 
-| Prop       | Type                                   | Default | Description                                          |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the content container. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the content container. |
 
 ### `<Source />`
 
-| Prop       | Type                                            | Default | Description                                       |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------- |
-| `...props` | `React.AnchorHTMLAttributes<HTMLAnchorElement>` | -       | Any other props are spread to the anchor element. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.AnchorHTMLAttributes<HTMLAnchorElement>` | - | Any other props are spread to the anchor element. |

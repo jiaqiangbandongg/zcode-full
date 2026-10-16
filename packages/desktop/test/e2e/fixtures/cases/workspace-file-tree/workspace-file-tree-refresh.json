@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "workspace-file-tree-refresh",
+  "spec": "./test/e2e/workspace-file-tree-refresh.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "runtime-workspace-files",
+      "path": "e2e-file-tree-refresh/",
+      "purpose": "测试在真实 workspace 文件系统里重命名和新增文件，验证文件树刷新按钮和 watcher 实时更新。"
+    }
+  ],
+  "requests": []
+}

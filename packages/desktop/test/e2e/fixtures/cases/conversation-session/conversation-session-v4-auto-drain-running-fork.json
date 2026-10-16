@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-auto-drain-running-fork",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-auto-drain-running-fork.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-auto-drain-running-fork.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-auto-drain-fork-q0-controlled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "Q1/Q2 必须在 Q0 running 时先进入 CLI 权威队列，真实 provider 速度无法稳定保证 admission 窗口。"
+    },
+    {
+      "id": "v4-auto-drain-fork-q1-stable-a1",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "需要在 Q2 晋升 running 前形成确定的 completedSuccess A1 logical boundary。"
+    },
+    {
+      "id": "v4-auto-drain-fork-q2-controlled",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "running stable fork 需要 Q2 可控地保持 active；真实 provider 可能在点击 A1 前完成。"
+    }
+  ]
+}

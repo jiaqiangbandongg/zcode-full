@@ -1,4 +1,4 @@
-import type { ApiClient } from "@zcode/shared";
+import { API_KEY_USAGE_SCENE, type ApiClient } from "@zcode/shared";
 import { readApiJson } from "#src/providers/api/apiJson.js";
 
 const BIGMODEL_TEAM_PLAN_API_KEY_NAME = "zcode-team-api-key";
@@ -13,10 +13,6 @@ export interface BigModelTeamPlanApiKeySummary {
   apiKey?: string | null;
   keyType?: number | null;
   name?: string | null;
-}
-
-interface BigModelTeamPlanApiKeySecret {
-  secretKey?: string | null;
 }
 
 interface BigModelBizEnvelope<T> {
@@ -70,10 +66,13 @@ export function createBigModelBizHeaders(
 function createBigModelTeamPlanApiKeyPayload(): {
   keyType: typeof BIGMODEL_TEAM_PLAN_API_KEY_TYPE;
   name: typeof BIGMODEL_TEAM_PLAN_API_KEY_NAME;
+  usageScene: typeof API_KEY_USAGE_SCENE.CODING_PLAN;
 } {
   return {
     name: BIGMODEL_TEAM_PLAN_API_KEY_NAME,
     keyType: BIGMODEL_TEAM_PLAN_API_KEY_TYPE,
+    // keyType 描述团队 Key 类型，usageScene 描述编程套餐用途，两者不能互相替代。
+    usageScene: API_KEY_USAGE_SCENE.CODING_PLAN,
   };
 }
 
@@ -121,7 +120,11 @@ export async function ensureBigModelTeamPlanProjectApiKeyWithStatus(params: {
   };
   const existingApiKey = apiKeys.find(isUsableBigModelTeamPlanApiKey) ?? null;
   if (existingApiKey) {
-    return { apiKey: existingApiKey, diagnostics: { list: listDiagnostics }, status: "existing" };
+    return {
+      apiKey: existingApiKey,
+      diagnostics: { list: listDiagnostics },
+      status: "existing",
+    };
   }
 
   // 一个账号可能有多个 Team Plan 项目，每个项目都需要自己的 keyType=2
@@ -155,31 +158,6 @@ export async function ensureBigModelTeamPlanProjectApiKeyWithStatus(params: {
     },
     status: createdApiKey ? "created" : "missing",
   };
-}
-
-export async function copyBigModelTeamPlanProjectApiKeySecret(params: {
-  apiClient: ApiClient;
-  authorization: string;
-  apiKey: string;
-  host: string;
-  teamContext: BigModelTeamPlanBizContext;
-  timeoutMs: number;
-}): Promise<string | null> {
-  const copyPayload = await readApiJson<BigModelBizEnvelope<BigModelTeamPlanApiKeySecret>>(
-    params.apiClient,
-    `${buildBigModelTeamPlanApiKeysUrl(params.host, params.teamContext)}/copy/${encodeURIComponent(
-      params.apiKey,
-    )}`,
-    {
-      method: "GET",
-      timeoutMs: params.timeoutMs,
-      headers: createBigModelBizHeaders(params.authorization, params.teamContext),
-    },
-  );
-  const secretKey = isSuccessfulBigModelBizEnvelope(copyPayload)
-    ? (copyPayload.data?.secretKey?.trim() ?? "")
-    : "";
-  return secretKey || null;
 }
 
 function buildBigModelTeamPlanApiKeysUrl(

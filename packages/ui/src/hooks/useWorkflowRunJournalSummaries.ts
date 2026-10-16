@@ -27,7 +27,7 @@ import { useV4Conversation } from "@/v4/V4ConversationContext.js";
  * 所以两个模式都收——reasonCode 若被透传就命中它，否则命中构造函数写死的能力名。
  * 刻意**不**把 `sessionNotFound` 算成能力缺席：那正是值得重试的那一种。
  */
-function isWorkflowRunsCapabilityMissing(error: unknown): boolean {
+export function isWorkflowRunsCapabilityMissing(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("capabilityUnsupported") || message.includes("listDynamicWorkflowRuns");
 }

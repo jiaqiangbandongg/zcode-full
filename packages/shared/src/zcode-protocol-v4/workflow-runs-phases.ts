@@ -3,6 +3,7 @@ import {
   type WorkflowRunPhase,
   type WorkflowRunState,
 } from "./workflow-runs.js";
+import { readPhaseHoles } from "./workflow-runs-holes.js";
 
 /**
  * `phase-entered` 的归约：控制流经过了
@@ -37,7 +38,15 @@ export function reduceRunLaunched(
   }
   if (phaseNames.length === 0) return run;
   const phaseAlongside = readPhaseAlongside(payload.phaseAlongside, phaseNames.length);
-  return { ...run, phaseNames, ...(phaseAlongside === undefined ? {} : { phaseAlongside }) };
+  // 留白下标表（docs/dynamic-workflow/presentation.md「Holes on the timeline」）与「同时在跑」表同一姿态：
+  // 搭声明表的车，下标按被接受的那张表裁。
+  const phaseHoles = readPhaseHoles(payload.holes, phaseNames.length);
+  return {
+    ...run,
+    phaseNames,
+    ...(phaseAlongside === undefined ? {} : { phaseAlongside }),
+    ...(phaseHoles === undefined ? {} : { phaseHoles }),
+  };
 }
 
 /**

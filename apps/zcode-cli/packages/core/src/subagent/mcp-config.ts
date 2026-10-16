@@ -1,5 +1,45 @@
-import type { McpServerStatus } from "@zcode/contracts";
+import type { McpServerConfig, McpServerStatus } from "@zcode/contracts";
 import { matchesModelVisibleMcpServerName } from "../mcp/name.js";
+
+export interface ParsedAgentMcpServers {
+  invalidServerNames: string[];
+  missingServerNames: string[];
+  scopedServers: Record<string, McpServerConfig>;
+}
+
+export function parseAgentMcpServers(
+  mcpServers: readonly unknown[] | undefined,
+  configuredServers: Record<string, McpServerConfig>,
+): ParsedAgentMcpServers {
+  const invalidServerNames: string[] = [];
+  const missingServerNames: string[] = [];
+  const scopedServers: Record<string, McpServerConfig> = {};
+  for (const spec of mcpServers ?? []) {
+    if (typeof spec === "string" && spec.trim().length > 0) {
+      const serverName = spec.trim();
+      const config = configuredServers[serverName];
+      if (!config) {
+        missingServerNames.push(serverName);
+      } else if (!isMcpServerConfig(config)) {
+        invalidServerNames.push(serverName);
+      } else {
+        scopedServers[serverName] = config;
+      }
+      continue;
+    }
+    if (!isRecord(spec)) continue;
+    for (const [serverName, config] of Object.entries(spec)) {
+      const normalizedServerName = serverName.trim();
+      if (normalizedServerName.length === 0) continue;
+      if (!isMcpServerConfig(config)) {
+        invalidServerNames.push(normalizedServerName);
+        continue;
+      }
+      scopedServers[normalizedServerName] = config;
+    }
+  }
+  return { invalidServerNames, missingServerNames, scopedServers };
+}
 
 export function matchesRequiredMcpServer(
   requiredName: string,
@@ -19,6 +59,17 @@ export function matchesRequiredMcpServer(
   );
 }
 
+export function matchesScopedMcpServer(
+  requiredName: string,
+  scopedServers: Record<string, McpServerConfig>,
+): boolean {
+  const serverNames = Object.keys(scopedServers);
+  if (requiredName === "*") return serverNames.length > 0;
+  return serverNames.some((serverName) =>
+    matchesModelVisibleMcpServerName(requiredName, serverName),
+  );
+}
+
 export function extractRequiredMcpServerNames(allowedTools: readonly string[]): string[] {
   const names = new Set<string>();
   for (const tool of allowedTools) {
@@ -34,4 +85,15 @@ function extractRequiredMcpServerName(tool: string): string | undefined {
   if (!trimmed.startsWith("mcp__")) return undefined;
   const [, serverName] = trimmed.split("__");
   return serverName && serverName.length > 0 ? serverName : undefined;
+}
+
+function isMcpServerConfig(value: unknown): value is McpServerConfig {
+  if (!isRecord(value)) return false;
+  if (value.type === "stdio") return typeof value.command === "string";
+  if (value.type === "http" || value.type === "sse") return typeof value.url === "string";
+  return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

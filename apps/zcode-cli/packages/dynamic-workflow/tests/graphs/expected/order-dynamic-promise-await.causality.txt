@@ -1,0 +1,10 @@
+lane actor#1 "left" @6:14
+lane actor#2 "right" @7:15
+lane actor#3 "summarizer" @10:23
+region seq#1 seq
+step ask#1 ask "left" @6:28 lane=actor#1 region=seq#1 always
+step ask#2 ask "right" @7:30 lane=actor#2 region=seq#1 always
+step ask#3 ask "summarizer" @10:43 lane=actor#3 region=seq#1 always
+edge ask#1 -> ask#3 seq maybe
+edge ask#2 -> ask#3 seq maybe
+sink ask#1,ask#2,ask#3

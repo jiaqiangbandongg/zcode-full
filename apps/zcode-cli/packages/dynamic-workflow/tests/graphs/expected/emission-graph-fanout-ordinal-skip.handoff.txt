@@ -1,0 +1,3 @@
+phase unphased
+participant unphased:actor#1[0] "w" member=0/2 steps=ask#1
+participant unphased:actor#1[1] "w" member=1/2 steps=ask#1

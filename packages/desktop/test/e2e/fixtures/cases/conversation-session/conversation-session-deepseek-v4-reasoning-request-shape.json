@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-deepseek-v4-reasoning-request-shape",
+  "spec": "./test/e2e/conversation-session/conversation-session-deepseek-v4-reasoning-request-shape.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-deepseek-v4-reasoning-request-shape.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-v4-reasoning-request-shape-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中 high/max 业务 fixture。"
+    },
+    {
+      "id": "upstream-v4-reasoning-high-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在会话内切换 high 后的 provider/model 身份、OpenAI-compatible transport 和请求 body；响应只需稳定完成并包含约定文本。"
+    },
+    {
+      "id": "upstream-v4-reasoning-max-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心断言在 custom provider 只保存 model ID 时，Agent resolver 默认 max 的 DeepSeek V4 请求 body；响应只需稳定完成并包含约定文本。"
+    }
+  ]
+}

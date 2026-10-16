@@ -1,0 +1,8 @@
+node source
+node world-read#1 "glob *.md" @6:27 type="string[]"
+node ask#1 "summarizer" @11:28 actors=actor#1 type="string"
+node sink
+actor actor#1 "summarizer" @11:8
+edge source -> world-read#1 data exact
+edge world-read#1 -> ask#1 data exact type="string[]"
+edge ask#1 -> sink data exact type="string"

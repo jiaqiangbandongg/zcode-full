@@ -1,0 +1,850 @@
+{
+  "version": 1,
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-context-boundaries.test.ts",
+  "fixtures": [
+    {
+      "id": "scb-title",
+      "description": "scb-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 5,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SCB_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "Context boundaries",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-seed-tool",
+      "description": "scb-seed-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_seed",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-context-reviewer",
+              "description": "seed",
+              "prompt": "E2E_SCB_SEED_CHILD",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-seed-final",
+      "description": "scb-seed-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_seed", "E2E_SCB_SEED:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_SEED_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-seed-child",
+      "description": "scb-seed-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_SEED_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_scb_seed_read",
+          "name": "Read",
+          "inputTokens": 32,
+          "input": {
+            "file_path": "./missing-boundary-fixture.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "scb-seed-child-final",
+      "description": "scb-seed-child-final",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_SEED_CHILD", "toolu_scb_seed_read"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_SEED_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-running-tool",
+      "description": "scb-running-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_RUNNING:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_running",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-context-reviewer",
+              "description": "running",
+              "prompt": "E2E_SCB_RUNNING_CHILD",
+              "run_in_background": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-running-final",
+      "description": "scb-running-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_running", "E2E_SCB_RUNNING:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-running-child",
+      "description": "scb-running-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_RUNNING_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_scb_running_read",
+          "name": "Read",
+          "inputTokens": 32,
+          "input": {
+            "file_path": "./missing-boundary-fixture.txt"
+          }
+        },
+        "delayMs": 60000
+      }
+    },
+    {
+      "id": "scb-running-continuation",
+      "description": "scb-running-continuation",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_RUNNING_CHILD", "toolu_scb_running_read"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:",
+          "E2E_SCB_DELIVER_NEXT"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-running-message-next",
+      "description": "running child consumes the next queued coordinator message",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SCB_PROFILE_",
+          "E2E_SCB_RUNNING_CHILD",
+          "toolu_scb_running_read",
+          "E2E_SCB_DELIVER_RECOVERED",
+          "E2E_SCB_DELIVER_NEXT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-deliver-running-tool",
+      "description": "scb-deliver_running-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_DELIVER_RUNNING:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_recovered_message",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "summary": "recovered_message",
+              "message": "E2E_SCB_DELIVER_RECOVERED"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-deliver-running-final",
+      "description": "scb-deliver_running-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_recovered_message", "E2E_SCB_DELIVER_RUNNING:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_DELIVER_RUNNING_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-cross-tool",
+      "description": "scb-cross-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_CROSS:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_cross_message",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "summary": "cross_message",
+              "message": "E2E_SCB_DELIVER_NEXT"
+            }
+          },
+          {
+            "id": "toolu_scb_cross_spawn",
+            "name": "Agent",
+            "inputTokens": 32,
+            "input": {
+              "subagent_type": "e2e-context-reviewer",
+              "description": "cross_spawn",
+              "prompt": "E2E_SCB_CROSS_CHILD",
+              "run_in_background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-cross-final",
+      "description": "scb-cross-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_cross_message", "toolu_scb_cross_spawn", "E2E_SCB_CROSS:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_CROSS_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-cross-child",
+      "description": "scb-cross-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_CROSS_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_CROSS_CHILD_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-background-notification",
+      "description": "scb-background-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SCB_RUNNING_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_STABLE:",
+          "E2E_SCB_RUNNING_RESUME:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_BACKGROUND_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-running-resume-tool",
+      "description": "scb-running-resume-tool",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_RUNNING_RESUME:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_scb_running_resume",
+          "name": "SendMessage",
+          "inputTokens": 32,
+          "input": {
+            "to": "{{latestAgentId}}",
+            "summary": "Resume completed running child",
+            "message": "E2E_SCB_RUNNING_RESUME_CHILD"
+          }
+        }
+      }
+    },
+    {
+      "id": "scb-running-resume-child",
+      "description": "scb-running-resume-child",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_RUNNING_RESUME_CHILD", "E2E_SCB_PROFILE_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_RESUME_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "scb-running-resume-final",
+      "description": "scb-running-resume-final",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_running_resume", "resumed it in the background"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_RESUME_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-running-resume-notification",
+      "description": "scb-running-resume-notification",
+      "maxMatches": 1,
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SCB_RUNNING_RESUME_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_STABLE:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_RUNNING_RESUME_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-stable-retry",
+      "description": "scb-stable-retry",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_STABLE:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 503,
+        "body": "{\"error\":{\"type\":\"overloaded_error\",\"message\":\"E2E retry boundary\"}}",
+        "headers": {
+          "content-type": "application/json"
+        },
+        "delayMs": 25000
+      }
+    },
+    {
+      "id": "scb-stable-tool",
+      "description": "scb-stable-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_STABLE:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_stable",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "summary": "stable",
+              "message": "E2E_SCB_STABLE_CHILD"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-stable-final",
+      "description": "scb-stable-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_stable", "E2E_SCB_STABLE:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_STABLE_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-stable-child",
+      "description": "scb-stable-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_STABLE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_STABLE_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "scb-stable-notification",
+      "description": "scb-stable-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SCB_STABLE_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_NEXT:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_STABLE_NOTED",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-next-tool",
+      "description": "scb-next-tool",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SCB_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_scb_next",
+            "name": "SendMessage",
+            "inputTokens": 32,
+            "input": {
+              "to": "{{latestAgentId}}",
+              "summary": "next",
+              "message": "E2E_SCB_NEXT_CHILD"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "scb-next-final",
+      "description": "scb-next-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["toolu_scb_next", "E2E_SCB_NEXT:"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_NEXT_DONE",
+          "inputTokens": 32
+        }
+      }
+    },
+    {
+      "id": "scb-next-child",
+      "description": "scb-next-child",
+      "metadata": {
+        "kind": "subagent",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SCB_PROFILE_", "E2E_SCB_NEXT_CHILD"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_SCB_SEED:",
+          "E2E_SCB_RUNNING:"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_NEXT_CHILD_DONE",
+          "inputTokens": 32
+        },
+        "delayMs": 1500
+      }
+    },
+    {
+      "id": "scb-next-notification",
+      "description": "scb-next-notification",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "仅用 provider 回放及测试 stdio 代理控制时序/读取故障；真实 Settings、Host、CLI 和 child runtime 执行，生产代码和依赖不变。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>completed</status>"],
+        "bodyIncludes": ["E2E_SCB_NEXT_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "E2E_SCB_NEXT_NOTED",
+          "inputTokens": 32
+        }
+      }
+    }
+  ],
+  "caseName": "conversation-session-subagent-context-boundaries"
+}

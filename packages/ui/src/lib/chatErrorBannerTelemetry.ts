@@ -8,13 +8,14 @@ import { logger } from "@/logger.js";
 import {
   getProviderBusinessErrorUiAction,
   isProviderBusinessErrorCode,
+  resolveRequestVerificationBusinessCode,
   type ProviderBusinessErrorUiAction,
 } from "@/lib/providerBusinessError.js";
 import { resolveTelemetryAttribution } from "@/lib/chatErrorAttribution.js";
 import type { ZCodeUiError } from "@/lib/zcodeUiError.js";
 
-const CHAT_ERROR_BANNER_ARMS_EVENT_NAME = "chat_error_banner";
-const CHAT_ERROR_BANNER_ARMS_GROUP = "ui_error";
+export const CHAT_ERROR_BANNER_ARMS_EVENT_NAME = "chat_error_banner";
+export const CHAT_ERROR_BANNER_ARMS_GROUP = "ui_error";
 export type ChatErrorBannerSurface = "chat_input_error_banner" | "session_subscription_error";
 
 const CHAT_ERROR_BANNER_MESSAGE_LIMIT = 500;
@@ -45,7 +46,10 @@ export function resolveVisibleChatErrorTelemetryRecoveryAction(
   error: Pick<ZCodeUiError, "code" | "message">,
 ): ChatProviderBusinessRecoveryAction | null {
   // 修复原因：旧 UI 会把普通 provider 业务错误的可见恢复动作作为聚合维度上报；
-  // 无可见动作的业务码（如 3007/3001）在这里自然返回 null，不再上报动作维度。
+  // 3007 的 request verification retry 是内部自动恢复动作，不显示按钮，因此必须继续留空。
+  if (resolveRequestVerificationBusinessCode(error.code, error.message)) {
+    return null;
+  }
   if (!isProviderBusinessErrorCode(error.code)) {
     return null;
   }
@@ -112,7 +116,7 @@ function resolveErrorKey(params: {
   ].join(":");
 }
 
-function buildChatErrorBannerTelemetryPayload(params: {
+export function buildChatErrorBannerTelemetryPayload(params: {
   surface?: ChatErrorBannerSurface;
   errorKey?: string | null;
   displayMessage: string;

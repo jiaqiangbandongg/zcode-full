@@ -7,7 +7,7 @@ function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function buildWorkspaceKey(workspacePath: string, workspaceIdentity: string | null): string {
+export function buildWorkspaceKey(workspacePath: string, workspaceIdentity: string | null): string {
   return workspaceIdentity?.trim() || workspacePath;
 }
 

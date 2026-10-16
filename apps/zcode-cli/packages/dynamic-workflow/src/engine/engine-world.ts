@@ -9,7 +9,7 @@
 import { canonicalJson, inputHash } from "./hash.js";
 import { heldResolution } from "./replay-order.js";
 import { boundWorldReadInput } from "./world-read-input.js";
-import { hashMismatch } from "./scheduler.js";
+import { hashMismatch } from "./hash-mismatch.js";
 import type { EngineState } from "./engine-state.js";
 import type {
   InstanceRef,
@@ -49,7 +49,7 @@ export function readWorld(
     }
     // 完结命中短路（journal 化世界读取使 resume 免疫于 run 与 resume 之间的磁盘变化）。
     // 释放点过 replay 次序闸：一条扇出分支里的 world 读取同样是别人的续体在等的东西，
-    // 按准入顺序放会把 join 之后的序号错位。
+    // 按准入顺序放会把 join 之后的序号错位（docs/execution-engine.md「Replaying the settle order」）。
     if (recorded.status === "completed") {
       return heldResolution(state.holdForReplay, instance, () => {
         state.record({ type: "node-settled", instance, outcome: "ok", cached: true });
@@ -207,7 +207,12 @@ export function recoverImportClosure(
   const live = new Set<string>();
   const queuedBeforeClose = new Set<string>();
   let closed = false;
-  for (const { event } of journal.listEvents(runId)) {
+  // 只读判定要的两种事件（docs/execution-engine.md「Reading the journal」）；类型过滤保序，
+  // 所以「node-queued 早于第一条 import-cache-closed」在过滤后的序列上照样成立。
+  for (const { event } of journal.listEvents(runId, {
+    types: ["node-queued", "import-cache-closed"],
+    reportItems: { limit: 0 },
+  })) {
     if (event.type === "import-cache-closed") closed = true;
     if (event.type !== "node-queued" || event.kind !== "ask") continue;
     const key = refToString(event.instance);

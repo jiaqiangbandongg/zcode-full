@@ -1,0 +1,54 @@
+# Conversation Session Fork Cross Product Matrix
+
+本文只收敛 fork 相关交叉组合，不枚举全排列。Fork 的产品语义按三个不变量剪枝：能否 fork、复制历史边界、继承未来 session 状态。
+
+来源 case：[conversation-session-case-catalog.md](../conversation-session-case-catalog.md) 的 `E/K/N/P`，以及 goal 专项矩阵的 `G3`。
+
+```text
+parent: stable turn S ---- current running turn R ---- future work
+               |
+               +-- fork(S) --> child: transcript <= S
+
+parent R / queue / background / continuation / shared workspace 原样继续
+```
+
+## 剪枝口径
+
+| 不变量 | 口径 | 说明 |
+| --- | --- | --- |
+| 能否 fork | 只允许 `completedSuccess` product turn 最后一段 completed assistant，但父 session 不必 completed | primary turn、foreground subagent、goal continuation 或 goal verifier 运行时都可 fork 更早稳定 target；compact 是 operation lock。当前 streaming/interrupted/failed partial、中间 assistant 段、user/tool/timeline 和无稳定 target 都拒绝 |
+| 复制历史边界 | child 只拿 fork 点及之前的稳定历史 | 新数据以持久化 turn anchor 解析固定 turnId、ordered messageIds 与 boundaryMessageId；旧数据只在无歧义时 fallback，否则拒绝。fork 点之后的父历史不进入 child；目标 turn 内 tool block 与最终 assistant 按逻辑边界整体进入 child |
+| 继承未来 session 状态 | child 继承 fork 点配置/历史状态，不复制父未来工作 | 模型、思考深度、provider 及当前模型的思考档位能力按 fork 点 runtime 快照继承；goal 只继承 fork 点之前的 target + verifier timeline。父 queue 保留，child queue 为空；live active/background work、pending background result 和 continuation inbox 只属于父 session |
+| running workspace 边界 | running fork 只复制对话，不 rewind 共享 workspace | 父 session 和共享文件原样继续；completed/idle 的既有 workspace checkpoint 行为本轮不扩大 |
+| timeline 投影 | fork notice 是 turn boundary | fork timeline 不进入 assistant 工作历史，也不被“已工作”折叠 |
+
+## 核心交叉 case
+
+| ID | 交叉维度 | 前置状态 | 用户/系统事件 | 期望结果 | 覆盖状态 | 自动化 |
+| --- | --- | --- | --- | --- | --- | --- |
+| FX01 | 基础成功态 + session 配置 | `completed(success)`，fork 点是 assistant message，父 session 可有当前模型/思考深度；历史中可包含 auto compact 和 tool block | fork assistant message | 创建 child；child 包含 fork 点及之前可见 transcript，compact 只影响模型恢复上下文、不裁剪 UI 历史；后续请求使用 fork 时父 session 的模型/思考深度；child queue 为空 | covered | `FK`、`MF/N04` |
+| FX02 | interrupted partial + held queue | stop 后形成 `completed(interrupted)` assistant partial，父 queue 可为 0 或 held，`autoDrain=false` | fork interrupted assistant partial | fork 入口 absent/disabled 或请求被 reject；不创建 child；父 queue 保留且不自动消费 | covered | `IA/E02-E03` |
+| FX03 | goal state 继承 + queue 不复制 | fork 点为 `completed(success)` assistant；父 session fork 前已有 goal/target，父 queue 任意 | fork stable assistant message | 创建 child；child 继承 fork 点之前的 goal target、iteration、verifier timeline；child queue 为空；FK 不用 renderer fixture 证明父 queue 跨切换恢复 | covered | `conversation-session-fork.test.ts` |
+| FX04 | failed/error partial 禁 fork | `error`，或 assistant turn 只有 failed/error partial、没有进入稳定 `completed(success)` 产品最终态 | fork assistant partial | fork 入口 disabled 或请求被 reject；不创建 child；不写入 fork timeline | missing | 建议补 `conversation-session-fork.test.ts` 或 fault 专项 |
+| FX05 | 非 assistant 目标 | 任意非 running 状态，目标是 user message、tool message 或 timeline marker | fork target | fork 入口不存在或 disabled；不创建 child | covered | `FK`、`TA` |
+| FX06 | running stable target | 父 session `running`，存在已稳定 assistant target；当前 primary turn、foreground subagent、goal continuation 或 goal verifier 仍在运行 | fork stable assistant message | 创建 child；child 只复制 fork 点前稳定 transcript、配置与 fork 点前 goal 状态，不复制 queue/active/background/continuation，不 rewind 共享 workspace；父 session 原样继续 | partial | `PV4-08` controlled-stream replay 已通过并留在 manual-review/pending；尚缺 background/continuation 代表 case 与人审转正 |
+| FX07 | edit/rerun active branch + fork | 父 session 曾 edit 旧 user query 并完成重跑，历史里同时存在旧分支和编辑后 active branch | fork 编辑后 assistant message | 创建 child；child 复制编辑后的 active branch；被 edit/rewind 掉的旧 user/assistant 分支不进入 child | covered | `conversation-session-fork.test.ts` |
+| FX08 | merged raw assistant + tool write | 同一逻辑 assistant turn 内先返回 tool_use，工具写入 workspace handoff 文件，随后才返回最终 assistant 文本；UI 将这些 raw assistant 合并成一条可见 assistant | fork 最终可见 assistant message | 创建 child；按目标 logical turn 的 ordered messageIds/boundaryMessageId 复制最终 assistant、对应 tool block 和该 turn 已产生的 workspace 文件事实；不得使用早段 raw assistant id 截断历史 | covered | `FM/E10` 正式 V4 replay 已转绿 |
+| FX09 | background work pending | 父 session 已 completed 或仍 running；background bash/subagent pending 或刚返回但 background result 尚未消费 | fork stable assistant message | 创建 child；child 不复制 live background bash/subagent、pending background result 或 continuation inbox；父 background 完成后只唤醒父 session | missing | 待补 background fork case |
+| FX10 | compact lock + 当前未收口 turn | `activeWork.kind=compact`，或 primary/subagent/goal continuation/goal verifier 的目标是当前 streaming/interrupted/failed/middle assistant | fork assistant message | compact 期间任何 fork 都拒绝；当前未收口 assistant 目标拒绝，但 goal verifier 运行不得屏蔽更早稳定 target | partial | `CA` 只覆盖 compact lock；当前 partial 负例待补 |
+| FX11 | 模型能力 + child 冷订阅 | `completed(success)`，父 runtime 使用非通用五档模型（代表：GLM-5.2=`max/high/nothink`） | fork stable assistant，检查 live child，冷订阅后发送后续输入 | 原子 fork bundle 写入现有扁平 `runtime/model_selection`；child live snapshot、冷恢复 snapshot 与后续 provider 请求使用同一 `provider/model/thought`，菜单精确显示 `high/max/nothink`。旧 child 缺 entry 时仅从配对 fork notice 恢复 variant | partial | `VK/E11` 已覆盖模型能力目录；本次补 core bundle、bootstrap legacy cold-resume 与 provider request 断言 |
+| FX12 | session-scoped Side Pane tab + child 切换 | desktop continuous 父任务 A 已打开辅助对话 tab；目标 assistant 为 `completed(success)` | fork stable assistant 并自动切到 child B；在 B 展开 Side Pane；再切回 A | B 的可见 tab 集为空时显示“打开标签页”启动页，不得把 workspace 中 A 的隐藏 tab 当作当前可渲染内容而出现空白；切回 A 恢复同一辅助对话 tab/child/草稿 | pending | `SSC22`；`manual-review/pending/conversation-session-fork-side-pane-empty-state.test.ts` |
+
+## 不纳入本矩阵的组合
+
+| 组合 | 剪枝原因 |
+| --- | --- |
+| queue length 的 `0/1/2/3+` 全排列 | queue 一律不复制，父 queue 保留；只需要证明 `queue=0` 与 `queue>0 held` 两类 |
+| background bash/subagent 数量和运行时长全排列 | live background work 一律不复制，父 background result 只回父 session；只需要证明 pending 与 returned-but-not-consumed 两类 |
+| goal 与模型/思考深度的全排列 | 它们同属 session 级未来状态，分别用 `FX01`、`FX03` 覆盖继承口径 |
+| 每个 provider / 模型 × fork 的全排列 | 能力列表由 child runtime 的当前模型权威投影；`FX11` 用“非通用五档”代表即可。桌面本地 completed 路径证明产品语义，手机 replayable、SSH/WSL/Docker 与 running fork 不重复扩展状态组合，只需协议 snapshot/delta 共用同一字段 |
+| 每种 session-scoped tab × fork × 各端/主题/语言 | `FX12` 用辅助对话 tab + desktop continuous 代表 `visibleTabs=[]` 的共同 renderer 分支；subagent/plan 等类型不重复，remote/mobile 与 replayable、theme/locale 不叉乘 |
+| primary / foreground subagent / goal continuation / goal verifier × 所有 target 形态 | `FX06` 用运行阶段代表证明更早稳定 target 可 fork，`FX10` 用未收口 target 代表负例 |
+| 每个 tool name 与 fork 的全排列 | 工具叉乘已由 [conversation-session-tool-cross-product-matrix.md](./conversation-session-tool-cross-product-matrix.md) 负责；fork 矩阵只额外保留 `FX08` 这种同一可见 assistant 合并多条 raw assistant 后的历史边界回归 |
+| edit 之后再叠加 goal/queue/model | edit 只改变 fork 的 active branch 历史边界；goal/queue/model 分别由 `FX01`、`FX03`、`FX07` 覆盖，不做全排列 |
+| failed compact / 网络错误 / 磁盘错误引发的故障态 fork | 属于环境故障 catalog；本矩阵只固化 failed/error partial 不是可 fork 的产品最终态 |

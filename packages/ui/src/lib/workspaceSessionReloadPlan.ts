@@ -1,11 +1,32 @@
 import type { ZCodeProvider, ZCodeError } from "@zcode/shared";
 import { buildWorkspacePrepareUiError } from "@/lib/chatPrepareError.js";
 
-const WORKSPACE_SESSION_RELOAD_DEBOUNCE_MS = 1200;
+export const WORKSPACE_SESSION_RELOAD_DEBOUNCE_MS = 1200;
+
+interface WorkspaceSessionReloadPlan {
+  resumeTaskId: string | undefined;
+  shouldPrepareWorkspace: boolean;
+}
 
 interface WorkspaceSessionReloadDraftErrorContext {
   workspacePath: string;
   provider: ZCodeProvider;
+}
+
+export function buildWorkspaceSessionReloadPlan(activeTaskId: string | null): WorkspaceSessionReloadPlan {
+  const resumeTaskId = activeTaskId?.trim();
+
+  if (!resumeTaskId) {
+    return {
+      resumeTaskId: undefined,
+      shouldPrepareWorkspace: true,
+    };
+  }
+
+  return {
+    resumeTaskId,
+    shouldPrepareWorkspace: false,
+  };
 }
 
 export function buildWorkspaceSessionReloadDraftError(

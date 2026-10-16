@@ -1,0 +1,75 @@
+phase phase#1 "总设计"
+phase phase#2 "并行构建"
+phase phase#3 "集成与门禁"
+phase phase#4 "视觉评审"
+phase phase#5 "终验与交付"
+node phase#1@1 mark phase=phase#1
+node ask#1@1 issue site=ask#1 phase=phase#1
+node phase#2@1 mark phase=phase#2
+node ask#2@1 issue site=ask#2 phase=phase#2
+node ask#3@1 issue site=ask#3 phase=phase#2
+node phase#3@1 mark phase=phase#3
+node world-read#1@1 issue site=world-read#1 phase=phase#3
+node ask#4@1 issue site=ask#4 phase=phase#3
+node world-read#2@1 issue site=world-read#2 phase=phase#3
+node ask#5@1 issue site=ask#5 phase=phase#3
+node phase#4@1 mark phase=phase#4
+node world-read#3@1 issue site=world-read#3 phase=phase#4
+node ask#6@1 issue site=ask#6 phase=phase#4
+node ask#7@1 issue site=ask#7 phase=phase#4
+node ask#8@1 issue site=ask#8 phase=phase#4
+node world-read#4@1 issue site=world-read#4 phase=phase#4
+node ask#9@1 issue site=ask#9 phase=phase#4
+node phase#5@1 mark phase=phase#5
+node world-read#5@1 issue site=world-read#5 phase=phase#5
+node world-read#6@1 issue site=world-read#6 phase=phase#5
+edge entry -> phase#1@1 next
+edge phase#1@1 -> ask#1@1 next
+edge ask#1@1 -> phase#2@1 next
+edge phase#2@1 -> ask#2@1 next
+edge ask#2@1 -> ask#3@1 fork
+edge ask#3@1 -> phase#3@1 join
+edge phase#3@1 -> world-read#1@1 next
+edge phase#3@1 -> phase#4@1 exit
+edge phase#3@1 -> sink exit
+edge world-read#1@1 -> ask#4@1 branch
+edge world-read#1@1 -> world-read#2@1 branch
+edge ask#4@1 -> world-read#1@1 loop via=continue
+edge world-read#2@1 -> world-read#1@1 loop
+edge world-read#2@1 -> ask#5@1 branch
+edge world-read#2@1 -> phase#4@1 exit
+edge world-read#2@1 -> sink exit
+edge ask#5@1 -> world-read#1@1 loop
+edge ask#5@1 -> phase#4@1 exit
+edge ask#5@1 -> sink exit
+edge phase#4@1 -> world-read#3@1 next
+edge phase#4@1 -> world-read#4@1 exit
+edge phase#4@1 -> phase#5@1 exit
+edge world-read#3@1 -> ask#6@1 branch
+edge world-read#3@1 -> ask#7@1 branch
+edge ask#6@1 -> world-read#3@1 loop via=continue
+edge ask#7@1 -> ask#8@1 branch
+edge ask#7@1 -> world-read#4@1 exit via=break
+edge ask#7@1 -> phase#5@1 exit via=break
+edge ask#8@1 -> world-read#3@1 loop
+edge ask#8@1 -> world-read#4@1 exit
+edge ask#8@1 -> phase#5@1 exit
+edge world-read#4@1 -> ask#9@1 branch
+edge world-read#4@1 -> phase#5@1 branch
+edge ask#9@1 -> phase#5@1 branch
+edge phase#5@1 -> world-read#5@1 next
+edge world-read#5@1 -> world-read#6@1 next
+edge world-read#6@1 -> sink jump via=return
+phase-edge entry -> phase#1 next
+phase-edge phase#1 -> phase#2 next
+phase-edge phase#2 -> phase#3 join
+phase-edge phase#3 -> phase#3 loop
+phase-edge phase#3 -> phase#3 loop via=continue
+phase-edge phase#3 -> phase#4 exit
+phase-edge phase#3 -> sink exit
+phase-edge phase#4 -> phase#4 loop
+phase-edge phase#4 -> phase#4 loop via=continue
+phase-edge phase#4 -> phase#5 branch
+phase-edge phase#4 -> phase#5 exit
+phase-edge phase#4 -> phase#5 exit via=break
+phase-edge phase#5 -> sink jump via=return

@@ -10,6 +10,7 @@ interface CronBotDeliveryRepo {
 interface CronBotDeliveryService {
   watchAutomationRun(params: {
     target: ZCodeAutomationBotDeliveryTarget;
+    runId?: string;
     taskId: string;
     workspacePath: string;
     workspaceIdentity?: string;
@@ -21,6 +22,7 @@ interface CronBotDeliveryService {
  */
 export async function watchCronRunBotDelivery(params: {
   automationId: string;
+  runId?: string;
   workspaceKey: string;
   workspacePath: string;
   workspaceIdentity?: string;
@@ -28,18 +30,14 @@ export async function watchCronRunBotDelivery(params: {
   repo: CronBotDeliveryRepo;
   botsService: CronBotDeliveryService;
 }): Promise<boolean> {
-  const target = await params.repo.getBotDeliveryTarget(
-    params.automationId,
-    params.workspaceKey,
-  );
+  const target = await params.repo.getBotDeliveryTarget(params.automationId, params.workspaceKey);
   if (!target) return false;
   await params.botsService.watchAutomationRun({
     target,
+    ...(params.runId ? { runId: params.runId } : {}),
     taskId: params.taskId,
     workspacePath: params.workspacePath,
-    ...(params.workspaceIdentity
-      ? { workspaceIdentity: params.workspaceIdentity }
-      : {}),
+    ...(params.workspaceIdentity ? { workspaceIdentity: params.workspaceIdentity } : {}),
   });
   return true;
 }

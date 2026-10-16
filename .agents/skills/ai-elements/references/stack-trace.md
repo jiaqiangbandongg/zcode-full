@@ -50,12 +50,18 @@ export default function Page() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       {messages.map((message) => {
-        const toolInvocations = message.parts?.filter((part) => part.type === "tool-invocation");
+        const toolInvocations = message.parts?.filter(
+          (part) => part.type === "tool-invocation"
+        );
 
         return toolInvocations?.map((tool) => {
           if (tool.toolName === "runCode" && tool.result?.error) {
             return (
-              <StackTrace key={tool.toolCallId} trace={tool.result.error} defaultOpen>
+              <StackTrace
+                key={tool.toolCallId}
+                trace={tool.result.error}
+                defaultOpen
+              >
                 <StackTraceHeader>
                   <StackTraceError>
                     <StackTraceErrorType />
@@ -138,88 +144,88 @@ See `scripts/stack-trace-no-internal.tsx` for this example.
 
 ### `<StackTrace />`
 
-| Prop              | Type                                                     | Default | Description                                                                                   |
-| ----------------- | -------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `trace`           | `string`                                                 | -       | The raw stack trace string to parse and display.                                              |
-| `open`            | `boolean`                                                | -       | Controlled open state.                                                                        |
-| `defaultOpen`     | `boolean`                                                | `false` | Whether the content is expanded by default.                                                   |
-| `onOpenChange`    | `(open: boolean) => void`                                | -       | Callback when open state changes.                                                             |
-| `onFilePathClick` | `(path: string, line?: number, column?: number) => void` | -       | Callback when a file path is clicked. Receives the file path, line number, and column number. |
-| `children`        | `React.ReactNode`                                        | -       | Child elements (StackTraceHeader, StackTraceContent, etc.).                                   |
-| `className`       | `string`                                                 | -       | Additional CSS classes.                                                                       |
-| `...props`        | `React.HTMLAttributes<HTMLDivElement>`                   | -       | Any other props are spread to the root div.                                                   |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `trace` | `string` | - | The raw stack trace string to parse and display. |
+| `open` | `boolean` | - | Controlled open state. |
+| `defaultOpen` | `boolean` | `false` | Whether the content is expanded by default. |
+| `onOpenChange` | `(open: boolean) => void` | - | Callback when open state changes. |
+| `onFilePathClick` | `(path: string, line?: number, column?: number) => void` | - | Callback when a file path is clicked. Receives the file path, line number, and column number. |
+| `children` | `React.ReactNode` | - | Child elements (StackTraceHeader, StackTraceContent, etc.). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the root div. |
 
 ### `<StackTraceHeader />`
 
-| Prop        | Type                                              | Default | Description                                                       |
-| ----------- | ------------------------------------------------- | ------- | ----------------------------------------------------------------- |
-| `children`  | `React.ReactNode`                                 | -       | Header content (typically StackTraceError and StackTraceActions). |
-| `className` | `string`                                          | -       | Additional CSS classes.                                           |
-| `...props`  | `React.ComponentProps<typeof CollapsibleTrigger>` | -       | Any other props are spread to the CollapsibleTrigger.             |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Header content (typically StackTraceError and StackTraceActions). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.ComponentProps<typeof CollapsibleTrigger>` | - | Any other props are spread to the CollapsibleTrigger. |
 
 ### `<StackTraceError />`
 
-| Prop        | Type                                   | Default | Description                                                               |
-| ----------- | -------------------------------------- | ------- | ------------------------------------------------------------------------- |
-| `children`  | `React.ReactNode`                      | -       | Error content (typically StackTraceErrorType and StackTraceErrorMessage). |
-| `className` | `string`                               | -       | Additional CSS classes.                                                   |
-| `...props`  | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the container div.                          |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Error content (typically StackTraceErrorType and StackTraceErrorMessage). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the container div. |
 
 ### `<StackTraceErrorType />`
 
-| Prop        | Type                                    | Default | Description                                              |
-| ----------- | --------------------------------------- | ------- | -------------------------------------------------------- |
-| `children`  | `React.ReactNode`                       | -       | Custom content. Defaults to the parsed error type (e.g., |
-| `className` | `string`                                | -       | Additional CSS classes.                                  |
-| `...props`  | `React.HTMLAttributes<HTMLSpanElement>` | -       | Any other props are spread to the span element.          |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom content. Defaults to the parsed error type (e.g.,  |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLSpanElement>` | - | Any other props are spread to the span element. |
 
 ### `<StackTraceErrorMessage />`
 
-| Prop        | Type                                    | Default | Description                                           |
-| ----------- | --------------------------------------- | ------- | ----------------------------------------------------- |
-| `children`  | `React.ReactNode`                       | -       | Custom content. Defaults to the parsed error message. |
-| `className` | `string`                                | -       | Additional CSS classes.                               |
-| `...props`  | `React.HTMLAttributes<HTMLSpanElement>` | -       | Any other props are spread to the span element.       |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom content. Defaults to the parsed error message. |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLSpanElement>` | - | Any other props are spread to the span element. |
 
 ### `<StackTraceActions />`
 
-| Prop        | Type                                   | Default | Description                                                                 |
-| ----------- | -------------------------------------- | ------- | --------------------------------------------------------------------------- |
-| `children`  | `React.ReactNode`                      | -       | Action buttons (typically StackTraceCopyButton and StackTraceExpandButton). |
-| `className` | `string`                               | -       | Additional CSS classes.                                                     |
-| `...props`  | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the container div.                            |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Action buttons (typically StackTraceCopyButton and StackTraceExpandButton). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the container div. |
 
 ### `<StackTraceCopyButton />`
 
-| Prop        | Type                                  | Default | Description                                                              |
-| ----------- | ------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `onCopy`    | `() => void`                          | -       | Callback fired after a successful copy.                                  |
-| `onError`   | `(error: Error) => void`              | -       | Callback fired if copying fails.                                         |
-| `timeout`   | `number`                              | `2000`  | How long to show the copied state (ms).                                  |
-| `children`  | `React.ReactNode`                     | -       | Custom content for the button. Defaults to copy/check icons.             |
-| `className` | `string`                              | -       | Additional CSS classes.                                                  |
-| `...props`  | `React.ComponentProps<typeof Button>` | -       | Any other props are spread to the underlying shadcn/ui Button component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `onCopy` | `() => void` | - | Callback fired after a successful copy. |
+| `onError` | `(error: Error) => void` | - | Callback fired if copying fails. |
+| `timeout` | `number` | `2000` | How long to show the copied state (ms). |
+| `children` | `React.ReactNode` | - | Custom content for the button. Defaults to copy/check icons. |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.ComponentProps<typeof Button>` | - | Any other props are spread to the underlying shadcn/ui Button component. |
 
 ### `<StackTraceExpandButton />`
 
-| Prop        | Type                                   | Default | Description                                      |
-| ----------- | -------------------------------------- | ------- | ------------------------------------------------ |
-| `className` | `string`                               | -       | Additional CSS classes.                          |
-| `...props`  | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the container div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the container div. |
 
 ### `<StackTraceContent />`
 
-| Prop        | Type                                              | Default | Description                                                                             |
-| ----------- | ------------------------------------------------- | ------- | --------------------------------------------------------------------------------------- |
-| `maxHeight` | `number`                                          | `400`   | Maximum height of the content area. Enables scrolling when content exceeds this height. |
-| `children`  | `React.ReactNode`                                 | -       | Content to display (typically StackTraceFrames).                                        |
-| `className` | `string`                                          | -       | Additional CSS classes.                                                                 |
-| `...props`  | `React.ComponentProps<typeof CollapsibleContent>` | -       | Any other props are spread to the CollapsibleContent.                                   |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `maxHeight` | `number` | `400` | Maximum height of the content area. Enables scrolling when content exceeds this height. |
+| `children` | `React.ReactNode` | - | Content to display (typically StackTraceFrames). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.ComponentProps<typeof CollapsibleContent>` | - | Any other props are spread to the CollapsibleContent. |
 
 ### `<StackTraceFrames />`
 
-| Prop                 | Type                                   | Default | Description                                                  |
-| -------------------- | -------------------------------------- | ------- | ------------------------------------------------------------ |
-| `showInternalFrames` | `boolean`                              | `true`  | Whether to show internal frames (node_modules, node: paths). |
-| `className`          | `string`                               | -       | Additional CSS classes.                                      |
-| `...props`           | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the container div.             |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `showInternalFrames` | `boolean` | `true` | Whether to show internal frames (node_modules, node: paths). |
+| `className` | `string` | - | Additional CSS classes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the container div. |

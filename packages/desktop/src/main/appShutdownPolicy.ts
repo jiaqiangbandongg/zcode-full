@@ -1,11 +1,11 @@
 export type AppShutdownKind = "normal" | "update-install";
 
-interface AppShutdownPolicy {
+export interface AppShutdownPolicy {
   forceKillDelayMs: number;
   waitTimeoutMs: number;
 }
 
-interface AppShutdownPolicySelection {
+export interface AppShutdownPolicySelection {
   kind: AppShutdownKind;
   policy: AppShutdownPolicy;
   upgraded: boolean;

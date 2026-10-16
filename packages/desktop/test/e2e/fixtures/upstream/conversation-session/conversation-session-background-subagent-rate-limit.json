@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-subagent-rate-limit",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-subagent-rate-limit.test.ts",
+  "fixtures": [
+    {
+      "id": "background-subagent-rate-limit-title",
+      "description": "background subagent rate limit case 的固定标题响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不属于本 case，只需稳定返回以免误匹配业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-background-subagent-rate-limit-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Background Agent 429\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-launch",
+      "description": "父模型启动一个 background Agent。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定创建真实 Agent(run_in_background=true) 以覆盖 terminal notification 投影。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT"],
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT",
+          "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT_DONE"
+        ],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_background_subagent_rate_limit_agent",
+          "name": "Agent",
+          "input": {
+            "description": "世界杯冠军预测分析",
+            "prompt": "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_CHILD: make one provider request; the replay server will return a stable 429.",
+            "run_in_background": true,
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-launch-ack",
+      "description": "父模型在 background Agent launch ACK 后结束当前 turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "让父会话先回 idle，随后由 failed task notification 唤醒。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT",
+          "Async agent launched successfully",
+          "toolu_e2e_background_subagent_rate_limit_agent"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ],
+        "lastUserMessageExcludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-subagent-rate-limit-launch-ack",
+          "text": "background-subagent-rate-limit-launched-ok"
+        }
+      }
+    },
+    {
+      "id": "background-subagent-rate-limit-child-initial-429",
+      "description": "child-only marker 的首个请求延迟返回 429，确保父 turn 先消费 launch ACK。",
+      "metadata": {
+        "kind": "subagent",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "首个 429 延迟到父 turn 消费 launch ACK 后返回；BG26 worker 禁用模型 retry，只验证 terminal/UI/snapshot 的原始错误投影。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_CHILD"],
+        "bodyIncludes": ["E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_CHILD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 429,
+        "statusMessage": "Too Many Requests",
+        "delayMs": 1500,
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "retry-after": "0"
+        },
+        "body": "{\"error\":{\"code\":\"AccountRateLimitExceeded\",\"message\":\"Requests are too frequent. Please reduce your request frequency, wait a short moment, and retry your request. Request id: e2e-background-subagent-rate-limit\",\"param\":null,\"type\":\"TooManyRequests\"}}"
+      }
+    },
+    {
+      "id": "background-subagent-rate-limit-parent-notification",
+      "description": "父模型消费 failed background Agent notification。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "证明 failed notification 经 runtime command queue 回到父模型并正常收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["<task-notification>", "<status>failed</status>"],
+        "bodyIncludes": [
+          "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT",
+          "<tool-use-id>toolu_e2e_background_subagent_rate_limit_agent</tool-use-id>",
+          "<status>failed</status>"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-background-subagent-rate-limit-parent-done",
+          "text": "E2E_BACKGROUND_SUBAGENT_RATE_LIMIT_PARENT_DONE"
+        }
+      }
+    }
+  ]
+}

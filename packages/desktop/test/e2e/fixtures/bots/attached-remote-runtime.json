@@ -1,0 +1,6 @@
+{
+  "caseId": "BOT-E2E-RT-02",
+  "classification": "synthetic",
+  "syntheticReason": "The case creates an attached-remote service boundary with startup background tasks disabled and records all attempted provider network calls.",
+  "timing": "fast-process"
+}

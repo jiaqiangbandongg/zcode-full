@@ -1,7 +1,7 @@
 import { downloadZCodeBuiltinRelease, type ZCodeBuiltinRelease } from "@zcode/provider-node";
 import type { ApiClient } from "@zcode/shared";
 
-interface FetchZCodeBuiltinRemoteReleaseOptions {
+export interface FetchZCodeBuiltinRemoteReleaseOptions {
   readonly apiClient: ApiClient;
   readonly endpointOrigin: string;
   readonly appVersion: string;

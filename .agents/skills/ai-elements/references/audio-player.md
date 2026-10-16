@@ -51,91 +51,91 @@ See `scripts/audio-player-remote.tsx` for this example.
 
 Root MediaController component. Accepts all MediaController props except `audio` (which is set to `true` by default).
 
-| Prop       | Type                                                  | Default | Description                                                                     |
-| ---------- | ----------------------------------------------------- | ------- | ------------------------------------------------------------------------------- |
-| `style`    | `CSSProperties`                                       | -       | Custom CSS properties can be passed to override media-chrome theming variables. |
-| `...props` | `Omit<React.ComponentProps<typeof MediaController>, ` | -       | Any other props are spread to the MediaController component.                    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `style` | `CSSProperties` | - | Custom CSS properties can be passed to override media-chrome theming variables. |
+| `...props` | `Omit<React.ComponentProps<typeof MediaController>, ` | - | Any other props are spread to the MediaController component. |
 
 ### `<AudioPlayerElement />`
 
 The audio element that contains the media source. Accepts either a remote URL or AI SDK Speech Result data.
 
-| Prop       | Type                         | Default | Description                                                                      |
-| ---------- | ---------------------------- | ------- | -------------------------------------------------------------------------------- |
-| `src`      | `string`                     | -       | The URL of the audio file to play (for remote audio).                            |
-| `data`     | `SpeechResult[`              | -       | AI SDK Speech Result audio data with base64 encoding (for AI-generated audio).   |
-| `...props` | `Omit<React.ComponentProps<` | -       | Any other props are spread to the audio element (excluding src when using data). |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `src` | `string` | - | The URL of the audio file to play (for remote audio). |
+| `data` | `SpeechResult[` | - | AI SDK Speech Result audio data with base64 encoding (for AI-generated audio). |
+| `...props` | `Omit<React.ComponentProps<` | - | Any other props are spread to the audio element (excluding src when using data). |
 
 ### `<AudioPlayerControlBar />`
 
 Container for control buttons, wraps children in a ButtonGroup.
 
-| Prop       | Type                                           | Default | Description                                                  |
-| ---------- | ---------------------------------------------- | ------- | ------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof MediaControlBar>` | -       | Any other props are spread to the MediaControlBar component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaControlBar>` | - | Any other props are spread to the MediaControlBar component. |
 
 ### `<AudioPlayerPlayButton />`
 
 Play/pause button wrapped in a shadcn Button component.
 
-| Prop       | Type                                           | Default | Description                                                  |
-| ---------- | ---------------------------------------------- | ------- | ------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof MediaPlayButton>` | -       | Any other props are spread to the MediaPlayButton component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaPlayButton>` | - | Any other props are spread to the MediaPlayButton component. |
 
 ### `<AudioPlayerSeekBackwardButton />`
 
 Seek backward button wrapped in a shadcn Button component.
 
-| Prop         | Type                                                   | Default | Description                                                          |
-| ------------ | ------------------------------------------------------ | ------- | -------------------------------------------------------------------- |
-| `seekOffset` | `number`                                               | `10`    | The number of seconds to seek backward.                              |
-| `...props`   | `React.ComponentProps<typeof MediaSeekBackwardButton>` | -       | Any other props are spread to the MediaSeekBackwardButton component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `seekOffset` | `number` | `10` | The number of seconds to seek backward. |
+| `...props` | `React.ComponentProps<typeof MediaSeekBackwardButton>` | - | Any other props are spread to the MediaSeekBackwardButton component. |
 
 ### `<AudioPlayerSeekForwardButton />`
 
 Seek forward button wrapped in a shadcn Button component.
 
-| Prop         | Type                                                  | Default | Description                                                         |
-| ------------ | ----------------------------------------------------- | ------- | ------------------------------------------------------------------- |
-| `seekOffset` | `number`                                              | `10`    | The number of seconds to seek forward.                              |
-| `...props`   | `React.ComponentProps<typeof MediaSeekForwardButton>` | -       | Any other props are spread to the MediaSeekForwardButton component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `seekOffset` | `number` | `10` | The number of seconds to seek forward. |
+| `...props` | `React.ComponentProps<typeof MediaSeekForwardButton>` | - | Any other props are spread to the MediaSeekForwardButton component. |
 
 ### `<AudioPlayerTimeDisplay />`
 
 Displays the current playback time, wrapped in ButtonGroupText.
 
-| Prop       | Type                                            | Default | Description                                                   |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof MediaTimeDisplay>` | -       | Any other props are spread to the MediaTimeDisplay component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaTimeDisplay>` | - | Any other props are spread to the MediaTimeDisplay component. |
 
 ### `<AudioPlayerTimeRange />`
 
 Seek slider for controlling playback position, wrapped in ButtonGroupText.
 
-| Prop       | Type                                          | Default | Description                                                 |
-| ---------- | --------------------------------------------- | ------- | ----------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof MediaTimeRange>` | -       | Any other props are spread to the MediaTimeRange component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaTimeRange>` | - | Any other props are spread to the MediaTimeRange component. |
 
 ### `<AudioPlayerDurationDisplay />`
 
 Displays the total duration of the audio, wrapped in ButtonGroupText.
 
-| Prop       | Type                                                | Default | Description                                                       |
-| ---------- | --------------------------------------------------- | ------- | ----------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof MediaDurationDisplay>` | -       | Any other props are spread to the MediaDurationDisplay component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaDurationDisplay>` | - | Any other props are spread to the MediaDurationDisplay component. |
 
 ### `<AudioPlayerMuteButton />`
 
 Mute/unmute button, wrapped in ButtonGroupText.
 
-| Prop       | Type                                           | Default | Description                                                  |
-| ---------- | ---------------------------------------------- | ------- | ------------------------------------------------------------ |
-| `...props` | `React.ComponentProps<typeof MediaMuteButton>` | -       | Any other props are spread to the MediaMuteButton component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaMuteButton>` | - | Any other props are spread to the MediaMuteButton component. |
 
 ### `<AudioPlayerVolumeRange />`
 
 Volume slider control, wrapped in ButtonGroupText.
 
-| Prop       | Type                                            | Default | Description                                                   |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof MediaVolumeRange>` | -       | Any other props are spread to the MediaVolumeRange component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof MediaVolumeRange>` | - | Any other props are spread to the MediaVolumeRange component. |

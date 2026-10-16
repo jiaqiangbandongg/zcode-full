@@ -1,0 +1,56 @@
+join join#1 "join" @19:19 order=0 type="void[]"
+fan-out fan-out#1 "fan-out" @20:7 order=1 count=3 type="Promise<void>[]"
+ask ask#1 "ask" head="researcher-" @21:58 order=2 within=fan-out#1 type="Fact[]"
+actor actor#1 head="researcher-" @21:29 order=3 within=fan-out#1
+join join#2 "join" @32:17 order=5 type="void[]"
+fan-out fan-out#2 "fan-out" @33:5 order=6 count=2 type="Promise<void>[]"
+fan-out fan-out#3 "fan-out" @34:7 order=7 within=fan-out#2
+ask ask#2 "ask" head="verifier-" @35:54 order=8 within=fan-out#3 type="Verdict"
+actor actor#2 head="verifier-" @35:25 order=9 within=fan-out#3
+join join#3 "join" @42:15 order=10 type="[void, void]" ports=-,-
+ask ask#3 "writer" @44:24 order=11 type="string"
+actor actor#3 "writer" @44:8 order=12
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#2 <- fan-out#3 exact
+fact ask-data ask#3 <- ask#1 exact
+fact ask-data ask#3 <- fan-out#3 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact ask-actor ask#3 <- actor#3 exact
+fact join-in join#1 <- fan-out#1 exact
+fact join-in join#2 <- fan-out#2 exact
+fact fan-out-in fan-out#3 <- ask#1 exact
+fact return <- ask#3 exact
+region seq#1 seq entered
+region call#1 call parent=seq#1 @16:18 entered label="future" strand
+region try#1 try parent=call#1 @18:3 entered
+region attempt#1 attempt parent=try#1 @18:7 entered
+region fanout#1 fanout parent=attempt#1 @20:7 label="map" strand
+region loop#1 loop parent=fanout#1 @22:9
+region finally#1 finally parent=try#1 @25:13 entered
+region call#2 call parent=seq#1 @30:16 entered label="future" strand
+region fanout#2 fanout parent=call#2 @33:5 label="map" strand
+region loop#2 loop parent=fanout#2 @34:7
+region choice#1 choice parent=loop#2 @36:9 entered
+region branch#1 branch parent=choice#1 @36:22
+mark phase#1 in=seq#1>call#1
+spawn actor#1 in=seq#1>call#1>try#1>attempt#1>fanout#1
+issue ask#1 in=seq#1>call#1>try#1>attempt#1>fanout#1 phase=phase#1
+settle ask#1 in=seq#1>call#1>try#1>attempt#1>fanout#1
+settle ask#1 in=seq#1>call#1>try#1>attempt#1 joins=fanout#1
+mark phase#2 in=seq#1>call#2
+settle ask#1 in=seq#1>call#2>fanout#2>loop#2
+spawn actor#2 in=seq#1>call#2>fanout#2>loop#2
+issue ask#2 in=seq#1>call#2>fanout#2>loop#2 phase=phase#2
+settle ask#2 in=seq#1>call#2>fanout#2>loop#2
+settle ask#2,ask#1 in=seq#1>call#2 joins=fanout#2
+settle ask#1,ask#2 in=seq#1 joins=call#1,call#2
+mark phase#3 in=seq#1
+spawn actor#3 in=seq#1
+issue ask#3 in=seq#1 phase=phase#3
+jump return seq#1 in=seq#1 phase=phase#3
+control branch#1 by=ask#2
+phase phase#1 "Gather facts from three angles" @17:3
+phase phase#2 "Verify each fact as it arrives" @31:3
+phase phase#3 "Write the report" @43:1

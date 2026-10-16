@@ -1,0 +1,187 @@
+{
+  "baseCommit": "4b9c4d51a098e05106151f48fe792b9c09810cd1",
+  "branch": "feat/fix-browser-natural-viewport-screenshot",
+  "platform": {
+    "os": "26.5.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "electron": "41.0.3",
+    "chromium": "146.0.7680.80",
+    "displays": [
+      {
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1512,
+          "height": 982
+        },
+        "scaleFactor": 2
+      },
+      {
+        "bounds": {
+          "x": -2560,
+          "y": -458,
+          "width": 2560,
+          "height": 1440
+        },
+        "scaleFactor": 2
+      }
+    ]
+  },
+  "red": {
+    "kind": "real ZCode dev with live model Node REPL",
+    "desktopZoomLevel": -2,
+    "artifacts": "/tmp/zct-natural-viewport/{red.json,red.png,events.jsonl}",
+    "before": {
+      "dpr": 1.6528925895690918,
+      "height": 855,
+      "target": {
+        "x": 99.99043464660645,
+        "y": 199.99505043029785
+      },
+      "width": 508
+    },
+    "after": {
+      "dpr": 1.6528925895690918,
+      "height": 855,
+      "target": {
+        "x": 99.99043464660645,
+        "y": 199.99505043029785
+      },
+      "width": 508
+    },
+    "events": [
+      {
+        "at": 1788841036354,
+        "dpr": 1.6528925895690918,
+        "height": 855,
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "type": "armed",
+        "width": 508
+      },
+      {
+        "at": 1788841074625,
+        "dpr": 1.6528925895690918,
+        "height": 1034,
+        "target": {
+          "x": 199.99505043029785,
+          "y": 199.99505043029785
+        },
+        "type": "resize",
+        "width": 614
+      },
+      {
+        "at": 1788841074706,
+        "dpr": 1.6528925895690918,
+        "height": 855,
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "type": "resize",
+        "width": 508
+      },
+      {
+        "at": 1788841074965,
+        "dpr": 1.6528925895690918,
+        "height": 855,
+        "id": "state",
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "trusted": true,
+        "type": "click",
+        "width": 508,
+        "x": 200,
+        "y": 200
+      },
+      {
+        "at": 1788841074990,
+        "dpr": 1.6528925895690918,
+        "height": 855,
+        "id": "target",
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "trusted": true,
+        "type": "click",
+        "width": 508,
+        "x": 100,
+        "y": 200
+      }
+    ]
+  },
+  "green": {
+    "kind": "real Electron with model decisions replayed; production Node REPL -> Host/Main -> Chromium",
+    "runId": "desktop-e2e-20260908-042444-192",
+    "artifacts": "packages/desktop/.e2e-artifacts/desktop-e2e-20260908-042444-192/zoom-coordinates",
+    "natural": {
+      "before": {
+        "dpr": 1.6528925895690918,
+        "height": 815,
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "width": 531
+      },
+      "after": {
+        "dpr": 1.6528925895690918,
+        "height": 815,
+        "target": {
+          "x": 99.99043464660645,
+          "y": 199.99505043029785
+        },
+        "width": 531
+      },
+      "events": [
+        {
+          "dpr": 1.6528925895690918,
+          "height": 815,
+          "target": {
+            "x": 99.99043464660645,
+            "y": 199.99505043029785
+          },
+          "targetId": "target",
+          "trusted": true,
+          "type": "click",
+          "width": 531
+        }
+      ],
+      "tabId": "iab-tab:499c9f5d-22ee-4d17-b342-4bac1101364e"
+    },
+    "pixels": {
+      "width": 878,
+      "height": 1347,
+      "center": [
+        165,
+        331
+      ],
+      "found": true
+    },
+    "e2eCasesPassed": 3,
+    "screenshots": 7,
+    "trustedClicks": 19
+  },
+  "checks": {
+    "relatedUnitTests": 244,
+    "typecheck": "passed",
+    "e2eTypecheck": "passed",
+    "lint": {
+      "errors": 0,
+      "existingWarnings": 43
+    },
+    "fixtureCheck": "passed"
+  },
+  "limits": [
+    "Windows/Linux 未重跑此补丁；不替代此前 Windows 的验证记录。",
+    "后台 fallback E2E 沿用已有直接 prepare IPC + metrics 原生探针；自然模式新增场景走完整产品链路。",
+    "未重跑手机远控或原生录制；保持其布局默认值和路由边界，unscaled 由既有单测保护。",
+    "此 E2E 仍在 manual-review/pending，尚未晋级 CI。"
+  ]
+}

@@ -49,7 +49,48 @@ export const WORKFLOW_ARTIFACT_LIMITS = {
   maxItemsPerPage: 500,
   /** 一页的缺省条数（调用方不传 limit 时网关用它）。 */
   defaultItemsPerPage: 200,
+  /**
+   * `workflowRunArtifactData` 一页的字节上界（按存储里的序列化字节计），由网关传给存储层。
+   * 取协议单帧上限（16 MiB）的四分之一：条数上界单独管不住字节——500 条 × 32 KiB 就顶到了
+   * 单帧上限，于是一页可能根本发不出去。一页至少带一条，所以单条的上限（`REPORT_CAPS`）
+   * 必须远小于单帧上限。
+   */
+  maxPageBytes: PROTOCOL_V4_LIMITS.logicalFrameAssemblyMaxBytes / 4,
+  /** `workflowRunArtifactData` 一次最多点名几个字段路径（一张看板的 spec 用不到这么多）。 */
+  maxFieldsPerRequest: 32,
+  /** 一个字段路径的最大长度。 */
+  maxFieldPathLength: 256,
+  /**
+   * 一个字段值的序列化字节上界。超过的值回成一段截短的字符串（前 1,000 个字符加「…」）：
+   * 图表只用数值，表格与看板的格子本来就只显示短文本。
+   */
+  maxFieldValueBytes: 4096,
 } as const;
+
+/**
+ * 按点路径从一条 report item 里取值："timing.after"、"rounds.0.ms"（docs/execution-engine.md
+ * 「Reading the journal」）。
+ *
+ * 这是**协议上的契约**，不只是渲染器的工具函数：看板取数时 CLI 在 SQLite 里按同一套规则把
+ * 字段取出来（adapters 的 dwf-journal-fields.ts），渲染器拿到的值必须与它自己从整条 item 里
+ * 取出来的逐字相同。规则：按 `.` 切段；当前值是数组时，段按 `Number(段)` 当下标（非负整数且
+ * 在界内才算）；是对象时按键取；走不通（null、标量、越界、缺键）得 `undefined`。
+ */
+export function readWorkflowArtifactField(item: unknown, path: string): unknown {
+  let cursor: unknown = item;
+  for (const segment of path.split(".")) {
+    if (cursor === null || cursor === undefined) return undefined;
+    if (Array.isArray(cursor)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= cursor.length) return undefined;
+      cursor = cursor[index];
+      continue;
+    }
+    if (typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[segment];
+  }
+  return cursor;
+}
 
 /**
  * 一个产物版本的**元数据**（journal `dwf_node.result_json` 上 `ArtifactVersionRecord` 的
@@ -120,7 +161,7 @@ export type WorkflowRunArtifact = z.infer<typeof workflowRunArtifactSchema>;
  * `workflowRunArtifactRead` 取字节）按需拉——权威始终在 journal。
  *
  * `itemCount` 在这里的职责是**刷新信号**：看板 hook 见它变化就带 `afterSequence` 增量取数。
- * 把标签 report 的原值放进快照会让 256 条 × 32KB 的最坏情形把状态帧撑到 2MB。
+ * 把标签 report 的原值放进这个高频状态键，一个 run 的条目有多少字节，每一帧就要搬多少字节。
  */
 export const workflowRunArtifactSummarySchema = z
   .object({
@@ -174,6 +215,18 @@ export const v4ConversationWorkflowRunArtifactDataParamsSchema = z
     afterSequence: z.number().int().nonnegative().optional(),
     /** 缺省 200、钳 [1, 500]——两者都在网关侧执行（存储层不得自造页大小，也不得再钳）。 */
     limit: z.number().int().positive().max(WORKFLOW_ARTIFACT_LIMITS.maxItemsPerPage).optional(),
+    /**
+     * 只取这些字段路径（{@link readWorkflowArtifactField} 的规则），而不是整条 item：看板只读
+     * spec 里点名的字段，一条 1 MiB 的 item 不该为了一个数被整条搬进渲染器。给了它，结果每条
+     * 带 `fields` 而不带 `item`。缺省 = 整条 item（老渲染器的形状）。
+     *
+     * 偏斜：老 CLI 的 strict schema 不认这个键、整条请求被拒；渲染器据此退回不带它重试。
+     */
+    fields: z
+      .array(z.string().min(1).max(WORKFLOW_ARTIFACT_LIMITS.maxFieldPathLength))
+      .min(1)
+      .max(WORKFLOW_ARTIFACT_LIMITS.maxFieldsPerRequest)
+      .optional(),
   })
   .strict();
 export type V4ConversationWorkflowRunArtifactDataParams = z.infer<
@@ -193,14 +246,19 @@ export const v4ConversationWorkflowRunArtifactDataResultSchema = z
           /**
            * 条目原值，**不做预览序列化**：看板的纯函数要按字段路径取数
            * （`ChartSpec.x.field` 形如 "timing.after"），拿到一段 pretty JSON 文本就没法取了。
-           * 单条在线上已由 `REPORT_CAPS.maxItemSerializedBytes`（32KB）与事件载荷有界化
-           * 双重保证，这里不再叠一层界。
+           * 单条由写入侧的 `REPORT_CAPS.maxItemSerializedBytes` 有界，一页由
+           * `WORKFLOW_ARTIFACT_LIMITS.maxPageBytes` 有界。请求带 `fields` 时缺席。
            */
           item: z.unknown(),
+          /**
+           * 请求带 `fields` 时：路径 → 值。走不通的路径不在表里（= `undefined`）；超过
+           * `maxFieldValueBytes` 的值是一段截短的字符串。
+           */
+          fields: z.record(z.string(), z.unknown()).optional(),
         })
         .strict(),
     ),
-    /** 本页取满 limit 且后面仍有条目（网关多取一条判定）。 */
+    /** 本页之后仍有条目（页可能因条数或字节上界提前收尾；由存储层判定）。 */
     hasMore: z.boolean(),
   })
   .strict();

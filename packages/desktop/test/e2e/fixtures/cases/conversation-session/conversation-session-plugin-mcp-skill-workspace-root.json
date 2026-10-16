@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plugin-mcp-skill-workspace-root",
+  "spec": "./test/e2e/conversation-session/conversation-session-plugin-mcp-skill-workspace-root.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plugin-mcp-skill-workspace-root.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "workspace-root-tool-call",
+      "description": "项目 Plugin root 直接激活后的 MCP tool_use。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定工具调用，证明项目 dirs discovery 进入 runtime。"
+    },
+    {
+      "id": "workspace-root-final",
+      "description": "项目 Plugin root MCP tool_result 后的最终响应。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终响应，闭合 project root runtime。"
+    }
+  ]
+}

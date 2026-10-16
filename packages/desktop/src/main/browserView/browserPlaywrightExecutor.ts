@@ -228,8 +228,8 @@ export async function handlePlaywrightAction(
   signal?: AbortSignal,
 ): Promise<BrowserCommandResult> {
   if (action.name === "domSnapshot") {
-    // 只 clone documentElement 返回的 outerHTML 噪声较多，缺少交互语义。
-    // 通过隔离环境中的 Playwright 生成 AI/ARIA 快照，再展开 iframe 并归一化结果。
+    // Bugfix：此前这里只 clone documentElement，返回的是高噪声 outerHTML，不是
+    // Playwright AI/ARIA snapshot。统一走 isolated-world runtime + iframe 展开和相同后处理。
     const value = await captureBrowserDomSnapshot(view, signal);
     return done({ ok: true, value });
   }

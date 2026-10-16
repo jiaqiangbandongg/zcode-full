@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-background-file-diff",
+  "spec": "./test/e2e/conversation-session/conversation-session-background-file-diff.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-background-file-diff.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": "background-file-diff-e2e/result.md",
+      "source": "created-by-spec",
+      "description": "spec 在默认工作区创建的单行 Markdown；notification product turn Read 后由 Edit 做 +1/-1 替换。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-background-file-diff-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题不参与 model-only 文件 checkpoint 语义，只用 case marker 隔离请求。"
+    },
+    {
+      "id": "upstream-background-file-diff-agent-tool",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定 Agent(run_in_background=true)，制造父 launch turn 与后续 model-only notification turn。"
+    },
+    {
+      "id": "upstream-background-file-diff-launch-ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "让父 turn 在 child 完成前稳定 idle，确保后续走独立 model-only wake。"
+    },
+    {
+      "id": "upstream-background-file-diff-child-result",
+      "kind": "subagent",
+      "source": "synthetic",
+      "timingPolicy": "delayed-text",
+      "syntheticReason": "六秒延迟确保 UI 先稳定观测 canStop=false，再触发独立 notification wake。"
+    },
+    {
+      "id": "upstream-background-file-diff-read",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定 Read 建立 read-before-edit 前提，并让 checkpoint anchor 来自隐藏 notification messageId。"
+    },
+    {
+      "id": "upstream-background-file-diff-edit",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "固定单行替换以精确断言摘要 +1/-1 和 Review before/after 内容。"
+    },
+    {
+      "id": "upstream-background-file-diff-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定最终 marker，用于确认文件摘要与 background 结果 assistant 归属同一产品轮次。"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-run-cases",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-run-cases.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-goal-run-cases.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-goal-run-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需稳定返回并与 goal/main 请求隔离。"
+    },
+    {
+      "id": "upstream-goal-run-high-usage-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 provider 的 token usage 和响应速度不可控，无法稳定形成 auto compact 前的 queue 窗口。"
+    },
+    {
+      "id": "upstream-goal-run-auto-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定有效 summary，避免真实模型返回无法通过 compact 校验的文本。"
+    },
+    {
+      "id": "upstream-goal-run-fast-goal-context-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Goal Run spec 使用小上下文验证 auto compact；verifier prompt 也可能真实越过阈值，必须保留 fast goal marker 供摘要后队列续跑。"
+    },
+    {
+      "id": "upstream-goal-run-slow-goal-context-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "保留 slow goal marker，使摘要后的 goal continuation 仍命中受控流 fixture。"
+    },
+    {
+      "id": "upstream-goal-run-verifier-goal-context-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "保留 verifier goal marker，使摘要后的 verifier/queue 时序仍由专用 fixture 控制。"
+    },
+    {
+      "id": "upstream-goal-run-manual-compact-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "提供可重复的两轮 compactable history。"
+    },
+    {
+      "id": "upstream-goal-run-manual-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "三秒窗口让 GUI 能在 compact running 时提交 future goal。"
+    },
+    {
+      "id": "upstream-goal-run-verifier-slow-continuation",
+      "kind": "goal-continuation",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定推进到 verifier admission 边界。"
+    },
+    {
+      "id": "upstream-goal-run-verifier-slow",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 verifier 可能在 future input 入队前完成。"
+    },
+    {
+      "id": "upstream-goal-run-slow-goal-continuation",
+      "kind": "goal-continuation",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 continuation 可能在 Stop、queue 或 send-now 动作前完成。"
+    },
+    {
+      "id": "upstream-goal-run-fast-goal-continuation",
+      "kind": "goal-continuation",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "短暂 active 窗口同时允许 UI 断言并快速进入 verifier。"
+    },
+    {
+      "id": "upstream-goal-run-fast-goal-verifier",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 passed 结果，稳定制造 completed goal。"
+    },
+    {
+      "id": "upstream-goal-run-ordinary-slow",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实普通回复可能在 goal 入队、编辑或 send-now 前完成。"
+    },
+    {
+      "id": "upstream-goal-run-ordinary-fast",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定普通回复内容，避免真实模型文案影响 GUI 断言。"
+    }
+  ]
+}

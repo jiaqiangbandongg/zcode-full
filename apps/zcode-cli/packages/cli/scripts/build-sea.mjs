@@ -6,7 +6,6 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveSpawnRuntimeOptions } from "../../../../../scripts/spawn-command.mjs";
 import { resolveDownloadedNodeBinary } from "./sea-node-download.mjs";
-import { stageNodeNotices } from "../../../../../scripts/third-party-notices.mjs";
 import {
   adHocCodesignArgs,
   hostTarget,
@@ -138,7 +137,7 @@ const resolveNodeBinary = async ({ nodeBinaries, nodeVersion, target }) => {
   });
 };
 
-const prepareSeaBlob = async (target, nodeVersion) => {
+const prepareSeaBlob = async (target) => {
   const seaBlob = seaBlobForTarget(target);
   const seaConfig = seaConfigForTarget(target);
   await prepareSeaRuntimeToolAssets({
@@ -173,11 +172,6 @@ const prepareSeaBlob = async (target, nodeVersion) => {
       target,
     });
   const providerConfigAssets = await collectSeaProviderConfigAssets({ root: repositoryRoot });
-  const nodeLicensePath = await stageNodeNotices(
-    seaAssetStagingForTarget(`${target}-node`),
-    nodeVersion,
-    repositoryRoot,
-  );
 
   await writeFile(
     seaConfig,
@@ -190,7 +184,6 @@ const prepareSeaBlob = async (target, nodeVersion) => {
           ...runtimeToolAssets,
           ...playwrightAssets,
           ...providerConfigAssets,
-          "zcode-node-license": nodeLicensePath,
         },
         disableExperimentalSEAWarning: true,
         main: "dist/zcode.cjs",
@@ -267,7 +260,7 @@ const smokeTestHostTarget = async (target, binaryPath) => {
 
 const buildTarget = async ({ nodeBinaries, nodeVersion, postjectBin, target }) => {
   const binaryPath = resolve(dist, outputBinaryName(target));
-  const seaBlob = await prepareSeaBlob(target, nodeVersion);
+  const seaBlob = await prepareSeaBlob(target);
   const targetNodeBinary = await resolveNodeBinary({
     nodeBinaries,
     nodeVersion,
@@ -277,8 +270,6 @@ const buildTarget = async ({ nodeBinaries, nodeVersion, postjectBin, target }) =
   console.log(`[sea] building ${target} -> ${binaryPath}`);
   await copyFile(targetNodeBinary, binaryPath);
   await chmod(binaryPath, 0o755);
-  // 同一原文既内嵌到 --licenses，也随 dist 提供，单文件上传仍可取到完整材料。
-  await stageNodeNotices(dist, nodeVersion, repositoryRoot);
 
   const sentinelFuse = await findSeaFuse(binaryPath);
   if (!sentinelFuse.startsWith(sentinelFusePrefix)) {

@@ -18,7 +18,9 @@ function getLocalStorageCandidate(): unknown {
   }
 }
 
-function isBrowserReadableStorageLike(storage: unknown): storage is BrowserReadableStorageLike {
+function isBrowserReadableStorageLike(
+  storage: unknown,
+): storage is BrowserReadableStorageLike {
   return (
     Boolean(storage) &&
     typeof (storage as Partial<BrowserReadableStorageLike>).getItem === "function"
@@ -32,7 +34,7 @@ function isBrowserStorageLike(storage: unknown): storage is BrowserStorageLike {
   );
 }
 
-function getSafeReadableLocalStorage(): BrowserReadableStorageLike | null {
+export function getSafeReadableLocalStorage(): BrowserReadableStorageLike | null {
   const storage = getLocalStorageCandidate();
 
   if (!isBrowserReadableStorageLike(storage)) {

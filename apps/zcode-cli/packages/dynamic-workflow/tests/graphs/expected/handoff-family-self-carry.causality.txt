@@ -1,0 +1,13 @@
+phase phase#1 "并行调研" @14:1
+phase phase#2 "撰写终稿" @23:1
+lane actor#1 @18:19 families=fanout#1
+lane actor#2 "writer" @24:19
+region seq#1 seq
+region fanout#1 fanout parent=seq#1 @16:3 label="map"
+step ask#1 ask "ask" @18:59 lane=actor#1 phase=phase#1 region=fanout#1 maybe serial
+step ask#2 ask "writer" @24:57 lane=actor#2 phase=phase#2 region=seq#1 always
+edge ask#1 -> ask#1 carry maybe
+edge ask#1 -> ask#2 data maybe exact
+phase-edge phase#1 -> phase#1 carry maybe
+phase-edge phase#1 -> phase#2 data maybe
+sink ask#2

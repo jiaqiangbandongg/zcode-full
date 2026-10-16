@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { ServicePlatform } from "../platform/serviceManager.js";
 import type { ServerLayout } from "./paths.js";
 
-interface StableLauncherBootstrap {
+export interface StableLauncherBootstrap {
   command: string;
   entry: string;
 }
@@ -16,7 +16,7 @@ function quoteShell(value: string): string {
 function stablePosixLauncher(bootstrap?: StableLauncherBootstrap): string {
   const fallback = bootstrap
     ? `exec ${quoteShell(bootstrap.command)} ${quoteShell(bootstrap.entry)} "$@"`
-    : 'echo "No current ZCode Server release" >&2; exit 1';
+    : "echo \"No current ZCode Server release\" >&2; exit 1";
   return `#!/bin/sh
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 RELEASE_DIR=$(sed -n 's/.*"releaseDir"[[:space:]]*:[[:space:]]*"\\([^"\\]*\\)".*/\\1/p' "$ROOT/current.json")

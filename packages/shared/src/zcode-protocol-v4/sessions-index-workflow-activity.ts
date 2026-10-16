@@ -41,6 +41,12 @@ export const sessionWorkflowPhaseSummarySchema = z.object({
    * 退化路（已进入的 phase）是按进入序拼出来的，没有并行可言，所以那时整个键缺席。
    */
   alongside: z.array(z.number().int().nonnegative()).max(WORKFLOW_RUNS_LIMITS.maxPhases).optional(),
+  /**
+   * 这一站是一处**还开着的留白**（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：
+   * `open` = 还没走到，`waiting` = run 停在这里等主代理补全。侧栏据此把灯画成虚线（等待时警示色）。
+   * 补全之后它就是一个普通的站，键缺席。只有声明表那条路有这个事实（`run.phaseHoles`）。
+   */
+  hole: z.enum(["open", "waiting"]).optional(),
 });
 export type SessionWorkflowPhaseSummary = z.infer<typeof sessionWorkflowPhaseSummarySchema>;
 
@@ -62,6 +68,12 @@ export const sessionWorkflowRunSummarySchema = z.object({
   currentPhase: z.string().min(1).max(WORKFLOW_RUNS_LIMITS.maxPhaseNameLength).optional(),
   /** status === "running" 的子代理数（tooltip 的「{n} agents working」）。 */
   agentsWorking: z.number().int().nonnegative(),
+  /**
+   * 正在等主代理补全的留白名（`run.holes` 里第一条 waiting 的 `name`）：侧栏运行行写
+   * 「{name} · 等待补全」（docs/dynamic-workflow/presentation.md「Holes on the timeline」的「The sidebar」）。
+   * 没有停驻的留白时缺席。
+   */
+  waitingHole: z.string().min(1).max(WORKFLOW_RUNS_LIMITS.maxPhaseNameLength).optional(),
 });
 export type SessionWorkflowRunSummary = z.infer<typeof sessionWorkflowRunSummarySchema>;
 
@@ -98,16 +110,26 @@ function phaseNameMatches(stationName: string, stamp: string): boolean {
   );
 }
 
-function derivePhases(run: WorkflowRunState): SessionWorkflowPhaseSummary[] {
+/**
+ * 站点表的唯一推导。侧栏运行行（经 `summarizeRun`）与任务岛的 run 行都读它，所以两处的灯
+ * 永远对同一件事说同一句话；任务岛不另写第二套。
+ */
+export function deriveSessionWorkflowPhases(run: WorkflowRunState): SessionWorkflowPhaseSummary[] {
   const entered = new Set((run.phases ?? []).map((phase) => phase.name));
   const current = run.currentPhase;
   let names: string[];
   // 「同时在跑」的下标说的是**声明表**里的位置，所以只有走声明表这条路时它才有意义；退化路
   // （已进入的 phase + 当前 phase）是另一个下标空间，那时整张表不带。
   let alongside: readonly (readonly number[])[] | undefined;
+  // 还开着的留白（声明表的下标）；等待中的按名字从 `run.holes` 认——留白名按规则 9012 唯一。
+  let holeIndexes: ReadonlySet<number> = new Set();
+  const waitingNames = new Set(
+    (run.holes ?? []).filter((hole) => hole.state === "waiting").map((hole) => hole.name),
+  );
   if (run.phaseNames !== undefined && run.phaseNames.length > 0) {
     names = run.phaseNames;
     alongside = run.phaseAlongside;
+    holeIndexes = new Set(run.phaseHoles ?? []);
   } else {
     names = (run.phases ?? []).map((phase) => phase.name);
     if (current !== undefined && !entered.has(current)) names = [...names, current];
@@ -139,7 +161,14 @@ function derivePhases(run: WorkflowRunState): SessionWorkflowPhaseSummary[] {
     const beside = (alongside?.[index] ?? []).filter(
       (other) => Number.isInteger(other) && other >= 0 && other < emitted && other !== index,
     );
-    return { name, status, ...(beside.length === 0 ? {} : { alongside: beside }) };
+    // 留白站：等待中的按 `run.holes` 认（名字唯一），其余下标表点名的是还没走到的留白。
+    const hole = waitingNames.has(name) ? "waiting" : holeIndexes.has(index) ? "open" : undefined;
+    return {
+      name,
+      status,
+      ...(beside.length === 0 ? {} : { alongside: beside }),
+      ...(hole === undefined ? {} : { hole }),
+    };
   });
 }
 
@@ -148,6 +177,10 @@ function summarizeRun(
   work: BackgroundWorkSummary | undefined,
 ): SessionWorkflowRunSummary {
   const name = work?.title.trim();
+  // 在跑的 run 才有「等补全」可言：终态 run 的 waiting 记录已被 reducer 剥掉，这里再守一道。
+  const waitingHole = isSessionWorkflowRunLive(run.status)
+    ? (run.holes ?? []).find((hole) => hole.state === "waiting")?.name
+    : undefined;
   return {
     runId: run.runId,
     ...(run.toolCallId === undefined ? {} : { toolCallId: run.toolCallId }),
@@ -155,9 +188,10 @@ function summarizeRun(
     status: run.status,
     ...(run.stopReason === undefined ? {} : { stopReason: run.stopReason }),
     ...(work === undefined ? {} : { startedAt: work.startedAt }),
-    phases: derivePhases(run),
+    phases: deriveSessionWorkflowPhases(run),
     ...(run.currentPhase === undefined ? {} : { currentPhase: run.currentPhase }),
     agentsWorking: run.actors.filter((actor) => actor.status === "running").length,
+    ...(waitingHole === undefined ? {} : { waitingHole }),
   };
 }
 

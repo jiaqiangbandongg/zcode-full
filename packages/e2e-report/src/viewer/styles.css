@@ -1,0 +1,416 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f8fb;
+  --panel: #ffffff;
+  --text: #17202a;
+  --muted: #64748b;
+  --line: #dce3ec;
+  --shadow: rgba(15, 23, 42, 0.07);
+  --pass: #178a45;
+  --fail: #c73447;
+  --chart-blue: #2f6edb;
+  --chart-green: #20a161;
+  --chart-amber: #c47b13;
+  --chart-purple: #7257c7;
+  --chart-red: #c73447;
+  --chart-cyan: #0f8c99;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --panel: #1d222b;
+    --text: #eef2f7;
+    --muted: #aab5c4;
+    --line: #303947;
+    --shadow: rgba(0, 0, 0, 0.22);
+    --pass: #38c172;
+    --fail: #ff6b7a;
+    --chart-blue: #79a7ff;
+    --chart-green: #48d18c;
+    --chart-amber: #ffbc4b;
+    --chart-purple: #b2a0ff;
+    --chart-red: #ff6b7a;
+    --chart-cyan: #54d7e5;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 44px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 4px 0;
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.path {
+  margin: 0;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.heroMeta {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  color: var(--muted);
+}
+
+.status,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pass {
+  background: color-mix(in srgb, var(--pass) 16%, transparent);
+  color: var(--pass);
+}
+
+.fail {
+  background: color-mix(in srgb, var(--fail) 16%, transparent);
+  color: var(--fail);
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.metric,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px var(--shadow);
+}
+
+.metric {
+  min-width: 0;
+  padding: 14px;
+}
+
+.metricIcon {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--chart-blue) 14%, transparent);
+  color: var(--chart-blue);
+}
+
+.metric svg {
+  width: 16px;
+  height: 16px;
+}
+
+.metric span,
+.metric small {
+  display: block;
+  color: var(--muted);
+}
+
+.metric strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 23px;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.trendGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 18px;
+}
+
+.wide {
+  margin-top: 14px;
+}
+
+.trendGrid .wide {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.panelHeader span {
+  color: var(--muted);
+  text-align: right;
+}
+
+.empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.chartBox {
+  height: 280px;
+  min-width: 0;
+}
+
+.trendChart {
+  height: 300px;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.coverageMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.coverageMetric {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.coverageMetric span,
+.coverageMetric small {
+  display: block;
+  color: var(--muted);
+}
+
+.coverageMetric strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.coverageArtifacts {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.coverageArtifacts div {
+  min-width: 0;
+}
+
+.coverageArtifacts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.coverageArtifacts dd {
+  margin: 2px 0 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 11px 10px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+code,
+pre {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+code {
+  color: var(--muted);
+  word-break: break-all;
+}
+
+pre {
+  margin: 8px 0 0;
+  color: var(--fail);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.infoList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.infoList div {
+  display: grid;
+  gap: 3px;
+}
+
+.infoList dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.infoList dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.stateScreen {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.stateScreen h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.stateScreen p {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 980px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coverageMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gridTwo,
+  .trendGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .trendGrid .wide {
+    grid-column: auto;
+  }
+
+  .hero {
+    display: grid;
+  }
+
+  .heroMeta {
+    justify-items: start;
+  }
+
+}
+
+@media (max-width: 560px) {
+  .shell {
+    width: min(100% - 20px, 1180px);
+    padding-top: 16px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .coverageMetricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric strong {
+    font-size: 22px;
+  }
+
+  th:nth-child(4),
+  td:nth-child(4) {
+    display: none;
+  }
+}

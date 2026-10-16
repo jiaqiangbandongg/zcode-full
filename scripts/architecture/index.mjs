@@ -110,7 +110,13 @@ export async function checkArchitecture({ cwd = process.cwd(), changedFiles = nu
         module.id,
         manifestRequires(await fs.readFile(manifest, "utf8")) ?? module.requires,
       );
-    const required = ["module.ts", "contract.ts"];
+    const required = [
+      "module.ts",
+      "contract.ts",
+      "contract.example.ts",
+      "contract.test.ts",
+      "CONTRACT.md",
+    ];
     for (const artifact of required) {
       if (!moduleFiles.some((file) => path.basename(file) === artifact)) {
         const file = module.roots[0];
@@ -128,6 +134,8 @@ export async function checkArchitecture({ cwd = process.cwd(), changedFiles = nu
   }
 
   for (const file of files) {
+    // CONTRACT.md 只参与产物存在性检查，文档里的示例不能当成源码依赖或源码行数。
+    if (path.extname(file) === ".md") continue;
     const module = modulesByFile.get(file);
     if (!module || (policy.global.managedOnly && !module.managed)) continue;
     const source = await fs.readFile(file, "utf8");
@@ -354,7 +362,7 @@ export async function generateContext({ cwd = process.cwd(), moduleId }) {
     "",
     "## Boundaries",
     "- Cross-module imports must use declared requirements and public entrypoints.",
-    "- Add a contract example before exposing a new capability.",
+    "- Add a contract example and contract test before exposing a new capability.",
   ].join("\n");
 }
 

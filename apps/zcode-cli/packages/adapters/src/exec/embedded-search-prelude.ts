@@ -31,6 +31,15 @@ const UGREP_DEFAULT_ARGS = [
   "--exclude-dir=.sl",
 ] as const;
 
+export function applyEmbeddedSearchPrelude(
+  command: string,
+  prelude?: ExecutionEmbeddedSearchPrelude,
+  options: EmbeddedSearchPreludeOptions = {},
+): string {
+  const content = buildEmbeddedSearchPreludeContent(prelude, options);
+  return content ? [content, command].join("\n") : command;
+}
+
 export function buildEmbeddedSearchPreludeContent(
   prelude?: ExecutionEmbeddedSearchPrelude,
   options: EmbeddedSearchPreludeOptions = {},

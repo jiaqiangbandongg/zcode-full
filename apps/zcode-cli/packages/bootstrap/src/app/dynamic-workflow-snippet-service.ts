@@ -43,7 +43,7 @@ import {
 } from "@zcode/dynamic-workflow";
 import { runWorkflowScript } from "@zcode/dynamic-workflow-runtime";
 import { dynamicWorkflowChildSpawn } from "./dynamic-workflow-run-launch.js";
-import { resolveWorkflowConcurrencyCeiling } from "./workflow-concurrency-ceiling.js";
+import { resolveWorkflowDefaultConcurrency } from "./workflow-default-concurrency.js";
 import { executeWorldRead, type WorldReadDeps } from "./workflow-world-read.js";
 
 /** logs 的界（契约常量在 @zcode/contracts 的 eval-workflow-snippet.ts；这里避免反向依赖工具层）。 */
@@ -70,8 +70,8 @@ export function createDynamicWorkflowSnippetService(
 ): DynamicWorkflowSnippetPort {
   const caps = (): Caps => {
     return {
-      // 并发上界与 run service / 治理器同一份实现。snippet 没有 ask，不接治理器。
-      maxConcurrency: resolveWorkflowConcurrencyCeiling(deps.availableParallelism),
+      // 并发上界与 run service / 治理器同一份实现（决策 30）。snippet 没有 ask，不接治理器。
+      maxConcurrency: resolveWorkflowDefaultConcurrency(deps.availableParallelism),
     };
   };
 
@@ -90,7 +90,7 @@ export function createDynamicWorkflowSnippetService(
 
       const table = collectSites(workflow);
       // world.run：snippet 是这些调用的工作台（提交前先对真命令跑通 gate 逻辑）。
-      // 非字面量 cmd 与生产同一诊断（授权面在编译期闭合）；命令集交给 driver 复验。
+      // 非字面量 cmd 与生产同一诊断（授权面在编译期闭合，driver 不另持名单）。
       const worldRun = collectWorldRunCommands(workflow, table);
       if (worldRun.diagnostics.length > 0) {
         return { kind: "diagnostics", diagnostics: worldRun.diagnostics };
@@ -121,7 +121,6 @@ export function createDynamicWorkflowSnippetService(
         fileSystemPort: deps.fileSystemPort,
         executionPort: deps.executionPort,
         cwd: request.cwd,
-        declaredRunCommands: new Set(worldRun.commands),
       };
       const runId = `dwfeval-${randomUUID()}`;
       const childSpawn = dynamicWorkflowChildSpawn();

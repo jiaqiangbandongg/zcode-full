@@ -9,7 +9,7 @@ import {
 } from "../../agent/message-history.js";
 import type { RegularTurnLoopState, TurnRequestState } from "./turn-loop-state.js";
 
-const OUTPUT_TOKEN_CONTINUE_PROMPT =
+export const OUTPUT_TOKEN_CONTINUE_PROMPT =
   "Output token limit hit. Resume directly — no apology, no recap of what you were doing. Pick up mid-thought if that is where the cut happened. Break remaining work into smaller pieces.";
 
 export const OUTPUT_TOKEN_LIMIT_ERROR_MESSAGE =

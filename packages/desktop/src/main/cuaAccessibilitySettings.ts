@@ -21,12 +21,12 @@ import type {
 } from "@zcode/shared";
 import { createDesktopCuaHelperInstaller } from "./desktopCuaHelperInstaller.js";
 
-const MACOS_ACCESSIBILITY_SETTINGS_URL =
+export const MACOS_ACCESSIBILITY_SETTINGS_URL =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
-const MACOS_SCREEN_RECORDING_SETTINGS_URL =
+export const MACOS_SCREEN_RECORDING_SETTINGS_URL =
   "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 
-interface OpenCuaAccessibilitySettingsOptions {
+export interface OpenCuaAccessibilitySettingsOptions {
   initialPermission?: CuaPermissionKind;
   requiredPermissions?: CuaPermissionKind[];
   env?: NodeJS.ProcessEnv;
@@ -79,7 +79,7 @@ function messageOf(error: unknown): string {
 // inode change time，用户态无法回拨），任何对 Mach-O / 签名清单 / Info.plist 的替换都会改变指纹。prepare
 // 时抓一次，dragstart 前同步比对，不符即拒拖 + 清缓存重新 prepare。残留仅剩比对与 startDrag 之间的
 // 微秒级窗口（与 launch 路径 verifyInstalled→launch 同源、同量级）。
-type CuaHelperBundleFingerprint = string;
+export type CuaHelperBundleFingerprint = string;
 
 function statSignature(path: string): string {
   try {
@@ -115,7 +115,7 @@ function bundleTreeFingerprint(root: string, maxEntries = 512): string {
   return parts.join(",");
 }
 
-function captureCuaHelperBundleFingerprint(appPath: string): CuaHelperBundleFingerprint {
+export function captureCuaHelperBundleFingerprint(appPath: string): CuaHelperBundleFingerprint {
   const parts = [
     `app=${statSignature(appPath)}`,
     `sig=${statSignature(join(appPath, "Contents", "_CodeSignature", "CodeResources"))}`,
@@ -563,7 +563,7 @@ export async function openCuaPermissionOnboarding(
 // 自动进入 TCC 列表）。弹窗被摘除后，拖拽重新成为 Helper 进入权限列表的**唯一**途径，
 // 故恢复本函数。openCuaAccessibilitySettings（旧确认弹窗频道）不恢复，它已被 onboarding 取代。
 
-interface PrepareCuaHelperPermissionDragOptions {
+export interface PrepareCuaHelperPermissionDragOptions {
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
   logger?: OpenCuaAccessibilitySettingsOptions["logger"];

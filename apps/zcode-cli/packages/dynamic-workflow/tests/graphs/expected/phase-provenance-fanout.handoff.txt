@@ -1,0 +1,8 @@
+phase phase#1
+participant phase#1:actor#1 "scout" steps=ask#1
+participant phase#1:workspace steps=world-read#1~phase#1
+phase phase#2
+participant phase#2:actor#2 "auditor" steps=ask#2
+participant phase#2:workspace steps=world-read#1~phase#2
+handoff phase#1:actor#1 -> phase#1:workspace types="string"
+handoff phase#2:actor#2 -> phase#2:workspace

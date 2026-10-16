@@ -43,8 +43,18 @@ export const MERGE_BACK = 10;
 export const TAIL = 4;
 export const STUB = 6;
 
-export function timelineWidth(count: number, inset = 0): number {
-  return count === 0 ? 0 : (count - 1) * STATION_PITCH + STATION_WIDTH + inset;
+/**
+ * 补全的头那一行（docs/dynamic-workflow/presentation.md「Holes on the timeline」）：只在有补全的时间线上
+ * 存在，24px，压在弧道之上——笔 12px 对准第一枚新灯的 x，名字与 `· T` 跟在后面，没有底也没有线。
+ */
+export const HEAD_ROW = 24;
+/** 尾巴留白在末站之后多占的宽度：开着时是淡出的虚线残段，补全后是头落下的余地。 */
+export const TAIL_STUB = 40;
+
+export function timelineWidth(count: number, inset = 0, tail = false): number {
+  return count === 0
+    ? 0
+    : (count - 1) * STATION_PITCH + STATION_WIDTH + inset + (tail ? TAIL_STUB : 0);
 }
 
 /** 第 i 站的左缘。 */
@@ -190,11 +200,13 @@ export interface TimelineLayout {
 export function timelineLayout(
   arcs: readonly TimelineArc[],
   bands: readonly TimelineBand[],
+  /** 有补全的时间线：最上面先留出头那一行（`HEAD_ROW`），其余整套式子原样下移。 */
+  heads = false,
 ): TimelineLayout {
   const banded = bands.length > 0;
   const tracks = banded ? Math.max(2, ...bands.map((band) => band.tracks.length)) : 1;
   const rowY: number[] = [];
-  let y = 0;
+  let y = heads ? HEAD_ROW : 0;
   for (let t = tracks - 1; t >= 0; t -= 1) {
     const lanes = arcLaneCount(arcs.filter((arc) => arc.air === t));
     // 最高一道的顶线落在 y = 8：rowY = air + RAIL_ROW/2 = 8 + ARC_BASE + ARC_LANE × (lanes − 1)。

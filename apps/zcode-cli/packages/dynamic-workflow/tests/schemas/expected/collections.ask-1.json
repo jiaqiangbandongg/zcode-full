@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "frozen": {
+      "items": {
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "matrix": {
+      "items": {
+        "items": {
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "optionalTail": {
+      "maxItems": 2,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    },
+    "pair": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    },
+    "restTail": {
+      "items": {
+        "type": "number"
+      },
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "type": "array"
+    },
+    "scores": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "type": "object"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "tags",
+    "frozen",
+    "pair",
+    "optionalTail",
+    "restTail",
+    "scores",
+    "matrix"
+  ],
+  "type": "object"
+}

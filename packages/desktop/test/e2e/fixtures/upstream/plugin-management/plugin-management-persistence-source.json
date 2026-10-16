@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-persistence-source",
+  "spec": "./test/e2e/plugins/plugin-management-persistence-source.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-management-orphaned-runtime",
+      "description": "PLM-LC-005 keeps an orphaned installed skill available to a fresh session.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_LIFECYCLE_ORPHANED_REQUEST"],
+        "bodyIncludes": ["E2E_PLUGIN_LIFECYCLE_RUNTIME_1.0.0"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": { "statusCode": 200, "text": "upstream-e2e-ok" }
+    }
+  ]
+}

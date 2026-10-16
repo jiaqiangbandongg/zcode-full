@@ -1,4 +1,5 @@
 import type {
+  RequestVerificationConfig,
   CodingPlanAgreementResponse,
   CodingPlanBatchPreviewRequest,
   CodingPlanBatchPreviewResponse,
@@ -15,6 +16,7 @@ import type {
   CodingPlanPaypalSupportResponse,
   CodingPlanProductInfo,
   CodingPlanProductInfoRequest,
+  CodingPlanBillingDiscountConfig,
   CodingPlanStaticProductsConfig,
   CodingPlanStaticTeamProductsConfig,
   CodingPlanPreviewRequest,
@@ -42,6 +44,9 @@ import type {
   StartPlanPreviewConfig,
   ZCodeModelContextBudgetStrategy,
   ForceUpdateConfig,
+  ManualClaimPlanPreviewSnapshot,
+  ManualClaimPlanClaimRequest,
+  ManualClaimPlanClaimResult,
   DynamicWorkflowClientConfig,
 } from "@zcode/shared";
 import type { ModelSelectionView } from "@zcode/provider";
@@ -60,7 +65,9 @@ export interface ICodingPlanSubscriptionService {
   getStaticProducts(): Promise<CodingPlanStaticProductsConfig>;
   getStaticTeamProducts(): Promise<CodingPlanStaticTeamProductsConfig>;
   getStartPlanPreview(): Promise<StartPlanPreviewConfig | null>;
-  /** 闲时任务灰度配置：forceRefresh 供入口打开时补拉（绕过 1h 快照缓存）。 */
+  getManualClaimPlanPreviews(): Promise<ManualClaimPlanPreviewSnapshot>;
+  claimManualPlan(request: ManualClaimPlanClaimRequest): Promise<ManualClaimPlanClaimResult>;
+  /** 闲时任务灰度配置（D31）：forceRefresh 供入口打开时补拉（绕过 1h 快照缓存）。 */
   getOffPeakClientConfig(options?: { forceRefresh?: boolean }): Promise<OffPeakClientConfig>;
   /**
    * 动态工作流灰度快照：远端 `configs.dynamicWorkflow.mode`
@@ -71,6 +78,8 @@ export interface ICodingPlanSubscriptionService {
   }): Promise<DynamicWorkflowClientConfig>;
   /** 兼容接口：固定返回 preflight-v1，不读取远端配置或缓存。 */
   getModelContextBudgetStrategy(): Promise<ZCodeModelContextBudgetStrategy>;
+  getBillingDiscount(): Promise<CodingPlanBillingDiscountConfig | undefined>;
+  getRequestVerificationConfig(): Promise<RequestVerificationConfig | null>;
   getForceUpdateConfig(): Promise<ForceUpdateConfig | null>;
   productInfo(request: CodingPlanProductInfoRequest): Promise<CodingPlanProductInfo>;
   preview(request: CodingPlanPreviewRequest): Promise<CodingPlanPreviewResponse>;

@@ -63,17 +63,17 @@ See `scripts/persona-command.tsx` for this example.
 
 The root component that renders the animated AI visual.
 
-| Prop          | Type              | Default | Description                                                                 |
-| ------------- | ----------------- | ------- | --------------------------------------------------------------------------- |
-| `state`       | `unknown`         | -       | The current state of the AI persona. Controls which animation is displayed. |
-| `variant`     | `unknown`         | -       | The visual style variant to display.                                        |
-| `className`   | `string`          | -       | Additional CSS classes to apply to the component.                           |
-| `onLoad`      | `RiveParameters[` | -       | Callback fired when the Rive file starts loading.                           |
-| `onLoadError` | `RiveParameters[` | -       | Callback fired if the Rive file fails to load.                              |
-| `onReady`     | `() => void`      | -       | Callback fired when the Rive animation is ready to play.                    |
-| `onPause`     | `RiveParameters[` | -       | Callback fired when the animation is paused.                                |
-| `onPlay`      | `RiveParameters[` | -       | Callback fired when the animation starts playing.                           |
-| `onStop`      | `RiveParameters[` | -       | Callback fired when the animation is stopped.                               |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `state` | `unknown` | - | The current state of the AI persona. Controls which animation is displayed. |
+| `variant` | `unknown` | - | The visual style variant to display. |
+| `className` | `string` | - | Additional CSS classes to apply to the component. |
+| `onLoad` | `RiveParameters[` | - | Callback fired when the Rive file starts loading. |
+| `onLoadError` | `RiveParameters[` | - | Callback fired if the Rive file fails to load. |
+| `onReady` | `() => void` | - | Callback fired when the Rive animation is ready to play. |
+| `onPause` | `RiveParameters[` | - | Callback fired when the animation is paused. |
+| `onPlay` | `RiveParameters[` | - | Callback fired when the animation starts playing. |
+| `onStop` | `RiveParameters[` | - | Callback fired when the animation is stopped. |
 
 ## States
 
@@ -112,9 +112,9 @@ import { Persona } from "@repo/elements/persona";
 import { useState } from "react";
 
 export default function App() {
-  const [state, setState] = useState<"idle" | "listening" | "thinking" | "speaking" | "asleep">(
-    "idle",
-  );
+  const [state, setState] = useState<
+    "idle" | "listening" | "thinking" | "speaking" | "asleep"
+  >("idle");
 
   const startListening = () => setState("listening");
   const startThinking = () => setState("thinking");

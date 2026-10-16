@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-automation-run-unread-clear",
+  "spec": "./test/e2e/conversation-session/conversation-session-automation-run-unread-clear.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-automation-run-unread-clear.json"
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-automation-run-unread-clear-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定命中定时任务 prompt 并快速结束，稳定验证后台终态写入未读，以及用户点击执行会话后的已读闭环。"
+    }
+  ]
+}

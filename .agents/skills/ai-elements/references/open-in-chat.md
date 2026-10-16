@@ -44,30 +44,30 @@ npx ai-elements@latest add open-in-chat
 
 ### `<OpenIn />`
 
-| Prop       | Type                                        | Default | Description                                                        |
-| ---------- | ------------------------------------------- | ------- | ------------------------------------------------------------------ |
-| `query`    | `string`                                    | -       | The query text to be sent to all AI platforms.                     |
-| `...props` | `React.ComponentProps<typeof DropdownMenu>` | -       | Props to spread to the underlying radix-ui DropdownMenu component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `query` | `string` | - | The query text to be sent to all AI platforms. |
+| `...props` | `React.ComponentProps<typeof DropdownMenu>` | - | Props to spread to the underlying radix-ui DropdownMenu component. |
 
 ### `<OpenInTrigger />`
 
-| Prop       | Type                                               | Default | Description                                                      |
-| ---------- | -------------------------------------------------- | ------- | ---------------------------------------------------------------- |
-| `children` | `React.ReactNode`                                  | -       | Custom trigger button.                                           |
-| `...props` | `React.ComponentProps<typeof DropdownMenuTrigger>` | -       | Props to spread to the underlying DropdownMenuTrigger component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `React.ReactNode` | - | Custom trigger button. |
+| `...props` | `React.ComponentProps<typeof DropdownMenuTrigger>` | - | Props to spread to the underlying DropdownMenuTrigger component. |
 
 ### `<OpenInContent />`
 
-| Prop        | Type                                               | Default | Description                                                      |
-| ----------- | -------------------------------------------------- | ------- | ---------------------------------------------------------------- |
-| `className` | `string`                                           | -       | Additional CSS classes to apply to the dropdown content.         |
-| `...props`  | `React.ComponentProps<typeof DropdownMenuContent>` | -       | Props to spread to the underlying DropdownMenuContent component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `className` | `string` | - | Additional CSS classes to apply to the dropdown content. |
+| `...props` | `React.ComponentProps<typeof DropdownMenuContent>` | - | Props to spread to the underlying DropdownMenuContent component. |
 
 ### `<OpenInChatGPT />`, `<OpenInClaude />`, `<OpenInT3 />`, `<OpenInScira />`, `<OpenInv0 />`, `<OpenInCursor />`
 
-| Prop       | Type                                            | Default | Description                                                                                                                                     |
-| ---------- | ----------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof DropdownMenuItem>` | -       | Props to spread to the underlying DropdownMenuItem component. The query is automatically provided via context from the parent OpenIn component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof DropdownMenuItem>` | - | Props to spread to the underlying DropdownMenuItem component. The query is automatically provided via context from the parent OpenIn component. |
 
 ### `<OpenInItem />`, `<OpenInLabel />`, `<OpenInSeparator />`
 

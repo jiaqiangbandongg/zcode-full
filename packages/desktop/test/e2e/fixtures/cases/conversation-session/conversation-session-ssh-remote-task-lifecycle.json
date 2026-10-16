@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-task-lifecycle",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-task-lifecycle.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-task-lifecycle.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    { "id": "ssh-task-lifecycle-title", "description": "SSH task lifecycle 标题辅助响应。", "kind": "common", "source": "synthetic", "timingPolicy": "fast-text", "syntheticReason": "标题不属于 lifecycle 断言，只需稳定 task row。" },
+    { "id": "ssh-task-lifecycle-a-first", "description": "workspace A 首发响应。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "稳定验证 A 首发和 task 创建。" },
+    { "id": "ssh-task-lifecycle-b-first", "description": "workspace B 首发响应。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "稳定验证 B 首发和 task 创建。" },
+    { "id": "ssh-task-lifecycle-a-follow", "description": "workspace A 重开后的续发响应。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "稳定验证 A 重开后仍命中原 task。" },
+    { "id": "ssh-task-lifecycle-b-follow", "description": "workspace B 续发响应。", "kind": "main", "source": "synthetic", "timingPolicy": "slow-stream", "syntheticReason": "稳定验证 A 关闭期间 B 仍可继续工作。" }
+  ]
+}

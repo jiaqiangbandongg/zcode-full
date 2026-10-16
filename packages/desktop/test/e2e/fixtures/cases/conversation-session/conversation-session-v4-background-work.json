@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-background-work",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-background-work.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-background-work.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-background-work-title",
+      "description": "E2E_V4_BGWORK 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_BGWORK 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-bgwork-toolcall",
+      "description": "M4 cancelBackgroundWork 门禁：首轮返回 run_in_background 的 Bash tool_use（长 sleep），形成可取消的后台工作。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "需要稳定产出一个 run_in_background 的后台 bash 任务以断言后台工作面板 + 取消。"
+    },
+    {
+      "id": "v4-bgwork-final",
+      "description": "M4 后台任务 backgrounded 后的 tool_result 跟进回复（固定文本）。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "后台任务已分离，主轮只需固定收尾文本；核心断言在后台工作面板 + 取消。"
+    }
+  ]
+}

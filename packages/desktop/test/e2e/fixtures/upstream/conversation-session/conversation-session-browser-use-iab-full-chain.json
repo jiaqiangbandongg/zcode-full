@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-browser-use-iab-full-chain",
+  "spec": "./test/e2e/conversation-session/conversation-session-browser-use-iab-full-chain.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-browser-use-iab-title",
+      "description": "Browser Use case 内固定标题响应，避免异步标题请求污染主链 matcher。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是本用例产品语义，只需稳定返回并与 Browser tool continuation 隔离。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_BROWSER_USE_IAB_FULL_CHAIN"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-browser-use-iab-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Browser Use IAB\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":64,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":8,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "upstream-browser-use-iab-bootstrap",
+      "description": "在 fresh node_repl kernel 中初始化 Browser client，创建 IAB tab，导航本地 fixture，并把 stable tab id 与 DOM snapshot 返回模型。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定驱动真实 BrowserControl 链路，并让下一次模型响应只能从真实 tool result 恢复 stable tab id。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_BROWSER_USE_IAB_FULL_CHAIN",
+          "E2E_BROWSER_FIXTURE_URL:"
+        ],
+        "bodyIncludes": ["mcp__node_repl__js"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_browser_iab_bootstrap",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nif (!browserPluginRoot) throw new Error('Browser plugin root is unavailable in the node_repl host');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst browserClientUrl = pathToFileURL(join(browserPluginRoot, 'scripts', 'browser-client.mjs')).href;\nconst { setupBrowserRuntime } = await import(browserClientUrl);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst tab = await browser.tabs.new();\nawait tab.goto('{{browserFixtureUrl}}');\nawait tab.setViewportSize({ width: 375, height: 667 });\nconst snapshot = await tab.playwright.domSnapshot();\n({ marker: 'E2E_BROWSER_USE_IAB_BOOTSTRAP_OK', e2eBrowserTabId: tab.id, snapshot });",
+            "title": "打开 Browser Use 测试页面"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-browser-use-iab-action",
+      "description": "在新的 fresh kernel 中重新初始化 Browser client，使用上一条 tool result 的动态 stable id 恢复 tab，再覆盖 locator、CUA、click 与截图。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证不依赖跨 cell binding 的 tab/page 连续性，同时稳定覆盖 actionability、trusted guest input、页面副作用、显式图片和 viewport 回读。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_USE_IAB_FULL_CHAIN",
+          "toolu_e2e_browser_iab_bootstrap",
+          "E2E_BROWSER_USE_IAB_BOOTSTRAP_OK",
+          "e2eBrowserTabId",
+          "E2E Browser Use Fixture",
+          "Submit"
+        ],
+        "bodyExcludes": [
+          "Submitted ZCode",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_browser_iab_action",
+          "name": "mcp__node_repl__js",
+          "input": {
+            "code": "const browserPluginRoot = process.env.ZCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT;\nif (!browserPluginRoot) throw new Error('Browser plugin root is unavailable in the node_repl host');\nconst { join } = await import('node:path');\nconst { pathToFileURL } = await import('node:url');\nconst browserClientUrl = pathToFileURL(join(browserPluginRoot, 'scripts', 'browser-client.mjs')).href;\nconst { setupBrowserRuntime } = await import(browserClientUrl);\nawait setupBrowserRuntime({ globals: globalThis });\nconst browser = await agent.browsers.get('iab');\nconst expectedTabId = '{{latestBrowserTabId}}';\nconst tab = await browser.tabs.get(expectedTabId);\nconst animatedInput = tab.playwright.getByLabel('Animated Name');\nconst sharedCount = await animatedInput.count();\nconst fillStartedAt = Date.now();\nawait animatedInput.fill('ZCode');\nconst fillCompletedBefore25s = Date.now() - fillStartedAt < 25000;\nlet strictMessage = '';\ntry {\n  await tab.playwright.getByRole('button', { name: 'Duplicate' }).click();\n} catch (error) {\n  strictMessage = error instanceof Error ? error.message : String(error);\n}\nlet overlayMessage = '';\ntry {\n  await tab.playwright.locator('#covered-button').click();\n} catch (error) {\n  overlayMessage = error instanceof Error ? error.message : String(error);\n}\nconst leakedInternalError = /AbortError|Cannot read properties of undefined|undefined.*count/i.test(strictMessage + '\\n' + overlayMessage);\nconst cuaInput = tab.playwright.getByLabel('CUA Name');\nawait cuaInput.click();\nawait new Promise((resolve) => setTimeout(resolve, 4000));\nawait tab.cua.type({ text: 'ZCode' });\nawait tab.playwright.getByRole('button', { name: 'Submit' }).click();\nfor (const width of [373, 374]) {\n  await tab.setViewportSize({ width, height: 667 });\n  await nodeRepl.emitImage(await tab.screenshot());\n}\nawait tab.setViewportSize({ width: 375, height: 667 });\nconst status = await tab.playwright.getByRole('status').innerText();\nconst recoveredSameTab = tab.id === expectedTabId;\nconst allActionabilityChecksPassed = recoveredSameTab && sharedCount === 2 && fillCompletedBefore25s && strictMessage.length > 0 && overlayMessage.length > 0 && !leakedInternalError && status === 'Submitted ZCode / ZCode';\n({\n  marker: allActionabilityChecksPassed ? 'E2E_BROWSER_USE_IAB_ACTIONABILITY_OK' : 'E2E_BROWSER_USE_IAB_ACTIONABILITY_FAILED',\n  recoveredSameTab,\n  sharedCount,\n  fillCompletedBefore25s,\n  strictRejected: strictMessage.length > 0,\n  overlayRejected: overlayMessage.length > 0,\n  leakedInternalError,\n  animatedInputValue: await animatedInput.getAttribute('value'),\n  inputValue: await cuaInput.getAttribute('value'),\n  status,\n  viewport: tab.viewportSize(),\n  tabs: await browser.tabs.list()\n});",
+            "title": "填写并截图 Browser Use 测试页面"
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-browser-use-iab-final",
+      "description": "消费真实页面 action 与截图结果，正常完成 turn 以触发轮尾自动截图。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定形成 normal completion，验证显式 emitImage 不抑制 Browser turn-end screenshot。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_BROWSER_USE_IAB_FULL_CHAIN",
+          "toolu_e2e_browser_iab_action",
+          "E2E_BROWSER_USE_IAB_ACTIONABILITY_OK",
+          "Submitted ZCode / ZCode"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "E2E_BROWSER_USE_IAB_DONE"
+      }
+    }
+  ]
+}

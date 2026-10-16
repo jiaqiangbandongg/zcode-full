@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-sendnow",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-sendnow.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-sendnow-title",
+      "description": "E2E_V4_SENDNOW_SLOW 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_V4_SENDNOW_SLOW 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_V4_SENDNOW_SLOW"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-sendnow-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Send Now E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-sendnow-slow-turn",
+      "description": "M4 sendQueuedNow 门禁：可控慢流首轮，保持 running 以便入队 + send now。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "sendQueuedNow 需 running 窗口入队，再 stop 当前 + 消费该项。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_SENDNOW_SLOW"],
+        "lastUserMessageExcludes": ["E2E_V4_SENDNOW_ITEM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"v4-sendnow-slow\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"V4_SENDNOW_STREAMING \"}}\n\n"
+          },
+          {
+            "offsetMs": 45000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 45100,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":80,\"output_tokens\":4,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 45200,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "text": {
+          "id": "v4-sendnow-slow",
+          "inputTokens": 80,
+          "outputTokens": 4,
+          "text": "V4_SENDNOW_STREAMING"
+        }
+      }
+    },
+    {
+      "id": "v4-sendnow-item-reply",
+      "description": "M4 sendQueuedNow 门禁：被立即发送的队列项的回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "sendQueuedNow stop 当前后以原文重发该队列项，模型给出回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_SENDNOW_ITEM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-sendnow-item",
+          "inputTokens": 60,
+          "outputTokens": 5,
+          "text": "V4_SENDNOW_ITEM_REPLY"
+        }
+      }
+    }
+  ]
+}

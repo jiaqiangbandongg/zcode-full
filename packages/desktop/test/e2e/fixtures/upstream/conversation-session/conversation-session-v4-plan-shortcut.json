@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-plan-shortcut",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-plan-shortcut.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-plan-shortcut-title",
+      "description": "E2E_V4_PLAN_SHORTCUT_SEED 首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Plan shortcut 任务需要一个已有 session；固定 seed 的 title sidecar，避免回退到共享 provider fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_V4_PLAN_SHORTCUT_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-plan-shortcut-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"V4 Plan Shortcut E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "v4-plan-shortcut-seed",
+      "description": "Plan shortcut seed：建立可发送普通 follow-up 的已有 session。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "空命令和附件拒绝不需要 provider；任务组合需要稳定的已有 session。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_PLAN_SHORTCUT_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-plan-shortcut-seed",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "V4_PLAN_SHORTCUT_SEED_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-plan-shortcut-task-one",
+      "description": "`/plan <task>` 首次切换 Plan 后的普通任务响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证 mode CAS 后 sendText 的 provider 正文只包含任务，不包含 `/plan` 前缀。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_PLAN_SHORTCUT_TASK_ONE"],
+        "lastUserMessageExcludes": ["/plan"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-plan-shortcut-task-one",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "V4_PLAN_SHORTCUT_TASK_ONE_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-plan-shortcut-task-two",
+      "description": "已处于 Plan 模式时 `/plan <task>` noop 后继续发送的普通任务响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证重复 Plan mode CAS 收敛为 noop 后仍进入普通 sendText。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_PLAN_SHORTCUT_TASK_TWO"],
+        "lastUserMessageExcludes": ["/plan"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-plan-shortcut-task-two",
+          "inputTokens": 112,
+          "outputTokens": 8,
+          "text": "V4_PLAN_SHORTCUT_TASK_TWO_OK"
+        }
+      }
+    }
+  ]
+}

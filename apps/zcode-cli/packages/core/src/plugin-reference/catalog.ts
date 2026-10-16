@@ -65,6 +65,9 @@ export function buildPluginReferenceCatalog(
       mcpServerNames: [...plugin.mcpServerNames].sort(),
       subagentNames: collectDeclaredSubagentNames(plugin),
       rootPath: plugin.rootPath,
+      ...(plugin.uiSurfaces && plugin.uiSurfaces.length > 0
+        ? { uiSurfaces: plugin.uiSurfaces }
+        : {}),
     };
   });
 

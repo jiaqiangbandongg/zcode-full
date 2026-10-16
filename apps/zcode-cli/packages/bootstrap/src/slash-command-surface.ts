@@ -2,7 +2,7 @@ import { BUILTIN_ZCODE_SLASH_COMMAND_HELP_ENTRIES, type ZCodeSlashCommand } from
 
 /**
  * App `/` 面板与加号菜单按本顺序展示（UI 不维护排序白名单）。`workflow` 紧随 `goal`：两者都是
- * 「开启一段工作」的入口；它受动态工作流开关约束，
+ * 「开启一段工作」的入口（docs/ui/chat-composer-action-menu.md「工作流入口」）；它受灰度门约束，
  * 由 zcode-protocol/slash-commands.ts 在装配时剔除。
  */
 export const APP_PROTOCOL_VISIBLE_BUILTIN_SLASH_COMMAND_NAMES = [
@@ -31,7 +31,7 @@ const RESERVED_SLASH_COMMAND_NAMES = new Set(
   ]).concat([...EXTRA_RESERVED_SLASH_COMMAND_NAMES]),
 );
 
-function normalizeZCodeSlashCommandName(name: string): string {
+export function normalizeZCodeSlashCommandName(name: string): string {
   return name.trim().replace(/^\/+/, "").toLowerCase();
 }
 

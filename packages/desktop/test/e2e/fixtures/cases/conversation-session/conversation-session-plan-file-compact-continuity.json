@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-plan-file-compact-continuity",
+  "spec": "./test/e2e/conversation-session/conversation-session-plan-file-compact-continuity.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-plan-file-compact-continuity.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-plan-file-compact-enter-plan-call",
+      "description": "首轮请求返回 EnterPlanMode，进入 plan mode。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造 plan mode 状态，避免依赖真实模型是否选择 EnterPlanMode。"
+    },
+    {
+      "id": "upstream-plan-file-compact-exit-plan-call",
+      "description": "plan mode 内返回 ExitPlanMode，触发审批弹窗并携带唯一 plan marker。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定触发 ExitPlanMode 审批弹窗，并让已批准 plan 内容可在文件和 compact 后请求中被追踪。"
+    },
+    {
+      "id": "upstream-plan-file-compact-approval-final",
+      "description": "审批通过后返回固定文本，让当前轮完成。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "审批通过后的回复内容不是本 case 核心，只需要稳定结束当前轮。"
+    },
+    {
+      "id": "upstream-plan-file-compact-checkpoint-final",
+      "description": "审批后追加一轮普通消息，使手动 compact 具备两轮以上可压缩历史。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "当前 compact 策略会跳过过短历史，checkpoint 只用于稳定满足 compact 入口条件。"
+    },
+    {
+      "id": "upstream-plan-file-compact-summary-success",
+      "description": "手动 /compact 的 streaming summary 请求成功。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "本 case 关注 compact 后 plan_file_reference 重新注入；summary 文案只需稳定完成 compact。"
+    },
+    {
+      "id": "upstream-plan-file-compact-post-compact-final",
+      "description": "compact 后普通请求重新包含 plan_file_reference 与完整 plan marker。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心合同是 provider-visible 请求内容，回复文本只需稳定结束后续轮。"
+    }
+  ]
+}

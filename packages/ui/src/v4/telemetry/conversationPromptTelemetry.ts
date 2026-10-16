@@ -6,7 +6,7 @@ import {
   legacyTelemetryProviderId,
 } from "@/lib/providerTelemetryIdentity.js";
 
-function resolveLegacyConversationModelValue(params: {
+export function resolveLegacyConversationModelValue(params: {
   configProvider?: string | null;
   modelName?: string | null;
 }): string | null | undefined {

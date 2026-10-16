@@ -1,0 +1,749 @@
+flowchart LR
+    N0["packages/client/src/globals.d.ts"]
+    N1["packages/client/src/index.ts"]
+    N2["packages/client/src/messageport.ts"]
+    N3["packages/client/src/remoteServiceAccess.ts"]
+    N4["packages/client/src/websocket.ts"]
+    N5["packages/desktop/src/host/electronPort.ts"]
+    N6["packages/desktop/src/host/index.ts"]
+    N7["packages/desktop/src/main/about.ts"]
+    N8["packages/desktop/src/main/broadcastHub.ts"]
+    N9["packages/desktop/src/main/index.ts"]
+    N10["packages/desktop/src/main/logger.ts"]
+    N11["packages/desktop/src/main/processMonitorWindow.ts"]
+    N12["packages/desktop/src/preload/index.ts"]    
+    N13["packages/desktop/src/preload/processMonitor.ts"]
+    N14["packages/desktop/src/renderer/src/env.d.ts"]
+    N15["packages/desktop/src/renderer/src/login.tsx"]
+    N16["packages/desktop/src/renderer/src/main.tsx"]
+    N17["packages/desktop/src/renderer/src/process-monitor.tsx"]
+    N18["packages/rpc/src/buffer.ts"]
+    N19["packages/rpc/src/channels.ts"]
+    N20["packages/rpc/src/foundation.ts"]
+    N21["packages/rpc/src/index.ts"]
+    N22["packages/rpc/src/ipc.ts"]
+    N23["packages/rpc/src/logging-middleware.ts"]
+    N24["packages/rpc/src/protocol.ts"]
+    N25["packages/rpc/src/proxy-channel.ts"]
+    N26["packages/rpc/src/remote.ts"]
+    N27["packages/rpc/src/serialization.ts"]
+    N28["packages/server/src/entry-http.ts"]
+    N29["packages/server/src/entry-stdio.ts"]
+    N30["packages/server/src/http.ts"]
+    N31["packages/server/src/index.ts"]
+    N32["packages/server/src/remote/backend.ts"]
+    N33["packages/server/src/remote/connect.ts"]
+    N34["packages/server/src/remote/deploy.ts"]
+    N35["packages/server/src/remote/handshake.ts"]
+    N36["packages/server/src/remote/index.ts"]
+    N37["packages/server/src/remote/ssh-backend.ts"]
+    N38["packages/server/src/remote/stdio-socket.ts"]
+    N39["packages/server/src/stdio.ts"]
+    N40["packages/services/src/accessor.ts"]
+    N41["packages/services/src/acp/acp.ts"]
+    N42["packages/services/src/acp/acpBinaryResolver.ts"]
+    N43["packages/services/src/acp/acpPersistence.ts"]
+    N44["packages/services/src/acp/acpProcessManager.ts"]
+    N45["packages/services/src/acp/acpProtocolHandler.ts"]
+    N46["packages/services/src/acp/acpService.ts"]
+    N47["packages/services/src/acp/acpSessionManager.ts"]
+    N48["packages/services/src/acp/acpWorkspaceProcessPool.ts"]
+    N49["packages/services/src/acp/adapters/claudeSessionAdapter.ts"]
+    N50["packages/services/src/acp/adapters/index.ts"]
+    N51["packages/services/src/acp/adapters/opencodeSessionAdapter.ts"]
+    N52["packages/services/src/acp/adapters/sessionResponseAdapter.ts"]
+    N53["packages/services/src/broadcast/broadcast.ts"]
+    N54["packages/services/src/broadcast/broadcastService.ts"]
+    N55["packages/services/src/collection.ts"]
+    N56["packages/services/src/credential/credential.ts"]
+    N57["packages/services/src/credential/credentialService.ts"]
+    N58["packages/services/src/descriptors.ts"]
+    N59["packages/services/src/file/file.ts"]
+    N60["packages/services/src/file/fileService.ts"]
+    N61["packages/services/src/index.ts"]
+    N62["packages/services/src/node.ts"]
+    N63["packages/services/src/setting/setting.ts"]
+    N64["packages/services/src/setting/settingService.ts"]
+    N65["packages/services/src/system/system.ts"]
+    N66["packages/services/src/system/systemService.ts"]
+    N67["packages/services/src/terminal/terminal.ts"]
+    N68["packages/services/src/terminal/terminalService.ts"]
+    N69["packages/shared/src/acp-types.ts"]
+    N70["packages/shared/src/channels.ts"]
+    N71["packages/shared/src/env.ts"]
+    N72["packages/shared/src/handshake.ts"]
+    N73["packages/shared/src/index.ts"]
+    N74["packages/shared/src/platform.ts"]
+    N75["packages/shared/src/protocol.ts"]
+    N76["packages/shared/src/test-ids.ts"]
+    N77["packages/shared/src/version.ts"]
+    N78["packages/ui/src/App.tsx"]
+    N79["packages/ui/src/ChatErrorBanner.tsx"]
+    N80["packages/ui/src/ChatInputToolbar.tsx"]
+    N81["packages/ui/src/ChatMessage.tsx"]
+    N82["packages/ui/src/ChatPlan.tsx"]
+    N83["packages/ui/src/ChatView.tsx"]
+    N84["packages/ui/src/DesktopWindowFrame.tsx"]
+    N85["packages/ui/src/DirectoryBrowser.tsx"]
+    N86["packages/ui/src/EmbeddedBrowserPane.tsx"]
+    N87["packages/ui/src/FileTree.tsx"]
+    N88["packages/ui/src/LexicalChatInput.tsx"]
+    N89["packages/ui/src/PermissionDialog.tsx"]
+    N90["packages/ui/src/OpenWorkspacePage.tsx"]
+    N91["packages/ui/src/Root.tsx"]
+    N92["packages/ui/src/SSHDialog.tsx"]
+    N93["packages/ui/src/SlashCommandPlugin.tsx"]
+    N94["packages/ui/src/TabBar.tsx"]
+    N95["packages/ui/src/TaskList.tsx"]
+    N96["packages/ui/src/Terminal.tsx"]
+    N97["packages/ui/src/WelcomeScreen.tsx"]
+    N98["packages/ui/src/components/ai-elements/agent.tsx"]
+    N99["packages/ui/src/components/ai-elements/artifact.tsx"]
+    N100["packages/ui/src/components/ai-elements/attachments.tsx"]
+    N101["packages/ui/src/components/ai-elements/audio-player.tsx"]
+    N102["packages/ui/src/components/ai-elements/chain-of-thought.tsx"]
+    N103["packages/ui/src/components/ai-elements/checkpoint.tsx"]
+    N104["packages/ui/src/components/ai-elements/code-block.tsx"]
+    N105["packages/ui/src/components/ai-elements/commit.tsx"]
+    N106["packages/ui/src/components/ai-elements/confirmation.tsx"]
+    N107["packages/ui/src/components/ai-elements/context.tsx"]
+    N108["packages/ui/src/components/ai-elements/controls.tsx"]
+    N109["packages/ui/src/components/ai-elements/conversation.tsx"]
+    N110["packages/ui/src/components/ai-elements/environment-variables.tsx"]
+    N111["packages/ui/src/components/ai-elements/file-tree.tsx"]
+    N112["packages/ui/src/components/ai-elements/image.tsx"]
+    N113["packages/ui/src/components/ai-elements/inline-citation.tsx"]
+    N114["packages/ui/src/components/ai-elements/jsx-preview.tsx"]
+    N115["packages/ui/src/components/ai-elements/message.tsx"]
+    N116["packages/ui/src/components/ai-elements/mic-selector.tsx"]
+    N117["packages/ui/src/components/ai-elements/model-selector.tsx"]
+    N118["packages/ui/src/components/ai-elements/node.tsx"]
+    N119["packages/ui/src/components/ai-elements/open-in-chat.tsx"]
+    N120["packages/ui/src/components/ai-elements/package-info.tsx"]
+    N121["packages/ui/src/components/ai-elements/panel.tsx"]
+    N122["packages/ui/src/components/ai-elements/persona.tsx"]
+    N123["packages/ui/src/components/ai-elements/plan.tsx"]
+    N124["packages/ui/src/components/ai-elements/prompt-input.tsx"]
+    N125["packages/ui/src/components/ai-elements/queue.tsx"]
+    N126["packages/ui/src/components/ai-elements/reasoning.tsx"]
+    N127["packages/ui/src/components/ai-elements/sandbox.tsx"]
+    N128["packages/ui/src/components/ai-elements/schema-display.tsx"]
+    N129["packages/ui/src/components/ai-elements/shimmer.tsx"]
+    N130["packages/ui/src/components/ai-elements/snippet.tsx"]
+    N131["packages/ui/src/components/ai-elements/sources.tsx"]
+    N132["packages/ui/src/components/ai-elements/speech-input.tsx"]
+    N133["packages/ui/src/components/ai-elements/stack-trace.tsx"]
+    N134["packages/ui/src/components/ai-elements/suggestion.tsx"]
+    N135["packages/ui/src/components/ai-elements/task.tsx"]
+    N136["packages/ui/src/components/ai-elements/terminal.tsx"]
+    N137["packages/ui/src/components/ai-elements/test-results.tsx"]
+    N138["packages/ui/src/components/ai-elements/tool.tsx"]
+    N139["packages/ui/src/components/ai-elements/toolbar.tsx"]
+    N140["packages/ui/src/components/ai-elements/transcription.tsx"]
+    N141["packages/ui/src/components/ai-elements/voice-selector.tsx"]
+    N142["packages/ui/src/components/ai-elements/web-preview.tsx"]
+    N143["packages/ui/src/components/lib/utils.ts"]
+    N144["packages/ui/src/components/ui/accordion.tsx"]
+    N145["packages/ui/src/components/ui/alert.tsx"]
+    N146["packages/ui/src/components/ui/avatar.tsx"]
+    N147["packages/ui/src/components/ui/badge.tsx"]
+    N148["packages/ui/src/components/ui/button-group.tsx"]
+    N149["packages/ui/src/components/ui/button.tsx"]
+    N150["packages/ui/src/components/ui/card.tsx"]
+    N151["packages/ui/src/components/ui/carousel.tsx"]
+    N152["packages/ui/src/components/ui/collapsible.tsx"]
+    N153["packages/ui/src/components/ui/command.tsx"]
+    N154["packages/ui/src/components/ui/dialog.tsx"]
+    N155["packages/ui/src/components/ui/dropdown-menu.tsx"]
+    N156["packages/ui/src/components/ui/hover-card.tsx"]
+    N157["packages/ui/src/components/ui/input-group.tsx"]
+    N158["packages/ui/src/components/ui/input.tsx"]
+    N159["packages/ui/src/components/ui/popover.tsx"]
+    N160["packages/ui/src/components/ui/progress.tsx"]
+    N161["packages/ui/src/components/ui/scroll-area.tsx"]
+    N162["packages/ui/src/components/ui/select.tsx"]
+    N163["packages/ui/src/components/ui/separator.tsx"]
+    N164["packages/ui/src/components/ui/spinner.tsx"]
+    N165["packages/ui/src/components/ui/switch.tsx"]
+    N166["packages/ui/src/components/ui/tabs.tsx"]
+    N167["packages/ui/src/components/ui/textarea.tsx"]
+    N168["packages/ui/src/components/ui/tooltip.tsx"]
+    N169["packages/ui/src/hooks/index.ts"]
+    N170["packages/ui/src/hooks/useAcpChat.ts"]
+    N171["packages/ui/src/hooks/useAcpConfig.ts"]
+    N172["packages/ui/src/hooks/useAcpModes.ts"]
+    N173["packages/ui/src/hooks/useAcpService.ts"]
+    N174["packages/ui/src/hooks/useAcpTasks.ts"]
+    N175["packages/ui/src/hooks/useCredentials.ts"]
+    N176["packages/ui/src/hooks/useFileService.ts"]
+    N177["packages/ui/src/hooks/usePlatform.tsx"]
+    N178["packages/ui/src/hooks/useServices.tsx"]
+    N179["packages/ui/src/hooks/useSettingService.ts"]
+    N180["packages/ui/src/hooks/useSlashCommands.ts"]
+    N181["packages/ui/src/hooks/useSystemService.ts"]
+    N182["packages/ui/src/hooks/useTabPersistence.ts"]
+    N183["packages/ui/src/hooks/useTerminalService.ts"]
+    N184["packages/ui/src/i18n/IntlProvider.tsx"]
+    N185["packages/ui/src/i18n/LocaleSwitcher.tsx"]
+    N186["packages/ui/src/i18n/index.ts"]
+    N187["packages/ui/src/i18n/locales/en-US.ts"]
+    N188["packages/ui/src/i18n/locales/zh-CN.ts"]
+    N189["packages/ui/src/index.ts"]
+    N190["packages/ui/src/lib/acpProviders.ts"]
+    N191["packages/ui/src/lib/chatStatus.ts"]
+    N192["packages/ui/src/lib/mapToolStatus.ts"]
+    N193["packages/ui/src/lib/promptInputTriggers.ts"]
+    N194["packages/ui/src/lib/slashCommands.ts"]
+    N195["packages/ui/src/logger.ts"]
+    N196["packages/ui/src/store/StoreProvider.tsx"]
+    N197["packages/ui/src/store/TabStoreProvider.tsx"]
+    N198["packages/ui/src/store/acpStore.ts"]
+    N199["packages/ui/src/store/index.ts"]
+    N200["packages/ui/src/store/tabStore.ts"]
+    N201["packages/ui/src/test-actions.ts"]
+    N202["packages/ui/src/useTheme.ts"]
+    N203["packages/web/src/main.tsx"]
+    N0 --> N73
+    N1 --> N2
+    N1 --> N3
+    N1 --> N4
+    N2 --> N3
+    N2 --> N21
+    N2 --> N61
+    N3 --> N21
+    N3 --> N61
+    N4 --> N3
+    N4 --> N21
+    N4 --> N61
+    N5 --> N21
+    N6 --> N5
+    N6 --> N21
+    N6 --> N36
+    N6 --> N61
+    N6 --> N62
+    N6 --> N73
+    N7 --> N73
+    N8 --> N61
+    N8 --> N73
+    N9 --> N7
+    N9 --> N8
+    N9 --> N10
+    N9 --> N11
+    N9 --> N36
+    N9 --> N73
+    N11 --> N10
+    N11 --> N73
+    N12 --> N73
+    N13 --> N73
+    N14 --> N0
+    N15 --> N1
+    N15 --> N73
+    N15 --> N189
+    N16 --> N1
+    N16 --> N73
+    N16 --> N189
+    N17 --> N73
+    N19 --> N18
+    N19 --> N20
+    N19 --> N24
+    N19 --> N27
+    N21 --> N18
+    N21 --> N19
+    N21 --> N20
+    N21 --> N22
+    N21 --> N23
+    N21 --> N24
+    N21 --> N25
+    N21 --> N26
+    N21 --> N27
+    N22 --> N18
+    N22 --> N19
+    N22 --> N20
+    N22 --> N24
+    N22 --> N27
+    N23 --> N19
+    N23 --> N20
+    N24 --> N18
+    N24 --> N20
+    N25 --> N19
+    N25 --> N20
+    N26 --> N20
+    N26 --> N22
+    N26 --> N24
+    N27 --> N18
+    N28 --> N30
+    N28 --> N62
+    N29 --> N39
+    N29 --> N62
+    N29 --> N73
+    N30 --> N21
+    N30 --> N36
+    N30 --> N61
+    N30 --> N73
+    N31 --> N30
+    N32 --> N21
+    N33 --> N1
+    N33 --> N21
+    N33 --> N32
+    N33 --> N34
+    N33 --> N35
+    N33 --> N38
+    N33 --> N61
+    N34 --> N32
+    N34 --> N73
+    N35 --> N32
+    N35 --> N73
+    N36 --> N32
+    N36 --> N33
+    N36 --> N34
+    N36 --> N35
+    N36 --> N37
+    N36 --> N38
+    N37 --> N21
+    N37 --> N32
+    N38 --> N21
+    N38 --> N32
+    N39 --> N21
+    N39 --> N61
+    N40 --> N41
+    N40 --> N53
+    N40 --> N56
+    N40 --> N59
+    N40 --> N63
+    N40 --> N65
+    N40 --> N67
+    N41 --> N21
+    N41 --> N58
+    N41 --> N73
+    N42 --> N73
+    N43 --> N73
+    N44 --> N21
+    N44 --> N42
+    N44 --> N43
+    N44 --> N45
+    N44 --> N47
+    N44 --> N48
+    N44 --> N50
+    N44 --> N73
+    N45 --> N50
+    N45 --> N73
+    N46 --> N21
+    N46 --> N41
+    N46 --> N44
+    N46 --> N73
+    N47 --> N48
+    N47 --> N50
+    N47 --> N73
+    N48 --> N42
+    N48 --> N73
+    N49 --> N52
+    N49 --> N73
+    N50 --> N49
+    N50 --> N51
+    N50 --> N52
+    N50 --> N73
+    N51 --> N52
+    N51 --> N73
+    N52 --> N73
+    N53 --> N21
+    N53 --> N58
+    N53 --> N73
+    N54 --> N21
+    N54 --> N53
+    N54 --> N73
+    N55 --> N21
+    N55 --> N58
+    N56 --> N58
+    N56 --> N73
+    N57 --> N56
+    N59 --> N58
+    N59 --> N73
+    N60 --> N59
+    N60 --> N73
+    N61 --> N40
+    N61 --> N41
+    N61 --> N53
+    N61 --> N55
+    N61 --> N56
+    N61 --> N58
+    N61 --> N59
+    N61 --> N63
+    N61 --> N65
+    N61 --> N67
+    N62 --> N41
+    N62 --> N46
+    N62 --> N53
+    N62 --> N54
+    N62 --> N55
+    N62 --> N56
+    N62 --> N57
+    N62 --> N59
+    N62 --> N60
+    N62 --> N63
+    N62 --> N64
+    N62 --> N65
+    N62 --> N66
+    N62 --> N67
+    N62 --> N68
+    N63 --> N58
+    N63 --> N73
+    N64 --> N63
+    N64 --> N73
+    N65 --> N58
+    N65 --> N73
+    N66 --> N65
+    N66 --> N73
+    N67 --> N21
+    N67 --> N58
+    N67 --> N73
+    N68 --> N21
+    N68 --> N67
+    N70 --> N73
+    N73 --> N69
+    N73 --> N70
+    N73 --> N71
+    N73 --> N72
+    N73 --> N74
+    N73 --> N75
+    N73 --> N76
+    N73 --> N77
+    N74 --> N73
+    N78 --> N61
+    N78 --> N73
+    N78 --> N83
+    N78 --> N166
+    N78 --> N84
+    N78 --> N86
+    N78 --> N87
+    N78 --> N184
+    N78 --> N185
+    N78 --> N190
+    N78 --> N195
+    N78 --> N92
+    N78 --> N198
+    N78 --> N196
+    N78 --> N95
+    N78 --> N96
+    N78 --> N201
+    N78 --> N202
+    N79 --> N73
+    N79 --> N149
+    N79 --> N184
+    N79 --> N195
+    N80 --> N73
+    N80 --> N162
+    N80 --> N171
+    N80 --> N195
+    N80 --> N198
+    N81 --> N115
+    N81 --> N126
+    N81 --> N138
+    N81 --> N170
+    N81 --> N184
+    N81 --> N192
+    N82 --> N73
+    N82 --> N123
+    N82 --> N125
+    N82 --> N184
+    N83 --> N73
+    N83 --> N79
+    N83 --> N80
+    N83 --> N81
+    N83 --> N82
+    N83 --> N109
+    N83 --> N170
+    N83 --> N184
+    N83 --> N88
+    N83 --> N191
+    N83 --> N89
+    N98 --> N104
+    N98 --> N143
+    N98 --> N144
+    N98 --> N147
+    N99 --> N143
+    N99 --> N149
+    N99 --> N168
+    N100 --> N143
+    N100 --> N149
+    N100 --> N156
+    N101 --> N143
+    N101 --> N148
+    N101 --> N149
+    N102 --> N143
+    N102 --> N147
+    N102 --> N152
+    N103 --> N143
+    N103 --> N149
+    N103 --> N163
+    N103 --> N168
+    N104 --> N143
+    N104 --> N149
+    N104 --> N162
+    N105 --> N143
+    N105 --> N146
+    N105 --> N149
+    N105 --> N152
+    N106 --> N143
+    N106 --> N145
+    N106 --> N149
+    N107 --> N143
+    N107 --> N149
+    N107 --> N156
+    N107 --> N160
+    N108 --> N143
+    N109 --> N143
+    N109 --> N149
+    N110 --> N143
+    N110 --> N147
+    N110 --> N149
+    N110 --> N165
+    N111 --> N143
+    N111 --> N152
+    N112 --> N143
+    N113 --> N143
+    N113 --> N147
+    N113 --> N151
+    N113 --> N156
+    N114 --> N143
+    N115 --> N143
+    N115 --> N148
+    N115 --> N149
+    N115 --> N168
+    N116 --> N143
+    N116 --> N149
+    N116 --> N153
+    N116 --> N159
+    N117 --> N143
+    N117 --> N153
+    N117 --> N154
+    N118 --> N143
+    N118 --> N150
+    N119 --> N143
+    N119 --> N149
+    N119 --> N155
+    N120 --> N143
+    N120 --> N147
+    N121 --> N143
+    N122 --> N143
+    N123 --> N129
+    N123 --> N143
+    N123 --> N149
+    N123 --> N150
+    N123 --> N152
+    N124 --> N143
+    N124 --> N153
+    N124 --> N155
+    N124 --> N156
+    N124 --> N157
+    N124 --> N162
+    N124 --> N164
+    N124 --> N168
+    N125 --> N143
+    N125 --> N149
+    N125 --> N152
+    N125 --> N161
+    N126 --> N129
+    N126 --> N143
+    N126 --> N152
+    N127 --> N138
+    N127 --> N143
+    N127 --> N152
+    N127 --> N166
+    N128 --> N143
+    N128 --> N147
+    N128 --> N152
+    N129 --> N143
+    N130 --> N143
+    N130 --> N157
+    N131 --> N143
+    N131 --> N152
+    N132 --> N143
+    N132 --> N149
+    N132 --> N164
+    N133 --> N143
+    N133 --> N149
+    N133 --> N152
+    N134 --> N143
+    N134 --> N149
+    N134 --> N161
+    N135 --> N143
+    N135 --> N152
+    N136 --> N143
+    N136 --> N149
+    N137 --> N143
+    N137 --> N147
+    N137 --> N152
+    N138 --> N104
+    N138 --> N143
+    N138 --> N147
+    N138 --> N152
+    N139 --> N143
+    N140 --> N143
+    N141 --> N143
+    N141 --> N149
+    N141 --> N153
+    N141 --> N154
+    N141 --> N164
+    N142 --> N143
+    N142 --> N149
+    N142 --> N152
+    N142 --> N158
+    N142 --> N168
+    N144 --> N143
+    N145 --> N143
+    N146 --> N143
+    N147 --> N143
+    N148 --> N143
+    N148 --> N163
+    N149 --> N143
+    N150 --> N143
+    N151 --> N143
+    N151 --> N149
+    N153 --> N143
+    N153 --> N154
+    N153 --> N157
+    N154 --> N143
+    N154 --> N149
+    N155 --> N143
+    N156 --> N143
+    N157 --> N143
+    N157 --> N149
+    N157 --> N158
+    N157 --> N167
+    N158 --> N143
+    N159 --> N143
+    N160 --> N143
+    N161 --> N143
+    N162 --> N143
+    N163 --> N143
+    N164 --> N143
+    N165 --> N143
+    N166 --> N143
+    N167 --> N143
+    N168 --> N143
+    N85 --> N61
+    N85 --> N73
+    N85 --> N195
+    N86 --> N73
+    N86 --> N184
+    N87 --> N61
+    N87 --> N73
+    N169 --> N175
+    N169 --> N176
+    N169 --> N177
+    N169 --> N178
+    N169 --> N179
+    N169 --> N181
+    N169 --> N183
+    N170 --> N73
+    N170 --> N173
+    N170 --> N195
+    N170 --> N198
+    N171 --> N73
+    N171 --> N173
+    N171 --> N195
+    N171 --> N198
+    N172 --> N198
+    N173 --> N61
+    N173 --> N178
+    N174 --> N73
+    N174 --> N173
+    N174 --> N195
+    N174 --> N198
+    N175 --> N178
+    N176 --> N73
+    N176 --> N178
+    N177 --> N73
+    N178 --> N61
+    N179 --> N73
+    N179 --> N178
+    N180 --> N198
+    N181 --> N73
+    N181 --> N178
+    N182 --> N61
+    N182 --> N195
+    N182 --> N197
+    N183 --> N21
+    N183 --> N178
+    N186 --> N184
+    N186 --> N185
+    N184 --> N61
+    N184 --> N73
+    N184 --> N187
+    N184 --> N188
+    N185 --> N73
+    N185 --> N184
+    N189 --> N78
+    N189 --> N84
+    N189 --> N87
+    N189 --> N169
+    N189 --> N186
+    N189 --> N90
+    N189 --> N91
+    N189 --> N92
+    N189 --> N199
+    N189 --> N196
+    N189 --> N96
+    N189 --> N201
+    N189 --> N202
+    N189 --> N97
+    N88 --> N93
+    N190 --> N73
+    N191 --> N73
+    N192 --> N138
+    N194 --> N73
+    N89 --> N73
+    N89 --> N106
+    N89 --> N184
+    N90 --> N61
+    N90 --> N73
+    N90 --> N84
+    N90 --> N85
+    N90 --> N195
+    N91 --> N61
+    N91 --> N73
+    N91 --> N78
+    N91 --> N177
+    N91 --> N178
+    N91 --> N182
+    N91 --> N195
+    N91 --> N90
+    N91 --> N196
+    N91 --> N197
+    N91 --> N94
+    N91 --> N97
+    N93 --> N73
+    N93 --> N180
+    N93 --> N193
+    N92 --> N73
+    N198 --> N73
+    N199 --> N61
+    N199 --> N73
+    N199 --> N202
+    N196 --> N61
+    N196 --> N199
+    N200 --> N73
+    N197 --> N200
+    N94 --> N73
+    N94 --> N184
+    N94 --> N197
+    N95 --> N73
+    N95 --> N149
+    N95 --> N155
+    N95 --> N174
+    N95 --> N184
+    N95 --> N190
+    N95 --> N198
+    N96 --> N21
+    N96 --> N61
+    N96 --> N73
+    N97 --> N73
+    N97 --> N145
+    N97 --> N149
+    N97 --> N150
+    N97 --> N157
+    N97 --> N164
+    N97 --> N84
+    N203 --> N1
+    N203 --> N73
+    N203 --> N189

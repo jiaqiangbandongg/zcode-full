@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-interaction-delegate",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-interaction-delegate.test.ts",
+  "fixtures": [
+    {
+      "id": "subagent-hitl-yolo-parent-agent",
+      "description": "父 agent 首轮请求返回 general-purpose Agent tool_use，用于 Full access 下的 child AskUserQuestion delegate。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造父 Agent tool_use，核心语义是 child AskUserQuestion 必须代理回父 task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_HITL_YOLO_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_YOLO_PARENT",
+          "E2E_SUBAGENT_HITL_YOLO_CHILD",
+          "E2E_SUBAGENT_HITL_YOLO_PARENT_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_hitl_yolo_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Run subagent AskUserQuestion delegate case",
+            "prompt": "E2E_SUBAGENT_HITL_YOLO_CHILD: Ask the user one question containing E2E_SUBAGENT_HITL_YOLO_QUESTION, then after the answer reply exactly E2E_SUBAGENT_HITL_YOLO_CHILD_DONE and no other text.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-yolo-child-ask",
+      "description": "Full access child subagent 返回 AskUserQuestion tool_use。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 child AskUserQuestion 等待态，验证 yolo 下仍代理到父 task 而不是被 deny broker 吞掉。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_HITL_YOLO_CHILD"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_YOLO_CHILD",
+          "E2E_SUBAGENT_HITL_YOLO_QUESTION"
+        ],
+        "bodyExcludes": [
+          "E2E_SUBAGENT_HITL_YOLO_ANSWER",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_hitl_yolo_ask",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_SUBAGENT_HITL_YOLO_QUESTION: provide the yolo child answer.",
+                "header": "Subagent question",
+                "options": [
+                  {
+                    "label": "Use default",
+                    "description": "Continue with the default subagent answer."
+                  },
+                  {
+                    "label": "Use fallback",
+                    "description": "Continue with the fallback subagent answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-yolo-child-final",
+      "description": "Full access child subagent 收到用户回答后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明 AskUserQuestion 回答已进入 child provider-visible 请求，child 可继续完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_YOLO_CHILD",
+          "E2E_SUBAGENT_HITL_YOLO_ANSWER",
+          "toolu_e2e_subagent_hitl_yolo_ask"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-hitl-yolo-child-final",
+          "inputTokens": 160,
+          "outputTokens": 12,
+          "text": "E2E_SUBAGENT_HITL_YOLO_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-yolo-parent-final",
+      "description": "父 agent 收到 yolo child 结果后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并正常收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_YOLO_PARENT",
+          "E2E_SUBAGENT_HITL_YOLO_CHILD_DONE",
+          "toolu_e2e_subagent_hitl_yolo_agent"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-hitl-yolo-parent-final",
+          "inputTokens": 180,
+          "outputTokens": 12,
+          "text": "E2E_SUBAGENT_HITL_YOLO_PARENT_DONE"
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-permission-parent-agent",
+      "description": "父 agent 首轮请求返回 general-purpose Agent tool_use，用于 build 模式 child Bash permission delegate。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造父 Agent tool_use，核心语义是 child Bash permission 必须代理回父 task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_HITL_PERMISSION_PARENT"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_PERMISSION_PARENT",
+          "E2E_SUBAGENT_HITL_PERMISSION_CHILD",
+          "E2E_SUBAGENT_HITL_PERMISSION_PARENT_DONE"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_hitl_permission_agent",
+          "name": "Agent",
+          "input": {
+            "description": "Run subagent Bash permission delegate case",
+            "prompt": "E2E_SUBAGENT_HITL_PERMISSION_CHILD: Run Bash command mkdir -p .zcode-e2e/conversation-session-subagent-interaction-delegate && printf 'E2E_SUBAGENT_HITL_PERMISSION_BASH_OUTPUT\\n' > .zcode-e2e/conversation-session-subagent-interaction-delegate/output.txt && cat .zcode-e2e/conversation-session-subagent-interaction-delegate/output.txt, then after it succeeds reply exactly E2E_SUBAGENT_HITL_PERMISSION_CHILD_DONE and no other text.",
+            "subagent_type": "general-purpose"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-permission-child-bash",
+      "description": "build 模式 child subagent 返回 Bash tool_use，触发权限请求。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 child Bash permission 等待态，验证权限请求代理回父 task。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SUBAGENT_HITL_PERMISSION_CHILD"],
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_PERMISSION_CHILD",
+          "E2E_SUBAGENT_HITL_PERMISSION_BASH_OUTPUT"
+        ],
+        "bodyExcludes": [
+          "toolu_e2e_subagent_hitl_permission_bash",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_subagent_hitl_permission_bash",
+          "name": "Bash",
+          "input": {
+            "command": "mkdir -p .zcode-e2e/conversation-session-subagent-interaction-delegate && printf 'E2E_SUBAGENT_HITL_PERMISSION_BASH_OUTPUT\\n' > .zcode-e2e/conversation-session-subagent-interaction-delegate/output.txt && cat .zcode-e2e/conversation-session-subagent-interaction-delegate/output.txt",
+            "description": "Emit E2E_SUBAGENT_HITL_PERMISSION_BASH_OUTPUT"
+          }
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-permission-child-final",
+      "description": "build 模式 child subagent 在 Bash 允许并执行后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应证明 Bash 输出已进入 child provider-visible 请求，child 可继续完成。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_PERMISSION_CHILD",
+          "E2E_SUBAGENT_HITL_PERMISSION_BASH_OUTPUT",
+          "toolu_e2e_subagent_hitl_permission_bash"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-hitl-permission-child-final",
+          "inputTokens": 180,
+          "outputTokens": 12,
+          "text": "E2E_SUBAGENT_HITL_PERMISSION_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "subagent-hitl-permission-parent-final",
+      "description": "父 agent 收到 permission child 结果后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "最终回复用于证明 Agent tool_result 被父会话 continuation 消费并正常收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_SUBAGENT_HITL_PERMISSION_PARENT",
+          "E2E_SUBAGENT_HITL_PERMISSION_CHILD_DONE",
+          "toolu_e2e_subagent_hitl_permission_agent"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-e2e-subagent-hitl-permission-parent-final",
+          "inputTokens": 190,
+          "outputTokens": 12,
+          "text": "E2E_SUBAGENT_HITL_PERMISSION_PARENT_DONE"
+        }
+      }
+    }
+  ]
+}

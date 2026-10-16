@@ -101,7 +101,10 @@ const WebPreviewDemo = () => {
           )}
         </div>
 
-        <PromptInput onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto relative">
+        <PromptInput
+          onSubmit={handleSubmit}
+          className="w-full max-w-2xl mx-auto relative"
+        >
           <PromptInputTextarea
             value={prompt}
             placeholder="Describe the app you want to build..."
@@ -164,41 +167,41 @@ export async function POST(req: Request) {
 
 ### `<WebPreview />`
 
-| Prop          | Type                                   | Default | Description                                 |
-| ------------- | -------------------------------------- | ------- | ------------------------------------------- |
-| `defaultUrl`  | `string`                               | -       | The initial URL to load in the preview.     |
-| `onUrlChange` | `(url: string) => void`                | -       | Callback fired when the URL changes.        |
-| `...props`    | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the root div. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `defaultUrl` | `string` | - | The initial URL to load in the preview. |
+| `onUrlChange` | `(url: string) => void` | - | Callback fired when the URL changes. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the root div. |
 
 ### `<WebPreviewNavigation />`
 
-| Prop       | Type                                   | Default | Description                                             |
-| ---------- | -------------------------------------- | ------- | ------------------------------------------------------- |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the navigation container. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the navigation container. |
 
 ### `<WebPreviewNavigationButton />`
 
-| Prop       | Type                                  | Default | Description                                                              |
-| ---------- | ------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `tooltip`  | `string`                              | -       | Tooltip text to display on hover.                                        |
-| `...props` | `React.ComponentProps<typeof Button>` | -       | Any other props are spread to the underlying shadcn/ui Button component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `tooltip` | `string` | - | Tooltip text to display on hover. |
+| `...props` | `React.ComponentProps<typeof Button>` | - | Any other props are spread to the underlying shadcn/ui Button component. |
 
 ### `<WebPreviewUrl />`
 
-| Prop       | Type                                 | Default | Description                                                             |
-| ---------- | ------------------------------------ | ------- | ----------------------------------------------------------------------- |
-| `...props` | `React.ComponentProps<typeof Input>` | -       | Any other props are spread to the underlying shadcn/ui Input component. |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `...props` | `React.ComponentProps<typeof Input>` | - | Any other props are spread to the underlying shadcn/ui Input component. |
 
 ### `<WebPreviewBody />`
 
-| Prop       | Type                                            | Default | Description                                             |
-| ---------- | ----------------------------------------------- | ------- | ------------------------------------------------------- |
-| `loading`  | `React.ReactNode`                               | -       | Optional loading indicator to display over the preview. |
-| `...props` | `React.IframeHTMLAttributes<HTMLIFrameElement>` | -       | Any other props are spread to the underlying iframe.    |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `loading` | `React.ReactNode` | - | Optional loading indicator to display over the preview. |
+| `...props` | `React.IframeHTMLAttributes<HTMLIFrameElement>` | - | Any other props are spread to the underlying iframe. |
 
 ### `<WebPreviewConsole />`
 
-| Prop       | Type                                   | Default | Description                                          |
-| ---------- | -------------------------------------- | ------- | ---------------------------------------------------- |
-| `logs`     | `Array<{ level: `                      | -       | Console log entries to display in the console panel. |
-| `...props` | `React.HTMLAttributes<HTMLDivElement>` | -       | Any other props are spread to the root div.          |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `logs` | `Array<{ level: ` | - | Console log entries to display in the console panel. |
+| `...props` | `React.HTMLAttributes<HTMLDivElement>` | - | Any other props are spread to the root div. |

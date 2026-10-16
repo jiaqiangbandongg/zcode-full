@@ -1,9 +1,9 @@
 import type { ArmsCustomEventPayload } from "@zcode/shared";
 import { logger } from "@/logger.js";
 
-const SESSION_OPEN_ARMS_GROUP = "ui_perf";
-const SESSION_OPEN_EVENT_START = "perf_ui_session_open_start";
-const SESSION_OPEN_EVENT_RESULT = "perf_ui_session_open_result";
+export const SESSION_OPEN_ARMS_GROUP = "ui_perf";
+export const SESSION_OPEN_EVENT_START = "perf_ui_session_open_start";
+export const SESSION_OPEN_EVENT_RESULT = "perf_ui_session_open_result";
 
 export type SessionOpenKind = "cold" | "warm" | "keep_warm";
 export type SessionOpenTrigger =
@@ -15,9 +15,9 @@ export type SessionOpenTrigger =
   | "selection"
   | "split"
   | "pane";
-type SessionOpenStatus = "success" | "failed" | "timeout";
-type SessionOpenProcessState = "spawned" | "reused";
-type SessionOpenRuntimeState = "cold" | "warm";
+export type SessionOpenStatus = "success" | "failed" | "timeout";
+export type SessionOpenProcessState = "spawned" | "reused";
+export type SessionOpenRuntimeState = "cold" | "warm";
 
 export interface SessionOpenArmsReporter {
   reportArmsCustomEvent(payload: ArmsCustomEventPayload): Promise<unknown>;
@@ -31,7 +31,7 @@ export interface SessionOpenIdentity {
   clientMode: "desktop-continuous";
 }
 
-interface SessionOpenTimingFields {
+export interface SessionOpenTimingFields {
   rendererPrepareMs?: number;
   hostPrepareMs?: number;
   providerRegistrySyncMs?: number;
@@ -46,7 +46,7 @@ interface SessionOpenTimingFields {
   paintToInteractiveMs?: number;
 }
 
-interface SessionOpenResultFields extends SessionOpenTimingFields {
+export interface SessionOpenResultFields extends SessionOpenTimingFields {
   status: SessionOpenStatus;
   totalMs: number;
   errorPhase?: string;
@@ -67,6 +67,10 @@ let reporter: SessionOpenArmsReporter | null = null;
 
 export function setSessionOpenArmsReporter(next: SessionOpenArmsReporter | null): void {
   reporter = next;
+}
+
+export function clearSessionOpenArmsReporterForTest(): void {
+  reporter = null;
 }
 
 function roundedNonNegative(value: number | undefined): number | undefined {
@@ -103,7 +107,9 @@ function identityProperties(identity: SessionOpenIdentity): Record<string, strin
   };
 }
 
-function buildSessionOpenStartArmsPayload(identity: SessionOpenIdentity): ArmsCustomEventPayload {
+export function buildSessionOpenStartArmsPayload(
+  identity: SessionOpenIdentity,
+): ArmsCustomEventPayload {
   return {
     name: SESSION_OPEN_EVENT_START,
     group: SESSION_OPEN_ARMS_GROUP,
@@ -112,7 +118,7 @@ function buildSessionOpenStartArmsPayload(identity: SessionOpenIdentity): ArmsCu
   };
 }
 
-function buildSessionOpenResultArmsPayload(
+export function buildSessionOpenResultArmsPayload(
   identity: SessionOpenIdentity & SessionOpenResultFields,
 ): ArmsCustomEventPayload {
   const properties: Record<string, string | number | boolean | undefined> = {

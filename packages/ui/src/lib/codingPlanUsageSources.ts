@@ -46,7 +46,7 @@ export function buildPersonalCodingPlanUsageSource({
   };
 }
 
-type CurrentSidebarCodingPlanUsageSource =
+export type CurrentSidebarCodingPlanUsageSource =
   | {
       audience: "individual";
       providerId: SidebarUsageCodingPlanProviderId;
@@ -186,6 +186,10 @@ export function resolveSidebarCurrentCodingPlanUsageSource({
   if (!accountAccess || accountAccess.mode !== "individual-coding-plan") return null;
   const providerId = getModelProviderFamilySpec(family).individualCodingPlanProviderId;
   return { audience: "individual", providerId, sourceId: providerId, accountAccess };
+}
+
+export function matchesTeamPlanUsageSourceKey(sourceId: string, selectedKey: string): boolean {
+  return sourceId === selectedKey;
 }
 
 function formatTeamUsageSourceLabel({

@@ -7,7 +7,18 @@ type WorkspaceUnreadState = Pick<
 > &
   Partial<Pick<WorkspaceZCodeUIState, "taskUnreadByTaskId">>;
 
-export function countAllUnreadTasks(workspaces: Record<string, WorkspaceUnreadState>): number {
+export function countWorkspaceUnreadTasks(workspace: WorkspaceUnreadState): number {
+  const visibleTasks = getVisibleTaskMetas(workspace);
+  if (visibleTasks.length > 0) {
+    return visibleTasks.filter((task) => Boolean(task.unreadAt)).length;
+  }
+
+  return Object.keys(workspace.taskUnreadByTaskId ?? {}).length;
+}
+
+export function countAllUnreadTasks(
+  workspaces: Record<string, WorkspaceUnreadState>,
+): number {
   const countedTaskKeys = new Set<string>();
   const visitedWorkspaceStates = new WeakSet<object>();
 

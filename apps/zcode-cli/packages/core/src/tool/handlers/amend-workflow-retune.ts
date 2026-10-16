@@ -1,7 +1,14 @@
-// AmendWorkflow：只改并发时就地生效。
-// 当调用只带 `run_id` 与 `max_concurrency`，且前驱仍在运行时，保留 run ID、子代理、转录与未完成 ask。
-// 本模块负责路由判定、端口调用和结果说明；若 run 在判定与调用之间结算，重新读取前驱事实，
-// 再决定是否允许回落到修订流程。
+// ============================================================
+// AmendWorkflow：只改并发即就地生效
+// ============================================================
+// docs/dynamic-workflow/launch.md「Changing only the parallelism of a live run」；引擎与驱动侧
+// 怎么接住新上界见 docs/dynamic-workflow/concurrency.md「Retuning a live run」。
+//
+// 一次「只带 `run_id` 与 `max_concurrency`、前驱还活着」的调用**不是修订**：它就地挪一个数，
+// run 保住自己的 id、子代理、转录与在飞的 ask，什么都不停、什么都不替代、一个窗都不弹。
+// 从 amend-workflow.ts 拆出来的理由与 amend-workflow-source.ts 同一条（400 行纪律 + 各管一段）：
+// 那边是修订的 handler，这里是这条路由的全部——判定、端口调用、模型面文案，以及结算竞态里
+// 落回一次真正修订时要重新读的那些事实。
 
 import {
   AmendWorkflowInputSchema,
@@ -19,11 +26,11 @@ import {
   resolveAmendMaxConcurrency,
   resolveAmendScript,
 } from "./amend-workflow-source.js";
-import { clampWorkflowMaxConcurrency } from "./create-workflow-source.js";
+import { normalizeWorkflowMaxConcurrency } from "./create-workflow-source.js";
 import { workflowRunNotFoundFailure } from "./workflow-run-introspection.js";
 
 /**
- * 「除并发之外什么都没变」：判的是**入参的形状**，不是新字段。
+ * 「除并发之外什么都没变」（docs/dynamic-workflow/launch.md）：判的是**入参的形状**，不是新字段。
  * `script`、`path`、`subagent_model` 与 `name` 无论带的是什么，都把这次调用送去修订那条路——
  * 它们各自都可能改变将要跑的东西，而这条路的前提是「跑的还是同一段脚本、同一批子代理」。
  *
@@ -41,7 +48,8 @@ export function isConcurrencyOnlyAmend(model: AmendWorkflowInput): boolean {
 }
 
 /**
- * resolveInput 里的路由判定。命中即返回**不带脚本**的归一化入参——此后 prepareApproval 放行、handler 调
+ * resolveInput 里的路由判定（docs/dynamic-workflow/launch.md：路由住在唯一同时知道两半条件的
+ * 那一步）。命中即返回**不带脚本**的归一化入参——此后 prepareApproval 放行、handler 调
  * `retuneConcurrency`；不命中回 `undefined`，调用方照常走修订。
  *
  * 三个前提缺一不可：入参形状只改并发、前驱还活着（`pending` 与 `running` 都试，活不活由端口说
@@ -52,7 +60,7 @@ export function resolveConcurrencyRetuneRoute(options: {
   model: AmendWorkflowInput;
   port: DynamicWorkflowRunPort;
   predecessor: AmendWorkflowPredecessor;
-  /** 前驱快照上的上界；缺席即它跑在天花板上。 */
+  /** 前驱快照上的上界；缺席即它跑在默认并发上。 */
   inherited: number | undefined;
 }): { result: true; input: AmendWorkflowInput } | ToolHandlerFailure | undefined {
   const { model, port, predecessor } = options;
@@ -62,8 +70,13 @@ export function resolveConcurrencyRetuneRoute(options: {
 
   // 三态在这里**不**归一：`null` 要原样递到端口（见 resolveAmendMaxConcurrency 的注释）。
   const requested = model.max_concurrency ?? null;
-  const ceiling = port.concurrencyCeiling?.();
-  const unchanged = refuseUnchangedBound(model.run_id, requested, options.inherited, ceiling);
+  const defaultConcurrency = port.defaultConcurrency?.();
+  const unchanged = refuseUnchangedBound(
+    model.run_id,
+    requested,
+    options.inherited,
+    defaultConcurrency,
+  );
   if (unchanged !== undefined) return unchanged;
   return {
     result: true,
@@ -72,19 +85,19 @@ export function resolveConcurrencyRetuneRoute(options: {
 }
 
 /**
- * 同值就在这里收口——早于 hook、早于确认窗，端口一次都不碰。天花板读不到（老宿主不带
- * `concurrencyCeiling`）时 `null` 无从折算成数，这道网就让开，由端口自己去答 `unchanged`。
+ * 同值就在这里收口——早于 hook、早于确认窗，端口一次都不碰。默认并发读不到（老宿主不带
+ * `defaultConcurrency`）时 `null` 无从折算成数，这道网就让开，由端口自己去答 `unchanged`。
  */
 function refuseUnchangedBound(
   runId: string,
   requested: number | null,
   inherited: number | undefined,
-  ceiling: number | undefined,
+  defaultConcurrency: number | undefined,
 ): ToolHandlerFailure | undefined {
-  const current = inherited ?? ceiling;
-  const next = requested === null ? ceiling : clampWorkflowMaxConcurrency(requested, ceiling);
+  const current = inherited ?? defaultConcurrency;
+  const next = requested === null ? defaultConcurrency : normalizeWorkflowMaxConcurrency(requested);
   if (current === undefined || next === undefined || current !== next) return undefined;
-  return retuneUnchangedFailure(runId, current, ceiling);
+  return retuneUnchangedFailure(runId, current, defaultConcurrency);
 }
 
 /**
@@ -101,7 +114,7 @@ export async function runConcurrencyRetune(
   if (port === undefined || typeof port.retuneConcurrency !== "function") return undefined;
   const answer = await port.retuneConcurrency({
     runId: parsed.run_id,
-    // 路由判定已保证这里是「一个数或 null」；`?? null` 只是把绕过归一化的缺席读作「回天花板」。
+    // 路由判定已保证这里是「一个数或 null」；`?? null` 只是把绕过归一化的缺席读作「回默认」。
     maxConcurrency: parsed.max_concurrency ?? null,
   });
   if (answer.ok) {
@@ -109,25 +122,25 @@ export async function runConcurrencyRetune(
       diagnostics: [],
       ok: true,
       // 不进后台追踪器：run 本来就在里面，而且它自始至终是同一个 run，没有 `backgrounded`
-      // 契约可言，也没有编译产物可画。`retuned` 是**显式**
+      // 契约可言，也没有编译产物可画（docs/dynamic-workflow/launch.md）。`retuned` 是**显式**
       // 的判别块：消费方不该按「ok 且没有 status」去猜，那个形状还有别的来路。
       response: retuneResponse(parsed.run_id, answer),
       retuned: {
         runId: parsed.run_id,
         maxConcurrency: answer.maxConcurrency,
         previous: answer.previous,
-        ceiling: answer.ceiling,
+        defaultConcurrency: answer.defaultConcurrency,
       },
     } satisfies CreateWorkflowOutput;
   }
   if (answer.reason === "unchanged") {
-    return retuneUnchangedFailure(parsed.run_id, answer.current, port.concurrencyCeiling?.());
+    return retuneUnchangedFailure(parsed.run_id, answer.current, port.defaultConcurrency?.());
   }
   return undefined;
 }
 
 /**
- * 结算竞态：同一份入参此刻
+ * 结算竞态（docs/dynamic-workflow/launch.md「When the port says `not_live`」）：同一份入参此刻
  * 描述的是一次修订。能不能做只看一件事——**那次修订本来要不要开窗**。
  *
  * 本会话自己的、不是用户亲手停下的 run：owner 规则本来也不开窗，于是照常修订，脚本与编译推迟
@@ -162,11 +175,7 @@ export async function resolveRetuneFallbackAmend(
       run_id: parsed.run_id,
       ...script.fields,
       // 落回修订就回到「一个数或没有」：这次调用显式给了值，没有可沿用的。
-      ...resolveAmendMaxConcurrency(
-        parsed.max_concurrency,
-        undefined,
-        port?.concurrencyCeiling?.(),
-      ),
+      ...resolveAmendMaxConcurrency(parsed.max_concurrency, undefined),
       predecessor: {
         ...predecessor,
         ...(script.inherited ? { script_inherited: true as const } : {}),
@@ -184,10 +193,15 @@ function predecessorNotFoundFailure(runId: string): ToolHandlerFailure {
   };
 }
 
-/** 现在生效的上界读成一句话；等于天花板即「没有自己的界」。 */
-function describeBoundInForce(bound: number | undefined, ceiling: number | undefined): string {
-  if (bound === undefined || bound === ceiling) {
-    return "has no limit on how many subagents run at once (it runs at this machine's maximum)";
+/** 现在生效的上界读成一句话；等于默认并发即「没有自己的界」。 */
+function describeBoundInForce(
+  bound: number | undefined,
+  defaultConcurrency: number | undefined,
+): string {
+  if (bound === undefined || bound === defaultConcurrency) {
+    return defaultConcurrency === undefined
+      ? "already runs at the default parallelism"
+      : `already runs at the default parallelism (at most ${defaultConcurrency} subagents at once)`;
   }
   return bound === 1
     ? "already runs at most 1 subagent at once"
@@ -198,12 +212,12 @@ function describeBoundInForce(bound: number | undefined, ceiling: number | undef
 export function retuneUnchangedFailure(
   runId: string,
   current: number | undefined,
-  ceiling: number | undefined,
+  defaultConcurrency: number | undefined,
 ): ToolHandlerFailure {
   return {
     result: false,
     errorCode: AMEND_WORKFLOW_ERROR_CODE.RETUNE_UNCHANGED,
-    message: `workflow_retune_unchanged: run ${runId} ${describeBoundInForce(current, ceiling)}, so there is nothing to change. Nothing was stopped, created or changed — pass a different \`max_concurrency\`, or a revised script if you meant to amend the run.`,
+    message: `workflow_retune_unchanged: run ${runId} ${describeBoundInForce(current, defaultConcurrency)}, so there is nothing to change. Nothing was stopped, created or changed — pass a different \`max_concurrency\`, or a revised script if you meant to amend the run.`,
   };
 }
 
@@ -226,23 +240,24 @@ export function notRetunableFailure(runId: string): ToolHandlerFailure {
 }
 
 /**
- * 模型面的回话：**点名一个 run、没有后继**——模型正是据此
- * 分辨自己这次调用走的是哪条路，不必被告知路由本身。上界等于天花板时说「限制已取消」而不是
- * 报一个数，与 `CreateWorkflow` 划的是同一条界。
+ * 模型面的回话（docs/dynamic-workflow/launch.md）：**点名一个 run、没有后继**——模型正是据此
+ * 分辨自己这次调用走的是哪条路，不必被告知路由本身。上界等于默认并发时注明「（默认）」，与
+ * `CreateWorkflow` 划的是同一条界。
  *
  * ⚠ 这段文本是**唯一**过得了 v4 的事实：这条路没有 display 载荷（`retuned` 这个块只到进程内为
  * 止，协议的 `toolOutputSchema` 只带 text / display / truncated），工具卡拿它当整行来画。所以它
  * 必须自足——点名 run、点名现在的上界、说清没有新 run——而且要稳：改词就等于改 UI。
+ * 两种上界各有一份逐字测试钉在 core/tests/amend-workflow-permission.test.ts。
  */
 function retuneResponse(
   runId: string,
   answer: Extract<DynamicWorkflowRunRetuneResult, { ok: true }>,
 ): string {
+  const count =
+    answer.maxConcurrency === 1
+      ? "at most 1 subagent runs at once"
+      : `at most ${answer.maxConcurrency} subagents run at once`;
   const bound =
-    answer.maxConcurrency === answer.ceiling
-      ? "the limit on how many subagents run at once is removed (this machine's maximum applies)"
-      : answer.maxConcurrency === 1
-        ? "at most 1 subagent runs at once"
-        : `at most ${answer.maxConcurrency} subagents run at once`;
+    answer.maxConcurrency === answer.defaultConcurrency ? `${count} (the default)` : count;
   return `Applied to the running run ${runId}; ${bound}. Run ${runId} keeps running under it: nothing was stopped and no new run was started.`;
 }

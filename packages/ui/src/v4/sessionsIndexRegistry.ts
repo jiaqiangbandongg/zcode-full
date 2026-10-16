@@ -75,6 +75,10 @@ function reportScopeEndpointMismatch(
   });
 }
 
+export function resetSessionsIndexScopeEndpointMismatchReportsForTest(): void {
+  reportedScopeEndpointMismatches.clear();
+}
+
 function createSessionsIndexTransport(
   scope: SessionsIndexScope,
   agentService: SessionsIndexAgentService,
@@ -171,4 +175,9 @@ export function releaseSessionsIndex(
     entriesByStore.delete(entry.store);
     if (registry.get(entryKey) === entry) registry.delete(entryKey);
   }
+}
+
+/** 仅测试/诊断用：当前注册的 endpoint+workspaceKey 条目数。 */
+export function sessionsIndexRegistrySize(): number {
+  return registry.size;
 }

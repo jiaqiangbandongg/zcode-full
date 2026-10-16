@@ -1,0 +1,14 @@
+node source
+node ask#1 "spy" @15:29 actors=actor#1 type="string"
+node join#1 "join" @16:27 type="[string, Box]"
+node ask#2 "reader" @18:24 actors=actor#2 type="string"
+node sink
+actor actor#1 "spy" @15:16
+actor actor#2 "reader" @18:8
+edge source -> ask#1 data exact
+edge ask#1 -> join#1 data exact port=0 type="string"
+edge ask#1 -> join#1 data inexact port=1 type="string"
+edge ask#1 -> ask#2 data inexact type="string"
+edge join#1 -> join#1 data inexact port=1 type="[string, Box]"
+edge join#1 -> ask#2 data inexact port=0 type="string"
+edge ask#2 -> sink data exact type="string"

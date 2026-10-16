@@ -14,6 +14,8 @@
   "scripts": {
     "build": "tsc && node scripts/build.mjs",
     "clean": "node ../../scripts/clean-dist.mjs",
+    "test": "tsx --disable-warning=DEP0205 --test tests/*.test.ts",
+    "coverage": "c8 --reporter=text --reporter=html tsx --disable-warning=DEP0205 --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint src",
     "lint:fix": "oxlint --write src"

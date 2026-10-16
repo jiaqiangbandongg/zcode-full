@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-goal",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-goal.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-v4-goal.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "v4-goal-title",
+      "description": "E2E_V4_GOAL_SEED 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_V4_GOAL_SEED 首发会触发默认 title sidecar；固定 case-local 标题响应，避免 default replay 回退 legacy provider-basic，并用该首发 marker 隔离跨 case 匹配。"
+    },
+    {
+      "id": "v4-goal-seed",
+      "description": "M4 /goal 门禁：首轮固定回复，建立可设目标的 session。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "goal slash 需要一个已存在 session；首轮文案固定。"
+    },
+    {
+      "id": "v4-goal-continuation-slow",
+      "description": "M4 /goal 设置后的 continuation 慢流，保持 active target 窗口以断言 goal 横幅。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "goal 设置后需要一段 streaming 窗口稳定验证 active 目标横幅，真实模型可能过快完成或触发验证。"
+    }
+  ]
+}

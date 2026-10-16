@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-edit",
+  "spec": "./test/e2e/conversation-session/conversation-session-edit.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-edit.json"
+  ],
+  "fileFixtures": [
+    {
+      "path": ".zcode-e2e/shared/readonly-tool.txt",
+      "source": "created-by-helper",
+      "description": "prepareConversationE2E 写入的只读工具输入文件，用于构造 edit 前后的 tool_result 历史。"
+    }
+  ],
+  "requests": [
+    {
+      "id": "upstream-conversation-edit-title-generic",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不属于 edit 产品语义，只需要稳定返回，避免严格 case-local replay 依赖 legacy provider-basic。"
+    },
+    {
+      "id": "upstream-conversation-readonly-tool-call",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通用只读 Read tool_use 让 edit case 覆盖真实 tool_result 历史。"
+    },
+    {
+      "id": "upstream-conversation-edit-original-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "首轮只用于构造可编辑 completed 历史，真实 provider 回复内容不影响 edit 产品语义。"
+    },
+    {
+      "id": "upstream-conversation-readonly-edit-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应稳定完成 edit 后的只读工具历史，用于断言旧 user query 被替换。"
+    },
+    {
+      "id": "upstream-conversation-edit-held-running-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "真实 provider 可能过快完成；旧 legacy slow stream 90.2s 贴近测试 90s 等待边界，会把时序抖动误报成产品 bug。"
+    },
+    {
+      "id": "upstream-conversation-edit-held-rerun-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "edit 重跑需要保持 streaming 来验证 held queue、普通 queue、goal queue 和重复 compact guard；使用 30s case-local 流避免 legacy 90.2s 边界超时。"
+    },
+    {
+      "id": "upstream-conversation-edit-manual-compact-success",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应只用于证明 compact marker 完成且 queue 保留，不依赖真实 summary 内容。"
+    },
+    {
+      "id": "upstream-conversation-edit-interrupted-source-controlled-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "D10 需要稳定制造已出现首个 assistant delta 但仍可 stop 的窗口；短 source 只保留 interrupted 语义，避免回放尾部拖慢该 case。"
+    },
+    {
+      "id": "upstream-conversation-edit-interrupted-rerun-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应用于区分 interrupted edit 后的新 rerun 是否真的执行；真实 provider 回复内容不影响产品语义。"
+    }
+  ]
+}

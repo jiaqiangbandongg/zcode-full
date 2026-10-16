@@ -34,7 +34,7 @@ export interface StartHostMemoryDiagnosticsLogOptions {
   };
 }
 
-interface HostMemoryDiagnosticsLog {
+export interface HostMemoryDiagnosticsLog {
   /** 立即采样一次（供测试与手动触发），返回是否写盘。 */
   sampleNow(): boolean;
   stop(): void;

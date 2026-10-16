@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-markdown-table-layout",
+  "spec": "./test/e2e/conversation-session/conversation-session-markdown-table-layout.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-markdown-table-layout.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "markdown-table-layout-title",
+      "description": "Markdown table layout case 内的标题生成固定响应，避免标题请求误命中表格主响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止 title 请求阻塞主消息流。"
+    },
+    {
+      "id": "markdown-table-layout-small",
+      "description": "MT/V01 小表格布局样本：固定返回未超过正文宽度的 Markdown 表格。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 验证 completed assistant markdown 表格布局，真实模型是否严格返回表格不属于布局合同。"
+    },
+    {
+      "id": "markdown-table-layout-large",
+      "description": "MT/V02 大表格布局样本：固定返回 14 列 100 行 Markdown 表格，稳定触发表格 viewport 横向滚动。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该 case 验证大表格 overflow、100 行内容与滚动 viewport DOM 合同，需要稳定构造足够宽且包含大量行的 assistant markdown 表格。"
+    }
+  ]
+}

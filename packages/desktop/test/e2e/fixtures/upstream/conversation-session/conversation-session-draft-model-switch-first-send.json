@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-draft-model-switch-first-send",
+  "spec": "./test/e2e/conversation-session/conversation-session-draft-model-switch-first-send.test.ts",
+  "fixtures": [
+    {
+      "id": "draft-model-switch-first-send-title",
+      "description": "草稿切换模型首发 case 内的标题生成固定响应，避免严格 case-local replay 依赖 legacy provider-basic。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中首发业务 fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"upstream-e2e-draft-model-switch-first-send-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-pro\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Draft Model Switch\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "draft-model-switch-first-send-main",
+      "description": "I10 空草稿切换到 secondary 模型后首发普通文本的固定最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "核心断言在草稿工具栏配置、请求 body/model/thought 和 UI 回复；响应只需稳定完成并包含约定文本。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_DRAFT_MODEL_SWITCH_FIRST_SEND"],
+        "bodyIncludes": ["E2E_DRAFT_MODEL_SWITCH_FIRST_SEND", "upstream-e2e-ok"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-e2e-draft-model-switch-first-send-main",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "upstream-e2e-ok"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+join join#1 "join" @15:31 order=0 type="{ key: string; result: ResearchResult; }[]"
+fan-out fan-out#1 "fan-out" @16:3 order=1 count=4 type="{ key: string; result: ResearchResult; }[]"
+ask ask#1 "ask" @18:59 order=2 within=fan-out#1 type="ResearchResult"
+actor actor#1 @18:19 order=3 within=fan-out#1
+ask ask#2 "writer" @24:57 order=5 type="Report"
+actor actor#2 "writer" @24:19 order=6
+fact ask-data ask#1 <- fan-out#1 exact
+fact ask-data ask#2 <- ask#1 exact
+fact ask-data ask#2 <- join#1 exact
+fact ask-data ask#2 <- fan-out#1 exact
+fact ask-actor ask#1 <- actor#1 exact
+fact ask-actor ask#2 <- actor#2 exact
+fact join-in join#1 <- ask#1 exact
+fact join-in join#1 <- fan-out#1 exact
+fact return <- ask#2 exact
+region seq#1 seq entered
+region fanout#1 fanout parent=seq#1 @16:3 label="map" strand
+region fanout#2 fanout parent=seq#1 @21:16 label="map"
+mark phase#1 in=seq#1
+spawn actor#1 in=seq#1>fanout#1
+issue ask#1 in=seq#1>fanout#1 phase=phase#1
+settle ask#1 in=seq#1>fanout#1
+settle ask#1 in=seq#1 joins=fanout#1
+mark phase#2 in=seq#1
+spawn actor#2 in=seq#1
+issue ask#2 in=seq#1 phase=phase#2
+settle ask#2 in=seq#1
+jump return seq#1 in=seq#1 phase=phase#2
+phase phase#1 "并行调研" @14:1
+phase phase#2 "撰写终稿" @23:1

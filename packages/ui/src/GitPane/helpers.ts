@@ -10,7 +10,7 @@ import {
 const MAX_RICH_DIFF_FULL_CONTENT_CHAR_COUNT = 180_000;
 const MAX_RICH_DIFF_FULL_CONTENT_LINE_COUNT = 1_200;
 
-type GitPaneDiffPreviewPlan =
+export type GitPaneDiffPreviewPlan =
   | {
       kind: "rich";
     }
@@ -37,7 +37,9 @@ export function getSourceMessageId(sourceId: GitChangeSourceId): string {
   }
 }
 
-export function getDiffFallbackMessageId(availability: GitDiffResult["availability"]): string {
+export function getDiffFallbackMessageId(
+  availability: GitDiffResult["availability"],
+): string {
   switch (availability) {
     case "binary":
       return "git.diff.binaryTitle";
@@ -113,7 +115,7 @@ function countLogicalLines(content: string | null): number {
   return lineCount;
 }
 
-function shouldRenderPatchOnlyGitDiffPreview(diff: GitDiffResult): boolean {
+export function shouldRenderPatchOnlyGitDiffPreview(diff: GitDiffResult): boolean {
   if (diff.availability !== "patch" || !diff.patch) {
     return false;
   }
@@ -124,7 +126,8 @@ function shouldRenderPatchOnlyGitDiffPreview(diff: GitDiffResult): boolean {
     return true;
   }
 
-  const fullContentCharCount = (diff.beforeContent?.length ?? 0) + (diff.afterContent?.length ?? 0);
+  const fullContentCharCount =
+    (diff.beforeContent?.length ?? 0) + (diff.afterContent?.length ?? 0);
   if (fullContentCharCount > MAX_RICH_DIFF_FULL_CONTENT_CHAR_COUNT) {
     return true;
   }
@@ -168,7 +171,7 @@ export function getGitPaneDiffPreviewPlan(diff: GitDiffResult | null): GitPaneDi
   return { kind: "patch" };
 }
 
-function shouldRenderPlainTextDiffPreview(patch: string): string[] | null {
+export function shouldRenderPlainTextDiffPreview(patch: string): string[] | null {
   const fallbackLines = getPlainTextPatchFallbackLines(patch);
   if (!fallbackLines) {
     return null;
@@ -190,7 +193,9 @@ function shouldRenderPlainTextDiffPreview(patch: string): string[] | null {
   // review 面板只该把纯文本新增/删除文件降级成轻量 preview。
   // 底层通用 fallback 为了避免文件变更展开空白，会覆盖 JSON 等结构化文件；
   // 这里重新按文件类型收口，避免结构化文件绕过 PatchDiff 的语义化渲染路径。
-  return getFiletypeFromFileName(patchFileName) === "text" ? fallbackLines : null;
+  return getFiletypeFromFileName(patchFileName) === "text"
+    ? fallbackLines
+    : null;
 }
 
 function getPatchContentFileName(lines: readonly string[]): string | null {

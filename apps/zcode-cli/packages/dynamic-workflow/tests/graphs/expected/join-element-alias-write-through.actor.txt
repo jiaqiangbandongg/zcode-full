@@ -1,0 +1,12 @@
+actor-node source
+actor-node actor#1 "wa" @7:11
+actor-node actor#2 "wb" @8:11
+actor-node actor#3 "wc" @11:22
+actor-node actor#4 "reader" @13:19
+actor-node sink
+actor-edge source -> actor#1 exact count=1
+actor-edge source -> actor#2 exact count=1
+actor-edge source -> actor#3 exact count=1
+actor-edge actor#1 -> actor#4 exact count=1 types="R"
+actor-edge actor#3 -> actor#4 exact count=1 types="string"
+actor-edge actor#4 -> sink exact count=1 types="string"

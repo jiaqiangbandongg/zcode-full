@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-personal-lifecycle",
+  "spec": "./test/e2e/plugins/plugin-management-personal-lifecycle.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/plugin-management/plugin-management-personal-lifecycle.json"
+  ],
+  "fileFixtures": [
+    "runtime-generated v1/v2 five-component marketplace under the isolated E2E home"
+  ],
+  "requests": [
+    {
+      "id": "plugin-management-lifecycle-v2-tool-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-tool-use",
+      "syntheticReason": "Deterministically prove a new v2 session advertises and invokes the plugin MCP tool."
+    },
+    {
+      "id": "plugin-management-lifecycle-v2-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Close the runtime lifecycle turn after the real local MCP tool result."
+    }
+  ]
+}

@@ -18,7 +18,7 @@ interface TelemetryLockOwner {
   pid: number;
 }
 
-interface EnsureCliDeviceMidOptions {
+export interface EnsureCliDeviceMidOptions {
   baseDir?: string;
   createId?: () => string;
   env?: Record<string, string | undefined>;

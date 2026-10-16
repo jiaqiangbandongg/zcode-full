@@ -1,0 +1,8 @@
+phase unphased
+participant unphased:actor#4 "seed" steps=ask#1
+participant unphased:actor#1 "a0" steps=ask#2~actor#1
+participant unphased:actor#2 "a1" steps=ask#2~actor#2
+participant unphased:actor#3 "a2" steps=ask#2~actor#3
+handoff unphased:actor#4 -> unphased:actor#1 types="string"
+handoff unphased:actor#4 -> unphased:actor#2 types="string"
+handoff unphased:actor#4 -> unphased:actor#3 types="string"

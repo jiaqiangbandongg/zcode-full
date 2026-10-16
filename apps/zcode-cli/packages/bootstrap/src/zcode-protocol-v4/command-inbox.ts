@@ -13,8 +13,8 @@ import {
   parseCommandEnvelope,
 } from "@zcode/shared/zcode-protocol-v4";
 
-/** guard 裁决结果：拒绝（撤 optimistic）或 noop（晚到者静默收口）。 */
-type GuardDecision =
+/** guard 裁决结果：拒绝（撤 optimistic）或 noop（晚到者静默收口，§6.3）。 */
+export type GuardDecision =
   | { verdict: "allow" }
   | { verdict: "stale"; reasonCode: string; message?: string }
   | { verdict: "reject"; reasonCode: string; message?: string }
@@ -22,7 +22,7 @@ type GuardDecision =
 
 type PersistentLookup = (key: CommandKey) => Promise<CommandAck | null> | CommandAck | null;
 
-interface CommandInboxHost {
+export interface CommandInboxHost {
   /** 会话当前 revision；未知会话返回 null（createSession 用 null sessionId）。 */
   getRevision(sessionId: string): number | null;
   /** 会话当前投影代际；CAS 必须先校验 epoch，再校验 revision。 */
@@ -55,7 +55,7 @@ interface LiveInputEntry {
   intent: ConversationInputIntent;
 }
 
-type CommandInboxOutcome =
+export type CommandInboxOutcome =
   | { kind: "ack"; ack: CommandAck }
   | {
       kind: "execute";

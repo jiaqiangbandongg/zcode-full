@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-model-output-token-budget",
+  "spec": "./test/e2e/conversation-session/conversation-session-model-output-token-budget.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-model-output-token-budget.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "model-output-token-budget-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需避免干扰预算请求匹配。"
+    },
+    {
+      "id": "otb01-default-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心证据来自成功 model-io 的 request.body.max_completion_tokens；响应只需稳定结束。"
+    },
+    {
+      "id": "otb02-16k-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心证据来自成功 model-io 的请求体；响应只需稳定结束。"
+    },
+    {
+      "id": "otb02-16k-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "第二轮只用于满足现有 Compact 的两轮历史前置条件，且仍需保持 16K。"
+    },
+    {
+      "id": "otb02-16k-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心证据来自 querySource=compact 的成功 model-io 请求体。"
+    },
+    {
+      "id": "otb03-64k-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "响应只为完成请求；model-io 请求体是验收证据。"
+    },
+    {
+      "id": "otb06-64k-history",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Auto Compact 会保留最新轮；先形成低 usage 历史，才能让后续高 usage seed 触发真实 summary 请求。"
+    },
+    {
+      "id": "otb06-64k-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控 usage 用于稳定触发 128K context、21K reserve 的 Auto Compact 决策。"
+    },
+    {
+      "id": "otb06-64k-auto-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Auto Compact 的成功请求体和决策日志共同证明 reserve/summary 预算一致。"
+    },
+    {
+      "id": "otb06-64k-post-compact-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 Auto Compact 后主请求没有回退到旧 32K cap。"
+    },
+    {
+      "id": "otb07-before-refresh-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "先建立同一 active session 的旧 runtime 预算，核心证据来自成功 model-io 请求体。"
+    },
+    {
+      "id": "otb07-after-refresh-main",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "请求响应只需稳定结束；session identity 与成功 model-io 请求体共同证明 active runtime 已刷新。"
+    },
+    {
+      "id": "otb07-after-refresh-compact",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "核心证据来自同一 session 中 querySource=compact 的成功 model-io 请求体。"
+    }
+  ]
+}

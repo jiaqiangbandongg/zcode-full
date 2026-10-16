@@ -1,0 +1,8 @@
+flowchart LR
+  workspace[("workspace")]
+  actor_1["reviewer ×N"]
+  sink(["sink"])
+  workspace -->|"string[]"| actor_1
+  actor_1 -->|"Verdict"| sink
+  classDef endpoint fill:#eeeeef,stroke:#9a9aa5,color:#555566;
+  class sink endpoint;

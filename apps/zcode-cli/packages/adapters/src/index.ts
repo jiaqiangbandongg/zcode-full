@@ -17,3 +17,4 @@ export * from "./auth/index.js";
 export * from "./browser/index.js";
 export * from "./mcp/index.js";
 export * from "./workflow/index.js";
+export * from "./tools/index.js";

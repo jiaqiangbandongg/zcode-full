@@ -247,7 +247,7 @@ export function ThoughtLevelCycleControl({
           data-composer-collapse-priority={composerCollapsePriority}
           data-testid={TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER}
         >
-          {/* 单档模型（如 Kimi K3）没有可切换状态，不能继续渲染带箭头的 Select。*/}
+          {/* Bugfix: 单档模型（只有一个思考档位）没有可切换状态，不能继续渲染带箭头的 Select。 */}
           {triggerContent}
         </span>
       </ControlHintTooltip>

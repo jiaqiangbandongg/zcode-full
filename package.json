@@ -1,38 +1,67 @@
 {
   "name": "zcode",
-  "version": "3.14.3",
+  "version": "3.15.1",
   "private": true,
-  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev:web": "concurrently -k -n server,web -c blue,green \"pnpm --filter @zcode/server dev\" \"pnpm --filter @zcode/web dev\"",
+    "dev:docs": "pnpm --filter @zcode/dev-docs dev",
     "dev:desktop": "pnpm run dev:desktop:prod",
     "dev:desktop:test": "node scripts/dev-desktop-env.mjs test",
     "dev:desktop:prod": "node scripts/dev-desktop-env.mjs production",
     "dev:desktop:bytecode": "node scripts/dev-desktop-env.mjs production --agent-bytecode",
+    "dev:e2e-report": "pnpm --filter @zcode/e2e-report dev",
     "dev:desktop:remote-prod": "node scripts/dev-desktop-remote-prod.mjs",
+    "dev:web-remote-control": "node scripts/build-desktop-agent-cli.mjs && concurrently -k -n web,desktop -c green,magenta \"pnpm --filter @zcode/web exec vite dev --strictPort\" \"node scripts/dev-web-remote-control-desktop.mjs\"",
+    "dev:web-share:test": "node scripts/dev-web-share-env.mjs test",
+    "dev:web-share:mock": "node scripts/dev-web-share-env.mjs mock",
     "dev:server": "pnpm --filter @zcode/server dev",
+    "dev:official-mcp": "node scripts/dev-official-mcp-server.mjs",
     "prepare": "husky",
     "prepare:desktop-runtime": "pnpm --filter @zcode/desktop prepare:runtime-assets",
     "dep:graph": "node scripts/dependency-graph.mjs",
     "dep:refs": "node scripts/dep-refs.mjs",
-    "verify:pre-push": "pnpm run lint && pnpm run architecture:check -- --changed",
+    "audit:agent-remnants": "node scripts/audit-zcode-agent-remnants.mjs",
+    "audit:conversation-session-coverage": "node scripts/audit-conversation-session-case-coverage.mjs --check",
+    "audit:conversation-session-complete": "node scripts/audit-conversation-session-case-coverage.mjs --check --require-complete",
+    "test": "pnpm run test:unit",
+    "test:e2e": "pnpm --filter @zcode/desktop test:e2e",
+    "test:e2e:all:coverage": "pnpm --filter @zcode/desktop test:e2e:all:coverage",
+    "test:e2e:windows:sharded": "pnpm --filter @zcode/desktop test:e2e:windows:sharded",
+    "test:e2e:container": "bash scripts/test-desktop-e2e-container.sh",
+    "test:e2e:container:conversation": "bash scripts/test-desktop-e2e-container.sh conversation-session-verified",
+    "test:e2e:container:plugins": "bash scripts/test-desktop-e2e-container.sh plugins-verified",
+    "test:coverage": "vitest run --coverage --exclude \"packages/desktop/test/e2e/**/*.test.ts\"",
+    "test:unit": "vitest run --exclude \"packages/desktop/test/e2e/**/*.test.ts\"",
+    "test:unit:affected": "node scripts/run-affected-unit-tests.mjs",
+    "test:docker:web-app-gateway": "node scripts/test-web-app-gateway-reset.mjs",
+    "verify:pre-push": "pnpm run lint && pnpm run architecture:check -- --changed && pnpm run test:unit:affected",
     "build": "pnpm -r build",
     "build:desktop-agent:bytecode": "node scripts/build-desktop-agent-bytecode.mjs",
+    "build:docs": "pnpm --filter @zcode/dev-docs build",
+    "build:web-remote-control": "pnpm --filter @zcode/web exec vite build --base=/remote/",
+    "build:web-remote-control:v3": "pnpm --filter @zcode/web exec vite build --base=/remote/v3/",
+    "build:web-remote-control:v4": "pnpm --filter @zcode/web exec vite build --base=/remote/v4/",
+    "build:web-remote-control:test": "pnpm --filter @zcode/web exec vite build --base=/remote/__test__/",
+    "build:web-share": "pnpm --filter @zcode/web-share build",
     "build:zcode": "node scripts/build-zcode.mjs",
     "build:bootstrap": "pnpm -r --filter \"./packages/*\" --filter \"!@zcode/desktop\" build && pnpm --filter @zcode/desktop build:no-runtime-assets",
     "build:sea": "pnpm --dir apps/zcode-cli build:sea",
     "build:sea:all": "pnpm install && pnpm --dir apps/zcode-cli build:sea",
     "build:native-search": "node scripts/build-native-search-tools.mjs",
     "pack:native-search": "node scripts/package-native-search-tools.mjs",
+    "ci:ensure-native-search-deps": "node scripts/ensure-native-search-deps.mjs",
+    "test:native-search:e2e": "node scripts/test-native-search-tools-e2e.mjs",
+    "test:sea-runtime-tools:e2e": "node scripts/test-sea-runtime-tools-e2e.mjs",
     "clean": "node scripts/clean.mjs",
-    "typecheck": "tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/zcode-server-cli packages/ui packages/web packages/desktop/tsconfig.host.json",
+    "typecheck": "tsc -b packages/rpc packages/provider packages/provider-node packages/shared packages/services packages/client packages/server packages/zcode-server-cli packages/ui packages/web apps/dev-docs packages/e2e-report packages/desktop/tsconfig.host.json packages/desktop/tsconfig.e2e.json",
     "bundle:desktop": "pnpm --filter @zcode/desktop run bundle --",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "knip": "knip",
     "count-lines": "bash scripts/count-lines.sh",
     "prepare:remote-assets": "pnpm --filter @zcode/desktop prepare:remote-assets",
+    "ci:assert-node": "node scripts/assert-node-version.mjs",
     "doctor:macos-release": "bash scripts/doctor-macos-release-app.sh",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix --fix-suggestions",
@@ -44,7 +73,8 @@
     "architecture:check": "node scripts/architecture/architecture-check.mjs check",
     "architecture:report": "node scripts/architecture/architecture-check.mjs report",
     "architecture:baseline:update": "node scripts/architecture/architecture-check.mjs baseline:update",
-    "architecture:context": "node scripts/architecture/architecture-check.mjs context"
+    "architecture:context": "node scripts/architecture/architecture-check.mjs context",
+    "test:architecture": "node --test scripts/test/architecture-governance.test.mjs"
   },
   "dependencies": {
     "border-beam": "^1.0.1",
@@ -52,9 +82,11 @@
     "tailwind-scrollbar-hide": "^4.0.0"
   },
   "devDependencies": {
+    "@jridgewell/trace-mapping": "0.3.31",
     "@release-it/conventional-changelog": "^10.0.6",
     "@tanstack/react-virtual": "^3.13.23",
     "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.1",
     "concurrently": "^9.1.2",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "conventional-changelog-writer": "^8.4.0",
@@ -70,7 +102,8 @@
     "ts-morph": "^28.0.0",
     "tsx": "^4.19.4",
     "turbo": "^2.4.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
   },
   "peerDependencies": {
     "@tanstack/react-virtual": "^3.13.23"
@@ -85,9 +118,12 @@
       "react-dom": "19.2.7"
     },
     "patchedDependencies": {
+      "vitest@4.1.7": "patches/vitest@4.1.7.patch",
+      "wdio-electron-service@9.2.1": "patches/wdio-electron-service@9.2.1.patch",
       "@arms/rum-electron@0.0.3": "patches/@arms__rum-electron@0.0.3.patch",
       "@ai-sdk/openai-compatible@2.0.60": "patches/@ai-sdk__openai-compatible@2.0.60.patch",
       "@ai-sdk/anthropic@3.0.81": "patches/@ai-sdk__anthropic@3.0.81.patch"
     }
-  }
+  },
+  "license": "Apache-2.0"
 }

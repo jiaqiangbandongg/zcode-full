@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ttft-diagnostics",
+  "spec": "./test/e2e/conversation-session/conversation-session-ttft-diagnostics.test.ts",
+  "fixtures": [
+    {
+      "id": "ttft-diag-title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "隔离标题生成，不让无关后台请求产生 Missing Fixture 重试与性能噪音。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_TTFT_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "diag-title",
+          "text": "{\"title\":\"TTFT diagnostics\"}",
+          "inputTokens": 30,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-hold",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_HOLD"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 8000,
+        "text": {
+          "id": "ttft-diag-hold",
+          "text": "ttft-diag-hold-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-queue",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_QUEUE"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 700,
+        "text": {
+          "id": "ttft-diag-queue",
+          "text": "ttft-diag-queue-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-cancel",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_CANCEL"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 15000,
+        "text": {
+          "id": "ttft-diag-cancel",
+          "text": "ttft-diag-cancel-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-retry-failure",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_RETRY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 503,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"type\": \"error\", \"error\": {\"type\": \"overloaded_error\", \"message\": \"Synthetic retry\"}}"
+      }
+    },
+    {
+      "id": "ttft-diag-retry-success",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_RETRY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ttft-diag-retry",
+          "text": "ttft-diag-retry-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-fail",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_FAIL"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 400,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"type\": \"error\", \"error\": {\"type\": \"invalid_request_error\", \"message\": \"Synthetic permanent failure\"}}"
+      }
+    },
+    {
+      "id": "ttft-diag-guide-read",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_GUIDE_PARENT"],
+        "bodyExcludes": ["Generate a concise title", "E2E_TTFT_GUIDE_FILE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 4000,
+        "toolUse": {
+          "id": "ttft-diag-read",
+          "name": "Read",
+          "input": {
+            "file_path": "{{e2eRuntimeRoot}}/ttft-diagnostics/input.txt"
+          }
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-guide-final",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title"],
+        "bodyIncludes": ["E2E_TTFT_GUIDE_FILE", "E2E_TTFT_DIAG_GUIDE_INPUT", "tool_result"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "guide-final",
+          "text": "ttft-diag-guide-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-pause",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_PAUSE"],
+        "bodyExcludes": ["Generate a concise title"],
+        "lastUserMessageExcludes": ["E2E_TTFT_DIAG_CONFIRM", "E2E_TTFT_DIAG_HELD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 15000,
+        "text": {
+          "id": "pause",
+          "text": "ttft-diag-pause-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      },
+      "description": "停止可能早于 provider 请求，PAUSE 未消费时不能抢匹配随后合并的 CONFIRM/HELD user content。"
+    },
+    {
+      "id": "ttft-diag-held",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_HELD"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 300,
+        "text": {
+          "id": "held",
+          "text": "ttft-diag-held-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    },
+    {
+      "id": "ttft-diag-confirm",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定首输出延迟，通过真实队列/取消/后台操作验证最终 OTLP。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_TTFT_DIAG_CONFIRM"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 300,
+        "text": {
+          "id": "confirm",
+          "text": "ttft-diag-confirm-ok",
+          "inputTokens": 80,
+          "outputTokens": 10
+        }
+      }
+    }
+  ]
+}

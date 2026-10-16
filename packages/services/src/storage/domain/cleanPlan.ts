@@ -15,13 +15,13 @@ export interface StorageCleanCandidate {
   mtimeMs: number;
 }
 
-interface StorageCleanPlan {
+export interface StorageCleanPlan {
   targets: StorageCleanCandidate[];
   skippedCount: number;
 }
 
 /** 子代理产物：会话目录 24 小时内有更新就整个跳过，避免删掉进行中 subagent 的 transcript。 */
-const SUBAGENT_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const SUBAGENT_ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function planStorageClean(params: {
   categoryId: StorageCategoryId;

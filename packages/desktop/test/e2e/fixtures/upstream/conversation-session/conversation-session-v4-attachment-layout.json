@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-attachment-layout",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-attachment-layout.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-attachment-layout-send",
+      "description": "AL01-AL14：附件、context 与可见文本首发。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定附件和四类 context 组合，稳定验证布局与 edit 解析。图片请求使用缓存路径，不匹配原文件名；原文件名由 UI 断言覆盖。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ATTACHMENT_LAYOUT_VISIBLE",
+          "\"type\":\"image\"",
+          "image/png",
+          "e2e-attachment-layout-a-very-long-filename-for-truncation.txt",
+          "E2E comment",
+          "e2e.example.test",
+          "E2E selection"
+        ],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-layout-send",
+          "inputTokens": 100,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_LAYOUT_SEND_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-attachment-layout-edit",
+      "description": "AL15：删除网页 context 后重新序列化。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "bodyExcludes 网页 URL，证明 edit branch 不保留已删除 context。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_LAYOUT_VISIBLE", "E2E comment", "E2E selection"],
+        "bodyExcludes": [
+          "e2e.example.test",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-layout-edit",
+          "inputTokens": 100,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_LAYOUT_EDIT_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-attachment-context-only",
+      "description": "AL02/AL14：仅 conversation selection 不产生空气泡。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "仅 context prompt 是确定性 renderer/provider 合同。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_CONTEXT_ONLY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-context-only",
+          "inputTokens": 30,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_CONTEXT_ONLY_OK"
+        }
+      }
+    },
+    {
+      "id": "v4-attachment-failed-image",
+      "description": "AL18/AL19：失败图片静态降级，gallery 保持消息隔离。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定第二条图片消息，稳定验证 renderer 缩略图失败和跨消息 gallery 边界。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_FAILED_IMAGE", "\"type\":\"image\"", "image/png"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "v4-attachment-failed-image",
+          "inputTokens": 30,
+          "outputTokens": 8,
+          "text": "V4_ATTACHMENT_FAILED_IMAGE_OK"
+        }
+      }
+    }
+  ]
+}

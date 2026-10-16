@@ -58,7 +58,7 @@ export { ENABLE_CUA_TOOL_CALL_GROUPING } from "@/v4/conversationCuaGroups.js";
 export const ENABLE_TERMINAL_TOOL_CALL_GROUPING = true;
 export const ENABLE_CHANGES_TOOL_CALL_GROUPING = false;
 
-interface ConversationAssistantWorkRenderOptions {
+export interface ConversationAssistantWorkRenderOptions {
   stageTailIsRunning?: boolean;
   enableCuaGrouping?: boolean;
   enableExploreGrouping?: boolean;

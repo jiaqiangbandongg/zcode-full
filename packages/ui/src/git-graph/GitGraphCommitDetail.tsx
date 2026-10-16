@@ -1,9 +1,13 @@
 import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
-import { formatCommitTime, getRefIcon, getShortHash } from "./GitGraphDisplay.js";
+import {
+  formatCommitTime,
+  getRefIcon,
+  getShortHash,
+} from "./GitGraphDisplay.js";
 import type { GitGraphCommit } from "./layout.js";
 
-interface GitGraphCommitDetailProps {
+export interface GitGraphCommitDetailProps {
   commit: GitGraphCommit;
 }
 
@@ -27,7 +31,8 @@ export function GitGraphCommitDetail({ commit }: GitGraphCommitDetailProps) {
                   key={`${commit.hash}:${ref.name}`}
                   className={cn(
                     "inline-flex h-5 min-w-0 items-center gap-1 rounded-md border border-border bg-surface px-1.5 text-ui-base text-foreground-subtle",
-                    ref.kind === "head" && "border-git-descendant bg-selected text-foreground",
+                    ref.kind === "head" &&
+                      "border-git-descendant bg-selected text-foreground",
                     ref.kind === "tag" && "border-git-added",
                   )}
                 >
@@ -49,7 +54,9 @@ export function GitGraphCommitDetail({ commit }: GitGraphCommitDetailProps) {
             <div className="text-foreground-subtlest">
               {intl.formatMessage({ id: "gitGraph.detail.author" })}
             </div>
-            <div className="truncate text-foreground">{commit.authorName || "-"}</div>
+            <div className="truncate text-foreground">
+              {commit.authorName || "-"}
+            </div>
           </div>
           <div className="min-w-0">
             <div className="text-foreground-subtlest">
@@ -64,7 +71,9 @@ export function GitGraphCommitDetail({ commit }: GitGraphCommitDetailProps) {
               {intl.formatMessage({ id: "gitGraph.detail.parents" })}
             </div>
             <div className="truncate font-mono text-foreground">
-              {commit.parents.length > 0 ? commit.parents.map(getShortHash).join(", ") : "-"}
+              {commit.parents.length > 0
+                ? commit.parents.map(getShortHash).join(", ")
+                : "-"}
             </div>
           </div>
         </div>

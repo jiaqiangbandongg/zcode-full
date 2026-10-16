@@ -1,0 +1,11 @@
+phase phase#1 "draft" @5:1
+phase phase#2 "edit" @7:1
+lane actor#1 "writer" @6:15
+lane actor#2 "editor" @8:40
+region seq#1 seq
+region branch#1 branch parent=seq#1 @8:33
+step ask#1 ask "writer" @6:31 lane=actor#1 phase=phase#1 region=seq#1 always
+step ask#2 ask "editor" @8:56 lane=actor#2 phase=phase#2 region=branch#1 maybe
+edge ask#1 -> ask#2 data maybe inexact
+phase-edge phase#1 -> phase#2 data maybe
+sink ask#2

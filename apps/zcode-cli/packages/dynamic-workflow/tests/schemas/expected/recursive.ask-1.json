@@ -1,0 +1,24 @@
+{
+  "$defs": {
+    "TreeNode": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "$ref": "#/$defs/TreeNode"
+          },
+          "type": "array"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "children"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/TreeNode"
+}

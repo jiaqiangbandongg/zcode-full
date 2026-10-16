@@ -3,7 +3,7 @@ import type { SpanExporter } from "@opentelemetry/sdk-trace-base";
 
 type EnvRecord = Record<string, string | undefined>;
 
-function resolveRendererActionTraceEndpoint(env: EnvRecord): string | undefined {
+export function resolveRendererActionTraceEndpoint(env: EnvRecord): string | undefined {
   const traceEndpoint = validHttpUrl(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT);
   if (traceEndpoint) return traceEndpoint;
   const commonEndpoint = validHttpUrl(env.OTEL_EXPORTER_OTLP_ENDPOINT);

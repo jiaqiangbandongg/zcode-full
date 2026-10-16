@@ -1,0 +1,3 @@
+phase unphased
+participant unphased:actor#1 "alpha" steps=ask#1
+participant unphased:actor#2 "beta" steps=ask#2

@@ -1,0 +1,15 @@
+node source
+node ask#1 "勘察员" @14:35 actors=actor#1 type="Survey"
+node hole#21b40fca/ask#1 "分组员" @16:36 actors=hole#21b40fca/actor#1 type="Plan"
+node hole#7c7fc07b "决定顺序" @17:23 type="Order"
+node ask#2 "执行者" @20:21 actors=actor#2 type="string"
+node sink
+actor actor#1 "勘察员" @14:22
+actor hole#21b40fca/actor#1 "分组员" @16:23
+actor actor#2 "执行者" @20:8
+edge source -> ask#1 data exact
+edge ask#1 -> hole#21b40fca/ask#1 data exact type="Survey"
+edge hole#21b40fca/ask#1 -> hole#7c7fc07b data exact type="Plan"
+edge hole#21b40fca/ask#1 -> ask#2 data exact type="Plan"
+edge hole#7c7fc07b -> ask#2 data exact type="Order"
+edge ask#2 -> sink data exact type="string"

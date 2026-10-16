@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-goal-interruptions",
+  "spec": "./test/e2e/conversation-session/conversation-session-goal-interruptions.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-goal-interruptions.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-goal-verifier-stop-continuation",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定让 /goal 进入 verifier 窗口，避免真实模型输出不满足 verifier 前置。"
+    },
+    {
+      "id": "upstream-goal-verifier-stop-delayed",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "goal verifier stop 需要稳定 running 窗口；真实 verifier 可能过快完成。"
+    },
+    {
+      "id": "upstream-goal-verifier-stop-next",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 stopped verifier 不阻塞下一条普通用户消息。"
+    },
+    {
+      "id": "upstream-goal-verifier-stop-next-verifier-passed",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "fast-json",
+      "syntheticReason": "普通下一轮完成后 active goal 可能再次 verifier；提供通过响应让 case 自然收口。"
+    },
+    {
+      "id": "upstream-goal-verifier-compact-continuation",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定让 compact 分支进入 verifier stop 窗口。"
+    },
+    {
+      "id": "upstream-goal-verifier-compact-delayed",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "goal verifier compact 需要稳定 running 窗口；真实 verifier 可能过快完成。"
+    },
+    {
+      "id": "upstream-goal-verifier-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-json",
+      "syntheticReason": "验证 stopped verifier 后允许 manual compact，并给后续请求一个可断言的 compact 摘要 marker。"
+    },
+    {
+      "id": "upstream-goal-verifier-compact-next",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证 stopped verifier compact 后普通用户消息能基于 compact 后摘要继续。"
+    },
+    {
+      "id": "upstream-goal-verifier-compact-next-verifier-passed",
+      "kind": "goal-verifier",
+      "source": "synthetic",
+      "timingPolicy": "fast-json",
+      "syntheticReason": "compact 后下一轮完成后 active goal 可能再次 verifier；提供通过响应让 case 自然收口。"
+    }
+  ]
+}

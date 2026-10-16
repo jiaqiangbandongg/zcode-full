@@ -1,6 +1,6 @@
 ---
 name: architecture-governance
-description: Apply the repository's architecture policy to code changes by generating a bounded context package, checking module and layer boundaries, and reporting baseline-aware violations. Use for any code change; skip for documentation-only work.
+description: Check ZCode module and layer boundaries for code changes. Generate bounded context for cross-module or ownership changes; skip documentation-only work.
 ---
 
 # Architecture governance
@@ -9,16 +9,16 @@ Use this skill before editing code in the ZCode repository. It is a design guide
 
 ## Before writing code
 
-1. Identify changed files and their modules with `pnpm architecture:check --changed`.
-2. Run `pnpm architecture:context <module-id>` (or the reusable wrapper `node .agents/skills/architecture-governance/scripts/context-package.mjs <module-id>`). Read the target contract, directly referenced contracts, and any existing relevant spec and tests before opening broad implementation files. Do not assume a documentation or test path exists; verify it in the checkout.
-3. Write or update the spec before implementation; create its directory when needed. State the behavior, ownership, invariants, failure semantics, and migration boundary in the spec.
-4. Make a short design decision before coding:
+1. Identify intended files and modules from the task, contracts, and existing tests. Run `pnpm architecture:check --changed` for the current baseline; a clean diff does not identify files you have not edited yet.
+2. For cross-module changes, state ownership changes, or an unclear contract, run `pnpm architecture:context <module-id>` (or `node .agents/skills/architecture-governance/scripts/context-package.mjs <module-id>`). For a local change with a known contract, read only the relevant contract, spec, and affected tests; expand when a concrete dependency or evidence gap requires it.
+3. Apply the spec and regression-evidence rules in [AGENTS.md](../../../AGENTS.md). New behavior needs a spec before implementation; restoring already specified behavior needs regression evidence, not a duplicate feature document. Pure refactors update docs only when contracts change.
+4. For changes to mutable state, asynchronous behavior, or module boundaries, make the relevant design decisions before coding:
    - **One owner:** name the single component that owns each piece of mutable state. Other layers read through its contract and send commands; they do not keep a second accepted queue, cache, or derived truth.
    - **One path:** reuse an existing command, service, hook, adapter, or contract when it already expresses the behavior. Do not create a parallel helper for the same responsibility.
-   - **Explicit boundaries:** choose the layer for every new file and the public contract for every cross-module edge. Use the module's declared `layers` and `layerOrder`; a file may import only its own layer or lower ones through their public surface. `domain` is pure (no IO, no `await` on the world), `app` decides side effects through ports, `adapters` executes them, `ui` depends only on this module's `contract.ts`. Quick test: needs `await`? not domain. Knows it is sqlite / MessagePort / a timer? adapters.
+   - **Explicit boundaries:** choose the layer for every new file and the public contract for every cross-module edge. Keep `ui → hooks/services → app → domain → adapters` and keep IO out of domain.
    - **Explicit time:** for asynchronous or remote behavior, write the event order, owner/lease, idempotency key, stale-result rule, replay/resume boundary, and desktop versus mobile delivery kind before implementation.
-   - **Bounded context:** prefer the generated reading package over copying whole implementations into the prompt. Read more only when a contract or test proves it is necessary.
-5. If the change crosses modules or changes state ownership, include the decision in the spec and add or update the module contract before implementation.
+   - **Bounded context:** use the relevant contracts, specs, and tests. A generated reading package helps when dependencies are unclear; do not require a whole-module reading pass for every local edit.
+5. If the change alters a public contract, ownership, or allowed dependency, record that decision in the relevant spec/contract before implementation. Editing files in two modules alone does not require a new document. Use the root task boundary for when to consult the user; ordinary authorized implementation choices proceed autonomously.
 
 Use this compact design sketch while planning stateful changes:
 
@@ -38,13 +38,11 @@ mobile: replayable ─ snapshot + gap repair ┘
 ## During and after editing
 
 6. Keep changes inside the declared module and its allowed layer direction. Add a module dependency or public contract before introducing a cross-module edge.
-7. Run `pnpm architecture:check --changed` again after editing. Report new violations separately from baseline violations, along with changed modules, tests, state owners, event-order assumptions, and net line changes.
+7. Run `pnpm architecture:check --changed` after editing. Report new violations separately from baseline violations; include owners and event-order assumptions when affected. Follow the root validation matrix, finish after required checks pass, and expand checks only for new edits, failures, or unresolved risks.
 
-The executable policy is `architecture-policy.yaml`; do not duplicate its rules in this file or in AGENTS.md. Use `pnpm architecture:baseline:update` only when a reviewed change intentionally changes the accepted legacy baseline. CI never refreshes baseline automatically.
+The executable policy is `architecture-policy.yaml`; keep its detailed rule definitions there. Check the actual managed-module coverage before claiming the gate verifies a boundary: a passing result does not prove unconfigured modules or runtime semantics are correct. Use `pnpm architecture:baseline:update` only when a reviewed change intentionally changes the accepted legacy baseline. CI never refreshes baseline automatically.
 
-When adding source, identify its owning module. If a new managed module is required, register its roots, dependencies, layers and public entrypoints in `architecture-policy.yaml`, and keep the local manifest consistent with that policy. Use the existing managed modules and the fixture below as examples.
-
-For a new managed module, provide `module.ts`, `contract.ts`, `contract.example.ts`, and a short `CONTRACT.md`. Keep runtime and persistence details behind the contract. Prefer typed service calls for one-to-one interactions, commands for state changes, and typed events for broadcast facts.
+For a new managed module, provide `module.ts`, `contract.ts`, `contract.example.ts`, `contract.test.ts`, and a short `CONTRACT.md`. Keep runtime and persistence details behind the contract. Prefer typed service calls for one-to-one interactions, commands for state changes, and typed events for broadcast facts.
 
 See [policy-schema.md](references/policy-schema.md), [module-contract.md](references/module-contract.md), and [rule-catalog.md](references/rule-catalog.md) when the change needs their detailed guidance. The [golden-module](references/golden-module) fixture is the smallest compliant example.
 See [ai-guidance.md](references/ai-guidance.md) for the anti-patterns this workflow is designed to prevent and the questions an agent must answer before proposing code.

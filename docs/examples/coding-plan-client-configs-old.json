@@ -1,0 +1,898 @@
+{
+  "code": 0,
+  "msg": "",
+  "data": {
+    "configs": {
+      "codingPlanStaticProducts": {
+        "builtin:bigmodel-coding-plan": [
+          {
+            "description": [
+              {
+                "text": "适合小型 Repo 轻量级迭代"
+              },
+              {
+                "text": "逐步开放最新旗舰模型及功能"
+              },
+              {
+                "text": "支持多款编程工具"
+              }
+            ],
+            "discountAmount": 49,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 49,
+            "monthlyPayAmount": 49,
+            "monthlyRenewAmount": 49,
+            "originalAmount": 49,
+            "payAmount": 49,
+            "priceCurrency": "CNY",
+            "priceUnit": "month",
+            "productId": "product-02434c",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 49,
+            "equity": [
+              {
+                "text": "基础用量额度"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合中型 Repo 日常开发"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              },
+              {
+                "text": "覆盖多款精选 MCP 工具"
+              },
+              {
+                "text": "更快生成速度"
+              }
+            ],
+            "discountAmount": 149,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 149,
+            "monthlyPayAmount": 149,
+            "monthlyRenewAmount": 149,
+            "originalAmount": 149,
+            "payAmount": 149,
+            "priceCurrency": "CNY",
+            "priceUnit": "month",
+            "productId": "product-1df3e1",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 149,
+            "equity": [
+              {
+                "text": "5x Lite 额度 + Lite 权益"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合高阶用户中大型 Repo 深度开发"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ],
+            "discountAmount": 469,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 469,
+            "monthlyPayAmount": 469,
+            "monthlyRenewAmount": 469,
+            "originalAmount": 469,
+            "payAmount": 469,
+            "priceCurrency": "CNY",
+            "priceUnit": "month",
+            "productId": "product-2fc421",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 469,
+            "equity": [
+              {
+                "text": "20x Lite 额度 + Pro 权益"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合小型 Repo 轻量级迭代"
+              },
+              {
+                "text": "逐步开放最新旗舰模型及功能"
+              },
+              {
+                "text": "支持多款编程工具"
+              }
+            ],
+            "discountAmount": 132.3,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 49,
+            "monthlyPayAmount": 44.1,
+            "monthlyRenewAmount": 44.1,
+            "originalAmount": 147,
+            "payAmount": 132.3,
+            "priceCurrency": "CNY",
+            "priceUnit": "quarter",
+            "productId": "product-b8ea38",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 132.3,
+            "equity": [
+              {
+                "text": "基础用量额度"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合中型 Repo 日常开发"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              },
+              {
+                "text": "覆盖多款精选 MCP 工具"
+              },
+              {
+                "text": "更快生成速度"
+              }
+            ],
+            "discountAmount": 402.3,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 149,
+            "monthlyPayAmount": 134.1,
+            "monthlyRenewAmount": 134.1,
+            "originalAmount": 447,
+            "payAmount": 402.3,
+            "priceCurrency": "CNY",
+            "priceUnit": "quarter",
+            "productId": "product-fef82f",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 402.3,
+            "equity": [
+              {
+                "text": "5x Lite 额度 + Lite 权益"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合高阶用户中大型 Repo 深度开发"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ],
+            "discountAmount": 1266.3,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 469,
+            "monthlyPayAmount": 422.1,
+            "monthlyRenewAmount": 422.1,
+            "originalAmount": 1407,
+            "payAmount": 1266.3,
+            "priceCurrency": "CNY",
+            "priceUnit": "quarter",
+            "productId": "product-5d3a03",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 1266.3,
+            "equity": [
+              {
+                "text": "20x Lite 额度 + Pro 权益"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合小型 Repo 轻量级迭代"
+              },
+              {
+                "text": "逐步开放最新旗舰模型及功能"
+              },
+              {
+                "text": "支持多款编程工具"
+              }
+            ],
+            "discountAmount": 470.4,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 49,
+            "monthlyPayAmount": 39.2,
+            "monthlyRenewAmount": 39.2,
+            "originalAmount": 588,
+            "payAmount": 470.4,
+            "priceCurrency": "CNY",
+            "priceUnit": "year",
+            "productId": "product-70a804",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 470.4,
+            "equity": [
+              {
+                "text": "基础用量额度"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合中型 Repo 日常开发"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              },
+              {
+                "text": "覆盖多款精选 MCP 工具"
+              },
+              {
+                "text": "更快生成速度"
+              }
+            ],
+            "discountAmount": 1430.4,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 149,
+            "monthlyPayAmount": 119.2,
+            "monthlyRenewAmount": 119.2,
+            "originalAmount": 1788,
+            "payAmount": 1430.4,
+            "priceCurrency": "CNY",
+            "priceUnit": "year",
+            "productId": "product-5643e6",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 1430.4,
+            "equity": [
+              {
+                "text": "5x Lite 额度 + Lite 权益"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "适合高阶用户中大型 Repo 深度开发"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ],
+            "discountAmount": 4502.4,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 469,
+            "monthlyPayAmount": 375.2,
+            "monthlyRenewAmount": 375.2,
+            "originalAmount": 5628,
+            "payAmount": 4502.4,
+            "priceCurrency": "CNY",
+            "priceUnit": "year",
+            "productId": "product-d46f8b",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "超值订阅，轻松畅享顶级编程体验",
+            "renewAmount": 4502.4,
+            "equity": [
+              {
+                "text": "20x Lite 额度 + Pro 权益"
+              }
+            ]
+          }
+        ],
+        "builtin:zai-coding-plan": [
+          {
+            "description": [
+              {
+                "text": "Small repo iteration"
+              },
+              {
+                "text": "Latest models over time"
+              },
+              {
+                "text": "20+ coding tools"
+              }
+            ],
+            "discountAmount": 18,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 18,
+            "monthlyPayAmount": 18,
+            "monthlyRenewAmount": 18,
+            "originalAmount": 18,
+            "payAmount": 18,
+            "priceCurrency": "USD",
+            "priceUnit": "month",
+            "productId": "product-af5f6f",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 18,
+            "equity": [
+              {
+                "text": "Base usage included"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-sized repo development"
+              },
+              {
+                "text": "Priority model access"
+              },
+              {
+                "text": "Curated MCP tools"
+              }
+            ],
+            "discountAmount": 72,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 72,
+            "monthlyPayAmount": 72,
+            "monthlyRenewAmount": 72,
+            "originalAmount": 72,
+            "payAmount": 72,
+            "priceCurrency": "USD",
+            "priceUnit": "month",
+            "productId": "product-9e5710",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 72,
+            "equity": [
+              {
+                "text": "5x Lite usage"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-to-large repo work"
+              },
+              {
+                "text": "First model access"
+              },
+              {
+                "text": "Peak-time priority"
+              }
+            ],
+            "discountAmount": 160,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 160,
+            "monthlyPayAmount": 160,
+            "monthlyRenewAmount": 160,
+            "originalAmount": 160,
+            "payAmount": 160,
+            "priceCurrency": "USD",
+            "priceUnit": "month",
+            "productId": "product-f2f5dd",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 160,
+            "equity": [
+              {
+                "text": "20x Lite usage"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Small repo iteration"
+              },
+              {
+                "text": "Latest models over time"
+              },
+              {
+                "text": "20+ coding tools"
+              }
+            ],
+            "discountAmount": 48.6,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 18,
+            "monthlyPayAmount": 16.2,
+            "monthlyRenewAmount": 16.2,
+            "originalAmount": 54,
+            "payAmount": 48.6,
+            "priceCurrency": "USD",
+            "priceUnit": "quarter",
+            "productId": "product-e68d08",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 48.6,
+            "equity": [
+              {
+                "text": "Base usage included"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-sized repo development"
+              },
+              {
+                "text": "Priority model access"
+              },
+              {
+                "text": "Curated MCP tools"
+              }
+            ],
+            "discountAmount": 194.4,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 72,
+            "monthlyPayAmount": 64.8,
+            "monthlyRenewAmount": 64.8,
+            "originalAmount": 216,
+            "payAmount": 194.4,
+            "priceCurrency": "USD",
+            "priceUnit": "quarter",
+            "productId": "product-0d9e64",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 194.4,
+            "equity": [
+              {
+                "text": "5x Lite usage"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-to-large repo work"
+              },
+              {
+                "text": "First model access"
+              },
+              {
+                "text": "Peak-time priority"
+              }
+            ],
+            "discountAmount": 432,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 160,
+            "monthlyPayAmount": 144,
+            "monthlyRenewAmount": 144,
+            "originalAmount": 480,
+            "payAmount": 432,
+            "priceCurrency": "USD",
+            "priceUnit": "quarter",
+            "productId": "product-8ba4f2",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 432,
+            "equity": [
+              {
+                "text": "20x Lite usage"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Small repo iteration"
+              },
+              {
+                "text": "Latest models over time"
+              },
+              {
+                "text": "20+ coding tools"
+              }
+            ],
+            "discountAmount": 172.8,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 18,
+            "monthlyPayAmount": 14.4,
+            "monthlyRenewAmount": 14.4,
+            "originalAmount": 216,
+            "payAmount": 172.8,
+            "priceCurrency": "USD",
+            "priceUnit": "year",
+            "productId": "product-096a9a",
+            "productName": "GLM Coding Lite",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 172.8,
+            "equity": [
+              {
+                "text": "Base usage included"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-sized repo development"
+              },
+              {
+                "text": "Priority model access"
+              },
+              {
+                "text": "Curated MCP tools"
+              }
+            ],
+            "discountAmount": 691.2,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 72,
+            "monthlyPayAmount": 57.6,
+            "monthlyRenewAmount": 57.6,
+            "originalAmount": 864,
+            "payAmount": 691.2,
+            "priceCurrency": "USD",
+            "priceUnit": "year",
+            "productId": "product-4cd71a",
+            "productName": "GLM Coding Pro",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 691.2,
+            "equity": [
+              {
+                "text": "5x Lite usage"
+              }
+            ]
+          },
+          {
+            "description": [
+              {
+                "text": "Mid-to-large repo work"
+              },
+              {
+                "text": "First model access"
+              },
+              {
+                "text": "Peak-time priority"
+              }
+            ],
+            "discountAmount": 1536,
+            "displayOrder": 1,
+            "monthlyOriginalAmount": 160,
+            "monthlyPayAmount": 128,
+            "monthlyRenewAmount": 128,
+            "originalAmount": 1920,
+            "payAmount": 1536,
+            "priceCurrency": "USD",
+            "priceUnit": "year",
+            "productId": "product-8af6e6",
+            "productName": "GLM Coding Max",
+            "productSmallTitle": "The smartest investment for your coding productivity.",
+            "renewAmount": 1536,
+            "equity": [
+              {
+                "text": "20x Lite usage"
+              }
+            ]
+          }
+        ]
+      },
+      "codingPlanStaticTeamProducts": {
+        "builtin:bigmodel-coding-plan": [
+          {
+            "productId": "product-3bc402",
+            "productName": "标准版",
+            "tier": "PRO",
+            "subscribeMode": "CONTINUOUS",
+            "subscribePeriod": "MONTHLY",
+            "purchaseMethodName": "连续包月",
+            "priceCurrency": "CNY",
+            "originalAmount": 598.0,
+            "discountAmount": 0.0,
+            "payAmount": 598.0,
+            "renewAmount": 598.0,
+            "equity": [
+              {
+                "text": "5小时最多：0.6亿 tokens"
+              },
+              {
+                "text": "每周最多：3亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "组织席位与权限统一管理"
+              },
+              {
+                "text": "团队用量与研发效能看板"
+              },
+              {
+                "text": "支持超额按量付费及预算控制"
+              },
+              {
+                "text": "集中式账单与发票管理"
+              },
+              {
+                "text": "数据默认不用于模型训练"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              }
+            ]
+          },
+          {
+            "productId": "product-86bf2d",
+            "productName": "标准版",
+            "tier": "PRO",
+            "subscribeMode": "ONE_TIME",
+            "subscribePeriod": "MONTHLY",
+            "purchaseMethodName": "按月采购",
+            "priceCurrency": "CNY",
+            "originalAmount": 598.0,
+            "discountAmount": 0.0,
+            "payAmount": 598.0,
+            "renewAmount": 598.0,
+            "equity": [
+              {
+                "text": "5小时最多：0.6亿 tokens"
+              },
+              {
+                "text": "每周最多：3亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "组织席位与权限统一管理"
+              },
+              {
+                "text": "团队用量与研发效能看板"
+              },
+              {
+                "text": "支持超额按量付费及预算控制"
+              },
+              {
+                "text": "集中式账单与发票管理"
+              },
+              {
+                "text": "数据默认不用于模型训练"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              }
+            ]
+          },
+          {
+            "productId": "product-7dcc26",
+            "productName": "标准版",
+            "tier": "PRO",
+            "subscribeMode": "CONTINUOUS",
+            "subscribePeriod": "YEARLY",
+            "purchaseMethodName": "连续包年",
+            "priceCurrency": "CNY",
+            "originalAmount": 7176.0,
+            "discountAmount": 0.0,
+            "payAmount": 7176.0,
+            "renewAmount": 6458.4,
+            "equity": [
+              {
+                "text": "5小时最多：0.6亿 tokens"
+              },
+              {
+                "text": "每周最多：3亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "组织席位与权限统一管理"
+              },
+              {
+                "text": "团队用量与研发效能看板"
+              },
+              {
+                "text": "支持超额按量付费及预算控制"
+              },
+              {
+                "text": "集中式账单与发票管理"
+              },
+              {
+                "text": "数据默认不用于模型训练"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              }
+            ]
+          },
+          {
+            "productId": "product-32c9d5",
+            "productName": "标准版",
+            "tier": "PRO",
+            "subscribeMode": "ONE_TIME",
+            "subscribePeriod": "YEARLY",
+            "purchaseMethodName": "按年采购",
+            "priceCurrency": "CNY",
+            "originalAmount": 7176.0,
+            "discountAmount": 0.0,
+            "payAmount": 7176.0,
+            "renewAmount": 6458.4,
+            "equity": [
+              {
+                "text": "5小时最多：0.6亿 tokens"
+              },
+              {
+                "text": "每周最多：3亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "组织席位与权限统一管理"
+              },
+              {
+                "text": "团队用量与研发效能看板"
+              },
+              {
+                "text": "支持超额按量付费及预算控制"
+              },
+              {
+                "text": "集中式账单与发票管理"
+              },
+              {
+                "text": "数据默认不用于模型训练"
+              },
+              {
+                "text": "优先体验最新旗舰模型及功能"
+              }
+            ]
+          },
+          {
+            "productId": "product-957ed0",
+            "productName": "高级版",
+            "tier": "MAX",
+            "subscribeMode": "CONTINUOUS",
+            "subscribePeriod": "MONTHLY",
+            "purchaseMethodName": "连续包月",
+            "priceCurrency": "CNY",
+            "originalAmount": 1198.0,
+            "discountAmount": 0.0,
+            "payAmount": 1198.0,
+            "renewAmount": 1198.0,
+            "equity": [
+              {
+                "text": "5小时最多：1.6亿 tokens"
+              },
+              {
+                "text": "每周最多：8亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "标准版全部权益"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ]
+          },
+          {
+            "productId": "product-d84b1f",
+            "productName": "高级版",
+            "tier": "MAX",
+            "subscribeMode": "ONE_TIME",
+            "subscribePeriod": "MONTHLY",
+            "purchaseMethodName": "按月采购",
+            "priceCurrency": "CNY",
+            "originalAmount": 1198.0,
+            "discountAmount": 0.0,
+            "payAmount": 1198.0,
+            "renewAmount": 1198.0,
+            "equity": [
+              {
+                "text": "5小时最多：1.6亿 tokens"
+              },
+              {
+                "text": "每周最多：8亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "标准版全部权益"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ]
+          },
+          {
+            "productId": "product-ddbe11",
+            "productName": "高级版",
+            "tier": "MAX",
+            "subscribeMode": "CONTINUOUS",
+            "subscribePeriod": "YEARLY",
+            "purchaseMethodName": "连续包年",
+            "priceCurrency": "CNY",
+            "originalAmount": 14376.0,
+            "discountAmount": 0.0,
+            "payAmount": 14376.0,
+            "renewAmount": 12938.4,
+            "equity": [
+              {
+                "text": "5小时最多：1.6亿 tokens"
+              },
+              {
+                "text": "每周最多：8亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "标准版全部权益"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ]
+          },
+          {
+            "productId": "product-6d8237",
+            "productName": "高级版",
+            "tier": "MAX",
+            "subscribeMode": "ONE_TIME",
+            "subscribePeriod": "YEARLY",
+            "purchaseMethodName": "按年采购",
+            "priceCurrency": "CNY",
+            "originalAmount": 14376.0,
+            "discountAmount": 0.0,
+            "payAmount": 14376.0,
+            "renewAmount": 12938.4,
+            "equity": [
+              {
+                "text": "5小时最多：1.6亿 tokens"
+              },
+              {
+                "text": "每周最多：8亿 tokens"
+              }
+            ],
+            "description": [
+              {
+                "text": "标准版全部权益"
+              },
+              {
+                "text": "首发接入最新旗舰模型及功能"
+              },
+              {
+                "text": "高峰期专属资源优先保障"
+              }
+            ]
+          }
+        ],
+        "builtin:zai-coding-plan": []
+      },
+      "startPlanPreview": {
+        "entitlements": [
+          {
+            "grantUnits": 3000000,
+            "meter": "model_usage",
+            "period": "daily",
+            "showName": "GLM-5.2",
+            "unitType": "token"
+          },
+          {
+            "grantUnits": 2000000,
+            "meter": "model_usage",
+            "period": "daily",
+            "showName": "GLM-5-Turbo",
+            "unitType": "token"
+          }
+        ],
+        "name": "Start Plan",
+        "planId": "zcode-v3-start-plan"
+      }
+    }
+  }
+}

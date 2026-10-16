@@ -32,7 +32,7 @@ const SHARE_PHASE_LABEL_IDS: Record<ConversationShareProgressPhase, string> = {
   checking: "conversationShare.phase.checking",
 };
 
-interface ConversationShareConfirmationDockProps {
+export interface ConversationShareConfirmationDockProps {
   selectedCount: number;
   totalCount: number;
   title?: string;
@@ -509,13 +509,13 @@ function ConversationShareConfirmationDockImpl({
               >
                 <span className="min-w-0 flex-1">
                   {error.messageId
-                    ? intl.formatMessage({ id: error.messageId })
+                    ? intl.formatMessage({ id: error.messageId }, { status: error.status ?? "—" })
                     : intl.formatMessage(
                         { id: "conversationShare.error.summary" },
                         { count: error.issueCount },
                       )}
                 </span>
-                {/* 服务端 request ID 属于诊断信息，常驻错误区会拉高 dock 并分散修复文案注意力；改为按需 Popover 展示。*/}
+                {/* 修复原因：服务端 request ID 属于诊断信息，常驻错误区会拉高 dock 并分散修复文案注意力；改为按需 Popover 展示。 */}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -541,6 +541,33 @@ function ConversationShareConfirmationDockImpl({
                     <PopoverTitle className="text-ui-sm font-medium">
                       {errorDetailsLabel}
                     </PopoverTitle>
+                    {(
+                      [
+                        ["HTTP", error.status],
+                        [
+                          intl.formatMessage({
+                            id: "conversationShare.issue.codeLabel",
+                          }),
+                          error.code,
+                        ],
+                        [
+                          intl.formatMessage({
+                            id: "conversationShare.issue.clientRequestIdLabel",
+                          }),
+                          error.clientRequestId,
+                        ],
+                        ["operationId", error.operationId],
+                      ] as const
+                    ).map(([label, value]) =>
+                      value === undefined ? null : (
+                        <p
+                          key={label}
+                          className="break-all text-ui-xs text-foreground-subtle select-text"
+                        >
+                          {label}: {value}
+                        </p>
+                      ),
+                    )}
                     {error.requestId ? (
                       <div className="grid gap-2">
                         <p className="text-ui-xs text-foreground-subtle">

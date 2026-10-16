@@ -16,9 +16,17 @@ import {
 type RemoteKind = RemoteTarget["kind"];
 export type SSHAuthMethod = "password" | "privateKey";
 
-function buildAvailableKinds(options: { isWindowsDesktop: boolean }): RemoteKind[] {
+export function buildAvailableKinds(options: {
+  isWindowsDesktop: boolean;
+  isLocalDevelopmentRuntime: boolean;
+}): RemoteKind[] {
   const kinds: RemoteKind[] = ["ssh"];
-  // 远程连接入口里 WSL 和 SSH 同属主机类连接。
+  // Bugfix: Server remote 目前只是本地开发能力。之前无条件放入可选列表，
+  // 导致 production-mode 打包也会露出未对外开放的入口。
+  if (options.isLocalDevelopmentRuntime) {
+    kinds.push("server");
+  }
+  // Bugfix: 远程连接入口里 WSL 和 SSH 同属主机类连接。
   // Windows 下先放 WSL 再放 Docker，避免 WSL 被 Docker 隔开后在选择页显得离 SSH 很远。
   if (options.isWindowsDesktop) {
     kinds.push("wsl");
@@ -57,6 +65,10 @@ export function useRemoteConnectionForm({
   const [wslUser, setWslUser] = useState("");
   const [dockerContainer, setDockerContainer] = useState("");
   const [manualDockerContainer, setManualDockerContainer] = useState("");
+  const [serverUrl, setServerUrl] = useState("");
+  const [serverName, setServerName] = useState("");
+  const [serverToken, setServerToken] = useState("");
+  const [serverWorkspacePath, setServerWorkspacePath] = useState("");
   const [sshConfigAliases, setSshConfigAliases] = useState<SSHConfigAliasOption[]>([]);
   const [sshConfigAliasesLoading, setSshConfigAliasesLoading] = useState(false);
   const [sshConfigAliasesLoaded, setSshConfigAliasesLoaded] = useState(false);
@@ -74,9 +86,12 @@ export function useRemoteConnectionForm({
   const applyingSshAliasRef = useRef(false);
   const dockerOptionsActiveLoadIdRef = useRef(0);
   const dockerOptionsInFlightLoadIdRef = useRef<number | null>(null);
+  const isLocalDevelopmentRuntime =
+    platform.isLocalDevelopmentRuntime === true || import.meta.env.DEV === true;
+
   const availableKinds = useMemo(
-    () => buildAvailableKinds({ isWindowsDesktop }),
-    [isWindowsDesktop],
+    () => buildAvailableKinds({ isWindowsDesktop, isLocalDevelopmentRuntime }),
+    [isLocalDevelopmentRuntime, isWindowsDesktop],
   );
 
   useEffect(() => {
@@ -338,6 +353,10 @@ export function useRemoteConnectionForm({
     wslUser,
     dockerContainer,
     manualDockerContainer,
+    serverUrl,
+    serverName,
+    serverToken,
+    serverWorkspacePath,
     sshConfigAliases,
     sshConfigAliasesLoading,
     sshConfigAliasesError,
@@ -359,7 +378,11 @@ export function useRemoteConnectionForm({
     setWslUser,
     setDockerContainer,
     setManualDockerContainer,
-    // Docker 容器列表是运行态数据，之前只在进入 Docker 页时拉一次。
+    setServerUrl,
+    setServerName,
+    setServerToken,
+    setServerWorkspacePath,
+    // Bugfix: Docker 容器列表是运行态数据，之前只在进入 Docker 页时拉一次。
     // 下拉每次打开都通过这个回调按需刷新，避免用户看到已过期的容器列表。
     refreshDockerContainers: () => refreshDockerContainers({ clearContainersOnError: false }),
     applySshConfigAlias,

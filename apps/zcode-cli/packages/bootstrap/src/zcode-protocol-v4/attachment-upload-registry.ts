@@ -39,7 +39,7 @@ interface CommittedUpload {
   expiresAt: number;
 }
 
-interface AttachmentUploadRegistryOptions {
+export interface AttachmentUploadRegistryOptions {
   now: () => number;
   putSessionAttachment: (
     sessionId: string,
@@ -166,7 +166,10 @@ export class AttachmentUploadRegistry {
     if (upload.receivedBytes + bytes.byteLength > upload.metadata.totalBytes) {
       throw new Error("fault.attachment.totalBytesExceeded");
     }
-    if (this.stagedBytes + bytes.byteLength > PROTOCOL_V4_LIMITS.attachmentUploadMaxStagedBytes) {
+    if (
+      this.stagedBytes + bytes.byteLength >
+      PROTOCOL_V4_LIMITS.attachmentUploadMaxStagedBytes
+    ) {
       throw new Error("fault.attachment.stagingCapacityExceeded");
     }
     upload.chunks.push(bytes);

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-v4-cold-failed-edit",
+  "spec": "./test/e2e/conversation-session/conversation-session-v4-cold-failed-edit.test.ts",
+  "fixtures": [
+    {
+      "id": "v4-cold-failed-edit-before-first-token",
+      "description": "首轮请求在任何 assistant SSE token 前返回 non-retryable 400，留下只有真实 user message 的失败 turn。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fault-stream",
+        "source": "synthetic",
+        "syntheticReason": "必须稳定制造 provider 首 token 前失败，才能验证 CLI 重启后的 cold hydration messageId 与 canEdit/command target。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_COLD_FAILED_EDIT_SOURCE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 400,
+        "statusMessage": "Bad Request",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"error\":{\"message\":\"synthetic failure before first assistant token\",\"type\":\"invalid_request_error\",\"code\":\"e2e_before_first_token\"}}"
+      }
+    },
+    {
+      "id": "v4-cold-failed-edit-rerun-success",
+      "description": "cold hydrated latest user edit 提交后的固定成功回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "用固定回复证明 edit command 命中 transcript messageId 并真正发起重跑。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_V4_COLD_FAILED_EDIT_RERUN"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "v4-cold-failed-edit-rerun-success",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "E2E_V4_COLD_FAILED_EDIT_OK"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ask-user-question-answer-visible",
+  "spec": "./test/e2e/conversation-session/conversation-session-ask-user-question-answer-visible.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-ask-user-question-answer-visible-call",
+      "description": "AskUserQuestion answer visible repro: 首轮返回单题问答工具调用。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造 AskUserQuestion 单题等待态，避免真实模型是否提问影响 UI 投影复现。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_ASK_USER_QUESTION_ANSWER_VISIBLE"],
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_ANSWER_VISIBLE",
+          "E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_tool_cross_product_ask_user_question",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION: choose an answer?",
+                "header": "E2E",
+                "options": [
+                  {
+                    "label": "Use default",
+                    "description": "Continue the e2e run with the default answer."
+                  },
+                  {
+                    "label": "Use fallback",
+                    "description": "Continue the e2e run with the fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-ask-user-question-answer-visible-final",
+      "description": "AskUserQuestion answer visible repro: 用户回答进入下一次模型请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "该响应只证明问答回答已被 agent 消费，核心断言在 UI 是否保留用户可见记录。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_ASK_USER_QUESTION_CUSTOM_ANSWER",
+          "E2E_TOOL_CROSS_PRODUCT_ASK_USER_QUESTION",
+          "toolu_e2e_tool_cross_product_ask_user_question"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "upstream-e2e-ok"
+      }
+    }
+  ]
+}

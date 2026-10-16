@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-tool-error-surface",
+  "spec": "./test/e2e/conversation-session/conversation-session-tool-error-surface.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-tool-error-surface.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "tool-error-surface-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题生成不是本 case 的产品语义，只需要稳定返回，防止标题请求误命中业务 fixture。"
+    },
+    {
+      "id": "tool-error-surface-parent-agent-tools",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "稳定制造同轮两个 Agent tool_use，其中 stale profile 在 runtime 启动 child 前失败。"
+    },
+    {
+      "id": "tool-error-surface-healthy-child-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "该响应证明 stale Agent 失败不会阻断同轮 healthy Agent child 请求。"
+    },
+    {
+      "id": "tool-error-surface-parent-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "最终回复用于证明父 continuation 看到的 failed tool_result 已经是具体 provider 根因而不是泛化 Turn failure。"
+    }
+  ]
+}

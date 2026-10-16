@@ -1,0 +1,21 @@
+node source
+node world-read#1 "glob src/**/*.ts" @6:27 type="string[]"
+node ask#1 "reviewer" @7:49 actors=actor#1 within=fan-out#1 type="string"
+node join#1 "join" @8:27 type="string[]"
+node fan-out#1 "fan-out" @8:31 type="string[]"
+node ask#2 "summarizer" @10:37 actors=actor#2 type="string"
+node sink
+actor actor#1 "reviewer" @7:31 within=fan-out#1
+actor actor#2 "summarizer" @10:17
+edge source -> world-read#1 data exact
+edge world-read#1 -> ask#1 data exact type="string[]"
+edge world-read#1 -> join#1 data exact type="string[]"
+edge world-read#1 -> fan-out#1 data exact type="string[]"
+edge world-read#1 -> ask#2 data exact type="string[]"
+edge ask#1 -> join#1 data inexact type="string"
+edge ask#1 -> ask#2 data inexact type="string"
+edge join#1 -> ask#2 data exact type="string[]"
+edge fan-out#1 -> ask#1 data exact type="string[]"
+edge fan-out#1 -> join#1 data exact type="string[]"
+edge fan-out#1 -> ask#2 data exact type="string[]"
+edge ask#2 -> sink data exact type="string"

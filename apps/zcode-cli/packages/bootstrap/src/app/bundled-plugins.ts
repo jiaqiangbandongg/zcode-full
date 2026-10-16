@@ -313,7 +313,7 @@ function resolveFilesystemSeedSource(): OfficialPluginSeedSource | undefined {
   };
 }
 
-function findMissingOfficialPluginSeedPaths(
+export function findMissingOfficialPluginSeedPaths(
   definition: Pick<OfficialPluginDefinition, "requiredSeedPaths">,
   files: ReadonlyArray<{ path: string }>,
 ): string[] {

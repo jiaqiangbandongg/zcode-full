@@ -1,13 +1,15 @@
 // ============================================================
 // 表满时腾位：谁可以让位、什么时候入座、以及被腾掉的东西怎么继续可数
 // ============================================================
-// 淘汰规则是纯函数，不读取时钟或执行 I/O。表外条目的分阶段计数由 workflow-runs-unlisted.ts 维护。
+// 住在归约主文件之外，与 workflow-runs-caps.ts / -concurrency.ts / -phases.ts / -started.ts
+// 同一个理由（主文件的 max-lines 门），也同一条纪律：纯函数、无时钟、无 I/O。格子表的加减法
+// 在同族的 workflow-runs-unlisted.ts。
 //
 // 为什么要腾位。触界的老语义是**拒新**，而读面画的是「此刻哪些子代理在跑」——于是一个宽
 // fan-out 的 run 跑过 1024 之后，新起的子代理一个都进不来，run 卡与站点花名册永远停在最早
 // 那批**已经结束**的身上，恰好把这个特性存在的理由抹掉。腾位把它反过来：终态的条目让位。
 //
-// 只淘汰终态条目还不够：一个阶段可能
+// 只腾位还不够，2026-09-20 的事故（5 × 2000 个子代理、并发 13）说的正是剩下那一半：一个阶段
 // 在头几秒里把**全部** actor-created 与**全部** node-queued 发完，头 1024 条还排着队就把两张表
 // 塞满，一条终态都没有，于是后面 976 个连人带活全被拒；调度器随后按 FIFO 派活，从第 1025 个
 // 开始每一个**正在跑**的子代理都不在表上。一个子代理变重要是在它**被派活**的那一刻，不是在
@@ -33,8 +35,8 @@ import {
 import { addToUnlistedBucket, withUnlistedBuckets } from "./workflow-runs-unlisted.js";
 
 /**
- * 归约使用的三项条目容量上限，默认使用 {@link WORKFLOW_RUNS_LIMITS}。
- * 淘汰与计数规则适用于调用方传入的上限。
+ * 归约要用到的三条条目界。本包的默认值就是 {@link WORKFLOW_RUNS_LIMITS}；单独定义成接口是为了
+ * 让测试能注入小界——1024 条要三千多条事件才撞得到，而这里的规则与界的**大小**无关。
  */
 export interface WorkflowRunEntryLimits {
   readonly maxActors: number;
@@ -61,7 +63,7 @@ interface Group extends Candidate {
   finished: boolean;
   /** 一条在跑的都没有、却还有排着队的：这个子代理在等槽位，它的活还没开始。 */
   idle: boolean;
-  /** 名下一条已列节点都没有：还没被问过，或者它的结算是不带 actor 的缓存命中。 */
+  /** 名下一条已列节点都没有：还没被问过，或者它的结算是老 journal 里不带 actor 的缓存命中。 */
   zeroNode: boolean;
 }
 
@@ -154,16 +156,20 @@ export function seatWorkflowNode(
   if (seat.eventType === "node-dispatched" && seat.actor !== null && run.truncated === true) {
     return activateInstance(run, seat.ref, seat.actor, limits);
   }
-  if (seat.eventType !== "node-queued") return { run, admitNew: byBirth, activated: false };
-  // B2：溢出过的 run 里，一条认不出主人的 queued 连位子都不该占——它画不出徽章（pill 按
-  // run.actors 过滤），而后面被派下去的活正需要那个位子。游离节点（world-read）不在此列。
+  // B2：溢出过的 run 里，一条认不出主人的**出生**连位子都不该占——它画不出徽章（pill 按
+  // run.actors 过滤），而后面被派下去的活正需要那个位子。两条出生都算：`node-queued`，以及
+  // 重发了出生事实的缓存结算。后者放进来还会**卡死**：点名了 actor 的节点不是游离节点，而组是按
+  // 已列 actor 建的，于是它哪一类受害者都不是，永远淘汰不掉。游离节点（world-read）不在此列。
   if (
+    seat.born &&
     run.truncated === true &&
     seat.actorRef !== null &&
     !run.actors.some((actor) => sameInstance(actor, seat.actorRef!))
   ) {
     return { run, admitNew: false, activated: false };
   }
+  // 出生即结算的缓存命中从不腾位（它没跑过，没有要展示的进行态）；腾位只给活的新人。
+  if (seat.eventType !== "node-queued") return { run, admitNew: byBirth, activated: false };
   return {
     run: withRoomForNode(run, seat.ref, seat.actorRef, limits),
     admitNew: byBirth,
@@ -337,8 +343,9 @@ function pickGroupVictim(
     groups.filter((group) => group.idle).at(-1) ??
     // 零节点 actor 同理取最靠后的，而且是最后一档：它没有节点、没有分数、表里也没有历史，
     // 淘汰它读者看不见任何损失，而它自己下一次被派活时会带着事实回来。少了这一档，一次
-    // resume 之后的宽 fan-out 会卡死——空表重开、前缀把 2000 个 actor 重新建出来、命中缓存的
-    // 结算又不带 actor，于是一张全是零节点 actor 的表谁都淘汰不动，此后每一次派发都被拒。
+    // resume 之后的宽 fan-out 会卡死——空表重开、前缀把 2000 个 actor 重新建出来，而它们的
+    // 第一问还没回来（老 journal 里命中缓存的结算又不带 actor），于是一张全是零节点 actor 的表
+    // 谁都淘汰不动，此后每一次派发都被拒。
     (allowZeroNode ? groups.filter((group) => group.zeroNode).at(-1) : undefined)
   );
 }
@@ -420,7 +427,7 @@ function listedGroups(run: WorkflowRunState): Group[] {
   return groups;
 }
 
-/** 游离节点：没有 actor 的已列节点（world-read）。只有已结算的才是候选。 */
+/** 游离节点：没有 actor 的已列节点（world-read，或老 journal 的缓存命中）。只有已结算的才是候选。 */
 function looseSettledNodes(run: WorkflowRunState): Candidate[] {
   const candidates: Candidate[] = [];
   run.nodes.forEach((node, index) => {

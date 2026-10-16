@@ -1,0 +1,62 @@
+{
+  "model": "<LITE_MODEL>",
+  "system": [
+    {
+      "type": "text",
+      "text": "You are selecting memories that will be useful to the coding agent as it processes a user's query. The first message lists the available memory files with their filenames and descriptions; subsequent messages each contain one user query.\n\nReturn a list of filenames for the memories that will clearly be useful to the coding agent as it processes the user's query (up to 5). Only include memories that you are certain will be helpful based on their name and description.\n- If you are unsure if a memory will be useful in processing the user's query, then do not include it in your list. Be selective and discerning.\n- If there are no memories in the list that would clearly be useful, feel free to return an empty list.\n- Be especially conservative with user-profile and project-overview memories ([user], [project]). These describe the user's ongoing focus, not what every question is about. A profile saying \"works on DB performance\" is NOT relevant to a question that merely contains the word \"performance\" unless the question is actually about that DB work. Match on what the question IS ABOUT, not on surface keyword overlap with who the user is.\n- Do not re-select memories you already returned for an earlier query in this conversation.\n",
+      "cache_control": {
+        "type": "ephemeral"
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Available memories:\n- [feedback] database-test-policy.md (<TIMESTAMP>): Database tests must use the real database rather than mocks.",
+          "cache_control": {
+            "type": "ephemeral"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Select memories relevant to:\nWhat database testing approach should I use for this repository?",
+          "cache_control": {
+            "type": "ephemeral"
+          }
+        }
+      ]
+    }
+  ],
+  "output_config": {
+    "format": {
+      "type": "json_schema",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "selected_memories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selected_knowledge_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["selected_memories"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

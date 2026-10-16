@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-turn-error-queue-preserved",
+  "spec": "./test/e2e/conversation-session/conversation-session-turn-error-queue-preserved.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-turn-error-queue-preserved.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "turn-error-queue-preserved-source-500",
+      "description": "N05：主 turn 在 queue 入队窗口后返回 500 JSON error。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "真实 provider 500 的响应时间不可控；delayMs 只用于稳定制造 running admission 窗口，验证错误终态的 queue 保留契约。"
+    },
+    {
+      "id": "turn-error-queue-preserved-followup",
+      "description": "NQ：错误后的队首输入显式继续消费成功。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "恢复路径需要固定 assistant 哨兵，证明 queue 未丢失且只在显式继续后发送。"
+    }
+  ]
+}

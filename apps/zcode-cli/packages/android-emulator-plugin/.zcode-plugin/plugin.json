@@ -1,0 +1,63 @@
+{
+  "name": "android-emulator",
+  "version": "0.1.0",
+  "description": "Provides Android development workflows and emulator automation for ZCode.",
+  "author": { "name": "Z.ai" },
+  "license": "MIT",
+  "skills": "skills",
+  "commands": "commands",
+  "mcpServers": {
+    "android-emulator": {
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "ANDROID_PLUGIN_DATA": "${ZCODE_PLUGIN_DATA}",
+        "ANDROID_PLUGIN_SDK_PATH": "${user_config.sdk_path}",
+        "ANDROID_PLUGIN_DEFAULT_AVD": "${user_config.default_avd}",
+        "ANDROID_PLUGIN_API_LEVEL": "${user_config.api_level}",
+        "ANDROID_PLUGIN_BUILD_TOOLS_VERSION": "${user_config.build_tools_version}",
+        "ANDROID_PLUGIN_SYSTEM_IMAGE_VARIANT": "${user_config.system_image_variant}",
+        "ANDROID_PLUGIN_SYSTEM_IMAGE_ABI": "${user_config.system_image_abi}",
+        "ANDROID_PLUGIN_JDK_MAJOR": "${user_config.jdk_major}"
+      }
+    }
+  },
+  "userConfig": {
+    "sdk_path": {
+      "type": "string",
+      "default": "",
+      "description": "Optional Android SDK root directory. When empty, falls back to ANDROID_HOME, ANDROID_SDK_ROOT, or common system paths."
+    },
+    "default_avd": {
+      "type": "string",
+      "default": "medium_phone",
+      "description": "Preferred AVD or device name."
+    },
+    "api_level": {
+      "type": "string",
+      "default": "35",
+      "description": "Android API level used when generating projects, installing SDK packages, and selecting the default system image."
+    },
+    "build_tools_version": {
+      "type": "string",
+      "default": "35.0.0",
+      "description": "Android SDK build-tools version used in installation guidance."
+    },
+    "system_image_variant": {
+      "type": "string",
+      "default": "default",
+      "description": "Android system image variant: default, google_apis, or google_apis_playstore."
+    },
+    "system_image_abi": {
+      "type": "string",
+      "default": "",
+      "description": "Optional Android system image ABI override. When empty, Apple Silicon/ARM64 hosts use arm64-v8a and other hosts use x86_64."
+    },
+    "jdk_major": {
+      "type": "string",
+      "default": "17",
+      "description": "JDK major version used for preflight checks and installation guidance."
+    }
+  }
+}
