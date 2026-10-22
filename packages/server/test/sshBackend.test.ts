@@ -358,30 +358,24 @@ describe("SSHBackend", () => {
       password: "secret",
     });
 
+    const executedCommands: string[] = [];
+    const rawProbeCommand =
+      "printf 'platform='; uname -s; printf 'arch='; uname -m; printf 'kernel='; " +
+      "if [ -r /proc/sys/kernel/ostype ]; then cat /proc/sys/kernel/ostype; else printf '\\n'; fi";
     const fakeClient = {
       exec: (
         command: string,
         callback: (error: Error | null, channel: FakeExecChannel) => void,
       ) => {
+        executedCommands.push(command);
+        expectSSHExecCommand(command, rawProbeCommand);
         const channel = new FakeExecChannel();
         callback(null, channel);
-
-        if (command === `/bin/sh -c ${quotePosixShellArgForTest("uname -s")}`) {
-          emitExecResult(channel, {
-            stdout: "Darwin\n",
-            exitCode: 0,
-            exitBeforeData: true,
-          });
-          return;
-        }
-        if (command === `/bin/sh -c ${quotePosixShellArgForTest("uname -m")}`) {
-          emitExecResult(channel, {
-            stdout: "arm64\n",
-            exitCode: 0,
-          });
-          return;
-        }
-        emitExecResult(channel, { stdout: "", exitCode: 0 });
+        emitExecResult(channel, {
+          stdout: "platform=Darwin\narch=arm64\nkernel=\n",
+          exitCode: 0,
+          exitBeforeData: true,
+        });
       },
     };
 
@@ -396,6 +390,7 @@ describe("SSHBackend", () => {
       platform: "darwin",
       arch: "arm64",
     });
+    expect(executedCommands).toHaveLength(1);
   });
 
   it("exec 成功完成时不应输出无意义的完成日志", async () => {

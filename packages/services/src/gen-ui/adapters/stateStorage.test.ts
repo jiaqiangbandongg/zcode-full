@@ -50,7 +50,7 @@ describe("desktop Gen UI state persistence", () => {
     await second.set(target, { modelContent: { year: 2026 }, privateContent: null });
     expect(await first.get(target)).toEqual({ modelContent: { year: 2026 }, privateContent: null });
   });
-  it("broadcasts external writes without echo loops", async () => {
+  it("delivers external writes through native filesystem watchers", async () => {
     const root = await mkdtemp(join(tmpdir(), "gen-ui-state-"));
     cleanup.push(() => rm(root, { recursive: true, force: true }));
     const a = createGenUiStateStorage(root),

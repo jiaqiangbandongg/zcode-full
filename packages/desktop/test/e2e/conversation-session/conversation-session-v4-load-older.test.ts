@@ -6,7 +6,7 @@
 // ③ prepend 锚定不跳：补页前视口首行在补页后仍停留在视口附近（不弹回顶部/底部）。
 // 合并/游标语义的完整覆盖在 L1（v4SessionDataLayer.test.ts loadOlder 组 +
 // bootstrap conversation-topic-publisher rows/range 黄金组）。
-import { TID_V4_TIMELINE, TID_V4_TIMELINE_LOAD_OLDER } from "@zcode/shared";
+import { TID_V4_TIMELINE, TID_V4_TIMELINE_LOAD_OLDER } from "@zcode/shared/test-ids";
 import { clearAppData } from "../helpers/desktop-app.js";
 import {
   getV4PaneSnapshot,

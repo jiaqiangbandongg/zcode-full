@@ -10,6 +10,60 @@ export function registerProviderPresentationCases(getEnvironment) {
     [390, "zh-CN", "light"],
     [1200, "en-US", "dark"],
   ]) {
+    test(`mimo templates ${width}/${locale}`, async () => {
+      const { browser, origin, artifacts } = getEnvironment();
+      const page = await browser.newPage({ viewport: { width, height: 1000 } });
+      const mutations = [],
+        errors = [];
+      page.on("pageerror", (error) => errors.push(String(error)));
+      await page.route("**/mutation", async (route) => {
+        mutations.push(route.request().postDataJSON());
+        await route.fulfill({ status: 200, body: "{}" });
+      });
+      try {
+        for (const [id, label, url] of [
+          ["xiaomi-mimo", "Xiaomi MiMo API", "https://api.xiaomimimo.com/anthropic"],
+          [
+            "xiaomi-mimo-token-plan",
+            "Xiaomi MiMo Token Plan",
+            "https://token-plan-cn.xiaomimimo.com/anthropic",
+          ],
+        ]) {
+          await page.goto(`${origin}fixture?${new URLSearchParams({ locale, theme })}`);
+          const card = page.getByTestId(`model-provider-template-item-${id}`);
+          await card.waitFor();
+          assert.equal((await card.innerText()).trim(), label);
+          await card.locator("img").evaluate((image) => image.decode());
+          assert.match(await card.locator("img").getAttribute("src"), /mimo/i);
+          await card.hover();
+          await page
+            .getByRole("tooltip")
+            .filter({ hasText: new RegExp(`^${label}$`) })
+            .waitFor();
+          await page.keyboard.press("Escape");
+          await mkdir(artifacts, { recursive: true });
+          await page.screenshot({ path: join(artifacts, `mimo-templates-${width}.png`) });
+          const count = mutations.length;
+          await card.click();
+          await page.locator(`input[value="${url}"]`).waitFor();
+          assert.equal(mutations.length, count + 1);
+          assert.deepEqual(mutations.at(-1), { action: "create", payload: id });
+          assert.equal(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+            true,
+          );
+          await mkdir(artifacts, { recursive: true });
+          await page.screenshot({ path: join(artifacts, `mimo-${id}-${width}.png`) });
+        }
+        assert.deepEqual(mutations, [
+          { action: "create", payload: "xiaomi-mimo" },
+          { action: "create", payload: "xiaomi-mimo-token-plan" },
+        ]);
+        assert.deepEqual(errors, []);
+      } finally {
+        await page.close();
+      }
+    });
     test(`openrouter template label ${width}/${locale}`, async () => {
       const { browser, origin, artifacts } = getEnvironment();
       const page = await browser.newPage({ viewport: { width, height: 1000 } });

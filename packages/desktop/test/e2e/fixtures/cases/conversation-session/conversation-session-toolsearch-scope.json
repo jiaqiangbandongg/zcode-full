@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-scope",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-scope.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-toolsearch-scope.json"
+  ],
+  "fileFixtures": ["./test/e2e/fixtures/mcp/toolsearch-server.mjs"],
+  "providerHarness": "./test/e2e/helpers/toolsearch-cli-process.ts",
+  "requests": [
+    {
+      "id": "conversation-session-toolsearch-scope-scope-searches",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-scope-scope-lookup",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-scope-scope-blocked",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-scope-scope-agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-scope-child-search",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-scope-scope-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    }
+  ],
+  "notes": "Case-local responses are consumed by the controlled HTTP harness. Stage selection and cancellation remain in the spec; tools, persistence and provider projection use production paths. Not admitted to Docker."
+}

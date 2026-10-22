@@ -30,4 +30,23 @@ describe("host transferred MessagePort rejection cleanup", () => {
     expect(rejectUnavailableAttachedServicePort(readyPort, true)).toBe(false);
     expect(readyPort.close).not.toHaveBeenCalled();
   });
+
+  it("application-locale-changed 只接受合法界面语言", async () => {
+    const { parseHostIncomingMessageEvent } = await import("../src/host/hostMessagePortGuard.js");
+
+    const valid = parseHostIncomingMessageEvent({
+      data: { type: "application-locale-changed", locale: "zh-CN" },
+      ports: [],
+    });
+    expect(valid.success && valid.data).toEqual({
+      type: "application-locale-changed",
+      locale: "zh-CN",
+    });
+    expect(
+      parseHostIncomingMessageEvent({
+        data: { type: "application-locale-changed", locale: "fr-FR" },
+        ports: [],
+      }).success,
+    ).toBe(false);
+  });
 });

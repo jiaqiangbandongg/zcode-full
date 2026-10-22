@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-disconnect-experience",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-disconnect-experience.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-disconnect-experience.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "RDUX-08 只验证未提交草稿、断开、重连与目录意图；不发送模型请求。",
+  "requests": []
+}

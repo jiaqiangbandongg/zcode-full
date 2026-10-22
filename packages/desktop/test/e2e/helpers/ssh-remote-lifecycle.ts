@@ -1,31 +1,40 @@
 /* eslint-disable max-lines -- SSH lifecycle case 共用 setup/teardown、身份与故障辅助逻辑，集中维护以保持同一安全边界。 */
 import {
-  TID_SETTINGS_BACK_BUTTON,
-  TID_TASK_ITEM,
-  TID_WORKSPACE_CLOSE,
-  TID_WORKSPACE_ITEM,
-  buildRemoteWorkspaceIdentity,
-  testId,
-  type RemoteTarget,
-} from "@zcode/shared";
+  clickRemoteHostConnect,
+  projectSectionSelector,
+  waitForProjectRowGone,
+  waitForTaskRowInProject,
+} from "./project-sidebar.js";
+import { removeRemoteProjectEntryForRow } from "./remote-project-handoff-probe.js";
+import { TID_TASK_SETTINGS_BUTTON } from "@zcode/shared/test-ids";
 import {
-  clickTestIdByDom,
   waitForWorkspaceApp,
+  switchToWorkspaceRendererWindow,
+  waitForTestIdByDom,
 } from "./desktop-app.js";
-import { createCustomOpenAIChatCompletionsProvider } from "./custom-openai-provider.js";
-import { selectUpstreamProviderModelById } from "./upstream-provider.js";
 import {
+  seedCustomOpenAIChatCompletionsProvider,
+  refreshSeededOpenAIProvidersThroughSettings,
+  seedCustomAnthropicMessagesProvider,
+} from "./custom-openai-provider.js";
+import {
+  selectUpstreamProviderModelById,
+  selectUpstreamThoughtLevelValue,
+} from "./upstream-provider.js";
+import {
+  getUpstreamRequestEvidence,
   getUpstreamRequestRecordCount,
   waitForUpstreamRequest,
 } from "./conversation-session-network.js";
 import {
   prepareV4ConversationE2E,
+  getV4Messages,
   selectV4TaskById,
   sendV4PromptAndWaitAccepted,
-  startNewV4Draft,
   waitForV4AssistantMessageContaining,
   waitForV4ConversationState,
 } from "./v4-conversation.js";
+import { hasAssistantReplyForUserTurn } from "./conversation-turn-evidence.js";
 import {
   clickLastEnabledSSHDialogButton,
   createSSHReplayTunnel,
@@ -36,8 +45,8 @@ import {
   readSSHRuntimeConfig,
   runSSHCommand,
   selectSSHRemoteDirectory,
+  ensureSSHProjectDirectoryStep,
   waitForRemoteTab,
-  waitForSSHDirectoryStep,
   type ReplayTunnel,
   type SSHConnectionConfig,
   type SSHRuntimeConfig,
@@ -45,7 +54,10 @@ import {
 } from "./ssh-remote-p0.js";
 
 export const SSH_LIFECYCLE_MODEL_ID = "e2e-ssh-remote-lifecycle-model";
+/** lifecycle 自定义模型暴露思考档位选择器，回放 fixture 按不思考录制。 */
+export const SSH_LIFECYCLE_THOUGHT_LEVEL = "disabled";
 export const SSH_LIFECYCLE_TURN_TIMEOUT_MS = 2 * 60_000;
+let followTurnSequence = 0;
 
 export interface SSHLifecycleTask {
   firstPrompt: string;
@@ -65,20 +77,42 @@ export interface SSHLifecycleProvider {
   tunnel: ReplayTunnel;
 }
 
+export interface SSHLifecycleProviderOptions {
+  apiType?: "openai-chat-completions" | "anthropic-messages";
+  tunnelUsername?: string;
+}
+
 export async function createSSHLifecycleProvider(
   config: SSHConnectionConfig,
   caseMarker: string,
+  options: SSHLifecycleProviderOptions = {},
 ): Promise<SSHLifecycleProvider> {
-  const tunnel = await createSSHReplayTunnel(config, caseMarker);
+  const tunnel = await createSSHReplayTunnel(
+    config,
+    caseMarker,
+    options.tunnelUsername ? { username: options.tunnelUsername } : {},
+  );
+
   try {
-    const provider = await createCustomOpenAIChatCompletionsProvider({
-      baseURL: tunnel.baseURL,
-      modelId: SSH_LIFECYCLE_MODEL_ID,
-      providerName: `SSH remote lifecycle ${Date.now()}`,
-    });
-    await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON, {
-      timeout: 30_000,
-      timeoutMsg: `${caseMarker}: provider 创建后设置页没有返回入口`,
+    const provider =
+      options.apiType === "anthropic-messages"
+        ? await seedCustomAnthropicMessagesProvider({
+            baseURL: `${tunnel.baseURL}/anthropic`,
+            modelId: SSH_LIFECYCLE_MODEL_ID,
+            providerId: `e2e-ssh-remote-lifecycle-${Date.now()}`,
+            providerName: `SSH remote lifecycle ${Date.now()}`,
+          })
+        : await seedCustomOpenAIChatCompletionsProvider({
+            baseURL: tunnel.baseURL,
+            modelId: SSH_LIFECYCLE_MODEL_ID,
+            providerId: `e2e-ssh-remote-lifecycle-${Date.now()}`,
+            providerName: `SSH remote lifecycle ${Date.now()}`,
+          });
+    // 这里只准备本机模型；用例继续通过真实连接验证远端 Provisioning。
+    // 显式刷新 Registry，避免依赖文件轮询延迟或重复测试设置页的新增表单。
+    const beforeRefresh = await readRemoteTabSnapshot();
+    await refreshSeededOpenAIProvidersThroughSettings([provider.name], {
+      workspacePath: beforeRefresh.activeWorkspacePath,
     });
     return { ...provider, tunnel };
   } catch (error) {
@@ -94,37 +128,26 @@ export async function connectSSHWorkspaceAndSendFirstTurn(options: {
   label: "A" | "B";
   workspacePath: string;
 }): Promise<SSHLifecycleTask> {
-  const target: RemoteTarget = {
-    kind: "ssh",
-    host: options.config.host,
-    port: options.config.port,
-    username: options.config.username,
-  };
-  const identity = buildRemoteWorkspaceIdentity(options.workspacePath, target);
-
-  await startNewV4Draft();
+  // 全局连接入口不依赖空草稿；避免为准备 SSH 额外创建本地目录和触发 workspace 切换。
   await openSSHRemoteDialog(options.caseMarker);
   await fillSSHPasswordSettings(options.config);
   await clickLastEnabledSSHDialogButton(options.caseMarker);
-  await waitForSSHDirectoryStep(options.caseMarker);
+  await ensureSSHProjectDirectoryStep(options.config, options.caseMarker);
   await selectSSHRemoteDirectory(options.workspacePath, options.caseMarker);
-  await waitForWorkspaceApp(
-    options.workspacePath,
-    SSH_WORKSPACE_READY_TIMEOUT_MS,
-  );
+  await waitForWorkspaceApp(options.workspacePath, SSH_WORKSPACE_READY_TIMEOUT_MS);
 
   const tab = await waitForRemoteTab({
     caseMarker: options.caseMarker,
-    expectedIdentity: identity,
     expectedPath: options.workspacePath,
   });
   expect(tab.remoteKind).toBe("ssh");
   expect(tab.remoteHost).toBe(options.config.host);
   expect(tab.secretPersistedInTab).toBe(false);
   if (!tab.remoteSessionId) {
-    throw new Error(
-      `${options.caseMarker}: workspace ${options.label} 缺少 remoteSessionId`,
-    );
+    throw new Error(`${options.caseMarker}: workspace ${options.label} 缺少 remoteSessionId`);
+  }
+  if (!tab.workspaceIdentity) {
+    throw new Error(`${options.caseMarker}: workspace ${options.label} 缺少稳定 workspaceIdentity`);
   }
 
   await selectUpstreamProviderModelById(SSH_LIFECYCLE_MODEL_ID, {
@@ -132,7 +155,14 @@ export async function connectSSHWorkspaceAndSendFirstTurn(options: {
     providerId: options.provider.id,
     providerName: options.provider.name,
   });
-  await startNewV4Draft();
+  // Bug 原因：产品要求切换到新模型后由用户显式选择思考档位，未选时发送键保持禁用；
+  // 09-09 恢复 helper 时丢掉了这一步，首发在 sendV4Prompt 处等待发送键超时。
+  await selectUpstreamThoughtLevelValue(SSH_LIFECYCLE_THOUGHT_LEVEL);
+  // 根因：项目创建已打开远端草稿，再点全局“新建任务”会切到本地未分类目录并重置模型，
+  // 甚至让回放通过掩盖错误执行归属。复用项目草稿，并在发送前核对权威 workspace identity。
+  const draft = await readRemoteTabSnapshot(tab.workspaceIdentity, options.workspacePath);
+  expect(draft.activeWorkspaceIdentity).toBe(tab.workspaceIdentity);
+  expect(draft.activeWorkspacePath).toBe(options.workspacePath);
 
   // fixture contract 使用稳定的 case/label 标记；run 身份已由 E2E profile 隔离。
   const marker = options.caseMarker.startsWith("E2E_")
@@ -153,17 +183,15 @@ export async function connectSSHWorkspaceAndSendFirstTurn(options: {
     task.firstPrompt,
     `${options.caseMarker}: workspace ${options.label} 首发没有被接受`,
   );
+  // 首回合只是准备历史。快速 replay 可以在 DOM 接受屏障之前已完成；业务 running 窗口
+  // 由各 case 的 controlled-stream 单独验证，不能要求探针命中一个已经过去的瞬态。
   const running = await waitForV4ConversationState(
-    (snapshot) =>
-      Boolean(snapshot.taskId && snapshot.taskId !== "draft") &&
-      snapshot.state === "streaming",
-    `${options.caseMarker}: workspace ${options.label} 首发没有进入 streaming`,
+    (snapshot) => Boolean(snapshot.taskId && snapshot.taskId !== "draft"),
+    `${options.caseMarker}: workspace ${options.label} 首发没有建立会话`,
     SSH_LIFECYCLE_TURN_TIMEOUT_MS,
   );
   if (!running.taskId) {
-    throw new Error(
-      `${options.caseMarker}: workspace ${options.label} 首发没有 taskId`,
-    );
+    throw new Error(`${options.caseMarker}: workspace ${options.label} 首发没有 taskId`);
   }
 
   await waitForUpstreamRequest(
@@ -172,22 +200,17 @@ export async function connectSSHWorkspaceAndSendFirstTurn(options: {
     SSH_LIFECYCLE_TURN_TIMEOUT_MS,
     { afterIndex: requestStart - 1 },
   );
-  await waitForV4AssistantMessageContaining(
-    task.firstReply,
-    SSH_LIFECYCLE_TURN_TIMEOUT_MS,
-  );
+  await waitForV4AssistantMessageContaining(task.firstReply, SSH_LIFECYCLE_TURN_TIMEOUT_MS);
   await waitForV4ConversationState(
     (snapshot) =>
-      snapshot.taskId === running.taskId &&
-      snapshot.state === "idle" &&
-      snapshot.queueCount === 0,
+      snapshot.taskId === running.taskId && snapshot.state === "idle" && snapshot.queueCount === 0,
     `${options.caseMarker}: workspace ${options.label} 首发没有回到 idle`,
     SSH_LIFECYCLE_TURN_TIMEOUT_MS,
   );
 
   return {
     ...task,
-    identity,
+    identity: tab.workspaceIdentity,
     label: options.label,
     remoteSessionId: tab.remoteSessionId,
     taskId: running.taskId,
@@ -208,179 +231,220 @@ export async function sendSSHFollowTurn(
     expectedRemoteSessionId: task.remoteSessionId,
   });
   const requestStart = await getUpstreamRequestRecordCount();
+  // 稳定 fixture 前缀保留；同一 worker 内给每次续发独立标记，避免历史回复满足等待。
+  const followMarker = `${task.followPrompt}:turn-${++followTurnSequence}:`;
+  const requestQuery = {
+    excludes: ["CRITICAL: Respond with TEXT ONLY", ...(foreignPrompt ? [foreignPrompt] : [])],
+    includes: [task.firstPrompt],
+    lastUserMessageIncludes: [followMarker],
+  };
   await sendV4PromptAndWaitAccepted(
-    `${task.followPrompt}: 只回复 ${task.followReply}`,
-    task.followPrompt,
+    `${followMarker} 只回复 ${task.followReply}`,
+    followMarker,
     `${caseMarker}: workspace ${task.label} 续发没有被接受`,
   );
   await waitForUpstreamRequest(
-    {
-      ...(foreignPrompt ? { excludes: [foreignPrompt] } : {}),
-      includes: [task.firstPrompt],
-      lastUserMessageIncludes: [task.followPrompt],
-    },
+    requestQuery,
     `${caseMarker}: workspace ${task.label} 续发历史或目标 workspace 错误`,
     SSH_LIFECYCLE_TURN_TIMEOUT_MS,
     { afterIndex: requestStart - 1 },
   );
-  await waitForV4AssistantMessageContaining(
-    task.followReply,
-    SSH_LIFECYCLE_TURN_TIMEOUT_MS,
+  await browser.waitUntil(
+    async () => hasAssistantReplyForUserTurn(await getV4Messages(), followMarker, task.followReply),
+    {
+      timeout: SSH_LIFECYCLE_TURN_TIMEOUT_MS,
+      timeoutMsg: `${caseMarker}: workspace ${task.label} 本次续发没有新 assistant 回复`,
+    },
   );
   await waitForV4ConversationState(
     (snapshot) =>
-      snapshot.taskId === task.taskId &&
-      snapshot.state === "idle" &&
-      snapshot.queueCount === 0,
+      snapshot.taskId === task.taskId && snapshot.state === "idle" && snapshot.queueCount === 0,
     `${caseMarker}: workspace ${task.label} 续发没有回到 idle`,
     SSH_LIFECYCLE_TURN_TIMEOUT_MS,
   );
-}
-
-export async function reconnectSSHWorkspaceThroughUI(options: {
-  caseMarker: string;
-  config: SSHConnectionConfig;
-  workspacePath: string;
-}): Promise<{
-  remoteSessionId: string;
-  identity: string;
-}> {
-  const identity = buildSSHIdentity(options.config, options.workspacePath);
-  await startNewV4Draft();
-  await openSSHRemoteDialog(options.caseMarker);
-  await fillSSHPasswordSettings(options.config);
-  await clickLastEnabledSSHDialogButton(options.caseMarker);
-  await waitForSSHDirectoryStep(options.caseMarker);
-  await selectSSHRemoteDirectory(options.workspacePath, options.caseMarker);
-  await waitForWorkspaceApp(
-    options.workspacePath,
-    SSH_WORKSPACE_READY_TIMEOUT_MS,
+  await browser.waitUntil(
+    async () => {
+      const requests = await getUpstreamRequestEvidence(requestQuery, {
+        afterIndex: requestStart - 1,
+      });
+      return (
+        requests.length === 1 &&
+        requests[0]!.status === "complete" &&
+        requests[0]!.statusCode === 200
+      );
+    },
+    {
+      timeout: 15_000,
+      timeoutMsg: `${caseMarker}: workspace ${task.label} 续发不是一次完整成功的模型请求`,
+    },
   );
-  const tab = await waitForRemoteTab({
-    caseMarker: options.caseMarker,
-    expectedIdentity: identity,
-    expectedPath: options.workspacePath,
-  });
-  if (!tab.remoteSessionId) {
-    throw new Error(`${options.caseMarker}: 重连后缺少 remoteSessionId`);
-  }
-  expect(tab.remoteKind).toBe("ssh");
-  expect(tab.remoteHost).toBe(options.config.host);
-  expect(tab.secretPersistedInTab).toBe(false);
-  return { identity, remoteSessionId: tab.remoteSessionId };
 }
 
-export async function removeSSHWorkspace(
+/**
+ * 从本机侧栏移除远端项目入口。对应旧「移除 SSH workspace」：
+ * 虚拟项目下远端组织态留在远端，本机只移除入口与缓存，不触发远端删除。
+ * 在线项目菜单不再提供该动作，这里直接调用本机入口服务。
+ */
+export async function removeRemoteProjectEntry(
   workspacePath: string,
   caseMarker: string,
 ): Promise<void> {
-  const workspaceItemId = testId(TID_WORKSPACE_ITEM, workspacePath);
-  await browser.waitUntil(
-    async () =>
-      browser.execute((itemId) => {
-        const item = Array.from(
-          document.querySelectorAll<HTMLElement>("[data-testid]"),
-        ).find((candidate) => candidate.dataset.testid === itemId);
-        if (!item) return false;
-        const moreButton = Array.from(
-          item.closest("li")?.querySelectorAll<HTMLButtonElement>("button") ??
-            [],
-        ).find((button) => {
-          const label = (button.getAttribute("aria-label") ?? "").toLowerCase();
-          return label.includes("more") || label.includes("更多");
-        });
-        if (!moreButton) return false;
-        moreButton.click();
-        return true;
-      }, workspaceItemId),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${caseMarker}: workspace ${workspacePath} 没有显示更多菜单入口`,
-    },
-  );
-  await clickTestIdByDom(testId(TID_WORKSPACE_CLOSE, workspacePath), {
-    timeout: 15_000,
-    timeoutMsg: `${caseMarker}: workspace ${workspacePath} 没有显示移除入口`,
+  await removeRemoteProjectEntryForRow(projectSectionSelector(workspacePath));
+  await waitForProjectRowGone(workspacePath, {
+    timeout: 30_000,
+    timeoutMsg: `${caseMarker}: 远端项目 ${workspacePath} 移除后仍在侧栏`,
   });
-  await browser.waitUntil(
-    () =>
-      browser.execute((itemId) => {
-        const item = Array.from(
-          document.querySelectorAll<HTMLElement>("[data-testid]"),
-        ).find((candidate) => candidate.dataset.testid === itemId);
-        return !item;
-      }, workspaceItemId),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${caseMarker}: workspace ${workspacePath} 移除后仍在侧栏`,
-    },
-  );
+}
+
+export type RemoteWorkspaceFaultOutcome = "retained-disconnected" | "self-healed";
+
+export async function waitForRemoteWorkspaceFaultSettled(
+  identity: string,
+  caseMarker: string,
+  staleSessionId: string | null,
+  probeContext?: () => Promise<unknown>,
+): Promise<RemoteWorkspaceFaultOutcome> {
+  // 远端 server 挂掉后有两条都合法的路径：停在 disconnected 保留态等用户点重连，
+  // 或者产品自己拉起新 server、换成新的 remoteSessionId。服务器上实测走的是后者
+  // （现场 sessionsBeforeFault.A=9effdcc2…，超时时读到 9dcde31a…，远端 status.json
+  // 已是新 pid + state:"ready"）。只认前者会把自愈误判成"没有进入断开态"。
+  // 这条判定真正要守的是：故障之后绝不能继续沿用故障前的 session。
+  let outcome: RemoteWorkspaceFaultOutcome | null = null;
+  let lastProbe: unknown = "not-probed";
+  await browser
+    .waitUntil(
+      async () => {
+        try {
+          const snapshot = await readRemoteTabSnapshot(identity);
+          lastProbe = {
+            workspaceIdentity: snapshot.workspaceIdentity,
+            remoteSessionId: snapshot.remoteSessionId,
+          };
+          if (snapshot.workspaceIdentity !== identity) return false;
+          if (snapshot.remoteSessionId === null) {
+            outcome = "retained-disconnected";
+            return true;
+          }
+          if (staleSessionId !== null && snapshot.remoteSessionId !== staleSessionId) {
+            outcome = "self-healed";
+            return true;
+          }
+          return false;
+        } catch (error) {
+          lastProbe = { error: error instanceof Error ? error.message : String(error) };
+          return false;
+        }
+      },
+      { timeout: SSH_WORKSPACE_READY_TIMEOUT_MS },
+    )
+    .catch(async (error: unknown) => {
+      const context = probeContext
+        ? await probeContext().catch((probeError: unknown) => ({
+            probeError: probeError instanceof Error ? probeError.message : String(probeError),
+          }))
+        : null;
+      throw new Error(
+        `${caseMarker}: 远端 server 故障后既没有进入 disconnected 保留态、也没有换成新 session（stale=${staleSessionId ?? "unknown"}）；现场: ${JSON.stringify(lastProbe)}；补充: ${JSON.stringify(context)}`,
+        { cause: error },
+      );
+    });
+  if (outcome === null) {
+    throw new Error(`${caseMarker}: 故障处理结果未判定`);
+  }
+  return outcome;
 }
 
 export async function waitForRemoteWorkspaceDisconnected(
   identity: string,
   caseMarker: string,
+  // 超时后再取一次的补充事实（远端此刻还有没有 server 进程、故障前的 sessionId 是多少）。
+  // 只有对比 sessionId 才能区分"产品没检测到断链"和"产品已经自愈重连（换了新 session）"。
+  probeContext?: () => Promise<unknown>,
 ): Promise<void> {
-  await browser.waitUntil(
-    async () => {
-      try {
-        const snapshot = await readRemoteTabSnapshot(identity);
-        return (
-          snapshot.workspaceIdentity === identity &&
-          snapshot.remoteSessionId === null
-        );
-      } catch {
-        return false;
-      }
-    },
-    {
-      timeout: SSH_WORKSPACE_READY_TIMEOUT_MS,
-      timeoutMsg: `${caseMarker}: remote workspace 没有进入 disconnected 保留态`,
-    },
-  );
+  // 现场事实：这条判定把 readRemoteTabSnapshot 的异常整个吞掉，超时后无法区分
+  // 「tab 还在但 remoteSessionId 没清空」（产品没检测到断链）和「tab 直接消失了」
+  // （保留态本身没实现）。记录最后一次探测结果再抛。
+  let lastProbe: unknown = "not-probed";
+  await browser
+    .waitUntil(
+      async () => {
+        try {
+          const snapshot = await readRemoteTabSnapshot(identity);
+          lastProbe = {
+            workspaceIdentity: snapshot.workspaceIdentity,
+            remoteSessionId: snapshot.remoteSessionId,
+          };
+          return snapshot.workspaceIdentity === identity && snapshot.remoteSessionId === null;
+        } catch (error) {
+          lastProbe = { error: error instanceof Error ? error.message : String(error) };
+          return false;
+        }
+      },
+      { timeout: SSH_WORKSPACE_READY_TIMEOUT_MS },
+    )
+    .catch(async (error: unknown) => {
+      const context = probeContext
+        ? await probeContext().catch((probeError: unknown) => ({
+            probeError: probeError instanceof Error ? probeError.message : String(probeError),
+          }))
+        : null;
+      throw new Error(
+        `${caseMarker}: remote workspace 没有进入 disconnected 保留态（expected identity=${identity}）；现场: ${JSON.stringify(lastProbe)}；补充: ${JSON.stringify(context)}`,
+        { cause: error },
+      );
+    });
 }
 
-export async function reconnectSSHWorkspace(
+/** 点击远端项目所属 host 分组的连接按钮；对应旧「重连 SSH workspace」。 */
+export async function reconnectRemoteProjectHost(
   workspacePath: string,
   caseMarker: string,
 ): Promise<void> {
-  const workspaceItemId = testId(TID_WORKSPACE_ITEM, workspacePath);
-  await browser.waitUntil(
-    async () =>
-      browser.execute((itemId) => {
-        const item = Array.from(
-          document.querySelectorAll<HTMLElement>("[data-testid]"),
-        ).find((candidate) => candidate.dataset.testid === itemId);
-        const button = Array.from(
-          item?.closest("li")?.querySelectorAll<HTMLButtonElement>("button") ??
-            [],
-        ).find((candidate) => {
-          const label = (candidate.getAttribute("aria-label") ?? "").toLowerCase();
-          return label.includes("reconnect") || label.includes("重新连接");
-        });
-        if (!button || button.disabled) return false;
-        button.click();
-        return true;
-      }, workspaceItemId),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${caseMarker}: workspace ${workspacePath} 没有显示可用的重连按钮`,
-    },
-  );
+  await clickRemoteHostConnect(workspacePath, {
+    timeout: 30_000,
+    timeoutMsg: `${caseMarker}: 远端项目 ${workspacePath} 没有显示可用的重连按钮`,
+  });
 }
 
-export async function listRemoteZCodeServerPids(
-  config: SSHConnectionConfig,
-): Promise<number[]> {
+export async function listRemoteZCodeServerPids(config: SSHConnectionConfig): Promise<number[]> {
   const result = await runSSHCommand(config, "ps -eo pid=,args=");
   if (result.code !== 0) {
     throw new Error(`读取远端 zcode-server PID 失败: ${result.stderr}`);
   }
+  // 缺陷原因：这里原先匹配 `zcode-server.cjs`，而 3.12 的 release 布局早已把 daemon 换成
+  // <release>/runtime/server-cli.js serve --supervisor（工作进程是 server-core.js）。旧名字
+  // 在远端根本不存在，匹配结果恒为空数组，SSH-P0-LIFE-02 只会报 before=/current= 全空，
+  // 看不出是探测失效而不是产品没起 server（2026-09-15 服务器全量实测）。
+  // 只认 daemon 一个角色：core 由 daemon 拉起，若一并计入，「一次连接新增恰好一个」的
+  // 合同就不成立了。
   return result.stdout
     .split("\n")
     .flatMap((line) => {
-      const match = line.match(/^\s*(\d+)\s+.*(?:^|\s)zcode-server\.cjs(?:\s|$)/u);
+      const match = line.match(/^\s*(\d+)\s+.*server-cli\.js\s+serve\b/u);
       return match ? [Number.parseInt(match[1]!, 10)] : [];
+    })
+    .filter((pid) => Number.isSafeInteger(pid) && pid > 0);
+}
+
+// daemon 拉起的工作进程（server-core.js）。故障注入要连它一起停，否则 daemon 死了、
+// core 还在服务已建立的会话，UI 根本不会进入断开态。
+async function listRemoteServerCorePids(
+  config: SSHConnectionConfig,
+  parentPid?: number,
+): Promise<number[]> {
+  const result = await runSSHCommand(config, "ps -eo pid=,ppid=,args=");
+  if (result.code !== 0) {
+    throw new Error(`读取远端 zcode server core PID 失败: ${result.stderr}`);
+  }
+  return result.stdout
+    .split("\n")
+    .flatMap((line) => {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+.*server-core\.js\b/u);
+      if (!match) return [];
+      const pid = Number.parseInt(match[1]!, 10);
+      const ppid = Number.parseInt(match[2]!, 10);
+      if (parentPid !== undefined && ppid !== parentPid) return [];
+      return [pid];
     })
     .filter((pid) => Number.isSafeInteger(pid) && pid > 0);
 }
@@ -398,89 +462,58 @@ export async function stopOwnedSSHServer(
     );
   }
   const pid = owned[0]!;
+  // 缺陷原因：daemon 是 server-cli.js serve --supervisor，真正服务会话的是它拉起的
+  // server-core.js。只 TERM daemon 时 core 继续服务已建立的会话，UI 不会进入断开保留态
+  // （实测现场 remoteSessionId 始终是有效 id）。顺序必须是先停 daemon——它的职责就是把
+  // 崩掉的 core 拉回来——再停 core，最后等两者都退出。
+  const corePids = await listRemoteServerCorePids(config, pid);
   const result = await runSSHCommand(config, `kill -TERM -- ${pid}`);
   if (result.code !== 0) {
     throw new Error(`${caseMarker}: 终止远端 zcode-server ${pid} 失败: ${result.stderr}`);
   }
+  if (corePids.length > 0) {
+    await runSSHCommand(config, `kill -TERM -- ${corePids.join(" ")}`).catch(() => undefined);
+  }
   await browser.waitUntil(
-    async () => !(await listRemoteZCodeServerPids(config)).includes(pid),
+    async () => {
+      const [daemons, cores] = await Promise.all([
+        listRemoteZCodeServerPids(config),
+        listRemoteServerCorePids(config),
+      ]);
+      return !daemons.includes(pid) && corePids.every((corePid) => !cores.includes(corePid));
+    },
     {
       timeout: SSH_WORKSPACE_READY_TIMEOUT_MS,
-      timeoutMsg: `${caseMarker}: 远端 zcode-server ${pid} 没有退出`,
+      timeoutMsg: `${caseMarker}: 远端 zcode-server ${pid}（core=${corePids.join(",") || "none"}）没有退出`,
     },
   );
   return pid;
 }
 
-export async function waitForRendererAfterColdRestart(
-  caseMarker: string,
-): Promise<void> {
-  await browser.waitUntil(
-    async () => {
-      try {
-        const puppeteer = await browser.getPuppeteer();
-        const target = puppeteer
-          .targets()
-          .find((candidate) => candidate.url().includes("/renderer/index.html"));
-        const targetId = target
-          ? ((target as unknown as { _targetId?: string })._targetId ?? null)
-          : null;
-        if (!targetId) return false;
-        await browser.switchToWindow(targetId);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    {
-      timeout: 60_000,
-      interval: 250,
-      timeoutMsg: `${caseMarker}: cold restart 后没有找到 renderer target`,
-    },
-  );
+export async function waitForRendererAfterColdRestart(caseMarker: string): Promise<void> {
+  // 冷重启必须复用 handle/target 交集校验；裸 CDP targetId 可能仍绑定过渡页。
+  // 此处只等主界面可操作，不强制切换到本机项目，以保留远程恢复的验收状态。
+  await switchToWorkspaceRendererWindow("", 60_000);
+  await waitForTestIdByDom(TID_TASK_SETTINGS_BUTTON, {
+    timeout: 60_000,
+    timeoutMsg: `${caseMarker}: cold restart 后主界面尚未就绪`,
+  });
 }
 
-export async function readTaskRowInWorkspace(
+/** task 行必须恢复到其 workspace 对应的项目 section 内且无错误标记。 */
+export async function readTaskRowInProject(
   task: SSHLifecycleTask,
   caseMarker: string,
 ): Promise<void> {
-  await browser.waitUntil(
-    async () =>
-      browser.execute((taskId, workspaceId) => {
-        const taskRow = Array.from(
-          document.querySelectorAll<HTMLElement>("[data-testid]"),
-        ).find((candidate) => candidate.dataset.testid === taskId);
-        const workspaceRow = Array.from(
-          document.querySelectorAll<HTMLElement>("[data-testid]"),
-        ).find((candidate) => candidate.dataset.testid === workspaceId);
-        return Boolean(
-          taskRow &&
-            workspaceRow?.closest("li")?.contains(taskRow) &&
-            !taskRow.querySelector('[data-error-indicator="true"]'),
-        );
-      }, testId(TID_TASK_ITEM, task.taskId), testId(TID_WORKSPACE_ITEM, task.workspacePath)),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${caseMarker}: task ${task.label} 没有恢复到正确 workspace`,
-    },
-  );
-}
-
-export function buildSSHIdentity(
-  config: SSHConnectionConfig,
-  workspacePath: string,
-): string {
-  const target: RemoteTarget = {
-    kind: "ssh",
-    host: config.host,
-    port: config.port,
-    username: config.username,
-  };
-  return buildRemoteWorkspaceIdentity(workspacePath, target);
+  await waitForTaskRowInProject(task.taskId, task.workspacePath, {
+    timeout: 30_000,
+    timeoutMsg: `${caseMarker}: task ${task.label} 没有恢复到正确项目`,
+  });
 }
 
 export async function prepareSSHLifecycle(
   caseMarker: string,
+  options: SSHLifecycleProviderOptions = {},
 ): Promise<{
   config: SSHRuntimeConfig;
   initialHosts: Array<{ name: string; pid: number }>;
@@ -490,6 +523,122 @@ export async function prepareSSHLifecycle(
   await prepareV4ConversationE2E({ skipProvider: true });
   const initialHosts = await readHostProcesses();
   expect(initialHosts).toHaveLength(1);
-  const provider = await createSSHLifecycleProvider(config, caseMarker);
+  const provider = await createSSHLifecycleProvider(config, caseMarker, options);
   return { config, initialHosts, provider };
+}
+
+export interface RemoteProcessIdentity {
+  pid: number;
+  ppid?: number;
+  startTicks: number;
+  cwd?: string;
+}
+
+export async function readRemoteCoreIdentity(
+  config: SSHConnectionConfig,
+  caseMarker: string,
+): Promise<{
+  pid: number;
+  supervisorPid: number;
+  startTicks: number;
+  state: string;
+  generation: number;
+}> {
+  const statusResult = await runSSHCommand(config, 'cat "$HOME/.zcode/server/run/status.json"');
+  if (statusResult.code !== 0) {
+    throw new Error(`${caseMarker}: 读取远端 Core status 失败: ${statusResult.stderr}`);
+  }
+  const status = JSON.parse(statusResult.stdout) as {
+    pid?: number;
+    state?: string;
+    generation?: number;
+  };
+  const corePid = status.pid;
+  if (typeof corePid !== "number" || !Number.isSafeInteger(corePid) || corePid <= 0) {
+    throw new Error(`${caseMarker}: Core status 缺少有效 pid`);
+  }
+  const proc = await runSSHCommand(
+    config,
+    `pid=${corePid}; test -r /proc/$pid/stat && awk '{print $4" "$22}' /proc/$pid/stat`,
+  );
+  const [supervisorText, startTicksText] = proc.stdout.trim().split(/\s+/u);
+  const supervisorPid = Number.parseInt(supervisorText ?? "", 10);
+  const startTicks = Number.parseInt(startTicksText ?? "", 10);
+  if (!Number.isSafeInteger(supervisorPid) || !Number.isSafeInteger(startTicks)) {
+    throw new Error(`${caseMarker}: Core /proc identity 不完整: ${proc.stdout.trim()}`);
+  }
+  return {
+    pid: corePid,
+    supervisorPid,
+    startTicks,
+    state: status.state ?? "unknown",
+    generation: status.generation ?? 0,
+  };
+}
+
+export async function listRemoteAgentProcesses(
+  config: SSHConnectionConfig,
+): Promise<Array<RemoteProcessIdentity & { cwd: string }>> {
+  // 进程口径按 spawnArgs 定位:workspace agent 恒以 `app-server --stdio` 拉起,
+  // 与实现形态无关 —— 旧 dev 态是 `node zcode.cjs app-server`,3.12+ release 下
+  // 优先用 glm 原生二进制(bundledResourceDir "glm", resolveEntrySegments
+  // ["zcode-agent"]),只有缺二进制时才回落 node+zcode.cjs(server-cli.js 的
+  // ZCODE_AGENT_RUNTIME)。server daemon 跑 `serve --supervisor`(3.12 实测口径,早期写作
+  // `serve --daemon`),都不含 `app-server --stdio`,不会被误匹配。
+  const result = await runSSHCommand(
+    config,
+    "for pid in $(ps -eo pid=,args= | awk '/app-server --stdio/ {print $1}'); do " +
+      "ppid=$(ps -o ppid= -p \"$pid\" | tr -d ' '); " +
+      "ticks=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null); " +
+      'cwd=$(readlink /proc/$pid/cwd 2>/dev/null); printf \'%s\\t%s\\t%s\\t%s\\n\' "$pid" "$ppid" "$ticks" "$cwd"; done',
+  );
+  if (result.code !== 0) throw new Error(`读取远端 Agent 进程失败: ${result.stderr}`);
+  return result.stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .flatMap((line) => {
+      const [pidText, ppidText, ticksText, ...cwdParts] = line.split("\t");
+      const pid = Number.parseInt(pidText ?? "", 10);
+      const startTicks = Number.parseInt(ticksText ?? "", 10);
+      if (!Number.isSafeInteger(pid) || !Number.isSafeInteger(startTicks)) return [];
+      const ppid = Number.parseInt(ppidText ?? "", 10);
+      return [
+        {
+          pid,
+          ...(Number.isSafeInteger(ppid) ? { ppid } : {}),
+          startTicks,
+          cwd: cwdParts.join("\t"),
+        },
+      ];
+    });
+}
+
+export async function terminateRemoteProcess(
+  config: SSHConnectionConfig,
+  process: RemoteProcessIdentity,
+  caseMarker: string,
+): Promise<void> {
+  const current = await runSSHCommand(
+    config,
+    `test -r /proc/${process.pid}/stat && awk '{print $22}' /proc/${process.pid}/stat || true`,
+  );
+  if (Number.parseInt(current.stdout.trim(), 10) !== process.startTicks) return;
+  const killed = await runSSHCommand(config, `kill -TERM -- ${process.pid}`);
+  if (killed.code !== 0)
+    throw new Error(`${caseMarker}: 终止远端进程 ${process.pid} 失败: ${killed.stderr}`);
+  await browser.waitUntil(
+    async () =>
+      (
+        await runSSHCommand(
+          config,
+          `test -r /proc/${process.pid}/stat && awk '{print $22}' /proc/${process.pid}/stat || true`,
+        )
+      ).stdout.trim() !== String(process.startTicks),
+    {
+      timeout: SSH_WORKSPACE_READY_TIMEOUT_MS,
+      interval: 500,
+      timeoutMsg: `${caseMarker}: 远端进程 ${process.pid} 没有退出`,
+    },
+  );
 }

@@ -130,6 +130,7 @@ await Promise.all([
   bundle(join(fixture, "sampling-main.ts"), "sampling-main.cjs", "node"),
   bundle(join(fixture, "managed-empty-main.ts"), "managed-empty-main.cjs", "node"),
   bundle(join(fixture, "managed-main.ts"), "managed-main.cjs", "node"),
+  bundle(join(fixture, "background-main.ts"), "background-main.cjs", "node"),
   bundle(join(fixture, "interaction-main.ts"), "interaction-main.cjs", "node"),
   bundle(join(fixture, "rows-main.ts"), "rows-main.cjs", "node"),
   bundle(join(fixture, "managed-renderer.tsx"), "managed.js"),
@@ -170,39 +171,50 @@ await writeFile(
   '<!doctype html><meta charset="utf-8"><style>.h-full{height:100%}.w-full{width:100%}.flex{display:flex}.flex-col{flex-direction:column}.flex-1{flex:1}.min-h-0{min-height:0}.overflow-y-auto{overflow-y:auto}.relative{position:relative}</style><body><div id="root"></div><script src="managed.js"></script>',
 );
 const electron = require("electron");
-const modes = process.argv.includes("--showcase-only")
-  ? ["showcase"]
-  : process.argv.includes("--sampling-only")
-    ? ["sampling"]
-    : process.argv.includes("--rows-only")
-      ? ["rows"]
-      : process.argv.includes("--managed-only")
-        ? ["interaction", "managed", "managed-empty"]
-        : process.argv.includes("--chain-only")
-          ? ["chain"]
-          : process.argv.includes("--retention-only")
-            ? ["retention"]
-            : process.argv.includes("--storage-only")
-              ? ["write", "read", "empty"]
-              : [
-                  "write",
-                  "read",
-                  "empty",
-                  "chain",
-                  "interaction",
-                  "managed",
-                  "managed-empty",
-                  "retention",
-                  "rows",
-                  "sampling",
-                ];
+const modes =
+  process.argv.includes("--background-only") ||
+  process.argv.includes("--photocraft-background-only")
+    ? ["background"]
+    : process.argv.includes("--showcase-only")
+      ? ["showcase"]
+      : process.argv.includes("--sampling-only")
+        ? ["sampling"]
+        : process.argv.includes("--rows-only")
+          ? ["rows"]
+          : process.argv.includes("--managed-only")
+            ? ["interaction", "managed", "managed-empty"]
+            : process.argv.includes("--chain-only")
+              ? ["chain"]
+              : process.argv.includes("--retention-only")
+                ? ["retention"]
+                : process.argv.includes("--storage-only")
+                  ? ["write", "read", "empty"]
+                  : [
+                      "write",
+                      "read",
+                      "empty",
+                      "chain",
+                      "interaction",
+                      "managed",
+                      "managed-empty",
+                      "retention",
+                      "rows",
+                      "sampling",
+                      "background",
+                    ];
 for (const mode of modes) {
   await new Promise((accept, reject) => {
     const env = { ...process.env };
+    if (process.argv.includes("--photocraft-background-only")) {
+      if (!env.ZCODE_PHOTOCRAFT_SERVER)
+        throw new Error("Set ZCODE_PHOTOCRAFT_SERVER to the built PhotoCraft dist/server.mjs");
+      env.ZCODE_PHOTOCRAFT_ONLY = "1";
+    }
     delete env.ELECTRON_RUN_AS_NODE;
     const child = spawn(
       electron,
-      mode === "chain" ||
+      mode === "background" ||
+        mode === "chain" ||
         mode === "interaction" ||
         mode === "managed" ||
         mode === "rows" ||
@@ -223,10 +235,13 @@ for (const mode of modes) {
             : [join(output, "main.cjs"), output, join(output, "profile"), mode],
       { env, stdio: "inherit" },
     );
-    const watchdog = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`Electron fixture timed out (${mode})`));
-    }, 90_000);
+    const watchdog = setTimeout(
+      () => {
+        child.kill("SIGKILL");
+        reject(new Error(`Electron fixture timed out (${mode})`));
+      },
+      mode === "background" ? (process.env.ZCODE_PHOTOCRAFT_SERVER ? 300_000 : 180_000) : 90_000,
+    );
     child.on("error", reject);
     child.on("exit", (code) => {
       clearTimeout(watchdog);
@@ -239,6 +254,9 @@ process.stdout.write(
   JSON.stringify(
     {
       output,
+      background: modes.includes("background")
+        ? JSON.parse(await readFile(join(output, "background-results.json"), "utf8"))
+        : undefined,
       interaction: modes.includes("interaction")
         ? JSON.parse(await readFile(join(output, "interaction-results.json"), "utf8"))
         : undefined,

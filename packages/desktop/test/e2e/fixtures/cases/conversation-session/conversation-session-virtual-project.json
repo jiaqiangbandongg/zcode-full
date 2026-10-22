@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-virtual-project.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "vp17-remote",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed reply drives a real remote SourceServer Agent; assertions inspect remote execution, additional-root capability, persistence ownership and reopening, not model output quality."
+    },
+    {
+      "id": "vp18-cold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed reply drives the real restarted remote Agent; assertions inspect changed root capabilities and actual runtime identity, not model output quality."
+    }
+  ]
+}

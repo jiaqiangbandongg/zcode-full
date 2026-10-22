@@ -3,7 +3,7 @@
 桌面端打包现在改成“两套资源明确分层”：
 
 - desktop 本地 agent 运行时按当前平台准备后进入安装包
-- remote 专用资源只产出到 `mock-cdn/releases/...`，不再进入安装包
+- remote 专用资源由 `@zcode/server-cli stage:remote-assets` 产出到 `mock-cdn/releases/...`，不再进入安装包
 
 ## 目录约定
 
@@ -13,13 +13,13 @@
   - 同目录下会生成 `*-<platform>.tgz` 归档，便于审计和后续远程分发复用
 - `packages/desktop/mock-cdn/`
   - 开发态 remote 资源入口
-  - 统一按 `releases/<version>/...` 布局保存 `node`、`server`、`node-pty`、`glm`、`tools`
+  - 统一按 `releases/<version>/...` 保存 `source-server-release.json` 与四个平台 Source Server archive
 
 ## 生产态
 
 - 生产安装包不再包含 `remote-assets`
-- 生产态 remote 资源通过 CDN 的 `manifest-<platform-arch>.json` 与跨版本 `components/...` 分发
-- 首次 remote 连接时会按 manifest 下载缺失组件，解压到本地 component cache，并组装到 `remoteCacheDir/releases/<version>/<platform-arch>/`；后续命中缓存不重复下载
+- 生产态 remote 资源通过 CDN 版本根的 `source-server-release.json` 与 `zcode-server-<platform-arch>.tar.gz` 分发
+- 首次安装或显式更新时按 descriptor 校验 SHA-256/大小；本地下载模式缓存完整 archive 后上传，SSH 远端下载模式在目标机下载同一 archive，最终都进入 immutable release installer
 - `ZCODE_ENV=production` 时默认内置两组官方 CDN：
   - 国内：`https://cdn.codegeex.cn/zcode/electron/releases/<version>`
   - 海外：`https://cdn-zcode.z.ai/zcode/electron/releases/<version>`
@@ -32,70 +32,34 @@
 - 如果构建期注入了 `CDN_DOMAIN` 列表，则按 CI 列表顺序使用，不再按语言/时区重排。
 - `ZCODE_ENV=test` 时默认使用内网测试资源根：
   `http://intranet.example.invalid:12345/ssh-remote-assets/<version>`。该目录由 CI 的
-  `build:remote:assets` job 在测试环境构建时从 `mock-cdn/releases/<version>/manifest-*.json`
-  与 `mock-cdn/components/` 同步生成，目录下直接包含 `manifest-*.json` 和 `components/`。
+  `build:remote:assets` job 同步 descriptor 与四个 archive。
 - `remoteCdnBaseUrl` 仍可通过环境变量覆盖；一旦显式设置，就只使用该自定义基址，不再套用
   `ZCODE_ENV` 默认值或 production 地区分流
-- SSH 远端服务器下载模式会在远端 `~/.zcode/server/asset-cache/` 下缓存已校验并解压的组件；最终安装路径仍是 `~/.zcode/server/` 下的现有 runtime、server、agent 和 tools 目录。
+- SSH 远端服务器下载模式会在远端临时目录下载并校验完整 archive；最终安装到 `~/.zcode/server/releases/`，并通过 `current.json` 原子切换。
 
 ## 开发态切换公网 CDN
 
-- 开发态默认仍使用 `mock-cdn/releases/<version>/...`
+- 开发态默认使用本轮 Source Server staging 写入的 `mock-cdn/releases/<version>/...`
 - 若要在开发态强制走公网 CDN，可设置环境变量：`ZCODE_DEV_REMOTE_ASSET_USE_CDN=1`
-- 开启后，remote deploy 不再读取 `mock-cdn`，会直接进入 CDN 下载 + 本地缓存链路
+- 开启后，remote deploy 不再读取 `mock-cdn`，会直接进入 descriptor/CDN + 本地 archive cache 链路
 - 未设置 `ZCODE_REMOTE_ASSET_CDN_BASE_URL` 时，仍按上面的地区分流规则生成“主 CDN + 备选 CDN”候选列表
 - 可配合 `ZCODE_REMOTE_ASSET_CDN_BASE_URL` 指向自定义 CDN 基址
 - 可设置 `ZCODE_REMOTE_ASSET_CACHE_DIR` 覆盖 remote cache 目录；例如 dev 启动时指向正式版 `~/Library/Application Support/ZCode/remote-assets-cache`，只复用 remote 资源缓存，不切换 Electron `userData`
 - 上述 remote asset 环境变量可从 shell 传入，也可写在仓库根目录或 `packages/desktop` 下的 `.env.local`；shell 环境变量优先级更高
 - 若要一键启动“desktop dev + 生产态 remote SSH 下载/cache 链路”，使用 `pnpm dev:desktop:remote-prod`
 
-## agent 准备链路
+## Source Server 准备链路
 
-当前 desktop 与 remote 默认都使用编译后的 `zcode.cjs`，不再按平台下载内嵌 Node 的原生
-`zcode-agent`：
+1. `@zcode/server-cli stage:remote-assets` 构建 Server CLI/Core 与 Agent bundle。
+2. 按 linux/darwin × x64/arm64 收集目标 Node、node-pty、官方插件和 native tools。
+3. 每个平台生成一个完整 archive，并写入统一 `source-server-release.json`。
+4. 开发态与生产态使用同一 archive 安装合同，不再生成散组件、wrapper 或 legacy manifest。
 
-1. `scripts/build-desktop-agent-cli.mjs` 构建 `apps/zcode-cli/packages/cli/dist/zcode.cjs`，并构建、校验
-   CUA 等 Dev 必需的官方插件 runtime。`pnpm dev:desktop` 在 `pre-dev` 后执行该脚本，开发态 resolver
-   优先直接使用 workspace 内的 bundle。
-2. 桌面打包的 `prepare:agent-bundle` 将 `zcode.cjs` 和官方插件 seed 资源写入
-   `packages/desktop/bundled-agents/<platform>/glm/`，再由 electron-builder 复制到安装包。
-3. remote 资产的 `prepare-prebuilds.mjs` 复用同一份 `zcode.cjs`，写入各平台
-   `packages/desktop/mock-cdn/releases/<version>/glm/<platform>/` 后产出 component artifact；远端使用已部署的
-   Node 执行该 bundle。
+桌面侧与 remote 侧共用同一份编译后的 `zcode.cjs`，不再按平台下载内嵌 Node 的原生 `zcode-agent`：
 
-`scripts/download-glm.mjs` 与 desktop `prepare:glm` 仅保留为手动兼容兜底，不进入默认 Dev、桌面打包或
-remote 资产准备链路。
-
-这样做的原因：
-
-- release generator 不再准备三方 agent runtime
-- 让 desktop、web、remote deploy 都消费同一份 ZCode Agent 资源结构
-- 避免把开发态 `node_modules`、跨平台 native、调试符号和缓存直接带进安装包
-
-### 开发态 SSH agent 覆盖
-
-`pnpm dev:desktop` 会先构建 `apps/zcode-cli/packages/cli/dist/zcode.cjs`。在
-本地开发运行且该文件存在时，SSH remote deploy 的 `glm` 组件不再使用
-mock-cdn / CDN 里的 `zcode-agent` native binary，而是把本地 `zcode.cjs` 上传到远端
-`~/.zcode/server/agents/glm/zcode.cjs`，并生成一个可执行的
-`~/.zcode/server/agents/glm/zcode-agent` wrapper。wrapper 使用远端已部署的
-`~/.zcode/server/node` 启动这份 bundle，因此 agent 仍运行在目标 SSH 机器内，文件、
-Git、terminal cwd 都保持远端语义。
-
-远端同时写入 `.dev-version` 内容 hash；只有该标记匹配、必要资源完整且远端
-`zcode.cjs` 的实际 SHA-256 与本地一致时才跳过重复上传。发布包或另一客户端覆盖
-bundle 但残留开发标记时，必须重新上传；无法校验实际内容也按需重新部署。
-生产态不启用该覆盖，仍严格使用 manifest/component 资源。开发时如需临时关闭覆盖，可设置
-`ZCODE_REMOTE_DEV_AGENT_BUNDLE=0`。
-
-## 哪些资源允许跨平台但禁止进包
-
-- `mock-cdn/releases/<version>/node-pty/linux-x64`
-- `mock-cdn/releases/<version>/node-pty/linux-arm64`
-- `mock-cdn/releases/<version>/glm/<platform>/`
-- `mock-cdn/releases/<version>/tools/<platform>/ripgrep/`
-
-这些目录是 remote 功能专用入口，可以按远程目标平台保留多份，但不应再被 electron-builder 复制进 `.app`。
+- `scripts/build-desktop-agent-cli.mjs` 构建 `apps/zcode-cli/packages/cli/dist/zcode.cjs`，并构建、校验 node-repl-host、Browser Use client 和模拟器等 Dev 必需的官方插件 runtime。`pnpm dev:desktop` 在 `pre-dev` 后执行该脚本，开发态 resolver 优先直接使用 workspace 内的 bundle；`stage:remote-assets` 也通过它取得 Agent bundle。
+- 桌面打包的 `prepare:agent-bundle` 将 `zcode.cjs` 和官方插件 seed 资源写入 `packages/desktop/bundled-agents/<platform>/glm/`，再由 electron-builder 复制到安装包。
+- `scripts/download-glm.mjs` 与 desktop `prepare:glm` 仅保留为手动兼容兜底，不进入默认 Dev、桌面打包或 remote 资产准备链路。
 
 ## 哪些资源禁止进入安装包
 

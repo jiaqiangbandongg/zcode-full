@@ -219,3 +219,15 @@ work 或 continuation inbox，不 rewind 共享 workspace；父 session 原样�
 
 relay/main 不得新增 session/task stream、queue、snapshot 或 fork 业务状态；这些状态必须能从 CLI
 projection/event log 与 command lookup 恢复。
+
+### 2026-09 虚拟项目目录导航
+
+Web 的最后导航位置与实际查看状态分开：`mobileViewState` 继续用于恢复，`mobileTaskView` 只表示当前连接下前台实际显示的完整任务地址。宽窄屏共用上报，Home/后台/草稿/被覆盖或断连立即取消；新配对和 bridge 代际拒绝旧消息，重连要求重新声明。Main 只保存瞬时连接/查看事实并推送，不写任务未读。desktop base 唯一 writer 按完整地址处理完成与查看事件，沿原 tasks-index marker CAS 收敛；详细合同见 `../task-list-refresh-semantics.md` 的已连接 Web 实际查看状态。
+
+远端 replayable bridge 的侧栏目录使用显式协商的窗口目录服务组（`window-project`、`window-remote-projects`、只读 `window-project-changes`）。业务 owner 仍是同一 Window Host；工作区的原 project/broadcast 通道仍属 Source。目录消费方同时选择读、写与变化事件，不借窗口目录替换文件、配置、提及等工作区服务。能力组缺失保留旧端路径；声明支持后的就绪失败显式报错。该能力不新增 attachment、实时状态副本或 Agent。完整合同见 `wide-screen-task-list.md` 的当前项目目录边界。
+
+手机 home 复用 ProjectSidebar，经当前 base attachment 读取 Host 项目行集合；手机 shell 仅拥有 home/chat 与浏览器返回状态。`workspace-bridge-open.project` 是严格的 projectId/hostId 意图，由 main 转交窗口 Host 的 ProjectService 准备执行目录。它允许在已在线物理 Source 上创建或复用目录 logical scope，不允许隐式新建物理连接、Host 或 Agent。准备前后检查连接成员代际、项目入口与物理连接对象；main 只保留当前导航的 RPC promise，同一 bridge identity 的重试不重复分配目录，取消/关窗/后续导航使迟到结果失效。
+
+Host 返回可信 workspaceIdentity、remoteSessionId、cwd 后沿原 shared-host attachment 建立手机 replayable bridge。项目/provider/初始输入只在 Web 的 Root 交接中传递，main 不存草稿或任务业务状态。桌面 direct continuous、手机 snapshot/gap 恢复、owner/lease 和 CLI CommandInbox 的单队列规则保持不变。
+
+手机未提交项目草稿复用 Renderer 既有 composer 持久化：按 workspaceKey 的 `__draft__` scope 保存可选 projectId，与正文/模型一起恢复。Root 重建或页面 reload 在 prewarm 前恢复该选择；显式新建未归类草稿写 NULL，明确 taskId 的历史打开优先。提升为持久任务后不把 projectId 复制到 session composer scope；已提交任务的归属仍只由 Host app 库拥有。main、relay 和 shared-host transport 均不持有这份草稿。

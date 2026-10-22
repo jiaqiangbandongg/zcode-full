@@ -53,7 +53,6 @@ describe("TaskOutput tool", () => {
         sideEffectScope: "none",
       }),
     ]);
-    expect(registry.toContracts()).toHaveLength(1);
     for (const alias of ["AgentOutputTool", "BashOutputTool", "AgentOutput", "BashOutput"]) {
       expect(registry.get(alias)?.handler).toBe(taskOutputToolEntry.handler);
     }

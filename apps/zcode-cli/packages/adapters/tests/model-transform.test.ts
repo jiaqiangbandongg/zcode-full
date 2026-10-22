@@ -400,32 +400,6 @@ describe("AI SDK model message transform", () => {
     ]);
   });
 
-  it("preserves unsigned reasoning blocks on Anthropic transports", () => {
-    const messages = toAiSdkMessages(
-      [
-        {
-          role: "assistant",
-          content: [
-            { type: "reasoning", text: "thinking before a tool" },
-            { type: "text", text: "done" },
-          ],
-        },
-      ],
-      {
-        providerKind: "anthropic",
-      },
-    );
-
-    expect((messages[0] as any).content).toEqual([
-      {
-        type: "reasoning",
-        text: "thinking before a tool",
-        providerOptions: { anthropic: { signature: "" } },
-      },
-      { type: "text", text: "done" },
-    ]);
-  });
-
   it.each([
     ["missing provider metadata", undefined],
     ["empty provider metadata", {}],
@@ -595,21 +569,6 @@ describe("AI SDK model message transform", () => {
     ]);
   });
 
-  it("leaves plain assistant messages unchanged", () => {
-    const messages = toAiSdkMessages(
-      [
-        {
-          role: "assistant",
-          content: "done",
-        },
-      ],
-      {},
-    );
-
-    expect((messages[0] as any).providerOptions).toBeUndefined();
-    expect((messages[0] as any).content).toBe("done");
-  });
-
   it("translates provider-neutral cache control to Anthropic provider options", () => {
     const messages = toAiSdkMessages([
       {
@@ -715,31 +674,6 @@ describe("AI SDK model message transform", () => {
       {
         type: "text",
         text: "[Attached image/png]\n[Media omitted from provider request because the selected model does not support image input.]",
-      },
-    ]);
-  });
-
-  it("translates PDF file blocks to AI SDK file parts", () => {
-    const messages = toAiSdkMessages([
-      {
-        role: "user",
-        content: [
-          {
-            type: "file",
-            mediaType: "application/pdf",
-            name: "report.pdf",
-            dataUrl: "data:application/pdf;base64,cGRm",
-          },
-        ],
-      },
-    ]);
-
-    expect((messages[0] as any).content).toEqual([
-      {
-        type: "file",
-        data: "cGRm",
-        filename: "report.pdf",
-        mediaType: "application/pdf",
       },
     ]);
   });

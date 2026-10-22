@@ -144,7 +144,10 @@ describe("highspeed metrics persistence", () => {
     } as unknown as SessionEventStorePort;
     const persist = (
       fallbackAt: number,
-      fallbackReason: "highspeed_card_expired" | "highspeed_request_failed",
+      fallbackReason:
+        | "highspeed_card_expired"
+        | "highspeed_request_failed"
+        | "highspeed_selection_unavailable",
     ) =>
       persistHighspeedTiming({
         sessionStore,

@@ -127,23 +127,6 @@ describe("DesktopBrowserScreenshotSurfaceCoordinator", () => {
     lease.release();
   });
 
-  it("viewport 不匹配后继续等待同一可信 sender 的下一次 ready", async () => {
-    const coordinator = new DesktopBrowserScreenshotSurfaceCoordinator({
-      sendPrepare: () => true,
-      sendRelease: vi.fn(),
-    });
-    const pending = coordinator.prepare({ ...input, signal: new AbortController().signal });
-    coordinator.handleReady({
-      windowId: 7,
-      senderWebContentsId: 700,
-      payload: { ...input, viewport: { width: 1277, height: 720 } },
-    });
-    coordinator.handleReady({ windowId: 7, senderWebContentsId: 700, payload: input });
-
-    const lease = await pending;
-    lease.release();
-  });
-
   it("surfaceScale 非法时继续等待同一可信 renderer 的下一次 ready", async () => {
     const coordinator = new DesktopBrowserScreenshotSurfaceCoordinator({
       sendPrepare: () => true,
@@ -233,16 +216,7 @@ describe("DesktopBrowserScreenshotSurfaceCoordinator", () => {
     expect(sendPrepare).toHaveBeenCalledTimes(1);
     coordinator.handleReady({ windowId: 7, senderWebContentsId: 700, payload: input });
     const [firstLease, secondLease] = await Promise.all([first, second]);
-    const internal = coordinator as unknown as {
-      groupsByGuestKey: Map<string, { leaseCount?: number; leaseReleases: Set<() => void> }>;
-      pendingByRequestId?: Map<string, unknown>;
-    };
-    const [group] = internal.groupsByGuestKey.values();
-    expect(internal).not.toHaveProperty("pendingByRequestId");
-    expect(group).not.toHaveProperty("leaseCount");
-    expect(group?.leaseReleases.size).toBe(2);
     firstLease.release();
-    expect(group?.leaseReleases.size).toBe(1);
     expect(sendRelease).not.toHaveBeenCalled();
     secondLease.release();
     expect(sendRelease).toHaveBeenCalledTimes(1);

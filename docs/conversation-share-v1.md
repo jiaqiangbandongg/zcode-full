@@ -14,13 +14,13 @@ Remote 首期不支持。
 
 运行中的会话可以分享此前已经完成的 product turn；运行中的 turn 可展示但不可选择。分享选择以
 `productTurnId` 为身份，`rowId` 只用于 timeline 定位。标题默认当前任务标题并允许仅为本次分享编辑，
-新分享草稿进入确认 Dock 时权限默认 `public_importable`（拥有链接的人可导入并继续）；用户显式切换
-权限后，返回选择阶段或重新打开同一草稿都保留该选择。
+新分享草稿打开设置浮窗时权限默认 `public_importable`（拥有链接的人可导入并继续）；用户显式切换
+权限后，调整分享范围或重新打开同一草稿都保留该选择。
 
 ```text
 Desktop UI
   -> workspace-scoped ConversationShareService
-       |- 本地 JWT / Share API
+       |- 目标 Environment JWT / Share API
        |- local/remote Conversation Rows + fileChanges
        `- local/remote artifact staging
   -> prepare -> upload -> confirm -> share URL
@@ -36,6 +36,12 @@ Share 落地页是独立静态构建：`pnpm run build:web-share` 使用 Vite `b
 `Dockerfile.web-share` 和 `nginx.web-share.conf` 发布到 `/cn/share` 与 `/share` 两个语言入口。
 两者共用同一份 SPA 和静态资源，路径前缀决定中文或英文 UI locale；它与 `/remote/v4` 使用独立镜像、
 Deployment、CI Job 和回滚版本；公开 Preview 匿名访问，private Preview 使用同源 Web OAuth。
+
+裁剪构建只安装 `@zcode/web-share` 的依赖闭包。复用的 Web/UI 源文件不能依赖完整工作区的
+`node_modules` 链接；Vite 对 `@zcode/shared` 根入口使用精确匹配的源码别名，避免从 Web
+目录解析失败，同时不得把 `@zcode/shared/*` 子路径改写到 `index.ts/*`。Share 闭包用到的每个
+`@zcode/shared/*` 子路径（如 `test-ids`、`zcode-protocol-v4`）都要在 `packages/web-share/vite.config.ts`
+登记精确的源码别名。隔离构建回归覆盖此约束。
 
 镜像和 nginx 路由的手工验收用 `scripts/test-web-share-build.sh`（需要本机 Docker，不需要 CUA Git
 凭据）。它校验构建产物落在 `/cn/share/assets`，
@@ -91,7 +97,7 @@ Preview not_found → 现有 Loader
 `/cn/share/mock-partial-unsupported`（认不出的行被跳过，顶部出软提示）和
 `/cn/share/mock-outdated-client`（载荷版本高于本 build，显示「需要更新 ZCode」而不是「格式无效」）。
 
-Desktop Host 的分享运行时始终使用真实 Share API，API 地址由 `ZCODE_ENV` 解析；不再提供运行时
+目标 Environment 的分享运行时始终使用真实 Share API，API 地址由 `ZCODE_ENV` 解析；不再提供运行时
 Mock 开关。`ConversationShareMockApiClient` 仅用于服务单测和协议 fixture，不能生成可跨进程访问的分享链接。
 
 公开页正文展示复用 `packages/ui` 的只读 presentation 层：通过
@@ -120,6 +126,11 @@ CTA；该响应式策略只影响 Web landing page 的展示，不改变 Deep Li
 公开页元信息中的“结果物数量”只统计公开 `rows` 内的 `kind: "artifact"` 行，也就是时间线实际展示的
 Assistant 结果物卡片。`preview.artifacts` 是结果物和 `userInput.attachments` 共用的完整下载 manifest，
 不能直接作为结果物计数；用户输入附件继续参与 URL/name 映射和下载，但不计入“结果物”数量。
+
+用户输入的图片附件按 `mime` 显示缩略图，优先通过 `previewRef`、其次通过 `ref` 在既有 artifact URL
+映射中取图；点击缩略图通过附件 `ref` 对应的地址打开原图。普通附件、无可用图片地址或图片加载
+失败时保留文件名、大小和原文件下载入口。桌面只读分享预览与公开页复用同一呈现，在手机窄屏自动
+换行并约束宽度；两种主题和中英文可访问名称都来自现有规则，不新增宿主读取或上传通道。
 
 ## 协议优先级
 
@@ -165,26 +176,38 @@ Assistant 结果物卡片。`preview.artifacts` 是结果物和 `userInput.attac
 
 ## 权威与安全边界
 
-发布 HTTP、JWT 和 staging 临时文件始终属于 Desktop Host。SSH/WSL/Docker 只提供远端 Agent
-Rows、fileChanges 和文件字节，不接收 Desktop 登录凭据。服务必须使用 Host attachment 注入的可信
-`clientMode`：只有 `desktop-continuous` 可以 publish/import；`web-remote-replayable` 必须拒绝。
+### R3 Source Server 的分享权威（2026-09-16）
 
-Share 读取 Rows/fileChanges 必须复用当前 MessagePort attachment 已完成握手的
-`createZCodeAgentConnectionScope(...).service`。禁止直接调用 raw Agent 的 V4 query，禁止为 Share 另建
-connectionId、hello/clientHello、Host、Agent runtime 或 subscription。connection scope 的生命周期仍由
-attachment owner 管理；Share 只持有当前调用期间的轻量 facade。
-
-远端隔离 key 固定为：
+R3 远程 workspace 的分享由目标 Source Server 执行，读取目标 Environment 当前 OAuth/JWT、
+网络配置、会话和文件。Desktop 只转发请求并提供可信 attachment 上下文；本地账号即使与远端
+不同，也不得改变分享所有者。Provisioning 可以先写入远端凭据，但每次分享只读远端正式 Store，
+不在线读取 Desktop JWT，也不在未登录/失效时回落本地账号。此规则替代旧 SSH mixed-service
+模式中“远端文件 + 本地 JWT/API”的组合；本地 workspace 继续在本机执行。
 
 ```text
-workspaceKey = workspaceIdentity?.trim() || workspacePath
+Desktop attachment（覆盖不可信 caller 上下文）
+  → SSH/WSL/Docker → Source Server Share RPC
+                    → 远端 OAuth + 远端 HTTP + 远端 Rows/File
+                    → 复用同一 V4 trusted carrier / 已握手连接
+  server 直连 → 保持一期禁用
+  手机 attachment / Source 的普通 Web 入口 → 拒绝发布和导入
 ```
 
-路径执行和展示仍使用 `workspacePath`。远端路由、缓存、发布 attempt 和文件 source 必须同时携带
-`workspaceIdentity` 与 `remoteSessionId`，不得只按路径判等。
+Source Share RPC 只接受受信 Host transport 下的 desktop-continuous 下游上下文；Rows/File 查询
+沿用该 transport 的既有 Agent scope，由它命名空间化下游 connectionId，不能另建连接或握手。
+Desktop 的 raw renderer 字段必须被可信 attachment 真值覆盖，Source Web 客户端不得伪造该字段。
+Source 的发布状态、预检缓存、临时文件与 HTTP 均由其现有 ShareService 管理；重连重建 RPC
+attachment，不新增 stream、队列或恢复语义。Desktop continuous 与手机 replayable 保持原边界。
 
-发布状态不进入 conversation snapshot、task sqlite、owner/lease、CommandInbox、relay 或 mobile
-replayable mirror。日志不得记录 JWT、Signed URL、Conversation Rows 正文、文件内容或绝对路径。
+Share 数据携带 workspaceIdentity 与 remoteSessionId；隔离 key 仍为
+`workspaceIdentity?.trim() || workspacePath`。Source 身份转换复用现有 canonical mapper。
+JWT、Signed URL、Rows 正文与文件内容不得进入日志。`remote:server:...` 是身份格式，不能据此
+把 SSH 当成用户选择的 Server 直连。
+
+回归：真实远程工厂 → Share RPC → trusted Agent 的完整组合；本地账号 A、远端 B 时必须只用 B，
+远端退出后拒绝而不回落 A；直接 Web/mobile 与 Server 直连仍拒绝；握手上下文必须与既有会话一致。
+SHARE18 单独运行，先通过现有 Provisioning 将显式提供的 Team profile 写入远端，再由远端访问
+匹配的生产 Share API。模型使用 case-local replay，必须真实生成文件并验证发布成功及产物字节。
 
 ### 公开分享页对第三方内容的防御边界
 
@@ -228,6 +251,78 @@ artifact 只经 `window.open` 打开、不做 `<img src>`，因此不受 `img-sr
 
 选择至少包含一个 terminal product turn。每个被选 ID 必须只有一个 `turnHeader`，且状态不是
 `running`。任一分页 revision/log epoch 不一致时必须在 preparation 前失败。
+
+### Workflow 工具展示
+
+`toolCall.display` 支持 `create_workflow`、`get_workflow_run`、`list_workflow_runs`、
+`eval_workflow_snippet`、`saved_workflow_list`、`list_models`、`resume_workflow_run`。
+客户端使用正式 `toolCallDisplaySchema` 校验并复制完整展示，服务端逐字段镜像其嵌套对象、
+枚举、可选字段、数组上界和 UTF-16 字符串长度；未知类型、未知字段与非法值仍拒绝。
+图片继续走既有 artifact 转换，不开放内联 Base64 或本地 URI。
+
+这里分享的是工具执行时的展示快照：工具行必须终态，快照中的 workflow status 可以仍为
+`running`，不要求后台工作流结束。runId、图内站点与阶段 ID 是快照数据，不作为分享端的
+执行授权；不发布实时 workflowRuns 状态，不增加运行、恢复或订阅动作。
+分享页复用现有 workflow 展示组件：Create/Amend 的静态阶段图与编译诊断、Get 的运行摘要/
+阶段/子代理/日志、List 的运行清单、Eval 的诊断/结果、Saved 的工作流清单、Resume 的结果说明。
+展示仅代表工具调用时的快照；不注入本地文件、session、编辑、运行或恢复回调。缺少 display 的
+历史行沿用通用工具卡；ListModels 使用共享的模型目录 renderer。导入端保留 display，schema_version 维持 1。
+桌面/手机、深浅主题与中英文下可阅读并展开详情，窄屏卡片表头允许换行，工作流名称不得被状态挤至不可见；页面不请求桌面宿主服务。
+
+验收：7 种展示完整投影、服务端 confirm 校验和导入解码通过；嵌套未知字段、类型/枚举错误、
+越界数组/字符串/整数、显式 null 失败，错误包含 row 和嵌套字段路径；普通工具、图片转换与
+分享完整性校验不回退。两端测试使用相同的 workflow display JSON 样本。
+浏览器验收 SHARE-WF01（pending）：启动 `pnpm dev:web-share:test`，运行
+`node packages/web/test/e2e/manual-review/pending/share-workflow.mjs`；测试拦截 preview API，
+覆盖桌面/手机、中英文、Zai Light/Dark 的基本展示、展开诊断、历史兜底、只读与无横向溢出。
+
+### 可扩展只读内容块
+
+公开投影在 `rows` 之外允许可选 `content_blocks`，每块带 `type`、独立 `version`、公开
+product-turn 锚点、`fallback_row_id`、`captured_at` 和 `resource_ids`。首个类型为
+`workflow` v1：运行图与状态、完成通知、六类用户产物。不是透传实时 workflowRuns；
+发布后为不可变快照。发布器生成一个已有 assistantText 类型的摘要 Row，旧读端可以阅读；
+新读端仅在块可识别且成功渲染时用卡片替换摘要。未知或损坏块保留摘要，不影响同轮正文。
+
+服务端通过可选 `content_block_versions: { workflow: 2 }` 声明当前能力；仍兼容版本 1，版本 2
+增加冻结文本预览。能力缺席时只发布摘要与
+允许的普通资源。`schema_version` 保持 1。新增块字段以严格白名单校验，资源必须闭包于
+本次 manifest；块使用独立 `content_blocks_sha256`，既有 rows/artifact 哈希不变。
+preview、continuation、导入归档均保留块，完整性在逐块解码前按 wire 原值校验。
+
+```text
+所选终态轮次 → Share Service → 原 Agent 的 journal 事件冻结读取
+                              → 同一 reducer 生成 run 状态与产物版本
+                              → 指定版本字节 / 截止 sequence 的看板条目
+                              → 公开字段投影 + 摘要 + 上传 → Server 不可变快照
+                                                           → Web / 导入只读展示
+```
+
+workflow 事件按 `afterSequence` 分页读取，跨页 sequence 必须严格递增；空的未完成页、重复游标、
+读取失败或累计超过 20000 条时将该 run 标记为不可用。读至 `hasMore=false` 形成 append-only
+前缀，末条 sequence 是本次截止点（不是首个请求的时刻）；持续追加也受总条数限制。看板分页
+过滤该水位之后的条目，文件按 reducer 记录的 artifact version 读取。禁止用 conversation
+revision 冒充 journal 水位。运行中的后台 workflow 不阻止已完成产品轮次分享；其卡片明确
+标注分享时快照。历史关联或源数据不可读取时保留带原因的摘要，不伪造成功、零计数或空看板。
+不会分享未选择的其它对话/子代理 transcript，不启用停止、恢复、审批或本地目录操作。
+卡片和看板复用纯展示组件与算法，公开 bundle 不引入 Desktop service/store。
+
+预检与发布使用同一采集器，发布重新冻结，不复用上一次预检的运行态。文件沿现有上传审核；
+结构化看板随块计入 payload 限额并参与内容审核。每个新增内容类型必须声明公开 schema、
+采集器、摘要、资源策略和只读 renderer；未知类型只读摘要，不自动执行插件代码。
+
+产物下载文件名使用来源类型对应的扩展名，标题中的点号和版本号不改变文件类型。文本解码及
+公开 schema 校验全部通过后，才同时登记内容块、artifact 行、字节和资源预算；失败产物仅
+保留未包含说明，不进入上传集合。合成的 workflow 摘要仅用于展示，预检与发布均不得把其
+标题、错误文本再次当作工作区文件引用。真实 assistantText 的文件发现保持原有行为。
+
+公开 API 返回的产物 URL 只接受 HTTP(S)。工具图片缺少宿主读取能力及对应公开资源时显示
+静态“预览不可用”，不显示无异步任务的 Loading。未知 HTTP 错误不归为响应契约损坏；无业务码
+的 403 沿用隐藏分享的 not_found 语义，已知业务码优先。真正的成功响应结构错误仍为 invalid_contract。
+
+验收 SHARE-WF02：完整运行卡、完成卡、board/table/chart/metrics、Markdown 与文件的实际
+打开；选择完成轮、运行中快照、跨版本摘要、资源闭包/篡改、无 Desktop 依赖，以及手机/
+桌面、Zai Light/Dark、中英文布局。旧分享未包含的数据只能重新发布补齐。
 
 ## 产物发现与上传
 
@@ -274,16 +369,74 @@ PDF、Office、Markdown/HTML、视频和音频都可以成为预览候选，但 
 
 ## UI 状态机
 
+顶部分享按钮打开锚定按钮的非模态浮窗（建议宽 360px，边缘自动避让），不加全屏遮罩，
+不替换 Composer。浮窗展示标题、整行分享范围按钮、权限、敏感信息确认和「生成分享链接」。
+分享范围按钮将摘要、对话图标与向右箭头合并，点击整行打开现有选择面板；不再单独显示「调整」。
+预检进行中（含 stale）在该按钮内显示 loading 与「正在检查分享内容…」，不另占一行；检查完成恢复范围摘要，按钮高度保持一致。
+预检问题入口使用紧凑提示（如「有内容无法分享，查看问题」），详细说明保留在点击后的浮层中。提示采用 sm 字号、左对齐，图标固定 16px 且对齐首行；窄窗口换行时文本保持左对齐。
+范围箭头与权限下拉箭头统一为 14px、右侧 8px 内边距；诊断详情与修复操作保留现有入口。
+浮窗主标题使用 text-ui-lg，字段 label 使用 text-ui-base，辅助说明保持次级字号。
+浮窗使用 12px 紧凑内边距与字段间距，输入框、范围按钮和权限选择统一共享 lg 控件规格；
+底部生成分享链接主按钮单独使用 40px 高度，文字保持 text-ui-base，上方表单控件保持 32px。
+敏感信息确认不使用卡片背景、边框或橙色侧线，以普通复选框与次级说明呈现。
+确认文案、发布阶段名称、诊断正文、成功页字段与链接使用 text-ui-base；
+说明、预检提示及辅助操作使用 text-ui-sm，不将辅助说明降为 text-ui-xs；主浮窗标题沿用已确认的 text-ui-lg。
+检查范围浮层复用共享 Popover 默认 offset、边框与阴影，
+使用 12px 内边距、base 正文和 sm 分组/说明，不叠加尖角、分隔线、橙色圆点或独立底色页脚。打开时聚焦浮窗而不自动选中标题。
+默认选择全部已完成轮次，权限默认 public_importable。运行轮次不可选，分享标题不修改任务标题。
+
 ```text
-closed
-  -> loading capabilities/catalog
-  -> selecting terminal turns
-  -> preflighting selected turns and attachment metadata
-  -> confirming title + access mode + disclosure in share dock
-  -> collecting -> uploading i/N -> confirming
-                           `-> 3215 safety pending -> confirming
-  -> published | failed
+顶部分享 → 分享设置浮窗 → 生成 → collecting → uploading → checking → published / failed
+                    │
+                    └ 调整 → 现有左侧选择面板（临时勾选）
+                                  ├ 确认 → 写回范围、关闭选择面板
+                                  └ 取消 → 丢弃临时勾选、关闭选择面板
 ```
+
+ConversationShareSelectionStore 按 sessionId 唯一持有已确认范围、临时勾选、浮窗可见性与发布状态。
+浮窗可见性由 `open` 表达，范围编辑由 `pendingExcludedRowIds != null` 表达；不再维护旧 scope/stage/view 或全局 dropdown 状态。正文只承担定位展示，勾选和全选统一由范围面板的事务命令处理；`ConversationSharePreflightStatus` 仅显示问题与重试/整轮移除操作，不保留旧下一步与批量选择控件。
+「调整」复制已确认范围到临时选择；逐轮勾选以 productTurnId 为身份，同轮多条 query 一起改变。
+选择面板复用现有提问/回复摘要，点击列表项（文字、摘要或空白）和复选框都切换临时选择；右侧独立定位按钮只跳转正文，不改变勾选。键盘 Enter/Space 可切换文字按钮，定位按钮可独立聚焦；运行中条目不可勾选，但仍可定位。
+选择面板各行统一 8px 纵向内边距、4px 标题摘要间距，取消首项特殊缩进；标题 base 常规字重，摘要 sm。Checkbox 与首行 prompt 垂直居中，message 与 prompt 左对齐。选择器宽 320px，窄窗口不超过视口减 16px；prompt 保持一行，message 最多两行并截断。滚动视口上下各使用 32px 透明度 mask 渐隐：仅在对应方向还有内容时显示，到顶/到底时取消对应渐隐；无溢出时不渐隐。mask 不作用于滚动条和底部操作区。顶部固定全选 Checkbox 与列表 Checkbox 左对齐：全选、未选、半选三态；半选时点击补齐全选，全选时点击清空，仅操作已完成的可选行。批量修改仅写入当前选择草稿，确认后生效，取消撤销；无可选行时禁用。
+
+面板采用顶部全选、中间滚动列表、底部状态与操作三层结构。底部默认显示已选轮数，超限时替换为 warning 色「超出上限 N 行」并禁用确认。预检进行中显示检查状态并禁用确认，空选亦禁用确认。行数与上限来自现有服务预检，不写死 500，不把轮数当行数。
+
+数据链路：勾选 → selection store 的 pendingExcludedRowIds 草稿 → 复用按轮缓存/预检 → 聚合行数 → 面板状态。确认保存草稿，取消丢弃草稿并恢复原选择的预检；草稿不存在时使用已确认选择。沿用 workspace/session 隔离与过期响应处理。验收覆盖全选/半选/空选、超限后减选恢复、取消回滚、检查中禁用确认，以及桌面/窄窗口与深浅主题。
+勾选由共享 Checkbox 表达，未勾选仍保持正文可读，仅运行中禁用项弱化；hover 使用统一浅色背景。
+底部固定显示「已选 N 轮」「取消」「确认」，计数为 sm，按钮统一 32px，列表内部滚动；未选任何轮次时确认禁用。
+确认后才更新浮窗数量；取消保留原范围和敏感信息勾选，范围改变后确认重置敏感信息勾选。
+调整期间浮窗保持可见，生成禁用；不新增二级页面、折叠列表或选择器。
+
+点击两个面板外部或 Esc 时优先取消临时选择，只关闭选择面板；再点击外部或 Esc 收起浮窗。
+点击正文定位、浮窗以及其权限/诊断浮层不误关闭选择面板。收起浮窗保留当前会话草稿，再打开恢复。
+切换 session 不得串用选择、标题、权限、发布进度或成功结果。
+
+发布前标题为空、未选内容、范围调整中或预检未通过时禁止生成。敏感信息未确认时点击生成只定位、
+聚焦复选框，将确认文案显示为 warning 颜色，并让复选框与文案整行左右轻微抖动一次（280ms、最大 4px）。
+不改变底色或复选框边框，不自动发布；重复点击重启动画而不叠加，勾选或卸载立即取消。开启减少动态效果时仅保留 warning 色。
+勾选后文案立即恢复正常颜色，仍需再点击生成。
+确认项已可见时不滚动；需要定位时仅滚动浮窗正文，外层页面与固定底部按钮保持稳定。
+发布期间锁定修改和关闭；失败原位显示原因、诊断与重试，保留草稿。
+生成中的浮窗沿用 12px 间距，显示最多两行任务标题、细进度条和三步阶段列表；只在当前阶段显示辅助进度说明，
+当前阶段进度（如上传数量）是主要信息，使用 text-ui-base；底部轮次/权限摘要使用 text-ui-sm。
+字号随界面设置缩放，图标尺寸保持不变。进行中图标旋转，完成态勾选，待执行态弱化。移除重复的顶部进度文案和不可操作的底部生成按钮，保留轮次/权限摘要；失败后恢复重试入口。
+成功原位显示只读标题、真实链接、复制链接和浏览器查看；复制后短暂显示已复制，浮窗继续保持。
+成功浮窗去掉重复说明与「分享标题」标签，任务标题最多两行；链接框为 32px，保留选中复制。
+统一 12px 内边距，移除底部分隔线；两个操作等宽、高 40px，浏览器查看为次按钮，复制链接为主按钮，成功图标与标题居中对齐。
+成功后关闭并再次点击顶部分享，开始新一轮分享设置：保留标题与权限，范围恢复为当前全部已完成轮次，
+清除上次成功链接、诊断、进度与发布 attempt，敏感信息确认重置为未勾选；可重新调整内容再生成。
+未发布成功的草稿关闭后仍恢复原设置，失败重试仍复用原 attempt。新一轮仅重置本地状态，不撤销旧链接。
+状态归属仍为 ConversationShareSelectionStore：published → closeShare（收起）→ openShare（新配置）→ publish（新 attempt）。
+被跳过的文件保留非阻断 warning。无真实 confirm 成功结果时不得显示链接。
+
+浮窗正文独立滚动，生成按钮保持可见；选择面板底部按钮同样不可被列表挤出。窄窗口无法并排容纳时，
+调整期间限制设置浮窗高度，选择面板避让到其下方，两个面板均保留原操作。兼容窄窗口、
+Zai Light/Dark 和中英文。手机 remote 与普通 Web 继续不提供分享入口，Desktop continuous 与
+手机 replayable 权限/恢复边界不变；发布 API、Host authority 和幂等重试机制不变。
+
+验收 SHARE34：打开/收起保留草稿；调整临时选择不改变已确认范围；取消回滚、确认生效与空选择禁用；
+文字定位不关面板；Esc/外部点击逐层关闭；运行轮次禁选；发布锁定、失败重试、成功复制；跨 session 隔离。
+浏览器组件集成用例保留在 manual-review/pending，不视为真实 Desktop 发布或手机远控实测。
 
 选择阶段的 `SharePreflight` 是独立的只读检查，不上传文件、不读取完整附件内容，也不改变选择草稿。
 它绑定当前 `sessionId`、`workspaceIdentity/workspacePath`、`remoteSessionId`、selection、rows
@@ -293,8 +446,8 @@ closed
 预检结果分为四类：
 
 - **阻断**：选择已失效、缺少 product turn、轮次/正文/工具/子 Agent/compact/goal verification 仍在运行、
-  本地或内联 URL、未闭合 artifact 引用、陈旧水位、已知容量超限或没有任何可分享内容。阻断项停留在选择阶段，
-  不允许进入确认阶段。
+  本地或内联 URL、未闭合 artifact 引用、陈旧水位、已知容量超限或没有任何可分享内容。阻断项展示在分享设置中，
+  不允许生成链接。
 - **可跳过**：存在但不支持的预览卡片文件、明确不存在或已变化的用户输入附件。允许继续，发布时跳过对应文件并在成功态展示 warning。
 - **卡片消失**：Assistant 预览候选在 stat 时不存在，视为 UI 不显示的卡片，不进入分享、不生成 warning。
 - **延后确认**：权限不足、远端断开或 stat 超时等无法证明文件不存在的情况。选择阶段只提示“发布时会再次确认”，
@@ -310,137 +463,26 @@ closed
   无法在线性公开时间线表达的内部 marker，直接从公开 projection 删除，不生成 warning、不计入跳过数量，也不要求
   用户取消轮次。若静默移除后整次选择没有其它可分享内容，才按“没有可分享内容”阻断。
 
-选择 Dock 在预检期间显示 `checking` 状态；阻断项显示具体轮次和“取消选择该轮”操作（按 issue 携带的
+分享浮窗 在预检期间显示 `checking` 状态；阻断项显示具体轮次和“取消选择该轮”操作（按 issue 携带的
 `productTurnId` 整轮移除，`turnOrdinal` 只用于展示文案——两者编号口径不同，用序号反查目录会取消错轮次）；存在可跳过文件时，操作行显示
 跳过数量。确认和发布阶段仍必须复用同一套校验并重新检查 revision/log epoch、文件 stat、大小和 SHA-256，防止预检后
 的文件或会话发生竞态变化。
 
-预检结果由当前分享流程的 renderer-local owner 按 `productTurnId` 缓存，而不是按整个 selection 反复检查。首次进入分享选择阶段时，
+预检结果由当前分享流程的 renderer-local owner 按 `productTurnId` 缓存，而不是按整个 selection 反复检查。首次打开分享浮窗时，
 仅批量检查当前尚未命中的轮次；之后新增选择只检查新增且未命中的轮次。取消已检查轮次、重新选择已检查轮次以及
-点击“下一步”都只读取缓存，不重新发起 preflight RPC。缓存绑定 `workspaceKey`、`remoteSessionId`、`sessionId`、
+确认范围都只读取缓存，不重新发起 preflight RPC。缓存绑定 `workspaceKey`、`remoteSessionId`、`sessionId`、
 `productTurnId`、rows revision/log epoch、turn/candidate fingerprint、fileChanges 状态和 capabilities fingerprint；
 当前轮次内容、候选集合、文件变更状态或能力发生变化时，只失效受影响轮次。
 缓存不进入数据库或 conversation snapshot，取消/完成分享或切换 session/workspace 时清理。
 
-选择 Dock 不再插入独立的“正在检查分享内容”中间条。预检状态通过操作行状态入口表达，
-“下一步”按钮始终只显示短文案，不显示等待图标或保留图标占位；检测完成前保持禁用，完成后沿用阻断问题和选择数量的禁用条件。
-详细阻断/跳过列表通过状态入口的 Popover 展示，避免检查状态变化导致 Dock 高度和按钮
-宽度跳动。
+分享浮窗交互归入 `packages/ui/src/conversation-share-interaction/` 受管模块。模块提供浮窗、
+预检提示、范围事务动作以及预检请求与响应处理器；调用方通过登记的入口访问。selection store 仍独占范围草稿，
+SessionPane 仍独占预检缓存和发布状态，模块不增加持久化或独立业务状态。手机远控不新增分享入口。
 
-选择 Dock 的批量标签按内容宽度保持单行，复选框、标签与计数不拆分；操作区空间不足时，取消/下一步按钮作为整组换到下一行并右对齐。中英文、放大 UI 字号及窄面板均遵循同一 CSS 布局，不改变选择状态或分享链路。
-
-选择与发布确认是两个可逆的 UI 阶段，并始终复用同一个 bottom dock。选择阶段只负责勾选已完成的
-product turn；点击「下一步」后，确认阶段在 dock 内同时展示本次分享的标题、访问权限和敏感信息确认，
-不再打开独立弹窗。新分享草稿首次进入确认阶段时访问权限默认是 `public_importable`；点击「上一步」返回
-选择阶段时，必须保留选择、标题、权限和其它 renderer-local
-草稿。选择阶段中的 timeline 仅用于查看和定位，不改变业务阶段。点击「确认并生成链接」后 dock
-原位切换为整理、上传和安全检查进度；发布开始后阶段不可切换。
-
-分享 dock 的 renderer-local 运行态必须按当前 `sessionId` 独立保存，至少包括标题覆盖、敏感信息确认、
-发布中状态、进度、成功链接、失败详情、warning 和本次幂等 attempt。SessionPane 可以复用同一个 pane
-实例来切换会话，但切换只改变当前 dock 的读取 key，不得把上一个 session 的结果投影到当前 session，
-也不得因为结束当前 session 的分享而清理其它 session 的分享状态。选择草稿和 dock 运行态都属于
-renderer-local UI 状态，不进入 conversation snapshot、SQLite、CommandInbox 或手机
-`web-remote-replayable` 恢复消息；预检缓存仍按现有规则在切换 session/workspace 时清理。
-
-```text
-Session A:  closed -> selecting -> confirming -> publishing -> published
-Session B:  closed -> selecting -> confirming -> publishing -> published
-
-switch A -> B: read/write dockStates[B] only
-switch B -> A: read/write dockStates[A] only
-```
-
-发布进度 dock 的底部摘要使用一行自然语言同时表达分享范围和访问权限，例如
-“分享 2 个对话轮次，链接持有者可导入并继续”；私有和只读权限分别替换为“仅自己可见”和
-“链接持有者可查看”。发布进行中不额外展示“不能修改分享内容”的锁定提示，因为标题、权限、返回、取消和确认
-控件已经被隐藏或禁用；进度标题、阶段和禁用按钮共同表达当前状态。窄屏允许该摘要自然换行，不改变语义。
-
-顶部分享入口复用工具栏的 `Button variant="ghost" size="icon-md"`，默认热区与背景为 28×28 CSS px，和帮助、终端、侧栏按钮一致；图标使用 Lucide `ShareIcon size-4`，不单独设置 mask 缩放。Windows 继续复用现有 caption control 尺寸覆盖。悬停与选中背景沿用语义 token；保留可访问名称、键盘操作及当前入口可见性，手机 `/remote` 不新增分享入口。此调整只涉及外观，不改变分享草稿所有权和点击语义。
-
-点击顶部分享入口进入选择阶段时，候选 product turn 默认全部选中，选择面板默认收起并展示
-timeline。分享已打开时，再次点击顶部入口取消当前 session 的分享，复用 `finishSelection` 清理
-选择草稿和可见 dock 状态；选择、确认、失败和成功阶段行为一致，不影响其它 session。
-发布进行中沿用 dock 的取消保护，顶部入口禁用，避免清理后异步发布结果重新写回。
-调整选择范围通过 timeline 左侧重新打开入口完成。此变更仅涉及 renderer 状态，不改变
-Desktop continuous、手机 replayable 和手机 `/remote` 不发起分享的边界。
-
-```text
-普通对话 --顶部分享--> 选择/确认/结果 --顶部分享--> finishSelection(sessionId) --> 普通对话
-发布中   --顶部分享禁用--> 等待发布结束
-```
-
-未勾选敏感信息确认时，“生成分享链接”保持可点击；点击不发起发布，而是将确认区域滚动到可见位置、聚焦复选框，并以 warning 背景闪亮一次（600ms），结束后恢复原样，不新增提示文字或持续高亮。重复点击重新播放，不叠加动画；减少动态效果偏好下仅定位并聚焦复选框。勾选后不自动发布，必须再次点击按钮。标题为空、未选择内容、发布中仍禁用，失败重试沿用原行为。披露确认仍由现有状态持有，Dock 不新增提示状态；桌面和 Web 共用此行为，不改变发布协议。
-
-敏感信息确认区在可用宽度允许时保持单行：左侧为复选框和确认文案，右侧为简短的自动检测说明与
-「查看检查范围」入口，右侧内容使用同一 `text-ui-xs` 字号并整体右对齐。完整的凭证、Token、密码、
-私钥、内部地址和个人信息清单继续放在检查范围 Popover 中；窄屏时右侧内容允许自然换行，不改变确认
-语义或校验条件。
-确认卡片与标题输入框、权限选择器共用同一 `mx-3` 内容轨道，并与权限区域保持独立的 `mt-3` 间距，
-避免敏感信息确认区贴住权限卡片或出现左右边界不一致。
-
-### 分享确认 Dock 窄宽度布局（SHARE28）
-
-确认 Dock 按自身容器内容盒宽度响应，不能用窗口 `md` 断点推断剩余空间。小于 640px 时权限单列，
-标签和说明完整换行；640px 起权限及发布阶段三列。小于 480px 时主操作独占第一行，返回/取消
-位于第二行；480px 起恢复横排。DOM 顺序调整为「生成分享链接」在前、返回/取消在后（窄屏主操作
-第一行即由该顺序直接成立），480px 起宽容器用 `order-last` 把主操作视觉后置到最右。窄屏下 Tab
-焦点顺序与视觉顺序一致；宽容器下 Tab 首停点为主操作、与视觉顺序（返回/取消在前）方向相反——
-这是「窄屏主操作第一行 + 宽屏主操作最右」两套视觉无法共用一份 DOM 顺序的已知取舍，主操作首停
-也符合键盘用户最常用路径。标题输入允许缩小到容器宽度；确认说明在窄屏隐藏装饰盾牌、减少重复缩进，保留复选框、警示边线、
-完整确认文案、自动检测说明和检查范围入口。Dock 总高度不超过 70dvh，正文独立纵向滚动，
-操作区不随正文滚出；不缩小字号、不新增权限文案、不改变发布验证。
-
-```text
-container width -> CSS layout only -> single column / wrapped actions
-sessionId      -> existing dock state -> title / permission / acknowledgement
-```
-
-SHARE28 验证：320/400/640/800px 面板（含宽窗口内窄面板）、中英文、明暗主题、短视口；
-控件与权限文案不横向溢出、操作区可见，缩窄再放宽保留标题、权限和确认勾选。
-复用现有 pending 分享 E2E 增补窄面板几何与状态断言，不提升为 formal。侧栏、公开分享页、
-手机 `/remote` 发布边界和 desktop continuous / mobile replayable 链路均不改变。
-
-发布成功后进入独立的 `published` 结果态：保留分享标题作为只读信息，展示持久的“分享已创建”状态和
-说明；隐藏访问权限、选择计数、确认提示、“上一步”和“取消”。业务操作只保留「去浏览器查看」与
-「复制链接」两个按钮，两个操作完成后仍保留结果态，用户可通过关闭图标或 `Esc` 退出。成功 Toast
-仅作为即时反馈，不能替代结果态中的持久成功提示。若存在被跳过的文件，在成功状态下以次级 warning
-展示，不得把部分成功误报为失败。
-
-选择、确认和发布成功三个分享 bottom dock 与普通 Composer 共用同一基础输入 surface：宽度继承
-timeline 内容列，使用 `rounded-2xl`、`border-input-border` 和 `bg-input`。分享 dock 不再额外使用
-popover ring 或大阴影，避免在普通输入框之间切换时产生不必要的层级和光晕差异。分享专有的内容高度、
-操作按钮、选择阶段 scrim、消息层渐隐 mask 以及 bottom dock 进入/退出动画继续保留；这些效果不改变
-分享状态、发布协议或 desktop continuous / mobile replayable 边界。
-
-### 选择面板高度与底部输入区避让
-
-选择阶段左侧的 `ConversationShareSelectionPanel` 使用内容自适应高度：候选较少时面板只包住
-header、列表内容和面板内边距，不因为固定高度产生空白；候选内容超过可视上限时，仅面板内的
-列表 `ScrollArea` 纵向滚动。面板的最终高度取自然内容高度和当前会话容器在底部 composer/share
-dock 之上的可用高度两者的最小值，不设置固定像素高度上限。可用高度由运行时真实测量，底部 dock
-增高、输入框变为多行、窗口 resize 或分屏布局变化时重新计算；面板底部与 dock 顶部至少保留
-16px 间距，不得遮挡或挤压输入区。
-选择面板不显示右上角关闭按钮；用户通过点击遮罩返回 timeline，或使用 timeline 左侧的重新打开入口恢复面板。
-点击面板条目的文字区域只定位正文到对应 turn，不改变选择面板的可见状态；只有点击面板以外的区域
-才收起面板并返回 timeline。点击复选框仍只改变当前 turn 的选择状态，不触发正文定位。
-
-```text
-会话内容区
-┌──────────────────────────────┐
-│ 顶部安全边距                  │
-│ ┌─ 选择面板 ───────────────┐ │
-│ │ header                   │ │
-│ │ 列表：自然高度            │ │
-│ │ 超过可用高度时仅列表滚动  │ │
-│ └──────────────────────────┘ │
-│ 至少 16px 间距                │
-│ 底部 composer / share dock    │ ← 实时测量顶部
-└──────────────────────────────┘
-```
-
-该布局规则只调整分享选择面板的 renderer 几何，不改变分享选择状态、timeline 滚动锁定、发布
-协议或手机 `/remote` 的分享能力边界。
+预检响应处理异常也必须结束检查：当前请求未命中的轮次写入可重试的 transport 阻断项，保留选择，
+禁止生成，并通过问题详情提供「重新检查」。异常日志与服务端失败日志分开记录。响应条目全部构建成功后，
+才能提交元信息与缓存，避免失败响应的 capabilities fingerprint 使恢复结果立即失效；过期请求不写入任何状态。
+状态顺序：`checking → ready（阻断）→ 重新检查 → checking → ready（成功或阻断）`。
 
 ## 发布错误详情契约
 
@@ -461,23 +503,41 @@ verification、用户输入附件、本地/内联 URL、未闭合 artifact 引�
 返回可定位信息，只显示稳定错误类型、阶段和安全的重试建议，不展示原始服务端文本。
 
 HTTP 错误分类以故障源为先：网关/负载均衡返回的 5xx 非 JSON 错误页（502/504 HTML）是
-基础设施故障，必须归类为 network 类，不得因 body 无法解析而归类为 `invalid_contract`
+基础设施故障，必须归类为 `service_unavailable`，与未收到响应的 network 类区分，不得因 body 无法解析而归类为 `invalid_contract`
 （后者语义是服务端违反 API 契约，会误导排障与用户提示）。artifact 上传是用户主动等待的
 大传输，单请求超时按 artifact 字节数动态放宽（保底带宽估算），不能沿用普通 JSON 请求的
 默认超时；confirm 之外的超时放宽规则同源。
 
 分享 dock 保留打开状态，发布失败继续停留在发布态 dock 中，并在进度信息下方内联显示可滚动的
-错误详情；发布失败不再显示顶部错误 Toast。错误态保留「上一步」「取消」和「重试生成链接」，
+错误详情；发布失败不再显示顶部错误 Toast。错误态保留「调整」、关闭浮窗和「重试生成链接」，
 用户修改选择、标题或权限后清除旧详情。所有详情文案必须同时支持中英文、浅色/深色主题和窄屏布局。
+
+发布、导入、网页预览共用业务码和 HTTP 状态分类：3216 提示内容未通过安全检查、需调整内容；
+3217 提示安全检查服务暂不可用、稍后重试；通用 5xx 提示分享服务暂不可用。原始数字 code 必须保留，
+包括未知业务码。401/429 空响应分别提示登录和稍后重试，HTML 错误页也按 HTTP 状态判断。
+3211/3212 在发布阶段提示重新生成链接，并清除旧 attempt 以生成新请求 ID；导入的 3211/3212/3214 和不支持的版本不提供原样重试，
+分别提示检查链接或账号、让分享者重新生成、只读分享无法导入、更新 ZCode。3210 不断言文件丢失，
+统一提示上传未完成或分享状态已变化。3215 保持现有有界串行轮询，优先使用合法 Retry-After-Ms。
+
+服务端校验失败的 data 只接收有界的 rule/path/field/row_index/row_kind 结构字段，忽略原始内容与
+其他字段；无效诊断字段不影响错误分类。主提示保持一句原因和下一步，技术位置放入错误详情。
+服务端请求 ID 优先取 x-request-id，缺失时可取合法的响应 logid；不得使用客户端请求 ID 代替。
+网页错误页同样提供 HTTP/code/服务端请求 ID 详情，导入失败日志保留这些字段供定位。
+
+```text
+HTTP 响应 → shared 分类/诊断校验 → Host 或 Web 客户端错误
+                                 ├─ 3215 → 原有 confirm owner 有界串行轮询
+                                 └─ 终态 → 原有 UI 错误态 → 原因/行动 + 按需诊断详情
+                                      └─ 3211/3212 → UI 清除已失效 attempt → 手动重试生成新请求 ID
+```
 
 错误详情中的服务端 `x-request-id` 默认不在错误 dock 内联展示；错误引导文案末尾提供一个
 click-only 的错误详情按钮，点击后通过向上的 Popover 展示并复制合法的服务端 request-id。
 没有 HTTP 响应 request-id 时仍保留该入口，在 Popover 中显示稳定缺失提示且不提供复制操作；
 不得使用客户端生成的请求头 ID 冒充服务端 ID。多条 issue 共用一个详情入口，不在每条 issue 后重复
 request-id。错误按钮与错误文案保持同一内容列，使用 24px 点击区域和语义 destructive 色，需支持
-键盘触发、Esc/点击外部关闭、窄屏碰撞调整以及浅色/深色主题。选择阶段的面板可关闭到 timeline，并通过左侧
-reopen tab 恢复；该操作只改变 `view`，不清空选择、标题、权限或错误草稿，且 reopen tab 仅在
-`stage=selection` 时显示。
+键盘触发、Esc/点击外部关闭、窄屏碰撞调整以及浅色/深色主题。范围面板取消时丢弃 pending 草稿，
+保留已确认范围、标题、权限与错误草稿；再次点击浮窗范围按钮开启新的编辑事务。正文定位不关闭面板。
 
 错误详情卡只有一条可行动文案时采用紧凑单行布局：文案、错误详情按钮和“关闭”操作垂直居中，
 上下内边距保持一致，使用较小的 `p-2`，并将卡片与操作栏的间距收窄为 `mb-2`；包含多条 issue 时才恢复列表所需的
@@ -488,11 +548,16 @@ reopen tab 恢复；该操作只改变 `view`，不清空选择、标题、权�
 成功后显示；不得使用 demo URL 或模拟 loading。相同标题、权限、选择和内容重试复用 clientRequestId，
 输入变化后生成新 ID。
 
-发布失败必须按稳定错误 kind 显示可操作提示，不得统一退化为“请重试”。Desktop Host 记录
+发布失败必须按稳定错误 kind 显示可操作提示，不得统一退化为“请重试”。执行分享的目标 Host 记录
 `operationId`、阶段、kind、HTTP status/code 和安全计数；Server Remote 等主动拒绝记录明确 reason。日志
 不得包含 JWT、Signed URL、Rows 正文、文件名或绝对路径。公开投影和产物 staging 失败还记录稳定
 `reasonCode`（如 `input_attachment`、`running_turn`、`artifact_changed`、`unsafe_url`）及安全的
 `rowKind/rowId/artifactType/phase` 诊断字段；UI 按 reasonCode 提示下一步操作，不展示底层原始错误文本。
+
+成功 HTTP 响应解析失败时，HTTP 客户端记录 `responseFormat`（`invalid_json` 或 `schema_mismatch`）、
+响应字节数、接口路径、请求 ID，以及最多 10 条校验问题的安全字段路径和类型；不记录原始响应、
+字段值或校验器原始错误消息。未知动态字段名以占位符隐藏。界面说明 ZCode 无法读取分享服务的返回结果，
+引导稍后重试，并在持续失败时通过错误详情复制请求 ID 联系支持；不把 HTTP 200 描述为发布成功。
 
 ## 导入与继续工作
 
@@ -634,3 +699,53 @@ Desktop `desktop-continuous` / 手机 `web-remote-replayable` 边界。
 - 接口异常及网络失败不要求取消轮次；发布失败保留选择与幂等身份。音视频与任意文件格式仅在现有协议和服务端能力支持时携带，不伪造 MIME 或扩展名绕过限制。
 
 验收：含内嵌图片的已完成轮次能通过预检、上传原始图片并产生可下载/导入的 artifact；不支持或损坏图片产生精确 warning；图片容量超限在选择阶段发现；HTTP 405 HTML 和响应体中断显示为接口/网络错误，详情保留关联 ID。
+
+### Workflow 分享展示一致性（SHARE-WF03）
+
+分享选择列表按 product turn 构建，包含没有 realUser 气泡的后台完成轮；普通提问导航保持不变。
+编译失败且未创建 run 的 CreateWorkflow 只保留工具诊断，不生成 unavailable 运行卡。
+运行卡复用客户端卡头、阶段图和产物条；完成轮只展示完成交付卡和四项统计，不重复阶段图。
+被内容块认领的 artifact Row 不再额外显示下载大卡，未知块仍保留原摘要和资源。
+workflow 内容版本 2 为 file/markdown 增加可选 preview_text（仅 text/plain、text/markdown，
+UTF-8 字节及字符均不超过 64 KiB）。发布端只在服务端 capabilities.workflow>=2 时发送；
+正文来自同一已冻结版本字节，并进入块哈希和既有安全审核。下载资源仍保留。
+读端优先使用快照正文，不依赖 OSS CORS；v1 分享继续兼容，原来遗漏的完成轮需要重新发布。
+
+分享只读视图不展示没有运行状态、没有产物且标记为 unavailable 的 workflow 占位块，
+同时移除该块的降级摘要和快照提示；正常或含部分数据的工作流继续展示。
+不额外生成 localhost/127.0.0.1 网站卡片；消息正文中的原始文本保持原样。此规则也适用于旧分享。
+
+分享预检必须保留认证、网络、服务不可用、限流、功能未开放、工作区连接、响应契约和
+授权声明错误的稳定分类，并复用明确的操作提示。纯传输/认证阻断使用“暂时无法检查分享”
+标题，不误判成内容问题；只有真实内容问题才显示内容阻断标题。未知原因不展示空的阶段占位。
+
+## 工具展示统一（tool-presentation v1）
+
+公开时间线复用 App 的全部工具 renderer、分组摘要和可公开详情。采用产品默认设置：探索/终端/CUA 分组开启、变更分组关闭、思考显示、Todo 隐藏；不上传个人设置。分享的只读边界保持不变，不新增 child session、工作区操作或插件交互应用。
+
+新增 content_blocks type=tool-presentation version=1，通过 content_block_versions 协商，顶层 schema_version 仍为 1。绑定 toolCall fallback_row_id，包含经过严格白名单过滤的 display、图片资源引用和 agent 类型；不包含格式化摘要、主题、运行授权或原始 raw。工作流继续使用原有内容块。媒体复用 artifact 上传与资源闭包，按工具归属和原顺序展示。
+
+旧分享以原工具行还原共同展示，不猜测丢失事实；旧服务端保持 V1 发布并提示结构化展示未完整保留。未知/损坏内容块退回原行，不能导致整份分享打不开。新块上线顺序：服务端、分享站、App。
+
+```mermaid
+flowchart TD
+  App[App 工具行] --> Facts[共同工具展示事实]
+  Share[分享行与公开内容块] --> Facts
+  Facts --> Renderer[共同 renderer 与分组]
+  Renderer --> Native[App 注入宿主能力]
+  Renderer --> Readonly[分享注入公开资源]
+```
+
+### 工具展示失败与宿主能力回归
+
+- 内嵌图片有资源 URL 时直接显示；否则由读取能力加载。缺少能力或空结果显示不可用，读取异常显示加载失败并记录日志。切换路径或能力后立即失效旧图片，迟到请求不能覆盖当前结果。
+- 审批弹窗直接复用工具 renderer 时也必须注入 App 展示能力。审批只预览待批准内容，不启动插件交互页面。App 工具行有合法插件 UI 声明和 session 绑定时，保留插件入口；无声明时仍使用专用 renderer。公开时间线不获得插件权限。
+- 预检不读取产物文件字节，仅使用已有元数据和 stat；工作流文件按 `version.bytes` 检查单文件、总字节和数量预算。声明大小缺失时不为预检额外读文件，发布时再读取并校验。已移除的独立产物行不重新物化。
+- 导入契约/完整性损坏不可原样重试；网络请求失败、响应体读取中断、服务不可用和 unknown 可重试，保留导入请求 ID。HTTP 错误不得仅因非 JSON 响应被归为契约损坏。
+
+```text
+图片输入变化 → 当前读取 → 成功 / 不可用 / 失败
+             └→ cleanup 失效旧读取 → 迟到结果丢弃
+App 宿主 → 展示能力 Provider → 工具行 / 审批预览
+导入请求 → HTTP 分类 → 传输故障可重试 / 契约损坏不可重试
+```

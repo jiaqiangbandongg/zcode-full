@@ -81,15 +81,6 @@ describe("mapSessionSummaryToTaskMeta", () => {
     ).toBeUndefined();
   });
 
-  it("sessionEnded=true 不是删除语义：成功收口的会话照常映射进列表", () => {
-    const meta = mapSessionSummaryToTaskMeta(
-      summary({ sessionEnded: true, phase: "completedSuccess" }),
-      { workspacePath: "/ws" },
-    );
-    expect(meta.taskId).toBe("s1");
-    expect(meta.status).toBe("completed");
-  });
-
   it("fork：parentSessionId → forkedFromTaskId", () => {
     const meta = mapSessionSummaryToTaskMeta(summary({ parentSessionId: "parent" }), {
       workspacePath: "/ws",

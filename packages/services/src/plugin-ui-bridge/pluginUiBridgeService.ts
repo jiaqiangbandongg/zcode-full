@@ -1,3 +1,8 @@
+import {
+  collectTelemetryRendererContext,
+  resolveWorkspaceTelemetryDetail,
+  type RendererTelemetryEventPayload,
+} from "@zcode/shared";
 import type {
   ZCodeMcpReadResourceResult,
   ZCodeMcpUiCallToolResult,
@@ -31,6 +36,7 @@ import type {
 } from "./contract.js";
 
 export interface PluginUiBridgeServiceDependencies {
+  reportTelemetryEvent?: (event: RendererTelemetryEventPayload) => void | Promise<void>;
   recycleInstance?: (params: import("./contract.js").PluginUiPluginScope) => Promise<boolean>;
   validateInstance?: (params: import("./contract.js").PluginUiPluginScope) => Promise<void>;
   openInstance?: (
@@ -226,7 +232,42 @@ export function createPluginUiBridgeService(
           "Plugin UI tool calls are unavailable in this runtime",
         );
       }
-      return dependencies.callMcpToolForUi(params, options);
+      const startedAt = Date.now();
+      const report = (result: "success" | "failure" | "cancelled") => {
+        try {
+          void Promise.resolve(
+            dependencies.reportTelemetryEvent?.({
+              elementName: "plugin_usage",
+              eventRegion: "app",
+              eventType: "result",
+              context: collectTelemetryRendererContext(),
+              eventExtraDetail: {
+                schema_version: "1",
+                action: "ui_tool_call",
+                result,
+                plugin_id: params.pluginId,
+                plugin_component: "ui",
+                duration_ms: String(Math.max(0, Date.now() - startedAt)),
+                ...resolveWorkspaceTelemetryDetail(params),
+              },
+            }),
+          ).catch(() => {});
+        } catch {
+          /* 观测失败不能改变工具调用结果。 */
+        }
+      };
+      try {
+        const result = await dependencies.callMcpToolForUi(params, options);
+        report(result.isError ? "failure" : "success");
+        return result;
+      } catch (error) {
+        report(
+          options?.signal?.aborted || (error instanceof Error && error.name === "AbortError")
+            ? "cancelled"
+            : "failure",
+        );
+        throw error;
+      }
     },
     async cancelToolCall(params) {
       // 没有 agent 依赖（web / 远程）时视为无可取消，不报错：取消是 best effort 的收尾动作。

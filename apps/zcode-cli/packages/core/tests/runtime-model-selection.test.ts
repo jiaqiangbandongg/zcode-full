@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createTestModelSelection } from "./test-model-selection.js";
 import {
   CoreErrorType,
+  ModelErrorCode,
+  ModelProtocolError,
   ModelRetryBudget,
   SessionEventType,
   createModelId,
@@ -12,6 +14,7 @@ import {
 import { createTestAgentRuntime } from "./test-agent-runtime.js";
 import { createTestSessionEventStore } from "./test-event-store.js";
 import { createTestModelFactory } from "./test-runtime-model.js";
+import { createRecordingSubagentSessionStore } from "./subagent-test-store.js";
 
 /** 只捕获 warn 的 Logger 桩：退回路径的留痕本身是回归断言的一部分。 */
 function createWarnCapturingLogger(warn: ReturnType<typeof vi.fn>): Logger {
@@ -613,6 +616,183 @@ describe("AgentRuntime model selection event", () => {
     },
   );
 
+  it.each([ModelErrorCode.ProviderNotFound, ModelErrorCode.ModelNotFound])(
+    "falls back before the request when execution Selection creation fails with %s",
+    async (code) => {
+      const sessionId = createSessionId(`runtime-execution-selection-creation-${code}`);
+      const eventStore = createTestSessionEventStore();
+      const highspeedProviderId = "account:bigmodel-highspeed-card";
+      const created: Array<{ providerId: string; modelId: string }> = [];
+      const runtime = createTestAgentRuntime(
+        sessionId,
+        {
+          modelSelection: createTestModelSelection("user-provider/user-model"),
+          titleGeneration: { enabled: false },
+          workingDirectory: "/workspace/project",
+        },
+        {
+          eventStore,
+          modelFactory: createTestModelFactory({
+            onCreate(input) {
+              created.push(input.selection);
+              if (input.selection.providerId === highspeedProviderId) {
+                throw new ModelProtocolError(code, "Highspeed selection is unavailable");
+              }
+            },
+            async generateText(_request, observation) {
+              return {
+                finishReason: "stop",
+                model: observation.model,
+                text: "continued with the original model",
+                usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
+              };
+            },
+          }),
+        },
+      );
+
+      const result = await runtime.executeTurn("continue before request", undefined, {
+        inputId: `command-creation-${code}`,
+        intent: {
+          sourceCommandId: `command-creation-${code}`,
+          kind: "sendText",
+          requestedDelivery: "start-now",
+          modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        },
+        modelExecution: {
+          selectionScope: "execution",
+          selectionFallback: {
+            providerId: highspeedProviderId,
+            rules: cardExpiryFallbackRules,
+            target: { providerId: "user-provider", modelId: "user-model" },
+          },
+        },
+      });
+
+      expect(result.response).toBe("continued with the original model");
+      expect(created).toEqual([
+        { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        { providerId: "user-provider", modelId: "user-model" },
+      ]);
+      const fallbackEvents = (await eventStore.getEvents(sessionId)).filter(
+        (event) => event.type === SessionEventType.TurnExecutionModelFallback,
+      );
+      expect(fallbackEvents).toHaveLength(1);
+      expect(fallbackEvents[0]?.payload).toMatchObject({
+        inputId: `command-creation-${code}`,
+        reason: "highspeed_selection_unavailable",
+        fromModelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        toModelSelection: { providerId: "user-provider", modelId: "user-model" },
+      });
+    },
+  );
+
+  it("reports the ordinary model creation error when Highspeed creation and fallback both fail", async () => {
+    const sessionId = createSessionId("runtime-execution-selection-creation-fallback-fails");
+    const eventStore = createTestSessionEventStore();
+    const sessionStore = createRecordingSubagentSessionStore();
+    const highspeedProviderId = "account:bigmodel-highspeed-card";
+    const runtime = createTestAgentRuntime(
+      sessionId,
+      {
+        modelSelection: createTestModelSelection("user-provider/user-model"),
+        titleGeneration: { enabled: false },
+        workingDirectory: "/workspace/project",
+      },
+      {
+        eventStore,
+        sessionStore,
+        modelFactory: createTestModelFactory({
+          onCreate(input) {
+            if (input.selection.providerId === highspeedProviderId) {
+              throw new ModelProtocolError(
+                ModelErrorCode.ProviderNotFound,
+                "Highspeed selection is unavailable",
+              );
+            }
+            throw new ModelProtocolError(
+              ModelErrorCode.ProviderNotFound,
+              "Original model selection is unavailable",
+            );
+          },
+        }),
+      },
+    );
+    await expect(
+      runtime.executeTurn("continue before request", undefined, {
+        inputId: "command-creation-fallback-fails",
+        intent: {
+          sourceCommandId: "command-creation-fallback-fails",
+          queueItemId: "input-creation-fallback-fails",
+          kind: "sendText",
+          requestedDelivery: "start-now",
+          modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+          highspeed: {
+            schemaVersion: 1,
+            cardId: "card-creation-fallback-fails",
+            taskId: String(sessionId),
+            provider: "builtin:zai-coding-plan",
+            model: "GLM-5.3",
+            issuedAt: 1_700_000_000_000,
+            expiresAt: 1_700_000_060_000,
+          },
+        },
+        modelExecution: {
+          selectionScope: "execution",
+          selectionFallback: {
+            providerId: highspeedProviderId,
+            rules: cardExpiryFallbackRules,
+            target: { providerId: "user-provider", modelId: "user-model" },
+          },
+        },
+      }),
+    ).rejects.toMatchObject({
+      message: "Model creation failed",
+      cause: expect.objectContaining({ message: "Original model selection is unavailable" }),
+    });
+
+    const events = await eventStore.getEvents(sessionId);
+    const turnStartedIndex = events.findIndex(
+      (event) => event.type === SessionEventType.TurnStarted,
+    );
+    const turnErrorIndex = events.findIndex((event) => event.type === SessionEventType.TurnError);
+    expect(turnStartedIndex).toBeGreaterThanOrEqual(0);
+    expect(turnErrorIndex).toBeGreaterThan(turnStartedIndex);
+    expect(events[turnStartedIndex]?.payload).toMatchObject({
+      input: "continue before request",
+      inputId: "command-creation-fallback-fails",
+    });
+    const [persistedUser] = await sessionStore.messages({ sessionID: sessionId });
+    expect(persistedUser).toMatchObject({
+      info: {
+        role: "user",
+        anchor: { sourceCommandId: "command-creation-fallback-fails" },
+        metadata: {
+          inputIntent: {
+            queueItemId: "input-creation-fallback-fails",
+            sourceCommandId: "command-creation-fallback-fails",
+          },
+        },
+      },
+      parts: [{ type: "text", text: "continue before request" }],
+    });
+    expect(
+      events.filter((event) => event.type === SessionEventType.TurnExecutionModelFallback),
+    ).toHaveLength(0);
+    expect(
+      events.find((event) => event.type === SessionEventType.TurnError)?.payload,
+    ).toMatchObject({
+      error: {
+        message: "Original model selection is unavailable",
+        // 创建期所有候选都失败时同样没有 fallback 事件；Renderer 按该事实作废匹配卡。
+        attribution: {
+          highspeedCardId: "card-creation-fallback-fails",
+          highspeedFallbackUnavailable: true,
+        },
+      },
+    });
+  });
+
   it("falls back to the Session Selection inside the same turn when the declared provider error hits", async () => {
     const sessionId = createSessionId("runtime-execution-selection-fallback");
     const eventStore = createTestSessionEventStore();
@@ -840,8 +1020,8 @@ describe("AgentRuntime model selection event", () => {
       fromModelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
       toModelSelection: target,
     });
-    // 退回只作用于本轮，不借机改写会话常驻选择。
-    expect(runtime.getSessionModelSelection()).toBeUndefined();
+    // 接纳用户消息时保存其普通选择；执行和回退不会把加速端点写入 Session。
+    expect(runtime.getSessionModelSelection()).toEqual(target);
     expect(warn).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -889,10 +1069,7 @@ describe("AgentRuntime model selection event", () => {
     });
 
     expect(requests).toEqual([{ providerId: highspeedProviderId, modelId: "GLM-5.3" }, target]);
-    expect(runtime.getSessionModelSelection()).toMatchObject({
-      providerId: "user-provider",
-      modelId: "user-model",
-    });
+    expect(runtime.getSessionModelSelection()).toEqual(target);
   });
 
   it("skips a declared target the model factory cannot resolve and falls back to the Session Selection", async () => {
@@ -985,6 +1162,15 @@ describe("AgentRuntime model selection event", () => {
           kind: "sendText",
           requestedDelivery: "start-now",
           modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+          highspeed: {
+            schemaVersion: 1,
+            cardId: "card-request-fallback-unavailable",
+            taskId: String(sessionId),
+            provider: "builtin:bigmodel-coding-plan",
+            model: "GLM-5.3",
+            issuedAt: 1_700_000_000_000,
+            expiresAt: 1_700_000_060_000,
+          },
         },
         modelExecution: {
           selectionScope: "execution",
@@ -1000,10 +1186,25 @@ describe("AgentRuntime model selection event", () => {
     const causeMessage = failure?.cause instanceof Error ? failure.cause.message : undefined;
     expect([failure?.message, causeMessage]).toContain("highspeed card is invalid");
     expect(requests).toEqual([{ providerId: highspeedProviderId, modelId: "GLM-5.3" }]);
-    const fallbackEvents = (await eventStore.getEvents(sessionId)).filter(
+    const events = await eventStore.getEvents(sessionId);
+    const fallbackEvents = events.filter(
       (event) => event.type === SessionEventType.TurnExecutionModelFallback,
     );
     expect(fallbackEvents).toHaveLength(0);
+    // 无处可退时没有 fallback 事件，Renderer 只能靠 TurnError 归因退卡；3402 是 provider 错误码，
+    // 不在目录错误白名单里，所以 Core 必须显式发布“已归因且无处可退”的事实（spec §2.2）。
+    const turnError = events.find((event) => event.type === SessionEventType.TurnError);
+    expect(turnError?.payload).toMatchObject({
+      error: {
+        code: "3402",
+        attribution: {
+          source: "provider",
+          providerErrorCode: "3402",
+          highspeedCardId: "card-request-fallback-unavailable",
+          highspeedFallbackUnavailable: true,
+        },
+      },
+    });
     expect(warn).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
@@ -1214,10 +1415,19 @@ describe("AgentRuntime model selection event", () => {
 
     // 加速模型失败一次即退回；退回后的会话模型再失败按真实错误整轮失败，不再二次降级。
     expect(providers).toEqual([highspeedProviderId, "user-provider"]);
-    const fallbackEvents = (await eventStore.getEvents(sessionId)).filter(
+    const events = await eventStore.getEvents(sessionId);
+    const fallbackEvents = events.filter(
       (event) => event.type === SessionEventType.TurnExecutionModelFallback,
     );
     expect(fallbackEvents).toHaveLength(1);
+    // 退回已经发生，卡由 fallback 事件作废；终态错误属于会话模型，不得再标成“无处可退”。
+    const turnError = events.find((event) => event.type === SessionEventType.TurnError);
+    expect(turnError?.payload).toMatchObject({
+      error: { attribution: { providerId: "user-provider" } },
+    });
+    expect(
+      (turnError?.payload as { error: { attribution: Record<string, unknown> } }).error.attribution,
+    ).not.toHaveProperty("highspeedFallbackUnavailable");
   });
 
   it("falls back before same-model stream recovery when the execution stream fails after visible output", async () => {
@@ -1246,17 +1456,20 @@ describe("AgentRuntime model selection event", () => {
             yield { id: "text-1", type: "text_start" };
             if (providerId === highspeedProviderId) {
               yield { id: "text-1", text: "partial accelerated output", type: "text_delta" };
-              throw Object.assign(new Error("Network connection failed for the provider request."), {
-                code: "model_request_failed",
-                context: {
-                  providerId,
-                  modelId: "GLM-5.3",
-                  reason: "network_error",
-                  retryable: true,
-                  source: "network",
+              throw Object.assign(
+                new Error("Network connection failed for the provider request."),
+                {
+                  code: "model_request_failed",
+                  context: {
+                    providerId,
+                    modelId: "GLM-5.3",
+                    reason: "network_error",
+                    retryable: true,
+                    source: "network",
+                  },
+                  name: "AiSdkModelAdapterError",
                 },
-                name: "AiSdkModelAdapterError",
-              });
+              );
             }
             yield { id: "text-1", text: "continued with the session model", type: "text_delta" };
             yield { id: "text-1", type: "text_end" };
@@ -1321,4 +1534,94 @@ describe("AgentRuntime model selection event", () => {
       },
     });
   });
+  it.each([false, true])(
+    "keeps the highspeed fallback fixed when Session changes (explicit=%s)",
+    async (explicit) => {
+      const sessionId = createSessionId("runtime-execution-selection-fallback");
+      const eventStore = createTestSessionEventStore();
+      const highspeedProviderId = "account:zai-highspeed-card";
+      const requests: Array<{ modelId: string; providerId: string }> = [];
+      const runtime = createTestAgentRuntime(
+        sessionId,
+        {
+          modelSelection: createTestModelSelection(
+            explicit ? "idle-provider/idle-model" : "user-provider/user-model",
+          ),
+          titleGeneration: { enabled: false },
+          workingDirectory: "/workspace/project",
+        },
+        {
+          eventStore,
+          modelFactory: createTestModelFactory({
+            async generateText(_request, observation) {
+              requests.push({
+                modelId: String(observation.model.modelId),
+                providerId: String(observation.model.providerId),
+              });
+              if (String(observation.model.providerId) === highspeedProviderId) {
+                // 模拟较新的用户输入已经接管续跑选择；旧加速轮不能跟随这个选择回退。
+                runtime.setSessionModelSelection(
+                  createTestModelSelection("new-provider/new-model"),
+                );
+                throw Object.assign(new Error("highspeed card is invalid"), {
+                  code: "invalid_model_request",
+                  context: {
+                    providerCode: "3402",
+                    providerId: highspeedProviderId,
+                    modelId: "GLM-5.3",
+                    source: "provider",
+                  },
+                  name: "AiSdkModelAdapterError",
+                });
+              }
+              return {
+                finishReason: "stop",
+                model: observation.model,
+                text: "continued with the session model",
+                usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
+              };
+            },
+          }),
+        },
+      );
+
+      const result = await runtime.executeTurn("continue after expiry", undefined, {
+        inputId: "command-highspeed-expired",
+        intent: {
+          sourceCommandId: "command-highspeed-expired",
+          kind: "sendText",
+          requestedDelivery: "start-now",
+          modelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        },
+        modelExecution: {
+          selectionScope: "execution",
+          selectionFallback: {
+            providerId: highspeedProviderId,
+            ...(explicit ? { target: createTestModelSelection("user-provider/user-model") } : {}),
+            rules: [{ reason: "highspeed_card_expired", providerErrorCode: "3402" }],
+          },
+        },
+      });
+
+      expect(result.response).toBe("continued with the session model");
+      expect(requests).toEqual([
+        { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        { providerId: "user-provider", modelId: "user-model" },
+      ]);
+      const fallbackEvent = (await eventStore.getEvents(sessionId)).find(
+        (event) => event.type === SessionEventType.TurnExecutionModelFallback,
+      );
+      expect(fallbackEvent?.payload).toMatchObject({
+        inputId: "command-highspeed-expired",
+        reason: "highspeed_card_expired",
+        fromModelSelection: { providerId: highspeedProviderId, modelId: "GLM-5.3" },
+        toModelSelection: { providerId: "user-provider", modelId: "user-model" },
+      });
+      // 回退只影响当前轮，不能把较新的用户选择覆盖回去。
+      expect(runtime.getSessionModelSelection()).toMatchObject({
+        providerId: "new-provider",
+        modelId: "new-model",
+      });
+    },
+  );
 });

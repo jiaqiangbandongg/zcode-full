@@ -24,10 +24,6 @@ describe("automation template Client Scenes icons", () => {
         view.container.querySelector('[data-client-scene-lucide-icon="calendar-clock"]'),
       ).not.toBeNull();
     });
-    const icon = view.container.querySelector("svg");
-    expect(icon?.getAttribute("stroke")).toBe("currentColor");
-    expect(icon?.className.baseVal).not.toContain("text-foreground");
-    expect(icon?.parentElement?.classList.contains("text-foreground")).toBe(true);
     expect(view.container.querySelector("img")).toBeNull();
     expect(view.container.querySelector("svg.lucide-target")).toBeNull();
   });

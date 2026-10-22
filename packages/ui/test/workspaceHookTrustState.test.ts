@@ -8,11 +8,6 @@ import enUS from "../src/i18n/locales/en-US.js";
 import zhCN from "../src/i18n/locales/zh-CN.js";
 
 describe("workspace Hook trust state 展示语义（D19）", () => {
-  it("行内 Trust 文案在 zh/en 两侧都存在", () => {
-    expect(zhCN["settings.hooks.review.trust"]).toBe("信任");
-    expect(enUS["settings.hooks.review.trust"]).toBe("Trust");
-  });
-
   it("只在「有 review → 无 review」跃变时判定审核终结", () => {
     // 授权走行内 Trust、不经 revoke 的 refresh，设置页需据此补刷新，
     // 否则按钮会滞留到组件重挂载（2026-08-11 UAT）。

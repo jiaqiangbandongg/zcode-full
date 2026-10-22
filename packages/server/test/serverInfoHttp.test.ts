@@ -54,6 +54,13 @@ describe("server info HTTP endpoint", () => {
       version: expect.any(String),
       protocolVersion: SERVER_REMOTE_PROTOCOL_VERSION,
       authRequired: false,
+      compatibility: {
+        schemaVersion: 1,
+        productVersion: expect.any(String),
+        minCompatibleVersion: expect.any(String),
+      },
+      migration: { failedPathCount: 0 },
+      identity: { osUser: expect.any(String), hostname: expect.any(String) },
       workspaces: [
         {
           path: "/srv/zcode/project",
@@ -65,6 +72,22 @@ describe("server info HTTP endpoint", () => {
         websocketRpc: true,
         processResourceTelemetry: true,
       },
+    });
+  });
+
+  it("announces virtual projects only for an initialized owner host", async () => {
+    const server = createHttpServer(new ServiceCollection(), 0, {
+      serverId: "owner",
+      virtualProjects: true,
+      migrationFailedPathCount: 2,
+    });
+    servers.push(server);
+    const address = server.address() as AddressInfo;
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/server-info`);
+    expect(await response.json()).toMatchObject({
+      serverId: "owner",
+      capabilities: { virtualProjects: true },
+      migration: { failedPathCount: 2 },
     });
   });
 
@@ -105,6 +128,24 @@ describe("server info HTTP endpoint", () => {
     });
   });
 
+  it("does not expose either retired remote-connect route", async () => {
+    const server = createHttpServer(new ServiceCollection(), 0);
+    servers.push(server);
+    const address = server.address() as AddressInfo;
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/connect-remote`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(404);
+    const websocketUpgradeRoute = await fetch(
+      `http://127.0.0.1:${address.port}/ws/remote/retired-session`,
+    );
+    expect(websocketUpgradeRoute.status).toBe(404);
+  });
+
   it("serves static web files with SPA fallback", async () => {
     const staticRoot = await mkdtemp(join(tmpdir(), "zcode-lite-static-"));
     tempDirs.push(staticRoot);
@@ -121,7 +162,8 @@ describe("server info HTTP endpoint", () => {
 
     const asset = await fetch(`${baseUrl}/app.js`);
     expect(asset.status).toBe(200);
-    expect(asset.headers.get("content-type")).toContain("text/javascript");
+    // 不同静态资源适配器使用两种合法 JS MIME；断言资源可执行类型而非库版本拼写。
+    expect(asset.headers.get("content-type")).toMatch(/^(?:text|application)\/javascript(?:;|$)/);
     await expect(asset.text()).resolves.toBe("console.log('lite');");
 
     const fallback = await fetch(`${baseUrl}/workspace/deep/link`);

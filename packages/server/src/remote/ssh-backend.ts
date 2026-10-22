@@ -2,6 +2,7 @@
 import { Client as SSHClient } from "ssh2";
 import type { ConnectConfig } from "ssh2";
 import { createReadStream } from "node:fs";
+import type { Duplex } from "node:stream";
 import { posix } from "node:path";
 import { Emitter } from "@zcode/rpc";
 import { resolveZCodeRuntimeEnv } from "@zcode/shared";
@@ -217,9 +218,21 @@ export class SSHBackend implements IRemoteBackend {
 
   async detect(): Promise<RemoteEnvironment> {
     await this.ensureConnected();
-    const reportedPlatform = normalizeRemotePlatform(await this.execSimple("uname -s"));
-    const arch = normalizeRemoteArch(await this.execSimple("uname -m"));
-    const kernelOstype = await this.readKernelOstype();
+    // Bug 原因：冷启动曾为 platform、arch、kernel ostype 串行创建三个 SSH exec channel，
+    // 仅环境探测就占掉大部分 10 秒恢复预算。保持一个 POSIX channel 可同时避免首次多 channel 竞态。
+    const output = await this.execSimple(
+      "printf 'platform='; uname -s; printf 'arch='; uname -m; printf 'kernel='; " +
+        "if [ -r /proc/sys/kernel/ostype ]; then cat /proc/sys/kernel/ostype; else printf '\\n'; fi",
+    );
+    const readField = (name: string): string =>
+      output
+        .split(/\r?\n/u)
+        .find((line) => line.startsWith(`${name}=`))
+        ?.slice(name.length + 1)
+        .trim() ?? "";
+    const reportedPlatform = normalizeRemotePlatform(readField("platform"));
+    const arch = normalizeRemoteArch(readField("arch"));
+    const kernelOstype = readField("kernel");
     const platform = resolveRemotePlatform(reportedPlatform, kernelOstype);
 
     if (platform !== reportedPlatform) {
@@ -316,6 +329,19 @@ export class SSHBackend implements IRemoteBackend {
     });
   }
 
+  async openDirectTcpChannel(port: number): Promise<Duplex> {
+    if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+      throw new Error(`Invalid remote TCP port: ${port}`);
+    }
+    await this.ensureConnected();
+    return await new Promise<Duplex>((resolve, reject) => {
+      this.client.forwardOut("127.0.0.1", 0, "127.0.0.1", port, (error, channel) => {
+        if (error) reject(error);
+        else resolve(channel);
+      });
+    });
+  }
+
   async exists(remotePath: string): Promise<boolean> {
     try {
       const resolvedRemotePath = await this.resolveRemotePath(remotePath);
@@ -384,18 +410,6 @@ export class SSHBackend implements IRemoteBackend {
 
     this.homeDirPromise = this.execSimple('printf %s "$HOME"').then((homeDir) => homeDir.trim());
     return this.homeDirPromise;
-  }
-
-  private async readKernelOstype(): Promise<string> {
-    try {
-      return (
-        await this.execSimple(
-          "if [ -r /proc/sys/kernel/ostype ]; then cat /proc/sys/kernel/ostype; fi",
-        )
-      ).trim();
-    } catch {
-      return "";
-    }
   }
 
   private shouldFallbackToExecUpload(error: unknown): boolean {

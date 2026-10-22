@@ -3,16 +3,8 @@
 // v4-bridge 经 resolveStableForkTarget 把 targetRowId 固定到 logical turn 边界 →
 // forkStableConversation → ACK.result.sessionId → pane 原地切到 child session（新
 // sessionId，但历史含父会话内容）。证明稳定边界解析与 conversation-only fork 打通。
-import {
-  TID_CHAT_THOUGHT_LEVEL_SELECT_ITEM,
-  TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER,
-} from "@zcode/shared";
-import {
-  DEFAULT_WORKSPACE,
-  clearAppData,
-  clickTestIdByDom,
-  waitForWorkspaceApp,
-} from "../helpers/desktop-app.js";
+import { TID_V4_MODEL_CONFIG } from "@zcode/shared/test-ids";
+import { DEFAULT_WORKSPACE, clearAppData, waitForWorkspaceApp } from "../helpers/desktop-app.js";
 import {
   selectUpstreamProviderModelById,
   selectUpstreamThoughtLevelValue,
@@ -78,6 +70,11 @@ describe("v4 M4 门禁：forkAssistant", () => {
     // Bug 回归：fork child 没有 legacy task config cache。旧 UI 因 session snapshot 不带
     // 模型能力，只能从 workspace catalog / 通用五档重建；线上表现为五档，本 fixture
     // 会被 custom provider catalog 遮成 off/high/max，但都不是 runtime 的 nothink/high/max。
+    // sessionId 先于能力 snapshot 切换；读取瞬时空数组会误报，等待同一目标集合到达。
+    await browser.waitUntil(
+      async () => (await readThoughtLevelValues()).join(",") === "high,max,nothink",
+      { timeout: 30000, timeoutMsg: "fork child 没有恢复父会话的三档思考能力" },
+    );
     expect(await readThoughtLevelValues()).toEqual(["high", "max", "nothink"]);
     await browser.waitUntil(async () => (await getV4ModelConfig()).thought === "high", {
       timeout: 30000,
@@ -131,7 +128,16 @@ async function prepareGlm52Draft(): Promise<void> {
   // 修复原因：设置页保存完成与 active workspace registry 刷新不是同一屏障，
   // 紧接着发送会让真实请求仍落到旧 provider。进程退出后原子 seed App+CLI 再重启。
   const [provider] = await restartWithSeededOpenAIProviders([
-    { modelId, providerId, providerName },
+    {
+      modelId,
+      providerId,
+      providerName,
+      // 个人模型夹具不会按名称继承 Built-in 能力，显式声明三档与请求参数。
+      reasoningLevel: {
+        values: ["nothink", "high", "max"],
+        map: '{"reasoning_effort":reasoningLevel}',
+      },
+    },
   ]);
   if (!provider) throw new Error("V4 fork GLM-5.2 replay provider seed 失败");
   await prepareV4ConversationE2E({ skipProvider: true });
@@ -149,28 +155,9 @@ async function prepareGlm52Draft(): Promise<void> {
 }
 
 async function readThoughtLevelValues(): Promise<string[]> {
-  await clickTestIdByDom(TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER, {
-    timeout: 30000,
-    timeoutMsg: "思考深度选择器没有出现",
-  });
-  const itemPrefix = `${TID_CHAT_THOUGHT_LEVEL_SELECT_ITEM}-`;
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        (prefix) => document.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`).length > 0,
-        itemPrefix,
-      ),
-    {
-      timeout: 10000,
-      timeoutMsg: "思考深度菜单没有渲染选项",
-    },
-  );
-  const values = await browser.execute((prefix) => {
-    return Array.from(document.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`))
-      .map((element) => (element.dataset.testid ?? "").slice(prefix.length))
-      .filter(Boolean)
-      .sort();
-  }, itemPrefix);
-  await browser.keys(["Escape"]);
-  return values;
+  return browser.execute((testId) => {
+    const values = document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)?.dataset
+      .thoughtLevels;
+    return (values ?? "").split(",").filter(Boolean).sort();
+  }, TID_V4_MODEL_CONFIG);
 }

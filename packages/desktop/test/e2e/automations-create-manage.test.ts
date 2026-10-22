@@ -11,7 +11,6 @@ import {
   TID_AUTOMATION_SCHEDULE_ADD,
   TID_AUTOMATIONS_LIST,
   TID_AUTOMATIONS_OPEN,
-  TID_COMPOSER_WORKSPACE_TRIGGER,
   TID_CONFIRM_DIALOG_CONFIRM,
   TID_CHAT_MODEL_SELECT_TRIGGER,
   TID_CHAT_MODEL_SELECT_GROUP,
@@ -19,7 +18,7 @@ import {
   TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER,
   TID_CHAT_THOUGHT_LEVEL_SELECT_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -27,9 +26,9 @@ import {
   hoverTestIdByWebDriver,
   setInputValueByTestIdDom,
   waitForTestIdByDom,
-} from "./helpers/desktop-app.js";
-import { prepareConversationE2E } from "./helpers/conversation-session.js";
-import { UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL } from "./helpers/upstream-provider.js";
+} from "#e2e/helpers/desktop-app";
+import { prepareConversationE2E } from "#e2e/helpers/conversation-session";
+import { UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL } from "#e2e/helpers/upstream-provider";
 
 /**
  * 定时任务「表单创建 → 编辑 → 暂停/恢复 → 删除」端到端。
@@ -64,18 +63,12 @@ describe("定时任务表单创建与管理 E2E", () => {
       timeoutMsg: "创建定时任务主按钮没有出现",
     });
 
-    // CWP11：创建页项目候选必须与左侧当前打开项目对齐，不能混入 app-owned
-    // conversation default 或 recentProjects 中已经关闭/删除的项目。
-    await clickTestIdByWebDriver(TID_COMPOSER_WORKSPACE_TRIGGER, {
+    // 表单已改用虚拟项目 Select；旧会话菜单定位会在进入业务断言前超时。
+    await clickTestIdByWebDriver("automation-project-select", {
       timeoutMsg: "定时任务创建页没有项目选择器",
     });
     const workspaceMenuItems = await readWorkspaceMenuItems();
-    // 新版允许任务脱离项目运行；仍需确认当前项目存在且没有混入其它已关闭项目。
-    expect(workspaceMenuItems).toHaveLength(2);
-    expect(workspaceMenuItems).toContain("ZCodeProject");
-    expect(
-      workspaceMenuItems.some((label) => /不在项目中工作|Work outside a project/u.test(label)),
-    ).toBe(true);
+    expect(workspaceMenuItems).toEqual(["ZCodeProject"]);
     await selectWorkspaceMenuItem("ZCodeProject");
     await clickTestIdByWebDriver(TID_CHAT_MODEL_SELECT_TRIGGER);
     await clickTestIdByWebDriver(
@@ -227,7 +220,7 @@ async function automationCardTitles(): Promise<string[]> {
 /** 读取项目选择菜单的可选行；菜单动作和搜索框不属于候选。 */
 async function readWorkspaceMenuItems(): Promise<string[]> {
   return browser.execute(() =>
-    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]'))
+    Array.from(document.querySelectorAll<HTMLElement>('[role="option"]'))
       .map((item) => item.innerText.trim())
       .filter(Boolean),
   );
@@ -237,9 +230,9 @@ async function readWorkspaceMenuItems(): Promise<string[]> {
 async function selectWorkspaceMenuItem(label: string): Promise<void> {
   // 与菜单枚举使用相同的可见文本口径，避免 WebDriver getText 对嵌套标签返回空串。
   const selected = await browser.execute((text) => {
-    const item = Array.from(
-      document.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]'),
-    ).find((candidate) => candidate.innerText.trim() === text);
+    const item = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+      (candidate) => candidate.innerText.trim() === text,
+    );
     item?.click();
     return Boolean(item);
   }, label);

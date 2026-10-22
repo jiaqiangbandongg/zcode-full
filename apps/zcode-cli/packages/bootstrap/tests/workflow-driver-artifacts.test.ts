@@ -212,7 +212,11 @@ afterAll(async () => {
 describe("workflow driver — 产物发布（artifact.file）", () => {
   it("把字节写进 store，并交出一条完整的落库记录", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
     const before = Date.now();
 
     const record = await driver.executeArtifactPublish!(
@@ -241,7 +245,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
 
   it("按 spec 的四个参数写 store（retention / toolName / toolCallId / sessionId）", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await driver.executeArtifactPublish!(
       fileRequest({ runId: "run-42", siteId: "artifact#7", ordinal: 5 }),
@@ -261,11 +269,15 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
     });
   });
 
-  it("路径是工作区相对的，子目录与反斜杠都归一成正斜杠出处", async () => {
+  it("工作区相对路径的点段归一后保留子目录出处", async () => {
     await mkdir(join(workspace, "a", "b"), { recursive: true });
     await writeFile(join(workspace, "a", "b", "note.txt"), "hi", "utf8");
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(
       fileRequest({ path: "./a/b/../b/note.txt" }),
@@ -277,7 +289,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
 
   it("越出工作区的相对路径被 ArtifactPathOutsideWorkspace 拒绝", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const error = await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: "../outside/secret.txt" })),
@@ -289,7 +305,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
 
   it("绝对路径同样按越界处理（工作区之外没有可展示的出处）", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: join(outside, "secret.txt") })),
@@ -304,7 +324,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
     await rm(link, { force: true });
     await symlink(join(outside, "secret.txt"), link);
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: "leak.txt" })),
@@ -318,7 +342,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
     await rm(link, { force: true });
     await symlink(join(workspace, "out", "report.pdf"), link);
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(fileRequest({ path: "alias.pdf" }));
     expect(record.sourcePath).toBe("alias.pdf");
@@ -327,7 +355,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
 
   it("路径不存在 / 指向目录都是 ArtifactSourceMissing", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const missing = await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: "out/nope.pdf" })),
@@ -344,7 +376,11 @@ describe("workflow driver — 产物发布（artifact.file）", () => {
     const big = join(workspace, "out", "huge.bin");
     await writeFile(big, Buffer.alloc(ARTIFACT_CAPS.maxFileBytes + 1, 0));
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const error = await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: "out/huge.bin" })),
@@ -428,7 +464,11 @@ describe("workflow driver — 产物的内容类型", () => {
     const name = `typed.${extension}`;
     await writeFile(join(workspace, "out", name), "x", "utf8");
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(fileRequest({ path: `out/${name}` }));
     expect(record.contentType).toBe(contentType);
@@ -439,7 +479,11 @@ describe("workflow driver — 产物的内容类型", () => {
     await writeFile(join(workspace, "out", "blob.zzz"), "x", "utf8");
     await writeFile(join(workspace, "out", "Makefile"), "x", "utf8");
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     expect(
       (await driver.executeArtifactPublish!(fileRequest({ path: "out/blob.zzz" }))).contentType,
@@ -451,7 +495,11 @@ describe("workflow driver — 产物的内容类型", () => {
 
   it("opts.contentType 覆盖扩展名表", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(
       fileRequest({ opts: { contentType: "text/html" } }),
@@ -463,7 +511,11 @@ describe("workflow driver — 产物的内容类型", () => {
 
   it("带参数的 contentType 被拒绝（展示侧按裸 MIME 精确分派）", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const error = await rejection(
       driver.executeArtifactPublish!(
@@ -479,7 +531,11 @@ describe("workflow driver — 产物的内容类型", () => {
 describe("workflow driver — 产物发布（artifact.markdown）", () => {
   it("走文本写通道，恒 text/markdown，且不带 sourcePath", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(
       markdownRequest({ opts: { title: "小结" } }),
@@ -505,7 +561,11 @@ describe("workflow driver — 产物发布（artifact.markdown）", () => {
 
   it("正文按 UTF-8 计字节：恰好 256 KB 放行，多一个字节即 ArtifactTooLarge", async () => {
     const { store, writes } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const exact = "a".repeat(ARTIFACT_CAPS.maxMarkdownBytes);
     const ok = await driver.executeArtifactPublish!(markdownRequest({ content: exact }));
@@ -521,7 +581,11 @@ describe("workflow driver — 产物发布（artifact.markdown）", () => {
 
   it("多字节字符按 UTF-8 而不是按字符数计上限", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     // 「中」是 3 字节：字符数远未超限，字节数刚好越线。
     const content = "中".repeat(Math.floor(ARTIFACT_CAPS.maxMarkdownBytes / 3) + 1);
@@ -534,7 +598,11 @@ describe("workflow driver — 产物发布（artifact.markdown）", () => {
 
   it("markdown 不读 opts.contentType（这一族恒 text/markdown）", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(
       markdownRequest({ opts: { contentType: "text/html" } }),
@@ -552,7 +620,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it.each(cases)("opts 是%s时大声拒绝", async (_label, opts) => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const error = await rejection(
       driver.executeArtifactPublish!(markdownRequest({ opts })),
@@ -563,7 +635,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it("title / description 必须是 string，绝不强转", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const title = await rejection(
       driver.executeArtifactPublish!(markdownRequest({ opts: { title: 7 } })),
@@ -580,7 +656,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it("title / description 超长按上限拒绝而不是截断", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const title = await rejection(
       driver.executeArtifactPublish!(
@@ -606,7 +686,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it("不认识的 opts 键静默忽略（编译期已拦住，运行期不再报第二次）", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const record = await driver.executeArtifactPublish!(
       markdownRequest({ opts: { title: "小结", 未知键: 1 } }),
@@ -616,7 +700,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it("非法 id（字符集 / 超长）是接线错误，报 DriverError", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(
       driver.executeArtifactPublish!(markdownRequest({ id: "bad id/slash" })),
@@ -632,7 +720,11 @@ describe("workflow driver — 产物的实参形状", () => {
 
   it("payload 缺席或类型不对同样大声失败（引擎护栏之外的第二道）", async () => {
     const { store } = fakeArtifactStore();
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: undefined })),
@@ -659,7 +751,11 @@ describe("workflow driver — 产物存储缺席", () => {
 
   it("store 不支持二进制写时：文件拒绝，markdown 照常发布", async () => {
     const { store, writes } = fakeArtifactStore({ binary: false });
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(driver.executeArtifactPublish!(fileRequest()), "ArtifactStoreUnavailable");
     const record = await driver.executeArtifactPublish!(markdownRequest());
@@ -683,7 +779,11 @@ describe("workflow driver — 产物存储缺席", () => {
         };
       },
     });
-    const driver = makeDriver({ cwd: workspace, fileSystemPort: port, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      fileSystemPort: port,
+      parentSessionId: SESSION_ID,
+    });
 
     await rejection(
       driver.executeArtifactPublish!(fileRequest({ path: "out/nope.pdf" })),
@@ -693,7 +793,11 @@ describe("workflow driver — 产物存储缺席", () => {
 
   it("store 写入自身失败归一成 DriverError，并带上原因文本", async () => {
     const { store } = fakeArtifactStore({ failWith: new Error("ENOSPC: no space left") });
-    const driver = makeDriver({ cwd: workspace, artifactStore: store, parentSessionId: SESSION_ID });
+    const driver = makeDriver({
+      cwd: workspace,
+      artifactStore: store,
+      parentSessionId: SESSION_ID,
+    });
 
     const error = await rejection(driver.executeArtifactPublish!(fileRequest()), "DriverError");
     expect(error.message).toContain("ENOSPC");

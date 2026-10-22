@@ -1,38 +1,379 @@
 import { redactFeedbackText } from "@zcode/shared";
-import { useCallback, useEffect, useRef } from "react";
-import { AlertTriangleIcon, LoaderIcon } from "lucide-react";
-import { TID_SSH_ERROR, type RemoteTarget } from "@zcode/shared";
+import { usePlatform } from "@/hooks/usePlatform.js";
+import { RemotePasswordInput } from "@/remote-connection/RemotePasswordInput.js";
+import {
+  classifyRemoteConnectionError,
+  resolveRemoteConnectionPresentation,
+} from "@/lib/remoteConnectionPresentation.js";
+import {
+  RemoteConnectionStatusTag,
+  RemoteConnectionKindTag,
+} from "@/remote-connection/RemoteConnectionTags.js";
+import {
+  DesktopCommandIds,
+  type SourceServerInstallPreview,
+  type SourceServerOperationLog,
+  type SourceServerRunningTask,
+} from "@zcode/shared";
+/* eslint-disable max-lines -- 连接阶段清单、日志和错误恢复共享同一视图状态，保持原子交互。 */
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  LoaderIcon,
+  MinusIcon,
+  XIcon,
+} from "lucide-react";
+import { type RemoteTarget } from "@zcode/shared";
+import { TID_SSH_ERROR } from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import type { RemoteConnectionLogEntry } from "@/hooks/useRemoteConnectionLogs.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import {
+  formatRemoteLinkRailTarget,
+  formatRemoteLinkRailDevice,
+} from "@/remote-connection/RemoteLinkRail.js";
+import {
   isRemoteConnectionLogScrolledToLatest,
   scrollRemoteConnectionLogsToLatestIfFollowing,
 } from "@/remote-connection/remoteConnectionLogScroll.js";
+
+/** 连接向导与侧栏详情共用的用户阶段；原始 phase 的归并规则只在这里维护一份。 */
+const REMOTE_CONNECTION_PHASES = [
+  ["channel", "remote.phase.channel"],
+  ["identify", "remote.phase.identify"],
+  ["deploy", "remote.phase.deploy"],
+  ["handshake", "remote.phase.handshake"],
+] as const;
+
+export type RemoteConnectionPhaseStatus = "pending" | "active" | "complete" | "failed";
+
+function normalizeRemoteConnectionPhase(rawPhase: string): string | null {
+  if (rawPhase === "probe") return "channel";
+  if (rawPhase === "directory-record") return "identify";
+  if (rawPhase === "publish-online") return "handshake";
+  if (rawPhase === "daemon" || rawPhase === "protocol-handshake" || rawPhase === "restart")
+    return "handshake";
+  if (
+    rawPhase === "download" ||
+    rawPhase === "preflight" ||
+    rawPhase === "upload" ||
+    rawPhase === "extract" ||
+    rawPhase === "verify-archive" ||
+    rawPhase === "verify" ||
+    rawPhase === "install"
+  ) {
+    return "deploy";
+  }
+  if (rawPhase === "channel") return "channel";
+  return REMOTE_CONNECTION_PHASES.some(([key]) => key === rawPhase) ? rawPhase : null;
+}
+
+export function resolveRemoteConnectionPhases(
+  logs: ReadonlyArray<Pick<RemoteConnectionLogEntry, "message" | "level">>,
+  options: { connectionReady?: boolean } = {},
+) {
+  let activeIndex = -1;
+  let failedIndex = -1;
+  for (const log of logs) {
+    const match = /^\[source-server:([^\]]+)\]/u.exec(log.message);
+    if (!match) continue;
+    const phaseIndex = REMOTE_CONNECTION_PHASES.findIndex(
+      ([key]) => key === normalizeRemoteConnectionPhase(match[1]!),
+    );
+    if (phaseIndex < 0) continue;
+    activeIndex = Math.max(activeIndex, phaseIndex);
+    if (log.level === "error") failedIndex = phaseIndex;
+  }
+  // 修复原因：成功连接后 publish-online 不是 Renderer 日志流的可靠终结事件，
+  // 仅按日志推断会出现顶部已连接但阶段轨永久停在握手中的状态。连接 session ready
+  // 是同一条连接流程的权威终态；没有错误阶段时用它完成最终阶段，不改变连接中的日志进度。
+  const connectionReady =
+    (options.connectionReady === true ||
+      logs.some((log) => log.message.startsWith("[source-server:publish-online]"))) &&
+    failedIndex < 0;
+  return REMOTE_CONNECTION_PHASES.map(([key, titleId], index) => ({
+    key,
+    titleId,
+    status: (failedIndex === index
+      ? "failed"
+      : connectionReady
+        ? "complete"
+        : index < activeIndex
+          ? "complete"
+          : index === activeIndex
+            ? "active"
+            : "pending") as RemoteConnectionPhaseStatus,
+  }));
+}
+
+export interface RemoteOperationProgress {
+  index: number;
+  total: number;
+  titleId: string;
+  /** 仅最新一条是上传/下载进度时存在，0-100 整数。 */
+  percent?: number;
+  /** 本次操作首条日志时间；Host 每次新操作都会替换旧日志。 */
+  startedAt?: number;
+}
+
+/** 侧栏详情只投影阶段与进度，不展示原始日志文本。 */
+export function resolveRemoteOperationProgress(
+  allLogs: ReadonlyArray<
+    Pick<SourceServerOperationLog, "phase" | "progress" | "timestamp" | "level">
+  >,
+): RemoteOperationProgress {
+  // 修复原因：Host 保留的是“最近一次操作”而非“进行中的操作”；断线后首次重试前、两次重试之间
+  // 读到的是已结束的上一次操作，曾显示“第 4/4 步 · 已用 120 分”。终态（ready / error）
+  // 说明该操作已结束，按尚无日志展示，等下一次尝试由 Host 替换日志。
+  const tail = allLogs.at(-1);
+  const logs = tail && (tail.phase === "ready" || tail.level === "error") ? [] : allLogs;
+  let index = 0;
+  for (const log of logs) {
+    const key = normalizeRemoteConnectionPhase(log.phase);
+    const found = REMOTE_CONNECTION_PHASES.findIndex(([phase]) => phase === key);
+    if (found > index) index = found;
+  }
+  const latest = logs.at(-1);
+  const transfer =
+    latest?.progress !== undefined && (latest.phase === "upload" || latest.phase === "download");
+  return {
+    index,
+    total: REMOTE_CONNECTION_PHASES.length,
+    titleId: REMOTE_CONNECTION_PHASES[index]![1],
+    ...(transfer ? { percent: Math.floor(latest.progress! * 100) } : {}),
+    ...(logs[0] ? { startedAt: logs[0].timestamp } : {}),
+  };
+}
+
+/**
+ * 阶段子说明（原型 s-sub）：只映射有结构化数据源的场景，映射不到时留空。
+ * 原始英文日志不再直接透传，避免与原型中文说明混排。
+ */
+export function resolveRemoteConnectionPhaseSub(
+  phase: { key: string; status: RemoteConnectionPhaseStatus },
+  context: {
+    kind?: RemoteTarget["kind"];
+    recognizedDeviceName?: string;
+    installConfirmationPending?: boolean;
+    deployErrorReason?: string;
+    rawPhase?: string;
+  },
+): { id: string; values?: Record<string, string> } | null {
+  switch (phase.key) {
+    case "channel":
+      return phase.status === "complete"
+        ? {
+            id:
+              context.kind && context.kind !== "server"
+                ? `remote.phaseSub.channelEstablished.${context.kind}`
+                : "remote.phaseSub.channelEstablished",
+          }
+        : null;
+    case "identify":
+      if (context.recognizedDeviceName) {
+        return {
+          id: "remote.phaseSub.identifyExisting",
+          values: { device: context.recognizedDeviceName },
+        };
+      }
+      if (context.installConfirmationPending) {
+        return { id: "remote.phaseSub.identifyNew" };
+      }
+      return null;
+    case "deploy":
+      if (phase.status === "failed" && context.deployErrorReason) {
+        return {
+          id: "remote.phaseSub.uploadFailed",
+          values: { reason: context.deployErrorReason },
+        };
+      }
+      if (context.installConfirmationPending) {
+        return { id: "remote.phaseSub.deployWaitingConfirm" };
+      }
+      if (phase.status === "active") {
+        const descriptions: Record<string, string> = {
+          extract: "remote.phaseSub.extracting",
+          "verify-archive": "remote.phaseSub.verifyingArchive",
+          verify: "remote.phaseSub.verifyingFiles",
+          install: "remote.phaseSub.installed",
+        };
+        const id = context.rawPhase && descriptions[context.rawPhase];
+        if (id) return { id };
+      }
+      return null;
+    case "handshake":
+      return phase.status === "active" && context.rawPhase === "restart"
+        ? { id: "remote.phaseSub.restarting" }
+        : null;
+    case "ready":
+      return phase.status === "complete" || phase.status === "active"
+        ? { id: "remote.phaseSub.readyOnline" }
+        : null;
+    default:
+      return null;
+  }
+}
 
 export function RemoteConnectionConnectingStep({
   kind,
   logs,
   errorMessage,
+  errorCode,
+  rawError,
+  upgradeTarget,
   loading,
+  installConfirmation,
+  target,
+  recognizedDeviceName,
+  profileName,
+  onUseRemoteDownload,
   onBack,
   onRetry,
+  upgradeRequired = false,
+  upgradeLoading = false,
+  onUpgrade,
+  connectionReady = false,
+  cancelled = false,
+  onCancelConnection,
+  credentials,
+  forceUpdate,
+  onMinimize,
+  onClose,
+  onBackToDevices,
+  backToDevicesLabel,
 }: {
+  forceUpdate?: { tasks?: SourceServerRunningTask[]; onConfirm: () => void; onCancel: () => void };
+  credentials?: {
+    passphrase: boolean;
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+  };
+  onMinimize?: () => void;
+  onClose?: () => void;
+  onBackToDevices?: () => void;
+  backToDevicesLabel?: string;
   kind: RemoteTarget["kind"];
   logs: RemoteConnectionLogEntry[];
   errorMessage: string;
+  errorCode?: string;
+  rawError?: string;
+  upgradeTarget?: "controller" | "server";
   loading: boolean;
+  installConfirmation?: {
+    target: RemoteTarget;
+    preview?: SourceServerInstallPreview;
+    onConfirm: () => void;
+    onCancel: () => void;
+  };
+  target?: RemoteTarget | null;
+  recognizedDeviceName?: string;
+  profileName?: string;
+  recognizedDeviceMeta?: string;
+  localVersion?: string;
+  onUseRemoteDownload?: () => void;
   onBack: () => void;
   onRetry: () => void;
+  upgradeRequired?: boolean;
+  upgradeLoading?: boolean;
+  onUpgrade?: () => void;
+  connectionReady?: boolean;
+  cancelled?: boolean;
+  onCancelConnection?: () => void;
+  onContinueToDirectory?: () => void;
 }) {
   const { intl } = useZCodeIntl();
+  const credentialInputId = useId();
+  const platform = usePlatform();
   const openFeedbackSubmit = useFeedbackStore((state) => state.openSubmit);
   const logContainerRef = useRef<HTMLDivElement | null>(null);
   const shouldFollowLatestLogRef = useRef(true);
   const latestLogId = logs.at(-1)?.id;
   const latestLogTimestamp = logs.at(-1)?.timestamp;
+  const [now, setNow] = useState(Date.now);
+  const [mountedAt] = useState(Date.now);
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [loading]);
+  const waitingPhase = credentials
+    ? "channel"
+    : installConfirmation || forceUpdate
+      ? "deploy"
+      : undefined;
+  const phases = resolveRemoteConnectionPhases(logs, { connectionReady }).map(
+    (phase, index, all) => {
+      const waitingIndex = all.findIndex((item) => item.key === waitingPhase);
+      if (waitingIndex >= 0)
+        return {
+          ...phase,
+          status: (index < waitingIndex
+            ? "complete"
+            : index === waitingIndex
+              ? "active"
+              : "pending") as RemoteConnectionPhaseStatus,
+        };
+      if (loading && !logs.length && index === 0) return { ...phase, status: "active" as const };
+      return phase;
+    },
+  );
+  const logTime = (timestamp: string) => {
+    const parts = String(timestamp).match(/(\d{1,2}):(\d{2}):(\d{2})/u);
+    if (!parts) return mountedAt;
+    const wallNow = Date.now();
+    const date = new Date(wallNow);
+    date.setHours(Number(parts[1]), Number(parts[2]), Number(parts[3]), 0);
+    // 展示时钟可能落后新日志不到一秒；只有明显跨日才回退，不能把新日志误判为昨天。
+    if (date.getTime() - wallNow > 12 * 60 * 60 * 1000) date.setDate(date.getDate() - 1);
+    return date.getTime();
+  };
+  const deploymentFailedLog = [...logs]
+    .reverse()
+    .find(
+      (entry) =>
+        entry.level === "error" &&
+        /^\[source-server:(?:download|preflight|upload|install)\]/u.test(entry.message),
+    );
+  const errorPresentation = classifyRemoteConnectionError({
+    errorCode: credentials && !errorCode ? "credentials-required" : errorCode,
+    error: rawError ?? errorMessage,
+    target: target ?? undefined,
+    upgradeTarget,
+  });
+  const presentation = resolveRemoteConnectionPresentation({
+    state: forceUpdate
+      ? "needs-upgrade"
+      : upgradeLoading
+        ? "updating"
+        : installConfirmation
+          ? "needs-install"
+          : loading
+            ? "bootstrapping"
+            : upgradeRequired
+              ? "needs-upgrade"
+              : errorMessage
+                ? "failed"
+                : connectionReady
+                  ? "online"
+                  : "absent",
+    errorCode: credentials && !errorCode ? "credentials-required" : errorCode,
+    error: rawError ?? errorMessage,
+    upgradeTarget,
+    target: target ?? undefined,
+    wizard: true,
+  });
+  const failed = presentation.status === "failed" && !loading && !cancelled;
+  const errorDetailsRef = useRef<HTMLDetailsElement>(null);
+  const [logsExpanded, setLogsExpanded] = useState(Boolean(errorMessage));
+
+  useEffect(() => {
+    if (errorMessage) setLogsExpanded(true);
+  }, [errorMessage]);
 
   const handleLogContainerScroll = useCallback(() => {
     const container = logContainerRef.current;
@@ -68,7 +409,7 @@ export function RemoteConnectionConnectingStep({
       type: "bug",
       module: kind === "ssh" ? "SSH连接失败" : kind === "wsl" ? "WSL连接失败" : "Agent任务执行失败",
       severity: "P2-中",
-      includeLogs: true,
+      includeLogs: false,
       description: buildRemoteConnectionFeedbackDescription(errorMessage, logs, (id, values) =>
         intl.formatMessage({ id }, values),
       ),
@@ -76,102 +417,570 @@ export function RemoteConnectionConnectingStep({
     });
   };
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 h-full">
-      <div className="flex flex-col flex-1 min-h-0 space-y-4">
-        <div className="min-h-0 flex-1 flex flex-col rounded-xl bg-background border border-border">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <p className="text-ui-base font-medium text-foreground">
-              {intl.formatMessage({ id: "remote.connectionLog" })}
-            </p>
-            {loading ? (
-              <div className="flex items-center gap-2 text-ui-base text-foreground-subtle">
-                <LoaderIcon className="size-3.5 animate-spin" />
-                {intl.formatMessage({ id: "remote.connecting" })}
-              </div>
-            ) : null}
-          </div>
-          <div
-            ref={logContainerRef}
-            onScroll={handleLogContainerScroll}
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 font-mono text-ui-base"
+  const installPanel = installConfirmation ? (
+    // 安装确认是阶段内的中性信息面板，圆角比所属阶段行低一级。
+    <div className="mt-2 flex items-start gap-3 rounded-sm border border-border bg-background px-3.5 py-3 text-ui-sm text-foreground">
+      <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <p className="font-medium">
+          {intl.formatMessage({ id: "remote.sourceServerInstallTitle" })}
+        </p>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-ui-xs">
+          <dt className="text-remote-foreground-muted">
+            {intl.formatMessage({ id: "remote.installTarget" })}
+          </dt>
+          <dd className="font-mono">{formatInstallTarget(installConfirmation.target)}</dd>
+          <dt className="text-remote-foreground-muted">
+            {intl.formatMessage({ id: "remote.installVersion" })}
+          </dt>
+          <dd className="font-mono" data-testid="remote-install-version">
+            {installConfirmation.preview?.version ??
+              intl.formatMessage({ id: "remote.infoUnavailable" })}
+          </dd>
+          <dt className="text-remote-foreground-muted">
+            {intl.formatMessage({ id: "remote.installLocation" })}
+          </dt>
+          <dd className="break-all font-mono" data-testid="remote-install-path">
+            {installConfirmation.preview?.installPath ??
+              intl.formatMessage({ id: "remote.infoUnavailable" })}
+          </dd>
+          <dt className="text-remote-foreground-muted">
+            {intl.formatMessage({ id: "remote.installSize" })}
+          </dt>
+          <dd className="font-mono">
+            {installConfirmation.preview
+              ? `${(installConfirmation.preview.sizeBytes / 1048576).toFixed(1)} MB`
+              : intl.formatMessage({ id: "remote.infoUnavailable" })}
+          </dd>
+        </dl>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button type="button" size="sm" onClick={installConfirmation.onConfirm}>
+            {intl.formatMessage({
+              id: "remote.sourceServerInstallConfirm",
+            })}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={installConfirmation.onCancel}
           >
-            {logs.length > 0 ? (
-              logs.map((entry) => (
-                <div key={entry.id} className="w-full flex min-w-0 leading-5 text-foreground">
-                  <span className="text-foreground-subtlest">{entry.timestamp}</span>
-                  <span
-                    className={cn(
-                      "mx-2",
-                      entry.level === "success"
-                        ? "text-success"
-                        : entry.level === "warn"
-                          ? "text-warning"
-                          : entry.level === "error"
-                            ? "text-destructive"
-                            : "text-foreground-subtle",
-                    )}
-                  >
-                    [{entry.level.toUpperCase()}]
-                  </span>
-                  <span>{entry.message}</span>
-                </div>
-              ))
-            ) : (
-              <div className="flex min-h-full items-center justify-center text-foreground-subtle">
-                <span>[INFO] {intl.formatMessage({ id: "remote.connectionLogEmpty" })}</span>
-              </div>
-            )}
-          </div>
+            {intl.formatMessage({ id: "common.cancel" })}
+          </Button>
         </div>
-
-        {errorMessage ? (
-          <div
-            data-testid={TID_SSH_ERROR}
-            className="flex flex-wrap items-start gap-3 rounded-xl border border-warning/30 px-4 py-3 text-ui-base text-warning"
+      </div>
+    </div>
+  ) : null;
+  const errorPanel =
+    errorMessage || credentials ? (
+      // 错误和凭据等待嵌入所属阶段；详细日志只在失败后展开。
+      <div
+        data-testid={TID_SSH_ERROR}
+        className={cn(
+          "space-y-2 rounded-sm border px-3.5 py-3",
+          presentation.border,
+          presentation.surface,
+        )}
+      >
+        <p
+          className={cn("flex items-center gap-2 text-ui-sm font-medium", presentation.foreground)}
+        >
+          {upgradeLoading ? (
+            <LoaderIcon className="size-4 shrink-0 animate-spin" />
+          ) : (
+            <AlertTriangleIcon className="size-4 shrink-0" />
+          )}
+          {intl.formatMessage({
+            id: upgradeLoading
+              ? presentation.shortMessageId
+              : credentials && !errorMessage
+                ? "remote.error.credentialsRequired"
+                : errorPresentation.titleId,
+          })}
+        </p>
+        {!upgradeLoading && errorMessage ? (
+          <>
+            <p className="text-ui-xs text-remote-foreground-muted">
+              {intl.formatMessage({ id: errorPresentation.reasonId })}
+            </p>
+            <details ref={errorDetailsRef} className="text-ui-xs text-remote-foreground-muted">
+              <summary className="cursor-pointer">
+                {intl.formatMessage({ id: "remote.error.details" })}
+              </summary>
+              <pre className="whitespace-pre-wrap break-words">{rawError ?? errorMessage}</pre>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  void navigator.clipboard.writeText(rawError ?? errorMessage);
+                }}
+              >
+                {intl.formatMessage({ id: "chat.toolCall.copyError" })}
+              </Button>
+            </details>
+          </>
+        ) : null}
+        {credentials ? (
+          <form
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              credentials.onSubmit();
+            }}
           >
-            <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
-            <span className="min-w-0 flex-1">{errorMessage}</span>
+            <label htmlFor={credentialInputId} className="block text-ui-sm">
+              {intl.formatMessage({
+                id: credentials.passphrase ? "ssh.privateKeyPassphrase" : "ssh.password",
+              })}
+            </label>
+            <RemotePasswordInput
+              id={credentialInputId}
+              autoFocus
+              required
+              className="mt-1"
+              data-testid={
+                credentials.passphrase ? "ssh-private-key-passphrase-input" : "ssh-password-input"
+              }
+              value={credentials.value}
+              onChange={(event) => credentials.onChange(event.target.value)}
+            />
+            <Button type="submit" size="sm" disabled={loading || !credentials.value}>
+              {intl.formatMessage({ id: "remote.startConnection" })}
+            </Button>
+          </form>
+        ) : null}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {!credentials ? (
             <Button
               type="button"
-              variant="outline"
               size="sm"
               onClick={() => {
-                void handleOpenFeedback();
+                if (presentation.primaryAction === "cancel") onCancelConnection?.();
+                else if (presentation.primaryAction === "update-desktop")
+                  void platform.executeDesktopCommand(DesktopCommandIds.CheckForUpdates);
+                else if (presentation.primaryAction === "update-server" && onUpgrade) onUpgrade();
+                else if (
+                  ["credentials", "edit-auth", "edit-host"].includes(presentation.primaryAction)
+                )
+                  onBack();
+                else if (["security", "details"].includes(presentation.primaryAction)) {
+                  if (errorDetailsRef.current) errorDetailsRef.current.open = true;
+                } else onRetry();
               }}
-              className="h-7 shrink-0 border-warning/30 text-warning hover:bg-warning/10"
+              disabled={loading || upgradeLoading}
             >
-              {intl.formatMessage({ id: "remoteConnection.feedback" })}
+              {upgradeLoading ? (
+                <LoaderIcon className="size-3.5 animate-spin" aria-hidden="true" />
+              ) : null}
+              {intl.formatMessage({
+                id: presentation.actionMessageId,
+              })}
             </Button>
+          ) : null}
+          {onUseRemoteDownload && errorPresentation.allowRemoteDownload ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onUseRemoteDownload}>
+              {intl.formatMessage({ id: "remote.useRemoteDownload" })}
+            </Button>
+          ) : null}
+          <Button type="button" variant="secondary" size="sm" onClick={onBack}>
+            {intl.formatMessage({ id: "remote.backToConnection" })}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              void handleOpenFeedback();
+            }}
+          >
+            {intl.formatMessage({ id: "remoteConnection.feedback" })}
+          </Button>
+        </div>
+      </div>
+    ) : null;
+  const errorPhase = credentials
+    ? "channel"
+    : errorCode === "source-server-identity-change-pending"
+      ? "identify"
+      : (phases.find((phase) => phase.status === "failed")?.key ??
+        phases.find((phase) => phase.status === "active")?.key ??
+        "channel");
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6 ">
+      <div className="flex flex-col flex-1 min-h-0 space-y-4 overflow-y-auto">
+        <div className="shrink-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-ui-base font-semibold">
+              {recognizedDeviceName ??
+                profileName ??
+                (target
+                  ? formatRemoteLinkRailDevice(target)
+                  : intl.formatMessage({ id: "remote.phase.channel" }))}
+            </h3>
+            {kind === "server" ? (
+              <span className="text-ui-xs">Server</span>
+            ) : (
+              <RemoteConnectionKindTag kind={kind} />
+            )}
+            {cancelled ? null : <RemoteConnectionStatusTag presentation={presentation} />}
           </div>
-        ) : null}
+          {target ? (
+            <p className="break-all font-mono text-ui-sm text-remote-foreground-muted">
+              {formatRemoteLinkRailTarget(target)}
+            </p>
+          ) : null}
+        </div>
+        <ol data-testid="remote-connection-stages" className="shrink-0 space-y-0.5 py-1">
+          {phases.map((phase, phaseIndex) => {
+            const phaseStart = logs.find((entry) => {
+              const raw = /^\[source-server:([^\]]+)\]/u.exec(entry.message)?.[1];
+              return raw && normalizeRemoteConnectionPhase(raw) === phase.key;
+            });
+            const nextStart = logs.find((entry) => {
+              const raw = /^\[source-server:([^\]]+)\]/u.exec(entry.message)?.[1];
+              return (
+                raw &&
+                phases.findIndex((item) => item.key === normalizeRemoteConnectionPhase(raw)) >
+                  phaseIndex
+              );
+            });
+            const phaseLog = [...logs].reverse().find((entry) => {
+              const match = /^\[source-server:([^\]]+)\]/u.exec(entry.message);
+              return match && normalizeRemoteConnectionPhase(match[1]!) === phase.key;
+            });
+            const rawPhase = /^\[source-server:([^\]]+)\]/u.exec(phaseLog?.message ?? "")?.[1];
+            const progressMatch =
+              phase.status === "active" && (rawPhase === "upload" || rawPhase === "download")
+                ? phaseLog?.message.match(/(\d+(?:\.\d+)?)%/u)
+                : null;
+            const transfer = phaseLog?.message.match(
+              /(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?) MB, (\d+(?:\.\d+)?) MB\/s/u,
+            );
+            const remainingSeconds =
+              transfer && Number(transfer[3]) > 0
+                ? Math.max(
+                    0,
+                    Math.ceil((Number(transfer[2]) - Number(transfer[1])) / Number(transfer[3])),
+                  )
+                : undefined;
+            const phaseSub = resolveRemoteConnectionPhaseSub(phase, {
+              kind,
+              rawPhase,
+              recognizedDeviceName,
+              installConfirmationPending: Boolean(installConfirmation),
+              deployErrorReason: deploymentFailedLog?.message.replace(
+                /^\[source-server:[^\]]+\]\s*/u,
+                "",
+              ),
+            });
+            return (
+              <li
+                key={phase.key}
+                className={cn(
+                  "relative flex shrink-0 min-w-0 items-start gap-3 rounded-md px-2.5 py-2 text-ui-sm",
+                  // 原型 .stages li.cur：当前阶段行有 surface 底色高亮。
+                  phase.status === "active" && "bg-surface",
+                )}
+              >
+                {phaseIndex < phases.length - 1 ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-5 top-8 bottom-0 border-l border-border"
+                  />
+                ) : null}
+                <span
+                  className={cn(
+                    "relative z-10 mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                    phase.status === "complete"
+                      ? "border-success bg-success-surface text-success-surface-foreground"
+                      : phase.status === "active"
+                        ? phase.key === waitingPhase
+                          ? "border-warning text-warning"
+                          : "border-progress-surface-foreground text-progress-surface-foreground"
+                        : phase.status === "failed"
+                          ? "border-destructive text-destructive"
+                          : "border-border text-remote-foreground-muted",
+                  )}
+                >
+                  {phase.status === "complete" ? (
+                    <CheckIcon className="size-3" />
+                  ) : phase.key === waitingPhase ? (
+                    <AlertTriangleIcon className="size-3 text-warning" />
+                  ) : phase.status === "active" ? (
+                    <LoaderIcon className="size-3 animate-spin" />
+                  ) : phase.status === "failed" ? (
+                    <XIcon className="size-3" />
+                  ) : (
+                    <span className="size-1.5 rounded-full bg-current" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={
+                        phase.status === "pending"
+                          ? "text-remote-foreground-muted"
+                          : phase.status === "active"
+                            ? "text-foreground font-semibold"
+                            : "text-foreground"
+                      }
+                    >
+                      {intl.formatMessage({
+                        id:
+                          phase.key === "channel" && kind !== "server"
+                            ? `remote.phase.channel.${kind}`
+                            : phase.titleId,
+                      })}
+                    </span>
+                    {phaseStart || phase.status === "active" ? (
+                      <span className="text-ui-xs tabular-nums text-remote-foreground-muted">
+                        {Math.max(
+                          0,
+                          Math.floor(
+                            ((phase.status === "complete" && nextStart
+                              ? logTime(nextStart.timestamp)
+                              : loading
+                                ? now
+                                : phaseLog
+                                  ? logTime(phaseLog.timestamp)
+                                  : now) -
+                              (phaseStart ? logTime(phaseStart.timestamp) : mountedAt)) /
+                              1000,
+                          ),
+                        )}{" "}
+                        s
+                      </span>
+                    ) : null}
+                  </div>
+                  {phaseSub ? (
+                    <p className="break-words text-ui-xs text-remote-foreground-muted">
+                      {intl.formatMessage({ id: phaseSub.id }, phaseSub.values)}
+                    </p>
+                  ) : null}
+                  {phase.key === "deploy" &&
+                  !phaseSub &&
+                  rawPhase &&
+                  phase.status === "active" &&
+                  ["download", "upload", "extract", "verify-archive", "verify", "install"].includes(
+                    rawPhase,
+                  ) ? (
+                    <p className="mt-1 text-ui-xs text-remote-foreground-muted">
+                      {intl.formatMessage({
+                        id:
+                          rawPhase === "download"
+                            ? "remote.phaseSub.downloading"
+                            : rawPhase === "upload"
+                              ? "remote.phaseSub.uploading"
+                              : rawPhase === "extract"
+                                ? "remote.phaseSub.extracting"
+                                : "remote.phaseSub.verifyingFiles",
+                      })}
+                    </p>
+                  ) : null}
+                  {phase.key === "deploy" ? installPanel : null}
+                  {phase.key === "deploy" && forceUpdate ? (
+                    <div className="mt-2 space-y-2 rounded-sm bg-warning-surface p-3 text-warning-surface-foreground">
+                      <p className="font-medium">
+                        {intl.formatMessage({ id: "settings.source.forceUpdateTitle" })}
+                      </p>
+                      <p>
+                        {intl.formatMessage({
+                          id: "settings.source.forceUpdateDescription",
+                        })}
+                      </p>
+                      {forceUpdate.tasks?.length ? (
+                        <ul className="space-y-1">
+                          {forceUpdate.tasks.map((task) => (
+                            <li
+                              key={`${task.workspaceIdentity ?? task.workspacePath}:${task.sessionId}`}
+                              className="break-all text-ui-sm"
+                            >
+                              <span>{task.sessionId}</span>
+                              <span className="ml-2 font-mono">{task.workspacePath}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>
+                          {intl.formatMessage({
+                            id: "remote.runningTasksUnavailable",
+                          })}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={forceUpdate.onConfirm}
+                        >
+                          {intl.formatMessage({ id: "settings.source.forceUpdate" })}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={forceUpdate.onCancel}
+                        >
+                          {intl.formatMessage({ id: "remote.cancelConnection" })}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {phase.key === errorPhase && !forceUpdate ? errorPanel : null}
+                  {progressMatch ? (
+                    <p className="mt-1 text-ui-xs tabular-nums text-remote-foreground-muted">
+                      {phaseLog?.message.match(/\([^)]+MB[^)]*\)/u)?.[0]}
+                      {" · "}
+                      {intl.formatMessage(
+                        {
+                          id:
+                            remainingSeconds === undefined
+                              ? "remote.transferTimeUnknown"
+                              : "remote.transferTimeRemaining",
+                        },
+                        { seconds: remainingSeconds ?? 0 },
+                      )}
+                    </p>
+                  ) : null}
+                  {progressMatch ? (
+                    <div
+                      role="progressbar"
+                      aria-label={intl.formatMessage({
+                        id:
+                          rawPhase === "download"
+                            ? "remote.phaseSub.downloading"
+                            : "remote.phaseSub.uploading",
+                      })}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Number(progressMatch[1])}
+                      className="mt-1.5 h-1 max-w-sm overflow-hidden rounded-full bg-surface"
+                    >
+                      <div
+                        className="h-full rounded-full bg-progress-surface-foreground"
+                        style={{ width: `${progressMatch[1]}%` }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        {/* 日志区使用 max-h-48 语义档位，避免把原型 180px 固化为组件专属高度。 */}
+        <div className="flex flex-col">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="self-start px-0"
+            onClick={() => setLogsExpanded((expanded) => !expanded)}
+          >
+            <ChevronRightIcon
+              className={cn("size-3.5 transition-transform", logsExpanded && "rotate-90")}
+            />
+            {intl.formatMessage({ id: "remote.connectionLog" })}
+            <span className="text-remote-foreground-muted">
+              {intl.formatMessage(
+                { id: "remote.connectionLogLines" },
+                { count: String(logs.length) },
+              )}
+            </span>
+          </Button>
+          {logsExpanded ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-end"
+              onClick={() => {
+                void navigator.clipboard.writeText(
+                  logs
+                    .map((entry) => `${entry.timestamp} [${entry.level}] ${entry.message}`)
+                    .join("\n"),
+                );
+              }}
+            >
+              {intl.formatMessage({ id: "remote.copyLog" })}
+            </Button>
+          ) : null}
+          {logsExpanded ? (
+            <div
+              data-testid="remote-connection-log"
+              ref={logContainerRef}
+              onScroll={handleLogContainerScroll}
+              className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border bg-background px-3 py-2 font-mono text-ui-xs leading-6"
+            >
+              {logs.length > 0 ? (
+                logs.map((entry) => (
+                  <div key={entry.id} className="w-full flex min-w-0 text-foreground">
+                    <span className="text-remote-foreground-muted">{entry.timestamp}</span>
+                    <span
+                      className={cn(
+                        "mx-2",
+                        entry.level === "success"
+                          ? "text-success"
+                          : entry.level === "warn"
+                            ? "text-warning"
+                            : entry.level === "error"
+                              ? "text-destructive"
+                              : "text-remote-foreground-muted",
+                      )}
+                    >
+                      [{entry.level.toUpperCase()}]
+                    </span>
+                    <span>{entry.message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center py-2 text-remote-foreground-muted">
+                  <span>[INFO] {intl.formatMessage({ id: "remote.connectionLogEmpty" })}</span>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex justify-end gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border pt-3">
+        {failed || onMinimize ? (
+          <Button type="button" variant="ghost" onClick={failed ? onBackToDevices : onMinimize}>
+            {failed ? null : <MinusIcon className="size-4" />}
+            {failed && backToDevicesLabel
+              ? backToDevicesLabel
+              : intl.formatMessage({
+                  id: failed ? "remote.selection.back" : "remote.continueInBackground",
+                })}
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button
           type="button"
           variant="secondary"
-          size="lg"
-          className="h-10 min-w-0 px-5"
-          onClick={onBack}
-          disabled={loading}
+          disabled={upgradeLoading}
+          onClick={failed ? onClose : cancelled ? onRetry : onCancelConnection}
         >
-          {intl.formatMessage({ id: "common.back" })}
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          className="h-10 min-w-0 px-5"
-          onClick={onRetry}
-          disabled={loading}
-        >
-          {loading
-            ? intl.formatMessage({ id: "remote.connecting" })
-            : intl.formatMessage({ id: "remote.retryConnection" })}
+          {intl.formatMessage({
+            id: failed ? "common.close" : cancelled ? "common.retry" : "remote.cancelConnection",
+          })}
         </Button>
       </div>
     </div>
   );
+}
+
+// 原型安装确认表格「目标账号」列直接展示 user@host:port，不再包整句文案。
+function formatInstallTarget(target: RemoteTarget): string {
+  if (target.kind === "ssh") {
+    return `${target.username}@${target.host}:${target.port ?? 22}`;
+  }
+  if (target.kind === "wsl")
+    return ["WSL", target.distro ?? "default", target.user].filter(Boolean).join(" · ");
+  if (target.kind === "docker") return `Docker · ${target.container}`;
+  return target.url;
 }
 
 function buildRemoteConnectionFeedbackDescription(

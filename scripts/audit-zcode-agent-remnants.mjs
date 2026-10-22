@@ -57,7 +57,7 @@ const categoryRules = [
       /^packages\/desktop\/electron-builder\.config\.js$/u,
       /^packages\/desktop\/wdio\.conf\.ts$/u,
       /^packages\/server\/src\/remote\/zcodeAgentDeploy\.ts$/u,
-      /^scripts\/(?:download-glm|prepare-prebuilds|sign-macos-runtime-binaries)\.(?:mjs|sh)$/u,
+      /^scripts\/(?:download-glm|sign-macos-runtime-binaries)\.(?:mjs|sh)$/u,
       /^packages\/services\/src\/providers\/(?:claude|codex|gemini)/u,
       /^packages\/services\/src\/model-provider\/modelProviderServiceApply\.ts$/u,
       /^packages\/services\/src\/model-selection\//u,

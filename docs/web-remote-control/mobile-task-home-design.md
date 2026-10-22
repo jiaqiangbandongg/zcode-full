@@ -1,6 +1,10 @@
 # 手机端远程控制任务首页改造方案
 
-> **状态：已实施。** 当前代码入口是 `packages/ui/src/WebRemoteControlMobileShell.tsx`、
+> **状态：已废弃（2026-10 合并 staging 时确认）。** 虚拟项目重构后，手机 home 与桌面共用 `ProjectSidebar`
+> （见 `docs/superpowers/specs/2026-09-09-virtual-project-design.md` §6.0.3 与偏差记录 D64），
+> 本文描述的手机专属任务首页、桌面→手机任务快照及相关代码均已删除。下文仅作历史背景，不作为实现依据。
+
+> **原状态：已实施。** 原代码入口是 `packages/ui/src/WebRemoteControlMobileShell.tsx`、
 > `WebRemoteControlMobileTaskHome.tsx` 与 `hooks/useWebRemoteControlTaskOpen.ts`；下文“推荐/实施顺序”
 > 保留设计轨迹，不表示待实现状态。
 >
@@ -49,7 +53,7 @@
 
 ## 2026-05-02 补充：workspace 级新建任务入口
 
-为补齐手机端操作闭环，任务首页的每个 workspace card 右侧增加“新建任务”按钮，行为如下：
+为补齐手机端操作闭环，任务首页提供“新建任务”入口（2026-09-23 起为右下角悬浮按钮 + 工作区选择弹层，见“首页”一节），选定工作区后的行为如下：
 
 1. 同 workspace：
    - 调用 `startDraft(workspacePath, workspaceIdentity)` 进入草稿态。
@@ -90,51 +94,100 @@ WebRemoteControlMobileShell
 
 ### 首页
 
-首页用于浏览当前 desktop window 内已打开的 workspace 和 task。
+首页用于浏览当前 desktop window 内已打开的 workspace 和 task。2026-09-23 按“处理阻塞 > 看进度 > 继续工作 > 切换电脑”的优先级改版为原生 App 风格的分组列表（原型确认存档于 `prototype/mobile-remote-redesign` 分支）。
 
-信息结构：
+```text
+┌──────────────────────────────────────┐
+│ [] Alice’s MacBook Pro ●  ⌄    (…) │  ← 页头：平台图标 + 电脑名 + 在线点，点击回设备列表
+├──────────────────────────────────────┤
+│ 已置顶 1                             │
+│ 全部任务              [最近 | 工作区] │
+│ 今天 3                               │
+│ ┌──────────────────────────────────┐ │
+│ │ ✋ 迁移设备列表到 relay v2 接口    │ │
+│ │    z-code · 2 分钟前 · 2 项待确认  │ │
+│ │ ◌  补充 attention 去重签名测试     │ │
+│ │    z-code · 刚刚                   │ │
+│ │ •  修复手机端主题切换闪白          │ │
+│ └──────────────────────────────────┘ │
+│ 昨天 / 本周 / 更早 …    [+ 新建任务] │
+└──────────────────────────────────────┘
+```
 
-1. 顶部品牌和设备状态：
-   - `ZCode Remote Control`
-   - 第一版展示连接状态，不新增设备名称协议字段
-2. 可关闭提示区：
-   - 说明本次扫码连接可查看当前设备上的项目、任务和会话
-   - 二维码失效后需要回到 desktop 重新连接
-3. 工作区任务区：
-   - 标题：当前设备上的工作区和任务
-   - 副文案：总 workspace/task 数
-   - 操作：全部收起、刷新
-4. workspace card：
-   - workspace 名称
-   - workspace 路径
-   - local / SSH remote / Docker / WSL 等弱标签，第一版可先用 local / remote
-   - 最近更新时间，从该 workspace 下 task 的 `updatedAt` 最大值派生；没有 task 时不展示
-   - task 数
-   - 展开/收起按钮
-5. task row：
-   - 任务标题
-   - provider CLI
-   - 更新时间
-   - 状态 pill
-   - 未读、运行中、错误等状态标识
-   - 当前选中 task 使用 selected 样式
+1. 页头（固定在顶部）：
+   - 设备入口（2026-10-14 起，手机 home 与宽屏远控共用项目侧栏后的现行行为，原型存档于 `prototype/mobile-device-row` 分支）：位于侧栏最顶部、“新建任务”之上，与“新建任务 / 自动化 / 插件市场”同为 ghost `lg` 行，不加分隔线。行内依次为平台图标（按本机记住的设备平台，未知时为通用电脑图标）、电脑名（`font-medium`，单行截断，不改写原名；缺失显示“未命名设备”）与 `ChevronsUpDown` 箭头；无“当前设备：”前缀，也无在线点。整行可点，可读名称与 tooltip 为“切换设备”，点击调用 `deviceNavigation.chooseOtherDevice()` 回到设备列表。手机端设备行占用原顶部留白（不再额外 `pt-11`），宽屏位于 `h-12` 拖拽区下方。未注入 `deviceNavigation` 时不渲染设备行。
+   - terminal transport 为 `reconnecting` 时，沿用 mobile shell 顶部居中的浮动提示“正在自动重连...”（不拦截点击），设备行不承载连接状态。
+   - 右侧“更多”菜单：排序方式（更新时间 / 创建时间）、全部收起（仅工作区视图）、外观（主题子菜单）、刷新。
+2. 不再显示扫码提示卡、“当前设备上的工作区和任务”标题与“n 个工作区 · m 个任务”计数。
+3. 分区自上而下：已置顶 → “全部任务”行（右侧为“最近 | 工作区”分段切换）→ 普通列表。2026-09-24 取消需要处理、运行中独立分区和手机运行优先排序，不增加状态筛选：
+   - 已置顶：所有未归档的 `pinned` task，包括正在运行、待审批的任务。
+   - 普通列表：其余非归档 task。“最近”视图（默认）按桌面时间线分组；“工作区”视图首次按 desktop 返回的 workspace 顺序分组。首次展示按选定的更新时间 / 创建时间倒序。
+   - 每个 task 只出现一次。状态、attention、后台工作或更新时间变化只更新行内容，不移动已展示任务，也不改变本次停留的日期桶与已有分组相对顺序。
+   - 新任务立即插入所属分组首位，同批新任务按当前时间偏好排序；新分组追加到普通列表末尾，不自动展开、不自动滚动。置顶/取消置顶立即改变归属；置顶区始终在顶部。归档、删除或快照可见范围移除的任务立即移出展示。
+   - 首次加载、成功刷新（含重试/返回首页刷新）、重新进入首页、主动切换分组或排序时统一重排。刷新失败保持当前顺序和内容；自动推送不重排。语言改变时重新计算日期分组。
+   - 没有成员的置顶/日期分区整体不显示；工作区仍保留可折叠标题和空状态。分区标题为弱化小字加数量，每个分区是一组 `rounded-xl` 列表。
+4. task 行（可点击高度不低于 56px）：
+   - 左侧固定 20px 状态列：切换中为转圈；需要处理为警告色举手图标；运行中为转圈；报错为红色告警图标；未读为蓝点；其余留空。图标形状不同并带可读名称，不只依赖颜色。
+   - 首行标题单行截断；次行为“工作区名 · 相对时间”（工作区视图省略工作区名），需要处理时末尾追加警告色“{count} 项待确认”，报错时追加红色“报错”；行右侧不放状态标签。
+   - 有工作流运行时，在次行下方绘制运行行。
+   - 当前选中 task 使用 selected 背景；断开的远程工作区中的 task 禁用。
+5. 工作区视图的分组标题可点击折叠：工作区图标（本地文件夹 / 远程云 / 对话）、名称、远程工作区的“远程”标签、task 数、折叠箭头；收起时有未读显示聚合蓝点。标题另显示“运行中 n”“待处理 m”，数量为 0 时隐藏，展开/折叠均可见。只统计本组非置顶任务，待处理按 task 数而非 interaction 数统计；有 attention 的任务计入待处理，其余运行或有后台工作的任务计入运行中。计数变化不自动展开或排序。路径默认隐藏，仅在工作区重名时以小字显示。远程断开时显示“未连接”与“重新连接”按钮，`lastConnectionError` 以小字显示在标题下。默认展开当前 workspace，“全部收起”在更多菜单中。
+6. 新建任务：右下角悬浮按钮“+ 新建任务”（两种视图都有）。点击后从底部弹出工作区选择：按工作区最近活跃时间（组内 task 最大 `updatedAt`）排序，显示类型、路径与最近时间；只有一个可用工作区时直接进入草稿；断开的远程工作区置灰并提供“重新连接”。选定后沿用上文 `startDraft` 规则。
+7. 状态：首次加载显示骨架行；没有任何 task 时显示“还没有任务”与“新建任务”按钮（此时隐藏悬浮按钮，没有工作区时不显示按钮）；加载或操作失败显示内联错误条与“重试”。
+8. 宽屏远控任务列表不在本次改版范围，也不显示 `attention`。
 
 2026-05-28 补充：手机首页顶部增加全局 pinned 分区。桌面 renderer 同步任务快照时会同时读取
 `kind: "pinned"` 与 `kind: "timeline"` 两类 sqlite 列表；mobile 首页收到统一 task targets 后，
 先按 `pinned === true` 拆出置顶分区，再把非置顶任务交给 workspace/timeline 普通列表。置顶任务
 不再重复出现在普通 workspace card 或 timeline 列表中，但 active task 校验和选中态必须同时匹配
-pinned 分区与普通分组。
+pinned 分区与普通分组。2026-09-24 起状态不再影响分区归属。
 
-首页自己拥有滚动区域，不能依赖桌面 sidebar 的滚动容器。
+首页自己拥有滚动区域，不能依赖桌面 sidebar 的滚动容器。workspace 快照（首次加载、返回首页刷新、
+`onWorkspaceListUpdated` 推送）由 `WebRemoteControlMobileShell` 通过
+`useWebRemoteControlWorkspaceList` 统一持有，首页与聊天页顶栏读取同一份投影；它只是桌面快照的展示缓存，
+不新增查询入口，也不做轮询。
+
+### 工作区任务列表的滚动边界
+
+手机首页切换到“工作区”视图后，每个展开分组最多显示前五条任务的完整高度；超过五条时，任务列表在组内纵向滚动，仍保留全部任务及既有点击行为。五条以内按内容高度展示，不预留空行。分组标题留在列表滚动区域外，计数仍表示本组全部任务。
+
+高度以实际前五条任务行计算，随界面字号、工作流运行行等内容变化更新，不裁切第五条。各工作区独立滚动，首页仍可滚动到其他分组。“最近”视图、全局置顶区、宽屏和桌面列表保持既有展示方式。此限制仅为 UI 布局，不改变快照、排序、任务 owner 或 continuous/replayable 链路。
+
+验收 MH05：覆盖 0、少于五条、恰好五条及超过五条；超过后可滚动至末条，其他分组和标题不随组内滚动；展开/折叠、任务增减、字号及工作流行高度变化后限制仍正确。手机 Zai Light / Zai Dark、中英文验证并保留宽屏回归。浏览器用例沿用 `remote-device-switch.mjs`，滚动断言位于 `remote-mobile-workspace-scroll.helpers.mjs`，仍为 pending 受控 relay 验证。
+
+### 手机首页展示顺序的归属与验收
+
+```text
+桌面任务 owner → 既有 replayable 快照 → Shell 的唯一快照投影
+                                         ├→ 任务行/工作区计数：读取最新事实
+                                         └→ 首页本次停留的展示顺序（仅身份 key、日期桶）
+自动推送 → 保留已有归属/顺序 + 首部插入新增项 + 移除不可见项
+成功刷新 / 切换视图或排序 / 重新进入 → 按最新快照重建展示顺序
+离开首页 → 丢弃本次展示顺序；不持久化、不增加 accepted queue
+```
+
+身份使用 `workspaceIdentity?.trim() || workspacePath` 加 `taskId`；同 taskId 的不同工作区不能共享位置。
+刷新成功与快照原子发布；过期刷新不能覆盖其间到达的推送，刷新失败不能触发重排。
+此展示记忆只属于手机 UI，不改变桌面 continuous、手机 replayable 的任务事实或恢复边界。
+
+验收场景：
+
+- MH01：运行 → 待审批 → 恢复 → 完成/报错/后台工作结束：行内容和标题计数更新，工作区/日期桶和已有行相对顺序不变。
+- 昨日任务更新到今天、跨午夜收到推送：本次停留不换日期桶；成功刷新后按当前日期与时间字段重排。
+- MH02：新增任务进入分组首位；置顶/取消置顶立即迁移且不重复；归档/删除/工作区从快照消失立即移除。
+- MH03：工作区折叠时显示运行中、待处理任务数，不计全局置顶，不把一条任务的多个交互计为多条任务。
+- MH04：手动刷新成功重排，失败保留，刷新过程中较新推送不被旧请求覆盖；返回首页和更换排序/视图使用新顺序。
+- 手机深浅主题、中英文、长工作区名下标题可读且无横向溢出；宽屏和桌面仍使用现有排序语义。
 
 ### 聊天页
 
 聊天页复用现有工作区主内容：
 
-1. 顶部保留移动简化后的 chat header。
-2. 增加返回首页入口。
-3. 主体继续使用 Root 注入的 V4 chat content（最终由 `packages/ui/src/v4/SessionPane.tsx` 承载会话）。
-4. terminal、browser、side pane 的移动端展示规则沿用现有远控策略，第一版不主动扩展。
+1. 顶栏：左侧“‹”返回首页；中间为当前 task 标题（草稿为“新任务”）与工作区名，transport 重连时副标题替换为转圈与“正在自动重连...”；右侧保留主题菜单。
+2. 返回按钮带警告色数字角标：统计除当前 task 外有 `attention` 的 task 数，为 0 时不显示；可读名称包含该数量。
+3. 浏览器标签页标题在有待确认 task 时加前缀“(n) ”（首页统计全部，聊天页不含当前 task），离开远控页面时恢复原标题。
+4. 顶栏下方继续渲染移动简化后的 chat header 与 Root 注入的 V4 chat content（最终由 `packages/ui/src/v4/SessionPane.tsx` 承载会话）。
+5. terminal、browser、side pane 的移动端展示规则沿用现有远控策略，本次不扩展；聊天内容区不改动。
 
 ### 聊天页交互浮层边界
 
@@ -246,13 +299,33 @@ interface WebRemoteControlMobileShellProps {
 
 1. 设置 switching 状态。
 2. 调用 `switcher.switchWorkspace(taskWorkspaceKey, { taskId: task.taskId,
-   mobileNavigationIntent: "chat", markTaskReadExpectedUnreadAt: task.unreadAt })`。
+mobileNavigationIntent: "chat", markTaskReadExpectedUnreadAt: task.unreadAt })`。
 3. Web 端连接目标 workspace 的 shared-host bridge 后，使用目标 bridge 的
    `workspacePath/workspaceIdentity` 和首页快照中的 `unreadAt` 调用
    `setTaskUnread(..., false, expectedUnreadAt)`；失败只记录日志，不得阻止任务打开。
 4. 新 bridge 渲染完成后，Root 接收 `initialTaskId` 并选中任务。
 5. MobileShell 消费这次用户点击流程携带的一次性导航意图，进入 `chat` 页面。
 6. 失败时记录 `logger.error`，并停留首页显示错误。
+
+已有远程任务打开的身份与失败边界（2026-10-13）：
+
+- Host 的远端项目适配器必须在 `resolveSessionDirectories` 返回前，使用与 `readTree`、`prepareSession` 相同的 resolver 为**返回的真实 cwd**登记并补齐 `workspaceIdentity`。不直接复制请求身份，不改变 cwd、项目归属和附加目录；解析失败原样拒绝。
+- `project-workspace-navigation` 保留任务、目录、设备身份和成员换代校验。目录或身份不一致时仍拒绝，不新建本地 scope，也不放宽为仅比较路径。
+- 点击跨 workspace 任务时只设置等待态。旧 Root 不提前进入聊天页；目标 bridge 成功后，由新 Root 的一次性 `chat` 意图完成导航。失败保留首页和原活动任务，不将失败目标登记为当前 UI 的 workspace/task；可再次点击重试，不自动重试或切换到本地任务。
+- bridge 的结构化失败 `{ reason, message }` 应显示 `message`，保留原 `reason` 供传输恢复判断。不得通过 `String(object)` 展示错误，也不得用改写传输错误类型来破坏恢复契约。同 workspace 任务继续直接选中并进入聊天页。
+
+```text
+手机列表点击 → 等待 bridge → Host 恢复已有任务目录 → 适配器登记远程身份
+                                               → 导航校验 → shared-host attachment
+                   ├─ 成功 → 新 Root 消费 chat 意图 → 目标远程任务
+                   └─ 失败 → 退出等待、显示 message → 保留列表和原任务
+```
+
+回归 `MRO01` 覆盖已有远程任务成功、目录/身份不匹配拒绝、结构化失败、失败重试和同 workspace 打开。
+服务层使用真实项目存储与身份适配器；手机交互候选位于
+`packages/web/test/e2e/manual-review/pending/remote-task-open.mjs`，通过真实 Web 入口及 RPC 帧协议控制 bridge 成功/失败，覆盖深浅主题和中英文。该候选不代表真实 SSH、真机或线上部署已验证。
+
+2026-10-13 验证：本地 Chrome 390px 的 4 组主题/语言配置通过；先打开本地历史，再断言远程 bridge 等待/失败停留列表、message 提示、成功重试后的远程正文与身份、同 workspace 打开不新建 bridge。受控历史快照经过 V4 schema 和真实 RPC 事件进入页面，无模型请求；截图与通信记录位于 `.tmp/remote-task-open-e2e/`。用例保持 pending。
 
 注意：扫码初始 task 只影响首页选中态，不调用这个点击流程。
 
@@ -346,6 +419,8 @@ hasBackgroundWork?: boolean;
 // 2026-09-14 追记：工作流运行摘要（≤ 4 条 run：在跑优先，其后最近结束的），来源是 sidecar 的 workflowActivity。
 // 手机行在标题下绘制 Workflow 图标 + 迷你轨道灯 + 当前 phase 名（24px，13px 文字）；只绘制，不参与排序或状态 pill。
 workflowActivity?: SessionWorkflowActivity;
+// 2026-09-23 追记：会话挂着的待确认交互（权限审批 / 用户提问），见下文「需要处理信号」。
+attention?: { kind: "permission" | "userInput"; count: number };
 ```
 
 字段来源按权威级别分层，不能把多个缓存当成同级事实：
@@ -367,12 +442,12 @@ workflowActivity?: SessionWorkflowActivity;
 
 这条优先级必须覆盖所有冲突方向，而不是只修 `running`：
 
-| sessions-index activity | 旧 runtime / 持久缓存 | 手机展示 |
-| --- | --- | --- |
-| `prewarming` / `running` | `completed` / `failed` / `error` | `running` |
-| `completedSuccess` / `completedInterrupted` | live / `failed` / `running` | `completed` |
-| `error` | live / `completed` / `running` | `error` |
-| 缺失或兼容 `draft` | 任意 | 保持现有 runtime → 持久终态 fallback |
+| sessions-index activity                     | 旧 runtime / 持久缓存            | 手机展示                             |
+| ------------------------------------------- | -------------------------------- | ------------------------------------ |
+| `prewarming` / `running`                    | `completed` / `failed` / `error` | `running`                            |
+| `completedSuccess` / `completedInterrupted` | live / `failed` / `running`      | `completed`                          |
+| `error`                                     | live / `completed` / `running`   | `error`                              |
+| 缺失或兼容 `draft`                          | 任意                             | 保持现有 runtime → 持久终态 fallback |
 
 因此 sessions-index 新帧既能把旧 `completed/error` cache 推进为 `running`，也能把旧 live cache 收口为
 `completed/error`。手机首页不自行合并这些来源。
@@ -388,13 +463,35 @@ workflowActivity?: SessionWorkflowActivity;
    `running` / `completed` / `error` pill 滞后到下一次 task list 刷新。
 5. 该字段只用于手机首页展示，不改变 ZCode runtime 的真实状态来源。旧数据缺失时 mobile 前端 fallback 为 `idle`。
 
+### 需要处理信号（attention）
+
+手机首页的“需要处理”分区只收有待确认交互（权限审批或用户提问）的任务；报错不算需要处理，继续
+由 `displayStatus = error` 表达。该信号与 phase 是两个独立维度：等待确认时 phase 通常仍是
+`running`，因此不扩展 `displayStatus` 枚举，而是单独携带 `attention`。
+
+1. 来源：sessions-index activity sidecar 的 `pendingInteractions`（`permissionCount` /
+   `userInputCount`），由 desktop renderer 在 `buildWebRemoteControlTaskTargets()` 中复用桌面侧栏的
+   `getTaskListAttention()` 归一：`count = permissionCount + userInputCount`；有用户提问时
+   `kind = "userInput"`，否则为 `"permission"`。`count = 0` 或缺少 activity 时不携带该字段。
+2. schema：`count` 为正整数，`kind` 只允许 `permission | userInput`；手机页面与桌面同版本部署，
+   不为旧版本保留额外兼容分支。
+3. owner：待确认交互的事实仍归 session runtime / sessions-index；desktop main、relay 与手机只透传和
+   展示，不据此改变 task 或 session 状态。手机不读取 runtime 或 Repo 自行推断。
+4. 手机按 `attention` 存在与否拆出“需要处理”分区；文案复用桌面“等待确认”语义，数量显示为
+   “{count} 项待确认”。
+
+```text
+sessions-index pendingInteractions ─> getTaskListAttention ─> WebRemoteControlTaskTarget.attention
+                                                                   └─> main 快照签名 ─> relay ─> 手机“需要处理”
+```
+
 ### 首页快照推送去重边界
 
 Desktop main 只对 renderer 已构建的 `WebRemoteControlWorkspaceListResult` 做传输去重，不拥有或重新
 解释 task 业务状态。去重签名必须覆盖手机首页需要即时采用、但只在生命周期节点或用户操作时变化的
 字段：
 
-1. task：`title`、`unreadAt`、`displayStatus`、`pinned`、`archived`、`remoteSessionId`；
+1. task：`title`、`unreadAt`、`displayStatus`、`attention`、`pinned`、`archived`、`remoteSessionId`；
 2. workspace 连接状态：`kind`、`connectionState`、`remoteSessionId`、`lastConnectionError`；
 3. task/workspace 的稳定身份字段继续参与签名，保证新增、删除和跨 workspace membership 变化可见。
 
@@ -493,7 +590,7 @@ currentMobilePage: "home" | "chat"
 UI 必须遵守根目录 `DESIGN.md`：
 
 1. 使用语义 token，例如 `bg-background`、`bg-card`、`border-card-border`、`text-foreground-subtle`。
-2. card 使用 `rounded-lg`，不要使用过大的圆角。
+2. 分组列表容器使用 `rounded-xl`，内部控件按 DESIGN.md 圆角层级递减；底部弹层沿用 `BottomSheet`，外壳使用对话框的 `bg-popover border-popover-border rounded-t-2xl`。
 3. 首页是业务工具界面，保持紧凑、清晰、可扫描，不做营销页。
 4. 支持 light、dark、Zai light、Zai dark。
 5. 支持中英文文案长度，不依赖固定英文短句。
@@ -535,31 +632,40 @@ pnpm lint
    - workspace 按 desktop 返回顺序分组。
    - 默认展开 `activeWorkspaceKey`。
    - `activeTaskId` 对应 task 显示 selected。
-   - 点击全部收起后所有 workspace card 收起。
-2. `packages/ui/test/useWebRemoteControlTaskOpen.test.ts`
+   - 需要处理 / 运行中 / 已置顶 / 普通列表的归属优先级，每个 task 只出现一次。
+   - 行内状态图标与次行“n 项待确认”“报错”，工作区视图省略工作区名，重名工作区才显示路径。
+   - 页头设备入口、更多菜单、空状态与新建任务入口。
+2. `packages/ui/test/webRemoteControlMobileShell.test.ts`
+   - 聊天页顶栏显示当前 task 标题与工作区；返回角标不统计当前 task。
+   - 重连状态并入页头/顶栏，不再渲染浮层提示。
+3. `packages/ui/test/useWebRemoteControlTaskOpen.test.ts`
    - 同 workspace task 调用 `onSelectTask` 和 `updateMobileViewState`。
    - 跨 workspace task 调用 `switchWorkspace` 时带上 `{ taskId, mobileNavigationIntent: "chat" }`。
    - 切换失败时保留错误并清掉 switching 状态。
-3. `packages/ui/test/workspaceShellRemoteMobileLayout.test.ts`
+4. `packages/ui/test/workspaceShellRemoteMobileLayout.test.ts`
    - 手机远控断点渲染 mobile shell。
    - 非手机断点继续渲染现有 shell/sidebar。
    - 扫码初始 task 只展开首页 card 和选中 task row，不进入 chat。
    - 用户点击 task 进入 chat 时只补一层 history state，浏览器返回回到 home。
    - 跨 workspace 点击后重新挂载 Root 时消费一次性 `mobileNavigationIntent` 进入 chat，并在消费后清空。
-4. `packages/shared/test/webRemoteControl.test.ts`
+5. `packages/shared/test/webRemoteControl.test.ts`
    - 如新增 `displayStatus`，补 schema/类型兼容测试。
-5. `packages/ui/test/webRemoteControlTaskIndex.test.ts`
+6. `packages/ui/test/webRemoteControlTaskIndex.test.ts`
    - `buildWebRemoteControlTaskTargets()` 按 sessions-index activity → task runtime →
      `ZCodeTaskMeta.status` 的优先级计算 `displayStatus`。
    - 覆盖 live phase 与 stale runtime/persisted cache 在 running、completed、error 三个方向上的冲突。
    - activity 缺失或为兼容 `draft` 时保持原有 runtime/persisted fallback，持久 `running` 仍不得制造假
      running。
-6. `packages/desktop/test/webRemoteControlManagerExternalRelay.test.ts`
-   - 同一 task 只改变 `title`、`unreadAt`、`displayStatus`、`pinned`、`archived` 或
+   - `pendingInteractions` 归一为 `attention`（kind/count），计数为 0 或无 activity 时不携带，且不改变
+     `displayStatus`。
+7. `packages/desktop/test/webRemoteControlManagerExternalRelay.test.ts`
+   - 同一 task 只改变 `title`、`unreadAt`、`displayStatus`、`attention`、`pinned`、`archived` 或
      `remoteSessionId` 时必须推送 `workspace-list-updated`。
    - 同一 workspace 只改变 `connectionState`、`remoteSessionId` 或 `lastConnectionError` 时必须推送；
      完全相同的有效字段快照仍应去重。
    - 单独改变高频 `updatedAt` 不属于本轮即时推送契约。
+
+2026-09-23 改版验证：上述单测外新增 `packages/ui/test/webRemoteControlMobileShellAttention.test.ts`（jsdom），覆盖推送驱动的返回角标与标签页标题、页头设备入口和单工作区直接新建草稿。pending 浏览器用例 `packages/web/test/e2e/manual-review/pending/remote-device-switch.mjs` 的连接后首页改用带分区样本的快照，手机 bridge/home-only 截图覆盖“最近”“工作区”视图与新建任务弹层，12 组配置通过；受控桌面响应不等于真实手机或线上部署验收。
 
 ## 历史实施顺序
 
@@ -581,3 +687,5 @@ pnpm lint
 3. 远程 workspace 必须始终使用 `workspaceIdentity` 做 key，不能只用 `workspacePath`。
 4. `WorkspaceShellLayout` 已有远控手机布局历史逻辑较多，接入 mobile shell 时要小心保留桌面远控行为。
 5. 如果后续加入真实 URL 路由，需要避免把短期 `remoteControlToken` 和内部 task 页面状态混在一起。
+
+2026-09-24 位置稳定性验证：`webRemoteControlMobileTaskOrder.test.ts` 覆盖日期桶、身份隔离、状态终止和任务归属；`useWebRemoteControlMobileTaskOrder.test.ts` 覆盖成功/失败/并发刷新与过期响应，Shell 回归覆盖聊天返回后的重排。上述 MH01–MH04 为已确认语义，pending 浏览器用例 `remote-device-switch.mjs` 复用 `remote-mobile-task-order.helpers.mjs`，通过真实 Web 入口和受控 relay 快照验证完成后原位更新、成功/失败刷新、新任务首位、置顶迁移、移除及折叠计数。手机 bridge/home-only 与宽屏 bridge 的深浅主题、中英文组合继续沿用 MD07；截图在 `.tmp/remote-device-switch-e2e/`。未转正，受控接口验证不替代真机和线上环境验收。

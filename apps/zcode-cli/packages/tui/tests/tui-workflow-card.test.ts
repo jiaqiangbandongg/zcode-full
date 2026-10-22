@@ -113,9 +113,10 @@ test("step counts include the instances the node cap kept out of the list", () =
     nodesTotal: WORKFLOW_RUNS_LIMITS.maxNodes + rejected,
   });
   // 卡片读的是同一个函数，所以两处不可能再各说各话。
-  const card = buildTuiWorkflowCardIndex({ ...EMPTY_TUI_WORKFLOW_MIRROR, state: { revision: 1, runs: [run] } }).get(
-    TOOL_CALL_ID,
-  );
+  const card = buildTuiWorkflowCardIndex({
+    ...EMPTY_TUI_WORKFLOW_MIRROR,
+    state: { revision: 1, runs: [run] },
+  }).get(TOOL_CALL_ID);
   assert.equal(card?.nodesTotal, WORKFLOW_RUNS_LIMITS.maxNodes + rejected);
   assert.equal(card?.nodesSettled, 1);
 });
@@ -327,13 +328,6 @@ test("applySessionEventToState routes dwf progress into the mirror", () => {
 });
 
 // ── 去重：常驻订阅与 per-turn sink 绝不双投 ──
-
-test("an event id is applied once no matter how many sinks deliver it", () => {
-  const applied = new Set<string>();
-  const event = sessionEvent({ runId: RUN_ID, sequence: 0, eventType: "log", payload: {} });
-  assert.equal(rememberSessionEvent(applied, event), true);
-  assert.equal(rememberSessionEvent(applied, event), false);
-});
 
 test("events built by the real contracts factory always carry a dedup key", () => {
   // 去重的全部依据是 SessionEvent.id。这条用例故意走**真实**的 createSessionEvent，
@@ -583,7 +577,6 @@ test("summaries map to seeds carrying only display facts, never runtime state", 
   const seed = workflowRunSeedFromSummary({ runId: "dwfrun-1", status: "running" });
   assert.deepEqual(seed, { runId: "dwfrun-1" });
   // label / updatedAt 缺席就该缺席，不造默认值；status / resumable 是运行态，走回放，不进补种。
-  assert.equal("label" in seed, false);
 
   const full = workflowRunSeedFromSummary({
     runId: "dwfrun-2",

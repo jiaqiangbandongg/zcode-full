@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe("TelemetryCore final HTTP privacy boundary", () => {
-  it("本机 HTTP 接收器实际收到的请求不含登录参数或错误原文", async () => {
+  it("本机 HTTP 接收器收到的请求不含登录参数、错误原文或不安全 Skill 名称", async () => {
     const received: string[] = [];
     const server = createServer(async (request, response) => {
       const chunks: Buffer[] = [];
@@ -60,6 +60,42 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
         error_type: "TOOL_EXEC_ERROR",
       });
       expect(received.join("\n")).not.toMatch(/FAKE_STATE|FAKE_TOKEN|FAKE_USER|Bearer|\/auth/);
+      // 直接调用 Core，证明最终出网边界也会拦截绕过 UI 的不安全名称。
+      const unsafeNames = [
+        "/Users/FAKE_USER/private",
+        "C:\\private\\key",
+        "https://example.com/?token=FAKE_TOKEN",
+        "demo\nFAKE_SECRET",
+        "sk-" + "a".repeat(49),
+        "a".repeat(65),
+        "a".repeat(5000),
+      ];
+      for (const status of ["fail", "denied", "stopped"]) {
+        for (const skill_name of unsafeNames) {
+          await core.reportEvent({
+            context,
+            elementName: "agent_step",
+            eventRegion: "app",
+            eventType: "agent_trace",
+            eventExtraDetail: { tool_name: "Skill", skill_name, status },
+          });
+          const body = received.at(-1)!;
+          expect(JSON.parse(body).event_extra_detail).toEqual({
+            tool_name: "Skill",
+            skill_name: "unknown",
+            status,
+          });
+          expect(body).not.toContain(skill_name);
+        }
+      }
+      await core.reportEvent({
+        context,
+        elementName: "agent_step",
+        eventRegion: "app",
+        eventType: "agent_trace",
+        eventExtraDetail: { tool_name: "Skill", skill_name: "pptx", status: "success" },
+      });
+      expect(JSON.parse(received.at(-1)!).event_extra_detail.skill_name).toBe("pptx");
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>
@@ -91,6 +127,7 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
         eventExtraDetail: {
           error_msg: "FAKE_BODY_SECRET https://example.com/private /Users/private/key",
           error_code: "E_TEST",
+          skill_name: "sk-" + "a".repeat(49),
         },
       });
       expect(fetchImpl).toHaveBeenCalledTimes(2);
@@ -98,6 +135,7 @@ describe("TelemetryCore final HTTP privacy boundary", () => {
       expect(JSON.parse(String(request.body)).event_extra_detail).toEqual({
         error_msg: "[redacted]",
         error_code: "E_TEST",
+        skill_name: "unknown",
       });
       expect(String(request.body)).not.toContain("FAKE_BODY_SECRET");
       expect(String(request.body)).not.toContain("FAKE_AUTH_HEADER");

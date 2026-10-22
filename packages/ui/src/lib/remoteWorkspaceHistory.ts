@@ -6,7 +6,7 @@ import type {
   RemoteTargetSnapshot,
   RemoteWorkspaceSessionEntry,
 } from "@zcode/shared";
-import { buildServerRemoteWorkspaceIdentity } from "@zcode/shared";
+import { buildServerRemoteWorkspaceIdentity, parseRemoteWorkspaceIdentity } from "@zcode/shared";
 import type { WindowTabState } from "@/store/tabStore.js";
 import { isWorkspaceTab } from "@/store/tabStore.js";
 
@@ -39,17 +39,19 @@ function buildRemoteWorkspaceServerTokenCredentialKey(workspaceKey: string): str
   return `remote-workspace:${workspaceKey}:server-token`;
 }
 
-function collectRemoteWorkspaceCredentialKeys(snapshot: RemoteTargetSnapshot): string[] {
+function collectOwnedRemoteWorkspaceCredentialKeys(snapshot: RemoteTargetSnapshot): string[] {
+  // 历史快照可引用 Profile 凭据，但引用不转移所有权。此前重投影移除引用时
+  // 把 Profile 密码也加入删除列表，导致冷启动后失去认证；所有历史清理只收集自有 key。
+  const isOwned = (key: string | undefined): key is string =>
+    typeof key === "string" && key.startsWith("remote-workspace:");
   if (snapshot.kind === "ssh") {
     return [snapshot.passwordCredentialKey, snapshot.privateKeyPassphraseCredentialKey].filter(
-      (key): key is string => typeof key === "string" && key.length > 0,
+      isOwned,
     );
   }
 
   if (snapshot.kind === "server") {
-    return [snapshot.tokenCredentialKey].filter(
-      (key): key is string => typeof key === "string" && key.length > 0,
-    );
+    return [snapshot.tokenCredentialKey].filter(isOwned);
   }
 
   return [];
@@ -140,12 +142,10 @@ export function formatRemoteWorkspaceDisplayLabel(
   label: string,
   target?: RemoteTarget | RemoteTargetSnapshot,
 ): string {
-  if (target?.kind !== "ssh") {
-    return label;
-  }
-
-  const sshConfigAlias = target.sshConfigAlias?.trim();
-  return sshConfigAlias ? `${label} [SSH: ${sshConfigAlias}]` : label;
+  // 线路信息属于设备原子/悬浮详情，不能把硬编码 SSH alias 拼进项目名称；
+  // 这样既避免窄侧栏截断，也让标题可本地化。target 参数保留兼容旧调用方。
+  void target;
+  return label;
 }
 
 function normalizeWorkspacePathForIdentity(path: string): string {
@@ -226,7 +226,17 @@ export function findMatchingRemoteWorkspaceSessionEntry(
   sessions: RemoteWorkspaceSessionEntry[],
   workspacePath: string,
   target: RemoteTarget | RemoteTargetSnapshot,
+  preferredWorkspaceIdentity?: string,
 ): RemoteWorkspaceSessionEntry | null {
+  const preferredWorkspaceKey = preferredWorkspaceIdentity?.trim();
+  if (preferredWorkspaceKey) {
+    const preferred = sessions.find(
+      (entry) =>
+        entry.workspacePath === workspacePath &&
+        buildWorkspaceSessionKey(entry) === preferredWorkspaceKey,
+    );
+    if (preferred) return preferred;
+  }
   const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, target);
   return (
     sessions.find((entry) => resolveRemoteWorkspaceSessionIdentity(entry) === workspaceIdentity) ??
@@ -239,6 +249,8 @@ export function createRemoteTargetSnapshot(
   target: RemoteTarget,
   previousSnapshot?: RemoteTargetSnapshot,
 ): RemoteTargetSnapshot {
+  const sourceServerOwnedCredentials =
+    parseRemoteWorkspaceIdentity(workspaceKey)?.kind === "server";
   switch (target.kind) {
     case "ssh":
       return {
@@ -250,13 +262,15 @@ export function createRemoteTargetSnapshot(
         assetInstallMode: target.assetInstallMode,
         privateKeyPath: target.privateKeyPath,
         passwordCredentialKey:
-          target.password && target.password.length > 0
+          !sourceServerOwnedCredentials && target.password && target.password.length > 0
             ? previousSnapshot?.kind === "ssh" && previousSnapshot.passwordCredentialKey
               ? previousSnapshot.passwordCredentialKey
               : buildRemoteWorkspacePasswordCredentialKey(workspaceKey)
             : undefined,
         privateKeyPassphraseCredentialKey:
-          target.privateKeyPassphrase && target.privateKeyPassphrase.length > 0
+          !sourceServerOwnedCredentials &&
+          target.privateKeyPassphrase &&
+          target.privateKeyPassphrase.length > 0
             ? previousSnapshot?.kind === "ssh" && previousSnapshot.privateKeyPassphraseCredentialKey
               ? previousSnapshot.privateKeyPassphraseCredentialKey
               : buildRemoteWorkspacePrivateKeyPassphraseCredentialKey(workspaceKey)
@@ -368,7 +382,7 @@ export function removeRemoteWorkspaceSessionEntries(
       continue;
     }
 
-    for (const credentialKey of collectRemoteWorkspaceCredentialKeys(session.target)) {
+    for (const credentialKey of collectOwnedRemoteWorkspaceCredentialKeys(session.target)) {
       credentialKeysToDelete.add(credentialKey);
     }
   }
@@ -385,6 +399,7 @@ export function buildRemoteWorkspaceSessionMutation(params: {
   localWorkspacePath?: string;
   workspaceIdentity?: string;
   target: RemoteTarget;
+  workspacePurpose?: "project" | "conversation";
   lastConnectionStatus: RemoteWorkspaceSessionEntry["lastConnectionStatus"];
   lastConnectionError?: string;
   touchOpenedAt: boolean;
@@ -394,6 +409,7 @@ export function buildRemoteWorkspaceSessionMutation(params: {
       params.remoteSessions,
       params.workspacePath,
       params.target,
+      params.workspaceIdentity,
     ) ?? null;
   const resolvedWorkspaceIdentity =
     params.workspaceIdentity ??
@@ -410,7 +426,12 @@ export function buildRemoteWorkspaceSessionMutation(params: {
   const nextEntry: RemoteWorkspaceSessionEntry = {
     kind: "remote",
     workspacePath: params.workspacePath,
-    // filesystem MCP 同步需要用“本机 workspace -> 远端 workspace”映射。
+    ...(params.workspacePurpose || currentEntry?.workspacePurpose
+      ? {
+          workspacePurpose: params.workspacePurpose ?? currentEntry?.workspacePurpose,
+        }
+      : {}),
+    // Bugfix: filesystem MCP 同步需要用“本机 workspace -> 远端 workspace”映射。
     // 远端历史之前只保存远端路径，已连接后的 Settings/Header 入口无法再恢复本机基准路径。
     ...(localWorkspacePath ? { localWorkspacePath } : {}),
     workspaceIdentity: resolvedWorkspaceIdentity,
@@ -422,29 +443,53 @@ export function buildRemoteWorkspaceSessionMutation(params: {
         ? (params.lastConnectionError ?? currentEntry?.lastConnectionError)
         : undefined,
   };
-  const nextRemoteSessions = upsertRemoteWorkspaceSessionEntries(params.remoteSessions, nextEntry);
+  // Bug 原因：Host 绑定 stable identity 后，旧 route entry 与新 entry 的 key 不同，
+  // 通用 upsert 会把两条都保留。已经通过 target/alias 证明的 currentEntry 就是被换代对象，
+  // 必须先移除再按 stable key 插入。
+  const nextRemoteSessions = upsertRemoteWorkspaceSessionEntries(
+    currentEntry
+      ? params.remoteSessions.filter((entry) => entry !== currentEntry)
+      : params.remoteSessions,
+    nextEntry,
+  );
   const nextRemoteWorkspaceKeys = new Set(
     nextRemoteSessions.map((entry) => buildWorkspaceSessionKey(entry)),
   );
   const credentialKeysToDelete = new Set<string>();
   const previousCredentialKeys = new Set(
-    currentEntry ? collectRemoteWorkspaceCredentialKeys(currentEntry.target) : [],
+    currentEntry ? collectOwnedRemoteWorkspaceCredentialKeys(currentEntry.target) : [],
   );
-  const nextCredentialKeys = new Set(collectRemoteWorkspaceCredentialKeys(nextSnapshot));
+  const nextCredentialKeys = new Set(collectOwnedRemoteWorkspaceCredentialKeys(nextSnapshot));
+  const sourceServerOwnedCredentials =
+    parseRemoteWorkspaceIdentity(workspaceKey)?.kind === "server";
+  const preservesRollbackCredential = (credentialKey: string): boolean =>
+    sourceServerOwnedCredentials &&
+    credentialKey.startsWith("remote-workspace:remote:") &&
+    !credentialKey.includes(":remote:server:");
 
   for (const previousCredentialKey of previousCredentialKeys) {
-    if (!nextCredentialKeys.has(previousCredentialKey)) {
+    if (
+      !nextCredentialKeys.has(previousCredentialKey) &&
+      !preservesRollbackCredential(previousCredentialKey)
+    ) {
       credentialKeysToDelete.add(previousCredentialKey);
     }
   }
 
   for (const removedEntry of params.remoteSessions) {
+    if (removedEntry === currentEntry) {
+      // currentEntry 的凭据差异已在 previousCredentialKeys 分支处理；
+      // 无显式 identity 的旧 entry 不能再被当成「被容量裁剪」重复删除凭据。
+      continue;
+    }
     if (nextRemoteWorkspaceKeys.has(buildWorkspaceSessionKey(removedEntry))) {
       continue;
     }
 
-    for (const credentialKey of collectRemoteWorkspaceCredentialKeys(removedEntry.target)) {
-      credentialKeysToDelete.add(credentialKey);
+    for (const credentialKey of collectOwnedRemoteWorkspaceCredentialKeys(removedEntry.target)) {
+      if (!preservesRollbackCredential(credentialKey)) {
+        credentialKeysToDelete.add(credentialKey);
+      }
     }
   }
 
@@ -521,24 +566,270 @@ export function buildPersistedWorkspaceSessionEntries(
     entries.push({
       kind: "local",
       workspacePath: tab.workspacePath,
-      ...(tab.workspacePurpose
-        ? { workspacePurpose: tab.workspacePurpose }
-        : {}),
+      ...(tab.workspacePurpose ? { workspacePurpose: tab.workspacePurpose } : {}),
     });
     return entries;
   }, []);
 }
 
 export function readPersistedWorkspaceSessionEntries(
-  settings: Pick<AppSettings, "lastWorkspaceSession">,
+  settings: Pick<
+    AppSettings,
+    | "lastWorkspaceSession"
+    | "lastActiveWorkspace"
+    | "sourceServerWorkspaceHistory"
+    | "connectionProfiles"
+    | "remoteConversationWorkspaceBySourceServerId"
+  >,
 ): PersistedWorkspaceSessionEntry[] {
-  return settings.lastWorkspaceSession ?? [];
+  // 新版只恢复活动执行目录；旧字段仅供首次导入或连接旧 Server 使用。
+  if (settings.lastActiveWorkspace !== undefined) {
+    return settings.lastActiveWorkspace ? [settings.lastActiveWorkspace] : [];
+  }
+  const projectAliases = mergeIdentityAliases([
+    buildSourceServerWorkspaceIdentityAliases(settings.sourceServerWorkspaceHistory ?? []),
+    buildSourceProfileWorkspaceIdentityAliases(
+      settings.sourceServerWorkspaceHistory ?? [],
+      settings.connectionProfiles ?? [],
+    ),
+  ]);
+  const conversationAliases = buildSourceConversationWorkspaceIdentityAliases(settings);
+
+  const result: PersistedWorkspaceSessionEntry[] = [];
+  const remoteIndexByKey = new Map<string, number>();
+  for (const entry of settings.lastWorkspaceSession ?? []) {
+    if (entry.kind === "local") {
+      result.push(entry);
+      continue;
+    }
+    const currentIdentity = resolveRemoteWorkspaceSessionIdentity(entry);
+    const aliasKey = `${entry.workspacePath}\0${currentIdentity}`;
+    const projectAlias = projectAliases.get(aliasKey);
+    const conversationAlias = conversationAliases.get(aliasKey);
+    // project history 与 device conversation map 理论上不会声明同一路径；旧数据若冲突，
+    // 保持 legacy identity fail-closed，不能把 workspace 猜到任一 Source。
+    const stableAlias =
+      projectAlias && conversationAlias && projectAlias !== conversationAlias
+        ? undefined
+        : (projectAlias ?? conversationAlias);
+    const normalized = stableAlias
+      ? {
+          ...entry,
+          workspaceIdentity: stableAlias,
+          ...(conversationAlias === stableAlias
+            ? { workspacePurpose: "conversation" as const }
+            : {}),
+        }
+      : entry;
+    const workspaceKey = buildWorkspaceSessionKey(normalized);
+    const existingIndex = remoteIndexByKey.get(workspaceKey);
+    if (existingIndex === undefined) {
+      remoteIndexByKey.set(workspaceKey, result.length);
+      result.push(normalized);
+      continue;
+    }
+    const existing = result[existingIndex];
+    if (existing?.kind === "remote" && normalized.lastOpenedAt > existing.lastOpenedAt) {
+      result[existingIndex] = {
+        ...existing,
+        ...normalized,
+        localWorkspacePath: normalized.localWorkspacePath ?? existing.localWorkspacePath,
+      };
+    }
+  }
+  return result;
+}
+
+function buildSourceServerWorkspaceIdentityAliases(
+  historyEntries: NonNullable<AppSettings["sourceServerWorkspaceHistory"]>,
+): Map<string, string> {
+  const aliases = new Map<string, string>();
+  for (const history of historyEntries) {
+    const legacyIdentity = history.legacyWorkspaceIdentity?.trim();
+    const stableIdentity = history.workspaceIdentity?.trim();
+    if (legacyIdentity && stableIdentity && legacyIdentity !== stableIdentity) {
+      aliases.set(`${history.workspacePath}\0${legacyIdentity}`, stableIdentity);
+    }
+  }
+  return aliases;
+}
+
+function buildSourceConversationWorkspaceIdentityAliases(
+  settings: Pick<AppSettings, "connectionProfiles" | "remoteConversationWorkspaceBySourceServerId">,
+): Map<string, string> {
+  const candidatesByAlias = new Map<string, Set<string>>();
+  for (const profile of settings.connectionProfiles ?? []) {
+    const sourceServerId = profile.sourceServerId?.trim();
+    if (!sourceServerId || profile.lifecycleState === "retired") {
+      continue;
+    }
+    const workspacePath =
+      settings.remoteConversationWorkspaceBySourceServerId?.[sourceServerId]?.workspacePath;
+    if (!workspacePath) continue;
+
+    // Bug 原因：rollback writer 必须为旧 Desktop 写 route identity，但 conversation
+    // 按合同不进入 project history，reader 过去没有逆映射来源，重启后只能恢复成 pending tab。
+    // 这里同时要求已绑定 Profile 的精确 authority 与设备级 canonical path，且只接受唯一 Source。
+    const legacyIdentity = buildRemoteWorkspaceIdentity(workspacePath, profile.target);
+    const stableIdentity = buildServerRemoteWorkspaceIdentity({
+      serverId: sourceServerId,
+      workspacePath,
+    });
+    const aliasKey = `${workspacePath}\0${legacyIdentity}`;
+    const candidates = candidatesByAlias.get(aliasKey) ?? new Set<string>();
+    candidates.add(stableIdentity);
+    candidatesByAlias.set(aliasKey, candidates);
+  }
+
+  const aliases = new Map<string, string>();
+  for (const [aliasKey, candidates] of candidatesByAlias) {
+    if (candidates.size !== 1) continue;
+    const stableIdentity = candidates.values().next().value;
+    if (stableIdentity) aliases.set(aliasKey, stableIdentity);
+  }
+  return aliases;
+}
+
+function buildSourceProfileWorkspaceIdentityAliases(
+  historyEntries: NonNullable<AppSettings["sourceServerWorkspaceHistory"]>,
+  profiles: NonNullable<AppSettings["connectionProfiles"]>,
+): Map<string, string> {
+  const candidatesByAlias = new Map<string, Set<string>>();
+  for (const history of historyEntries) {
+    const sourceServerId = history.sourceServerId?.trim();
+    if (!sourceServerId) continue;
+    const stableIdentity = buildServerRemoteWorkspaceIdentity({
+      serverId: sourceServerId,
+      workspacePath: history.workspacePath,
+    });
+    for (const profile of profiles) {
+      if (
+        profile.lifecycleState === "retired" ||
+        profile.sourceServerId?.trim() !== sourceServerId
+      ) {
+        continue;
+      }
+      const legacyIdentity = buildRemoteWorkspaceIdentity(history.workspacePath, profile.target);
+      if (legacyIdentity === stableIdentity) continue;
+      const aliasKey = `${history.workspacePath}\0${legacyIdentity}`;
+      const candidates = candidatesByAlias.get(aliasKey) ?? new Set<string>();
+      candidates.add(stableIdentity);
+      candidatesByAlias.set(aliasKey, candidates);
+    }
+  }
+
+  const aliases = new Map<string, string>();
+  for (const [aliasKey, candidates] of candidatesByAlias) {
+    if (candidates.size !== 1) continue;
+    const stableIdentity = candidates.values().next().value;
+    if (stableIdentity) aliases.set(aliasKey, stableIdentity);
+  }
+  return aliases;
+}
+
+function mergeIdentityAliases(
+  aliasMaps: readonly ReadonlyMap<string, string>[],
+): Map<string, string> {
+  const candidatesByAlias = new Map<string, Set<string>>();
+  for (const aliasMap of aliasMaps) {
+    for (const [aliasKey, stableIdentity] of aliasMap) {
+      const candidates = candidatesByAlias.get(aliasKey) ?? new Set<string>();
+      candidates.add(stableIdentity);
+      candidatesByAlias.set(aliasKey, candidates);
+    }
+  }
+  const aliases = new Map<string, string>();
+  for (const [aliasKey, candidates] of candidatesByAlias) {
+    if (candidates.size !== 1) continue;
+    const stableIdentity = candidates.values().next().value;
+    if (stableIdentity) aliases.set(aliasKey, stableIdentity);
+  }
+  return aliases;
+}
+
+export interface RemoteWorkspaceSessionIdentityRekey {
+  workspacePath: string;
+  previousWorkspaceIdentity: string;
+  workspaceIdentity: string;
+}
+
+export function projectRemoteWorkspaceSessionIdentityAliases(
+  remoteSessions: readonly RemoteWorkspaceSessionEntry[],
+  sourceServerWorkspaceHistoryOrSettings:
+    | NonNullable<AppSettings["sourceServerWorkspaceHistory"]>
+    | Pick<
+        AppSettings,
+        | "sourceServerWorkspaceHistory"
+        | "connectionProfiles"
+        | "remoteConversationWorkspaceBySourceServerId"
+      >,
+): {
+  remoteSessions: RemoteWorkspaceSessionEntry[];
+  identityRekeys: RemoteWorkspaceSessionIdentityRekey[];
+} {
+  const sourceServerWorkspaceHistory = Array.isArray(sourceServerWorkspaceHistoryOrSettings)
+    ? sourceServerWorkspaceHistoryOrSettings
+    : (sourceServerWorkspaceHistoryOrSettings.sourceServerWorkspaceHistory ?? []);
+  const settings: Pick<
+    AppSettings,
+    | "sourceServerWorkspaceHistory"
+    | "connectionProfiles"
+    | "remoteConversationWorkspaceBySourceServerId"
+  > = Array.isArray(sourceServerWorkspaceHistoryOrSettings)
+    ? {}
+    : sourceServerWorkspaceHistoryOrSettings;
+  const aliases = mergeIdentityAliases([
+    buildSourceServerWorkspaceIdentityAliases(sourceServerWorkspaceHistory),
+    buildSourceProfileWorkspaceIdentityAliases(
+      sourceServerWorkspaceHistory,
+      settings.connectionProfiles ?? [],
+    ),
+    buildSourceConversationWorkspaceIdentityAliases({
+      connectionProfiles: settings.connectionProfiles ?? [],
+      remoteConversationWorkspaceBySourceServerId:
+        settings.remoteConversationWorkspaceBySourceServerId,
+    }),
+  ]);
+  const identityRekeys = remoteSessions.flatMap((entry) => {
+    const previousWorkspaceIdentity = resolveRemoteWorkspaceSessionIdentity(entry);
+    const workspaceIdentity = aliases.get(`${entry.workspacePath}\0${previousWorkspaceIdentity}`);
+    return workspaceIdentity
+      ? [
+          {
+            workspacePath: entry.workspacePath,
+            previousWorkspaceIdentity,
+            workspaceIdentity,
+          },
+        ]
+      : [];
+  });
+  const projectedEntries = readPersistedWorkspaceSessionEntries({
+    lastWorkspaceSession: [...remoteSessions],
+    sourceServerWorkspaceHistory,
+    ...(settings.connectionProfiles ? { connectionProfiles: settings.connectionProfiles } : {}),
+    ...(settings.remoteConversationWorkspaceBySourceServerId
+      ? {
+          remoteConversationWorkspaceBySourceServerId:
+            settings.remoteConversationWorkspaceBySourceServerId,
+        }
+      : {}),
+  });
+  return {
+    remoteSessions: projectedEntries.flatMap((entry) => (entry.kind === "remote" ? [entry] : [])),
+    identityRekeys,
+  };
 }
 
 export function getRemoteWorkspaceSessionEntries(
-  settings: Pick<AppSettings, "lastWorkspaceSession">,
+  settings: Pick<
+    AppSettings,
+    | "lastWorkspaceSession"
+    | "sourceServerWorkspaceHistory"
+    | "connectionProfiles"
+    | "remoteConversationWorkspaceBySourceServerId"
+  >,
 ): RemoteWorkspaceSessionEntry[] {
-  return (settings.lastWorkspaceSession ?? []).flatMap((entry) =>
+  return readPersistedWorkspaceSessionEntries(settings).flatMap((entry) =>
     entry.kind === "remote" ? [entry] : [],
   );
 }

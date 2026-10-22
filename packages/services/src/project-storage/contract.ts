@@ -1,0 +1,112 @@
+import type { DatabaseSync } from "node:sqlite";
+import type { AppSettings } from "@zcode/shared";
+import type { MigrationResult } from "@zcode/shared/sqlite-migrations";
+
+export interface ProjectMigrationContext {
+  /** 可信持库 Server 身份；不受客户端请求或旧 canonical route 影响。 */
+  hostId?: string;
+  backupDirectories: readonly string[];
+  settings?: Pick<
+    AppSettings,
+    "lastWorkspaceSession" | "recentProjects" | "sourceServers" | "connectionProfiles"
+  >;
+  now?: () => number;
+  warn?: (message: string, details?: Record<string, unknown>) => void;
+}
+
+/** Host 数据库的版本化迁移端口；不读取或修改 CLI db.sqlite。 */
+export interface ProjectStorageContract {
+  /** 加法升级后同事务交接旧版本新增行/删除/标题意图；每次启动调用，不重算已处理的 NULL。 */
+  migrate(db: DatabaseSync, context: ProjectMigrationContext): Promise<MigrationResult>;
+  repository(db: DatabaseSync, hostId?: string): ProjectRepositoryContract;
+  admitTaskIdentity(db: DatabaseSync, task: ProjectTaskRef, hostId?: string): void;
+}
+
+export interface ProjectRoot {
+  rootPath: string;
+  position: number;
+  isPrimary: boolean;
+}
+export interface VirtualProject {
+  /** 所属 Host 异步探测的只读投影，不写入项目数据库或远端入口缓存；旧 Server 可省略。 */
+  primaryRootStatus?: "available" | "missing" | "unavailable";
+  /** 旧 Server 的只读单 root 投影，不是本机持久化项目。 */
+  legacySingleRoot?: true;
+  /** 旧单 root 按所属 Host 规则派生的目录匹配值；不落库，不改变原 root、项目 ID 或任务 cwd。 */
+  directoryMatchPath?: string;
+  id: string;
+  hostId: string;
+  name: string;
+  nameOverridden: boolean;
+  roots: ProjectRoot[];
+  position: number;
+  pinned: boolean;
+  deleted: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface ProjectTaskRef {
+  workspacePath: string;
+  workspaceIdentity?: string;
+  taskId: string;
+}
+export type ProjectTask = import("@zcode/shared").ZCodeTaskMeta & {
+  projectId: string | null;
+  hostId: string;
+  pinned: boolean;
+  archived: boolean;
+};
+export interface ProjectTree {
+  legacySingleRoot?: true;
+  projects: VirtualProject[];
+  tasks: ProjectTask[];
+  /** 仅显式请求时返回删除事实；离线缺席不能替代这些引用。 */
+  deletedTasks?: Array<ProjectTaskRef & { hostId: string }>;
+}
+
+export const LEGACY_SINGLE_ROOT_PROJECT_PREFIX = "legacy-single-root:";
+export interface SaveProjectInput {
+  id?: string;
+  hostId?: string;
+  name?: string;
+  defaultName?: string;
+  roots?: string[];
+  primaryRoot?: string;
+  pinned?: boolean;
+  restoreProjectId?: string;
+}
+export interface ProjectDirectories {
+  workspacePath: string;
+  /** 远端装配层登记后的 attachment 身份；执行仍使用 workspacePath。 */
+  workspaceIdentity?: string;
+  additionalDirectories: string[];
+  projectId: string | null;
+}
+export interface AutoArchiveInput {
+  cutoff: number;
+  activeTasks: readonly ProjectTaskRef[];
+}
+export interface ProjectRepositoryContract {
+  /** 单事务纯按 CLI 最后活动时间筛选，置顶与 activeTasks 除外，仅写组织态；覆盖未归类 cwd。 */
+  archiveInactive(input: AutoArchiveInput): ProjectTaskRef[];
+  /** 可只取目录，并参与调用方已有的 SQLite 读快照。 */
+  readTree(options?: {
+    includeDeleted?: boolean;
+    includeDeletedTasks?: boolean;
+    includeTasks?: boolean;
+  }): ProjectTree;
+  saveProject(input: SaveProjectInput): VirtualProject;
+  deleteProject(id: string): void;
+  /** 在写事务内只为空项目初始化 root；并发编辑已添加的目录优先。 */
+  initializeProjectRoot(id: string, path: string): VirtualProject;
+  moveTask(input: { task: ProjectTaskRef; projectId: string; addMissingRoot?: boolean }): void;
+  reorderProjects(ids: string[]): void;
+  resolveSessionDirectories(task: ProjectTaskRef): ProjectDirectories;
+  /** CLI 创建之前原子预留归属；无事实的预留行不进入列表，重试不覆盖组织操作。 */
+  reserveCreatedTask(input: {
+    task: ProjectTaskRef;
+    projectId: string | null;
+    /** Host 已固化的执行目录；首次预留持久化，重试不改。undefined 为普通新建。 */
+    additionalDirectories?: string[];
+  }): ProjectDirectories;
+}

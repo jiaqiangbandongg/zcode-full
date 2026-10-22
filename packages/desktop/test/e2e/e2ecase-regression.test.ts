@@ -11,7 +11,7 @@ import {
   TID_SIDEBAR_CODING_PLAN_USAGE_BUTTON,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import AppPage from "./pages/app.page.js";
 import {
   DEFAULT_WORKSPACE,

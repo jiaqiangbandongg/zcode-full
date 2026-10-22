@@ -1,12 +1,14 @@
+import { seedTaskIndex } from "./helpers/taskIndexFixture.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Worker } from "node:worker_threads";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZCodeTaskMeta } from "@zcode/shared";
 import { getTasksIndexDatabasePath, setDataBaseDir } from "#src/paths.js";
+import { projectStorage } from "#src/project-storage/index.js";
 import { TaskIndexRepo } from "#src/session/taskIndexRepo.js";
 
 let repo: TaskIndexRepo;
@@ -63,15 +65,89 @@ async function holdSqliteWriteLock(databasePath: string): Promise<Worker> {
 }
 
 describe("TaskIndexRepo unread compare-and-clear", () => {
+  it("reads and sorts only CLI fact columns even when legacy columns and JSON disagree", async () => {
+    for (const [taskId, updatedAt] of [
+      ["older", 100],
+      ["newer", 200],
+    ] as const) {
+      await repo.applyCliFacts({
+        meta: { ...createTask(0), taskId, updatedAt, title: `CLI ${taskId}`, provider: "glm" },
+        lastOutcome: "error",
+      });
+    }
+    const db = new DatabaseSync(getTasksIndexDatabasePath());
+    try {
+      db.exec(`UPDATE tasks SET title='legacy',task_status='running',updated_at=999999,
+        meta_json=json_set(meta_json,'$.title','JSON stale','$.status','running','$.updatedAt',999999)
+        WHERE task_id='older'`);
+    } finally {
+      db.close();
+    }
+    const query = {
+      workspaceScopes: [{ workspacePath: "/workspace/project" }],
+      kind: "active" as const,
+    };
+    expect((await repo.queryTaskList(query)).items.map((task) => task.taskId)).toEqual([
+      "newer",
+      "older",
+    ]);
+    expect((await repo.queryTaskList({ ...query, search: "CLI older" })).items).toEqual([
+      expect.objectContaining({ title: "CLI older", updatedAt: 100, status: "error" }),
+    ]);
+    expect((await repo.listTaskMetas({})).map((task) => task.taskId)).toEqual(["newer", "older"]);
+  });
+
+  it("exposes a skipped backup to the startup barrier", async () => {
+    const migrate = projectStorage.migrate;
+    const mock = vi.spyOn(projectStorage, "migrate").mockImplementation(async (...args) => ({
+      ...(await migrate(...args)),
+      backupSkipped: true,
+    }));
+    try {
+      await repo.ensureReady();
+      expect(repo.migrationBackupSkipped).toBe(true);
+    } finally {
+      mock.mockRestore();
+    }
+  });
+
+  it("materializes reserved creation from CLI facts while preserving intervening organization changes", async () => {
+    const projectRepo = await repo.getProjectRepository();
+    const meta = { ...createTask(100), provider: "glm" as const };
+    projectRepo.reserveCreatedTask({ task: meta, projectId: null });
+    await repo.updateTaskState({ ...meta, patch: { pinned: true, unreadAt: 200 } });
+    await repo.applyCliFacts({ meta, titleSource: "generated", lastOutcome: "completed" });
+    expect(
+      await repo.listTaskMetas({
+        workspacePath: meta.workspacePath,
+        provider: "glm",
+        pinned: true,
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        taskId: meta.taskId,
+        provider: "glm",
+        title: "Task 1",
+        unreadAt: 200,
+      }),
+    ]);
+    expect(projectRepo.readTree().tasks[0]).toMatchObject({
+      projectId: null,
+      title: "Task 1",
+      pinned: true,
+      unreadAt: 200,
+    });
+  });
+
   it("保留用户点击后新产生的未读", async () => {
     const initialUnreadAt = 100;
     const terminalUnreadAt = 200;
     const task = createTask(initialUnreadAt);
-    await repo.syncTaskMeta({ meta: task });
+    await seedTaskIndex(repo, { meta: task });
     await repo.updateTaskState({
       taskId: task.taskId,
       workspacePath: task.workspacePath,
-      patch: { status: "completed", unreadAt: terminalUnreadAt },
+      patch: { unreadAt: terminalUnreadAt },
     });
 
     const result = await repo.clearTaskUnreadIfMatches({
@@ -93,8 +169,8 @@ describe("TaskIndexRepo unread compare-and-clear", () => {
   });
 
   it("远程 workspace 重启后在时钟回拨时仍推进未读 marker", async () => {
-    const firstWorkspaceIdentity = "ssh://host-a/workspace/project";
-    const secondWorkspaceIdentity = "ssh://host-b/workspace/project";
+    const firstWorkspaceIdentity = "remote:ssh:host-a:22:user:/workspace/project";
+    const secondWorkspaceIdentity = "remote:ssh:host-b:22:user:/workspace/project";
     const firstTask = {
       ...createTask(100),
       workspaceIdentity: firstWorkspaceIdentity,
@@ -103,8 +179,8 @@ describe("TaskIndexRepo unread compare-and-clear", () => {
       ...createTask(100),
       workspaceIdentity: secondWorkspaceIdentity,
     };
-    await repo.syncTaskMeta({ meta: firstTask });
-    await repo.syncTaskMeta({ meta: secondTask });
+    await seedTaskIndex(repo, { meta: firstTask });
+    await seedTaskIndex(repo, { meta: secondTask });
     repo.close();
     const legacyDatabase = new DatabaseSync(getTasksIndexDatabasePath());
     legacyDatabase.exec("ALTER TABLE tasks DROP COLUMN last_unread_at");
@@ -163,7 +239,7 @@ describe("TaskIndexRepo unread compare-and-clear", () => {
     const task = createTask(100);
     const otherHostRepo = new TaskIndexRepo();
     try {
-      await repo.syncTaskMeta({ meta: task });
+      await seedTaskIndex(repo, { meta: task });
       const newerUnread = await otherHostRepo.updateTaskState({
         taskId: task.taskId,
         workspacePath: task.workspacePath,
@@ -171,7 +247,7 @@ describe("TaskIndexRepo unread compare-and-clear", () => {
       });
       expect(newerUnread.unreadAt).toBe(101);
 
-      const persistedSnapshot = await repo.syncTaskMeta({
+      const persistedSnapshot = await seedTaskIndex(repo, {
         meta: {
           ...task,
           status: "completed",
@@ -198,7 +274,7 @@ describe("TaskIndexRepo unread compare-and-clear", () => {
   it("跨 Host 写锁释放后仍能分配新未读 marker", async () => {
     const task = createTask(100);
     const otherHostRepo = new TaskIndexRepo();
-    await repo.syncTaskMeta({ meta: task });
+    await seedTaskIndex(repo, { meta: task });
     await otherHostRepo.ensureReady();
     const writeLock = await holdSqliteWriteLock(getTasksIndexDatabasePath());
     try {

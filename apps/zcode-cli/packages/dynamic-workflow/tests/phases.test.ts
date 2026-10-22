@@ -86,9 +86,7 @@ describe("phase marker diagnostics (9004)", () => {
     expected: { column: number; line: number; contains: string },
   ): void {
     const { diagnostics } = markers(scriptText);
-    const match = diagnostics.find(
-      (d) => d.line === expected.line && d.column === expected.column,
-    );
+    const match = diagnostics.find((d) => d.line === expected.line && d.column === expected.column);
     expect(
       match,
       `expected a 9004 diagnostic at ${expected.line}:${expected.column}; got ${JSON.stringify(diagnostics)}`,
@@ -114,7 +112,11 @@ describe("phase marker diagnostics (9004)", () => {
   });
 
   it("rejects an empty name, and one that is only whitespace", () => {
-    expectRejected(`phase("");\nreturn 1;`, { column: 7, contains: "has no name to show", line: 1 });
+    expectRejected(`phase("");\nreturn 1;`, {
+      column: 7,
+      contains: "has no name to show",
+      line: 1,
+    });
     expectRejected(`phase("  \\t ");\nreturn 1;`, {
       column: 7,
       contains: "has no name to show",
@@ -202,7 +204,10 @@ describe("phase markers in analyzeWorkflowScript", () => {
       expect(result.ok, script).toBe(false);
       expect(result.graph, script).toBeUndefined();
       expect(result.causality, script).toBeUndefined();
-      expect(result.diagnostics.some((d) => d.code === PHASE_MARKER_CODE), script).toBe(true);
+      expect(
+        result.diagnostics.some((d) => d.code === PHASE_MARKER_CODE),
+        script,
+      ).toBe(true);
     }
   });
 
@@ -240,14 +245,6 @@ describe("phase markers in analyzeWorkflowScript", () => {
       line: 1,
     });
     expect(result.diagnostics[0]?.message).toContain("facade function 'phase'");
-  });
-
-  it("does not flag a direct marker call as unsited facade misuse", () => {
-    const result = analyzeWorkflowScript(
-      `phase("work");\nconst a = agent("a");\nconst x = await a.ask<string>("go");\nreturn x;`,
-    );
-    expect(result.diagnostics).toEqual([]);
-    expect(result.ok).toBe(true);
   });
 });
 

@@ -2,7 +2,8 @@
 import { createInterface } from "node:readline";
 import { connect } from "node:net";
 import { readFile } from "node:fs/promises";
-const [port, htmlPath, source] = process.argv.slice(2);
+const [port, htmlPath, sourceArgument] = process.argv.slice(2);
+const source = sourceArgument === "managed-delayed" ? "managed" : sourceArgument;
 const control = connect(Number(port), "127.0.0.1");
 const sendEvent = (event) => control.write(JSON.stringify({ source, ...event }) + "\n");
 const respond = (id, result) =>
@@ -57,16 +58,37 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   if (message.id === undefined) return;
   const { id, method, params } = message;
   switch (method) {
-    case "initialize":
-      respond(id, {
+    case "initialize": {
+      const initialization = {
         protocolVersion: "2025-11-25",
         capabilities: { tools: {}, resources: { subscribe: true } },
         serverInfo: { name: "host-e2e", version: "1" },
-      });
+      };
+      // 用控制闸门重现 session 先恢复、MCP 后连接，不能依赖机器启动速度碰运气。
+      if (sourceArgument === "managed-delayed") {
+        pending.set("initialize", { id, result: initialization });
+        sendEvent({ type: "initialize-waiting" });
+      } else respond(id, initialization);
       break;
+    }
     case "tools/list":
       respond(id, {
         tools: [
+          ...(source.startsWith("admission")
+            ? [
+                {
+                  name: "open_editor",
+                  description: "Open fixture editor",
+                  inputSchema: {
+                    type: "object",
+                    properties: { key: { type: "string" }, delayed: { type: "boolean" } },
+                    required: ["key"],
+                  },
+                  annotations: { readOnlyHint: true },
+                  _meta: { ui: { resourceUri: "ui://fixture", surface: "same" } },
+                },
+              ]
+            : []),
           {
             name: "edit",
             description: "Local E2E app-only tool",

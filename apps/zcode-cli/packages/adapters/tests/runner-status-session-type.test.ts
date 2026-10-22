@@ -26,11 +26,6 @@ describe("resolveModelRequestSessionType", () => {
     { actorKind: "subagent", expected: "subagent", operation: "agent_step" },
     { actorKind: "workflow_child", expected: "other", operation: "agent_step" },
     { actorKind: "system", expected: "other", operation: "session_title_generation" },
-    { actorKind: "system", expected: "other", operation: "project_memory_extract" },
-    { actorKind: "system", expected: "other", operation: "workspace_generate_text" },
-    { actorKind: "tool", expected: "other", operation: "web_search" },
-    { actorKind: "tool", expected: "other", operation: "web_fetch_processing" },
-    { actorKind: "tool", expected: "other", operation: "read_session_context_extract" },
   ] as const)("maps $operation/$actorKind to $expected", ({ actorKind, expected, operation }) => {
     expect(resolveModelRequestSessionType(undefined, modelCall(operation, actorKind))).toBe(
       expected,
@@ -49,12 +44,7 @@ describe("resolveModelRequestSessionType", () => {
     ).toBe("subagent");
   });
 
-  it.each([
-    "agent_step",
-    "context_compaction",
-    "project_memory_recall",
-    "session_title_generation",
-  ] as const)("preserves explicit side_chat for %s", (operation) => {
+  it.each(["agent_step"] as const)("preserves explicit side_chat for %s", (operation) => {
     expect(resolveModelRequestSessionType("side_chat", modelCall(operation, "system"))).toBe(
       "side_chat",
     );

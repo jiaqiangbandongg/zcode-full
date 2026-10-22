@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { ProjectAccessTokenClient } from "../src/project-access-token-client.js";
-import { projectAccessTokenFingerprint } from "../src/project-access-token.js";
+import {
+  projectAccessTokenFingerprint,
+  ProjectAccessTokenTransientError,
+} from "#src/project-access-token.js";
+import { CREDENTIAL_DECRYPT_ERROR_CODE } from "#src/oauth.js";
 
 const input = {
   origin: "https://example.invalid",
@@ -45,6 +49,56 @@ function fixture(existing = true) {
 }
 
 describe("ProjectAccessTokenClient", () => {
+  it.each(["recovery-io", "metadata-503", "load-io"])(
+    "%s：恢复前留下固定诊断，普通读取错误不误报恢复",
+    async (failure) => {
+      const observe = vi.fn();
+      const unreadableEvent = {
+        family: "bigmodel",
+        stage: "resolve",
+        code: "project_token_location_unreadable",
+      };
+      const locationStore = {
+        load: vi.fn(async (): Promise<string | null> => {
+          throw Object.assign(new Error("private ciphertext"), {
+            code: failure === "load-io" ? "EACCES" : CREDENTIAL_DECRYPT_ERROR_CODE,
+          });
+        }),
+        recoverUnreadable: vi.fn(async (): Promise<string | null> => {
+          // 恢复自身可能失败，必须在调用存储端口前就能看到解密失败的线索。
+          expect(observe.mock.calls).toEqual([[unreadableEvent]]);
+          if (failure === "recovery-io") throw new Error("private storage error");
+          return null;
+        }),
+        save: vi.fn(),
+        delete: vi.fn(),
+      };
+      const request = vi.fn(async () => {
+        // Host adapter 将 HTTP 503 映射为该固定错误，不向共享客户端暴露响应正文。
+        throw new ProjectAccessTokenTransientError();
+      });
+      const client = new ProjectAccessTokenClient({ request, locationStore, observe });
+      await expect(client.resolve(input)).rejects.toThrow("project_token_request_failed");
+      const codes =
+        failure === "load-io"
+          ? ["project_token_request_failed"]
+          : failure === "recovery-io"
+            ? ["project_token_location_unreadable", "project_token_request_failed"]
+            : [
+                "project_token_location_unreadable",
+                "project_token_location_recovery",
+                "project_token_request_failed",
+              ];
+      expect(observe.mock.calls).toEqual(
+        codes.map((code) => [{ family: "bigmodel", stage: "resolve", code }]),
+      );
+      expect(locationStore.recoverUnreadable).toHaveBeenCalledTimes(failure === "load-io" ? 0 : 1);
+      expect(request).toHaveBeenCalledTimes(failure === "metadata-503" ? 1 : 0);
+      expect(locationStore.save).not.toHaveBeenCalled();
+      expect(locationStore.delete).not.toHaveBeenCalled();
+    },
+  );
+
   it("收到失败指纹后复用 Key ID 换证，并发/迟到拒绝只产生一次新签发", async () => {
     const f = fixture();
     let issues = 0;

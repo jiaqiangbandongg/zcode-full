@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
-import { ChevronDown, UploadCloud } from "lucide-react";
+import { BlocksIcon, CableIcon, ChevronDown, UploadCloud, WandIcon } from "lucide-react";
 import type { RemoteTarget } from "@zcode/shared";
 import type {
   IMcpSyncService,
@@ -60,18 +60,13 @@ export function shouldStartRemoteSyncOperation(params: {
   return !params.inFlight && params.selectedCount > 0;
 }
 
-export function useRemoteSyncDialogIntent(params: {
-  rpcReady: boolean;
-  targetKey: string;
-}): {
+export function useRemoteSyncDialogIntent(params: { rpcReady: boolean; targetKey: string }): {
   open: boolean;
   setOpen: (open: boolean) => void;
 } {
   const [openedTargetKey, setOpenedTargetKey] = useState<string | null>(null);
   const open =
-    params.rpcReady &&
-    params.targetKey.length > 0 &&
-    openedTargetKey === params.targetKey;
+    params.rpcReady && params.targetKey.length > 0 && openedTargetKey === params.targetKey;
 
   useEffect(() => {
     // 弹窗 open 曾只绑定 PluginList 组件生命周期，远端断连或切换目标时
@@ -87,9 +82,7 @@ export function useRemoteSyncDialogIntent(params: {
   const setOpen = useCallback(
     (nextOpen: boolean) => {
       setOpenedTargetKey(
-        nextOpen && params.rpcReady && params.targetKey.length > 0
-          ? params.targetKey
-          : null,
+        nextOpen && params.rpcReady && params.targetKey.length > 0 ? params.targetKey : null,
       );
     },
     [params.rpcReady, params.targetKey],
@@ -148,8 +141,8 @@ export function RemoteSyncMenuItems({
     <>
       {canSyncSkills ? (
         <DropdownMenuItem onMouseDown={handleMouseDown} onSelect={onOpenSkillSync}>
-          <UploadCloud className="size-3.5" />
-          {intl.formatMessage({ id: "settings.skills.remoteSync.open" })}
+          <WandIcon className="size-3.5" />
+          {intl.formatMessage({ id: "remote.syncSkills" })}
         </DropdownMenuItem>
       ) : null}
       {canSyncMcp ? (
@@ -158,14 +151,14 @@ export function RemoteSyncMenuItems({
           onMouseDown={handleMouseDown}
           onSelect={onOpenMcpSync}
         >
-          <UploadCloud className="size-3.5" />
-          {intl.formatMessage({ id: "settings.mcp.remoteSync.open" })}
+          <CableIcon className="size-3.5" />
+          {intl.formatMessage({ id: "remote.syncMcp" })}
         </DropdownMenuItem>
       ) : null}
       {canSyncPlugins ? (
         <DropdownMenuItem onMouseDown={handleMouseDown} onSelect={onOpenPluginSync}>
-          <UploadCloud className="size-3.5" />
-          {intl.formatMessage({ id: "settings.plugins.remoteSync.open" })}
+          <BlocksIcon className="size-3.5" />
+          {intl.formatMessage({ id: "remote.syncPlugins" })}
         </DropdownMenuItem>
       ) : null}
     </>
@@ -198,14 +191,9 @@ export function RemoteSyncDropdownButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="gap-1"
-        >
+        <Button type="button" variant="secondary" size="sm" className="gap-1">
           <UploadCloud className="size-3.5" aria-hidden="true" />
-          {intl.formatMessage({ id: "settings.remoteSync.open" })}
+          {intl.formatMessage({ id: "remote.syncAll" })}
           <ChevronDown className="size-3.5 text-foreground-subtle" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
@@ -282,11 +270,7 @@ export function RemoteSyncDialogs({
   onPluginsSynced?: () => Promise<void> | void;
 }) {
   const skillDialogProps =
-    canSyncSkills &&
-    skillOpen &&
-    remoteTarget &&
-    localSkillSyncService &&
-    remoteSkillSyncService
+    canSyncSkills && skillOpen && remoteTarget && localSkillSyncService && remoteSkillSyncService
       ? {
           localSkillSyncService,
           remoteSkillSyncService,
@@ -294,11 +278,7 @@ export function RemoteSyncDialogs({
         }
       : null;
   const mcpDialogProps =
-    canSyncMcp &&
-    mcpOpen &&
-    remoteTarget &&
-    localMcpSyncService &&
-    remoteMcpSyncService
+    canSyncMcp && mcpOpen && remoteTarget && localMcpSyncService && remoteMcpSyncService
       ? {
           localMcpSyncService,
           remoteMcpSyncService,

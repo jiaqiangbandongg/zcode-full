@@ -1,3 +1,4 @@
+import { createPluginUiSidePaneTab } from "./sidePane/pluginUiSidePaneTab.js";
 import { describe, expect, it } from "vitest";
 import { exampleOpenSideTab, examplePresentation } from "./contract.example.js";
 import {
@@ -71,6 +72,27 @@ describe("plugin-ui contract", () => {
     });
     expect(surfaceTab.id).toContain(":surface:panel");
     expect(surfaceTab.serverName).toBe(examplePresentation.serverName);
+  });
+
+  it("文档窗口实例独立，序列化恢复不重复拼接作用域", () => {
+    const input = {
+      workspaceKey: "/repo",
+      workspacePath: "/repo",
+      parentSessionId: "s1",
+      pluginId: "pdf",
+      resourceUri: "ui://pdf/panel.html",
+      surfaceId: "pdf",
+      title: "PDF",
+      instanceId: "first",
+      serverName: "pdf",
+    };
+    const first = createPluginUiSidePaneTab(input);
+    const second = createPluginUiSidePaneTab({ ...input, instanceId: "second" });
+    expect(first.id).not.toBe(second.id);
+    const restored = JSON.parse(JSON.stringify(first));
+    expect(readPluginUiScopeRef(restored)).toEqual(readPluginUiScopeRef(input));
+    expect(createPluginUiSidePaneTab(restored).id).toBe(first.id);
+    expect(createPluginUiSidePaneTab({ ...input, parentSessionId: "s2" }).id).not.toBe(first.id);
   });
 
   it("默认卡片高度符合宿主约定", () => {

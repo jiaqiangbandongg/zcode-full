@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- Upstream E2E 回放服务需要集中维护 fixture 匹配、capture artifact、chunk timeline 和 SSE 时间轴回放，拆开会让录制/回放协议更难追踪。 */
 import { randomUUID } from "node:crypto";
-import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -55,6 +54,7 @@ interface UpstreamReplayFixtureFile {
 type UpstreamReplayCloseMode = "end" | "destroy";
 
 interface UpstreamReplayFixture {
+  metadata?: { timingPolicy?: string };
   captured?: {
     capturedAt?: string;
     model?: string;
@@ -82,6 +82,8 @@ interface UpstreamReplayFixture {
     chunks?: UpstreamReplayResponseChunk[];
     closeMode?: UpstreamReplayCloseMode;
     delayMs?: number;
+    /** 仅 controlled-stream：写出 N 个 chunk 后等待测试完成关键操作再释放。 */
+    releaseAfterChunks?: number;
     events?: E2ENetworkCaptureResponseEvent[];
     headers?: Record<string, string>;
     statusCode: number;
@@ -143,8 +145,41 @@ export async function startUpstreamReplayServer(
   const fixtures = options.fixturePaths.flatMap((path) =>
     loadFixtureFile(path, options.fixtureVariables),
   );
+  for (const fixture of fixtures) {
+    const count = fixture.response.releaseAfterChunks;
+    if (count === undefined) continue;
+    if (
+      fixture.metadata?.timingPolicy !== "controlled-stream" ||
+      !Number.isInteger(count) ||
+      count < 1 ||
+      count >= (fixture.response.chunks?.length ?? 0) ||
+      fixture.response.events?.length
+    ) {
+      throw new Error(`无效受控流 fixture: ${fixture.id}；不得改变 recorded/fault stream 的时间轴`);
+    }
+  }
   const fixtureMatchCounts = new Map<string, number>();
   const records: MutableCaptureRecord[] = [];
+  const gates = new Map<string, { release(): void; cancel(): void }>();
+
+  const holdStream = (id: string, response: ServerResponse) =>
+    new Promise<void>((resolveGate, rejectGate) => {
+      if (gates.has(id)) {
+        rejectGate(new Error(`重复的受控请求: ${id}`));
+        return;
+      }
+      const finish = (error?: Error) => {
+        clearTimeout(timer);
+        response.off("close", closed);
+        gates.delete(id);
+        if (error) rejectGate(error);
+        else resolveGate();
+      };
+      const closed = () => finish(new Error(`受控流已断开: ${id}`));
+      const timer = setTimeout(() => finish(new Error(`受控流未被测试释放: ${id}`)), 120_000);
+      gates.set(id, { release: () => finish(), cancel: closed });
+      response.once("close", closed);
+    });
 
   let serverPort = requestedPort;
   let baseUrl = `http://${host}:${serverPort}`;
@@ -172,12 +207,26 @@ export async function startUpstreamReplayServer(
   };
 
   const server = createServer((request, response) => {
+    // 控制端不进入模型请求台账；每个独立 replay server 只释放自己的正在等待的 fixture。
+    if (request.method === "GET" && request.url === "/__e2e__/gates") {
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify([...gates.keys()]));
+      return;
+    }
+    if (request.method === "POST" && request.url?.startsWith("/__e2e__/release/")) {
+      const gate = gates.get(request.url.slice("/__e2e__/release/".length));
+      response.statusCode = gate ? 204 : 409;
+      gate?.release();
+      response.end();
+      return;
+    }
     void handleReplayRequest(request, response, {
       baseUrl,
       fixtureMatchCounts,
       fixtures,
       records,
       writeArtifact,
+      holdStream,
     }).catch((error: unknown) => {
       // Bug 根因：旧 handler 是裸 `void Promise`，capture 写入抛错后没有任何人
       // 收口 response，provider 只能一直等 socket。证据通道失败必须显式结束请求。
@@ -214,7 +263,10 @@ export async function startUpstreamReplayServer(
     baseUrl,
     host,
     port: serverPort,
-    stop: () => stopServer(server, writeArtifact),
+    stop: () => {
+      for (const gate of gates.values()) gate.cancel();
+      return stopServer(server, writeArtifact);
+    },
   };
 }
 
@@ -227,6 +279,7 @@ async function handleReplayRequest(
     fixtures: UpstreamReplayFixture[];
     records: MutableCaptureRecord[];
     writeArtifact(): Promise<void>;
+    holdStream(id: string, response: ServerResponse): Promise<void>;
   },
 ) {
   const startedAt = new Date().toISOString();
@@ -325,6 +378,17 @@ async function handleReplayRequest(
     await writeResponse(response, record, {
       body: resolvedBody.body,
       chunks: fixture.response.chunks,
+      closeMode: fixture.response.closeMode,
+      ...(fixture.response.releaseAfterChunks === undefined
+        ? {}
+        : {
+            releaseAfterChunks: fixture.response.releaseAfterChunks,
+            release: () => {
+              if (fixture.metadata?.timingPolicy !== "controlled-stream")
+                throw new Error("仅 controlled-stream 允许显式释放");
+              return context.holdStream(fixture.id, response);
+            },
+          }),
       headers: resolvedBody.headers,
       statusCode: fixture.response.statusCode,
       statusMessage: fixture.response.statusMessage ?? "OK",
@@ -777,31 +841,47 @@ async function writeResponse(
   fixtureResponse: {
     body: string;
     chunks?: UpstreamReplayResponseChunk[];
+    closeMode?: UpstreamReplayCloseMode;
+    releaseAfterChunks?: number;
+    release?: () => Promise<void>;
     headers: Record<string, string>;
     statusCode: number;
     statusMessage: string;
   },
 ) {
   const responseChunks = normalizeReplayChunks(fixtureResponse.chunks);
+  const destroyStream = fixtureResponse.closeMode === "destroy";
+  // 同时带 text/chunks 的 fixture 实际发送 chunks，证据也必须记录真正发出的字节。
   const responseBody =
-    fixtureResponse.body.length > 0
-      ? Buffer.from(fixtureResponse.body, "utf-8")
-      : Buffer.concat(responseChunks.map((chunk) => chunk.body));
+    responseChunks.length > 0
+      ? Buffer.concat(responseChunks.map((chunk) => chunk.body))
+      : Buffer.from(fixtureResponse.body, "utf-8");
   const responseHeaders = sanitizeResponseHeaders(fixtureResponse.headers);
-  if (responseChunks.length === 0) {
+  if (responseChunks.length === 0 && !destroyStream) {
     responseHeaders["content-length"] = String(responseBody.length);
   } else {
     delete responseHeaders["content-length"];
   }
   response.writeHead(fixtureResponse.statusCode, fixtureResponse.statusMessage, responseHeaders);
+  let actualOffsets: number[] | undefined;
   if (responseChunks.length > 0) {
-    await writeReplayChunks(response, responseChunks);
-    response.end();
+    if (
+      fixtureResponse.release &&
+      (!Number.isInteger(fixtureResponse.releaseAfterChunks) ||
+        fixtureResponse.releaseAfterChunks! < 1 ||
+        fixtureResponse.releaseAfterChunks! >= responseChunks.length)
+    ) {
+      throw new Error("releaseAfterChunks 必须位于流内部");
+    }
+    actualOffsets = await writeReplayChunks(response, responseChunks, fixtureResponse);
+    if (!destroyStream) response.end();
+  } else if (destroyStream) {
+    await writeResponseChunk(response, responseBody);
   } else {
     response.end(responseBody);
   }
 
-  record.status = "complete";
+  record.status = destroyStream ? "error" : "complete";
   record.completedAt = new Date().toISOString();
   record.durationMs = durationMs(record.startedAt, record.completedAt);
   record.statusCode = fixtureResponse.statusCode;
@@ -810,26 +890,44 @@ async function writeResponse(
   record.responseHeaders = sanitizeE2ENetworkCaptureHeaders(responseHeaders);
   record.responseTextPreview = redactE2ENetworkCaptureJsonText(responseBody.toString("utf-8"));
   if (responseChunks.length > 0) {
-    record.responseChunkTimeline = responseChunks.map((chunk) => ({
+    record.responseChunkTimeline = responseChunks.map((chunk, index) => ({
       base64: chunk.body.toString("base64"),
       byteLength: chunk.byteLength,
-      offsetMs: chunk.offsetMs,
+      offsetMs: fixtureResponse.release ? actualOffsets![index]! : chunk.offsetMs,
     }));
+  }
+  if (destroyStream) {
+    // chunks/body 与 events 必须执行相同的故障合同；只在 artifact 标 destroy
+    // 却正常 end 会把网络中断测试变成正常 EOF，并制造“产品假完成”的错误结论。
+    record.error = "Replay fixture destroyed SSE response stream";
+    response.destroy();
   }
 }
 
-async function writeReplayChunks(response: ServerResponse, chunks: NormalizedReplayChunk[]) {
+async function writeReplayChunks(
+  response: ServerResponse,
+  chunks: NormalizedReplayChunk[],
+  control?: { releaseAfterChunks?: number; release?: () => Promise<void> },
+) {
   let previousOffsetMs = 0;
-  for (const chunk of chunks) {
+  const startedAt = Date.now();
+  const actualOffsets: number[] = [];
+  for (const [index, chunk] of chunks.entries()) {
+    if (index === control?.releaseAfterChunks && control.release) {
+      await control.release();
+      // 只移除被释放的那段人为慢窗口，后续 chunk 间距及内容原样保留。
+      previousOffsetMs = chunk.offsetMs;
+    }
     const delayMs = Math.max(0, chunk.offsetMs - previousOffsetMs);
     if (delayMs > 0) {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, delayMs));
     }
     previousOffsetMs = chunk.offsetMs;
-    if (!response.write(chunk.body)) {
-      await once(response, "drain");
-    }
+    actualOffsets.push(Date.now() - startedAt);
+    // 等待写入完成后再进入下一帧/销毁连接，避免最后一帧只进用户态队列就被丢弃。
+    await writeResponseChunk(response, chunk.body);
   }
+  return actualOffsets;
 }
 
 interface NormalizedReplayChunk {
@@ -926,7 +1024,7 @@ async function writeEventStreamResponse(
   response.end();
 }
 
-function writeResponseChunk(response: ServerResponse, text: string): Promise<void> {
+function writeResponseChunk(response: ServerResponse, text: string | Buffer): Promise<void> {
   return new Promise((resolveWrite, rejectWrite) => {
     response.write(text, (error) => {
       if (error) {

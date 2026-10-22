@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZCodePluginsOverviewResult, ZCodePluginInfo } from "@zcode/shared";
 import type { IPluginManagementService } from "@zcode/services";
-import { usePluginManagementStore } from "../src/store/pluginManagementStore.js";
+import {
+  createPluginManagementStore,
+  usePluginManagementStore,
+} from "../src/store/pluginManagementStore.js";
 import { buildStoreItems } from "../src/settings/pluginStoreListing.js";
 
 function makePlugin(overrides: Partial<ZCodePluginInfo> = {}): ZCodePluginInfo {
@@ -84,6 +87,7 @@ beforeEach(() => {
   usePluginManagementStore.setState({
     workspacePath: null,
     workspaceIdentity: null,
+    authorityKey: null,
     configScope: null,
     plugins: [],
     marketplaces: [],
@@ -94,12 +98,49 @@ beforeEach(() => {
     loading: false,
     error: null,
     togglingPluginId: null,
-    operationId: null,
+    activeOperations: [],
     describeCache: {},
   });
 });
 
 describe("pluginManagementStore", () => {
+  it("loads both independently mounted market projections for the same workspace", async () => {
+    const first = createPluginManagementStore();
+    const second = createPluginManagementStore();
+    const pluginService = createPluginServiceMock();
+    await Promise.all(
+      [first, second].map((store) =>
+        store.getState().initialize({
+          workspacePath: "/workspace/app",
+          pluginService,
+        }),
+      ),
+    );
+    expect(first.getState().plugins).toHaveLength(1);
+    expect(second.getState().plugins).toHaveLength(1);
+    expect(second.getState().loading).toBe(false);
+  });
+
+  it("keeps a project's effective market independent of global management", async () => {
+    const market = createPluginManagementStore();
+    const management = createPluginManagementStore();
+    const pluginService = createPluginServiceMock({
+      listPlugins: vi.fn(async (params) => ({
+        plugins: [makePlugin({ enabled: params.configScope === "user" })],
+        diagnostics: [],
+      })),
+    });
+    await Promise.all([
+      market.getState().initialize({ workspacePath: "/workspace/app", pluginService }),
+      management
+        .getState()
+        .initialize({ workspacePath: "/workspace/app", configScope: "user", pluginService }),
+    ]);
+    expect(market.getState().plugins[0]?.enabled).toBe(false);
+    expect(management.getState().plugins[0]?.enabled).toBe(true);
+    expect(market.getState().configScope).toBeNull();
+  });
+
   it("initialize loads plugins from the agent service", async () => {
     const pluginService = createPluginServiceMock();
 
@@ -364,7 +405,7 @@ describe("pluginManagementStore", () => {
     expect(usePluginManagementStore.getState().marketplaces.map((item) => item.id)).toEqual([
       "claude-plugins-official",
     ]);
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   // 回归：addMarketplace 必须返回 boolean。popover 依赖它决定成功后清空输入并关闭，失败则保留输入不误关。
@@ -391,7 +432,7 @@ describe("pluginManagementStore", () => {
 
     expect(added).toBe(true);
     expect(usePluginManagementStore.getState().error).toBeNull();
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("keeps a successful marketplace add from becoming stale when refresh overlaps it", async () => {
@@ -439,7 +480,7 @@ describe("pluginManagementStore", () => {
     await expect(refreshPromise).resolves.toBe(true);
   });
 
-  // 回归：失败分支返回 false 并把错误写进 state.error；operationId 复位。
+  // 回归：失败分支返回 false 并把错误写进 state.error；在途操作清理。
   // 这正是 popover「保留输入 + 不关闭 + 展示上方错误」赖以工作的契约。
   it("resolves false and records the error when marketplace add fails", async () => {
     const addPluginMarketplace = vi.fn(async () => {
@@ -463,7 +504,7 @@ describe("pluginManagementStore", () => {
 
     expect(added).toBe(false);
     expect(usePluginManagementStore.getState().error).toBe("bad source");
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("reports a partial marketplace refresh failure after reloading successful sources", async () => {
@@ -508,7 +549,7 @@ describe("pluginManagementStore", () => {
     expect(updated).toBe(false);
     expect(state.error).toBe("Archive download timed out");
     expect(state.marketplaces[0]?.refreshFailure).toEqual(failure);
-    expect(state.operationId).toBeNull();
+    expect(state.activeOperations).toEqual([]);
   });
 
   // 回归：claude-plugins-official 是 GitHub git 源，其刷新失败（任何原因）不再写入 state.error，
@@ -603,7 +644,7 @@ describe("pluginManagementStore", () => {
 
     expect(usePluginManagementStore.getState().error).toBe("Plugin not found: fixture@personal");
     expect(usePluginManagementStore.getState().installedPlugins).toEqual([]);
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("forwards Workspace scope when installing from the Workspace plugin store", async () => {
@@ -685,7 +726,7 @@ describe("pluginManagementStore", () => {
 
     expect(configured).toBe(false);
     expect(usePluginManagementStore.getState().error).toBe("remote workspace disconnected");
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("clears a completed configuration operation after the selected scope changes", async () => {
@@ -713,15 +754,15 @@ describe("pluginManagementStore", () => {
       .getState()
       .configurePlugin("skill-creator@zcode-plugins-official", { label: "user" }, pluginService);
     await vi.waitFor(() => expect(configurePlugin).toHaveBeenCalledTimes(1));
-    expect(usePluginManagementStore.getState().operationId).toBe(
-      "plugin:configure:skill-creator@zcode-plugins-official",
-    );
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([
+      { id: "plugin:configure:skill-creator@zcode-plugins-official" },
+    ]);
 
     usePluginManagementStore.setState({ configScope: "workspace" });
     resolveConfiguration?.();
 
     await expect(configuration).resolves.toBe(false);
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("does not carry a previous scope operation into a newly initialized scope", async () => {
@@ -756,10 +797,10 @@ describe("pluginManagementStore", () => {
       pluginService,
     });
 
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
     resolveConfiguration?.();
     await expect(userConfiguration).resolves.toBe(false);
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("keeps the old version and update badge when update returns an error diagnostic", async () => {
@@ -799,7 +840,7 @@ describe("pluginManagementStore", () => {
 
     expect(usePluginManagementStore.getState().error).toBe("Marketplace source is missing");
     expect(usePluginManagementStore.getState().installedPlugins).toEqual([installedPlugin]);
-    expect(usePluginManagementStore.getState().operationId).toBeNull();
+    expect(usePluginManagementStore.getState().activeOperations).toEqual([]);
   });
 
   it("maps an empty describe result with an error diagnostic to a retryable state", async () => {
@@ -827,6 +868,24 @@ describe("pluginManagementStore", () => {
       status: "error",
       error: "plugin source is missing",
     });
+  });
+
+  it("discards a description that completes after switching projects", async () => {
+    const service = createPluginServiceMock();
+    let finish!: (value: { components: []; diagnostics: [] }) => void;
+    service.describePlugin = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const store = createPluginManagementStore();
+    await store.getState().initialize({ workspacePath: "/workspace/a", pluginService: service });
+    const pending = store.getState().describePlugin("panel@personal", "panel", "personal", service);
+    await store.getState().initialize({ workspacePath: "/workspace/b", pluginService: service });
+    finish({ components: [], diagnostics: [] });
+    await pending;
+    expect(store.getState().describeCache["panel@personal"]).toBeUndefined();
   });
 
   it("keeps a partially described plugin loaded when components are available", async () => {
@@ -887,4 +946,180 @@ describe("pluginManagementStore", () => {
     expect(state.plugins.map((plugin) => plugin.name)).toEqual(["skill-creator"]);
     expect(state.loading).toBe(false);
   });
+
+  it("does not reuse an in-flight load across Sources with the same home", async () => {
+    let resolveA: ((value: { plugins: ZCodePluginInfo[]; diagnostics: [] }) => void) | undefined;
+    const listA = vi.fn(
+      () =>
+        new Promise<{ plugins: ZCodePluginInfo[]; diagnostics: [] }>((resolve) => {
+          resolveA = resolve;
+        }),
+    );
+    const listB = vi.fn(async () => ({
+      plugins: [makePlugin({ name: "source-b" })],
+      diagnostics: [] as [],
+    }));
+    const first = usePluginManagementStore.getState().initialize({
+      workspacePath: "/root",
+      authorityKey: "source-settings:a",
+      pluginService: createPluginServiceMock({ listPlugins: listA as never }),
+    });
+    const second = usePluginManagementStore.getState().initialize({
+      workspacePath: "/root",
+      authorityKey: "source-settings:b",
+      pluginService: createPluginServiceMock({ listPlugins: listB as never }),
+    });
+    await Promise.resolve();
+    const bCallsBeforeA = listB.mock.calls.length;
+    resolveA?.({ plugins: [makePlugin({ name: "source-a" })], diagnostics: [] });
+    await Promise.all([first, second]);
+    expect(bCallsBeforeA).toBe(1);
+    expect(usePluginManagementStore.getState().plugins.map((plugin) => plugin.name)).toEqual([
+      "source-b",
+    ]);
+  });
+
+  it("ignores a stale toggle response after the Source authority changes for the same home", async () => {
+    let resolveWrite: ((value: { plugin: ZCodePluginInfo; enabled: boolean }) => void) | undefined;
+    const setPluginEnabled = vi.fn(
+      () =>
+        new Promise<{ plugin: ZCodePluginInfo; enabled: boolean }>((resolve) => {
+          resolveWrite = resolve;
+        }),
+    );
+    const pluginService = createPluginServiceMock({
+      setPluginEnabled: setPluginEnabled as unknown as IPluginManagementService["setPluginEnabled"],
+    });
+
+    await usePluginManagementStore.getState().initialize({
+      workspacePath: "/root",
+      authorityKey: "source-settings:a",
+      pluginService,
+    });
+    const change = usePluginManagementStore
+      .getState()
+      .setEnabled("skill-creator@zcode-plugins-official", false, pluginService);
+
+    // 两台 Source 的 home 同为 /root：workspacePath、identity、configScope 全部相同，只有 authority 不同。
+    usePluginManagementStore.setState({
+      authorityKey: "source-settings:b",
+      plugins: [makePlugin({ enabled: true })],
+    });
+    resolveWrite?.({ plugin: makePlugin({ enabled: false }), enabled: false });
+
+    await expect(change).resolves.toBe(false);
+    const state = usePluginManagementStore.getState();
+    expect(state.authorityKey).toBe("source-settings:b");
+    expect(state.plugins.map((plugin) => plugin.enabled)).toEqual([true]);
+  });
+});
+
+it("keeps both pending installs busy and settles each independently", async () => {
+  const releases = new Map<string, () => void>();
+  const pluginService = createPluginServiceMock({
+    installPlugin: vi.fn(
+      ({ pluginName }) =>
+        new Promise((resolve) => {
+          releases.set(pluginName, () =>
+            resolve({ installedPlugins: [], dependencyClosure: [], diagnostics: [] }),
+          );
+        }),
+    ),
+  });
+  const store = createPluginManagementStore();
+  await store.getState().initialize({ workspacePath: "/workspace/app", pluginService });
+  const first = store.getState().installPlugin("first", "personal", pluginService);
+  const second = store.getState().installPlugin("second", "personal", pluginService);
+  const ids = () => store.getState().activeOperations.map((operation) => operation.id);
+  expect(ids()).toEqual(["plugin:install:first@personal", "plugin:install:second@personal"]);
+  releases.get("second")!();
+  await second;
+  expect(ids()).toEqual(["plugin:install:first@personal"]);
+  releases.get("first")!();
+  await first;
+  expect(ids()).toEqual([]);
+});
+
+it("does not let an old context settle a new same-name install", async () => {
+  const releases: Array<() => void> = [];
+  const pluginService = createPluginServiceMock({
+    installPlugin: vi.fn(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() =>
+            resolve({ installedPlugins: [], dependencyClosure: [], diagnostics: [] }),
+          );
+        }),
+    ),
+  });
+  const store = createPluginManagementStore();
+  await store.getState().initialize({ workspacePath: "/workspace/first", pluginService });
+  const old = store.getState().installPlugin("same", "personal", pluginService);
+  await store.getState().initialize({ workspacePath: "/workspace/second", pluginService });
+  const current = store.getState().installPlugin("same", "personal", pluginService);
+  releases[0]!();
+  await old;
+  expect(store.getState().activeOperations.map((operation) => operation.id)).toEqual([
+    "plugin:install:same@personal",
+  ]);
+  releases[1]!();
+  await current;
+  expect(store.getState().activeOperations).toEqual([]);
+});
+
+it("keeps a same-name operation busy when its overlapping call fails", async () => {
+  const completions: Array<{ resolve: () => void; reject: () => void }> = [];
+  const pluginService = createPluginServiceMock({
+    installPlugin: vi.fn(
+      () =>
+        new Promise((resolve, reject) => {
+          completions.push({
+            resolve: () =>
+              resolve({ installedPlugins: [], dependencyClosure: [], diagnostics: [] }),
+            reject: () => reject(new Error("install failed")),
+          });
+        }),
+    ),
+  });
+  const store = createPluginManagementStore();
+  await store.getState().initialize({ workspacePath: "/workspace/app", pluginService });
+  const first = store.getState().installPlugin("same", "personal", pluginService);
+  const second = store.getState().installPlugin("same", "personal", pluginService);
+  completions[1]!.reject();
+  await expect(second).resolves.toBe(false);
+  expect(store.getState().error).toBe("install failed");
+  expect(store.getState().activeOperations).toEqual([{ id: "plugin:install:same@personal" }]);
+  completions[0]!.resolve();
+  await expect(first).resolves.toBe(true);
+  expect(store.getState().activeOperations).toEqual([]);
+});
+
+it("finishing source validation cannot unlock a pending installation", async () => {
+  let finishInstall!: () => void;
+  let finishValidation!: () => void;
+  const service = createPluginServiceMock({
+    installPlugin: vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishInstall = () =>
+            resolve({ installedPlugins: [], dependencyClosure: [], diagnostics: [] });
+        }),
+    ),
+  });
+  service.validatePlugin = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        finishValidation = () => resolve({ diagnostics: [] });
+      }),
+  );
+  const store = createPluginManagementStore();
+  await store.getState().initialize({ workspacePath: "/workspace/app", pluginService: service });
+  const install = store.getState().installPlugin("first", "personal", service);
+  const validate = store.getState().validateSource("/workspace/source", service);
+  finishValidation();
+  await validate;
+  expect(store.getState().activeOperations).toEqual([{ id: "plugin:install:first@personal" }]);
+  finishInstall();
+  await install;
+  expect(store.getState().activeOperations).toEqual([]);
 });

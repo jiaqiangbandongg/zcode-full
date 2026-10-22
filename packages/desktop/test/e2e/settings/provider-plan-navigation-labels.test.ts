@@ -1,12 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   TID_MODEL_PROVIDER_NAV_ITEM,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   DEFAULT_WORKSPACE,

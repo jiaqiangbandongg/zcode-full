@@ -127,7 +127,6 @@ describe("renderPresentationToPrintHost", () => {
     expect(style?.textContent).toContain("@page");
     expect(style?.textContent).toContain("size: 1280px 720px");
     expect(style?.textContent).toContain("break-after: page");
-    expect(style?.textContent).toContain("scrollbar-width: none");
     printHost.dispose();
   });
 

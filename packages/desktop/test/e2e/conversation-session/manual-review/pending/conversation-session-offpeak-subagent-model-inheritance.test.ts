@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import {
   TID_AUTOMATIONS_OPEN,
   TID_CHAT_MODEL_SELECT_ITEM,
@@ -9,7 +11,7 @@ import {
   TID_OFFPEAK_FORM_TITLE,
   TID_OFFPEAK_TAB,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -20,7 +22,11 @@ import {
   assertUpstreamRequestCapture,
   waitForUpstreamNetworkCapture,
 } from "../../../helpers/upstream-capture.js";
-import { UPSTREAM_MODEL } from "../../../helpers/upstream-provider.js";
+import {
+  selectUpstreamModel,
+  selectUpstreamThoughtLevel,
+  UPSTREAM_MODEL,
+} from "../../../helpers/upstream-provider.js";
 import {
   prepareConversationE2E,
   sendPrompt,
@@ -30,6 +36,11 @@ import {
   waitForUserMessageContaining,
 } from "../../../helpers/conversation-session.js";
 import { sel } from "../../../helpers/selectors.js";
+import { switchV4Mode } from "../../../helpers/v4-conversation.js";
+import {
+  openFaultInjectedHostWindow,
+  readHostBoundary,
+} from "../../../helpers/subagent-host-window.js";
 
 const OFFPEAK_PARENT_MARKER = "E2E_OFFPEAK_SUBAGENTS_PARENT";
 const ORDINARY_PROMPT_MARKER = "E2E_OFFPEAK_SUBAGENTS_ORDINARY_PROMPT";
@@ -40,10 +51,7 @@ const EXPECTED_FOREGROUND_STAGES = [
   "child-code-search",
   "child-custom-inherit",
 ] as const;
-const UNEXPECTED_BACKGROUND_STAGES = [
-  "unexpected-background-explicit",
-  "unexpected-background-profile",
-] as const;
+const EXPECTED_BACKGROUND_STAGES = ["background-explicit", "background-profile"] as const;
 
 interface OffPeakMockRequestRecord {
   hasApiKey: boolean;
@@ -56,31 +64,107 @@ interface OffPeakMockRequestRecord {
   ticketId: string;
 }
 
-describe("闲时 turn foreground subagent 模型继承 E2E", () => {
+describe("闲时后台 subagent 模型继承与唤起 E2E", () => {
   after(async () => {
     await browser.electron.restoreAllMocks();
     await clearAppData();
   });
 
-  it("OP10: 内建/自定义 foreground 覆盖 profile model，background 拒绝且下一轮恢复用户 provider", async function () {
+  it("OP10/IL01/IL02: foreground 与 background 继承闲时模型，主轮结束等待后台唤起，发送普通消息才切回用户模型", async function () {
     this.timeout(300000);
 
+    const handoffFault = process.env.ZCODE_E2E_OFFPEAK_HANDOFF_FAULT === "1";
+    if (handoffFault) {
+      const { windowId } = await openFaultInjectedHostWindow(
+        fileURLToPath(new URL("../../../helpers/offpeak-host-faults.cjs", import.meta.url)),
+      );
+      // 只保留注入窗口，避免另一个 Host 先抢到闲时任务，使故障边界没有被执行。
+      await browser.electron.execute((electron, retainedId) => {
+        for (const window of electron.BrowserWindow.getAllWindows())
+          if (window.id !== retainedId) window.close();
+      }, windowId);
+    }
     await prepareConversationE2E();
 
+    const takeover = process.env.ZCODE_E2E_OFFPEAK_TAKEOVER === "1";
     const title = `E2E_OFFPEAK_SUBAGENTS_${Date.now()}`;
     await createOffPeakTask({
       instructions: `${OFFPEAK_PARENT_MARKER}: verify the foreground subagent provider matrix.`,
       title,
     });
 
-    const records = await waitForOffPeakScenarioCompletion();
+    let records = await waitForOffPeakScenarioCompletion();
     await clickTestIdByDom(TID_AUTOMATIONS_OPEN, {
       timeoutMsg: "闲时任务完成后无法重新打开 Automations",
     });
     await openOffPeakTab();
+    await browser.waitUntil(
+      async () => /Running|进行中|运行中/u.test((await readOffPeakCardText(title)) ?? ""),
+      { timeout: 15000, timeoutMsg: "后台工作未结束时闲时卡应保持进行中" },
+    );
+    await openOffPeakTaskSession(title);
+    await waitForChatState(
+      (snapshot) => snapshot.state === "idle" && snapshot.queueCount === 0,
+      "后台屏障关闭时主轮应已自然结束",
+      60000,
+    );
+    // 工具栏草稿选择用户模型但尚未发送，不得改变随后后台唤起使用的闲时 Selection。
+    await selectUpstreamModel();
+    await selectUpstreamThoughtLevel();
+    if (takeover) {
+      await sendPrompt(ORDINARY_PROMPT_MARKER);
+      await waitForComposerText("", "用户接管消息没有提交");
+      await waitForAssistantMessageContaining(ORDINARY_REPLY_TOKEN);
+    }
+    // 主轮已结束但后台仍在等待。显式放行真实子请求，证明通知能另起续跑轮。
+    const port = Number(process.env.ZCODE_OFFPEAK_MOCK_PORT ?? "45197");
+    const expireOnWake = handoffFault || process.env.ZCODE_E2E_OFFPEAK_EXPIRE_WAKE === "1";
+    const release = await fetch(`http://127.0.0.1:${port}/__e2e/off-peak/release-background`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expireOnWake }),
+    });
+    expect(release.ok).toBe(true);
+    const bashNotification = "<tool-use-id>toolu_e2e_offpeak_bash</tool-use-id>";
+    let userWakeBody: string | undefined;
+    if (takeover) {
+      const userWake = await waitForUpstreamNetworkCapture(bashNotification);
+      assertUpstreamRequestCapture(userWake, {
+        expectedText: bashNotification,
+        model: UPSTREAM_MODEL,
+      });
+      userWakeBody = JSON.stringify(userWake.requestJson);
+    } else {
+      await browser.waitUntil(
+        async () => {
+          records = await readOffPeakMockRequests();
+          return records.some((record) => record.stage === "parent-wakeup");
+        },
+        { timeout: 60000, timeoutMsg: "后台完成未唤起主 agent" },
+      );
+    }
+    await clickTestIdByDom(TID_AUTOMATIONS_OPEN);
+    await openOffPeakTab();
     await waitForOffPeakCardCompleted(title);
+    if (handoffFault) {
+      const boundary = await readHostBoundary();
+      const failed = boundary.filter((event) => event.kind === "ticket-ack-failed");
+      const confirmed = boundary.filter((event) => event.kind === "ticket-ack-confirmed");
+      expect(failed).toHaveLength(1);
+      expect(confirmed).toHaveLength(1);
+      expect(confirmed[0]!.id).toBe(failed[0]!.id);
+      expect(boundary.filter((event) => event.kind === "ticket-control")).toHaveLength(2);
+    }
 
+    records = await readOffPeakMockRequests();
+    expect(records.filter((record) => record.stage === "bash-started")).toHaveLength(1);
+    expect(records.filter((record) => record.stage === "parent-initial")).toHaveLength(1);
     const parentInitial = requireStage(records, "parent-initial");
+    // 默认标题也属于本次闲时执行，不能只继承模型却漏掉请求票据。
+    const sessionTitle = requireStage(records, "session-title");
+    expect(sessionTitle.ticketId).toBe(parentInitial.ticketId);
+    expect(sessionTitle.model).toBe(parentInitial.model);
+    expect(sessionTitle.hasApiKey).toBe(true);
     const foregroundRecords = EXPECTED_FOREGROUND_STAGES.map((stage) =>
       requireStage(records, stage),
     );
@@ -91,21 +175,51 @@ describe("闲时 turn foreground subagent 模型继承 E2E", () => {
 
     expect(ticketIds.size).toBe(1);
     for (const record of foregroundRecords) {
-      expect(record.model).toBe("GLM-5.2");
+      expect(record.model).toBe("GLM-5.3");
       expect(record.maxTokens).toBe(parentInitial.maxTokens);
       expect(record.hasApiKey).toBe(true);
       expect(record.hasAuthorization).toBe(true);
       expect(record.hasCodingPlanApiKey).toBe(true);
     }
-    for (const stage of UNEXPECTED_BACKGROUND_STAGES) {
-      expect(records.some((record) => record.stage === stage)).toBe(false);
+    for (const stage of EXPECTED_BACKGROUND_STAGES) {
+      const record = requireStage(records, stage);
+      expect(record.model).toBe("GLM-5.3");
+      expect(record.ticketId).toBe(parentInitial.ticketId);
+      expect(record.hasCodingPlanApiKey).toBe(true);
     }
 
     const continuationBody = JSON.stringify(parentContinuation.requestJson);
-    expect(continuationBody).toContain(
-      "Idle-time tasks do not support background agents. Run this agent in the foreground.",
+    expect(continuationBody).not.toContain("Idle-time tasks do not support background agents.");
+    let wakeBody = userWakeBody ?? "";
+    if (takeover) {
+      expect(records.some((record) => record.stage === "parent-wakeup")).toBe(false);
+    } else {
+      const wakeup = requireStage(records, "parent-wakeup");
+      expect(wakeup.model).toBe("GLM-5.3");
+      if (expireOnWake) {
+        const expired = requireStage(records, "parent-wakeup-expired");
+        expect(expired.ticketId).toBe(parentInitial.ticketId);
+        expect(wakeup.ticketId).not.toBe(expired.ticketId);
+        expect(
+          records.some(
+            (record) =>
+              record.stage === "parent-wakeup" &&
+              record.ticketId !== expired.ticketId &&
+              JSON.stringify(record.requestJson) === JSON.stringify(expired.requestJson),
+          ),
+        ).toBe(true);
+      } else {
+        expect(wakeup.ticketId).toBe(parentInitial.ticketId);
+      }
+      wakeBody = JSON.stringify(wakeup.requestJson);
+    }
+    expect(wakeBody.includes("<tool-use-id>toolu_e2e_offpeak_bash</tool-use-id>")).toBe(true);
+    const outputPath =
+      /<output-file>([^<]*toolu_e2e_offpeak_bash-stdout\.log)<\/output-file>/u.exec(wakeBody)?.[1];
+    expect(outputPath).toBeTruthy();
+    expect(await readFile(JSON.parse(`"${outputPath!}"`) as string, "utf8")).toContain(
+      "E2E_OFFPEAK_BACKGROUND_BASH_OK",
     );
-    expect(continuationBody).toContain("E2E OffPeak Background Reviewer");
 
     await openOffPeakTaskSession(title);
     await waitForChatState(
@@ -114,9 +228,11 @@ describe("闲时 turn foreground subagent 模型继承 E2E", () => {
       60000,
     );
 
-    await sendPrompt(ORDINARY_PROMPT_MARKER);
-    await waitForComposerText("", "闲时任务后的普通 prompt 没有提交");
-    await waitForUserMessageContaining(ORDINARY_PROMPT_MARKER);
+    if (!takeover) {
+      await sendPrompt(ORDINARY_PROMPT_MARKER);
+      await waitForComposerText("", "闲时任务后的普通 prompt 没有提交");
+      await waitForUserMessageContaining(ORDINARY_PROMPT_MARKER);
+    }
     const ordinaryRecord = await waitForUpstreamNetworkCapture(ORDINARY_PROMPT_MARKER);
     assertUpstreamRequestCapture(ordinaryRecord, {
       expectedText: ORDINARY_PROMPT_MARKER,
@@ -146,7 +262,7 @@ describe("闲时 turn foreground subagent 模型继承 E2E", () => {
     });
     const modelTrigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
     await modelTrigger.waitForDisplayed({ timeout: 15000 });
-    expect(await modelTrigger.getAttribute("data-model-current-value")).toBe("GLM-5.2");
+    expect(await modelTrigger.getAttribute("data-model-current-value")).toBe("GLM-5.3");
     await modelTrigger.click();
     const visibleModelItems = await browser.execute(
       (itemPrefix) =>
@@ -155,7 +271,7 @@ describe("闲时 turn foreground subagent 模型继承 E2E", () => {
           .filter((value) => value.startsWith(itemPrefix)),
       `${TID_CHAT_MODEL_SELECT_ITEM}-`,
     );
-    expect(visibleModelItems).toEqual([testId(TID_CHAT_MODEL_SELECT_ITEM, "GLM-5.2")]);
+    expect(visibleModelItems).toEqual([testId(TID_CHAT_MODEL_SELECT_ITEM, "GLM-5.3")]);
     await browser.keys("Escape");
   });
 });
@@ -164,6 +280,7 @@ async function createOffPeakTask(input: { instructions: string; title: string })
   await clickTestIdByDom(TID_AUTOMATIONS_OPEN, {
     timeoutMsg: "侧栏没有出现 Automations 入口",
   });
+  await openOffPeakTab();
   await clickTestIdByDom(TID_OFFPEAK_CREATE_BUTTON, {
     timeoutMsg: "闲时任务创建按钮没有出现",
   });
@@ -173,6 +290,8 @@ async function createOffPeakTask(input: { instructions: string; title: string })
   await setInputValueByTestIdDom(TID_OFFPEAK_FORM_INSTRUCTIONS, input.instructions, {
     timeoutMsg: "闲时任务 instructions 输入没有出现",
   });
+  // 后台 Bash 是本用例的受测行为，任务显式使用全权限，避免停在交互审批。
+  await switchV4Mode("yolo");
   await clickTestIdByDom(TID_OFFPEAK_EDIT_SUBMIT, {
     timeoutMsg: "闲时任务创建提交按钮不可点击",
   });
@@ -183,7 +302,12 @@ async function waitForOffPeakScenarioCompletion(): Promise<OffPeakMockRequestRec
   await browser.waitUntil(
     async () => {
       latest = await readOffPeakMockRequests();
-      return latest.some((record) => record.stage === "parent-continuation");
+      return [
+        "parent-continuation",
+        "background-explicit",
+        "background-profile",
+        "bash-started",
+      ].every((stage) => latest.some((record) => record.stage === stage));
     },
     {
       interval: 1000,
@@ -246,6 +370,8 @@ async function openOffPeakTab(): Promise<void> {
     () =>
       browser.execute((tabTestId) => {
         const tabGroup = document.querySelector<HTMLElement>(`[data-testid="${tabTestId}"]`);
+        if (!tabGroup && document.querySelector('[data-testid="offpeak-create-button"]'))
+          return true;
         const offPeakButton = Array.from(
           tabGroup?.querySelectorAll<HTMLButtonElement>("button") ?? [],
         ).find((button) => /闲时任务|Idle/u.test(button.textContent ?? ""));

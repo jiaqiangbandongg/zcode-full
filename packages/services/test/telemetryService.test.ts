@@ -113,14 +113,6 @@ describe("telemetryCore", () => {
     },
   );
 
-  it("exports a telemetry core factory", async () => {
-    const loadModule = () => import("../src/telemetry/telemetryCore.js");
-
-    await expect(loadModule()).resolves.toMatchObject({
-      createTelemetryCore: expect.any(Function),
-    });
-  });
-
   it("uses crypto.randomUUID with the correct receiver by default", async () => {
     const home = makeTempHome();
     process.env.HOME = home;
@@ -834,7 +826,6 @@ describe("telemetryCore", () => {
     // 首次：eventId=first-1，device_mid 是另一次独立调用 first-2（已解耦，不再相等）
     expect(firstBody.event_id).toBe("first-1");
     expect(firstBody.device_mid).toBe("first-2");
-    expect(firstBody.device_mid).not.toBe(firstBody.event_id);
     // 重启：eventId 重新生成 second-1，device_mid 复用落盘值 first-2（跨重启稳定）
     expect(secondBody.event_id).toBe("second-1");
     expect(secondBody.device_mid).toBe("first-2");

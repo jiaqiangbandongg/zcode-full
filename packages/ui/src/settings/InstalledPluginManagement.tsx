@@ -33,7 +33,7 @@ export function InstalledPluginDetailDialog({
   onRequestUpdate,
   onSavePluginOptions,
   open,
-  operationId,
+  activeOperations,
   plugin,
   renderPluginSource,
   setPluginOptionDraft,
@@ -51,7 +51,7 @@ export function InstalledPluginDetailDialog({
   onRequestUpdate?: (pluginId: string) => void;
   onSavePluginOptions: (plugin: ZCodePluginInfo) => void;
   open: boolean;
-  operationId: string | null;
+  activeOperations: ReadonlyArray<{ id: string }>;
   plugin: ZCodePluginInfo | null;
   renderPluginSource: (plugin: ZCodePluginInfo) => string;
   setPluginOptionDraft: (pluginId: string, key: string, value: string | number | boolean) => void;
@@ -72,7 +72,7 @@ export function InstalledPluginDetailDialog({
           configScope={configScope}
           installedAt={installedAt}
           latestVersion={latestVersion}
-          operationId={operationId}
+          activeOperations={activeOperations}
           plugin={plugin}
           renderPluginSource={renderPluginSource}
           setPluginOptionDraft={setPluginOptionDraft}
@@ -96,7 +96,7 @@ export function InstalledPluginDetailPanel({
   onRequestUninstall,
   onRequestUpdate,
   onSavePluginOptions,
-  operationId,
+  activeOperations,
   plugin,
   renderPluginSource,
   setPluginOptionDraft,
@@ -112,7 +112,7 @@ export function InstalledPluginDetailPanel({
   onRequestUninstall?: (pluginId: string) => void;
   onRequestUpdate?: (pluginId: string) => void;
   onSavePluginOptions: (plugin: ZCodePluginInfo) => void;
-  operationId: string | null;
+  activeOperations: ReadonlyArray<{ id: string }>;
   plugin: ZCodePluginInfo | null;
   renderPluginSource: (plugin: ZCodePluginInfo) => string;
   setPluginOptionDraft: (pluginId: string, key: string, value: string | number | boolean) => void;
@@ -195,9 +195,7 @@ export function InstalledPluginDetailPanel({
         </DetailSection>
 
         {pluginWarnings.length > 0 ? (
-          <DetailSection
-            title={intl.formatMessage({ id: "settings.plugins.detail.warnings" })}
-          >
+          <DetailSection title={intl.formatMessage({ id: "settings.plugins.detail.warnings" })}>
             <PluginWarningList warnings={pluginWarnings} />
           </DetailSection>
         ) : null}
@@ -233,7 +231,7 @@ export function InstalledPluginDetailPanel({
                 getValue={getPluginOptionValue}
                 onSave={onSavePluginOptions}
                 onSetDraft={setPluginOptionDraft}
-                operationId={operationId}
+                activeOperations={activeOperations}
                 plugin={plugin}
                 scope={configScope}
               />
@@ -265,7 +263,9 @@ export function InstalledPluginDetailPanel({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={operationId === `plugin:update:${plugin.id}`}
+                disabled={activeOperations.some(
+                  (operation) => operation.id === `plugin:update:${plugin.id}`,
+                )}
                 onClick={() => onRequestUpdate(plugin.id)}
               >
                 {intl.formatMessage({ id: "settings.plugins.detail.update" })}
@@ -281,7 +281,9 @@ export function InstalledPluginDetailPanel({
               variant="ghost"
               size="sm"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              disabled={operationId === `plugin:uninstall:${plugin.id}`}
+              disabled={activeOperations.some(
+                (operation) => operation.id === `plugin:uninstall:${plugin.id}`,
+              )}
               onClick={() => onRequestUninstall(plugin.id)}
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
@@ -317,9 +319,7 @@ export function PluginWarningList({ warnings }: { warnings: ZCodePluginDiagnosti
           className="flex min-w-0 items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2"
         >
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden="true" />
-          <span className="min-w-0 break-all text-ui-sm text-foreground">
-            {diagnostic.message}
-          </span>
+          <span className="min-w-0 break-all text-ui-sm text-foreground">{diagnostic.message}</span>
         </li>
       ))}
     </ul>

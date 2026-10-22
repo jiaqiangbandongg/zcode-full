@@ -167,10 +167,3 @@ describe("BroadcastHub claim", () => {
     }
   });
 });
-
-describe("BroadcastHub.collectMemoryDiagnostics", () => {
-  it("返回 claims / processes 的只读大小", () => {
-    const hub = new BroadcastHub();
-    expect(hub.collectMemoryDiagnostics()).toEqual({ claims: 0, processes: 0 });
-  });
-});

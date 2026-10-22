@@ -16,6 +16,11 @@ const PREVIEW_CASE_ROOT = join(DEFAULT_WORKSPACE, ".zcode-e2e", "conversation-sh
 const PREVIEW_PDF = "晨报_2026-09-08_早会版.pdf";
 const PREVIEW_VIDEOS = ["condensed.mp4", "纵横四海_电影解说.mp4", "final_subtitled.mp4"] as const;
 
+async function selectSharePermission(permission: "link-viewer" | "link-editor" | "private") {
+  await $('[data-testid="conversation-share-permission-picker"] [role="combobox"]').click();
+  await $(`[data-conversation-share-permission="${permission}"]`).click();
+}
+
 describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
   after(async () => {
     await rm(PREVIEW_CASE_ROOT, { recursive: true, force: true });
@@ -63,85 +68,16 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     });
     expect(toolbarGeometry.share).toEqual(toolbarGeometry.terminal);
     await shareButton.click();
+    await $("[data-testid=conversation-share-popover]").waitForDisplayed();
     expect(await $("[data-testid=conversation-share-selection-panel]").isExisting()).toBe(false);
-    // 回归原因：顶部入口原先只切换选择面板，再次点击没有退出分享。
-    await $("[data-testid=conversation-share-selection-dock]").waitForDisplayed();
-    await $("[data-testid=conversation-share-trigger]").click();
-    await $("[data-testid=conversation-share-selection-dock]").waitForDisplayed({ reverse: true });
-    expect(await $("[data-testid=conversation-share-trigger]").getAttribute("aria-pressed")).toBe(
-      "false",
-    );
-    expect(await $("[data-testid=conversation-share-selection-reopen]").isExisting()).toBe(false);
-    await $("[data-testid=conversation-share-trigger]").click();
-    await $("[data-testid=conversation-share-selection-dock]").waitForDisplayed();
-    // 回归原因：固定标签宽度会拆开英文；窄面板应让按钮整组换行。
-    const selectionLayout = await browser.execute(() => {
-      const dock = document.querySelector<HTMLElement>(
-        '[data-testid="conversation-share-selection-dock"]',
-      )!;
-      const label = dock.querySelector<HTMLElement>(
-        '[data-testid="conversation-share-bulk-label"]',
-      )!;
-      const bulk = dock.querySelector<HTMLElement>(
-        '[data-testid="conversation-share-bulk-actions"]',
-      )!;
-      const next = dock.querySelector<HTMLElement>('[data-testid="conversation-share-next"]')!;
-      const originalText = label.textContent;
-      const originalStyle = dock.getAttribute("style");
-      label.textContent = "Deselect all";
-      dock.style.width = "320px";
-      const labelRect = label.getBoundingClientRect();
-      const result = {
-        singleLine: labelRect.height <= parseFloat(getComputedStyle(label).lineHeight) + 1,
-        actionsBelow: next.getBoundingClientRect().top >= bulk.getBoundingClientRect().bottom,
-        fits: dock.scrollWidth <= dock.clientWidth,
-      };
-      label.textContent = originalText;
-      if (originalStyle === null) dock.removeAttribute("style");
-      else dock.setAttribute("style", originalStyle);
-      return result;
-    });
-    expect(selectionLayout).toEqual({ singleLine: true, actionsBelow: true, fits: true });
-    const reopenSelectionButton = await $("[data-testid=conversation-share-selection-reopen]");
-    await reopenSelectionButton.waitForClickable();
-    await reopenSelectionButton.click();
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-    const selectionItems = await $$('[data-conversation-share-selection-item="true"]');
-    expect(selectionItems.length).toBeGreaterThan(1);
-    const secondSelectionItem = selectionItems[1]!;
-    await (
-      await secondSelectionItem.$('[data-conversation-share-checkbox-hit-area="true"]')
-    ).click();
-    expect(
-      await (
-        await $$('[data-conversation-share-selection-item="true"]')
-      )[1]!.getAttribute("data-conversation-share-selection-state"),
-    ).toBe("unselected");
-    await $("[data-testid=conversation-share-selection-scrim]").click();
-    await browser.waitUntil(
-      async () => !(await $("[data-testid=conversation-share-selection-panel]").isDisplayed()),
-      { timeout: 5_000, timeoutMsg: "选择面板关闭后仍可见" },
-    );
-    await reopenSelectionButton.waitForClickable();
-    await reopenSelectionButton.click();
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-    expect(
-      await (
-        await $$('[data-conversation-share-selection-item="true"]')
-      )[1]!.getAttribute("data-conversation-share-selection-state"),
-    ).toBe("unselected");
-    const nextButton = await $("[data-testid=conversation-share-next]");
-    await nextButton.waitForClickable();
-    await nextButton.click();
-    const backButton = await $("[data-testid=conversation-share-back]");
-    await backButton.waitForClickable();
-    await backButton.click();
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-    await nextButton.waitForClickable();
-    await nextButton.click();
-    const publicReadonly = await $('[data-conversation-share-permission="link-viewer"]');
-    await publicReadonly.waitForClickable();
-    await publicReadonly.click();
+    await $("[data-testid=conversation-share-adjust]").click();
+    const selectionPanel = await $("[data-testid=conversation-share-selection-panel]");
+    await selectionPanel.waitForDisplayed();
+    const items = await selectionPanel.$$('[data-conversation-share-selection-item="true"]');
+    await items[1]!.$('[role="checkbox"]').click();
+    await $("[data-testid=conversation-share-selection-apply]").click();
+    await selectionPanel.waitForDisplayed({ reverse: true });
+    await selectSharePermission("link-viewer");
     const disclosureScopeTrigger = await $(
       "[data-testid=conversation-share-disclosure-scope-trigger]",
     );
@@ -162,63 +98,6 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     expect(await reviewCheckbox.isFocused()).toBe(true);
     expect(await $("[data-testid=conversation-share-review-hint]").isExisting()).toBe(false);
     await reviewCheckbox.click();
-    // SHARE28：宽窗口内也可能只有极窄 Dock，不能用 viewport 断点代替容器宽度。
-    const beforeNarrow = await browser.execute(() => {
-      const dock = document.querySelector<HTMLElement>(
-        '[data-testid="conversation-share-confirmation-dock"]',
-      )!;
-      const title = dock.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!;
-      dock.style.width = "320px";
-      return title.value;
-    });
-    try {
-      await browser.waitUntil(
-        async () =>
-          browser.execute(() => {
-            const dock = document.querySelector<HTMLElement>(
-              '[data-testid="conversation-share-confirmation-dock"]',
-            )!;
-            const bounds = dock.getBoundingClientRect();
-            const buttons = [
-              ...dock.querySelectorAll<HTMLElement>(
-                '[data-testid="conversation-share-confirmation-actions"] button',
-              ),
-            ];
-            const labels = [...dock.querySelectorAll<HTMLElement>('[role="radio"] span')];
-            return (
-              dock.scrollWidth <= dock.clientWidth + 1 &&
-              buttons.every((button) => {
-                const rect = button.getBoundingClientRect();
-                return (
-                  rect.left >= bounds.left &&
-                  rect.right <= bounds.right &&
-                  rect.bottom <= window.innerHeight
-                );
-              }) &&
-              labels.every((label) => label.scrollWidth <= label.clientWidth + 1)
-            );
-          }),
-        { timeout: 5_000, timeoutMsg: "320px 分享 Dock 存在裁切" },
-      );
-      expect(await publicReadonly.getAttribute("aria-checked")).toBe("true");
-      expect(await reviewCheckbox.isSelected()).toBe(true);
-    } finally {
-      await browser.execute(() => {
-        document
-          .querySelector<HTMLElement>('[data-testid="conversation-share-confirmation-dock"]')!
-          .style.removeProperty("width");
-      });
-    }
-    expect(
-      await browser.execute(
-        () =>
-          document.querySelector<HTMLInputElement>(
-            '[data-testid="conversation-share-confirmation-dock"] input:not([type="checkbox"])',
-          )!.value,
-      ),
-    ).toBe(beforeNarrow);
-    expect(await publicReadonly.getAttribute("aria-checked")).toBe("true");
-    expect(await reviewCheckbox.isSelected()).toBe(true);
     await publishButton.waitForClickable();
     await publishButton.click();
 
@@ -251,27 +130,12 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     expect(sessionB).not.toBe(sessionA);
     expect(await $("[data-testid=conversation-share-success-dock]").isExisting()).toBe(false);
     await (await $("[data-testid=conversation-share-trigger]")).click();
-    const sessionBReopenSelection = await $("[data-testid=conversation-share-selection-reopen]");
-    if (!(await $("[data-testid=conversation-share-selection-panel]").isDisplayed())) {
-      await sessionBReopenSelection.waitForClickable();
-      await sessionBReopenSelection.click();
-    }
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-    const sessionBPreflightStatus = await $(
-      "[data-testid=conversation-share-selection-preflight-status]",
-    );
-    await sessionBPreflightStatus.waitForDisplayed({ timeout: 30_000 });
-    // 预检进度由状态入口展示，下一步不再重复展示等待图标或空占位。
-    expect(await $("[data-testid=conversation-share-next]").getHTML()).not.toContain("<span");
-    await browser.waitUntil(
-      async () => (await sessionBPreflightStatus.getAttribute("aria-busy")) !== "true",
-      { timeout: 30_000, timeoutMsg: "Session B 分享候选预检没有完成" },
-    );
-    await $("[data-testid=conversation-share-next]").waitForClickable();
-    await $("[data-testid=conversation-share-next]").click();
     await $("[data-testid=conversation-share-confirmation-dock]").waitForDisplayed();
     expect(await $("[data-testid=conversation-share-success-dock]").isExisting()).toBe(false);
+    await $("[data-testid=conversation-share-trigger]").click();
     await selectV4TaskById(sessionA!);
+    if (!(await $("[data-testid=conversation-share-success-dock]").isDisplayed()))
+      await $("[data-testid=conversation-share-trigger]").click();
     await $("[data-testid=conversation-share-success-dock]").waitForDisplayed();
     await $("[data-testid=conversation-share-success-dismiss]").click();
     await browser.waitUntil(
@@ -279,31 +143,15 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
       { timeout: 5_000, timeoutMsg: "关闭 Session A 分享结果后仍可见" },
     );
     await selectV4TaskById(sessionB!);
+    await $("[data-testid=conversation-share-trigger]").click();
     await $("[data-testid=conversation-share-confirmation-dock]").waitForDisplayed();
     expect(await $("[data-testid=conversation-share-success-dock]").isExisting()).toBe(false);
-    await $("[data-testid=conversation-share-cancel]").click();
+    await $("[data-testid=conversation-share-trigger]").click();
 
-    // 关闭成功结果后重新发布同一份草稿，验证重试仍复用完整幂等请求体，不因 accepted_at 变化返回 409。
+    // 关闭再打开保留已发布结果，不重复提交同一份分享。
     await selectV4TaskById(sessionA!);
-    await browser.waitUntil(
-      async () => !(await $(`[data-testid="conversation-share-success-dock"]`).isDisplayed()),
-      { timeout: 5_000, timeoutMsg: "关闭分享成功结果后仍可见" },
-    );
-    const retryShareButton = await $("[data-testid=conversation-share-trigger]");
-    await retryShareButton.waitForClickable();
-    await retryShareButton.click();
-    await $("[data-testid=conversation-share-selection-reopen]").click();
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-    const retrySelectionItems = await $$('[data-conversation-share-selection-item="true"]');
-    const retrySecondSelection = await retrySelectionItems[1]!.$(
-      '[data-conversation-share-checkbox-hit-area="true"]',
-    );
-    await retrySecondSelection.click();
-    await $("[data-testid=conversation-share-next]").click();
-    await $('[data-conversation-share-permission="link-viewer"]').click();
-    await $("[data-testid=conversation-share-disclosure-checkbox]").click();
-    await $("[data-testid=conversation-share-confirm]").click();
-    await copyButton.waitForDisplayed({ timeout: 120_000 });
+    await $("[data-testid=conversation-share-trigger]").click();
+    await $("[data-testid=conversation-share-success-dock]").waitForDisplayed();
   });
 
   it("SHARE25：选择阶段检查最终预览卡片，PDF 分享、视频 warning、正文路径不入候选", async function () {
@@ -327,14 +175,6 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     );
 
     await (await $("[data-testid=conversation-share-trigger]")).click();
-    const reopenSelectionButton = await $("[data-testid=conversation-share-selection-reopen]");
-    const selectionPanel = await $("[data-testid=conversation-share-selection-panel]");
-    if (!(await selectionPanel.isExisting()) || !(await selectionPanel.isDisplayed())) {
-      await reopenSelectionButton.waitForClickable();
-      await reopenSelectionButton.click();
-    }
-    await $("[data-testid=conversation-share-selection-panel]").waitForDisplayed();
-
     const preflightStatus = await $("[data-testid=conversation-share-selection-preflight-status]");
     await preflightStatus.waitForDisplayed({ timeout: 30_000 });
     await browser.waitUntil(
@@ -350,17 +190,9 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     for (const video of PREVIEW_VIDEOS) expect(preflightText).toContain(video);
     expect(preflightText).not.toContain(PREVIEW_PDF);
     expect(preflightText).not.toContain("layout-review.md");
-    expect(await $("[data-testid=conversation-share-next]").isEnabled()).toBe(true);
-
-    await $("[data-testid=conversation-share-next]").click();
-    const publicImportable = await $('[data-conversation-share-permission="link-editor"]');
-    expect(await publicImportable.getAttribute("aria-checked")).toBe("true");
-    expect(
-      await (
-        await $('[data-conversation-share-permission="private"]')
-      ).getAttribute("aria-checked"),
-    ).toBe("false");
-    await $('[data-conversation-share-permission="link-viewer"]').click();
+    await browser.keys("Escape");
+    expect(await $("[data-testid=conversation-share-confirm]").isEnabled()).toBe(true);
+    await selectSharePermission("link-viewer");
     await $("[data-testid=conversation-share-disclosure-checkbox]").click();
     await $("[data-testid=conversation-share-confirm]").click();
 
@@ -388,11 +220,17 @@ describe(`${CASE_MARKER}: Desktop local 分享发布与导入入口`, () => {
     );
 
     await (await $(`[data-testid="conversation-share-trigger"]`)).click();
-    const details = await $(`[data-testid="conversation-share-selection-preflight-blocked"]`);
+    const status = await $("[data-testid=conversation-share-selection-preflight-status]");
+    await status.waitForClickable({ timeout: 30_000 });
+    await browser.waitUntil(async () => (await status.getAttribute("aria-busy")) !== "true", {
+      timeout: 30_000,
+    });
+    await status.click();
+    const details = await $(`[data-testid="conversation-share-selection-preflight-popover"]`);
     await details.waitForDisplayed({ timeout: 30_000 });
     expect(await details.getText()).toMatch(/本地|local/iu);
     expect(await details.getText()).toMatch(/取消选择|deselect/iu);
-    expect(await (await $(`[data-testid="conversation-share-next"]`)).isEnabled()).toBe(false);
+    expect(await (await $(`[data-testid="conversation-share-confirm"]`)).isEnabled()).toBe(false);
     expect((await getToastMessages()).join("\n")).not.toMatch(
       /生成分享链接失败|Could not generate the share link/iu,
     );

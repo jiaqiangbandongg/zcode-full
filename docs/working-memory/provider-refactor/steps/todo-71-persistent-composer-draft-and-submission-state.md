@@ -137,6 +137,8 @@ interface V4ComposerDraft {
 - 本轮持久化扩展只覆盖现有安全可序列化字段和 `mode/modelSelection`；
 - 跨重启附件恢复留给独立设计，不得把失效 object URL 或未校验本地路径直接写入持久 Draft。
 
+> 2026-10-14 更新：空正文持久化与初始化规则由 [Composer 仅持久化文字草稿](../../../ui/composer-text-draft-persistence.md) 替代。下面的历史设计中“立即写入 Draft”“空文本保留配置”不再作为当前实施合同。
+
 ## 4. 初始化规则
 
 初始化只在 Composer 创建、Workspace/Session scope 切换或恢复时执行一次。完成后，普通 React render 不再重新

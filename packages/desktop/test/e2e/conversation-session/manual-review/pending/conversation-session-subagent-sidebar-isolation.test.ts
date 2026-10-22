@@ -1,7 +1,7 @@
 import { waitForToolCallBlockByToolCallId } from "../../../helpers/conversation-session-tool.js";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
-import { TID_TASK_ITEM, TID_V4_SUBAGENT_OPEN_SIDE_PANE, testId } from "@zcode/shared";
+import { TID_TASK_ITEM, TID_V4_SUBAGENT_OPEN_SIDE_PANE, testId } from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths } from "../../../helpers/desktop-app.js";
 import {
   prepareV4ConversationE2E,

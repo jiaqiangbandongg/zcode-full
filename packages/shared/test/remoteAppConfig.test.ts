@@ -2,19 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   getCommunityUrlFromConfig,
   getCommunityUrlFromConfigs,
-  getFeedbackUrlFromConfig,
   getForceUpdateMinimalVersionFromConfig,
 } from "../src/remoteAppConfig.js";
 
 describe("remoteAppConfig", () => {
-  it("读取 feedback_url", () => {
-    expect(
-      getFeedbackUrlFromConfig({
-        feedback_url: "https://example.com/feedback",
-      }),
-    ).toBe("https://example.com/feedback");
-  });
-
   it("中文界面只读取中文社群地址", () => {
     expect(
       getCommunityUrlFromConfig(

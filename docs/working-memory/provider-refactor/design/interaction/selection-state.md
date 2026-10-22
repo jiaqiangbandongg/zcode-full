@@ -1,5 +1,7 @@
 # 模型选择状态
 
+> **已实现：** [闲时后台生命周期计划](../../../../off-peak-task/background-lifecycle-plan.md) 拆出每会话 `cliDefaultSelection`，保留 Runtime Session Selection 负责续跑，复用现有存储且不做配置/数据库迁移。验证范围与 review 修复记录见该计划。
+
 ModelSelection 是可以持久化和传输的模型意图：
 
 ```ts
@@ -116,7 +118,29 @@ App Recent
 生成随后丢弃的旧协议 snapshot。旧 snapshot 的模型字段契约不因 V4 放宽；真正启动请求时仍校验
 Selection，不能为创建成功而自动选择其他模型或档位。
 
-Session Selection 保存 Session 后续执行延续使用的 ModelSelection。普通 Submission 真正启动 Agent Loop 时写入；Guide 被当前 Loop 接收时写入。
+Session Selection 保存 Session 后续执行延续使用的 ModelSelection。普通用户消息在 CLI 串行 admission 接受时更新；已排队消息执行时使用自己的 Submission 快照，不覆盖较新输入确定的续跑选择。闲时任务在自己的生命周期中维护临时续跑选择，用户输入接管后采用用户提交的选择。验证记录见闲时后台生命周期计划。
+
+### CLI 默认与加速卡回退
+
+`cliDefaultSelection` 由 Bootstrap 按会话维护，只给没有显式选择的 CLI/TUI 用户输入补齐模型。新会话从 `~/.zcode/v2/provider_config.json` 的 `config.defaultModelSelection` 初始化，恢复会话复用已有普通用户选择；不会在每次请求时重读全局默认。`/model`、`/effort` 修改并保存这个默认值，消息尚未接受时不改 Session 续跑选择。App 继续维护 Composer 草稿，不新增第二份 CLI 默认状态。
+
+`highspeedFallbackSelection` 仅指**加速卡过期的回退选择**：在加速轮启动、任何异步初始化之前，从当时的普通 Session 选择复制并冻结。错误处理只读这份快照，不能读取后来被新消息更新的 Session。回退保留本轮历史，移除加速卡请求鉴权；没有普通选择时保留真实卡过期错误。它不是闲时换票或通用错误回退。
+
+```mermaid
+sequenceDiagram
+  participant CLI as CLI 默认选择
+  participant Admission as 输入接纳
+  participant Session as Session 续跑选择
+  participant Turn as 当前加速轮
+  CLI->>CLI: /model 更新下一条输入默认
+  CLI->>Admission: 用户发送消息，固定 Submission
+  Admission->>Session: 接受后更新续跑选择
+  Session->>Turn: 启动时复制加速卡回退选择
+  Admission->>Session: 后续用户输入更新选择
+  Turn->>Turn: 卡过期，只使用启动时回退快照
+```
+
+这些职责拆分复用现有 Provider Config 与 Session entry，不增加配置迁移或数据库迁移。
 
 Provider Config 更新不会重写 Session Selection。下一次执行以这份 Selection 查询最新 Registry，并创建新的 Model。Session 中只保存 Selection，因此 API Key、Endpoint 或模型配置更新可以在新 Model 创建时生效。
 
@@ -185,7 +209,7 @@ Entry 初始化 Composer
   > Host preferredSelection
 ```
 
-长驻 Entry 在创建每个新 Session 时重新读取 Configured Default。文件或其他持久载体的更新只影响以后创建的 Session；已经开始的 Session 继续由 Session Selection 决定。
+长驻 Entry 在创建每个新 Session 时重新读取 Configured Default。文件或其他持久载体的更新只影响以后创建的 Session；已经开始的 CLI/TUI 会话由 cliDefaultSelection 补齐缺省请求；后台续跑由 Session Selection 决定。
 
 恢复已有 Session 时不读取 Configured Default。持久 Session Selection 即使暂时不可用也保持原意，由界面提示或执行时报告不可绑定；系统不会静默换成当前第一个模型。
 
@@ -295,7 +319,7 @@ Prompt CLI 恢复已有 Session：
 ```text
 显式 --model / --reasoning
   >
-Session Selection
+cliDefaultSelection（从持久普通用户选择初始化）
 ```
 
 Configured Default 属于目标 Workspace 的 Host/domain 配置。Host `preferredSelection` 已经原子包含
@@ -313,10 +337,10 @@ Configured Default 与 Fallback Policy 的解析结果；Renderer 不重复这�
 | ----------------- | ------------------------------------------ | ------------------------- |
 | Draft Selection   | Composer 编辑                              | Entry Draft               |
 | App Recent        | App 接受用户 Submission                    | App × workspaceKey        |
-| Session Selection | 普通 Submission 启动 Loop，或 Guide 被接收 | Session                   |
+| Session Selection | 普通 Submission 被接纳；闲时执行临时设值 | Session（仅持久化普通选择） |
+| CLI Default Selection | CLI/TUI 的 /model、/effort；会话初始化 | 复用已有普通用户选择存储 |
 | Active Model      | Loop 启动，或 Guide 在 Step 边界切换       | 当前 Agent Loop，不持久化 |
 
 这些状态共享 ModelSelection 语义，但不共享写入时机。一个状态变化后，可以按明确事件更新另一个状态；任何状态都不通过观察其他状态的当前值来猜测自己应该保存什么。
 
-闲时任务的 ModelSelection 只属于它自己的执行 context，不写 App Recent、Configured Default 或 Session
-Selection。由于没有改写 Session Selection，也不存在执行后的恢复步骤。
+闲时任务临时更新内存 Session Selection，供所属后台恢复/唤起读取；不写 App Recent、Configured Default、CLI Default 或持久用户选择。整项完成且未被用户接管时恢复原普通选择；用户输入被接纳后以用户选择为准，旧闲时收口不再覆盖。

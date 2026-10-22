@@ -28,6 +28,7 @@ afterEach(() => {
   }
   vi.doUnmock("node:child_process");
   vi.doUnmock("node:fs");
+  vi.doUnmock("../src/main/fileApplications.js");
   vi.restoreAllMocks();
   vi.resetModules();
 });
@@ -173,4 +174,49 @@ describe("editors", () => {
       }),
     ).not.toThrow();
   });
+});
+
+describe("file application detection cache", () => {
+  it.each(["missing", "icon", "error"])(
+    "retries %s results without restarting and shares pending detection",
+    async (failure) => {
+      setProcessPlatform("linux");
+      const resolveFileApplicationPath = vi.fn();
+      vi.doMock("../src/main/fileApplications.js", () => ({
+        getFileApplicationDefs: () => [{ id: "reader", name: "Reader" }],
+        matchesFileApplication: () => true,
+        resolveFileApplicationPath,
+      }));
+      const { app } = await import("electron");
+      vi.mocked(app.getFileIcon).mockResolvedValue({ toPNG: () => Buffer.from("icon") } as never);
+      if (failure === "missing") resolveFileApplicationPath.mockResolvedValueOnce(null);
+      else if (failure === "error")
+        resolveFileApplicationPath.mockRejectedValueOnce(new Error("detection failed"));
+      else {
+        resolveFileApplicationPath.mockResolvedValueOnce("/usr/bin/reader");
+        vi.mocked(app.getFileIcon).mockImplementation(async (path) => {
+          if (path === "/usr/bin/reader") throw new Error("icon unavailable");
+          return { toPNG: () => Buffer.from("icon") } as never;
+        });
+      }
+      const { getInstalledEditors } = await import("../src/main/editors.js");
+      if (failure === "error")
+        await expect(getInstalledEditors("/work/a.pdf")).rejects.toThrow("detection failed");
+      else
+        expect(await getInstalledEditors("/work/a.pdf")).not.toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: "reader" })]),
+        );
+      resolveFileApplicationPath.mockResolvedValue("/usr/bin/reader");
+      vi.mocked(app.getFileIcon).mockResolvedValue({ toPNG: () => Buffer.from("icon") } as never);
+      const results = await Promise.all([
+        getInstalledEditors("/work/a.pdf"),
+        getInstalledEditors("/work/b.pdf"),
+      ]);
+      for (const result of results)
+        expect(result).toEqual(expect.arrayContaining([expect.objectContaining({ id: "reader" })]));
+      expect(resolveFileApplicationPath).toHaveBeenCalledTimes(2);
+      await getInstalledEditors("/work/c.pdf");
+      expect(resolveFileApplicationPath).toHaveBeenCalledTimes(2);
+    },
+  );
 });

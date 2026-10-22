@@ -809,7 +809,7 @@ describe("a tail chain twenty fills deep", () => {
     return { lengths, text };
   };
 
-  it("keeps every fill stable and every id as short at step 20 as at step 1", () => {
+  it("keeps 20 nested fills stable with bounded ids and their enclosing fill identity", () => {
     const { lengths, text } = grow();
     // 最长的 id 是 `hole#xxxxxxxx/actor#1` 这一类：21 个字符，与深度无关。
     expect(new Set(lengths)).toEqual(new Set([lengths[0]]));
@@ -820,10 +820,8 @@ describe("a tail chain twenty fills deep", () => {
     const names = collectPhaseNames(analyzed.flow).phaseNames;
     for (let k = 1; k <= STEPS; k += 1) expect(names).toContain(stepName(k));
     expect(collectPhaseNames(analyzed.flow).holes).toEqual([]);
-  });
 
-  it("records each step's enclosing step in fill, so nesting survives without being spelled in the id", () => {
-    const { text } = grow();
+    // 同一次二十层补全同时验证 ID 稳定性与父留白身份，避免重复整条编译链。
     const { table } = sitesOf(text);
     for (let k = 2; k <= STEPS; k += 1) {
       const hole = table.holes.find((h) => h.id === holeSiteId(stepName(k)));

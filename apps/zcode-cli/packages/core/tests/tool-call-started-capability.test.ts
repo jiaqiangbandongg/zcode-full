@@ -99,7 +99,7 @@ async function run(entry: ToolEntry, input: Record<string, unknown>, name: strin
     { traceContext },
   );
   const started = events.find((event) => event.type === SessionEventType.ToolCallStarted);
-  return { payload: started?.payload as ToolCallStartedPayload | undefined, order };
+  return { payload: started?.payload as ToolCallStartedPayload | undefined, order, events };
 }
 
 describe("ToolCallStarted carries the resolved side-effect capability", () => {
@@ -137,4 +137,31 @@ describe("ToolCallStarted carries the resolved side-effect capability", () => {
     expect(payload).toMatchObject({ readOnly: true, sideEffectScope: "none" });
     expect(isWorkspaceMutatingToolCall(payload!)).toBe(false);
   });
+});
+
+describe("MCP execution attribution", () => {
+  it.each([false, true])(
+    "keeps actual plugin ownership on terminal events (failure=%s)",
+    async (fails) => {
+      const entry = probeEntry({});
+      entry.metadata.mcpPresentation = {
+        pluginId: "actual@market",
+        serverName: "server",
+        toolName: "tool",
+      };
+      entry.handler = async () => {
+        if (fails) throw new Error("tool failed");
+        // 注册表在执行期间变化，也不能丢失本次执行的归属。
+        entry.metadata.mcpPresentation!.pluginId = "changed@market";
+        return { ok: true };
+      };
+      const { events } = await run(entry, {}, "mcp-owner");
+      const terminal = events.filter(
+        (event) =>
+          event.type === (fails ? SessionEventType.ToolCallError : SessionEventType.ToolCallResult),
+      );
+      expect(terminal).toHaveLength(1);
+      expect(terminal[0].payload).toMatchObject({ pluginId: "actual@market" });
+    },
+  );
 });

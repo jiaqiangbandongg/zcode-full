@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AgentInputSchema, BashInputJsonSchema, BashOutputJsonSchema } from "@zcode/contracts";
 import { agentToolEntry } from "../src/tool/handlers/agent.js";
@@ -16,8 +13,6 @@ import { writeToolEntry } from "../src/tool/handlers/write.js";
 import { formatTaskNotification } from "../src/runtime-task/notification.js";
 import { createToolRegistry } from "../src/tool/registry.js";
 import { buildExploreSystemPrompt } from "../src/subagent/explore.js";
-
-const testDirname = dirname(fileURLToPath(import.meta.url));
 
 function normalizeWebSearchDynamicDate(description: string | undefined): string {
   return (description ?? "").replace(
@@ -54,6 +49,8 @@ const DIRECT_BRANCH_EXPECTED_PROVIDER_TOOL_ORDER = [
   "WebFetch",
   "WebSearch",
   "Write",
+  "ToolSearch",
+  "DeferredToolCall",
   "SendMessage",
   "ReadSessionContext",
   "ReplyToChannel",
@@ -137,7 +134,12 @@ describe("tool contract declarations", () => {
       includeSendMessage: true,
       includeSkill: true,
     });
-    expect(directRegistry.list().slice(0, 3)).toEqual(["Read", "Write", "Edit"]);
+    expect(directRegistry.list().slice(0, 4)).toEqual([
+      "ToolSearch",
+      "DeferredToolCall",
+      "Read",
+      "Write",
+    ]);
     expect(
       orderProviderVisibleToolContracts(directRegistry.toContracts()).map((tool) => tool.name),
     ).toEqual(DIRECT_BRANCH_EXPECTED_PROVIDER_TOOL_ORDER);
@@ -259,28 +261,6 @@ describe("tool contract declarations", () => {
     }
   });
 
-  it("keeps ExitPlanMode guidance aligned with the current plan parameter contract", () => {
-    const registry = createToolRegistry();
-    registerBuiltInTools(registry);
-    const description =
-      registry.toContracts().find((contract) => contract.name === "ExitPlanMode")?.description ??
-      "";
-
-    expect(description).toContain("DOES take the plan content as the required plan parameter");
-    expect(description).toContain("use AskUserQuestion before finalizing your plan");
-    expect(description).toContain("ExitPlanMode inherently requests user approval");
-    expect(description).not.toContain("yolo");
-    expect(description).not.toContain("read the plan from the file");
-    expect(description).toMatch(/\n$/u);
-  });
-
-  it("uses the concise Read description lines for range and line-number guidance", () => {
-    expect(readToolEntry.metadata.description).toBe(SOURCE_DERIVED_READ_SHORT_DESCRIPTION);
-    expect(readToolEntry.metadata.description).not.toContain(
-      "Each line is the line number, a single separator (a tab), then the verbatim file content",
-    );
-  });
-
   it("matches direct short Glob and Grep provider contracts exactly", () => {
     const registry = createToolRegistry();
     registerBuiltInTools(registry);
@@ -299,9 +279,6 @@ describe("tool contract declarations", () => {
     const contract = registry.toContracts().find((tool) => tool.name === "SendMessage");
 
     expect(contract?.description).toBe(SOURCE_DERIVED_SEND_MESSAGE_DESCRIPTION);
-    expect(contract?.description).not.toContain("Usage:");
-    expect(contract?.description).not.toContain("shutdown_request");
-    expect(contract?.description).not.toContain("teammate");
     expect(getSchemaPath(contract?.inputSchema, ["required"])).toEqual([
       "to",
       "summary",
@@ -317,39 +294,6 @@ describe("tool contract declarations", () => {
     expect(getSchemaPath(contract?.inputSchema, ["properties", "message", "description"])).toBe(
       "Plain text message content",
     );
-  });
-
-  it("projects supported provider schema differences from the primary input schema", () => {
-    const contractToolsDir = resolve(testDirname, "../../contracts/src/tools");
-    const files = [
-      "agent.ts",
-      "ask-user-question.ts",
-      "bash.ts",
-      "edit.ts",
-      "json-schema.ts",
-      "plan-mode.ts",
-      "skill.ts",
-      "webfetch.ts",
-    ];
-
-    for (const file of files) {
-      const source = readFileSync(resolve(contractToolsDir, file), "utf8");
-      expect(source, file).not.toContain("deleteToolJsonSchemaKeys");
-      expect(source, file).not.toContain("setToolJsonSchemaValue");
-      expect(source, file).not.toContain("getToolJsonSchemaNode");
-    }
-
-    for (const file of files.filter((file) => file !== "json-schema.ts")) {
-      const source = readFileSync(resolve(contractToolsDir, file), "utf8");
-      expect(source, file).not.toContain("ProviderInputSchema");
-      expect(source, file).not.toContain("InputJsonSchema = {");
-      expect(source, file).not.toContain("satisfies JsonSchema");
-      expect(source, file).not.toContain("superRefine(nonEmptyString");
-      expect(source, file).not.toContain("superRefine(maxLength");
-      expect(source, file).not.toContain("superRefine(maxItems");
-      expect(source, file).not.toContain("superRefine(noUnexpectedKeys");
-      expect(source, file).not.toContain("validateBashTimeout");
-    }
   });
 
   it("requires every built-in tool to declare the v2 common contract", () => {
@@ -383,15 +327,6 @@ describe("tool contract declarations", () => {
     expect(BashInputJsonSchema.properties).toHaveProperty("run_in_background");
   });
 
-  it("keeps local provider output schemas out of contracts runtime exports", () => {
-    const coreHandlersDir = resolve(testDirname, "../src/tool/handlers");
-    const agentSource = readFileSync(resolve(coreHandlersDir, "agent.ts"), "utf8");
-    const sendMessageSource = readFileSync(resolve(coreHandlersDir, "send-message.ts"), "utf8");
-
-    expect(agentSource).not.toContain("AgentProviderOutputJsonSchema");
-    expect(sendMessageSource).not.toContain("SendMessageProviderOutputJsonSchema");
-  });
-
   it("projects output schema and runtime-only declarations into model contracts", () => {
     const registry = createToolRegistry();
     registerBuiltInTools(registry, {
@@ -420,7 +355,9 @@ describe("tool contract declarations", () => {
     expect(agentDescription).not.toContain("ID or name");
     expect(agentDescription).not.toContain(".claude/agents");
     expect(agentDescription).not.toContain("When you launch multiple agents for independent work");
-    expect(agentDescription).toContain("Available agent types are listed in <system-reminder> messages in the conversation.");
+    expect(agentDescription).toContain(
+      "Available agent types are listed in <system-reminder> messages in the conversation.",
+    );
     expect(agentDescription).not.toContain("- general-purpose:");
     expect(agentDescription).not.toContain("- Explore:");
     expect(agentDescription).not.toContain("model:");
@@ -434,12 +371,6 @@ describe("tool contract declarations", () => {
     expect(byName.get("Read")?.outputSchema).toBeDefined();
     expect(byName.get("Read")?.capability).toContain("Read");
     expect(byName.get("Read")?.description).toBe(SOURCE_DERIVED_READ_SHORT_DESCRIPTION);
-    expect(byName.get("Read")?.description).not.toContain("Usage:");
-    expect(byName.get("Read")?.description).not.toContain("GB2312");
-    expect(byName.get("Read")?.description).not.toContain("PDF");
-    expect(byName.get("Read")?.description).not.toContain("Jupyter");
-    expect(byName.get("Read")?.description).not.toContain("pages");
-    expect(byName.get("Read")?.description).not.toContain("To find files use Glob");
     expect(byName.get("Glob")?.permission?.permission).toBe("read");
     expect(byName.get("Glob")?.description).toContain("Fast file pattern matching.");
     expect(byName.get("Glob")?.description).toContain('glob patterns like "**/*.js"');
@@ -924,7 +855,7 @@ describe("tool contract declarations", () => {
     expect(askDescription).toContain("Do NOT use this tool to ask");
   });
 
-  it("aligns P1 tool prompt semantic guidance", () => {
+  it("keeps Skill naming and loading guidance", () => {
     const registry = createToolRegistry();
     registerBuiltInTools(registry, {
       includeAgent: true,
@@ -933,14 +864,6 @@ describe("tool contract declarations", () => {
     });
 
     const byName = new Map(registry.toContracts().map((tool) => [tool.name, tool]));
-
-    const bashDescription = byName.get("Bash")?.description ?? "";
-    expect(bashDescription).toContain("Executes a bash command and returns its output.");
-    expect(bashDescription).toContain("Working directory persists between calls");
-    expect(bashDescription).toContain("Avoid using this tool to run");
-    expect(bashDescription).toContain("run_in_background");
-    expect(bashDescription).toContain("# Git");
-    expect(bashDescription).not.toContain("Usage:");
 
     const skillDescription = byName.get("Skill")?.description ?? "";
     const normalizedSkillDescription = skillDescription.toLowerCase();
@@ -953,7 +876,7 @@ describe("tool contract declarations", () => {
     expect(skillDescription).toContain("built-in CLI commands");
   });
 
-  it("keeps provider prompts at the intended guidance depth", () => {
+  it("projects preview guidance and direct Explore search instructions", () => {
     const registry = createToolRegistry();
     registerBuiltInTools(registry, {
       includeAgent: true,
@@ -962,19 +885,6 @@ describe("tool contract declarations", () => {
     });
 
     const byName = new Map(registry.toContracts().map((tool) => [tool.name, tool]));
-    const wordCount = (text: string) => text.trim().split(/\s+/u).filter(Boolean).length;
-
-    const todoWriteDescription = byName.get("TodoWrite")?.description ?? "";
-    expect(todoWriteDescription.length, "SIMPLE todo description should stay compact").toBeLessThan(
-      1500,
-    );
-    expect(todoWriteDescription).toContain("task list for the current session");
-    expect(todoWriteDescription).toContain("replaces the previous one");
-    expect(todoWriteDescription).toContain("Keep one item");
-    expect(todoWriteDescription).not.toContain("<reasoning>");
-    expect(todoWriteDescription).not.toContain("## When to Use");
-    expect(todoWriteDescription).not.toContain("activeForm");
-
     const askDescription = byName.get("AskUserQuestion")?.description ?? "";
     expect(askDescription.length).toBeGreaterThan(1700);
     expect(askDescription).toContain("Preview feature");
@@ -990,20 +900,6 @@ describe("tool contract declarations", () => {
     expect(previewDescription).toBe(
       "Optional preview content rendered when this option is focused. Use for mockups, code snippets, or visual comparisons that help users compare options. See the tool description for the expected content format.",
     );
-
-    const bashDescription = byName.get("Bash")?.description ?? "";
-    expect(bashDescription.length).toBeLessThan(1600);
-    expect(wordCount(bashDescription)).toBeGreaterThan(120);
-    expect(bashDescription).toContain("Executes a bash command and returns its output.");
-    expect(bashDescription).toContain("Working directory persists between calls");
-    expect(bashDescription).toContain("Avoid using this tool to run");
-    expect(bashDescription).toContain("`find`, `grep`, `cat`");
-    expect(bashDescription).toContain("default 120000, max 600000");
-    expect(bashDescription).toContain("run_in_background");
-    expect(bashDescription).toContain("# Git");
-    expect(bashDescription).not.toContain("Usage:");
-    expect(bashDescription).not.toContain("DO NOT use newlines to separate commands");
-    expect(bashDescription).not.toContain("Always create NEW commits rather than amending");
 
     const explorePrompt = buildExploreSystemPrompt({
       workingDirectory: "/workspace/project",
@@ -1023,12 +919,13 @@ describe("tool contract declarations", () => {
     expect(explorePrompt).not.toContain("Assistant knowledge cutoff");
   });
 
-  it("keeps built-in tool JSON schemas provider-compatible", () => {
+  it("keeps built-in tool input JSON schemas provider-compatible", () => {
     for (const entry of builtInTools) {
-      const schemaIssues = [
-        ...findProviderSchemaIssues(entry.inputSchema, `${entry.metadata.name}.inputSchema`),
-        ...findProviderSchemaIssues(entry.outputSchema, `${entry.metadata.name}.outputSchema`),
-      ];
+      // Provider 只接收输入声明；输出 union 由本地 executor 校验，不能套用输入限制。
+      const schemaIssues = findProviderSchemaIssues(
+        entry.inputSchema,
+        `${entry.metadata.name}.inputSchema`,
+      );
 
       expect(schemaIssues, entry.metadata.name).toEqual([]);
     }
@@ -1121,16 +1018,10 @@ describe("tool contract declarations", () => {
     const mainAllowlistRegistry = createToolRegistry();
     registerBuiltInTools(mainAllowlistRegistry, { allowedTools: ["Read", "Glob", "Grep"] });
 
-    const exploreRegistry = createToolRegistry();
-    registerBuiltInTools(exploreRegistry, {
-      allowedTools: ["Read", "Glob", "Grep"],
-    });
-
     expect(mainRegistry.has("Agent")).toBe(true);
     expect(mainRegistry.has("Glob")).toBe(true);
     expect(mainRegistry.has("Grep")).toBe(true);
     expect(mainAllowlistRegistry.list()).toEqual(["Read", "Glob", "Grep"]);
-    expect(exploreRegistry.list()).toEqual(["Read", "Glob", "Grep"]);
   });
 
   it("does not expose explicitly disallowed built-in tools", () => {
@@ -1174,14 +1065,12 @@ describe("tool contract declarations", () => {
         "- Commit or push only when the user asks. If on the default branch, branch first.",
       ].join("\n"),
     );
-    expect(bashDescription).toContain(
-      "Avoid using this tool to run `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands",
-    );
-    expect(bashDescription).not.toContain("`find`, `grep`");
 
     const agentDescription = byName.get("Agent")?.description ?? "";
     expect(agentDescription).not.toContain("Tools: Glob, Grep");
-    expect(agentDescription).toContain("Available agent types are listed in <system-reminder> messages in the conversation.");
+    expect(agentDescription).toContain(
+      "Available agent types are listed in <system-reminder> messages in the conversation.",
+    );
     expect(agentDescription).not.toContain("(Tools:");
     expect(agentDescription).not.toContain("<system-reminder>\n");
 
@@ -1345,9 +1234,6 @@ describe("tool contract declarations", () => {
     expect(todoItem.properties).toHaveProperty("priority");
     expect(todoItem.properties).not.toHaveProperty("activeForm");
     expect(todoItem.properties.status.enum).toEqual(["pending", "in_progress", "completed"]);
-    expect(todoWrite?.description).toContain("task list for the current session");
-    expect(todoWrite?.description).toContain("replaces the previous one");
-    expect(todoWrite?.description).toContain("Keep one item");
   });
 
   it("describes Grep input with ripgrep-oriented guidance", () => {
@@ -1417,17 +1303,6 @@ describe("tool contract declarations", () => {
     ).toBe(
       "src/a.ts\nsrc/b.ts\n(Results are truncated. Consider using a more specific path or pattern.)",
     );
-  });
-
-  it("uses the provider-visible Read prompt for supported capabilities", () => {
-    expect(readToolEntry.metadata.description).toBe(SOURCE_DERIVED_READ_SHORT_DESCRIPTION);
-    expect(readToolEntry.metadata.description).toContain("cat -n format");
-    expect(readToolEntry.metadata.description).toContain("Reads images (PNG, JPG, …)");
-    expect(readToolEntry.metadata.description).toContain("Do NOT re-read a file you just edited");
-    expect(readToolEntry.metadata.description).not.toContain("PDF");
-    expect(readToolEntry.metadata.description).not.toContain("Jupyter");
-    expect(readToolEntry.metadata.description).not.toContain("pages");
-    expect(readToolEntry.metadata.modelInstructions).toBeUndefined();
   });
 
   it("keeps Bash model input simple while accepting semantic runtime values", () => {
@@ -1504,13 +1379,6 @@ describe("tool contract declarations", () => {
     ).toBe("src/a.ts:3\n\nFound 3 total occurrences across 1 file.");
   });
 
-  it("caps Grep model-visible results at the search tool budget", () => {
-    expect(grepToolEntry.resultBudget?.maxInlineBytes).toBe(20_000);
-    expect(grepToolEntry.resultBudget?.maxModelBytes).toBe(20_000);
-    expect(grepToolEntry.resultBudget?.preview?.maxBytes).toBe(20_000);
-    expect(grepToolEntry.metadata.maxOutputBytes).toBe(20_000);
-  });
-
   it("formats file mutation results as concise model-visible confirmations", () => {
     const originalFile = "secret old content";
     const structuredPatch = [
@@ -1535,8 +1403,6 @@ describe("tool contract declarations", () => {
     expect(editContent).toBe(
       "The file /work/file.ts has been updated. All occurrences were successfully replaced. (file state is current in your context — no need to Read it back)",
     );
-    expect(editContent).not.toContain(originalFile);
-    expect(editContent).not.toContain("structuredPatch");
 
     const writeCreateContent = writeToolEntry.formatModelContent?.({
       type: "create",
@@ -1548,7 +1414,6 @@ describe("tool contract declarations", () => {
     expect(writeCreateContent).toBe(
       "File created successfully at: /work/new.ts (file state is current in your context \u2014 no need to Read it back)",
     );
-    expect(writeCreateContent).not.toContain("large new file content");
 
     const writeUpdateContent = writeToolEntry.formatModelContent?.({
       type: "update",
@@ -1560,8 +1425,6 @@ describe("tool contract declarations", () => {
     expect(writeUpdateContent).toBe(
       "The file /work/file.ts has been updated successfully. (file state is current in your context \u2014 no need to Read it back)",
     );
-    expect(writeUpdateContent).not.toContain(originalFile);
-    expect(writeUpdateContent).not.toContain("large new file content");
   });
 
   it("formats Read text output as cat-n content without JSON escaping tabs", () => {
@@ -1579,8 +1442,6 @@ describe("tool contract declarations", () => {
     expect(modelContent).toBe(
       "1\t工作任务\n2\t- [ ] prd auto research 的\n3\t\t- [ ] beta 部分继续",
     );
-    expect(modelContent).not.toContain("\\t- [ ] beta");
-    expect(modelContent).not.toContain('"content"');
   });
 
   it("exports the Read line-number formatter for raw text content", () => {

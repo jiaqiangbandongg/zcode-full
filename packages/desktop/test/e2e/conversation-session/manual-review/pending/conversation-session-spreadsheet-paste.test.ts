@@ -1,6 +1,6 @@
 // T11：Excel 多表示剪贴板中的 TSV 文本优先于同 payload 的合成 PNG。
 // 证据层 L3：真实 ClipboardEvent → Lexical 默认 paste → composer → provider request。
-import { TID_V4_COMPOSER_INPUT, TID_V4_ROW_ATTACHMENTS } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT, TID_V4_ROW_ATTACHMENTS } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   clickV4Send,

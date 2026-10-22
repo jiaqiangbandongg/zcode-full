@@ -1,8 +1,4 @@
-import {
-  TID_CHAT_COMPACT_MARKER,
-  TID_CHAT_INPUT,
-  TID_CHAT_MESSAGES,
-} from "@zcode/shared";
+import { TID_CHAT_COMPACT_MARKER, TID_CHAT_INPUT, TID_CHAT_MESSAGES } from "@zcode/shared/test-ids";
 import { UPSTREAM_MODEL } from "../../../helpers/upstream-provider.js";
 import {
   assertUpstreamRequestCapture,

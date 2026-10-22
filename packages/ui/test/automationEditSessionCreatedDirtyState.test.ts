@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
 import { createElement, type ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { type ZCodeAutomation, type ModelSelection } from "@zcode/shared";
 import {
   TID_AUTOMATION_SCHEDULE_ADD,
   TID_AUTOMATION_SCHEDULE_PREVIEW,
-  type ZCodeAutomation,
-  type ModelSelection,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stableHookValues = vi.hoisted(() => ({
   configResult: { configOptions: [] },
   projectOptions: [] as Array<{
+    projectId?: string | null;
+    hostId?: string;
     workspacePath: string;
     workspaceIdentity?: string;
     remoteSessionId?: string;
@@ -34,7 +35,8 @@ const stableHookValues = vi.hoisted(() => ({
 }));
 
 vi.mock("@/components/ui/select.js", async () => {
-  const { createElement: h, useEffect } = await import("react");
+  const { createElement: h, useEffect, createContext, useContext } = await import("react");
+  const Selection = createContext<((value: string) => void) | undefined>(undefined);
   const passthrough = ({ children }: { children?: ReactNode }) => h("div", null, children);
   return {
     Select: ({
@@ -62,10 +64,13 @@ vi.mock("@/components/ui/select.js", async () => {
         }, 0);
         return () => window.clearTimeout(timer);
       }, []);
-      return h("div", null, children);
+      return h(Selection.Provider, { value: onValueChange }, children);
     },
     SelectContent: passthrough,
-    SelectItem: passthrough,
+    SelectItem: ({ children, value }: { children?: ReactNode; value: string }) => {
+      const select = useContext(Selection);
+      return h("button", { type: "button", onClick: () => select?.(value) }, children);
+    },
     SelectTrigger: passthrough,
     SelectValue: passthrough,
   };
@@ -159,34 +164,7 @@ vi.mock("@/ModelConfigSelect.js", async () => {
 vi.mock("@/chat-input-toolbar/ThoughtLevelCycleControl.js", () => ({
   ThoughtLevelCycleControl: () => null,
 }));
-vi.mock("@/ChatEmptyState.js", () => ({
-  ChatEmptyWorkspacePreviewMenu: ({
-    workspaceTabs,
-    onSelectWorkspace,
-  }: {
-    workspaceTabs: Array<{ workspacePath: string; workspaceIdentity?: string; label: string }>;
-    onSelectWorkspace: (workspace: {
-      workspacePath: string;
-      workspaceIdentity?: string;
-      label: string;
-    }) => void;
-  }) =>
-    createElement(
-      "div",
-      null,
-      workspaceTabs.map((workspace) =>
-        createElement(
-          "button",
-          {
-            key: workspace.workspaceIdentity ?? workspace.workspacePath,
-            type: "button",
-            onClick: () => onSelectWorkspace(workspace),
-          },
-          workspace.label,
-        ),
-      ),
-    ),
-}));
+
 vi.mock("@/hooks/useAutomationProjectOptions.js", () => ({
   useAutomationProjectOptions: () => stableHookValues.projectOptions,
 }));
@@ -197,21 +175,31 @@ vi.mock("@/hooks/useServices.js", () => ({
   useOptionalServices: () => null,
   useServices: () => stableHookValues.services,
 }));
-vi.mock("@/hooks/useModelSelectionView.js", () => ({
-  useModelSelectionView: (
+vi.mock("@/hooks/useWorkspaceServices.js", () => ({
+  useOptionalBaseWorkspaceServices: () => null,
+  useWorkspaceServicesResolution: (
     workspacePath: string | null | undefined,
     remoteSessionId?: string | null,
     workspaceIdentity?: string | null,
     remoteTarget?: unknown,
-    input?: { selection: ModelSelection | null },
   ) => {
-    stableHookValues.selectionInputs.push(input);
     stableHookValues.modelSelectionTargets.push({
       workspacePath,
       remoteSessionId,
       workspaceIdentity,
       remoteTarget,
     });
+    return { connectionKind: "local", services: stableHookValues.services };
+  },
+}));
+vi.mock("@/hooks/useModelSelectionView.js", () => ({
+  useModelSelectionServiceView: (
+    _service: unknown,
+    _enabled: boolean,
+    _reason: string,
+    input?: { selection: ModelSelection | null },
+  ) => {
+    stableHookValues.selectionInputs.push(input);
     return {
       state: stableHookValues.modelSelectionView
         ? {
@@ -490,6 +478,7 @@ describe("AutomationEditView session-created dirty state", () => {
     });
     const conversationAutomation: ZCodeAutomation = {
       ...uiCreatedAutomation,
+      projectId: null,
       workspaceKey: conversationWorkspacePath,
       workspacePath: conversationWorkspacePath,
     };

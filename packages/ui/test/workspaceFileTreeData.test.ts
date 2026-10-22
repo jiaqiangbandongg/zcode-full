@@ -208,6 +208,11 @@ function createWorkspaceFileTreeHarness(initialEntriesByDirectory: Record<string
     },
     root,
     services,
+    queueWatcherChange(path: string) {
+      const id = [...watchedPathById.entries()].find(([, value]) => value === path)?.[0];
+      if (!id) throw new Error(`missing watcher for ${path}`);
+      watcherListeners.get(id)?.({ dirPath: path });
+    },
     async fireWatcherChange(path: string) {
       const watcherId = [...watchedPathById.entries()].find(
         ([, watchedPath]) => watchedPath === path,
@@ -242,6 +247,32 @@ describe("useWorkspaceFileTreeData", () => {
     delete (globalThis as { window?: unknown }).window;
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: unknown })
       .IS_REACT_ACT_ENVIRONMENT;
+  });
+
+  it("卸载文件树释放 watcher，并取消尚未执行的目录和 Git 刷新", async () => {
+    vi.useFakeTimers();
+    const harness = createWorkspaceFileTreeHarness({
+      [WORKSPACE_PATH]: [file(`${WORKSPACE_PATH}/old.ts`)],
+    });
+    await harness.render();
+    await flushReactWork();
+    expect(harness.watchedPaths()).toContain(WORKSPACE_PATH);
+    act(() => harness.queueWatcherChange(WORKSPACE_PATH));
+    const reads = vi.mocked(harness.services.fileService.readdir).mock.calls.length;
+    const gitReads = vi.mocked(harness.services.gitService.refresh).mock.calls.length;
+    act(() => {
+      harness.root.unmount();
+    });
+    expect(harness.watchedPaths()).toEqual([]);
+    expect(harness.services.fileWatcherService.unwatch).toHaveBeenCalledWith({
+      id: `watch:${WORKSPACE_PATH}`,
+    });
+    await act(async () => {
+      vi.runAllTimers();
+      await flushMicrotasks();
+    });
+    expect(harness.services.fileService.readdir).toHaveBeenCalledTimes(reads);
+    expect(harness.services.gitService.refresh).toHaveBeenCalledTimes(gitReads);
   });
 
   it("实时刷新展开目录里的新增文件，不需要重启 ZCode", async () => {

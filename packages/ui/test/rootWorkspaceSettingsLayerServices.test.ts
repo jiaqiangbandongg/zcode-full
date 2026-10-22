@@ -3,6 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IServiceAccessor } from "@zcode/services";
 
+vi.mock("@/project-sidebar/index.js", () => ({
+  ProjectDirectoryProvider: ({ children }: { children: unknown }) => children,
+}));
+
 const workspaceSettingsLayerMock = vi.fn(() => null);
 
 vi.mock("../src/App.js", () => ({
@@ -53,7 +57,7 @@ describe("RootWorkspaceContent settings layer services", () => {
         user: null,
         reconnectingRemoteWorkspaceKeys: [],
         remoteWorkspaceErrorByWorkspaceKey: {},
-        reconnectingRemoteWorkspaceLogsByWorkspaceKey: {},
+
         allowOpenWorkspace: true,
       }),
     );

@@ -45,6 +45,11 @@ v0 能力不提供远程配置管理 UI；本地 Environment 是编辑权威，�
 Workspace 后续同步失败不拆除连接，只留下不含 Secret 的结构化 warning，并等待下一次真实
 触发重新读取最新快照。
 
+R3 Source Server 自动重连换代 `remoteSessionId` 时（`desktopRemoteSessions.ts handleReconnected`），
+Desktop Main 先 dispose 绑定旧 session 的登记，再以新 `remoteSessionId` 重新登记同一 Environment key，
+等价于该 Environment 重新上线：触发一次 `environment-online` 整份重下发，补齐离线期间的本地配置变更。
+重连不是发布屏障，失败只记录结构化 warning，不拆除已恢复的 Workspace。
+
 ### Environment 级协调
 
 Workspace 不是同步单位。同一 Remote Environment 的多个 Workspace、多个窗口共用 Desktop
@@ -60,6 +65,31 @@ Main 只保存 Environment key、Host registration、trigger、generation 和请
 或转发配置与 Secret。被选中的 Window Host 在执行时重新读取最新 Local Source，并调用该
 Environment 的 Remote Target。同步期间发生的新触发只推进 generation；当前轮结束后再读取
 一次最新快照形成尾随同步，不为每个事件排队，也不使用固定延迟。
+
+### 物理连接关闭与同步请求收口
+
+Window Host 的 `ServerRemoteConnection` 同时拥有 transport、`SocketProtocol` 和
+`ChannelClient` 的生命周期。显式断开、socket close/error 或握手失败时必须幂等释放该连接的
+RPC 客户端与协议；未完成及等待 Initialize 的请求以 `ConnectionClosed` 拒绝，迟到响应不能
+重新完成旧请求。连接关闭事件仍按既有 Source 生命周期通知上层。
+`connectOnce` 在写入在线表前持有连接所有权；包括握手记录落盘失败、版本解析抛错在内的
+全部失败出口，统一释放未发布连接一次。发布成功后由在线表接管，迟到的旧连接关闭不影响新连接。
+
+```text
+Provider apply 尚未返回 -> Source 断开 -> 旧 ChannelClient.dispose
+                                      -> Host 返回同步失败 -> 旧 lane 收口
+新 Source 连接 -> 同一 Environment 读取最新配置 -> 同步成功 -> Renderer attachment ready
+```
+
+远端配置文件已更新不等于整个 apply RPC 已结束；用户此时断开仍须满足上述契约。
+不得跳过首次同步屏障，也不得通过 UI 延时、清空同步队列或额外重试规避悬挂请求。
+WebSocket Server 与 SSH/WSL/Docker 共用的 Duplex 连接遵循同一规则；手机 relay 断线和
+replayable attachment 恢复不代表物理 Source 终结，不触发此清理。不修改 workspace identity、
+session 路由、desktop-continuous/web-remote-replayable 语义或持久化格式，无数据迁移。
+
+回归覆盖：`serverRemoteConnectionLifecycle.test.ts` 以真实网络请求覆盖断开时未返回的 RPC、
+新连接的 Environment 同步、迟到响应与重复释放；`r3-provisioning-gui` 保留删除后立即断开、
+离线修改、组头重连、最新配置同步和继续对话的 GUI 断言。
 
 ### Desktop 模型配置页
 
@@ -204,6 +234,27 @@ Remote zcode-server
 Remote Target RPC 不复用 Renderer 的 `IProviderSettingsService` 写接口，避免把“跨 Environment
 复制”和“远端本地编辑”混成一条无幂等、无回滚的路径。
 
+### Worker Registry 刷新屏障
+
+Provisioning 写入目标 Environment 的 Personal Config 后，存量 Agent Worker 可能仍持有写入前
+的进程内 Registry。远端 Host 在会话创建、模型切换和输入执行前，必须通过内部
+`provider/refreshRegistry` 请求让目标 Worker 从自己的正式 Config Store 读取并刷新 Registry；该
+请求不携带 Desktop Registry、凭据或模型配置快照。刷新和待执行的 Selection 校验必须在输入
+ACK 之前完成；刷新失败或 Selection 不可用时拒绝本次输入并保留用户草稿，不能先 ACK 再让后台
+turn 静默失败。
+V4 `switchModelConfig` 与输入命令共用该刷新屏障：刷新成功后才发送模型切换命令。
+
+```text
+Host execution admission
+  -> Worker provider/refreshRegistry
+  -> Worker reads local Personal/Account Config and rebuilds Registry
+  -> Selection validation
+  -> ACK + turn execution
+```
+
+该屏障不重启 Worker、不改变运行中 Active Model 的创建时冻结语义，也不改变 Desktop
+`continuous` 与 Mobile `replayable` 的传输边界。
+
 ## 兼容与失败语义
 
 - Result 与 Host execution result 增加可选 `errorCode`，只接受固定枚举：
@@ -222,17 +273,66 @@ Remote Target RPC 不复用 Renderer 的 `IProviderSettingsService` 写接口，
 - 首次连接的旧远端不支持 Provisioning capability 时返回 `unsupported`，不发送 Secret，也不发布 Remote Workspace ready。
 - HTTP `zcode-server` 只有在配置 `ZCODE_SERVER_AUTH_TOKEN` 后才开放受信 Desktop Host 的
   Provisioning target；未配置认证时保持“不支持”，避免把跨 Environment 凭据写入口暴露给匿名连接。
+- R3 Source Server Core（`packages/zcode-server-cli`，`serviceAuthorityMode: "standalone-server"`）
+  **始终**注册 Provisioning target：R3 ingress token（`<serverRoot>/run/ingress-token`，0600）常在，
+  不存在上一条那种“未配置鉴权则不支持”的分支。隔离在 `clientMode` 层完成：`/ws/host` 的
+  `desktop-continuous` 连接（capability ticket + ingress token）拿到真实 `IProviderProvisioningTargetService`；
+  `/ws` 的 `web-remote-replayable` 连接在 `exposeWebSocket` 中被 override 为抛错 stub
+  （“Provider Provisioning 仅支持受信 Desktop Host”），Window Host 的手机 allowlist 也不含该 channel。
+  旧版 daemon（无 target）不会在 R3 主链上收到 Envelope：`ZCODE_MIN_COMPATIBLE_VERSION` 默认等于
+  产品版本，R3 兼容门在握手阶段就判定“需升级”并先执行远端更新，更新后的 Core 才进入首连 Provisioning。
+  Core 使用的 ZCode Built-in Provider Config 由构建期 define 按内容 hash 物化到
+  `~/.zcode/server/config/provider/zcode-builtin-<sha256>.json`（不写进不可变 release 目录）。
+  R3 侧接线见 [r3-source-server-remote-architecture.md §8.3](../architecture/r3-source-server-remote-architecture.md)。
+
+  ```text
+  zcode-server-cli Core（standalone-server，target 常驻）
+    ├─ /ws/host  desktop-continuous ──► IProviderProvisioningTargetService（真实实现）
+    └─ /ws       web-remote-replayable ─► { apply: () => throw }（stub；手机 allowlist 亦不含该 channel）
+  ```
+
 - Remote Workspace 已连接后的自动同步失败只记录结构化 warning，不拆除现有连接，也不改变本地保存成功反馈；本轮不新增 Environment 错误状态、协议、Banner 或设置页入口。这是远程配置独立管理上线前的临时过渡语义。
 - 网络断开导致结果未知时，以 `syncId` 重试；目标端重复收到任意已完成 `syncId` 时返回之前结果，
   不会因后续同步覆盖幂等记录而重新应用旧 Envelope。
 - Environment 离线时保留一次待同步意图，重新上线后读取最新本地状态执行；普通失败不循环
   重试，等待下一次真实触发。
 
+## Desktop 附着 Source 的连接初始化与反向资源通道
+
+SSH / WSL / Docker 经 SourceServerConnectionManager 建立的每一代物理 RPC 连接，
+在发布 online、允许 logical workspace attachment 之前，先下发 Desktop 当前
+`dynamicWorkflowMode`。自动重连同样读取最新模式；模式同步不支持或失败只记录告警，
+沿用既有旧版本兼容行为。独立 `kind: "server"` 保持自己的设置权威，不下发此模式。
+
+群话题资源与 channel reply 的反向 RPC channel 由物理连接拥有，同一个 Source 的
+多个 logical workspace 共用这一 channel。每次请求先经 registry 验证
+`remoteSessionId + workspaceIdentity + workspacePath` 仍属于当前在线 attachment，
+再核对其 Agent service 是该物理连接的代理实例；不能以 logical ServiceCollection
+对象同一作为物理身份，也不能仅按工作区路径放行。socket 关闭、建连失败或物理
+连接 dispose 均释放反向 channel 及在途读取；logical tab 关闭不关闭其他 tab 共用
+的物理连接。新物理连接创建自己的 channel，旧代请求不得借用新代权限。
+
+```text
+物理 RPC 建立 → 注册反向 channel → 下发 Desktop workflow mode → Manager 发布 online
+                         │                                  └→ 多 logical attachment
+物理关闭/释放 ────────────┴→ 取消旧代资源请求；重连从 RPC 建立重新执行
+```
+
+该接缝只管理已鉴权物理连接与反向路由，不增加 runtime、accepted input queue 或
+业务状态。桌面 continuous 和手机经 shared-host 的 replayable 边界保持各自可信
+attachment 的 clientMode。
+
+Source Server 内部 peer 路由使用 canonical workspace identity；反向 RPC 返回 Desktop
+前通过同一个 workspace identity mapper 转回 stable identity，响应再映射回 canonical。
+Desktop registry 的权限校验继续使用 stable identity，不能将内部 identity 泄漏为另一份
+attachment 身份，也不能为绕过校验而降低到仅比较 workspacePath。
+
 ## 默认偏好与首次失败诊断回归
 
+- `R3A-PRV-05` 的真实 Store 回归必须验证删除 Provider 后完整替换、保留失效默认、空 Registry 返回无推荐；`R3A-PRV-11` 必须验证无效 Provider 留在 Personal Layer 但不可执行、失效默认原样落盘且 Host 推荐合法模型。两项均不得继续断言“默认不可用则回滚”；真实写入、刷新和提交失败仍按 `R3A-PRV-08` 验证回滚。
 - 聚焦测试覆盖缺失/失效 reasoning、缺失 Provider/Model、空 Registry、合法默认、写入/刷新/
   幂等提交失败与回滚，以及旧结果和未知错误码的安全处理。
-- `SSH-P0-CONN-05` 通过真实 Electron → SSH → 远端 Target 验证：损坏本地同步凭据时错误和
+- `SSH-P0-CONN-08` 通过真实 Electron → SSH → 远端 Target 验证：损坏本地同步凭据时错误和
   连接日志都显示 `source-read-failed`；恢复凭据后，保留失效默认也能进入远端目录和工作区。
   用例使用既有无账号启动 fixture，避免无关的假 OAuth 触发登录过期弹窗。
 - 2026-10-09：macOS Desktop → 隔离 Ubuntu 22.04 aarch64 SSH E2E 通过，artifact

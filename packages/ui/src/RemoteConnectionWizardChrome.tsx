@@ -1,185 +1,177 @@
 import { CheckIcon, MinusIcon, XIcon } from "lucide-react";
+import type { RemoteTarget } from "@zcode/shared";
+import { TID_REMOTE_NEW_CONNECTION_PREVIEW } from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { DialogDescription, DialogTitle } from "@/components/ui/dialog.js";
 import { Button } from "@/components/ui/button.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import { RemoteConnectionKindTag } from "@/remote-connection/RemoteConnectionTags.js";
 
-export type RemoteWizardStep = "kind" | "settings" | "connecting" | "directory";
+export type RemoteWizardStep = "device" | "settings" | "connecting" | "directory";
 
-interface WizardStepMeta {
-  key: RemoteWizardStep;
-  titleId: string;
+/** 表单屏头部的实时预览：target 为空时显示该类型的占位。 */
+export interface RemoteSettingsPreview {
+  kind: RemoteTarget["kind"];
+  target: string | null;
 }
 
-const REMOTE_WIZARD_STEPS: WizardStepMeta[] = [
-  {
-    key: "kind",
-    titleId: "remote.step.kind",
-  },
-  {
-    key: "settings",
-    titleId: "remote.step.settings",
-  },
-  {
-    key: "connecting",
-    titleId: "remote.step.connecting",
-  },
-  {
-    key: "directory",
-    titleId: "remote.step.directory",
-  },
-];
-
-function getStepIndex(step: RemoteWizardStep): number {
-  return REMOTE_WIZARD_STEPS.findIndex((item) => item.key === step);
-}
-
-export function RemoteConnectionWizardSidebar({ currentStep }: { currentStep: RemoteWizardStep }) {
+/**
+ * 表单是选择屏的子视图，不把尚未选择设备的首屏画成已完成。
+ * 设置入口（设备管理）不显示步骤条：只有表单与进度两屏，进度页自带标题（RDUX-27）。
+ */
+export function RemoteConnectionWizardSidebar({
+  currentStep,
+  deviceManagement,
+}: {
+  currentStep: RemoteWizardStep;
+  deviceManagement?: boolean;
+}) {
   const { intl } = useZCodeIntl();
-  const currentIndex = getStepIndex(currentStep);
-
+  if (deviceManagement) return null;
+  const currentIndex = currentStep === "directory" ? 2 : currentStep === "connecting" ? 1 : 0;
   return (
-    <>
-      <nav className="md:hidden">
-        <div className="flex min-w-0 gap-2 overflow-x-auto rounded-xl border border-border bg-surface p-2">
-          {REMOTE_WIZARD_STEPS.map((step, index) => {
-            const isCurrent = currentStep === step.key;
-            const isCompleted = index < currentIndex;
-
-            return (
-              <div
-                key={step.key}
-                aria-current={isCurrent ? "step" : undefined}
+    <nav aria-label={intl.formatMessage({ id: "remote.wizard" })}>
+      <ol className="flex items-center gap-2 text-ui-sm">
+        {["remote.selection.step", "remote.selection.connect", "remote.step.directory"].map(
+          (id, index) => (
+            <li
+              key={id}
+              aria-current={index === currentIndex ? "step" : undefined}
+              className={cn(
+                "flex min-w-0 items-center gap-2",
+                index === currentIndex
+                  ? "font-medium text-foreground"
+                  : "text-remote-foreground-muted",
+              )}
+            >
+              {index > 0 ? <span className="h-px w-5 bg-border" /> : null}
+              <span
                 className={cn(
-                  "flex min-w-28 shrink-0 items-center gap-2 rounded-lg px-2 py-2",
-                  isCurrent
-                    ? "bg-card text-foreground"
-                    : isCompleted
-                      ? "bg-background-alt text-foreground"
-                      : "text-foreground-subtle",
+                  "flex size-4 shrink-0 items-center justify-center rounded-md border text-ui-xs",
+                  index === currentIndex && "border-primary bg-primary text-primary-foreground",
                 )}
               >
-                <div
-                  className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full border text-ui-base font-mono font-semibold",
-                    isCurrent
-                      ? "bg-primary text-primary-foreground"
-                      : isCompleted
-                        ? "border-success bg-success text-success-foreground"
-                        : "border-border bg-background text-foreground-subtle",
-                  )}
-                >
-                  {isCompleted ? <CheckIcon className="size-3.5" /> : index + 1}
-                </div>
-                <span className="truncate text-ui-base font-medium">
-                  {intl.formatMessage({ id: step.titleId })}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </nav>
+                {index < currentIndex ? <CheckIcon className="size-3" /> : index + 1}
+              </span>
+              <span>{intl.formatMessage({ id })}</span>
+            </li>
+          ),
+        )}
+      </ol>
+    </nav>
+  );
+}
 
-      <aside className="hidden w-56 shrink-0 flex-col gap-2 p-1 md:flex">
-        <div className="rounded-xl border border-border bg-surface flex flex-col gap-4 p-4 h-full">
-          <h3 className="text-ui-base font-medium tracking-wide text-foreground-subtle uppercase">
-            {intl.formatMessage({ id: "remote.wizard" })}
-          </h3>
-
-          <div className="space-y-2">
-            {REMOTE_WIZARD_STEPS.map((step, index) => {
-              const isCurrent = currentStep === step.key;
-              const isCompleted = index < currentIndex;
-
-              return (
-                <div
-                  key={step.key}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border-0 px-3 py-3 transition-colors",
-                    isCurrent
-                      ? "border-border-hover bg-card"
-                      : isCompleted
-                        ? "border-transparent bg-background-alt"
-                        : "border-transparent bg-transparent",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex size-6 shrink-0 items-center justify-center rounded-full border text-ui-base font-mono font-semibold",
-                      isCurrent
-                        ? "bg-primary text-primary-foreground"
-                        : isCompleted
-                          ? "border-success bg-success text-success-foreground"
-                          : "border-border bg-background text-foreground-subtle",
-                    )}
-                  >
-                    {isCompleted ? <CheckIcon className="size-4" /> : index + 1}
-                  </div>
-                  <div className="min-w-0">
-                    <p
-                      className={cn(
-                        "text-ui-base font-medium",
-                        isCurrent || isCompleted ? "text-foreground" : "text-foreground-subtle",
-                      )}
-                    >
-                      {intl.formatMessage({ id: step.titleId })}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </aside>
-    </>
+function SettingsPreviewText({ preview }: { preview: RemoteSettingsPreview }) {
+  const { intl } = useZCodeIntl();
+  const placeholder =
+    preview.kind === "ssh"
+      ? "user@host:22"
+      : intl.formatMessage({
+          id:
+            preview.kind === "docker"
+              ? "docker.selectContainer"
+              : preview.kind === "wsl"
+                ? "wsl.defaultDistro"
+                : "server.urlPlaceholder",
+        });
+  return (
+    <DialogDescription
+      data-testid={TID_REMOTE_NEW_CONNECTION_PREVIEW}
+      className={cn(
+        "break-all font-mono text-ui-sm",
+        preview.target ? "text-remote-foreground-muted" : "text-foreground-subtlest",
+      )}
+    >
+      {preview.target ?? placeholder}
+    </DialogDescription>
   );
 }
 
 export function RemoteConnectionWizardHeader({
+  currentStep,
   title,
   description,
+  settingsPreview,
   onMinimize,
   onClose,
+  hideHeading = false,
+  deviceManagement,
 }: {
+  currentStep: RemoteWizardStep;
   title: string;
   description: string;
+  settingsPreview?: RemoteSettingsPreview;
   onMinimize?: () => void;
   onClose?: () => void;
+  hideHeading?: boolean;
+  deviceManagement?: boolean;
 }) {
   const { intl } = useZCodeIntl();
+  const controls = (
+    <div className="flex shrink-0 items-center gap-1">
+      {onMinimize ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          title={intl.formatMessage({ id: "remote.minimize" })}
+          onClick={onMinimize}
+        >
+          <MinusIcon className="size-4" />
+          <span className="sr-only">{intl.formatMessage({ id: "remote.minimize" })}</span>
+        </Button>
+      ) : null}
+      {onClose ? (
+        <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" onClick={onClose}>
+          <XIcon className="size-4" />
+          <span className="sr-only">{intl.formatMessage({ id: "common.close" })}</span>
+        </Button>
+      ) : null}
+    </div>
+  );
+  // 设置入口的类型切换已表达类型，只有项目/聊天入口在标题旁显示类型标签。
+  const showKindTag = !deviceManagement && settingsPreview != null;
+  const heading = (
+    <div
+      className={cn(
+        "min-w-0",
+        hideHeading ? "sr-only" : settingsPreview ? "space-y-1.5" : "space-y-2",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <DialogTitle className="text-ui-lg font-medium">{title}</DialogTitle>
+        {showKindTag && settingsPreview.kind !== "server" ? (
+          <RemoteConnectionKindTag kind={settingsPreview.kind} />
+        ) : null}
+      </div>
+      {settingsPreview ? (
+        <SettingsPreviewText preview={settingsPreview} />
+      ) : (
+        <DialogDescription className="text-pretty text-remote-foreground-muted">
+          {description}
+        </DialogDescription>
+      )}
+    </div>
+  );
+
+  if (deviceManagement) {
+    return (
+      <div className="flex items-start justify-between gap-4">
+        {heading}
+        {controls}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
-        <DialogTitle className="text-lg font-medium">{title}</DialogTitle>
-        <div className="flex shrink-0 items-center gap-1">
-          {onMinimize ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              onClick={onMinimize}
-            >
-              <MinusIcon className="size-4" />
-              <span className="sr-only">{intl.formatMessage({ id: "remote.minimize" })}</span>
-            </Button>
-          ) : null}
-          {onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              onClick={onClose}
-            >
-              <XIcon className="size-4" />
-              <span className="sr-only">{intl.formatMessage({ id: "common.close" })}</span>
-            </Button>
-          ) : null}
-        </div>
+        <RemoteConnectionWizardSidebar currentStep={currentStep} />
+        {controls}
       </div>
-      <DialogDescription>{description}</DialogDescription>
+      {heading}
     </div>
   );
 }

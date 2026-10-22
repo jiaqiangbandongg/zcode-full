@@ -33,8 +33,11 @@ _Avoid_: 刷新、检查更新（口语可用，文档统一"手动刷新"）
 ### 商店页结构
 
 **Public Segment（公开）**:
-商店列表页的分段之一，展示且仅展示官方市场的目录（Featured + 分类区块）。
+商店列表页的分段之一，展示官方市场中由产品团队维护的条目；发布字段 `publisherType` 为 `official`，旧目录未提供时默认公开。
 _Avoid_: 官方 tab、商店 tab
+
+**Community Segment（社区）**:
+官方市场收录的外部维护插件；从 `external_plugins/` 发布为 `publisherType: community`，与用途分类独立。
 
 **Personal Segment（个人）**:
 商店列表页的另一分段，展示全部个人来源的目录，按市场分组。
@@ -48,13 +51,14 @@ _Avoid_: 与 Recommended 混用
 个人分段顶部的策展区，名单由仓内 `recommendedPlugins.json` 维护（当前推 claude-plugins-official 的精选插件）。仅存在于个人分段。
 _Avoid_: 与 Featured 混用
 
-**Installed Strip（已安装条）**:
-列表页顶部的一排已安装插件图标，点击图标进入详情页。
-_Avoid_: 已安装列表（那是 Manage Installed 视图的事）
+**Manage Installed View（插件管理）**:
+市场右上角的“插件管理”进入同一页面内的管理视图；保留全局默认和项目覆盖，可返回浏览并保留搜索、来源与管理范围。更多菜单仅暂停/启用与卸载，更新和恢复继承使用独立操作。
 
-**Manage Installed View（管理已安装视图）**:
-已安装条右侧齿轮进入的管理界面，承载插件级启停开关、更新、卸载、启用状态筛选。
-_Avoid_: Installed tab（旧 IA 术语，已废弃）
+**UI Plugin（界面插件）**:
+清单声明有效的 `ui.surfaces`，发布目录携带 `componentTypes: ["ui", …]`。未安装时使用目录能力，安装后以实际清单为准；暂停不改变分类。归属、用途和 UI 能力是独立维度。UI 专区和搜索均限定当前来源分段。
+
+**Default UI Recommendations（默认界面推荐）**:
+Side Pane 的独立精选名单，由客户端配置接口的 `uiPluginRecommendations` 下发，关联完整市场目录展示，未安装、未启用也可推荐；点击后分别安装、启用或打开真实面板。开发安装和用户安装不自动加入，与市场内完整 UI 专区不同。
 
 ### 元数据
 

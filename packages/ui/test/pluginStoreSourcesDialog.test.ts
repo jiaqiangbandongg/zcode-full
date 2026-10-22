@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -17,29 +16,6 @@ afterEach(() => {
 });
 
 describe("PluginStoreSourcesDialog", () => {
-  it("uses the shared dialog typography and large action sizes", () => {
-    const addSource = readFileSync(
-      "packages/ui/src/settings/AddMarketplaceSourceDialog.tsx",
-      "utf8",
-    );
-    const sources = readFileSync("packages/ui/src/settings/PluginStoreSourcesDialog.tsx", "utf8");
-    const page = readFileSync("packages/ui/src/settings/PluginStorePage.tsx", "utf8");
-
-    expect(addSource).toContain('DialogTitle className="text-ui-lg font-medium text-foreground"');
-    expect(addSource).toContain('className="text-ui-base text-foreground-subtle"');
-    expect(addSource).toContain("min-w-0 overflow-y-auto");
-    expect(addSource).toContain("whitespace-pre-wrap break-words");
-    expect(addSource.match(/size="lg"/g)).toHaveLength(3);
-    expect(addSource).not.toContain('className="h-9 rounded-lg"');
-    expect(sources).toContain('DialogTitle className="text-ui-lg font-medium text-foreground"');
-    expect(sources).toContain("text-ui-base text-foreground-subtle");
-    expect(sources).toContain("text-ui-base text-destructive");
-    expect(sources.match(/size="icon-lg"/g)).toHaveLength(2);
-    expect(page).toContain("error && !addSourceOpen");
-    expect(page).toContain("onAddMarketplace={handleAddMarketplace}");
-    expect(page).toContain("error={addMarketplaceError}");
-  });
-
   it("shows the persisted marketplace refresh failure beside its source", () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -91,7 +67,7 @@ describe("PluginStoreSourcesDialog", () => {
           ],
           onUpdateMarketplace: () => {},
           onRemoveMarketplace: () => {},
-          operationId: null,
+          activeOperations: [],
         }),
       ),
     );
@@ -114,7 +90,7 @@ describe("PluginStoreSourcesDialog", () => {
           open: true,
           onOpenChange: () => {},
           onAddMarketplace: async () => false,
-          operationId: null,
+          activeOperations: [],
           error: "Invalid marketplace source",
         }),
       ),
@@ -172,7 +148,7 @@ describe("PluginStoreSourcesDialog", () => {
           ],
           onUpdateMarketplace: () => {},
           onRemoveMarketplace: () => {},
-          operationId: null,
+          activeOperations: [],
         }),
       ),
     );

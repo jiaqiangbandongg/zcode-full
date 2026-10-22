@@ -19,14 +19,7 @@
       "kind": "common",
       "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "标题内容不属于 T15-T17 语义；只需把三个首轮 title sidecar 与 provider-visible 功能请求隔离。"
-    },
-    {
-      "id": "pasted-image-edge-unknown",
-      "kind": "main",
-      "source": "synthetic",
-      "timingPolicy": "fast-text",
-      "syntheticReason": "响应只负责稳定收口；E2E 通过真实 PNG paste 和 requestJson 结构化断言 unknown capability 保留 image + path。"
+      "syntheticReason": "标题内容不属于 T16-T17 语义；只需隔离 title sidecar 与 provider-visible 功能请求。"
     },
     {
       "id": "pasted-image-edge-failure-seed",

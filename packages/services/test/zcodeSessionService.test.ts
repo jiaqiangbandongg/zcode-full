@@ -224,14 +224,11 @@ describe("createZCodeSessionService", () => {
       }),
     ).resolves.toBe(snapshot);
 
-    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith(
-      {
-        workspacePath: "/workspace/app",
-        workspaceIdentity: "remote:ssh:dev:/workspace/app",
-        sessionId: "draft-1",
-      },
-      undefined,
-    );
+    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith({
+      workspacePath: "/workspace/app",
+      workspaceIdentity: "remote:ssh:dev:/workspace/app",
+      sessionId: "draft-1",
+    });
     expect(taskIndexSyncer.syncSnapshotAndBroadcast).toHaveBeenCalledWith(snapshot, {
       modelOverride: "current-provider/current-model",
       broadcastReason: "task_model_changed",
@@ -284,7 +281,7 @@ describe("createZCodeSessionService", () => {
       ...target,
       expectedPersistence: "deferred",
     });
-    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith(target, undefined);
+    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith(target);
   });
 
   it("only closes a draft when the Agent confirms it is still deferred", async () => {
@@ -658,14 +655,11 @@ describe("createZCodeSessionService", () => {
 
     await service.createSession({ workspacePath: "/workspace/app" });
 
-    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith(
-      {
-        workspacePath: "/workspace/app",
-        workspaceIdentity: undefined,
-        sessionId: "session-1",
-      },
-      undefined,
-    );
+    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith({
+      workspacePath: "/workspace/app",
+      workspaceIdentity: undefined,
+      sessionId: "session-1",
+    });
     expect(taskIndexSyncer.syncSnapshotAndBroadcast).toHaveBeenCalledWith(snapshot, {
       moveGroupedTaskToTop: true,
       broadcastReason: "task_meta_changed",
@@ -935,14 +929,11 @@ describe("createZCodeSessionService", () => {
       }),
     ).resolves.toBe(snapshot);
 
-    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith(
-      {
-        workspacePath: "/workspace/app",
-        workspaceIdentity: undefined,
-        sessionId: "session-1",
-      },
-      undefined,
-    );
+    expect(taskIndexSyncer.ensureSessionSubscription).toHaveBeenCalledWith({
+      workspacePath: "/workspace/app",
+      workspaceIdentity: undefined,
+      sessionId: "session-1",
+    });
     expect(taskIndexSyncer.syncSnapshotAndBroadcast).toHaveBeenCalledWith(snapshot, {
       modelOverride: "current-provider/current-model",
       broadcastReason: "task_model_changed",

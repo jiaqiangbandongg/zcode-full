@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  conversationShareContentBlockSchema,
+  SHARE_CONTENT_LIMITS,
+} from "./conversation-share-content.js";
 
 import type { Locale } from "./protocol.js";
 import {
@@ -157,6 +161,7 @@ const conversationShareAllowedArtifactShapeSchema = z.object({
 });
 
 const conversationShareCapabilitiesBaseFields = {
+  content_block_versions: z.record(z.string(), z.number().int().positive()).optional(),
   ttl_ms: z.number().int().positive(),
   max_rows: z.number().int().positive(),
   max_payload_bytes: z.number().int().positive(),
@@ -290,6 +295,7 @@ export type ConversationShareArtifactUpload = z.infer<
 >;
 
 const conversationShareIntegrityFields = {
+  content_blocks_sha256: conversationShareSha256Schema.optional(),
   projection_sha256: conversationShareSha256Schema,
   artifact_set_sha256: conversationShareSha256Schema,
 } as const;
@@ -313,6 +319,11 @@ export const conversationShareConfirmRequestSchema = z
     projection: z
       .object({
         rows: z.array(conversationRowSchema).min(1),
+        content_blocks: z
+          .array(conversationShareContentBlockSchema)
+          .min(1)
+          .max(SHARE_CONTENT_LIMITS.blocks)
+          .optional(),
       })
       .strict(),
     integrity: conversationShareOutboundIntegritySchema,
@@ -336,7 +347,11 @@ const conversationSharePublicMetadataSchema = z.object({
 
 export const conversationSharePreviewArtifactSchema =
   conversationShareInboundArtifactDescriptorSchema.extend({
-    url: z.string().url(),
+    // 公开 URL 会进入链接、媒体及 fetch，不允许 API 响应启动其它协议。
+    url: z
+      .string()
+      .url()
+      .refine((url) => /^https?:\/\//iu.test(url)),
     url_expires_at: z.number().int().nonnegative(),
   });
 
@@ -350,6 +365,7 @@ export const conversationSharePreviewDataSchema = z.object({
   schema_version: conversationShareSchemaVersionSchema,
   share: conversationSharePublicMetadataSchema,
   rows: z.array(z.unknown()),
+  content_blocks: z.array(z.unknown()).optional(),
   artifacts: z.array(conversationSharePreviewArtifactSchema),
   integrity: conversationShareIntegritySchema,
 });
@@ -372,7 +388,7 @@ export type ConversationShareContinuationRequest = z.infer<
 
 export const conversationShareContinuationArtifactSchema =
   conversationShareInboundArtifactDescriptorSchema.extend({
-    download_url: z.string().url(),
+    download_url: conversationSharePreviewArtifactSchema.shape.url,
     download_url_expires_at: z.number().int().nonnegative(),
   });
 
@@ -384,6 +400,7 @@ export const conversationShareContinuationDataSchema = z.object({
     share_id: z.string().trim().min(1),
   }),
   rows: z.array(z.unknown()),
+  content_blocks: z.array(z.unknown()).optional(),
   artifacts: z.array(conversationShareContinuationArtifactSchema),
   integrity: conversationShareIntegritySchema,
 });
@@ -417,8 +434,78 @@ export const conversationShareKnownErrorCodeSchema = z.union([
   z.literal(3213),
   z.literal(3214),
   z.literal(3215),
+  z.literal(3216),
+  z.literal(3217),
 ]);
 export type ConversationShareApiErrorCode = z.infer<typeof conversationShareKnownErrorCodeSchema>;
+
+const SHARE_ERROR_KIND_BY_CODE = {
+  3001: "invalid_contract",
+  3002: "rate_limited",
+  3200: "feature_disabled",
+  3201: "authentication_required",
+  3203: "unsupported_schema_version",
+  3204: "invalid_contract",
+  3205: "invalid_conversation",
+  3206: "disclosure_required",
+  3207: "unsafe_structure",
+  3208: "artifact_not_allowed",
+  3209: "limit_exceeded",
+  3210: "upload_incomplete",
+  3211: "not_found",
+  3212: "expired",
+  3213: "authentication_required",
+  3214: "import_not_allowed",
+  3215: "safety_check_pending",
+  3216: "safety_check_rejected",
+  3217: "safety_check_unavailable",
+} as const satisfies Record<ConversationShareApiErrorCode, string>;
+
+export type ConversationShareErrorKind =
+  | (typeof SHARE_ERROR_KIND_BY_CODE)[ConversationShareApiErrorCode]
+  | "service_unavailable"
+  | "network"
+  | "unknown";
+
+/** 桌面与网页共享分类；错误码表达业务语义，未知码仍按 HTTP 判断服务故障。 */
+export function classifyConversationShareError(
+  status: number,
+  code?: number,
+): ConversationShareErrorKind {
+  const known = conversationShareKnownErrorCodeSchema.safeParse(code);
+  if (known.success) return SHARE_ERROR_KIND_BY_CODE[known.data];
+  if (status === 401) return "authentication_required";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "service_unavailable";
+  if (status === 403 || status === 404) return "not_found";
+  if (status === 410) return "expired";
+  if (status === 413) return "limit_exceeded";
+  // HTTP 拒绝与响应契约损坏分开；仅成功响应缺少契约时归为 invalid_contract。
+  return status >= 200 && status < 300 && code === undefined ? "invalid_contract" : "unknown";
+}
+
+const rejectionCoordinateSchema = z
+  .string()
+  .min(1)
+  .max(65)
+  .regex(/^[A-Za-z0-9_.[\]~-]+$/u);
+export const conversationShareRejectionSchema = z.object({
+  rule: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9_]*$/u),
+  path: rejectionCoordinateSchema.optional().catch(undefined),
+  field: rejectionCoordinateSchema.optional().catch(undefined),
+  row_index: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional().catch(undefined),
+  row_kind: rejectionCoordinateSchema.optional().catch(undefined),
+});
+export type ConversationShareRejection = z.infer<typeof conversationShareRejectionSchema>;
+
+export const conversationShareRequestIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9._:-]{1,128}$/u);
 
 /**
  * 错误信封对 code 不设枚举：后端上线一个新业务码时，老客户端应该照样能拿到服务端 msg，
@@ -427,6 +514,8 @@ export type ConversationShareApiErrorCode = z.infer<typeof conversationShareKnow
 export const conversationShareErrorEnvelopeSchema = z.object({
   code: z.number().int(),
   msg: z.string(),
+  logid: conversationShareRequestIdSchema.optional().catch(undefined),
+  data: conversationShareRejectionSchema.optional().catch(undefined),
 });
 export type ConversationShareErrorEnvelope = z.infer<typeof conversationShareErrorEnvelopeSchema>;
 

@@ -104,6 +104,56 @@ describe("desktopWindowLifecycle createWindow", () => {
     );
   });
 
+  it("InitLocal 携带 spawn 时刻 Main 的实时界面语言", () => {
+    let handleDomReady: (() => void) | undefined;
+    const webContents = {
+      id: 43,
+      on: vi.fn((event: string, listener: () => void) => {
+        if (event === "dom-ready") handleDomReady = listener;
+      }),
+    };
+    const win = {
+      id: 8,
+      webContents,
+      on: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      show: vi.fn(),
+      focus: vi.fn(),
+    };
+    vi.mocked(createBrowserWindow).mockReturnValue(win as never);
+    const spawnHostProcess = vi.fn(() => ({ pid: 1238 }) as never);
+    let locale: "zh-CN" | "en-US" = "en-US";
+
+    createWindow({
+      iconPath: "/tmp/icon.png",
+      preloadPath: "/tmp/preload.js",
+      logger: { info: vi.fn(), warn: vi.fn() },
+      forceQuitRef: { current: false },
+      windowHostProcessMap: new Map(),
+      spawnHostProcess,
+      disposeHostProcess: vi.fn(),
+      syncAutoUpdaterStateToWindow: vi.fn(),
+      syncReadyUpdateToWindow: vi.fn(),
+      syncPostUpdateReleaseNotesToWindow: vi.fn(),
+      webRemoteControlManager: { disposeWindow: vi.fn(async () => undefined) },
+      disposeRemoteWorkspaceSessionsForWindow: vi.fn(),
+      reattachRemoteWorkspaceSessionsForWindow: vi.fn(),
+      agentSpawnFallbackCwd: "/Users/dev/.zcode/workspace/default",
+      deviceMid: "device-mid",
+      runtimeProcessEnvFallbackPatch: {},
+      currentApplicationLocale: () => locale,
+    });
+
+    // 窗口创建后、Host spawn 前切换语言，InitLocal 必须读到切换后的值。
+    locale = "zh-CN";
+    handleDomReady?.();
+    expect(spawnHostProcess).toHaveBeenCalledWith(
+      win,
+      "local-43",
+      expect.objectContaining({ type: "init-local", locale: "zh-CN" }),
+    );
+  });
+
   it("等待提前采集的 runtime env 完成后再创建 Local Host", async () => {
     let handleDomReady: (() => void) | undefined;
     let resolveRuntimeEnv: ((patch: Record<string, string>) => void) | undefined;

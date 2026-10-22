@@ -69,6 +69,7 @@ export const skillHandler: ToolHandler = async (input, context) => {
   );
 
   context.recordSkillTelemetryMetadata?.({
+    name: loaded.metadata.name,
     ...(loaded.metadata.qualifiedName ? { qualifiedName: loaded.metadata.qualifiedName } : {}),
     ...(loaded.metadata.pluginId ? { pluginId: loaded.metadata.pluginId } : {}),
     source: loaded.metadata.source,

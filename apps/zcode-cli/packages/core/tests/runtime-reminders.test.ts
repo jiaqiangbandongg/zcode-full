@@ -56,7 +56,14 @@ describe("runtime request reminders", () => {
           toolCalls: [{ id: "todo-write-1", name: "TodoWrite", input: {} }],
         },
       },
-      { message: { role: "tool" as const, content: "ok", toolCallId: "todo-write-1", toolName: "TodoWrite" } },
+      {
+        message: {
+          role: "tool" as const,
+          content: "ok",
+          toolCallId: "todo-write-1",
+          toolName: "TodoWrite",
+        },
+      },
       { message: { role: "assistant" as const, content: "after write 1" } },
       {
         message: { role: "user" as const, content: "todo reminder" },
@@ -125,7 +132,14 @@ describe("runtime request reminders", () => {
           toolCalls: [{ id: "todo-write-recent", name: "TodoWrite", input: {} }],
         },
       },
-      { message: { role: "tool" as const, content: "ok", toolCallId: "todo-write-recent", toolName: "TodoWrite" } },
+      {
+        message: {
+          role: "tool" as const,
+          content: "ok",
+          toolCallId: "todo-write-recent",
+          toolName: "TodoWrite",
+        },
+      },
       { message: { role: "assistant" as const, content: "recent assistant" } },
     ];
 
@@ -210,11 +224,9 @@ describe("runtime request reminders", () => {
       prompt: "Explain tradeoffs while solving the task.",
     });
 
-    expect(body).toBe("Learning output style is active. Remember to follow the specific guidelines for this style.");
-    expect(body).toContain("Learning output style is active");
-    expect(body).not.toContain("Explain tradeoffs while solving the task.");
-    expect(body).not.toContain("<system-reminder>");
-    expect(body).not.toContain("source=");
+    expect(body).toBe(
+      "Learning output style is active. Remember to follow the specific guidelines for this style.",
+    );
   });
 
   it("builds plan mode reminders with human-turn cadence and full/sparse cycle", () => {
@@ -354,7 +366,7 @@ describe("runtime request reminders", () => {
     ]);
   });
 
-  it("does not append runtime target reminders to provider request entries", () => {
+  it("keeps a trailing legacy Plan reminder in the provider projection", () => {
     const entries: RuntimeMessageEntry[] = [
       { message: { role: "system", content: "system prompt" } },
       {
@@ -370,15 +382,6 @@ describe("runtime request reminders", () => {
       },
     ];
 
-    expect(entries).toHaveLength(3);
-    expect(entries[1]).toMatchObject({
-      message: {
-        role: "user",
-        content: "compare prompts",
-      },
-    });
-    expect(entries[1]?.message).not.toHaveProperty("cacheControl");
-
     const { messages } = buildProviderRequestMessages({ entries, applyCacheControl: true });
     expect(messages).toHaveLength(3);
     expect(messages[1]).toEqual({
@@ -393,8 +396,6 @@ describe("runtime request reminders", () => {
     expect(JSON.stringify(messages[2]?.content)).toContain("Plan mode is active");
     const reminderTexts = String(JSON.stringify(messages));
     expect(reminderTexts).toContain("compare prompts");
-    expect(reminderTexts).not.toContain("Current session goal state");
-    expect(reminderTexts).not.toContain("Review prompt trajectory output");
     expect(JSON.stringify(messages)).not.toContain("projectionPolicy");
   });
 

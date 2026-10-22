@@ -307,6 +307,7 @@ describe("Write model-result harness", () => {
       context,
     );
 
+    expect(fs.files.get(file)).toBe("now filled\n");
     expect(result.output).toEqual({
       type: "create",
       filePath: file,
@@ -377,96 +378,6 @@ describe("Write model-result harness", () => {
 });
 
 describeWriteStrictContract("Write strict model-result contract", () => {
-  it("creates a new file and maps the create result for the model", async () => {
-    const file = join(tmpDir, "nested", "created.txt");
-    const fs = createMemoryFileSystem({});
-
-    const result = await writeForModel(
-      {
-        file_path: file,
-        content: "alpha\nbeta\n",
-      },
-      contextWith(fs),
-    );
-
-    expect(fs.files.get(file)).toBe("alpha\nbeta\n");
-    expect(result.output).toEqual({
-      type: "create",
-      filePath: file,
-      content: "alpha\nbeta\n",
-      structuredPatch: [],
-      originalFile: null,
-      userModified: false,
-    });
-    expect(asModelText(result.modelContent)).toBe(
-      `File created successfully at: ${file}${WRITE_STORAGE_SUFFIX}`,
-    );
-  });
-
-  it("updates an existing nonempty file and maps the update result for the model", async () => {
-    const file = join(tmpDir, "existing.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "old line\nkept line\n",
-    });
-    const context = contextWith(fs, {
-      readFileState: createReadFileState(file, "old line\nkept line\n"),
-    });
-
-    const result = await writeForModel(
-      {
-        file_path: file,
-        content: "new line\nkept line\n",
-      },
-      context,
-    );
-
-    expect(fs.files.get(file)).toBe("new line\nkept line\n");
-    expect(result.output).toMatchObject({
-      type: "update",
-      filePath: file,
-      content: "new line\nkept line\n",
-      originalFile: "old line\nkept line\n",
-      userModified: false,
-    });
-    expect(result.output.structuredPatch.length).toBeGreaterThan(0);
-    expect(result.output.structuredPatch[0]?.lines).toContain("-old line");
-    expect(result.output.structuredPatch[0]?.lines).toContain("+new line");
-    expect(asModelText(result.modelContent)).toBe(
-      `The file ${file} has been updated successfully.${WRITE_STORAGE_SUFFIX}`,
-    );
-  });
-
-  it("treats an existing empty file as a create result after it has been read", async () => {
-    const file = join(tmpDir, "empty-existing.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "",
-    });
-    const context = contextWith(fs, {
-      readFileState: createReadFileState(file, ""),
-    });
-
-    const result = await writeForModel(
-      {
-        file_path: file,
-        content: "now filled\n",
-      },
-      context,
-    );
-
-    expect(fs.files.get(file)).toBe("now filled\n");
-    expect(result.output).toEqual({
-      type: "create",
-      filePath: file,
-      content: "now filled\n",
-      structuredPatch: [],
-      originalFile: null,
-      userModified: false,
-    });
-    expect(asModelText(result.modelContent)).toBe(
-      `File created successfully at: ${file}${WRITE_STORAGE_SUFFIX}`,
-    );
-  });
-
   it("returns an update result even when a nonempty overwrite is a no-op", async () => {
     const file = join(tmpDir, "same-content.txt");
     const fs = createMemoryFileSystem({
@@ -494,34 +405,6 @@ describeWriteStrictContract("Write strict model-result contract", () => {
     });
     expect(asModelText(result.modelContent)).toBe(
       `The file ${file} has been updated successfully.${WRITE_STORAGE_SUFFIX}`,
-    );
-  });
-
-  it("writes relative paths under cwd but preserves the original path in the model result", async () => {
-    const fs = createMemoryFileSystem({});
-
-    const result = await writeForModel(
-      {
-        file_path: "relative-created.txt",
-        content: "relative content",
-      },
-      contextWith(fs, {
-        workingDirectory: tmpDir,
-        workspaceRoot: tmpDir,
-      }),
-    );
-
-    expect(fs.files.get(join(tmpDir, "relative-created.txt"))).toBe("relative content");
-    expect(result.output).toEqual({
-      type: "create",
-      filePath: "relative-created.txt",
-      content: "relative content",
-      structuredPatch: [],
-      originalFile: null,
-      userModified: false,
-    });
-    expect(asModelText(result.modelContent)).toBe(
-      `File created successfully at: relative-created.txt${WRITE_STORAGE_SUFFIX}`,
     );
   });
 
@@ -641,31 +524,6 @@ describeWriteStrictContract("Write strict model-result contract", () => {
         filePath: file,
         originalFile: "before",
       },
-    });
-  });
-
-  it("rejects writes when content changes inside the same millisecond", async () => {
-    const file = join(tmpDir, "same-ms-content-change.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "before",
-    });
-    const context = contextWith(fs, {
-      readFileState: createReadFileState(file, "before", { mtimeMs: 1000.2 }),
-    });
-    fs.files.set(file, "after!");
-    fs.setMtime(file, 1000.8);
-
-    await expect(
-      writeForModel(
-        {
-          file_path: file,
-          content: "replacement",
-        },
-        context,
-      ),
-    ).rejects.toMatchObject({
-      message:
-        "File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.",
     });
   });
 

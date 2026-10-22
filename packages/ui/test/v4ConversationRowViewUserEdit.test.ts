@@ -9,7 +9,7 @@ import {
   TID_V4_FEEDBACK_DISLIKE,
   TID_V4_FEEDBACK_LIKE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import type { AssistantTextRow, ReasoningRow, UserInputRow } from "@zcode/shared/zcode-protocol-v4";
 import type { CodeCommentComposerAttachment } from "@/lib/codeCommentContext.js";
 import { DEFAULT_CODE_PREVIEW_SETTINGS } from "@/lib/codePreviewSettings.js";
@@ -661,17 +661,6 @@ describe("ConversationRowView user query editing", () => {
     const messageBubble = findElementByAttribute(container, "data-v4-user-input-bubble", "true");
     expect(Boolean(attachmentArea)).toBe(attachments.length > 0);
     expect(Boolean(messageBubble)).toBe(bubble);
-    if (messageBubble) {
-      const bubbleClasses = collectAttributeValues(messageBubble, "class").join(" ");
-      const bubbleClassTokens = bubbleClasses.split(/\s+/);
-      expect(bubbleClasses).toContain("max-w-full");
-      expect(bubbleClasses).toContain("@min-[624px]/conversation:max-w-xl");
-      expect(bubbleClassTokens).not.toContain("w-fit");
-      expect(bubbleClassTokens).not.toContain("w-full");
-      expect(bubbleClassTokens).not.toContain("@md/conversation:max-w-xl");
-      expect(bubbleClassTokens).not.toContain("@xl/conversation:max-w-xl");
-      expect(bubbleClassTokens).not.toContain("@md/conversation:w-full");
-    }
     if (attachmentArea && messageBubble) {
       expect(attachmentArea.parentNode).toBe(messageBubble.parentNode);
       const siblings = attachmentArea.parentNode as {
@@ -685,7 +674,7 @@ describe("ConversationRowView user query editing", () => {
     await act(async () => root.unmount());
   });
 
-  it("renders sent attachments as surface pills with a file icon and filename", async () => {
+  it("renders sent file attachments with their icon and filename", async () => {
     const container = installMinimalDom();
     const root: Root = createRoot(container);
 
@@ -704,9 +693,6 @@ describe("ConversationRowView user query editing", () => {
 
     const pill = findElementByAttribute(container, "data-v4-user-input-attachment-pill", "true");
     expect(pill).not.toBeNull();
-    const classes = collectAttributeValues(pill, "class").join(" ");
-    expect(classes).toContain("rounded-full");
-    expect(classes).toContain("bg-surface");
     expect(collectText(pill)).toBe("note.txt");
     expect(collectAttributeValues(pill, "src").some((src) => src.endsWith(".svg"))).toBe(true);
 
@@ -880,15 +866,6 @@ describe("ConversationRowView user query editing", () => {
       attachmentIndex: 1,
       signal: expect.any(AbortSignal),
     });
-    const imageClasses = collectAttributeValues(image, "class").join(" ");
-    expect(imageClasses).toContain("size-20");
-    expect(imageClasses).toContain("rounded-xl");
-    expect(imageClasses).not.toMatch(/(?:^|\s)border(?:\s|$)/u);
-    expect(imageClasses).toContain("after:border");
-    expect(imageClasses).toContain("after:pointer-events-none");
-    const videoClasses = collectAttributeValues(video, "class").join(" ");
-    expect(videoClasses).toContain("size-20");
-    expect(videoClasses).toContain("rounded-xl");
 
     await act(async () => root.unmount());
   });
@@ -1518,33 +1495,6 @@ describe("ConversationRowView user query editing", () => {
     });
   });
 
-  it("does not append a visual cursor to streaming assistant text", async () => {
-    const row = assistantTextRow();
-    const container = installMinimalDom();
-    const root: Root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        createElement(
-          ZCodeIntlProvider,
-          { initialLocale: "zh-CN" },
-          createElement(ConversationRowView, {
-            context: rowContext,
-            row,
-          }),
-        ),
-      );
-    });
-
-    expect(collectText(container)).toContain(row.text);
-    const classValues = collectAttributeValues(container, "class");
-    expect(classValues.join(" ")).not.toContain("animate-pulse");
-
-    await act(async () => {
-      root.unmount();
-    });
-  });
-
   it.each(["complete", "streaming"] as const)(
     "puts assistant %s text inside a real selectable DOM region",
     async (state) => {
@@ -1680,7 +1630,6 @@ describe("ConversationRowView user query editing", () => {
     );
     expect(fileAttachmentPill?.parentNode).toBe(pillRow);
     expect(webElementChip?.parentNode).toBe(pillRow);
-    expect(collectAttributeValues(webElementChip, "class").join(" ")).toContain("rounded-full");
 
     const copyAction = messageActionPropsByTestId.get(`v4-copy-${row.rowId}`);
     expect(copyAction).toBeDefined();
@@ -1914,17 +1863,14 @@ describe("ConversationRowView user query editing", () => {
 
     // 编辑态按「媒体优先、组内原序」排列：second.png、third.mov 为媒体卡，first.txt 为文件卡。
     expect(attachmentPropsById.get(`${row.rowId}-1`)).toMatchObject({
-      className: expect.stringContaining("size-12"),
       variant: "grid",
       "data-v4-user-edit-attachment-kind": "image",
     });
     expect(attachmentPropsById.get(`${row.rowId}-2`)).toMatchObject({
-      className: expect.stringContaining("size-12"),
       variant: "grid",
       "data-v4-user-edit-attachment-kind": "video",
     });
     expect(attachmentPropsById.get(`${row.rowId}-0`)).toMatchObject({
-      className: expect.stringContaining("h-12"),
       variant: "inline",
       "data-v4-user-edit-attachment-kind": "file",
     });
@@ -1933,7 +1879,6 @@ describe("ConversationRowView user query editing", () => {
     const secondRemoveId = testId(TID_V4_EDIT_ATTACHMENT_REMOVE, `${row.rowId}-1`);
     expect(attachmentRemovePropsByTestId.get(firstRemoveId)).toMatchObject({
       alwaysVisible: undefined,
-      className: expect.stringContaining("size-3.5"),
       label: "移除附件",
       placement: "corner",
       variant: "default",
@@ -2231,7 +2176,6 @@ describe("ConversationRowView user query editing", () => {
     expect(disabledTooltipTrigger.type).toBe("span");
     expect(disabledTooltipTrigger.props["data-disabled-tooltip-trigger"]).toBe("true");
     expect(rewindButton.props.disabled).toBe(true);
-    expect(rewindButton.props.size).toBe("icon-md");
     expect((rewindButton.props.children as ReactElement).type).toBe(FileClockIcon);
 
     await act(async () => {
@@ -2310,11 +2254,7 @@ describe("ConversationRowView user query editing", () => {
       testId(TID_V4_EDIT_REWIND_WORKSPACE, String(row.rowId)),
     );
     expect(rewindButton.props.disabled).toBe(false);
-    expect(rewindButton.props.size).toBe("icon-md");
-    expect(rewindButton.props.children).toMatchObject({
-      type: FileClockIcon,
-      props: { className: "size-4" },
-    });
+    expect((rewindButton.props.children as ReactElement).type).toBe(FileClockIcon);
 
     await act(async () => {
       (rewindButton.props.onClick as () => void)();

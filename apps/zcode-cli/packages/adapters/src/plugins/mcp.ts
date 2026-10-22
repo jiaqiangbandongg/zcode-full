@@ -4,7 +4,7 @@ import { findOfficialMcpReservedHeaders } from "@zcode/shared";
 import type {
   McpOAuthConfig,
   McpServerConfig,
-  McpServerRuntimeSource,
+  McpServerConfigBase,
   PluginDiagnostic,
   PluginManifest,
   PluginOptionValues,
@@ -181,10 +181,15 @@ function resolveMcpServerConfig(
   if (!isRecord(server)) throw new Error("MCP server config must be an object");
   const type = typeof server.type === "string" ? server.type : inferMcpType(server);
   if (!SUPPORTED_MCP_TYPES.has(type)) throw new Error(`Unsupported MCP transport: ${type}`);
-  // ZCode 官方市场同时包含随应用装载的 Builtin Plugin 与按需安装的 CDN Plugin；后者运行时
-  // source 为 `cache`，因此必须按 marketplace 身份归类，不能只看 loader source。
-  const source: McpServerRuntimeSource = {
-    kind: context.loaded.marketplace === ZCODE_OFFICIAL_PLUGIN_MARKETPLACE ? "builtin" : "plugin",
+  // 修复原因：各 transport 分别重建配置曾漏传 alwaysLoad，导致插件常驻工具被延迟。
+  // 通用字段只在此解析；source 按 marketplace 归类，兼容 source 为 cache 的官方 CDN 插件。
+  const baseConfig: McpServerConfigBase = {
+    alwaysLoad: typeof server.alwaysLoad === "boolean" ? server.alwaysLoad : undefined,
+    enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
+    timeoutMs: typeof server.timeoutMs === "number" ? server.timeoutMs : undefined,
+    source: {
+      kind: context.loaded.marketplace === ZCODE_OFFICIAL_PLUGIN_MARKETPLACE ? "builtin" : "plugin",
+    },
   };
 
   // zcode_official 允许 http 与 stdio，sse 出现即禁用该 MCP，不静默忽略——静默会让配置作者以为鉴权已生效。
@@ -224,6 +229,7 @@ function resolveMcpServerConfig(
     // 内置插件的 broker 凭据。manifest env spread 之后覆写，确保 user/manifest 无法覆盖。
     env[ZCODE_PLUGIN_ID_ENV_KEY] = context.loaded.id;
     return {
+      ...baseConfig,
       type: "stdio",
       command: resolveTemplate(command, context, { allowSensitive: false }),
       args: Array.isArray(server.args)
@@ -235,10 +241,7 @@ function resolveMcpServerConfig(
         typeof server.cwd === "string"
           ? resolveTemplate(server.cwd, context, { allowSensitive: false })
           : undefined,
-      enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
       env,
-      source,
-      timeoutMs: typeof server.timeoutMs === "number" ? server.timeoutMs : undefined,
       ...(officialAuth
         ? {
             auth: officialAuth,
@@ -271,26 +274,22 @@ function resolveMcpServerConfig(
       );
     }
     return {
+      ...baseConfig,
       type: "http",
       url: resolveTemplate(url, context, { allowSensitive: false }),
-      enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
       headers,
       auth: officialAuth,
-      source,
       // provenance 由宿主生成；即便 .mcp.json 里写了 official 字段也会被此处覆盖。
       official: buildOfficialProvenance(identity),
-      timeoutMs: typeof server.timeoutMs === "number" ? server.timeoutMs : undefined,
     };
   }
 
   return {
+    ...baseConfig,
     type,
     url: resolveTemplate(url, context, { allowSensitive: false }),
-    enabled: typeof server.enabled === "boolean" ? server.enabled : undefined,
     headers,
     oauth,
-    source,
-    timeoutMs: typeof server.timeoutMs === "number" ? server.timeoutMs : undefined,
   } as McpServerConfig;
 }
 

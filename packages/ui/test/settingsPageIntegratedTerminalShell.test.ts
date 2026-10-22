@@ -2,6 +2,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const selectedSection = vi.hoisted(() => ({ value: "general" }));
+vi.mock("@/components/ui/toast.js", () => ({ toast: vi.fn() }));
+
+const stateUpdates = vi.hoisted(() => [] as unknown[]);
 const pendingEffects = vi.hoisted(() => [] as Array<() => void | (() => void)>);
 const generalSectionCapture = vi.hoisted(
   () => ({ props: undefined }) as { props: Record<string, unknown> | undefined },
@@ -13,6 +17,18 @@ const settingsPageConfigCalls = vi.hoisted(
       isMacDesktop?: boolean;
       isWindowsDesktop?: boolean;
     }>,
+);
+const sharedSettingsState = vi.hoisted(
+  () =>
+    ({ value: undefined }) as {
+      value: Record<string, unknown> | undefined;
+    },
+);
+const sourceServerManagementState = vi.hoisted(
+  () =>
+    ({ value: undefined }) as {
+      value: Record<string, unknown> | undefined;
+    },
 );
 
 const remoteSystemInfo = vi.fn(async () => ({
@@ -41,6 +57,7 @@ const remoteServices = {
   settingService: {
     get: vi.fn(async () => ({})),
     update: vi.fn(async () => {}),
+    updateDataBaseDir: vi.fn(async () => {}),
   },
   systemService: {
     info: remoteSystemInfo,
@@ -49,7 +66,12 @@ const remoteServices = {
 };
 
 const localServices = {
-  settingService: remoteServices.settingService,
+  // 回归：不能让本机与 Source 共用一个替身，否则写错机器也会通过。
+  settingService: {
+    get: vi.fn(async () => ({})),
+    update: vi.fn(async () => {}),
+    updateDataBaseDir: vi.fn(async () => {}),
+  },
   systemService: {
     info: localSystemInfo,
     listIntegratedTerminalShells: localListIntegratedTerminalShells,
@@ -60,6 +82,16 @@ vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
   return {
     ...actual,
+    useState: (initial: unknown) => {
+      const [value, setValue] = actual.useState(initial);
+      return [
+        value,
+        (next: unknown) => {
+          stateUpdates.push(next);
+          setValue(next);
+        },
+      ];
+    },
     useEffect: (effect: () => void | (() => void)) => {
       pendingEffects.push(effect);
     },
@@ -104,18 +136,12 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
 }));
 
 const mockPlatform = {
+  syncAppSettings: vi.fn(),
   canOpenCommunity: vi.fn(async () => false),
   getZCodeStdioTapDevState: vi.fn(async () => ({
     enabled: false,
     visible: false,
   })),
-  getWindowControlsOverlayMetrics: vi.fn(() => ({ rightPaddingPx: 188 })),
-  onWindowControlsOverlayChanged: vi.fn(
-    (handler: (metrics: { rightPaddingPx?: number }) => void) => {
-      handler({ rightPaddingPx: 188 });
-      return () => {};
-    },
-  ),
 };
 
 vi.mock("@/hooks/usePlatform.js", () => ({
@@ -124,12 +150,19 @@ vi.mock("@/hooks/usePlatform.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  ServiceProvider: ({ children }: { children: unknown }) => createElement("div", null, children),
   useOptionalServices: () => remoteServices,
   useServices: () => remoteServices,
 }));
 
 vi.mock("@/hooks/useWorkspaceServices.js", () => ({
-  useBaseWorkspaceServices: () => localServices,
+  useBaseWorkspaceServices: () =>
+    sourceServerManagementState.value
+      ? {
+          ...localServices,
+          sourceServerManagementService: sourceServerManagementState.value,
+        }
+      : localServices,
   useWorkspaceServicesResolution: () => ({
     services: remoteServices,
     remoteSessionId: null,
@@ -139,8 +172,9 @@ vi.mock("@/hooks/useWorkspaceServices.js", () => ({
   }),
 }));
 
+const updateSharedSettings = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/hooks/useSettingService.js", () => ({
-  useSettings: () => ({ settings: undefined, update: vi.fn() }),
+  useSettings: () => ({ settings: sharedSettingsState.value, update: updateSharedSettings }),
 }));
 
 vi.mock("@/hooks/useModelProviders.js", () => ({
@@ -156,6 +190,7 @@ vi.mock("@/hooks/useUsageEntitlement.js", () => ({
 }));
 
 vi.mock("@/store/StoreProvider.js", () => ({
+  useZCodeStoreWithDefault: (_selector: unknown, fallback: unknown) => fallback,
   useZCodeStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       codePreviewSettings: {},
@@ -171,6 +206,7 @@ vi.mock("@/store/StoreProvider.js", () => ({
 }));
 
 vi.mock("@/store/TabStoreProvider.js", () => ({
+  useOptionalTabStore: () => undefined,
   useTabStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       activeWorkspaceIdentity: undefined,
@@ -181,7 +217,7 @@ vi.mock("@/store/TabStoreProvider.js", () => ({
 
 vi.mock("@/lib/settingsNavigation.js", () => ({
   addPendingSettingsSectionListener: () => () => {},
-  consumeInitialSettingsSection: () => "general",
+  consumeInitialSettingsSection: () => selectedSection.value,
   consumePendingSettingsPluginTab: () => undefined,
   consumePendingSettingsPluginOrigin: () => undefined,
   consumePendingSettingsPluginScopeKey: () => undefined,
@@ -189,6 +225,8 @@ vi.mock("@/lib/settingsNavigation.js", () => ({
   clearPendingSettingsPluginScopeKey: () => undefined,
   consumePendingSettingsModelProviderTarget: () => undefined,
   consumePendingSettingsUsageTab: () => undefined,
+  consumePendingSettingsSourceServerId: () => undefined,
+  consumePendingSettingsSourceServerDetails: () => false,
   resolveSettingsSection: (section: string) => section,
   shouldFallbackSettingsUsageTabToApp: () => false,
   writeLastSettingsSectionPreference: vi.fn(),
@@ -220,6 +258,7 @@ vi.mock("@/settings/UsageStatsSection.js", () => ({
 vi.mock("@/settings/SkillsSection.js", () => ({
   SkillsSection: () => null,
 }));
+vi.mock("@/project-sidebar/ArchiveManagement.js", () => ({ ArchiveManagement: () => null }));
 vi.mock("@/settings/PluginsSection.js", () => ({
   PluginsSection: () => null,
 }));
@@ -230,7 +269,10 @@ vi.mock("@/settings/HooksSection.js", () => ({
   HooksSection: () => null,
 }));
 vi.mock("@/settings/BrowserSettingsSection.js", () => ({
-  BrowserSettingsSection: () => null,
+  BrowserSettingsSection: (props: Record<string, unknown>) => {
+    generalSectionCapture.props = props;
+    return createElement("div");
+  },
 }));
 vi.mock("@/settings/MigrationSection.js", () => ({
   MigrationSection: () => null,
@@ -248,7 +290,7 @@ vi.mock("../src/settingsPageHelpers.js", () => ({
     settingsPageConfigCalls.push(options);
     const settingsSections = [
       {
-        id: "general",
+        id: selectedSection.value,
         titleId: "settings.general",
         navLabelId: "settings.general",
         icon: () => null,
@@ -266,11 +308,16 @@ vi.mock("../src/settingsPageHelpers.js", () => ({
     };
   },
   resolveSettingsSectionForPlatform: (section: string) => section,
+  isSettingsSectionAvailable: () => true,
   GeneralSectionContent: (props: Record<string, unknown>) => {
     generalSectionCapture.props = props;
     return createElement("div", null, "general");
   },
   GeneralSectionHeader: () => null,
+  TaskAutoArchiveSettings: (props: Record<string, unknown>) => {
+    generalSectionCapture.props = props;
+    return null;
+  },
 }));
 
 async function flushPromises() {
@@ -288,9 +335,16 @@ function flushPendingEffects() {
 describe("SettingsPage integrated terminal shell", () => {
   beforeEach(() => {
     pendingEffects.length = 0;
+    selectedSection.value = "general";
+    stateUpdates.length = 0;
+    localServices.settingService.get.mockReset().mockResolvedValue({});
+    remoteServices.settingService.get.mockReset().mockResolvedValue({});
     generalSectionCapture.props = undefined;
     settingsPageConfigCalls.length = 0;
+    sharedSettingsState.value = undefined;
+    sourceServerManagementState.value = undefined;
     vi.clearAllMocks();
+    localServices.settingService.update.mockReset().mockResolvedValue(undefined);
     remoteSystemInfo.mockResolvedValue({
       homedir: "C:\\Users\\remote",
       platform: "win32",
@@ -332,6 +386,19 @@ describe("SettingsPage integrated terminal shell", () => {
     expect(html).toContain('id="settings-sidebar-group-basics"');
   }, 90_000);
 
+  it("defaults ToolSearch off and saves the selected mode through shared settings", async () => {
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, {}));
+    expect(generalSectionCapture.props?.toolSearchMode).toBe("off");
+    const change = generalSectionCapture.props?.onToolSearchModeChange as (
+      mode: "auto" | "local" | "off",
+    ) => Promise<void>;
+    for (const mode of ["auto", "local", "off"] as const) {
+      await change(mode);
+      expect(updateSharedSettings).toHaveBeenLastCalledWith({ toolSearchMode: mode });
+    }
+  });
+
   it("defaults message stream reasoning to visible before settings hydrate", async () => {
     const { SettingsPage } = await import("../src/SettingsPage.js");
 
@@ -353,63 +420,7 @@ describe("SettingsPage integrated terminal shell", () => {
     expect(remoteListIntegratedTerminalShells).not.toHaveBeenCalled();
   });
 
-  it("uses a fixed inline action-group inset instead of native caption metrics", async () => {
-    const { SettingsPage } = await import("../src/SettingsPage.js");
-
-    renderToStaticMarkup(
-      createElement(SettingsPage, {
-        isWindowsDesktop: true,
-      }),
-    );
-    const html = renderToStaticMarkup(
-      createElement(SettingsPage, { isDesktop: true, isWindowsDesktop: true }),
-    );
-    expect(html).toContain("mr-[134px]");
-    expect(mockPlatform.getWindowControlsOverlayMetrics).not.toHaveBeenCalled();
-    expect(mockPlatform.onWindowControlsOverlayChanged).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["macOS", { isDesktop: true, isMacDesktop: true, isWindowsDesktop: false }],
-    ["Windows", { isDesktop: true, isMacDesktop: false, isWindowsDesktop: true }],
-    ["Linux", { isDesktop: true, isMacDesktop: false, isWindowsDesktop: false }],
-  ])(
-    "keeps the %s settings content frame 4px from the desktop window edge",
-    async (_platform, props) => {
-      const { SettingsPage } = await import("../src/SettingsPage.js");
-      const html = renderToStaticMarkup(createElement(SettingsPage, props));
-
-      expect(html).toContain("grid-cols-[68px_minmax(0,1fr)]");
-      expect(html).toContain("lg:grid-cols-[268px_minmax(0,1fr)]");
-      expect(html).toMatch(/data-settings-content-frame="true"[^>]*p-1 pl-0 pt-0/);
-      expect(html).toContain('data-settings-top-inset="true"');
-    },
-  );
-
-  it("uses 5px for the Windows settings panel and preserves other platform radii", async () => {
-    const { SettingsPage } = await import("../src/SettingsPage.js");
-    const windowsHtml = renderToStaticMarkup(
-      createElement(SettingsPage, { isDesktop: true, isWindowsDesktop: true }),
-    );
-    const macHtml = renderToStaticMarkup(
-      createElement(SettingsPage, { isDesktop: true, isMacDesktop: true }),
-    );
-    const linuxHtml = renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
-
-    expect(windowsHtml).toMatch(/data-settings-panel-frame="true"[^>]*rounded-\[5px\]/);
-    expect(macHtml).toMatch(/data-settings-panel-frame="true"[^>]*rounded-xl/);
-    expect(linuxHtml).toMatch(/data-settings-panel-frame="true"[^>]*rounded-xl/);
-  });
-
-  it("does not add the desktop frame inset to web settings", async () => {
-    const { SettingsPage } = await import("../src/SettingsPage.js");
-    const html = renderToStaticMarkup(createElement(SettingsPage, { isDesktop: false }));
-
-    expect(html).toMatch(/data-settings-content-frame="true"[^>]*p-0/);
-    expect(html).not.toContain('data-settings-top-inset="true"');
-  });
-
-  it("keeps Linux settings titlebar controls on the themed page background", async () => {
+  it("shows inline window controls on Linux desktop", async () => {
     const { SettingsPage } = await import("../src/SettingsPage.js");
 
     const html = renderToStaticMarkup(
@@ -421,10 +432,6 @@ describe("SettingsPage integrated terminal shell", () => {
     );
 
     expect(html).toContain('data-testid="desktop-window-controls"');
-    expect(html).toContain("lucide-circle-question-mark");
-    expect(html).not.toContain("lucide-chevron-down");
-    expect(html).not.toContain("w-[120px]");
-    expect(html).toContain("mr-[134px]");
   });
 
   it("lists shell options from the local host even when the remote workspace is non-Windows", async () => {
@@ -447,5 +454,168 @@ describe("SettingsPage integrated terminal shell", () => {
     expect(localListIntegratedTerminalShells).toHaveBeenCalled();
     expect(remoteSystemInfo).not.toHaveBeenCalled();
     expect(remoteListIntegratedTerminalShells).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "onDesktopChromiumHardwareAccelerationChange",
+      false,
+      { desktopChromiumHardwareAccelerationEnabled: false },
+    ],
+    ["onCloseToTrayOnWindowsChange", false, { closeToTrayOnWindows: false }],
+    [
+      "onIntegratedTerminalShellChange",
+      {
+        mode: "shell",
+        id: "powershell",
+        dialect: "powershell",
+        label: "PowerShell",
+        path: "C:\\PowerShell\\pwsh.exe",
+      },
+      {
+        integratedTerminalShell: {
+          mode: "shell",
+          id: "powershell",
+          dialect: "powershell",
+          label: "PowerShell",
+          path: "C:\\PowerShell\\pwsh.exe",
+        },
+      },
+    ],
+    ["onHttpProxyChange", " http://127.0.0.1:7890 ", { httpProxy: "http://127.0.0.1:7890" }],
+    [
+      "onHttpProxyNoProxyChange",
+      " localhost, , .example.test ",
+      { httpProxyNoProxy: "localhost,.example.test" },
+    ],
+    [
+      "onHttpProxyCaCertPathChange",
+      " /local/root-ca.pem ",
+      { httpProxyCaCertPath: "/local/root-ca.pem" },
+    ],
+  ])(
+    "persists Desktop %s on the base Host while Source is active",
+    async (callback, value, patch) => {
+      const { SettingsPage } = await import("../src/SettingsPage.js");
+      renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+      await (generalSectionCapture.props![callback] as (value: unknown) => Promise<void>)(value);
+      expect(localServices.settingService.update).toHaveBeenCalledWith(patch);
+      expect(remoteServices.settingService.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps native directory migration on the Desktop", async () => {
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    await (generalSectionCapture.props!.onDataBaseDirChange as (dir: string) => Promise<void>)(
+      "/local/selected-folder",
+    );
+    expect(localServices.settingService.updateDataBaseDir).toHaveBeenCalledWith(
+      "/local/selected-folder",
+    );
+    expect(remoteServices.settingService.updateDataBaseDir).not.toHaveBeenCalled();
+  });
+
+  it("propagates local save failures without updating the tray or falling back to Source", async () => {
+    localServices.settingService.update.mockRejectedValueOnce(new Error("local disk failure"));
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    await expect(
+      (
+        generalSectionCapture.props!.onCloseToTrayOnWindowsChange as (
+          enabled: boolean,
+        ) => Promise<void>
+      )(false),
+    ).rejects.toThrow("local disk failure");
+    expect(mockPlatform.syncAppSettings).not.toHaveBeenCalled();
+    expect(remoteServices.settingService.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["onTerminalInheritSystemProfileChange", false, { terminalInheritSystemProfile: false }],
+    ["onTerminalFontFamilyChange", " Source Mono ", { terminalFontFamily: "Source Mono" }],
+    ["onTaskAutoArchiveEnabledChange", true, { taskAutoArchiveEnabled: true }],
+    ["onTaskAutoArchiveOlderThanDaysChange", 30, { taskAutoArchiveOlderThanDays: 30 }],
+  ])("preserves target Environment ownership for %s", async (callback, value, patch) => {
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    if (String(callback).startsWith("onTaskAutoArchive")) selectedSection.value = "archives";
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    await (generalSectionCapture.props![callback] as (value: unknown) => Promise<void>)(value);
+    expect(remoteServices.settingService.update).toHaveBeenCalledWith(patch);
+    expect(localServices.settingService.update).not.toHaveBeenCalled();
+  });
+
+  it("persists embedded browser certificate policy on Desktop", async () => {
+    selectedSection.value = "browser";
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    await (
+      generalSectionCapture.props!.onEmbeddedBrowserAllowInsecureCertificatesChange as (
+        enabled: boolean,
+      ) => Promise<void>
+    )(true);
+    expect(localServices.settingService.update).toHaveBeenCalledWith({
+      embeddedBrowserAllowInsecureCertificates: true,
+    });
+    expect(remoteServices.settingService.update).not.toHaveBeenCalled();
+  });
+
+  it("propagates local migration failure without invoking Source migration", async () => {
+    localServices.settingService.updateDataBaseDir.mockRejectedValueOnce(new Error("copy denied"));
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    await expect(
+      (generalSectionCapture.props!.onDataBaseDirChange as (dir: string) => Promise<void>)(
+        "/local/denied",
+      ),
+    ).rejects.toThrow("copy denied");
+    expect(remoteServices.settingService.updateDataBaseDir).not.toHaveBeenCalled();
+  });
+  it("hydrates each field from its owning Environment despite conflicting snapshots", async () => {
+    localServices.settingService.get.mockResolvedValueOnce({
+      dataBaseDir: "/desktop/data",
+      httpProxy: "http://desktop-proxy:7890",
+      terminalFontFamily: "wrong local font",
+      taskAutoArchiveOlderThanDays: 91,
+    });
+    remoteServices.settingService.get.mockResolvedValueOnce({
+      dataBaseDir: "/source/data",
+      httpProxy: "http://source-proxy:7890",
+      terminalFontFamily: "Source Mono",
+      taskAutoArchiveOlderThanDays: 30,
+    });
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    flushPendingEffects();
+    await flushPromises();
+    expect(stateUpdates).toEqual(
+      expect.arrayContaining(["/desktop/data", "http://desktop-proxy:7890", "Source Mono", 30]),
+    );
+    for (const wrong of ["/source/data", "http://source-proxy:7890", "wrong local font", 91])
+      expect(stateUpdates).not.toContain(wrong);
+  });
+
+  it("ignores pending settings reads after the owning page is detached", async () => {
+    let completeLocal!: (value: Record<string, unknown>) => void;
+    let completeSource!: (value: Record<string, unknown>) => void;
+    localServices.settingService.get.mockReturnValueOnce(
+      new Promise((resolve) => {
+        completeLocal = resolve;
+      }),
+    );
+    remoteServices.settingService.get.mockReturnValueOnce(
+      new Promise((resolve) => {
+        completeSource = resolve;
+      }),
+    );
+    const { SettingsPage } = await import("../src/SettingsPage.js");
+    renderToStaticMarkup(createElement(SettingsPage, { isDesktop: true }));
+    const cleanups = pendingEffects.splice(0).map((effect) => effect());
+    for (const cleanup of cleanups) cleanup?.();
+    completeLocal({ dataBaseDir: "/stale/desktop" });
+    completeSource({ terminalFontFamily: "stale Source font" });
+    await flushPromises();
+    expect(stateUpdates).not.toContain("/stale/desktop");
+    expect(stateUpdates).not.toContain("stale Source font");
   });
 });

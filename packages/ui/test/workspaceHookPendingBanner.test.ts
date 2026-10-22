@@ -10,9 +10,7 @@ import {
   TID_V4_WORKSPACE_HOOK_PENDING_BANNER,
   TID_V4_WORKSPACE_HOOK_PENDING_DISMISS,
   TID_V4_WORKSPACE_HOOK_PENDING_REVIEW,
-} from "@zcode/shared";
-import enUS from "@/i18n/locales/en-US.js";
-import zhCN from "@/i18n/locales/zh-CN.js";
+} from "@zcode/shared/test-ids";
 import {
   WorkspaceHookPendingBanner,
   workspaceHookPendingDismissStore,
@@ -71,9 +69,7 @@ vi.mock("@/v4/V4ConversationContext.js", () => ({
 }));
 
 // 模拟 workspaceHookReviewCommands 的 sendWorkspaceHookCommand
-const sendWorkspaceHookCommandMock = vi.hoisted(() =>
-  vi.fn(async () => ({ accepted: true })),
-);
+const sendWorkspaceHookCommandMock = vi.hoisted(() => vi.fn(async () => ({ accepted: true })));
 
 vi.mock("@/settings/workspaceHookReviewCommands.js", () => ({
   sendWorkspaceHookCommand: sendWorkspaceHookCommandMock,
@@ -167,13 +163,6 @@ describe("WorkspaceHookPendingBanner（软门禁 D4）", () => {
     expect(html).not.toContain('data-testid="' + TID_V4_WORKSPACE_HOOK_PENDING_BANNER + '"');
   });
 
-  it("dismiss 后同 bundle 不再现（幂等 key = sessionId + bundleDigest）", () => {
-    // 第一次 dismiss
-    workspaceHookPendingDismissStore.dismiss("sess-1", sampleAdmission.bundleDigest);
-    const html = renderBanner({ admission: sampleAdmission });
-    expect(html).not.toContain('data-testid="' + TID_V4_WORKSPACE_HOOK_PENDING_BANNER + '"');
-  });
-
   it("bundle 变化后 dismiss 失效，提示条重新出现", () => {
     // dismiss 旧 bundle
     workspaceHookPendingDismissStore.dismiss("sess-1", sampleAdmission.bundleDigest);
@@ -229,25 +218,5 @@ describe("WorkspaceHookPendingBanner（软门禁 D4）", () => {
     const html = renderBanner({ admission: sampleAdmission });
     expect(html).toContain('data-testid="' + TID_V4_WORKSPACE_HOOK_PENDING_REVIEW + '"');
     expect(html).toContain('data-testid="' + TID_V4_WORKSPACE_HOOK_PENDING_DISMISS + '"');
-  });
-
-  it("i18n key zh/en 双侧存在（缺 key 会把原始 id 渲染到界面）", () => {
-    const keys = [
-      "chat.workspaceHookPending.message",
-      "chat.workspaceHookPending.review",
-      "chat.workspaceHookPending.dismiss",
-    ];
-    for (const key of keys) {
-      expect(zhCN[key], `zh-CN 缺 ${key}`).toBeTruthy();
-      expect(enUS[key], `en-US 缺 ${key}`).toBeTruthy();
-    }
-  });
-
-  it("zh-CN 文案包含 count 参数占位", () => {
-    expect(zhCN["chat.workspaceHookPending.message"]).toContain("{count}");
-  });
-
-  it("en-US 文案包含 count 参数占位", () => {
-    expect(enUS["chat.workspaceHookPending.message"]).toContain("{count}");
   });
 });

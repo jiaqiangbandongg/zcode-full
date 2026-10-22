@@ -1,6 +1,6 @@
 // PV4-03/PV4-08 pending：Q0 running 时先把 Q1/Q2 入 CLI FIFO；Q1 auto-drain
 // 形成稳定 A1，Q2 随后仍 running 时精确 fork A1。
-import { TID_V4_FORK, TID_V4_ROW } from "@zcode/shared";
+import { TID_V4_FORK, TID_V4_ROW } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import { waitForUpstreamNetworkRequestStarted } from "../../../helpers/upstream-capture.js";
 import {

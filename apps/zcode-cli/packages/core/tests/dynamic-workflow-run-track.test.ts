@@ -78,7 +78,12 @@ function makeRuntime(name: string): {
           throw new Error("resume 重臂不应触发 submit");
         },
         async getTask() {
-          return { runId: "dwfrun-1", taskId: "dwfrun-1", startedAt: new Date(), status: "running" };
+          return {
+            runId: "dwfrun-1",
+            taskId: "dwfrun-1",
+            startedAt: new Date(),
+            status: "running",
+          };
         },
         waitForTask: () => terminal.waitForTask(),
         async cancel() {
@@ -108,9 +113,7 @@ describe("trackResumedDynamicWorkflowRun", () => {
     // 回收护栏：恢复的 run 在飞期间，会话绝不能显得空闲。
     expect(runtime.hasRunningBackgroundTasks()).toBe(true);
 
-    const started = events.find(
-      (event) => event.type === SessionEventType.BackgroundTaskStarted,
-    );
+    const started = events.find((event) => event.type === SessionEventType.BackgroundTaskStarted);
     expect(started?.payload).toMatchObject({
       cancellable: true,
       description: "Nightly audit",
@@ -137,9 +140,9 @@ describe("trackResumedDynamicWorkflowRun", () => {
       output: "revived artifact",
     });
     await vi.waitFor(() => {
-      expect(
-        events.some((event) => event.type === SessionEventType.BackgroundTaskCompleted),
-      ).toBe(true);
+      expect(events.some((event) => event.type === SessionEventType.BackgroundTaskCompleted)).toBe(
+        true,
+      );
     });
     expect(runtime.hasRunningBackgroundTasks()).toBe(false);
   });
@@ -149,9 +152,7 @@ describe("trackResumedDynamicWorkflowRun", () => {
     await runtime.trackResumedDynamicWorkflowRun({ runId: "dwfrun-1", toolCallId: "call-1" });
     await runtime.trackResumedDynamicWorkflowRun({ runId: "dwfrun-1", toolCallId: "call-1" });
 
-    const started = events.filter(
-      (event) => event.type === SessionEventType.BackgroundTaskStarted,
-    );
+    const started = events.filter((event) => event.type === SessionEventType.BackgroundTaskStarted);
     expect(started).toHaveLength(1);
   });
 
@@ -159,9 +160,7 @@ describe("trackResumedDynamicWorkflowRun", () => {
     const { runtime, events } = makeRuntime("dwf-track-no-anchor");
     await runtime.trackResumedDynamicWorkflowRun({ runId: "dwfrun-old" });
 
-    const started = events.find(
-      (event) => event.type === SessionEventType.BackgroundTaskStarted,
-    );
+    const started = events.find((event) => event.type === SessionEventType.BackgroundTaskStarted);
     expect((started?.payload as { toolCallId?: string }).toolCallId).toBe("resume-dwfrun-old");
     // 展示名缺席 → 兜底链走到 taskId（与 submit 路径同语义，UI 侧按 fallbackName 处理）。
     expect((started?.payload as { description?: string }).description).toBe("dwfrun-old");
@@ -212,11 +211,16 @@ function makeUnitFixture(runId = "dwfrun-relive"): {
     },
     sessionId: createSessionId("dwf-relive-unit"),
   } as unknown as ToolExecutorDeps;
-  return { deps, events, notifications, registry, settleTerminal: (value) => terminal.resolve(value) };
+  return {
+    deps,
+    events,
+    notifications,
+    registry,
+    settleTerminal: (value) => terminal.resolve(value),
+  };
 }
 
 describe("trackBackgroundTask 终态残留复位（单元级）", () => {
-
   it("重臂终态条目按新生命重盖 branchGeneration（cancel → rewind → resume 不被 stale-branch fencing 拦下）", async () => {
     const { deps, registry } = makeUnitFixture();
     // 上一段生命周期在分支代 3 登记并被 cancel；随后用户 rewind，active 分支代推进到 7。
@@ -295,7 +299,11 @@ describe("trackBackgroundTask 终态残留复位（单元级）", () => {
     });
 
     const tracker = new BackgroundTaskTracker(deps);
-    const toolCall: ExecutableToolCall = { id: "call-resume-new", name: CREATE_WORKFLOW_TOOL_NAME, input: {} };
+    const toolCall: ExecutableToolCall = {
+      id: "call-resume-new",
+      name: CREATE_WORKFLOW_TOOL_NAME,
+      input: {},
+    };
     await tracker.trackBackgroundTask(
       toolCall,
       { status: "backgrounded", backgroundTaskId: "dwfrun-relive" },
@@ -593,7 +601,6 @@ describe("终态通知的 manifest 载荷", () => {
       title: "orphan",
       workId: "dwfrun-lost",
     });
-    expect(terminalMetaOf(notifications[0])).toBeUndefined();
   });
 
   // 用户面产物的 chips 载荷（docs/dynamic-workflow/authoring.md「How the user sees them」）。这是通知行 chips
@@ -630,7 +637,13 @@ describe("终态通知的 manifest 载荷", () => {
             { version: 2, publishedAt: 2, bytes: 4096 },
           ],
         },
-        { id: "perf", kind: "chart", version: 1, itemCount: 7, versions: [{ version: 1, publishedAt: 3 }] },
+        {
+          id: "perf",
+          kind: "chart",
+          version: 1,
+          itemCount: 7,
+          versions: [{ version: 1, publishedAt: 3 }],
+        },
       ],
     });
     await vi.waitFor(() => {
@@ -680,7 +693,10 @@ describe("终态通知的 manifest 载荷", () => {
           version: 2,
           itemCount: 0,
           primary: true,
-          versions: [{ version: 1, publishedAt: 9, bytes: 8, primary: true }, { version: 2, publishedAt: 10, bytes: 9, primary: true }],
+          versions: [
+            { version: 1, publishedAt: 9, bytes: 8, primary: true },
+            { version: 2, publishedAt: 10, bytes: 9, primary: true },
+          ],
         },
       ],
     });
@@ -698,7 +714,13 @@ describe("终态通知的 manifest 载荷", () => {
       description: "结论与修复建议",
     });
     expect(meta?.artifacts?.slice(1).map((artifact) => artifact.id)).toEqual([
-      "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+      "a1",
+      "a2",
+      "a3",
+      "a4",
+      "a5",
+      "a6",
+      "a7",
     ]);
     // 非交付物的 description 不进载荷（chip 上放不下，也不需要）。
     expect(meta?.artifacts?.slice(1).some((artifact) => "description" in artifact)).toBe(false);
@@ -780,8 +802,20 @@ describe("终态通知的 manifest 载荷", () => {
       status: "completed",
       artifacts: [
         // 未来版本的新种类：放行会让整份载荷被 zod 拒收，连带其余 chip 一起消失。
-        { id: "future", kind: "hologram", version: 1, itemCount: 0, versions: [{ version: 1, publishedAt: 1 }] },
-        { id: "notes", kind: "markdown", version: 1, itemCount: 0, versions: [{ version: 1, publishedAt: 2 }] },
+        {
+          id: "future",
+          kind: "hologram",
+          version: 1,
+          itemCount: 0,
+          versions: [{ version: 1, publishedAt: 1 }],
+        },
+        {
+          id: "notes",
+          kind: "markdown",
+          version: 1,
+          itemCount: 0,
+          versions: [{ version: 1, publishedAt: 2 }],
+        },
       ],
     });
     await vi.waitFor(() => {
@@ -815,9 +849,23 @@ describe("终态通知的 manifest 载荷", () => {
         // 非正整数版本号 ⇒ 整条丢。
         { id: "half", kind: "file", version: 1.5, itemCount: 0, versions: [] },
         // contentType 超 255 ⇒ 只丢这一个装饰键，条目仍在。
-        { id: "ok", kind: "file", version: 1, contentType: "a/".repeat(200), itemCount: 0, versions: [] },
+        {
+          id: "ok",
+          kind: "file",
+          version: 1,
+          contentType: "a/".repeat(200),
+          itemCount: 0,
+          versions: [],
+        },
         // title 超 120 ⇒ 截断（title 是展示文本，截短仍然有意义）。
-        { id: "long", kind: "markdown", version: 1, title: "标".repeat(200), itemCount: 0, versions: [] },
+        {
+          id: "long",
+          kind: "markdown",
+          version: 1,
+          title: "标".repeat(200),
+          itemCount: 0,
+          versions: [],
+        },
       ],
     });
     await vi.waitFor(() => {
@@ -867,9 +915,6 @@ describe("终态通知的 manifest 载荷", () => {
       title: "wait",
       workId: "bash-bg",
     });
-    expect(
-      (notifications[0]!.originMeta as { workflowNotification?: unknown }).workflowNotification,
-    ).toBeUndefined();
   });
 });
 
@@ -880,13 +925,13 @@ describe("trackResumedDynamicWorkflowRun 终态残留复位（v4 路径回归）
   it("cancel 结算后再重臂同 runId：两轮终态各送达一次通知且内容可分辨", async () => {
     const { runtime, events, terminal } = makeRuntime("dwf-track-relive");
     const recorded: string[] = [];
-    const notifySpy = vi
-      .spyOn(runtime, "enqueueBackgroundTaskNotification")
-      .mockImplementation((notification: { text: string }) => {
+    vi.spyOn(runtime, "enqueueBackgroundTaskNotification").mockImplementation(
+      (notification: { text: string }) => {
         // 只记录不真正入队：入队会经 runtime 命令队列启动模型轮次（task-notification →
         // executeTurnCommand），测试没有模型；本用例钉的是「通知是否被 claim 吞掉」。
         recorded.push(notification.text);
-      });
+      },
+    );
 
     await runtime.trackResumedDynamicWorkflowRun({ runId: "dwfrun-1", toolCallId: "call-origin" });
     terminal.resolve({
@@ -922,7 +967,6 @@ describe("trackResumedDynamicWorkflowRun 终态残留复位（v4 路径回归）
       (event) => event.type === SessionEventType.BackgroundTaskCompleted,
     );
     expect(completions).toHaveLength(2);
-    expect(notifySpy).toHaveBeenCalled();
   });
 });
 
@@ -944,10 +988,15 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
   }
 
   it("走 dwf 生命周期：registry 在册、workflow 面板条目可取消、终态通知携产物与 reports", async () => {
-    const { deps, events, notifications, registry, settleTerminal } = makeUnitFixture("dwfrun-feat");
+    const { deps, events, notifications, registry, settleTerminal } =
+      makeUnitFixture("dwfrun-feat");
     const tracker = new BackgroundTaskTracker(deps);
     await tracker.trackBackgroundTask(
-      { id: "call-resume-1", name: RESUME_WORKFLOW_RUN_TOOL_NAME, input: { run_id: "dwfrun-feat" } },
+      {
+        id: "call-resume-1",
+        name: RESUME_WORKFLOW_RUN_TOOL_NAME,
+        input: { run_id: "dwfrun-feat" },
+      },
       resumeOutput("dwfrun-feat"),
       createRootTraceContext({ sessionId: createSessionId("dwf-feat") }),
       undefined,
@@ -1005,7 +1054,11 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
     const { deps, notifications, registry, settleTerminal } = makeUnitFixture("dwfrun-again");
     const tracker = new BackgroundTaskTracker(deps);
     await tracker.trackBackgroundTask(
-      { id: "call-resume-a", name: RESUME_WORKFLOW_RUN_TOOL_NAME, input: { run_id: "dwfrun-again" } },
+      {
+        id: "call-resume-a",
+        name: RESUME_WORKFLOW_RUN_TOOL_NAME,
+        input: { run_id: "dwfrun-again" },
+      },
       resumeOutput("dwfrun-again"),
       createRootTraceContext({ sessionId: createSessionId("dwf-again") }),
       undefined,
@@ -1027,7 +1080,11 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
     // existing 合并语义保住**首个** resume 工具行 id，不换成新描述子——join 键稳定，
     // 不做「换成新行」的断言。
     await tracker.trackBackgroundTask(
-      { id: "call-resume-b", name: RESUME_WORKFLOW_RUN_TOOL_NAME, input: { run_id: "dwfrun-again" } },
+      {
+        id: "call-resume-b",
+        name: RESUME_WORKFLOW_RUN_TOOL_NAME,
+        input: { run_id: "dwfrun-again" },
+      },
       resumeOutput("dwfrun-again"),
       createRootTraceContext({ sessionId: createSessionId("dwf-again") }),
       undefined,
@@ -1056,7 +1113,11 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
 
     const tracker = new BackgroundTaskTracker(deps);
     await tracker.trackBackgroundTask(
-      { id: "call-resume-mixed", name: RESUME_WORKFLOW_RUN_TOOL_NAME, input: { run_id: "dwfrun-mixed" } },
+      {
+        id: "call-resume-mixed",
+        name: RESUME_WORKFLOW_RUN_TOOL_NAME,
+        input: { run_id: "dwfrun-mixed" },
+      },
       resumeOutput("dwfrun-mixed"),
       createRootTraceContext({ sessionId: createSessionId("dwf-mixed") }),
       undefined,
@@ -1077,7 +1138,12 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
     };
     const traceContext = createRootTraceContext({ sessionId: createSessionId("dwf-cycle") });
 
-    await tracker.trackBackgroundTask(toolCall, resumeOutput("dwfrun-cycle"), traceContext, undefined);
+    await tracker.trackBackgroundTask(
+      toolCall,
+      resumeOutput("dwfrun-cycle"),
+      traceContext,
+      undefined,
+    );
     settleTerminal({
       runId: "dwfrun-cycle",
       taskId: "dwfrun-cycle",
@@ -1088,7 +1154,12 @@ describe("ResumeWorkflowRun 的追踪分派", () => {
       expect(notifications).toHaveLength(1);
     });
 
-    await tracker.trackBackgroundTask(toolCall, resumeOutput("dwfrun-cycle"), traceContext, undefined);
+    await tracker.trackBackgroundTask(
+      toolCall,
+      resumeOutput("dwfrun-cycle"),
+      traceContext,
+      undefined,
+    );
     settleTerminal({
       runId: "dwfrun-cycle",
       taskId: "dwfrun-cycle",

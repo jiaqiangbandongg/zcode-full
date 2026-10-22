@@ -43,30 +43,35 @@ export function isShareImportIntentSame(
   return intent.shareCode === payload.shareCode;
 }
 
+const IMPORT_FAILURE_PRESENTATIONS: Readonly<
+  Record<string, { messageId: string; retryable: boolean }>
+> = {
+  authentication_required: {
+    messageId: "conversationShare.import.loginRequired",
+    retryable: false,
+  },
+  not_found: { messageId: "conversationShare.import.notFound", retryable: false },
+  expired: { messageId: "conversationShare.import.expired", retryable: false },
+  import_not_allowed: { messageId: "conversationShare.import.notAllowed", retryable: false },
+  unsupported_schema_version: {
+    messageId: "conversationShare.import.unsupportedVersion",
+    retryable: false,
+  },
+  feature_disabled: { messageId: "conversationShare.error.featureDisabled", retryable: false },
+  invalid_contract: { messageId: "conversationShare.import.integrityFailed", retryable: false },
+  service_unavailable: { messageId: "conversationShare.error.serviceUnavailable", retryable: true },
+  rate_limited: { messageId: "conversationShare.error.rateLimited", retryable: true },
+  network: { messageId: "conversationShare.error.network", retryable: true },
+};
+
 export function resolveShareImportFailurePresentation(kind: string): {
-  messageId:
-    | "conversationShare.import.loginRequired"
-    | "conversationShare.import.notFound"
-    | "conversationShare.import.expired"
-    | "conversationShare.import.integrityFailed"
-    | "conversationShare.import.failed";
+  messageId: string;
   retryable: boolean;
 } {
-  if (kind === "authentication_required") {
-    return {
-      messageId: "conversationShare.import.loginRequired",
-      retryable: false,
-    };
-  }
-  return {
-    messageId:
-      kind === "not_found"
-        ? "conversationShare.import.notFound"
-        : kind === "expired"
-          ? "conversationShare.import.expired"
-          : kind === "invalid_contract"
-            ? "conversationShare.import.integrityFailed"
-            : "conversationShare.import.failed",
-    retryable: true,
-  };
+  return (
+    IMPORT_FAILURE_PRESENTATIONS[kind] ?? {
+      messageId: "conversationShare.import.failed",
+      retryable: true,
+    }
+  );
 }

@@ -739,6 +739,14 @@ Key 不再读取。旧文件没有明确表达的 Model Property 不写 Personal
 Importer 不增加 `COMPATIBILITY_*`，也不按 Catalog、modelId、Provider 类型或 Endpoint 猜值。解析失败或
 Overlay 后完整校验失败时不修改原文件。
 
+Standalone CLI 为兼容评测使用的 `~/.zcode/cli/config.json`，首次导入时还保留自定义模型的输出上限：
+按 `limit.output` → `options.max_tokens` → 模型顶层 `maxOutputTokens` 选取有限正整数，写入精确
+Personal Model Rule 的 `optionSpecs.maxOutputTokens.max`。仅有 output、没有 context 也创建规则；
+缺失时不写默认值，map 仍从正式配置规则继承。不接受字符串转换，不扩展 `extra_body` 等任意 options，
+原有 parser 对非法显式字段的拒绝行为保持不变。此例外只适用于 CLI 首次导入，不改变 Desktop 的
+context-only 迁移；已有正式 Personal 文件不补迁，修改旧文件不会覆盖新配置。实现与验收见
+[Todo161](../../steps/todo-161-cli-legacy-output-token-migration.md)。
+
 无版本 Legacy importer 是过渡发布设施。强制升级窗口结束，且最低支持版本/升级链已经保证用户经过带
 importer 的版本，或者产品明确接受更早版本用户重新配置后，删除 importer、旧 parser、Catalog 依赖、
 迁移专用常量和测试。正式 Config 的相邻 `schemaVersion` migration 仍然保留，不属于这条退役链。

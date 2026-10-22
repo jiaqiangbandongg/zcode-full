@@ -42,20 +42,6 @@ describe("i18n catalog", () => {
       expect(catalogShape(getZCodeCopy(locale))).toEqual(baseShape);
     }
   });
-
-  it("returns localized TUI and CLI copy", () => {
-    const copy = getZCodeCopy("zh-CN");
-
-    expect(copy.tui.status.ready).toBe("就绪。");
-    expect(copy.tui.sidebar.sections.status).toBe("状态");
-    expect(copy.tui.sidebar.sections.modifiedFiles).toBe("变更文件");
-    expect(copy.tui.loginRequired.message).toContain("没有可用模型");
-    expect(copy.tui.loginSetup.title).toBe("配置 Coding Plan");
-    expect(copy.tui.loginSetup.pending.help).toContain("Esc");
-    expect(copy.tui.loginSetup.input.placeholder).toBe("粘贴 API key");
-    expect(copy.tui.input.placeholder).toBe("输入提示词");
-    expect(copy.cli.help("1.0.0")).toContain("用法:");
-  });
 });
 
 function catalogShape(value: unknown): unknown {

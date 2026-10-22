@@ -83,9 +83,9 @@ function createOptions(overrides?: Partial<RemoteIpcOptions>): RemoteIpcOptions 
       armsEnv: "test",
     },
     webRemoteControlManager: {
+      notifyAuthStateChanged: vi.fn(),
       authorizeStart: vi.fn(),
       startAuthorized: vi.fn(),
-      resetPairingAuthorized: vi.fn(),
       stop: vi.fn(),
       getStatus: vi.fn(),
     },
@@ -273,6 +273,80 @@ describe("remote workspace connect telemetry IPC", () => {
     });
   });
 
+  it("returns structured bind failures across Electron invoke", async () => {
+    const bindError = Object.assign(new Error("workspace migration conflict"), {
+      code: "workspace-task-identity-conflict",
+      retryable: false,
+    });
+    await registerHarness({
+      bindRemoteWorkspaceSessionContext: vi.fn(async () => {
+        throw bindError;
+      }),
+    });
+    const handler = h.handlers.get(PlatformChannels.BindRemoteWorkspaceSessionContext);
+
+    await expect(
+      handler?.(
+        { sender: { id: 73 } },
+        {
+          remoteSessionId: "remote-session-1",
+          workspacePath: "/workspace/demo",
+        },
+      ),
+    ).resolves.toEqual({
+      success: false,
+      error: "workspace migration conflict",
+      reasonCode: "workspace-task-identity-conflict",
+      retryable: false,
+    });
+  });
+
+  it("does not expose an unregistered prefixed reason code to Renderer", async () => {
+    const internalError = Object.assign(new Error("internal bind detail"), {
+      code: "source-server-private-debug",
+      retryable: true,
+    });
+    await registerHarness({
+      bindRemoteWorkspaceSessionContext: vi.fn(async () => {
+        throw internalError;
+      }),
+    });
+    const handler = h.handlers.get(PlatformChannels.BindRemoteWorkspaceSessionContext);
+
+    await expect(
+      handler?.(
+        { sender: { id: 73 } },
+        { remoteSessionId: "remote-session-1", workspacePath: "/workspace/demo" },
+      ),
+    ).resolves.toEqual({ success: false, error: "internal bind detail" });
+  });
+
+  it("只透传本次连接实际复用的目标，后续新连接不继承复用信息", async () => {
+    const target: RemoteTarget = { kind: "ssh", host: "active.example.com", username: "dev" };
+    let reused = true;
+    const { handler } = await registerHarness({
+      createRemoteWorkspaceSession: vi.fn(
+        async (_window, _target, _requestId, _context, lifecycle) => {
+          lifecycle?.onConnected?.({
+            remoteSessionId: "remote-session-1",
+            target,
+            generation: 1,
+            ...(reused ? { reusedConnectionTarget: target } : {}),
+          });
+          return "remote-session-1";
+        },
+      ),
+    });
+    expect(await handler({ sender: { id: 73 } }, { target, requestId: "reused" })).toMatchObject({
+      reusedConnectionTarget: target,
+    });
+    reused = false;
+    expect(await handler({ sender: { id: 73 } }, { target, requestId: "new" })).toEqual({
+      success: true,
+      sessionId: "remote-session-1",
+    });
+  });
+
   it.each([
     ["ssh", { kind: "ssh", host: "dev.example.com", username: "root" }],
     ["wsl", { kind: "wsl", distro: "Ubuntu" }],
@@ -314,7 +388,10 @@ describe("remote workspace connect telemetry IPC", () => {
           workspacePath: "/workspace/demo",
           workspaceIdentity: `remote:${remoteKind}:identity:/workspace/demo`,
         },
-        { remoteUsageTelemetryEligible: true },
+        expect.objectContaining({
+          remoteUsageTelemetryEligible: true,
+          onConnected: expect.any(Function),
+        }),
       );
       expect(h.reportRemoteConnectResultToArms).toHaveBeenCalledWith({
         rendererId: 73,
@@ -345,7 +422,11 @@ describe("remote workspace connect telemetry IPC", () => {
       },
     );
 
-    expect(result).toEqual({ success: false, error: "password rejected" });
+    expect(result).toEqual({
+      success: false,
+      error: "password rejected",
+      reasonCode: "remote-connection-unknown",
+    });
     expect(reportRemoteUsageEvent).toHaveBeenCalledWith(74, {
       elementName: "remote_workspace_connect_result",
       eventRegion: "remote_workspace",
@@ -365,6 +446,56 @@ describe("remote workspace connect telemetry IPC", () => {
       errorCategory: "auth",
     });
   });
+
+  it("preserves migration conflict semantics in connect results", async () => {
+    const error = Object.assign(new Error("workspace migration conflict"), {
+      code: "workspace-task-identity-conflict",
+      retryable: false,
+    });
+    const { handler } = await registerHarness({
+      createRemoteWorkspaceSession: vi.fn(async () => {
+        throw error;
+      }),
+    });
+
+    await expect(
+      handler(
+        { sender: { id: 74 } },
+        { target: { kind: "ssh", host: "dev.example.com", username: "root" } },
+      ),
+    ).resolves.toEqual({
+      success: false,
+      error: "workspace migration conflict",
+      reasonCode: "workspace-task-identity-conflict",
+      retryable: false,
+    });
+  });
+
+  it.each(["source-server-upgrade-required", "source-server-install-required"])(
+    "%s 的实际 Profile 和 WSL 身份透传到平台结果",
+    async (code) => {
+      const profileId = "17ef20b3-622d-4a53-98c1-0cdff29f3e6d";
+      const resolved = { resolvedWslTarget: { kind: "wsl", distro: "Ubuntu", user: "dev" } };
+      const { handler } = await registerHarness({
+        createRemoteWorkspaceSession: vi.fn(async () => {
+          throw Object.assign(new Error("upgrade required"), {
+            code,
+            retryable: false,
+            profileId,
+            ...resolved,
+          });
+        }),
+      });
+      await expect(handler({ sender: { id: 74 } }, { target: { kind: "wsl" } })).resolves.toEqual({
+        success: false,
+        error: "upgrade required",
+        reasonCode: code,
+        retryable: false,
+        profileId,
+        ...resolved,
+      });
+    },
+  );
 
   it("埋点 reporter 抛错时不改写已经成功的远程连接结果", async () => {
     const reportRemoteUsageEvent = vi.fn(() => {

@@ -6,23 +6,11 @@ import {
   DYNAMIC_WORKFLOW_RUN_EVENT_PAYLOAD_LIMITS,
   SessionEventType,
   boundDynamicWorkflowRunEventPayload,
-  type DynamicWorkflowRunProgressPayload,
 } from "../src/index.js";
 
 describe("dynamic workflow run progress 会话事件", () => {
   it("事件类型进入 SessionEventType 词汇表", () => {
     expect(SessionEventType.DynamicWorkflowRunProgress).toBe("dynamic_workflow_run_progress");
-  });
-
-  it("payload 类型承载 runId / sequence / eventType 与端口同形的 JSON 载荷", () => {
-    const payload: DynamicWorkflowRunProgressPayload = {
-      runId: "dwfrun-1",
-      toolCallId: "tc-1",
-      sequence: 7,
-      eventType: "node-settled",
-      payload: { instance: { siteId: "ask#1", ordinal: 1 }, outcome: "ok" },
-    };
-    expect(payload.payload.outcome).toBe("ok");
   });
 });
 
@@ -72,7 +60,11 @@ describe("boundDynamicWorkflowRunEventPayload", () => {
 
   it("过深嵌套在上限处剪断并置 truncated", () => {
     let deep: Record<string, unknown> = { leaf: 1 };
-    for (let level = 0; level < DYNAMIC_WORKFLOW_RUN_EVENT_PAYLOAD_LIMITS.maxDepth + 3; level += 1) {
+    for (
+      let level = 0;
+      level < DYNAMIC_WORKFLOW_RUN_EVENT_PAYLOAD_LIMITS.maxDepth + 3;
+      level += 1
+    ) {
       deep = { nested: deep };
     }
     const { truncated } = boundDynamicWorkflowRunEventPayload(deep);

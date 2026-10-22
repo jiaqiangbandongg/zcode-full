@@ -1,12 +1,11 @@
 import { readFile } from "node:fs/promises";
+import { BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID } from "@zcode/shared";
 import {
-  BIGMODEL_PROVIDER_ID,
   TID_LOGIN_TRIGGER,
   TID_OAUTH_ERROR,
   TID_OAUTH_LOGIN_BUTTON,
   testId,
-  ZAI_PROVIDER_ID,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -44,6 +43,7 @@ describe("OAuth 凭据损坏恢复", () => {
     await expectBigModelLoginButton();
     await expectNoOAuthErrorAlert();
     await waitForCorruptOAuthCredentialsCleanup();
+    expect((await readCredentials())["bot:e2e:credential"]).toBe("e2e-independent-bot-token");
   });
 });
 

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-rpn-project-navigation",
+  "spec": "./test/e2e/conversation-session/conversation-session-rpn-project-navigation.test.ts",
+  "providerRequestPolicy": "none",
+  "providerFixtures": ["./test/e2e/fixtures/upstream/common.json"],
+  "fileFixtures": [],
+  "requests": []
+}

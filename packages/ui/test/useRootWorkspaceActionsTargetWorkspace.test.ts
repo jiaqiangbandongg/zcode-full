@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { resolveNewTaskTargetFromRequest } from "@/root/useRootWorkspaceActions.js";
-import type { WorkbenchNewTaskTarget } from "@/v4/workbenchNewTaskTarget.js";
+import type { WorkbenchNewTaskTarget } from "@/conversation-workspace-target/workbenchTarget.js";
 
 function source(relative: string): string {
   return readFileSync(new URL(relative, import.meta.url), "utf8").replaceAll("\r\n", "\n");
@@ -95,15 +95,11 @@ describe("startNewTaskFromActiveWorkspace 接线契约", () => {
     expect(shell).toMatch(
       /handleCreateTaskInChat\(\{\s*initialPrompt: prompt,\s*\.\.\.\(targetWorkspace \? \{ targetWorkspace \} : \{\}\),\s*\}\)/,
     );
-    // 工作流「运行」不再走 autoSubmit 对话文案：直接启动（docs/dynamic-workflow/launch.md），
-    // 该分支应已删除，autoSubmit 通道全线移除。
-    expect(shell).not.toContain("autoSubmit: true");
-    expect(shell).not.toContain("handleLaunchWorkflowInChat");
   });
 
   it("handleCreateTaskInChat 仅在无 targetWorkspace 时应用活动 workspace 只读守卫，带 target 时仍到达 onCreateTask", () => {
     // WorkspaceShellLayout 组件体量大且依赖繁多，直接挂载不实际；此处用源码契约（正则）
-    // 证明守卫按 targetWorkspace 短路。契约：先算 hasTargetWorkspace，再 `!hasTargetWorkspace &&
+    // 检查守卫的源码形状，不替代执行级权限验证：先算 hasTargetWorkspace，再 `!hasTargetWorkspace &&
     // workspaceReadOnlyReason` 才 return，随后 showChatMainView() + onCreateTask(request)。
     const shell = source("../src/app-shell/WorkspaceShellLayout.tsx");
     expect(shell).toMatch(
@@ -119,7 +115,7 @@ describe("startNewTaskFromActiveWorkspace 接线契约", () => {
   });
 
   it("handleOpenSavedWorkflowRun 用 params 携带的目标 workspace 打开实例，而非活动项目", () => {
-    // 中枢是跨项目视图：实例必须开在发起它的项目（不变式 8）。用源码契约证明目标取自 params，
+    // 中枢是跨项目视图：实例必须开在发起它的项目（不变式 8）。源码守卫检查目标取自 params，
     // 仅缺省时兜底回退活动 workspace；remoteSessionId 按目标 workspace 从 tab 反查。
     const shell = source("../src/app-shell/WorkspaceShellLayout.tsx");
     expect(shell).toMatch(

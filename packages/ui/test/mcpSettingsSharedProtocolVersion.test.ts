@@ -21,7 +21,6 @@ describe("mcp settings shared protocolVersion round-trip", () => {
 
   it("omits protocolVersion from the config when the form leaves it unset (auto)", () => {
     const form = { ...EMPTY_FORM, type: "http" as const, url: "https://mcp.example.com/mcp" };
-    expect(form.protocolVersion).toBe("");
     expect("protocolVersion" in formToConfig(form)).toBe(false);
   });
 

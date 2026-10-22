@@ -22,6 +22,7 @@
 12. [WebSearch](13-websearch.md)
 13. [Workflow](15-workflow.md)
 14. [EnterPlanMode / ExitPlanMode](16-plan-mode.md)
+15. [ToolSearch](19-tool-search.md)
 
 ## 公共 tool 形态
 

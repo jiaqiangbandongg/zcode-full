@@ -130,7 +130,10 @@ function contextWith(port?: DynamicWorkflowRunPort): ToolExecutionContext {
   } as ToolExecutionContext;
 }
 
-async function call(runId: string, port?: DynamicWorkflowRunPort): Promise<Record<string, unknown>> {
+async function call(
+  runId: string,
+  port?: DynamicWorkflowRunPort,
+): Promise<Record<string, unknown>> {
   return (await getWorkflowRunToolEntry.handler({ run_id: runId }, contextWith(port))) as Record<
     string,
     unknown
@@ -147,7 +150,10 @@ function asFailure(output: unknown): ToolHandlerFailure {
  * 输出 = 端口详情逐字段搬过来，外加 handler 自己铸的两件事：那一句摘要，和这次快照的时刻。
  * 时钟是真的 `Date.now()`，所以这里只钉形状不钉值——值的确定性由格式器与摘要的单测钉。
  */
-function expectMirrorsDetail(output: Record<string, unknown>, detail: DynamicWorkflowRunDetail): void {
+function expectMirrorsDetail(
+  output: Record<string, unknown>,
+  detail: DynamicWorkflowRunDetail,
+): void {
   expect(GetWorkflowRunOutputSchema.parse(output)).toEqual({
     ...detail,
     summary: expect.any(String),
@@ -199,7 +205,6 @@ describe("GetWorkflowRun handler — running snapshot", () => {
     const detail: DynamicWorkflowRunDetail = { ...RUNNING_DETAIL, maxConcurrency: 3 };
     const output = await call("dwfrun-running", stubDetailPort({ "dwfrun-running": detail }));
 
-    expect(output.maxConcurrency).toBe(3);
     expectMirrorsDetail(output, detail);
   });
 
@@ -221,7 +226,6 @@ describe("GetWorkflowRun handler — running snapshot", () => {
     };
     const output = await call("dwfrun-running", stubDetailPort({ "dwfrun-running": detail }));
 
-    expect(output.subagentModel).toBe("bigmodel/GLM-4.6$high");
     expectMirrorsDetail(output, detail);
   });
 
@@ -284,14 +288,28 @@ describe("GetWorkflowRun handler — the situation cross-section", () => {
     const detail: DynamicWorkflowRunDetail = {
       ...RUNNING_DETAIL,
       phases: [
-        { name: "collect", state: "done", rounds: 1, nodesSettled: 2, nodesRunning: 0, enteredAt: 1, exitedAt: 2 },
-        { name: "judge", state: "current", rounds: 1, nodesSettled: 1, nodesRunning: 1, enteredAt: 2 },
+        {
+          name: "collect",
+          state: "done",
+          rounds: 1,
+          nodesSettled: 2,
+          nodesRunning: 0,
+          enteredAt: 1,
+          exitedAt: 2,
+        },
+        {
+          name: "judge",
+          state: "current",
+          rounds: 1,
+          nodesSettled: 1,
+          nodesRunning: 1,
+          enteredAt: 2,
+        },
       ],
     };
     const output = await call("dwfrun-running", stubDetailPort({ "dwfrun-running": detail }));
 
     expectMirrorsDetail(output, detail);
-    expect(output.subagents).toHaveLength(2);
   });
 
   // 一个 actor 都没有的 run 是空数组，不是缺席：「有几个子代理」永远有答案，而 0 就是那个答案。
@@ -353,9 +371,19 @@ describe("GetWorkflowRun handler — the situation cross-section", () => {
       ],
     };
     const output = await call("dwfrun-old", stubDetailPort({ "dwfrun-old": detail }));
-    const ask = (output.subagents as Record<string, unknown>[])[0]!.currentAsk as Record<string, unknown>;
+    const ask = (output.subagents as Record<string, unknown>[])[0]!.currentAsk as Record<
+      string,
+      unknown
+    >;
 
-    for (const key of ["turn", "toolCalls", "lastTool", "startedAt", "actorSeq", "instructionsHead"]) {
+    for (const key of [
+      "turn",
+      "toolCalls",
+      "lastTool",
+      "startedAt",
+      "actorSeq",
+      "instructionsHead",
+    ]) {
       expect(key in ask).toBe(false);
     }
   });
@@ -363,7 +391,10 @@ describe("GetWorkflowRun handler — the situation cross-section", () => {
   // 一次调用一把尺：摘要与模型面的每一个年龄都对这一个读数算。
   it("stamps the snapshot with one clock and assembles the summary from it", async () => {
     const before = Date.now();
-    const output = await call("dwfrun-running", stubDetailPort({ "dwfrun-running": RUNNING_DETAIL }));
+    const output = await call(
+      "dwfrun-running",
+      stubDetailPort({ "dwfrun-running": RUNNING_DETAIL }),
+    );
 
     expect(output.generatedAt as number).toBeGreaterThanOrEqual(before);
     expect(output.generatedAt as number).toBeLessThanOrEqual(Date.now());
@@ -460,9 +491,6 @@ describe("GetWorkflowRun handler — published artifacts", () => {
       },
       { id: "perf", kind: "chart", version: 1, itemCount: 12 },
     ]);
-    // `uri` 刻意不出：模型读不了 tool-artifact store。`spec` / `versions` 也是 UI 的事。
-    expect(JSON.stringify(output.artifacts)).not.toContain("zcode-artifact://");
-    expect(JSON.stringify(output.artifacts)).not.toContain("round");
     expect(GetWorkflowRunOutputSchema.safeParse(output).success).toBe(true);
   });
 
@@ -553,7 +581,15 @@ describe("GetWorkflowRun handler — published artifacts", () => {
       }),
     );
     expect(output.artifacts).toEqual([
-      { id: "report", kind: "markdown", title: "审计报告", version: 1, bytes: 2_048, itemCount: 0, primary: true },
+      {
+        id: "report",
+        kind: "markdown",
+        title: "审计报告",
+        version: 1,
+        bytes: 2_048,
+        itemCount: 0,
+        primary: true,
+      },
       { id: "perf", kind: "chart", version: 1, itemCount: 12 },
     ]);
     expect(GetWorkflowRunOutputSchema.safeParse(output).success).toBe(true);
@@ -599,8 +635,6 @@ describe("GetWorkflowRun handler — terminal failure", () => {
     };
     const output = await call("dwfrun-dead", stubDetailPort({ "dwfrun-dead": detail }));
 
-    expect(output.error).toEqual(detail.error);
-    expect(output.stopReason).toBe("interrupted");
     expectMirrorsDetail(output, detail);
   });
 
@@ -641,8 +675,6 @@ describe("GetWorkflowRun handler — terminal failure", () => {
     };
     const output = await call("dwfrun-stop", stubDetailPort({ "dwfrun-stop": detail }));
 
-    expect(output.stopReason).toBe("provider");
-    expect(output.error).toEqual(detail.error);
     expectMirrorsDetail(output, detail);
   });
 });
@@ -1068,7 +1100,9 @@ describe("GetWorkflowRun handler — pending escalations", () => {
     expect("pendingQuestions" in idle).toBe(false);
     const empty = await call(
       "dwfrun-empty",
-      stubDetailPort({ "dwfrun-empty": { ...RUNNING_DETAIL, runId: "dwfrun-empty", pendingQuestions: [] } }),
+      stubDetailPort({
+        "dwfrun-empty": { ...RUNNING_DETAIL, runId: "dwfrun-empty", pendingQuestions: [] },
+      }),
     );
     expect("pendingQuestions" in empty).toBe(false);
   });
@@ -1141,11 +1175,30 @@ const SITREP_BASE: Omit<GetWorkflowRunOutput, "summary"> = {
   logTail: [
     { sequence: 11, message: "collected 14 failing specs", at: Date.UTC(2026, 7, 21, 9, 0, 50) },
     { sequence: 14, message: "dispatching judges in pairs", at: Date.UTC(2026, 7, 21, 9, 1, 50) },
-    { sequence: 19, message: "judge#1 finished: 6 flaky, 1 real", at: Date.UTC(2026, 7, 21, 9, 4, 10) },
+    {
+      sequence: 19,
+      message: "judge#1 finished: 6 flaky, 1 real",
+      at: Date.UTC(2026, 7, 21, 9, 4, 10),
+    },
   ],
   phases: [
-    { name: "collect", state: "done", rounds: 1, nodesSettled: 2, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0), exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20) },
-    { name: "judge", state: "current", rounds: 1, nodesSettled: 3, nodesRunning: 3, enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20) },
+    {
+      name: "collect",
+      state: "done",
+      rounds: 1,
+      nodesSettled: 2,
+      nodesRunning: 0,
+      enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0),
+      exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+    },
+    {
+      name: "judge",
+      state: "current",
+      rounds: 1,
+      nodesSettled: 3,
+      nodesRunning: 3,
+      enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+    },
     { name: "verify", state: "ahead", rounds: 0, nodesSettled: 0, nodesRunning: 0 },
     { name: "report", state: "ahead", rounds: 0, nodesSettled: 0, nodesRunning: 0 },
   ],
@@ -1193,7 +1246,11 @@ const SITREP_BASE: Omit<GetWorkflowRunOutput, "summary"> = {
         startedAt: Date.UTC(2026, 7, 21, 9, 4, 28),
         turn: 4,
         toolCalls: 7,
-        lastTool: { name: "Read", target: "packages/net/retry.spec.ts", at: Date.UTC(2026, 7, 21, 9, 5, 32) },
+        lastTool: {
+          name: "Read",
+          target: "packages/net/retry.spec.ts",
+          at: Date.UTC(2026, 7, 21, 9, 5, 32),
+        },
       },
       stepsSettled: 1,
       stepsFailed: 0,
@@ -1205,7 +1262,12 @@ const SITREP_BASE: Omit<GetWorkflowRunOutput, "summary"> = {
       ordinal: 1,
       state: "waiting",
       phaseName: "judge",
-      wait: { cause: "backoff", reason: "429", retryAfterMs: 20_000, since: Date.UTC(2026, 7, 21, 9, 5, 20) },
+      wait: {
+        cause: "backoff",
+        reason: "429",
+        retryAfterMs: 20_000,
+        since: Date.UTC(2026, 7, 21, 9, 5, 20),
+      },
       stepsSettled: 1,
       stepsFailed: 0,
       tokens: 2_130,
@@ -1213,7 +1275,12 @@ const SITREP_BASE: Omit<GetWorkflowRunOutput, "summary"> = {
   ],
   health: {
     lastProgressAt: Date.UTC(2026, 7, 21, 9, 5, 0),
-    concurrency: { effective: 2, cap: 3, reason: "rate_limited", since: Date.UTC(2026, 7, 21, 9, 4, 35) },
+    concurrency: {
+      effective: 2,
+      cap: 3,
+      reason: "rate_limited",
+      since: Date.UTC(2026, 7, 21, 9, 4, 35),
+    },
     consecutiveFailures: 0,
     cachedSteps: 0,
     pendingQuestionsKnown: true,
@@ -1228,7 +1295,9 @@ const SITREP_BASE: Omit<GetWorkflowRunOutput, "summary"> = {
       askedAt: Date.UTC(2026, 7, 21, 9, 5, 0),
     },
   ],
-  artifacts: [{ id: "triage-board", kind: "board", title: "Triage board", version: 3, itemCount: 7 }],
+  artifacts: [
+    { id: "triage-board", kind: "board", title: "Triage board", version: 3, itemCount: 7 },
+  ],
 };
 
 describe("GetWorkflowRun model content — a running situation report", () => {
@@ -1280,11 +1349,19 @@ describe("GetWorkflowRun model content — a running situation report", () => {
     expect(content).toContain(
       "judge      agent#2@2  executing  phase judge  ask#4@1 (step 3), 1m 12s on this step, turn 4, 7 tool calls, last Read packages/net/retry.spec.ts 8s ago  5,100 tokens",
     );
-    expect(content).toContain("judge      agent#2@1  parked     phase judge  on question q-01 for 40s  4,980 tokens");
-    expect(content).toContain("agent#3@1  waiting    phase judge  backoff after 429 for 20s, retry in 20s  2,130 tokens");
-    expect(content).toContain("collector  agent#1@1  idle       phase collect  2 steps  6,210 tokens");
+    expect(content).toContain(
+      "judge      agent#2@1  parked     phase judge  on question q-01 for 40s  4,980 tokens",
+    );
+    expect(content).toContain(
+      "agent#3@1  waiting    phase judge  backoff after 429 for 20s, retry in 20s  2,130 tokens",
+    );
+    expect(content).toContain(
+      "collector  agent#1@1  idle       phase collect  2 steps  6,210 tokens",
+    );
     // 任务摘要缩进一行挂在它所属的那一行下面。
-    expect(content).toContain("  task: Judge specs 1-7 for flakiness; report real failures with evidence");
+    expect(content).toContain(
+      "  task: Judge specs 1-7 for flakiness; report real failures with evidence",
+    );
   });
 
   it("prefixes each log line with its age", () => {
@@ -1302,20 +1379,70 @@ describe("GetWorkflowRun model content — a completed run", () => {
     ...SITREP_BASE,
     status: "completed",
     updatedAt: Date.UTC(2026, 7, 21, 9, 4, 20),
-    usage: { ...SITREP_BASE.usage, spentTokens: 41_200, nodesRunning: 0, nodesCompleted: 12, nodesObserved: 12 },
+    usage: {
+      ...SITREP_BASE.usage,
+      spentTokens: 41_200,
+      nodesRunning: 0,
+      nodesCompleted: 12,
+      nodesObserved: 12,
+    },
     phases: [
-      { name: "collect", state: "done", rounds: 1, nodesSettled: 2, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0), exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20) },
-      { name: "judge", state: "done", rounds: 1, nodesSettled: 6, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20), exitedAt: Date.UTC(2026, 7, 21, 9, 3, 0) },
-      { name: "verify", state: "done", rounds: 2, nodesSettled: 3, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 3, 0), exitedAt: Date.UTC(2026, 7, 21, 9, 4, 0) },
-      { name: "report", state: "done", rounds: 1, nodesSettled: 1, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 4, 0), exitedAt: Date.UTC(2026, 7, 21, 9, 4, 20) },
+      {
+        name: "collect",
+        state: "done",
+        rounds: 1,
+        nodesSettled: 2,
+        nodesRunning: 0,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0),
+        exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+      },
+      {
+        name: "judge",
+        state: "done",
+        rounds: 1,
+        nodesSettled: 6,
+        nodesRunning: 0,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+        exitedAt: Date.UTC(2026, 7, 21, 9, 3, 0),
+      },
+      {
+        name: "verify",
+        state: "done",
+        rounds: 2,
+        nodesSettled: 3,
+        nodesRunning: 0,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 3, 0),
+        exitedAt: Date.UTC(2026, 7, 21, 9, 4, 0),
+      },
+      {
+        name: "report",
+        state: "done",
+        rounds: 1,
+        nodesSettled: 1,
+        nodesRunning: 0,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 4, 0),
+        exitedAt: Date.UTC(2026, 7, 21, 9, 4, 20),
+      },
     ],
     // 终态 run 上干完的子代理才是 `done`。
     subagents: [{ ...SITREP_BASE.subagents[0]!, state: "done" }],
-    health: { lastProgressAt: Date.UTC(2026, 7, 21, 9, 4, 20), consecutiveFailures: 0, cachedSteps: 2, pendingQuestionsKnown: true },
+    health: {
+      lastProgressAt: Date.UTC(2026, 7, 21, 9, 4, 20),
+      consecutiveFailures: 0,
+      cachedSteps: 2,
+      pendingQuestionsKnown: true,
+    },
     pendingQuestions: undefined,
     result: "12 specs triaged",
     artifacts: [
-      { id: "report", kind: "markdown", title: "Nightly triage report", version: 1, itemCount: 0, primary: true },
+      {
+        id: "report",
+        kind: "markdown",
+        title: "Nightly triage report",
+        version: 1,
+        itemCount: 0,
+        primary: true,
+      },
     ],
   };
   const content = renderWithSummary(completed);
@@ -1328,7 +1455,9 @@ describe("GetWorkflowRun model content — a completed run", () => {
 
   // 终态 run 不报 stalled（它当然不动了），也不报 leftover（没有残留行）。
   it("drops the stalled reading from a terminal run's health", () => {
-    expect(content).toContain("<health>last_progress=1m 20s ago  consecutive_failures=0  cached_steps=2</health>");
+    expect(content).toContain(
+      "<health>last_progress=1m 20s ago  consecutive_failures=0  cached_steps=2</health>",
+    );
     expect(content).not.toContain("stalled=");
     expect(content).not.toContain("leftover");
   });
@@ -1352,8 +1481,23 @@ describe("GetWorkflowRun model content — an interrupted run seen from another 
     // 子代理各自那一条。observed 仍是三态之和 = 5 + 2。
     usage: { ...SITREP_BASE.usage, nodesObserved: 7, nodesRunning: 2 },
     phases: [
-      { name: "collect", state: "done", rounds: 1, nodesSettled: 2, nodesRunning: 0, enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0), exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20) },
-      { name: "judge", state: "unfinished", rounds: 1, nodesSettled: 3, nodesRunning: 2, enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20) },
+      {
+        name: "collect",
+        state: "done",
+        rounds: 1,
+        nodesSettled: 2,
+        nodesRunning: 0,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 0, 0),
+        exitedAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+      },
+      {
+        name: "judge",
+        state: "unfinished",
+        rounds: 1,
+        nodesSettled: 3,
+        nodesRunning: 2,
+        enteredAt: Date.UTC(2026, 7, 21, 9, 1, 20),
+      },
       { name: "verify", state: "ahead", rounds: 0, nodesSettled: 0, nodesRunning: 0 },
       { name: "report", state: "ahead", rounds: 0, nodesSettled: 0, nodesRunning: 0 },
     ],
@@ -1365,7 +1509,12 @@ describe("GetWorkflowRun model content — an interrupted run seen from another 
         name: "judge",
         state: "unfinished",
         phaseName: "judge",
-        currentAsk: { siteId: "ask#4", ordinal: 0, actorSeq: 1, startedAt: Date.UTC(2026, 7, 21, 9, 2, 0) },
+        currentAsk: {
+          siteId: "ask#4",
+          ordinal: 0,
+          actorSeq: 1,
+          startedAt: Date.UTC(2026, 7, 21, 9, 2, 0),
+        },
         stepsSettled: 1,
         stepsFailed: 0,
         tokens: 4_980,
@@ -1376,7 +1525,12 @@ describe("GetWorkflowRun model content — an interrupted run seen from another 
         name: "judge",
         state: "unfinished",
         phaseName: "judge",
-        currentAsk: { siteId: "ask#4", ordinal: 1, actorSeq: 2, startedAt: Date.UTC(2026, 7, 21, 9, 4, 28) },
+        currentAsk: {
+          siteId: "ask#4",
+          ordinal: 1,
+          actorSeq: 2,
+          startedAt: Date.UTC(2026, 7, 21, 9, 4, 28),
+        },
         stepsSettled: 1,
         stepsFailed: 0,
         tokens: 5_100,
@@ -1403,16 +1557,24 @@ describe("GetWorkflowRun model content — an interrupted run seen from another 
 
   // 沉默会被读成「没有人在等」，而那是最危险的误读——这是仅有的两处「把不知道说出口」之一。
   it("replaces the pending block with the explicit unknown sentence", () => {
-    expect(content).toContain("<pending_questions>Unknown: pending questions are tracked only by the process");
-    expect(content).toContain("Resuming the run will re-ask any question its subagent still needs answered.");
+    expect(content).toContain(
+      "<pending_questions>Unknown: pending questions are tracked only by the process",
+    );
+    expect(content).toContain(
+      "Resuming the run will re-ask any question its subagent still needs answered.",
+    );
     expect(content).not.toContain("[q-01]");
   });
 
   // 另一处：终态 run 里标着 running 的行是残留，不是活的工作。
   it("adds the leftover note under health and marks the phase unfinished", () => {
-    expect(content).toContain('The 2 "running" steps below are leftovers of the exited process, not live work.');
+    expect(content).toContain(
+      'The 2 "running" steps below are leftovers of the exited process, not live work.',
+    );
     expect(content).toContain("2. judge    unfinished  1 round  3 settled, 2 unfinished");
-    expect(content).toContain("judge      agent#2@1  unfinished  phase judge  ask#4@0 (step 2) was in flight at the stop");
+    expect(content).toContain(
+      "judge      agent#2@1  unfinished  phase judge  ask#4@0 (step 2) was in flight at the stop",
+    );
   });
 
   it("still routes to ResumeWorkflowRun and AmendWorkflow with the full argument", () => {

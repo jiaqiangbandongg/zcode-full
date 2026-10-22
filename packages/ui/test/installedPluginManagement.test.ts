@@ -10,55 +10,6 @@ import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { InstalledPluginDetailPanel } from "../src/settings/InstalledPluginManagement.js";
 
 describe("InstalledPluginDetailPanel", () => {
-  it("renders plugin hook event, matcher, and command details", () => {
-    const plugin: ZCodePluginInfo = {
-      id: "ralph-loop@claude-plugins-official",
-      name: "ralph-loop",
-      enabled: true,
-      source: "cache",
-      marketplace: "claude-plugins-official",
-      skillCount: 0,
-      skillRootCount: 0,
-      commandRootCount: 1,
-      declaredMcpServerNames: [],
-      mcpServerNames: [],
-      hookDetails: [
-        {
-          event: "Stop",
-          type: "command",
-          command: 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/stop-hook.sh"',
-          sourcePath: "/cache/ralph-loop/hooks/hooks.json",
-          runnable: true,
-        },
-      ],
-      rootPath: "/cache/ralph-loop",
-    };
-
-    const html = renderToStaticMarkup(
-      createElement(
-        ZCodeIntlProvider,
-        { initialLocale: "zh-CN" },
-        createElement(InstalledPluginDetailPanel, {
-          getPluginOptionValue: (
-            _plugin: ZCodePluginInfo,
-            _key: string,
-            option: ZCodePluginUserConfigOption,
-          ) => option.default ?? "",
-          onSavePluginOptions: () => {},
-          operationId: null,
-          plugin,
-          renderPluginSource: (target: ZCodePluginInfo) => target.marketplace,
-          setPluginOptionDraft: () => {},
-        }),
-      ),
-    );
-
-    expect(html).toContain("Stop");
-    expect(html).toContain("stop-hook.sh");
-    expect(html).toContain("可运行");
-    expect(html).not.toContain("暂未暴露 Hook 明细");
-  });
-
   it("renders authoritative skill component names for both enabled and disabled plugins", () => {
     // 复现反馈中的 superpowers（14 个技能）。components 由 CLI 权威枚举随 list 下发，
     // 与启用态无关：启用/停用都应展示具体技能名，而不只是数量、也不应整组消失。
@@ -97,7 +48,7 @@ describe("InstalledPluginDetailPanel", () => {
               option: ZCodePluginUserConfigOption,
             ) => option.default ?? "",
             onSavePluginOptions: () => {},
-            operationId: null,
+            activeOperations: [],
             plugin,
             renderPluginSource: (target: ZCodePluginInfo) => target.marketplace,
             setPluginOptionDraft: () => {},
@@ -146,7 +97,7 @@ describe("InstalledPluginDetailPanel", () => {
               option: ZCodePluginUserConfigOption,
             ) => option.default ?? "",
             onSavePluginOptions: () => {},
-            operationId: null,
+            activeOperations: [],
             plugin,
             renderPluginSource: (target: ZCodePluginInfo) => target.marketplace,
             setPluginOptionDraft: () => {},
@@ -214,7 +165,7 @@ describe("InstalledPluginDetailPanel", () => {
             option: ZCodePluginUserConfigOption,
           ) => option.default ?? "",
           onSavePluginOptions: () => {},
-          operationId: null,
+          activeOperations: [],
           plugin,
           renderPluginSource: (target: ZCodePluginInfo) => target.marketplace,
           setPluginOptionDraft: () => {},

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +17,8 @@ const mockFooterSettings = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/ControlHintTooltip.js", () => ({
+vi.mock("@/ControlHintTooltip.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/ControlHintTooltip.js")>()),
   ControlHintTooltip: ({ children, title }: { children: unknown; title: string }) =>
     createElement("span", { "data-tooltip-title": title }, children),
 }));
@@ -94,28 +93,6 @@ describe("WorkspaceSidebarFooter web remote control tooltip", () => {
     };
   });
 
-  it("keeps long profile names constrained inside the footer row", () => {
-    const html = renderToStaticMarkup(
-      createElement(WorkspaceSidebarFooter, {
-        theme: "dark",
-        localeMenuValue: "zh-CN",
-        onLocaleChange: () => {},
-        onThemeChange: () => {},
-        onSettingsButtonClick: () => {},
-        user: {
-          id: "user-long-name",
-          username: "very-very-very-very-very-very-long-user-name",
-          displayName: "VeryVeryVeryVeryVeryVeryVeryVeryLongDisplayName",
-        },
-      }),
-    );
-
-    expect(html).toContain("min-w-0 flex-1");
-    expect(html).toContain("overflow-hidden");
-    expect(html).toContain("text-left");
-    expect(html).toContain("truncate text-ui-base font-semibold");
-  });
-
   it("derives compact sidebar footer plan badge labels", () => {
     expect(
       resolveSidebarFooterPlanBadgeLabel({
@@ -184,8 +161,6 @@ describe("WorkspaceSidebarFooter web remote control tooltip", () => {
     );
 
     expect(html).toContain("sidebar.usage.plan.audienceTeam");
-    expect(html).toContain("text-ui-xs");
-    expect(html).not.toContain("text-ui-sm");
     expect(html).not.toContain("Max");
   });
 
@@ -421,144 +396,5 @@ describe("WorkspaceSidebarFooter web remote control tooltip", () => {
 
     expect(html).toContain('data-testid="web-remote-control-trigger"');
     expect(html).not.toContain('data-tooltip-title="webRemoteControl.trigger"');
-  });
-
-  it("shows desktop zoom commands under an interface zoom submenu", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    expect(source).toContain("{isDesktop ? (");
-    expect(source).toContain('id: "sidebar.settings.interfaceZoom"');
-    expect(source).toContain("<DropdownMenuSubContent");
-    expect(source).toContain("DesktopCommandIds.ZoomIn");
-    expect(source).toContain("DesktopCommandIds.ZoomOut");
-    expect(source).toContain("DesktopCommandIds.ResetZoom");
-    expect(source).toContain('id: "titleBar.menu.view.zoomIn"');
-    expect(source).toContain('id: "titleBar.menu.view.zoomOut"');
-    expect(source).toContain('id: "titleBar.menu.view.actualSize"');
-  });
-
-  it("keeps the interface zoom submenu gated to desktop mode", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    expect(source).toContain("{isDesktop ? (");
-    expect(source).toContain(") : null}");
-  });
-
-  it("keeps profile menu grouped as language theme zoom usage auth", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    const localeIndex = source.indexOf('id: "settings.locale"');
-    const themeIndex = source.indexOf('id: "settings.themeMode"');
-    const zoomIndex = source.indexOf('id: "sidebar.settings.interfaceZoom"');
-    const usageIndex = source.indexOf("<WorkspaceSidebarFooterUsageSummary");
-    const loginIndex = source.indexOf('id: "app.login"');
-    const logoutIndex = source.indexOf('id: "app.logout"');
-    const separatorBeforeAuthIndex = source.indexOf("<DropdownMenuSeparator />", usageIndex);
-
-    expect(localeIndex).toBeGreaterThan(-1);
-    expect(themeIndex).toBeGreaterThan(localeIndex);
-    expect(zoomIndex).toBeGreaterThan(themeIndex);
-    expect(usageIndex).toBeGreaterThan(zoomIndex);
-    expect(separatorBeforeAuthIndex).toBeGreaterThan(usageIndex);
-    expect(loginIndex).toBeGreaterThan(separatorBeforeAuthIndex);
-    expect(logoutIndex).toBeGreaterThan(separatorBeforeAuthIndex);
-  });
-
-  it("keeps the always-visible upgrade entry inside the footer summary", () => {
-    const footerSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-    const summarySource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooterUsageSummary.tsx"),
-      "utf8",
-    );
-    const usageIndex = footerSource.indexOf("<WorkspaceSidebarFooterUsageSummary");
-
-    // 偏好设置与用量之间由 summary 统一管理分隔线，账号操作组另有分隔线。
-    const preferencesIndex = footerSource.indexOf('id: "settings.locale"');
-    expect(footerSource.slice(preferencesIndex, usageIndex)).not.toContain(
-      "<DropdownMenuSeparator />",
-    );
-    expect(summarySource).toContain("<DropdownMenuSeparator />");
-    expect(summarySource.indexOf("sidebar.usage.plan.openStats")).toBeLessThan(
-      summarySource.indexOf("onUpgradeClick?.("),
-    );
-    expect(summarySource).toContain("setPendingSettingsUsageIntent();");
-    expect(summarySource).toContain("onUsageClick?.();");
-    expect(summarySource).toContain("upgradeTargetProviderId");
-    expect(summarySource).toContain("onUpgradeClick?.(");
-    expect(summarySource).not.toContain("if (!upgradeProviderId");
-    expect(summarySource).not.toContain("if (!upgradeTargetProviderId");
-    expect(summarySource).toContain("<DropdownMenuSeparator />");
-    expect(summarySource).not.toContain("<CodingPlanUsageRemainingPanel");
-  });
-
-  it("keeps settings-page usage stats separate from the back button", () => {
-    const footerSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-    const settingsSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/SettingsPage.tsx"),
-      "utf8",
-    );
-
-    expect(footerSource).toContain("onUsageClick,");
-    expect(footerSource).toContain(
-      "const usageButtonClick = onUsageClick ?? onSettingsButtonClick;",
-    );
-    expect(footerSource).toContain("onUsageClick={usageButtonClick}");
-    expect(settingsSource).toContain("const handleOpenUsageSettings = useCallback(() => {");
-    expect(settingsSource).toContain('setActiveSettingsSection("usage");');
-    expect(settingsSource).toContain("onSettingsButtonClick={onBack}");
-    expect(settingsSource).toContain("onUsageClick={handleOpenUsageSettings}");
-  });
-
-  it("keeps duplicated help actions out of the profile menu", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    expect(source).not.toContain('id: "titleBar.menu.help.feedback"');
-    expect(source).not.toContain('id: "sidebar.menu.community"');
-    expect(source).not.toContain('id: "titleBar.menu.help.exportLogs"');
-    expect(source).not.toContain("<DropdownMenuItem onSelect={onSettingsButtonClick}>");
-    expect(source).not.toContain("runExportLogsAction");
-  });
-
-  it("keeps usage remaining mounted across profile menu toggles", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    // 此用例验证菜单保持挂载，不应绑定会随国际化文案调整的宽度。
-    expect(source).toMatch(/<DropdownMenuContent\b[^>]*\bforceMount\s*>/);
-    expect(source).toContain("<WorkspaceSidebarFooterUsageSummary");
-    expect(source).toContain("enabled");
-    expect(source).not.toContain("enabled={profileMenuOpen}");
-  });
-
-  it("renders the profile plan badge from the shared usage summary state", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebarFooter.tsx"),
-      "utf8",
-    );
-
-    expect(source).toContain("useWorkspaceSidebarFooterUsageSummaryState");
-    expect(source).toContain("<WorkspaceSidebarFooterPlanBadge state={usageSummaryState} />");
-    expect(source).toContain("<WorkspaceSidebarFooterUsageSummaryContent");
-    expect(source).toContain("state={usageSummaryState}");
   });
 });

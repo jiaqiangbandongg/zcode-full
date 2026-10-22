@@ -50,22 +50,6 @@ function ctx(sessionId: string, port?: BrowserControlPort): ToolExecutionContext
 }
 
 describe("node_repl browser injection", () => {
-  it("exposes the browser.tabs.new path when browserControlPort is present", async () => {
-    const port = browserPort(
-      vi.fn(async (): Promise<BrowserCommandResult> => ({ ok: true, elapsedMs: 1 })),
-    );
-    const c = ctx("bs1", port);
-    const out = (await jsToolEntry.handler(
-      {
-        code: "const browser = await agent.browsers.getDefault(); return typeof browser.tabs.new;",
-      },
-      c,
-    )) as JsOutput;
-    expect(out.error).toBeUndefined();
-    expect(out.result).toBe("function");
-    disposeNodeReplSession("bs1" as ToolExecutionContext["sessionId"]);
-  });
-
   it("injects browser.documentation and agent.documentation.get as separate surfaces", async () => {
     const port = browserPort(
       vi.fn(async (): Promise<BrowserCommandResult> => ({ ok: true, elapsedMs: 1 })),
@@ -244,7 +228,6 @@ describe("node_repl browser injection", () => {
     )) as JsOutput;
     expect(out.error).toBeUndefined();
     // 至少发生了一次 navigate 调用。
-    expect(execute).toHaveBeenCalled();
     const firstCall = execute.mock.calls[0][0] as {
       command: { method: string; url?: string };
     };

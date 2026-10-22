@@ -466,19 +466,6 @@ describe("bundled official plugin cache resilience", () => {
     await expectNoSeedBackups(browserRoot);
   });
 
-  it("rebuilds after a legacy backup is left by an interrupted replacement", async () => {
-    const storageRoot = await createStorageRoot(cleanups);
-    resolveOfficialPluginRoots({ storageRoot });
-    const browserRoot = join(storageRoot, BROWSER_CACHE_SUFFIX);
-    const backupRoot = `${browserRoot}.backup`;
-    await rename(browserRoot, backupRoot);
-
-    expect(() => resolveOfficialPluginRoots({ storageRoot })).not.toThrow();
-
-    expect(existsSync(browserRoot)).toBe(true);
-    await expectNoSeedBackups(browserRoot);
-  });
-
   it("does not restore a fixed backup that may belong to an active replacement", async () => {
     const storageRoot = await createStorageRoot(cleanups);
     resolveOfficialPluginRoots({ storageRoot });

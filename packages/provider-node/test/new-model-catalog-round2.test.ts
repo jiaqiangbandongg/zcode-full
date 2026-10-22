@@ -212,16 +212,18 @@ describe("Todo113 第二轮：原厂、聚合、快照必须有独立正确配�
       ),
     ).toEqual({ reasoning_effort: "max", max_completion_tokens: 4096 });
   });
-  it.each([
-    "gpt-5.4-image-2",
-    "gpt-5.40",
-    "gpt-5.4-future",
-    "qwen3.7-omni-flash",
-    "qwen3.6-max-preview",
-    "deepseek-v4.1-pro",
-  ])("相邻型号 %s 不被新规则吞掉", (id) => {
-    expect(resolve(id).properties?.contextWindow).toBe(200000);
-  });
+  it.each(["gpt-5.4-image-2", "gpt-5.40", "gpt-5.4-future"])(
+    "封闭维护集合之外的 %s 沿用简单前后缀匹配",
+    (id) => {
+      expect(resolve(id).properties?.contextWindow).toBe(1_050_000);
+    },
+  );
+  it.each(["qwen3.7-omni-flash", "qwen3.6-max-preview", "deepseek-v4.1-pro"])(
+    "相邻型号 %s 不被新规则吞掉",
+    (id) => {
+      expect(resolve(id).properties?.contextWindow).toBe(1_000_000);
+    },
+  );
   it("个人参数仍可覆盖新 Built-in，不代写保存的选择", () => {
     const c = resolve("gpt-5.4").overlay(
       new ModelConfig({

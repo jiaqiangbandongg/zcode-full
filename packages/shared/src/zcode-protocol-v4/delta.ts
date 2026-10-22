@@ -19,6 +19,7 @@ import {
   pendingInteractionSchema,
   planStateSchema,
   queueStateSchema,
+  runtimeInitializationSchema,
   sessionActionAvailabilitySchema,
   sessionConfigStateSchema,
   sessionControlSchema,
@@ -38,6 +39,7 @@ import {
 
 // StatePatch：键级整体替换（Object.assign），键集合封闭。键内绝不深合并。
 export const statePatchSchema = z.object({
+  runtimeInitialization: runtimeInitializationSchema.optional(),
   revision: z.number().optional(),
   control: sessionControlSchema.optional(),
   sharedContextImport: sharedContextImportStateSchema.optional(),

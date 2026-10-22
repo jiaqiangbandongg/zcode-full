@@ -20,6 +20,8 @@ export function enqueueCancellableRuntimeCommand<
       resolve: (result: Result) => void;
     }) => Command;
     onCommandCancelled?: () => void;
+    /** 已通过取消检查，尚未进入 drain 的同步接纳点。 */
+    onCommandAccepted?: () => void;
   },
 ): Promise<Result> {
   return new Promise<Result>((resolve, reject) => {
@@ -61,6 +63,13 @@ export function enqueueCancellableRuntimeCommand<
       return;
     }
     abortSignal?.addEventListener("abort", abortQueuedCommand, { once: true });
+    try {
+      input.onCommandAccepted?.();
+    } catch (error) {
+      input.onCommandCancelled?.();
+      rejectCommand(error);
+      return;
+    }
     runtime.enqueueRuntimeCommand(command);
   });
 }

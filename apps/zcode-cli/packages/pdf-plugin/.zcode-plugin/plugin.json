@@ -1,15 +1,41 @@
 {
   "name": "pdf",
-  "version": "0.1.8",
-  "description": "PDF document production skills, published as an official ZCode plugin.",
+  "version": "0.2.1",
+  "description": "PDF production skills and a PDF viewer panel, published as an official ZCode plugin.",
   "description_i18n": {
-    "en": "PDF production skills: typeset and render reports, resumes, posters, and covers to PDF.",
-    "zh-CN": "PDF 制作技能：报告、简历、海报、封面的排版与渲染输出。"
+    "en": "PDF production skills: typeset and render reports, resumes, posters, and covers to PDF. View PDFs in a side panel: reference passages in chat, and the agent can read, search, point at and capture pages.",
+    "zh-CN": "PDF 制作技能：报告、简历、海报、封面的排版与渲染输出；并可在侧栏查看 PDF，把内容引用到对话，Agent 可以阅读、搜索、定位高亮并截取页面。"
   },
   "author": {
     "name": "Z.ai"
   },
   "license": "Apache-2.0",
   "skills": "skills",
-  "agents": "agents"
+  "agents": "agents",
+  "mcpServers": {
+    "pdf": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/server.mjs"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "ZCODE_WORKSPACE_ROOT": "${ZCODE_PROJECT_DIR}"
+      }
+    }
+  },
+  "ui": {
+    "surfaces": [
+      {
+        "id": "pdf",
+        "title": {
+          "zh-CN": "PDF",
+          "en-US": "PDF"
+        },
+        "icon": "file-text",
+        "server": "pdf",
+        "resourceUri": "ui://pdf/panel.html",
+        "availability": "session"
+      }
+    ]
+  }
 }

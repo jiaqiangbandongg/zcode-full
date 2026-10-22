@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-task-groups",
+  "spec": "./test/e2e/conversation-session/conversation-session-task-groups.test.ts",
+  "fixtures": [
+    {
+      "id": "grp06-first-send",
+      "description": "First send in a task group",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed response exercises the real Host/CLI creation and group placement, without testing model content."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_GROUP_TASK"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "grp06",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_GROUP_READY"
+        }
+      }
+    },
+    {
+      "id": "grp06-pending-placement",
+      "description": "Accepted task remains navigable while group admission is held",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed response isolates group admission failure from the real Host/CLI accepted task and directory lifecycle."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_GROUP_PENDING"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "grp06-pending",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_GROUP_PENDING_READY"
+        }
+      }
+    }
+  ]
+}

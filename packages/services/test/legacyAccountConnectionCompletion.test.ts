@@ -88,10 +88,16 @@ describe("旧 Team 连接组织补齐的实际设置边界", () => {
   it.each(["connection", "domain"])("等待期间用户修改 %s，迟到迁移不能覆盖", async (field) => {
     const { service, prepareLegacyAccountConnections, read } = await setup();
     await prepareLegacyAccountConnections(async () => {
+      const before = await service.get();
       await service.update(
         field === "connection"
           ? { providerFamilyConnectionSelections: { bigmodel: { kind: "individual-coding-plan" } } }
           : { providerFamilyDomain: "zai" },
+        {
+          providerFamilyDomain: before.providerFamilyDomain,
+          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+          providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
+        },
       );
       return "old-organization";
     });

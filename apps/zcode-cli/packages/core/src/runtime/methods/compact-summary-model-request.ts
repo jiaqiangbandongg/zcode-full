@@ -22,6 +22,7 @@ import {
 import type { RuntimeModelTextResult } from "../types.js";
 
 type CompactSummaryModelRequest = {
+  toolSearchEnabled?: boolean;
   abortSignal?: AbortSignal;
   maxOutputTokens?: number;
   messages: Parameters<Model["generateText"]>[0]["messages"];
@@ -311,6 +312,7 @@ function cleanRequest(request: CompactSummaryModelRequest) {
   return {
     messages: request.messages,
     tools: request.tools,
+    toolSearchEnabled: request.toolSearchEnabled,
     abortSignal: request.abortSignal,
     ...(request.maxOutputTokens !== undefined
       ? { options: { maxOutputTokens: request.maxOutputTokens } }

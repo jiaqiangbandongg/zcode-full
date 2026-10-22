@@ -3,7 +3,8 @@ import { join, resolve } from "node:path";
 import type { FileSystemPort, Logger, TraceContext } from "@zcode/contracts";
 
 import { ensureMemoryDirectoryExists } from "../memory/directory.js";
-import type { AgentRuntimeConfig, MemoryRuntimeConfig } from "../runtime/types.js";
+import type { MemoryRuntimeConfig } from "../runtime/types.js";
+import type { AgentDefinitionsSnapshot } from "./definitions.js";
 import type { AgentProfile, AgentMemoryScope } from "./profile.js";
 import { buildPersistentAgentMemoryPrompt } from "./persistent-memory-prompt.js";
 
@@ -46,19 +47,18 @@ function withPersistentAgentMemoryTools(profile: AgentProfile): AgentProfile {
   return tools.length === profile.tools.length ? profile : { ...profile, tools };
 }
 
-export function projectPersistentAgentMemoryTools(config: AgentRuntimeConfig): AgentRuntimeConfig {
-  const memory = config.memory;
-  const profiles = config.subagents?.profiles;
-  if (!profiles || !isPersistentAgentMemoryEnabled(memory)) return config;
+export function projectPersistentAgentMemoryTools(
+  definitions: AgentDefinitionsSnapshot,
+  memory: MemoryRuntimeConfig | undefined,
+): AgentDefinitionsSnapshot {
+  if (!isPersistentAgentMemoryEnabled(memory)) return definitions;
+  const profiles = definitions.activeAgents;
 
   const projected = profiles.map(withPersistentAgentMemoryTools);
-  if (projected.every((profile, index) => profile === profiles[index])) return config;
+  if (projected.every((profile, index) => profile === profiles[index])) return definitions;
   return {
-    ...config,
-    subagents: {
-      ...config.subagents,
-      profiles: projected,
-    },
+    ...definitions,
+    activeAgents: projected,
   };
 }
 

@@ -101,6 +101,7 @@ export interface OutputStylePromptConfig {
 
 export interface ContextBuilderConfig {
   workingDirectory: string;
+  additionalDirectories?: readonly string[];
   envInfo: EnvInfo;
   /** 当前步骤的执行对象，不进入 Context Source 或持久化环境快照。 */
   model?: Model;

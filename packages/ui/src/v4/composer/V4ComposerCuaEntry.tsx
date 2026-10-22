@@ -6,7 +6,7 @@
  */
 import { memo } from "react";
 import { MonitorCogIcon } from "lucide-react";
-import { TID_V4_COMPOSER_CUA_ENTRY } from "@zcode/shared";
+import { TID_V4_COMPOSER_CUA_ENTRY } from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useOptionalPlatform } from "@/hooks/usePlatform.js";

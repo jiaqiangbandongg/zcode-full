@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { FileMediaPreview } from "@zcode/shared";
 import { CodeBlock } from "@/components/ai-elements/code-block.js";
 import { MessageResponse, type MessageFileLinkTarget } from "@/components/ai-elements/message.js";
 import { ToolInput, ToolOutput } from "@/components/ai-elements/tool.js";
-import { useServices } from "@/hooks/useServices.js";
+import { useToolPresentationCapabilities } from "@/ToolCallBlocks/presentationCapabilities.js";
+import { logger } from "@/logger.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import type {
   CodeViewerSource,
@@ -133,28 +133,59 @@ function InlineCodeContent({
 }
 
 function InlineImageContent({ preview }: { preview: ImageCodeViewerSource }) {
-  const { fileService } = useServices();
+  const { readMediaPreview, resourceUrl } = useToolPresentationCapabilities();
   const { intl } = useZCodeIntl();
-  const [imagePreview, setImagePreview] = useState<FileMediaPreview | null>(null);
+  const directSrc = resourceUrl?.(preview.path);
+  const [result, setResult] = useState<{
+    path: string;
+    reader: typeof readMediaPreview;
+    src?: string;
+    failed?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void fileService.readMediaPreview({ path: preview.path }).then((mediaPreview) => {
-      if (!cancelled) {
-        setImagePreview(mediaPreview);
+    setResult(null);
+    if (directSrc || !readMediaPreview) return;
+    // 图片读取失败曾留下永久 loading 和未处理 rejection；终态必须收口。
+    void (async () => {
+      try {
+        const media = await readMediaPreview(preview.path);
+        if (!cancelled)
+          setResult({ path: preview.path, reader: readMediaPreview, src: media?.dataBase64 });
+      } catch (error) {
+        if (cancelled) return;
+        logger.warn("[ToolCallBody] 内嵌图片读取失败", {
+          path: preview.path,
+          error: String(error),
+        });
+        setResult({ path: preview.path, reader: readMediaPreview, failed: true });
       }
-    });
-
+    })();
     return () => {
       cancelled = true;
     };
-  }, [fileService, preview.path]);
+  }, [directSrc, readMediaPreview, preview.path]);
 
-  if (!imagePreview) {
-    return <p>{intl.formatMessage({ id: "chat.toolCall.loading" })}</p>;
+  // 在 effect 清理前也不能显示旧路径或旧能力的图片。
+  const current =
+    result?.path === preview.path && result.reader === readMediaPreview ? result : null;
+  const src = directSrc ?? current?.src;
+  if (!src) {
+    return (
+      <p>
+        {intl.formatMessage({
+          id: current?.failed
+            ? "chat.toolCall.previewFailed"
+            : !readMediaPreview || current
+              ? "chat.toolCall.previewUnavailable"
+              : "chat.toolCall.loading",
+        })}
+      </p>
+    );
   }
 
-  return <img src={imagePreview.dataBase64} alt={preview.title} />;
+  return <img src={src} alt={preview.title} />;
 }
 
 function InlinePlanResult({

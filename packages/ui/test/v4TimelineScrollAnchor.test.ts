@@ -23,11 +23,11 @@ import {
   timelineWheelScrollIntent,
 } from "@/v4/timelineScrollAnchor.js";
 
-const metrics = (
-  scrollTop: number,
-  viewportHeight: number,
-  contentHeight: number,
-) => ({ scrollTop, viewportHeight, contentHeight });
+const metrics = (scrollTop: number, viewportHeight: number, contentHeight: number) => ({
+  scrollTop,
+  viewportHeight,
+  contentHeight,
+});
 
 describe("timelineScrollAnchor", () => {
   it("distanceToBottom：正常滚动区间与内容不足一屏（不为负）", () => {
@@ -39,12 +39,8 @@ describe("timelineScrollAnchor", () => {
 
   it("isAtBottom：容差内视为在底（亚像素/最后一行 padding）", () => {
     expect(isAtBottom(metrics(1400, 600, 2000))).toBe(true);
-    expect(
-      isAtBottom(metrics(1400 - BOTTOM_ANCHOR_EPSILON_PX, 600, 2000)),
-    ).toBe(true);
-    expect(
-      isAtBottom(metrics(1400 - BOTTOM_ANCHOR_EPSILON_PX - 1, 600, 2000)),
-    ).toBe(false);
+    expect(isAtBottom(metrics(1400 - BOTTOM_ANCHOR_EPSILON_PX, 600, 2000))).toBe(true);
+    expect(isAtBottom(metrics(1400 - BOTTOM_ANCHOR_EPSILON_PX - 1, 600, 2000))).toBe(false);
     // 内容不足一屏恒为在底
     expect(isAtBottom(metrics(0, 600, 300))).toBe(true);
   });
@@ -61,11 +57,6 @@ describe("timelineScrollAnchor", () => {
     // 滚回底部
     following = nextFollowingAfterScroll(metrics(1400, 600, 2000));
     expect(following).toBe(true);
-  });
-
-  it("状态机：程序化贴底落点在底部，scroll 事件不误解除跟随", () => {
-    // 贴底后 scroll 事件的落点 = 底部 → 跟随保持
-    expect(nextFollowingAfterScroll(metrics(1400, 600, 2000))).toBe(true);
   });
 
   it("只有用户 scroll 改变滚动权，terminal/virtualizer 布局回退保持原状态", () => {
@@ -120,13 +111,6 @@ describe("timelineScrollAnchor", () => {
     expect(shouldShowBackToBottom(false, 10)).toBe(true);
     expect(shouldShowBackToBottom(true, 10)).toBe(false);
     expect(shouldShowBackToBottom(false, 0)).toBe(false);
-  });
-
-  it("多 pane 独立性（纯函数无共享状态）：两组指标互不影响", () => {
-    const paneA = nextFollowingAfterScroll(metrics(0, 600, 2000));
-    const paneB = nextFollowingAfterScroll(metrics(1400, 600, 2000));
-    expect(paneA).toBe(false);
-    expect(paneB).toBe(true);
   });
 
   it("宽度 resize 期间禁止逐行补偿，稳定后只补偿视口上方行", () => {

@@ -2,7 +2,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { GitPaneChangeCard } from "@/GitPaneChangeCard.js";
-import { LightweightDiffPreview } from "@/components/ui/lightweight-diff-preview.js";
 import { PatchFallbackContent } from "@/previewPanePatchFallbackContent.js";
 
 vi.mock("@pierre/diffs/react", () => ({
@@ -81,20 +80,6 @@ function createGitChangeCardElement(diffState: Record<string, unknown>) {
 }
 
 describe("content horizontal scrolling", () => {
-  it("keeps patch preview pane content scrollable in both axes", () => {
-    const html = renderToStaticMarkup(
-      createElement(PatchFallbackContent, {
-        patch: "diff --git a/demo.ts b/demo.ts\n@@ -1 +1 @@\n-foo\n+bar",
-        codePreviewSettings,
-        resolvedTheme: "light",
-      }),
-    );
-
-    expect(html).toContain("data-diff-viewer");
-    expect(html).toContain("overflow-auto");
-    expect(html).not.toContain("overflow-hidden");
-  });
-
   it("does not opt patch preview pane rendering out of the diff worker pool", () => {
     const html = renderToStaticMarkup(
       createElement(PatchFallbackContent, {
@@ -131,7 +116,7 @@ describe("content horizontal scrolling", () => {
 
     expect(html).toContain("data-patch-plain-text-preview");
     expect(html).toContain("data-lightweight-diff-preview");
-    expect(html).toContain("overflow-auto");
+
     expect(html).toContain("bar");
     expect(html).toContain("new");
     expect(html).not.toContain("+bar");
@@ -162,21 +147,6 @@ describe("content horizontal scrolling", () => {
     expect(html).toContain('data-lightweight-diff-highlighted="false"');
     expect(html).toContain("&lt;!DOCTYPE html&gt;");
     expect(html).not.toContain("+&lt;!DOCTYPE html&gt;");
-  });
-
-  it("allows expanded Git change card diffs to scroll horizontally", () => {
-    const html = renderToStaticMarkup(
-      createGitChangeCardElement({
-        availability: "patch",
-        patch: null,
-        beforeContent: "foo\n",
-        afterContent: "bar\n",
-        path: "/workspace/demo.ts",
-        summary: null,
-      }),
-    );
-
-    expect(html).toContain("overflow-x-auto overflow-y-hidden");
   });
 
   it("keeps small Git change card diffs on the rich before/after renderer", () => {
@@ -230,10 +200,9 @@ describe("content horizontal scrolling", () => {
   });
 
   it("renders large Git change card diffs from patch input", () => {
-    const beforeContent = Array.from(
-      { length: 1_300 },
-      (_, index) => `line-${index + 1}`,
-    ).join("\n");
+    const beforeContent = Array.from({ length: 1_300 }, (_, index) => `line-${index + 1}`).join(
+      "\n",
+    );
     const afterContent = beforeContent.replace("line-10", "line-10 changed");
 
     const html = renderToStaticMarkup(
@@ -261,20 +230,12 @@ describe("content horizontal scrolling", () => {
   });
 
   it("renders expensive Git patch fallbacks as lightweight text", () => {
-    const afterLines = Array.from(
-      { length: 1_300 },
-      (_, index) => `+  "line-${index + 1}": true,`,
-    );
+    const afterLines = Array.from({ length: 1_300 }, (_, index) => `+  "line-${index + 1}": true,`);
 
     const html = renderToStaticMarkup(
       createGitChangeCardElement({
         availability: "patch",
-        patch: [
-          "--- /dev/null",
-          "+++ b/demo.json",
-          "@@ -0,0 +1,1300 @@",
-          ...afterLines,
-        ].join("\n"),
+        patch: ["--- /dev/null", "+++ b/demo.json", "@@ -0,0 +1,1300 @@", ...afterLines].join("\n"),
         beforeContent: "",
         afterContent: afterLines.map((line) => line.slice(1)).join("\n"),
         path: "/workspace/demo.json",
@@ -288,25 +249,5 @@ describe("content horizontal scrolling", () => {
     expect(html).not.toContain("+  &quot;line-1&quot;: true,");
     expect(html).not.toContain('data-testid="patch-diff"');
     expect(html).not.toContain('data-testid="multi-file-diff"');
-  });
-
-  it("keeps lightweight diff row backgrounds on one shared scroll width", () => {
-    const html = renderToStaticMarkup(
-      createElement(LightweightDiffPreview, {
-        codePreviewSettings,
-        lines: [
-          "-short",
-          "+a very long changed line that should define the shared scroll width",
-          "+short",
-        ],
-      }),
-    );
-
-    expect(html).toContain("data-lightweight-diff-scroll-content");
-    expect(html).toContain(
-      "min-w-full font-mono leading-relaxed text-foreground w-max",
-    );
-    expect(html).toContain("flex min-w-full w-full");
-    expect(html).not.toContain("flex min-w-full w-max");
   });
 });

@@ -1316,39 +1316,42 @@ describe("ConversationProjectionStore", () => {
     expect(store.getState().optimisticCommands).toHaveLength(0);
   });
 
-  it("A12：accepted 输入投影完全静默时只触发一次 same-sub recovery", async () => {
-    vi.useFakeTimers();
-    try {
-      await store.connect();
-      store.markCommandPending({ commandId: "silent-input", type: "sendText", issuedAt: 1 });
+  it.each(["sendText", "editUserQuery"] as const)(
+    "A12：%s accepted 输入投影完全静默时只触发一次 same-sub recovery",
+    async (type) => {
+      vi.useFakeTimers();
+      try {
+        await store.connect();
+        store.markCommandPending({ commandId: "silent-input", type, issuedAt: 1 });
 
-      store.expectAcceptedInputProjection("silent-input");
-      store.expectAcceptedInputProjection("silent-input");
-      await vi.advanceTimersByTimeAsync(ACCEPTED_INPUT_PROJECTION_GRACE_MS - 1);
-      expect(transport.resyncCalls).toEqual([]);
+        store.expectAcceptedInputProjection("silent-input");
+        store.expectAcceptedInputProjection("silent-input");
+        await vi.advanceTimersByTimeAsync(ACCEPTED_INPUT_PROJECTION_GRACE_MS - 1);
+        expect(transport.resyncCalls).toEqual([]);
 
-      await vi.advanceTimersByTimeAsync(1);
-      expect(transport.resyncCalls).toEqual([
-        {
-          subscriptionId: "sub-1",
-          base: { logEpoch: "epoch-1", seq: 5 },
-        },
-      ]);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(transport.resyncCalls).toEqual([
+          {
+            subscriptionId: "sub-1",
+            base: { logEpoch: "epoch-1", seq: 5 },
+          },
+        ]);
 
-      // 恢复只作用于订阅；store 没有重放 command 的写路径，同一 expectation 也不重启 timer。
-      await vi.advanceTimersByTimeAsync(ACCEPTED_INPUT_PROJECTION_GRACE_MS);
-      expect(transport.resyncCalls).toHaveLength(1);
-    } finally {
-      await store.close();
-      vi.useRealTimers();
-    }
-  });
+        // 恢复只作用于订阅；store 没有重放 command 的写路径，同一 expectation 也不重启 timer。
+        await vi.advanceTimersByTimeAsync(ACCEPTED_INPUT_PROJECTION_GRACE_MS);
+        expect(transport.resyncCalls).toHaveLength(1);
+      } finally {
+        await store.close();
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it("A12：及时 user row 或 queue authority 会取消 accepted-input recovery", async () => {
     vi.useFakeTimers();
     try {
       await store.connect();
-      store.markCommandPending({ commandId: "row-input", type: "sendText", issuedAt: 1 });
+      store.markCommandPending({ commandId: "row-input", type: "editUserQuery", issuedAt: 1 });
 
       // 覆盖 frame 先于 ACK Promise continuation 的正常竞态：登记 expectation 时事实已可见。
       transport.emit(

@@ -25,7 +25,7 @@ type ModelReferenceResolution =
   | { ok: true; selection: ModelSelection; entry: ModelCatalogEntry; canonical: string }
   | {
       ok: false;
-      reason: "not_found" | "ambiguous" | "disabled" | "reasoning_level_unknown";
+      reason: "not_found" | "ambiguous" | "other_provider" | "disabled" | "reasoning_level_unknown";
       message: string;
       candidates: ModelCatalogEntry[];
     };
@@ -38,11 +38,20 @@ type ModelReferenceResolution =
 const MODEL_REFERENCE_CANDIDATE_LINES = 40;
 
 /**
- * 把用户说的模型名解析成一次选型。三档，按特异性从高到低（顺序是规格的一部分）：
+ * 把用户说的模型名解析成一次选型。三档，按特异性从高到低（顺序是规格的一部分，
+ * docs/dynamic-workflow/launch.md「`subagent_model` resolves by specificity」）：
  *
  *   1. `providerId/modelId` 全称精确命中；
- *   2. 裸 `modelId` 恰好只挂在一个 provider 下；
- *   3. 裸 `modelId` 挂在多个 provider 下 → 其中有**当前会话那一个**就取它，否则 `ambiguous`。
+ *   2. 裸 `modelId` 在**当前会话的 provider** 下有 → 取它，别的 provider 也有同名无所谓；
+ *   3. 裸 `modelId` 只在别的 provider 下有 → `other_provider`，列出它们的全称。
+ *
+ * 第 2、3 档是 provider 边界：裸名绝不悄悄落到另一个 provider 上。曾经的规则是「裸名只挂在
+ * 一个 provider 下就直接命中」，结果主代理照着技能里的示例写一个 `GLM-5.3-Flash`，会话跑在
+ * team plan 上而这个 id 恰好只配在个人 key 下，子代理就全跑去了另一张账单——用户没要过。
+ * 跨 provider 从此只有一种写法：全称，而技能只允许在用户点名了那个模型时才写它。
+ *
+ * 目录里没有 `current` 条目（会话模型不在注册表里）时没有边界可守：裸名退回「唯一就取、
+ * 多个即 `ambiguous`」。
  *
  * 全部比较大小写不敏感：注册表不给与 `modelId` 不同的展示名，所以没有「按 label 再找一轮」
  * 这一档——用户说的名字与 id 之间只差大小写和 provider 前缀。
@@ -59,16 +68,26 @@ export function resolveModelReference(
   entries: ModelCatalogEntry[],
 ): ModelReferenceResolution {
   const { reference, level } = splitReasoningLevel(text.trim());
-  const matches = matchEntries(reference, entries);
+  const qualified = isQualifiedReference(reference);
+  const matches = matchEntries(reference, qualified, entries);
   if (matches.length === 0) return notFoundResolution(text, entries);
 
   const enabled = matches.filter((entry) => entry.disabledReason === undefined);
   if (enabled.length === 0) return disabledResolution(text, matches);
 
-  // 第 3 档。全称也走这里：同一个 provider/model 在目录里出现两次是宿主的问题，静默取第一个
-  // 会让「我选的到底是哪一个」没有答案。
-  const entry = enabled.length === 1 ? enabled[0]! : enabled.find((candidate) => candidate.current);
-  if (entry === undefined) return ambiguousResolution(text, enabled);
+  // provider 边界（第 2、3 档）。只看**可用**的匹配：当前 provider 下的同名条目若被禁用，裸名
+  // 同样不得溜到别的 provider 去——那仍是用户没要过的一张账单。
+  const sessionEntry = entries.find((entry) => entry.current);
+  const guarded = !qualified && sessionEntry !== undefined;
+  const home = guarded
+    ? enabled.filter((entry) => sameToken(entry.providerId, sessionEntry.providerId))
+    : enabled;
+  if (guarded && home.length === 0) return otherProviderResolution(text, sessionEntry, enabled);
+
+  // 同一个 provider/model 在目录里出现两次是宿主的问题，静默取第一个会让「我选的到底是哪一个」
+  // 没有答案；没有 `current` 条目时裸名撞多个 provider 也落到这里。
+  const entry = home.length === 1 ? home[0]! : home.find((candidate) => candidate.current);
+  if (entry === undefined) return ambiguousResolution(text, home);
 
   const options = resolveReasoningOptions(entry, level);
   if (options === undefined) {
@@ -133,10 +152,19 @@ function splitReasoningLevel(text: string): { reference: string; level?: string 
   return { reference: text.slice(0, index), level: text.slice(index + 1) };
 }
 
-/** 第 1、2 档的候选集：带 `/` 按全称比，不带按裸 `modelId` 比。 */
-function matchEntries(reference: string, entries: ModelCatalogEntry[]): ModelCatalogEntry[] {
-  const providerSeparatorIndex = reference.indexOf("/");
-  if (providerSeparatorIndex > 0) {
+/** 带 `/`（且 provider 段非空）即全称；其余按裸 `modelId` 处理。 */
+function isQualifiedReference(reference: string): boolean {
+  return reference.indexOf("/") > 0;
+}
+
+/** 候选集：全称按两段比，裸名按 `modelId` 比（provider 边界在调用方守）。 */
+function matchEntries(
+  reference: string,
+  qualified: boolean,
+  entries: ModelCatalogEntry[],
+): ModelCatalogEntry[] {
+  if (qualified) {
+    const providerSeparatorIndex = reference.indexOf("/");
     const providerId = reference.slice(0, providerSeparatorIndex);
     const modelId = reference.slice(providerSeparatorIndex + 1);
     return entries.filter(
@@ -184,6 +212,26 @@ function notFoundResolution(text: string, entries: ModelCatalogEntry[]): ModelRe
     ok: false,
     reason: "not_found",
     message: `No configured model matches \`${text}\`. ${body}\n\nPass one of these ids, or call ListModels.`,
+    candidates,
+  };
+}
+
+/**
+ * 裸名只在别的 provider 下有：不替用户跨账单。文案把规则说给模型听——它多半是自作主张挑了
+ * 个「轻量」模型，该做的是去问用户；真是用户点名的，全称就在清单里，抄过去即可。
+ */
+function otherProviderResolution(
+  text: string,
+  sessionEntry: ModelCatalogEntry,
+  candidates: ModelCatalogEntry[],
+): ModelReferenceResolution {
+  const lines = candidates.map((entry) => formatModelCatalogId(entry));
+  // 会话 provider 用人类可读名：team plan 的 providerId 是一串 UUID，印出来谁也认不出。
+  const sessionProvider = sessionEntry.providerLabel ?? sessionEntry.providerId;
+  return {
+    ok: false,
+    reason: "other_provider",
+    message: `\`${text}\` is not configured under the session's provider (${sessionProvider}), only under:\n${lines.join("\n")}\n\nA bare model name never moves the subagents to another provider. Do not pick one on your own: if you think it would help, ask the user first; once they asked for that model, pass its full \`providerId/modelId\`.`,
     candidates,
   };
 }

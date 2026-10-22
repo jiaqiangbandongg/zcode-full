@@ -68,6 +68,8 @@ export function acquirePluginUiPage(key: string, create: () => Page): Promise<Pa
     .add(page)
     .then(
       () => {
+        // admission 后即启动；请求方此时可能已切页，不能依赖 React 后续 update 或锚点。
+        page.start();
         notifyPluginUiPageCreated(key);
         return page;
       },

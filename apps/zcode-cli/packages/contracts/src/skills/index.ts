@@ -26,6 +26,8 @@ export type SkillDiagnosticCode =
   | "skill_not_found";
 
 export interface SkillRoot {
+  /** 附加目录能力的目录限定名；不是项目身份。 */
+  namespace?: string;
   path: string;
   scope: SkillScope;
   source: SkillSource;
@@ -58,6 +60,8 @@ export interface SkillMetadata {
 
 /** Skill tool result 中允许跨边界传播的最小 metadata；不包含正文或 description。 */
 export interface SkillTelemetryMetadata {
+  /** 实际解析的技能原始名称；不限插件来源。 */
+  name?: string;
   qualifiedName?: string;
   pluginId?: string;
   source?: SkillSource;

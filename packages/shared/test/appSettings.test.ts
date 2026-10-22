@@ -1,7 +1,115 @@
 import { describe, expect, it } from "vitest";
-import { appSettingsPatchSchema, appSettingsSchema } from "../src/validationAppSettings.js";
+import { z } from "zod";
+import { appSettingsPatchSchema, appSettingsSchema } from "#src/validationAppSettings.js";
 
 describe("app settings", () => {
+  it("自动归档默认关闭并保留 30 天，已有天数不覆盖", () => {
+    expect(appSettingsSchema.parse({})).toMatchObject({
+      taskAutoArchiveEnabled: false,
+      taskAutoArchiveOlderThanDays: 30,
+    });
+    for (const days of [3, 7, 14, 30]) {
+      expect(
+        appSettingsSchema.parse({ taskAutoArchiveOlderThanDays: days })
+          .taskAutoArchiveOlderThanDays,
+      ).toBe(days);
+    }
+  });
+
+  it.each([undefined, false, true])("旧自动归档选择 %s 一次性关闭，保留天数", (enabled) => {
+    const migrated = appSettingsSchema.parse({
+      taskAutoArchiveEnabled: enabled,
+      taskAutoArchiveOlderThanDays: 14,
+    });
+    expect(migrated).toMatchObject({
+      taskAutoArchiveEnabled: false,
+      taskAutoArchiveOlderThanDays: 14,
+      taskAutoArchiveResetVersion: 1,
+    });
+    expect(appSettingsSchema.parse(migrated)).toEqual(migrated);
+    const reopened = appSettingsSchema.parse({
+      ...migrated,
+      ...appSettingsPatchSchema.parse({ taskAutoArchiveEnabled: true }),
+    });
+    expect(reopened.taskAutoArchiveEnabled).toBe(true);
+    expect(appSettingsSchema.parse(reopened)).toEqual(reopened);
+  });
+
+  it("defaults ToolSearch off and accepts only the three App modes", () => {
+    expect(appSettingsSchema.parse({}).toolSearchMode).toBe("off");
+    expect(appSettingsPatchSchema.parse({})).not.toHaveProperty("toolSearchMode");
+    for (const mode of ["auto", "local", "off"]) {
+      expect(appSettingsSchema.parse({ toolSearchMode: mode }).toolSearchMode).toBe(mode);
+      expect(appSettingsPatchSchema.parse({ toolSearchMode: mode }).toolSearchMode).toBe(mode);
+    }
+    for (const mode of ["native", "invalid", true, null]) {
+      expect(appSettingsPatchSchema.safeParse({ toolSearchMode: mode }).success).toBe(false);
+    }
+  });
+
+  it("preserves an explicit startup reconnect preference while keeping old settings optional", () => {
+    // 合同 §8.2：旧设置缺字段不触发迁移，Host/UI 继续按 true 解释；显式 false 必须通过完整 schema。
+    const parsed = appSettingsSchema.parse({});
+    expect(parsed.remoteStartupAutoReconnectEnabled).toBeUndefined();
+
+    expect(
+      appSettingsSchema.parse({ remoteStartupAutoReconnectEnabled: false })
+        .remoteStartupAutoReconnectEnabled,
+    ).toBe(false);
+
+    expect(
+      appSettingsPatchSchema.parse({ remoteStartupAutoReconnectEnabled: false })
+        .remoteStartupAutoReconnectEnabled,
+    ).toBe(false);
+
+    expect(
+      appSettingsPatchSchema.safeParse({
+        remoteStartupAutoReconnectEnabled: "yes",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("drops the removed global asset install mode preference", () => {
+    const staleFullSettings = appSettingsSchema.parse({
+      remoteDefaultAssetInstallMode: "remote-download",
+    });
+    expect("remoteDefaultAssetInstallMode" in staleFullSettings).toBe(false);
+
+    const stalePatch = appSettingsPatchSchema.parse({
+      remoteDefaultAssetInstallMode: "remote-download",
+    });
+    expect("remoteDefaultAssetInstallMode" in stalePatch).toBe(false);
+  });
+
+  it("round-trips Source-scoped conversation backing paths without extending strict project history", () => {
+    const record = {
+      "11111111-1111-4111-8111-111111111111": {
+        workspacePath: "/home/dev/.zcode/workspace/default",
+        lastResolvedAt: 123,
+      },
+    };
+    expect(
+      appSettingsSchema.parse({
+        remoteConversationWorkspaceBySourceServerId: record,
+      }).remoteConversationWorkspaceBySourceServerId,
+    ).toEqual(record);
+    expect(
+      appSettingsPatchSchema.parse({
+        remoteConversationWorkspaceBySourceServerId: record,
+      }).remoteConversationWorkspaceBySourceServerId,
+    ).toEqual(record);
+    expect(
+      appSettingsSchema.safeParse({
+        remoteConversationWorkspaceBySourceServerId: {
+          "11111111-1111-4111-8111-111111111111": {
+            workspacePath: "/home/dev/.zcode/workspace/default",
+            lastResolvedAt: -1,
+          },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("round-trips every structured Provider Family connection selection", () => {
     const selections = {
       zai: { kind: "individual-coding-plan" },
@@ -28,6 +136,26 @@ describe("app settings", () => {
         },
       }).success,
     ).toBe(false);
+  });
+
+  it("defaults old remote open entries to project and preserves explicit conversation purpose", () => {
+    const base = {
+      kind: "remote",
+      workspacePath: "/workspace/demo",
+      target: { kind: "docker", container: "demo" },
+      lastOpenedAt: 1,
+      lastConnectionStatus: "connected",
+    } as const;
+    expect(
+      appSettingsSchema.parse({ lastWorkspaceSession: [base] }).lastWorkspaceSession[0],
+    ).toMatchObject({
+      workspacePurpose: "project",
+    });
+    expect(
+      appSettingsSchema.parse({
+        lastWorkspaceSession: [{ ...base, workspacePurpose: "conversation" }],
+      }).lastWorkspaceSession[0],
+    ).toMatchObject({ workspacePurpose: "conversation" });
   });
 
   it("defaults and validates the human embedded Browser viewport preference", () => {
@@ -130,8 +258,9 @@ describe("app settings", () => {
 
   it("accepts auto mode and rejects incomplete shell selections", () => {
     expect(
-      appSettingsPatchSchema.parse({ integratedTerminalShell: { mode: "auto" } })
-        .integratedTerminalShell,
+      appSettingsPatchSchema.parse({
+        integratedTerminalShell: { mode: "auto" },
+      }).integratedTerminalShell,
     ).toEqual({ mode: "auto" });
 
     expect(() =>
@@ -246,8 +375,9 @@ describe("app settings", () => {
         .webRemoteControlLastEnabledContext,
     ).toEqual(context);
     expect(
-      appSettingsPatchSchema.parse({ webRemoteControlLastEnabledContext: context })
-        .webRemoteControlLastEnabledContext,
+      appSettingsPatchSchema.parse({
+        webRemoteControlLastEnabledContext: context,
+      }).webRemoteControlLastEnabledContext,
     ).toEqual(context);
     expect(
       appSettingsPatchSchema.parse({
@@ -279,6 +409,58 @@ describe("dynamicWorkflowMode 设置（DWG-19）", () => {
     expect(appSettingsSchema.parse({}).dynamicWorkflowMode).toBeUndefined();
     expect(appSettingsSchema.parse({ dynamicWorkflowMode: "future" }).dynamicWorkflowMode).toBe(
       undefined,
+    );
+  });
+});
+
+describe("远程介绍回滚兼容", () => {
+  // 冻结 e147c3b79a 的相关字段合同；不能复用新版预处理，否则会掩盖旧版拒绝 3 的问题。
+  const previousSettingsSchema = z.object({
+    remoteBoundaryOnboardingVersion: z.literal(2).optional(),
+    recentProjects: z.array(z.string()).default([]),
+    memoryEnabled: z.boolean().default(false),
+  });
+
+  it.each([undefined, 2])("新确认不扩展旧字段（原值 %s）", (legacyVersion) => {
+    const patch = appSettingsPatchSchema.parse({ remoteBoundaryIntroAcknowledgedVersion: 1 });
+    expect(patch).toEqual({ remoteBoundaryIntroAcknowledgedVersion: 1 });
+    const written = appSettingsSchema.parse({
+      recentProjects: ["/example/project"],
+      memoryEnabled: true,
+      remoteBoundaryOnboardingVersion: legacyVersion,
+      ...patch,
+    });
+    const rollback = previousSettingsSchema.safeParse(written);
+    expect(rollback.success).toBe(true);
+    expect(rollback.data).toEqual({
+      recentProjects: ["/example/project"],
+      memoryEnabled: true,
+      remoteBoundaryOnboardingVersion: legacyVersion,
+    });
+  });
+
+  it("迁移已落盘的 3，同时保留原设置和明确确认事实", () => {
+    const written = appSettingsSchema.parse({
+      remoteBoundaryOnboardingVersion: 3,
+      recentProjects: ["/example/project"],
+      memoryEnabled: true,
+    });
+    expect(written).toMatchObject({
+      remoteBoundaryOnboardingVersion: 2,
+      remoteBoundaryIntroAcknowledgedVersion: 1,
+      recentProjects: ["/example/project"],
+      memoryEnabled: true,
+    });
+    expect(previousSettingsSchema.safeParse(written).success).toBe(true);
+    expect(appSettingsSchema.parse(written)).toEqual(written);
+  });
+
+  it("旧 2 不代表新版已确认，补丁不能继续写 3", () => {
+    expect(appSettingsSchema.parse({ remoteBoundaryOnboardingVersion: 2 })).not.toHaveProperty(
+      "remoteBoundaryIntroAcknowledgedVersion",
+    );
+    expect(appSettingsPatchSchema.safeParse({ remoteBoundaryOnboardingVersion: 3 }).success).toBe(
+      false,
     );
   });
 });

@@ -74,34 +74,6 @@ function resolvePersistedActiveSession(
   return sessions[activeIndex];
 }
 
-export function resolveStartupAgentWarmupTargets(
-  settings: Pick<ReturnType<typeof appSettingsSchema.parse>, "recentProjects">,
-  activeTarget: StartupWorkspaceWarmupTarget,
-): StartupWorkspaceWarmupTarget[] {
-  const candidates: StartupWorkspaceWarmupTarget[] = [
-    activeTarget,
-    ...(settings.recentProjects ?? []).map((workspacePath) => ({
-      workspacePath,
-    })),
-  ];
-  const seen = new Set<string>();
-  const targets: StartupWorkspaceWarmupTarget[] = [];
-
-  for (const candidate of candidates) {
-    const workspaceKey = candidate.workspaceIdentity?.trim() || candidate.workspacePath;
-    if (!workspaceKey || seen.has(workspaceKey)) {
-      continue;
-    }
-    seen.add(workspaceKey);
-    targets.push(candidate);
-    if (targets.length === STARTUP_AGENT_WARMUP_LIMIT) {
-      break;
-    }
-  }
-
-  return targets;
-}
-
 export function createOpenWorkspaceStartupBootstrap(workspacePath: string): StartupWindowBootstrap {
   return {
     initialWorkspacePath: workspacePath,
@@ -120,13 +92,16 @@ export async function resolveStartupWindowBootstrap({
   logger?: StartupWorkspaceLogger;
 }): Promise<StartupWindowBootstrap> {
   const settings = await readStartupSettings(settingsFile, logger);
-  const sessions = settings.lastWorkspaceSession ?? [];
+  const sessions =
+    settings.lastActiveWorkspace === undefined
+      ? (settings.lastWorkspaceSession ?? [])
+      : settings.lastActiveWorkspace
+        ? [settings.lastActiveWorkspace]
+        : [];
+  const activeIndex = settings.lastActiveWorkspace === undefined ? settings.lastActiveTabIndex : 0;
 
   if (sessions.length > 0) {
-    const persistedActiveSession = resolvePersistedActiveSession(
-      sessions,
-      settings.lastActiveTabIndex,
-    );
+    const persistedActiveSession = resolvePersistedActiveSession(sessions, activeIndex);
     const unavailableWorkspacePath =
       persistedActiveSession?.kind === "local" &&
       !(await isAvailableWorkspaceDirectory(persistedActiveSession.workspacePath))
@@ -141,24 +116,20 @@ export async function resolveStartupWindowBootstrap({
         unavailableWorkspacePath,
       );
     }
-    const localActiveSessionIndex = resolveStartupLocalWorkspaceSessionIndex(
-      sessions,
-      settings.lastActiveTabIndex,
-    );
+    const localActiveSessionIndex = resolveStartupLocalWorkspaceSessionIndex(sessions, activeIndex);
     const activeSession =
       localActiveSessionIndex == null ? undefined : sessions[localActiveSessionIndex];
     if (activeSession?.kind === "local") {
-      // 被动 sessions-index 全量恢复不能启动全部 workspace；Main 在唯一启动边界固定只选
-      // active workspace（STARTUP_AGENT_WARMUP_LIMIT），Host 走原 initializeWorkspace 路径；
-      // recentProjects 保持 dormant，预热失败也不扫描其它 workspace 补位。
-      const agentWarmupTargets = resolveStartupAgentWarmupTargets(settings, {
-        workspacePath: activeSession.workspacePath,
-      });
+      // 项目/最近目录不再决定 Agent 生命周期，只预热上次活动执行目录。
+      const agentWarmupTargets = [{ workspacePath: activeSession.workspacePath }];
       return {
         ...(unavailableWorkspacePath ? { unavailableWorkspacePath } : {}),
         agentWarmupTargets,
       };
     }
+    // 远程活动项没有本地预热目标，Host 会用此 app-owned cwd 准备会话库。
+    // 切换数据根后该目录尚不存在；必须在交给 Host 前创建，否则 CLI 在发出存储帧前即退出。
+    await mkdir(conversationWorkspaceDir, { recursive: true });
     return unavailableWorkspacePath ? { unavailableWorkspacePath } : {};
   }
 
@@ -171,22 +142,4 @@ export async function resolveStartupWindowBootstrap({
     initialWorkspacePurpose: "conversation",
     agentWarmupTargets: [{ workspacePath: conversationWorkspaceDir }],
   };
-}
-
-export async function resolveStartupWorkspacePath({
-  settingsFile,
-  conversationWorkspaceDir,
-  logger,
-}: {
-  settingsFile: string;
-  conversationWorkspaceDir: string;
-  logger?: StartupWorkspaceLogger;
-}): Promise<string | undefined> {
-  return (
-    await resolveStartupWindowBootstrap({
-      settingsFile,
-      conversationWorkspaceDir,
-      logger,
-    })
-  ).initialWorkspacePath;
 }

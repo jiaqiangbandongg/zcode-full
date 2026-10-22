@@ -27,12 +27,12 @@ type Journal = JournalStorePort & {
 };
 
 let tempRoot: string;
-let store: ReturnType<typeof createSqliteSessionStore>;
+let store: Awaited<ReturnType<typeof createSqliteSessionStore>>;
 let journal: Journal;
 
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-replay-"));
-  store = createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
+  store = await createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
   const resolved = resolveDynamicWorkflowJournalStore(store as never);
   if (resolved === undefined) throw new Error("sqlite store must expose the dwf journal");
   journal = resolved as Journal;
@@ -436,10 +436,9 @@ describe("replayRunProgress — 结算按行铸造", () => {
 
     // 归约面：两条缓存结算都归到子代理名下；最后一条是本 run 的重放命中，sessionId 指回本 run。
     const run = reduce("dwfrun-cached");
-    expect(run.nodes.filter((node) => node.actorSiteId === "actor#1").map((node) => node.siteId)).toEqual([
-      "ask#1",
-      "ask#2",
-    ]);
+    expect(
+      run.nodes.filter((node) => node.actorSiteId === "actor#1").map((node) => node.siteId),
+    ).toEqual(["ask#1", "ask#2"]);
     expect(run.actors[0]?.sessionId).toBe(own);
   });
 

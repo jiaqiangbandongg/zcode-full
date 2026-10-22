@@ -20,6 +20,7 @@ import {
   NATIVE_SUPPLIER_KEY_PREFIX,
   createUuid,
   computeLineChangeStat,
+  sanitizeTelemetrySkillName,
   decodeCustomModelValue,
 } from "@zcode/shared";
 interface ComposerInputTimingState {
@@ -118,9 +119,11 @@ interface ActiveAgentStep {
   agentId?: string;
   agentRole?: AgentStepRole;
   skillMetadata?: AgentStepSkillMetadata;
+  pluginMetadata?: { pluginId: string; component: "mcp" };
 }
 
 interface AgentStepSkillMetadata {
+  name?: string;
   qualifiedName?: string;
   pluginId?: string;
   source?: "agents" | "zcode" | "bundled" | "plugin" | "remote";
@@ -399,6 +402,15 @@ function finalizeAgentStep(input: {
       error_type: normalizedStatus === "success" ? "" : (input.errorType ?? "UNKNOWN"),
       error_msg: normalizedStatus === "success" ? "" : (input.errorMsg ?? ""),
       ...(input.automationId ? { automation_id: input.automationId } : {}),
+      ...(isToolCall && (input.step.pluginMetadata?.pluginId || input.step.skillMetadata?.pluginId)
+        ? {
+            plugin_id: input.step.pluginMetadata?.pluginId ?? input.step.skillMetadata!.pluginId!,
+            plugin_component: input.step.pluginMetadata?.component ?? "skill",
+          }
+        : {}),
+      ...(isToolCall && input.step.toolName === "Skill"
+        ? { skill_name: sanitizeTelemetrySkillName(input.step.skillMetadata?.name) }
+        : {}),
       ...(isToolCall && input.step.toolName === "Skill" && input.step.skillMetadata?.qualifiedName
         ? { skill_qualified_name: input.step.skillMetadata.qualifiedName }
         : {}),
@@ -1084,10 +1096,15 @@ function applyAgentStepSkillMetadata(
   step: ActiveAgentStep,
   metadata: AgentStepSkillMetadata | undefined,
 ): void {
-  // 修复原因：metadata 只允许写入 Skill step，避免非 Skill tool_call 的脏字段进入 telemetry。
   if (!metadata || step.toolName !== "Skill") return;
+  // 只接收已解析 metadata；绝不能用 input.skill/name 补齐失败调用的名称。
+  const name =
+    metadata.source && metadata.name !== undefined
+      ? sanitizeTelemetrySkillName(metadata.name)
+      : undefined;
   step.skillMetadata = {
     ...step.skillMetadata,
+    ...(name ? { name } : {}),
     ...(metadata.qualifiedName ? { qualifiedName: metadata.qualifiedName } : {}),
     ...(metadata.pluginId ? { pluginId: metadata.pluginId } : {}),
     ...(metadata.source ? { source: metadata.source } : {}),
@@ -1215,6 +1232,7 @@ export function recordAgentStepTelemetryEvent(input: {
         toolName: input.event.toolName ?? input.event.kind,
       });
       applyAgentStepToolAttribution(toolStep, input.toolAttribution);
+      if (input.event.pluginMetadata) toolStep.pluginMetadata = input.event.pluginMetadata;
       applyAgentStepSkillMetadata(toolStep, input.skillMetadata ?? input.event.skillMetadata);
       applySettledPermissionWaitAttribution(state, toolStep);
       state.toolStepsById.set(input.event.toolId, toolStep);
@@ -1248,6 +1266,7 @@ export function recordAgentStepTelemetryEvent(input: {
             toolName: input.event.toolName ?? input.event.kind,
           });
           applyAgentStepToolAttribution(toolStep, input.toolAttribution);
+          if (input.event.pluginMetadata) toolStep.pluginMetadata = input.event.pluginMetadata;
           applyAgentStepSkillMetadata(toolStep, input.skillMetadata ?? input.event.skillMetadata);
           applySettledPermissionWaitAttribution(state, toolStep);
           state.toolStepsById.set(input.event.toolId, toolStep);
@@ -1274,6 +1293,7 @@ export function recordAgentStepTelemetryEvent(input: {
           },
         );
       }
+      if (input.event.pluginMetadata) existing.pluginMetadata = input.event.pluginMetadata;
       applyAgentStepSkillMetadata(existing, input.skillMetadata ?? input.event.skillMetadata);
       applyAgentStepToolAttribution(existing, input.toolAttribution);
       // 修复原因：恢复/乱序链路可能先看到 permission_request，随后直接收到工具终态，

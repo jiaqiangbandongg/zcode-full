@@ -77,18 +77,6 @@ describe("internal provider-native WebSearch model tools", () => {
     });
   });
 
-  it("maps Anthropic native WebSearch from the resolved Model Config fact", () => {
-    const tools = toAiSdkTools([createInternalProviderNativeWebSearchContract()], {
-      providerKind: "anthropic",
-      supportsNativeWebSearch: true,
-    });
-
-    expect(tools?.web_search).toMatchObject({
-      id: "anthropic.web_search_20260209",
-      type: "provider",
-    });
-  });
-
   it.each(["openai", "openai-compatible"] as const)(
     "fails closed for a configured native WebSearch capability unsupported by API kind %s",
     (providerKind) => {

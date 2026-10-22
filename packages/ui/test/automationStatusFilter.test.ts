@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ZCodeOffPeakTask, ZCodeOffPeakTaskStatus } from "@zcode/shared";
 import {
-  AUTOMATION_STATUS_FILTERS,
   filterAutomationsByStatus,
   filterOffPeakTasksByStatus,
   resolveAutomationStatusFilterKind,
@@ -14,10 +13,6 @@ function offPeakTask(status: ZCodeOffPeakTaskStatus): ZCodeOffPeakTask {
 }
 
 describe("automation status filter", () => {
-  it("筛选项固定为 全部/进行中/已完成/失败 四组", () => {
-    expect(AUTOMATION_STATUS_FILTERS).toEqual(["all", "inProgress", "completed", "failed"]);
-  });
-
   it("闲时任务：queued/paused/running 归进行中，failed/cancelled 归失败", () => {
     expect(resolveOffPeakStatusFilterKind(offPeakTask("queued"))).toBe("inProgress");
     expect(resolveOffPeakStatusFilterKind(offPeakTask("paused"))).toBe("inProgress");

@@ -203,7 +203,7 @@ const executeToolStrategy: ToolDisplayStrategy = {
 
 const searchToolStrategy: ToolDisplayStrategy = {
   matches(context) {
-    return context.identity.family === "search";
+    return context.identity.family === "search" || context.identity.family === "web-fetch";
   },
   build(context) {
     // search/fetch 类工具的输入通常只是 query、路径或过滤条件，

@@ -1,11 +1,11 @@
 import type { MenuItem } from "electron";
+import { type ResourceUsageSnapshot } from "@zcode/shared";
 import {
   TID_RESOURCE_MANAGER_TAB,
   TID_WORKSPACE_HELP_MENU_RESOURCE_MANAGER,
   TID_WORKSPACE_HELP_MENU_TRIGGER,
   testId,
-  type ResourceUsageSnapshot,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clickTestIdByWebDriver, dispatchMouseDownByExactTestId } from "./desktop-app.js";
 import { sel } from "./selectors.js";
 

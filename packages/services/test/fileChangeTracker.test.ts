@@ -205,9 +205,4 @@ describe("SessionFileChangeTracker", () => {
       expect(tracker.getCurrentTurnIndex()).toBe(-1);
     });
   });
-
-  it("getChangesForTurn 对不存在的轮次返回空", () => {
-    const tracker = new SessionFileChangeTracker();
-    expect(tracker.getChangesForTurn(999)).toEqual([]);
-  });
 });

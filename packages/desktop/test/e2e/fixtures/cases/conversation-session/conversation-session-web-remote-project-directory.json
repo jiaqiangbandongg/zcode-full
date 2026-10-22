@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-web-remote-project-directory",
+  "spec": "./test/e2e/conversation-session/conversation-session-web-remote-project-directory.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-web-remote-project-directory.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "MRO02 通过真实 Electron、SSH Source 和 loopback relay 验证项目草稿导航及目录归属，不发送模型请求。",
+  "requests": []
+}

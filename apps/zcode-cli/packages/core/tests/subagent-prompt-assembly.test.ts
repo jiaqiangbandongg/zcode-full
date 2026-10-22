@@ -240,7 +240,6 @@ describe("subagent provider-visible prompt assembly", () => {
     expect(childRequests).toHaveLength(1);
     expectSystemMessagesCached(childRequests[0]);
     const systems = systemContents(childRequests[0]);
-    expect(systems).toHaveLength(2);
     expect(systems.map((content) => content.endsWith("\n"))).toEqual([false, false]);
     expect(systems[0]).toBe("You are ZCode, an interactive coding agent");
     expect(systems[1]).toMatch(/^\nYou are ZCode Explore/u);
@@ -251,9 +250,7 @@ describe("subagent provider-visible prompt assembly", () => {
     expect(systems[1]).toContain(
       "\n\nHere is useful information about the environment you are running in:",
     );
-    expect(systems[1]).toContain(
-      "Working directory: /Users/dev/Desktop/Z/z-code/apps/zcode-cli",
-    );
+    expect(systems[1]).toContain("Working directory: /Users/dev/Desktop/Z/z-code/apps/zcode-cli");
     expect(systems[1]).toContain("Is directory a git repo: Yes");
     expect(systems[1]).toContain("Platform: darwin");
     expect(systems[1]).toContain("Shell: Git Bash");
@@ -479,7 +476,6 @@ describe("subagent provider-visible prompt assembly", () => {
     expect(systems[1]).toContain(
       "\n\nHere is useful information about the environment you are running in:",
     );
-    expect(systems).not.toContain("\n");
     expect(systems.join("")).toBe(
       result.sections
         .filter((section) => section.injectionTarget === "system")

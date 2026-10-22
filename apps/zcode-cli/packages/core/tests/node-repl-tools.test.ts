@@ -81,8 +81,6 @@ describe("node_repl tools", () => {
     expect(content).toBe(
       "Error: Timeout waiting for locator\nlocator.fill failed for selector #search\n    at click (browser.js:1:1)",
     );
-    expect(String(content).match(/Timeout waiting for locator/g)).toHaveLength(1);
-    expect(String(content).match(/locator\.fill failed/g)).toHaveLength(1);
   });
 
   it("registers node_repl tools only when includeNodeRepl is true", () => {

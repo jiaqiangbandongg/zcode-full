@@ -25,7 +25,8 @@ describe("fallback Read snapshots through SQLite", () => {
       const dbPath = join(root, "session.sqlite");
       const sessionId = createSessionId("fallback-read-state");
       await writeFile(file, "old\n");
-      let store = createSqliteSessionStore({ dbPath });
+      // 合并适配：SQLite store 已改为异步打开，必须等初始化完成后再注入持久化故障。
+      let store = await createSqliteSessionStore({ dbPath });
       const failed = Promise.withResolvers<void>();
       const secondRead = Promise.withResolvers<void>();
       const calls: string[] = [];
@@ -167,7 +168,7 @@ describe("fallback Read snapshots through SQLite", () => {
         if (restore === "resume") {
           runtime.beginShutdown();
           store.close();
-          store = createSqliteSessionStore({ dbPath });
+          store = await createSqliteSessionStore({ dbPath });
           runtime = createRuntime();
           await runtime.resumeFromStore();
         } else {

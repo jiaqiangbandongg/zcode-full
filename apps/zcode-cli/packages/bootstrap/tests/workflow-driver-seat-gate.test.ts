@@ -93,7 +93,12 @@ const silentSink: WorkflowReportSink = {
 /** 装配一个带闸门与真治理器的 driver，并起 `count` 个各自在飞一个 ask 的子代理。 */
 async function startRun(count: number, limit: number) {
   const journal = new InMemoryJournalStore();
-  journal.createRun({ runId: RUN, caps: { maxConcurrency: limit }, spentTokens: 0, status: "running" });
+  journal.createRun({
+    runId: RUN,
+    caps: { maxConcurrency: limit },
+    spentTokens: 0,
+    status: "running",
+  });
   const seatGate = createWorkflowRunSeatGate({ limit });
   const control = createWorkflowRunControl();
   control.bindSeatGate(seatGate);
@@ -173,7 +178,7 @@ describe("driver 侧座位闸门", () => {
     expect(run.seatGate.stats()).toEqual({ limit: 1, working: 4, parked: 0 });
 
     // 其余三个的下一个 turn step：快路径未命中（runner 因此发 queued → waiting(slot)），随后停驻。
-    const parked = run.admissions.slice(1).map((admission, offset) => {
+    run.admissions.slice(1).map((admission, offset) => {
       expect(admission.tryAcquire?.({ model: MODEL })).toBeUndefined();
       return admission.acquire({
         model: MODEL,
@@ -182,7 +187,6 @@ describe("driver 侧座位闸门", () => {
     });
     await flush();
     expect(run.seatGate.stats()).toEqual({ limit: 1, working: 1, parked: 3 });
-    expect(parked).toHaveLength(3);
 
     // 工具跑完之后，同一个子代理的下一个请求就是 turn step 了——但它是此刻唯一在工作的那个，
     // 上界之内，所以照常通过（上界 1 永远留得下一个在跑的人）。
@@ -230,7 +234,11 @@ describe("driver 侧座位闸门", () => {
       outcome: "ok",
       cached: true,
     });
-    run.driver.emit({ type: "node-settled", instance: { siteId: "world#1", ordinal: 1 }, outcome: "ok" });
+    run.driver.emit({
+      type: "node-settled",
+      instance: { siteId: "world#1", ordinal: 1 },
+      outcome: "ok",
+    });
     await flush();
     expect(granted).toEqual([]);
     expect(run.seatGate.stats()).toEqual({ limit: 1, working: 1, parked: 1 });

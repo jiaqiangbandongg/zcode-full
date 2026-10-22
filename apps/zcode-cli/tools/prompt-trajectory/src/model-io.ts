@@ -5,8 +5,13 @@ import {
   deriveTrajectoriesFromEntries,
   type DerivedTrajectoryResult,
 } from "./derive.js";
-import { isAppendOnly, isTrajectoryMessageEqual } from "./message-continuity.js";
-import type { JsonObject, OpenAiMessage, TrajectoryJsonlEntry } from "./types.js";
+import { completeAssistantMessage } from "./message-continuity.js";
+import type {
+  JsonObject,
+  OpenAiMessage,
+  TrajectoryDerivationOptions,
+  TrajectoryJsonlEntry,
+} from "./types.js";
 
 const DEFAULT_QUERY_SOURCE = "main_turn";
 const SESSION_TITLE_PROMPT_PREFIX = "Generate a concise title for this coding session.";
@@ -41,20 +46,24 @@ interface ModelIoToolCall {
   name?: string;
 }
 
-export interface ModelIoTrajectoryOptions {
+export interface ModelIoTrajectoryOptions extends TrajectoryDerivationOptions {
   querySource?: string;
 }
 
-export async function writeModelIoAnthropicTrajectory(input: {
-  inputPath: string;
-  outDir: string;
-  querySource?: string;
-}): Promise<DerivedTrajectoryResult> {
-  const result = deriveTrajectoriesFromModelIoEntries(await readModelIoJsonl(input.inputPath), {
-    querySource: input.querySource,
-  });
+export async function writeModelIoAnthropicTrajectory(
+  input: ModelIoTrajectoryOptions & {
+    inputPath: string;
+    outDir: string;
+  },
+): Promise<DerivedTrajectoryResult> {
+  const result = deriveTrajectoriesFromModelIoEntries(
+    await readModelIoJsonl(input.inputPath),
+    input,
+  );
   if (result.trajectories.length === 0) {
-    throw new Error(`No model-io records matched querySource ${input.querySource ?? DEFAULT_QUERY_SOURCE}`);
+    throw new Error(
+      `No model-io records matched querySource ${input.querySource ?? DEFAULT_QUERY_SOURCE}`,
+    );
   }
 
   const trajectoriesDir = join(input.outDir, "trajectories");
@@ -97,8 +106,9 @@ export function deriveTrajectoriesFromModelIoEntries(
   );
   const trajectoryEntries = modelIoRecordsToTrajectoryEntries(
     expandedRecords.filter((record) => modelIoQuerySource(record) === querySource),
+    options,
   );
-  return deriveTrajectoriesFromEntries(trajectoryEntries);
+  return deriveTrajectoriesFromEntries(trajectoryEntries, options);
 }
 
 async function readModelIoJsonl(inputPath: string): Promise<ModelIoJsonlEntry[]> {
@@ -208,6 +218,7 @@ function expandMessageCollection(
 
 function modelIoRecordsToTrajectoryEntries(
   records: readonly ModelIoJsonlEntry[],
+  options: ModelIoTrajectoryOptions,
 ): TrajectoryJsonlEntry[] {
   const entries: TrajectoryJsonlEntry[] = [];
   let requestIndex = 0;
@@ -251,6 +262,7 @@ function modelIoRecordsToTrajectoryEntries(
           assistantMessage,
           messages as OpenAiMessage[],
           requests[recordIndex + 1]?.body.messages,
+          options,
         ),
         requestIndex,
       });
@@ -258,30 +270,6 @@ function modelIoRecordsToTrajectoryEntries(
   }
 
   return entries;
-}
-
-function completeAssistantMessage(
-  summary: OpenAiMessage,
-  previous: readonly OpenAiMessage[],
-  next: unknown,
-): OpenAiMessage {
-  if (!Array.isArray(next) || !next.every(isOpenAiMessage) || !isAppendOnly(previous, next)) {
-    return summary;
-  }
-  const recorded = next[previous.length];
-  if (recorded?.role !== "assistant" || !Array.isArray(recorded.content)) return summary;
-  // response 摘要没有完整 thinking/签名，直接比较会误分段。
-  // 只从前缀连续且正文/工具完全匹配的下一请求补全；已有历史的 thinking 仍严格比较。
-  const comparable = {
-    ...recorded,
-    content: recorded.content.filter((block: unknown) => {
-      const type = asRecord(block)?.type;
-      return type !== "thinking" && type !== "redacted_thinking";
-    }),
-  };
-  return isTrajectoryMessageEqual(summary, comparable)
-    ? (cloneJsonObject(recorded) as OpenAiMessage)
-    : summary;
 }
 
 function assistantMessageFromModelIoResponse(

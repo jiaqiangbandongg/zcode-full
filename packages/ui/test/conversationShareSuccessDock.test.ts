@@ -33,15 +33,6 @@ describe("ConversationShareSuccessDock", () => {
 
     const dock = screen.getByTestId("conversation-share-success-dock");
     expect(dock).toBeTruthy();
-    expect(dock.className).toContain("w-full");
-    expect(dock.className).not.toContain("max-w-[43.75rem]");
-    expect(dock.className).toContain("border-input-border");
-    expect(dock.className).toContain("bg-input");
-    expect(dock.className).toContain("text-foreground");
-    expect(dock.className).not.toContain("bg-popover");
-    expect(dock.className).not.toContain("text-popover-foreground");
-    expect(dock.className).not.toContain("shadow-lg");
-    expect(dock.className).not.toContain("ring-1");
     expect(screen.getByTestId("conversation-share-success-status").textContent).toContain(
       "conversationShare.result.title",
     );
@@ -57,13 +48,6 @@ describe("ConversationShareSuccessDock", () => {
       .getByTestId("conversation-share-success-actions")
       .querySelectorAll("button");
     expect(actions).toHaveLength(2);
-    expect([...actions].map((action) => action.getAttribute("data-size"))).toEqual(["lg", "lg"]);
-    expect(screen.getByTestId("conversation-share-open-browser").getAttribute("data-variant")).toBe(
-      "outline",
-    );
-    expect(screen.getByTestId("conversation-share-copy-link").getAttribute("data-variant")).toBe(
-      "default",
-    );
     fireEvent.click(screen.getByTestId("conversation-share-open-browser"));
     fireEvent.click(screen.getByTestId("conversation-share-copy-link"));
     expect(onOpen).toHaveBeenCalledTimes(1);

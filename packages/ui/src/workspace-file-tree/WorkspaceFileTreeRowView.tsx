@@ -1,8 +1,9 @@
+import { SidebarNativeTooltip, ControlHintTooltip } from "@/ControlHintTooltip.js";
 /* eslint-disable max-lines -- 文件树行集中维护拖拽、打开方式、Git 状态与上下文菜单交互。 */
 import type { EditorInfo, OpenInEditorRemoteTarget } from "@zcode/shared";
 import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
 import { AlertCircle, ChevronRight, LoaderCircle } from "lucide-react";
-import { TID_WORKSPACE_FILE_TREE_ROW, testId } from "@zcode/shared";
+import { TID_WORKSPACE_FILE_TREE_ROW, testId } from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import {
   ContextMenu,
@@ -15,7 +16,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu.js";
 import { toast } from "@/components/ui/toast.js";
-import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useFileContextActions } from "@/hooks/useFileContextActions.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { FileDisplayIcon, resolveFileDisplayDescriptor } from "@/lib/fileDisplay.js";
@@ -208,126 +208,128 @@ export function WorkspaceFileTreeRowView({
     });
   };
   const rowElement = (
-    <div
-      role="treeitem"
-      data-testid={testId(TID_WORKSPACE_FILE_TREE_ROW, row.path)}
-      aria-expanded={isDirectory ? row.expanded : undefined}
-      tabIndex={0}
-      draggable={!isDeletedFile}
-      className={cn(
-        "group/file-tree-row relative flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg border pr-2 py-1 text-left text-ui-base text-foreground outline-none transition-[background-color,border-color,box-shadow]",
-        isDeletedFile ? "cursor-default" : "cursor-pointer",
-        "pl-[calc(var(--workspace-file-tree-depth)*0.75rem+0.5rem)]",
-        selected
-          ? "border-input-border-focused bg-transparent hover:bg-surface-hover"
-          : "border-transparent hover:bg-surface-hover",
-        "focus-visible:border-border-hover",
-      )}
-      title={relativePath}
-      onClick={handleRowClick}
-      onContextMenu={() => onSelect(row.path)}
-      onKeyDown={(event) => {
-        if (isDeletedFile && event.key === "Enter") {
-          // 修复：键盘 Enter 和鼠标点击走的是两条路径；deleted 虚拟文件同样不能打开预览。
-          event.preventDefault();
-          onSelect(row.path);
-          return;
-        }
-        onKeyDown(event, row);
-      }}
-      onDragStart={(event) => {
-        if (isDeletedFile) {
-          event.preventDefault();
-          return;
-        }
-        event.dataTransfer.effectAllowed = "copy";
-        event.dataTransfer.setData(
-          WORKSPACE_FILE_DRAG_MIME,
-          serializeWorkspaceFileDragPayload(workspaceFilePayload),
-        );
-        event.dataTransfer.setData(
-          "text/plain",
-          buildFileMentionMarkdown(relativePath, row.name, row.type),
-        );
-        setIsDragging(true);
-        dispatchWorkspaceFileDragState(true);
-      }}
-      onDragEnd={() => {
-        setIsDragging(false);
-        dispatchWorkspaceFileDragState(false);
-      }}
-    >
-      {/* 引导线上下各延伸 1px；12px 层级步进让最后一条线与当前层级图标之间稳定保留 4px。 */}
-      {hierarchyGuideStyle && !isDragging ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -inset-y-px left-2.5"
-          data-workspace-file-tree-hierarchy-guides={row.depth}
-          style={hierarchyGuideStyle}
-        />
-      ) : null}
-      {isDirectory ? (
-        <span className="flex size-4 shrink-0 items-center justify-center text-foreground-subtle">
-          <ChevronRight
-            aria-hidden="true"
-            className={cn(
-              "size-3 text-foreground-subtlest transition-transform",
-              row.expanded && "rotate-90",
-            )}
-          />
-        </span>
-      ) : null}
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        {fileIconSrc ? <FileDisplayIcon src={fileIconSrc} className="shrink-0 size-4" /> : null}
-        <WorkspaceFileTreeRowName
-          name={row.name}
-          className={cn("min-w-0 flex-1 truncate", rowStatusTextClassName)}
-          slashClassName="mx-1 text-foreground-subtlest"
-        />
-      </span>
-      {gitStatusText && gitStatusLabel ? (
-        <ControlHintTooltip
-          title={gitStatusLabel}
-          side="right"
-          align="center"
-          sideOffset={4}
-          triggerClassName="ml-auto"
-        >
+    <SidebarNativeTooltip>
+      <div
+        role="treeitem"
+        data-testid={testId(TID_WORKSPACE_FILE_TREE_ROW, row.path)}
+        aria-expanded={isDirectory ? row.expanded : undefined}
+        tabIndex={0}
+        draggable={!isDeletedFile}
+        className={cn(
+          "group/file-tree-row relative flex h-7 w-full min-w-0 items-center gap-1.5 rounded-lg border pr-2 py-1 text-left text-ui-base text-foreground outline-none transition-[background-color,border-color,box-shadow]",
+          isDeletedFile ? "cursor-default" : "cursor-pointer",
+          "pl-[calc(var(--workspace-file-tree-depth)*0.75rem+0.5rem)]",
+          selected
+            ? "border-input-border-focused bg-transparent hover:bg-surface-hover"
+            : "border-transparent hover:bg-surface-hover",
+          "focus-visible:border-border-hover",
+        )}
+        title={relativePath}
+        onClick={handleRowClick}
+        onContextMenu={() => onSelect(row.path)}
+        onKeyDown={(event) => {
+          if (isDeletedFile && event.key === "Enter") {
+            // 修复：键盘 Enter 和鼠标点击走的是两条路径；deleted 虚拟文件同样不能打开预览。
+            event.preventDefault();
+            onSelect(row.path);
+            return;
+          }
+          onKeyDown(event, row);
+        }}
+        onDragStart={(event) => {
+          if (isDeletedFile) {
+            event.preventDefault();
+            return;
+          }
+          event.dataTransfer.effectAllowed = "copy";
+          event.dataTransfer.setData(
+            WORKSPACE_FILE_DRAG_MIME,
+            serializeWorkspaceFileDragPayload(workspaceFilePayload),
+          );
+          event.dataTransfer.setData(
+            "text/plain",
+            buildFileMentionMarkdown(relativePath, row.name, row.type),
+          );
+          setIsDragging(true);
+          dispatchWorkspaceFileDragState(true);
+        }}
+        onDragEnd={() => {
+          setIsDragging(false);
+          dispatchWorkspaceFileDragState(false);
+        }}
+      >
+        {/* 引导线上下各延伸 1px；12px 层级步进让最后一条线与当前层级图标之间稳定保留 4px。 */}
+        {hierarchyGuideStyle && !isDragging ? (
           <span
-            className={cn(
-              "inline-flex shrink-0 justify-center font-mono text-ui-base font-bold leading-none",
-              gitStatusIndicatorClassName,
-            )}
-            aria-label={gitStatusLabel}
-          >
-            {gitStatusText}
-          </span>
-        </ControlHintTooltip>
-      ) : null}
-      {shouldShowDirectoryGitDots ? (
-        <ControlHintTooltip
-          title={directoryGitStatuses.map((status) => gitStatusLabelByStatus[status]).join(", ")}
-          side="right"
-          align="center"
-          sideOffset={4}
-          triggerClassName="ml-1"
-        >
-          <span className="flex shrink-0 items-center" aria-label="●">
-            <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-y-px left-2.5"
+            data-workspace-file-tree-hierarchy-guides={row.depth}
+            style={hierarchyGuideStyle}
+          />
+        ) : null}
+        {isDirectory ? (
+          <span className="flex size-4 shrink-0 items-center justify-center text-foreground-subtle">
+            <ChevronRight
+              aria-hidden="true"
               className={cn(
-                "size-1.5 rounded-full",
-                getWorkspaceFileGitStatusDotClassName(directoryGitStatuses[0]),
+                "size-3 text-foreground-subtlest transition-transform",
+                row.expanded && "rotate-90",
               )}
             />
           </span>
-        </ControlHintTooltip>
-      ) : null}
-      {row.loading ? (
-        <LoaderCircle className="ml-2 size-3 shrink-0 animate-spin text-foreground-subtlest" />
-      ) : row.error ? (
-        <AlertCircle className="ml-2 size-3 shrink-0 text-warning" />
-      ) : null}
-    </div>
+        ) : null}
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          {fileIconSrc ? <FileDisplayIcon src={fileIconSrc} className="shrink-0 size-4" /> : null}
+          <WorkspaceFileTreeRowName
+            name={row.name}
+            className={cn("min-w-0 flex-1 truncate", rowStatusTextClassName)}
+            slashClassName="mx-1 text-foreground-subtlest"
+          />
+        </span>
+        {gitStatusText && gitStatusLabel ? (
+          <ControlHintTooltip
+            title={gitStatusLabel}
+            side="right"
+            align="center"
+            sideOffset={4}
+            triggerClassName="ml-auto"
+          >
+            <span
+              className={cn(
+                "inline-flex shrink-0 justify-center font-mono text-ui-base font-bold leading-none",
+                gitStatusIndicatorClassName,
+              )}
+              aria-label={gitStatusLabel}
+            >
+              {gitStatusText}
+            </span>
+          </ControlHintTooltip>
+        ) : null}
+        {shouldShowDirectoryGitDots ? (
+          <ControlHintTooltip
+            title={directoryGitStatuses.map((status) => gitStatusLabelByStatus[status]).join(", ")}
+            side="right"
+            align="center"
+            sideOffset={4}
+            triggerClassName="ml-1"
+          >
+            <span className="flex shrink-0 items-center" aria-label="●">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  getWorkspaceFileGitStatusDotClassName(directoryGitStatuses[0]),
+                )}
+              />
+            </span>
+          </ControlHintTooltip>
+        ) : null}
+        {row.loading ? (
+          <LoaderCircle className="ml-2 size-3 shrink-0 animate-spin text-foreground-subtlest" />
+        ) : row.error ? (
+          <AlertCircle className="ml-2 size-3 shrink-0 text-warning" />
+        ) : null}
+      </div>
+    </SidebarNativeTooltip>
   );
   // 普通远程路径不能交给本机文件管理器，但 WSL Explorer 会在 main 边界
   // 转成 UNC；因此它和“打开方式 → 资源管理器”必须共享相同的可用性与执行路径。

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-ui-market",
+  "spec": "./test/e2e/plugins/plugin-management-ui-market.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-plugin-market-session-ready",
+      "description": "Create an existing session with a real local UI plugin before opening its surface.",
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_PLUGIN_MARKET_SESSION_READY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "plugin-market-session-ready"
+      }
+    }
+  ]
+}

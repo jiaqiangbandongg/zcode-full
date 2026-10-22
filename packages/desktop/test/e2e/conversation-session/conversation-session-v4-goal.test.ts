@@ -3,7 +3,7 @@
 // dispatchCommand("sendGoalCommand") → v4-bridge goalSession(set) → TargetChanged 事件 →
 // reducer 更新 goal 状态 → unified status-panel shell 投影 objective + active。
 // 证明 goal slash 入口 + goal 状态投影 + 摘要 timer/pause/resume UI 全链路。
-import { TID_CHAT_SUMMARY_PANEL, TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_CHAT_SUMMARY_PANEL, TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   setInputValueByTestIdDom,

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { TID_CHAT_MESSAGES, TID_GIT_PANE } from "@zcode/shared";
+import { TID_CHAT_MESSAGES, TID_GIT_PANE } from "@zcode/shared/test-ids";
 import { Key } from "webdriverio";
 import {
   DEFAULT_WORKSPACE,

@@ -138,24 +138,6 @@ describe("terminateProcessTree Windows", () => {
     );
   });
 
-  it("force 前定向复核 CreationDate 匹配才强杀 root", async () => {
-    const child = {
-      exitCode: null,
-      pid: 4242,
-      signalCode: null,
-    } as ChildProcess;
-
-    terminateProcessTree(child, { forceAfterMs: 1_000 });
-    await vi.advanceTimersByTimeAsync(250);
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      "taskkill",
-      ["/PID", "4242", "/T", "/F"],
-      expect.objectContaining({ windowsHide: true }),
-      expect.any(Function),
-    );
-  });
-
   it("force 前直接使用 PowerShell 定向复核 root", async () => {
     const child = {
       exitCode: null,

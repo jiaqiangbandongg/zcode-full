@@ -159,36 +159,4 @@ describe("provider-node private config codecs", () => {
       }),
     ).toThrow();
   });
-
-  it("拒绝 Personal Provider Config 中的全局 match 规则", () => {
-    expect(() =>
-      decodeProviderConfigFile({
-        schemaVersion: 1,
-        providers: {},
-        modelConfigRules: {
-          matchRules: [],
-          providerModelRules: [],
-        },
-      }),
-    ).toThrow();
-  });
-
-  it("round-trips a complete ModelSelection without exposing the file envelope", () => {
-    const selection = {
-      providerId: "provider-a",
-      modelId: "model-a",
-      options: { reasoningLevel: "high" },
-    };
-    const encoded = encodeProviderConfigFile({
-      providers: ProviderConfigMap.empty(),
-      models: ModelConfigRules.empty(),
-      defaultModelSelection: selection,
-    });
-
-    expect(encoded.config.defaultModelSelection).toEqual(selection);
-    expect(decodeProviderConfigFile(encoded).defaultModelSelection).toEqual(selection);
-    expect(() => decodeProviderConfigFile({ schemaVersion: 2 })).toThrow(
-      UnsupportedProviderConfigVersionError,
-    );
-  });
 });

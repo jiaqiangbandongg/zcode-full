@@ -29,7 +29,7 @@ export interface SubagentRunOptions {
   modelOverride?: {
     selection: ModelSelection;
     requestDependencies?: ModelRequestDependencies;
-    background: "deny";
+    background: "deny" | "allow";
   };
 }
 
@@ -41,11 +41,7 @@ export type SubagentLaunchOptions = SubagentRunOptions;
 
 export type SubagentStartRequest = SubagentRunRequest;
 
-export interface SubagentStartOptions {
-  signal?: AbortSignal;
-  /** 后台 child 启动时继承的普通 Model；临时 turn 模型仍禁止进入后台。 */
-  model?: Model;
-}
+export type SubagentStartOptions = SubagentRunOptions;
 
 export interface SubagentWaitOptions {
   signal?: AbortSignal;
@@ -67,9 +63,7 @@ export interface SubagentSendMessageRequest {
   trace: TraceContext;
 }
 
-export interface SubagentSendMessageOptions {
-  signal?: AbortSignal;
-}
+export type SubagentSendMessageOptions = SubagentRunOptions;
 
 export type SubagentSendMessageDelivery = "queued" | "steered" | "resumed_background";
 

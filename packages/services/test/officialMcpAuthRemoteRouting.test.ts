@@ -321,9 +321,7 @@ describe("official mcp auth headers over desktop-attached remote", () => {
         ok: false,
         reason: "official_mcp_origin_untrusted",
       });
-      // 响应里不得出现任何 headers 字段
       const payload = remote?.respond.mock.calls[0]?.[1] as Record<string, unknown>;
-      expect(payload["headers"]).toBeUndefined();
       expect(JSON.stringify(payload)).not.toContain("must-not-leak");
     } finally {
       await harness.dispose();

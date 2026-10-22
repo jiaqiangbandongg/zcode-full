@@ -12,33 +12,33 @@
       "id": "v4-plan-shortcut-title",
       "description": "E2E_V4_PLAN_SHORTCUT_SEED 首发的 case-local 标题生成响应。",
       "kind": "common",
-      "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "Plan shortcut 任务需要一个已有 session；固定 seed 的 title sidecar，避免回退到共享 provider fixture。"
+      "source": "synthetic",
+      "syntheticReason": "为列表操作测试建立已有会话，固定 seed 标题响应。"
     },
     {
       "id": "v4-plan-shortcut-seed",
       "description": "Plan shortcut seed：建立可发送普通 follow-up 的已有 session。",
       "kind": "main",
-      "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "空命令和附件拒绝不需要 provider；任务组合需要稳定的已有 session。"
+      "source": "synthetic",
+      "syntheticReason": "为点击选择和窄屏原文发送提供稳定的已有会话。"
     },
     {
       "id": "v4-plan-shortcut-task-one",
-      "description": "`/plan <task>` 首次切换 Plan 后的普通任务响应。",
+      "description": "选择计划模式后，正文和附件走标准 Plan 发送。",
       "kind": "main",
-      "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "验证 mode CAS 后 sendText 的 provider 正文只包含任务，不包含 `/plan` 前缀。"
+      "source": "synthetic",
+      "syntheticReason": "验证选中不发送，另行发送时保留附件并携带标准 Plan 指令。"
     },
     {
       "id": "v4-plan-shortcut-task-two",
-      "description": "已处于 Plan 模式时 `/plan <task>` noop 后继续发送的普通任务响应。",
+      "description": "关闭 Plan 后发送原始 /plan 文本，不发生隐式模式切换。",
       "kind": "main",
-      "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "验证重复 Plan mode CAS 收敛为 noop 后仍进入普通 sendText。"
+      "source": "synthetic",
+      "syntheticReason": "验证发送层不再剥离 /plan，也不再启用 Plan。"
     }
   ]
 }

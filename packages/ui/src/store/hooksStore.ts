@@ -6,6 +6,7 @@ import { getWorkspaceKey } from "@/lib/workspaceKey.js";
 interface HooksStoreState {
   workspacePath: string | null;
   workspaceIdentity: string | null;
+  authorityKey: string | null;
   loadedWorkspaceKey: string | null;
   hooks: Hook[];
   loading: boolean;
@@ -15,6 +16,7 @@ interface HooksStoreState {
     workspacePath: string | undefined,
     workspaceIdentity: string | undefined,
     hooksService: IHooksService,
+    authorityKey?: string,
   ) => Promise<void>;
   /**
    * refresh 必须显式传入发起时的 target（path/identity/service 三元组）。
@@ -24,7 +26,11 @@ interface HooksStoreState {
    */
   refresh: (
     hooksService: IHooksService,
-    target: { workspacePath?: string | null; workspaceIdentity?: string | null },
+    target: {
+      workspacePath?: string | null;
+      workspaceIdentity?: string | null;
+      authorityKey?: string | null;
+    },
   ) => Promise<void>;
   addHook: (config: HookConfig, hooksService: IHooksService) => Promise<void>;
   updateHook: (id: string, config: HookConfig, hooksService: IHooksService) => Promise<void>;
@@ -38,12 +44,21 @@ type StoreGet = () => HooksStoreState;
 
 const inflightLoads = new Map<string, Promise<void>>();
 
-// store 是单例，切换 workspace 后先发起的加载可能后到。任何异步结果写回 store 之前
+function getHooksCacheKey(
+  workspacePath: string,
+  workspaceIdentity?: string | null,
+  authorityKey?: string | null,
+): string {
+  const targetKey = getWorkspaceKey(workspacePath, workspaceIdentity);
+  return authorityKey?.trim() ? `${authorityKey.trim()}\0${targetKey}` : targetKey;
+}
+
+// Bugfix：store 是单例，切换 workspace 后先发起的加载可能后到。任何异步结果写回 store 之前
 // 都要比对发起时的 target key，否则旧 workspace 的 hooks 会覆盖当前投影，并被后续写操作落盘
 // 到当前 workspace。
 function currentWorkspaceKey(get: StoreGet): string | null {
-  const { workspacePath, workspaceIdentity } = get();
-  return workspacePath ? getWorkspaceKey(workspacePath, workspaceIdentity) : null;
+  const { workspacePath, workspaceIdentity, authorityKey } = get();
+  return workspacePath ? getHooksCacheKey(workspacePath, workspaceIdentity, authorityKey) : null;
 }
 
 function errorMessage(error: unknown): string {
@@ -108,9 +123,9 @@ function updateHookFromConfig(hook: Hook, config: HookConfig): Hook {
 }
 
 async function loadCurrentHooks(get: StoreGet, set: StoreSet, hooksService: IHooksService) {
-  const { workspacePath, workspaceIdentity } = get();
+  const { workspacePath, workspaceIdentity, authorityKey } = get();
   if (!workspacePath) return;
-  const key = getWorkspaceKey(workspacePath, workspaceIdentity);
+  const key = getHooksCacheKey(workspacePath, workspaceIdentity, authorityKey);
   const result = await hooksService.loadHooks({
     workspacePath,
     ...(workspaceIdentity ? { workspaceIdentity } : {}),
@@ -170,21 +185,27 @@ async function applyHookMutation(
 export const useHooksStore = create<HooksStoreState>((set, get) => ({
   workspacePath: null,
   workspaceIdentity: null,
+  authorityKey: null,
   loadedWorkspaceKey: null,
   hooks: [],
   loading: false,
   error: null,
   operatingHookId: null,
 
-  initialize: async (workspacePath, workspaceIdentity, hooksService) => {
+  initialize: async (workspacePath, workspaceIdentity, hooksService, authorityKey) => {
     const normalizedIdentity = workspaceIdentity?.trim() || null;
-    set({ workspacePath: workspacePath ?? null, workspaceIdentity: normalizedIdentity });
+    const normalizedAuthorityKey = authorityKey?.trim() || null;
+    set({
+      workspacePath: workspacePath ?? null,
+      workspaceIdentity: normalizedIdentity,
+      authorityKey: normalizedAuthorityKey,
+    });
     if (!workspacePath) {
       set({ hooks: [], loading: false, loadedWorkspaceKey: null });
       return;
     }
-    const key = getWorkspaceKey(workspacePath, normalizedIdentity);
-    // 切到另一个 workspace 时立即丢弃上一份投影，避免新数据到达前展示并操作别人的 hooks。
+    const key = getHooksCacheKey(workspacePath, normalizedIdentity, normalizedAuthorityKey);
+    // Bugfix：切到另一个 workspace 时立即丢弃上一份投影，避免新数据到达前展示并操作别人的 hooks。
     if (get().loadedWorkspaceKey !== key) {
       set({ hooks: [], loadedWorkspaceKey: null });
     }
@@ -217,9 +238,10 @@ export const useHooksStore = create<HooksStoreState>((set, get) => ({
     // 三元组在调用点原子捕获：service 与 path/identity 必须来自同一时刻的同一 target。
     const targetPath = target.workspacePath ?? null;
     const targetIdentity = target.workspaceIdentity?.trim() || null;
+    const targetAuthorityKey = target.authorityKey?.trim() || null;
     if (!targetPath) return;
-    const key = getWorkspaceKey(targetPath, targetIdentity);
-    // 发起前 target 已不是当前 workspace（Trust 等待期间用户已切走）时必须直接
+    const key = getHooksCacheKey(targetPath, targetIdentity, targetAuthorityKey);
+    // Bugfix：发起前 target 已不是当前 workspace（Trust 等待期间用户已切走）时必须直接
     // 放弃——loading/error 是全局单一字段，若仍 set({loading:true}) 会在结果因 key 不匹配
     // 被丢弃后，把当前 workspace 永久留在 loading=true。
     if (currentWorkspaceKey(get) !== key) return;

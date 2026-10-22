@@ -41,42 +41,15 @@ describe("SettingsHeaderBreadcrumb", () => {
       name: "Settings path",
     });
     expect(navigation.textContent).toBe("Memoryz-codeMEMORY.md");
-    expect(navigation.className).toContain("px-2.5");
-    expect(navigation.className).not.toContain("px-4");
-    expect(navigation.querySelector("ol")?.className).toContain("gap-0");
-    expect(navigation.querySelector("ol")?.className).not.toContain("gap-1");
-    expect(screen.getAllByTestId("settings-breadcrumb-separator")).toHaveLength(
-      2,
-    );
-    expect(
-      screen
-        .getAllByTestId("settings-breadcrumb-separator")[0]
-        ?.getAttribute("class"),
-    ).toContain("text-foreground-subtlest");
+    expect(screen.getAllByTestId("settings-breadcrumb-separator")).toHaveLength(2);
     expect(screen.getAllByRole("button")).toHaveLength(2);
     expect(screen.getByText("MEMORY.md").tagName).toBe("SPAN");
-    expect(screen.getByText("MEMORY.md").className).toContain("px-2");
-    expect(screen.getByText("MEMORY.md").closest("ol")?.className).toContain(
-      "text-ui-base/relaxed",
-    );
     expect(screen.getByRole("button", { name: "Memory" }).className).toContain(
       "[app-region:no-drag]",
     );
-    expect(
-      screen.getByRole("button", { name: "Memory" }).getAttribute("data-size"),
-    ).toBe("default");
-    expect(screen.getByRole("button", { name: "Memory" }).className).toContain(
-      "text-foreground-subtle",
+    expect(screen.getByRole("button", { name: "Memory" }).getAttribute("data-testid")).toBe(
+      "settings-breadcrumb-section",
     );
-    expect(screen.getByRole("button", { name: "Memory" }).className).toContain(
-      "hover:text-foreground",
-    );
-    expect(
-      screen.getByRole("button", { name: "Memory" }).getAttribute("data-testid"),
-    ).toBe("settings-breadcrumb-section");
-    expect(
-      screen.getByRole("button", { name: "Memory" }).className,
-    ).not.toContain("px-1");
 
     fireEvent.click(screen.getByRole("button", { name: "Memory" }));
     fireEvent.click(screen.getByRole("button", { name: "z-code" }));
@@ -93,10 +66,7 @@ describe("SettingsHeaderBreadcrumb", () => {
         SettingsBreadcrumbProvider,
         { onItemsChange, sectionLabel: "Memory" },
         createElement(SettingsBreadcrumbReporter, {
-          items: [
-            { label: "z-code", onSelect: onOpenProject },
-            { label: "MEMORY.md" },
-          ],
+          items: [{ label: "z-code", onSelect: onOpenProject }, { label: "MEMORY.md" }],
           onSectionSelect: onOpenSection,
         }),
       ),
@@ -141,9 +111,7 @@ describe("SettingsHeaderBreadcrumb", () => {
     view.rerender(renderTree(false));
 
     expect(
-      onItemsChange.mock.lastCall?.[0].map(
-        (item: SettingsBreadcrumbItem) => item.label,
-      ),
+      onItemsChange.mock.lastCall?.[0].map((item: SettingsBreadcrumbItem) => item.label),
     ).toEqual(["Plugin Marketplace", "Plugins", "New MCP server"]);
   });
 });

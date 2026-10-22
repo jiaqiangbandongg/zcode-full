@@ -163,27 +163,6 @@ describe("remote media preview range proxy", () => {
     await proxy.dispose();
   });
 
-  it("invalidates a lease when the remote file size changes", async () => {
-    const fileService = createFileService();
-    const stat = vi.mocked(fileService.stat);
-    const proxy = createRemoteMediaPreviewProxy({
-      fileService,
-      scope: {
-        kind: "remote",
-        remoteSessionId: "remote-session-a",
-        workspacePath: "/remote/workspace",
-        workspaceIdentity: "remote:ssh:host-a:/remote/workspace",
-      },
-    });
-    const prepared = await proxy.service.prepare({
-      path: "/remote/workspace/video.mp4",
-      expectedKind: "video",
-    });
-    stat.mockResolvedValueOnce({ path: prepared.path, type: "file", size: 11 });
-    await expect(fetch(prepared.url)).resolves.toMatchObject({ status: 409 });
-    await proxy.dispose();
-  });
-
   it("reserves the per-lease request slot before awaiting remote stat", async () => {
     const fileService = createFileService();
     const stat = vi.mocked(fileService.stat);

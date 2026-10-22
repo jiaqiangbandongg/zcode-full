@@ -72,6 +72,36 @@ describe("handleOAuthCallbackSuccess", () => {
     expect(reportAppTelemetryEventMock).toHaveBeenCalledTimes(1);
   });
 
+  it("连接域 CAS 冲突不能否定已经成功的 OAuth session", async () => {
+    const { handleOAuthCallbackSuccess } = await import("@/root/useRootOAuthEffects.js");
+    const setUser = vi.fn();
+    const setOAuthError = vi.fn();
+    const refreshProviderState = vi.fn(async () => {});
+    const refreshLatestModelProviderFamilySelection = vi.fn(async () => null);
+    await expect(
+      handleOAuthCallbackSuccess({
+        result: {
+          kind: "session",
+          provider: BIGMODEL_PROVIDER_ID,
+          userInfo: { id: "user-1", username: "user" },
+        },
+        platform: { reportTelemetryEvent: vi.fn(async () => {}) },
+        setProviderFamilyDomain: async () => {
+          throw new Error("Account connection settings changed");
+        },
+        setUser,
+        setOAuthError,
+        refreshProviderState,
+        refreshLatestModelProviderFamilySelection,
+      }),
+    ).resolves.toBeUndefined();
+    expect(setUser).toHaveBeenCalledWith({ id: "user-1", username: "user" });
+    expect(setOAuthError).toHaveBeenCalledExactlyOnceWith(null);
+    expect(refreshProviderState).toHaveBeenCalledOnce();
+    expect(refreshLatestModelProviderFamilySelection).not.toHaveBeenCalled();
+    expect(reportAppTelemetryEventMock).toHaveBeenCalledOnce();
+  });
+
   it("Provider Family 选择校正失败不应阻断 OAuth 登录成功态", async () => {
     const { handleOAuthCallbackSuccess } = await import("@/root/useRootOAuthEffects.js");
     const setUser = vi.fn();
@@ -178,48 +208,6 @@ describe("handleOAuthCallbackSuccess", () => {
     const refreshLatestModelProviderFamilySelection = vi.fn(async () => {
       events.push("selection");
       return { kind: "individual-coding-plan" as const };
-    });
-    const setProviderFamilyDomain = vi.fn(async () => {});
-    const platform = {
-      reportTelemetryEvent: vi.fn(async () => {}),
-    };
-
-    await handleOAuthCallbackSuccess({
-      result: {
-        kind: "session",
-        provider: ZAI_PROVIDER_ID,
-        userInfo: {
-          id: "user-1",
-          username: "zai-user",
-          displayName: "Z.ai User",
-        },
-      },
-      platform,
-      refreshLatestModelProviderFamilySelection,
-      refreshAppSettings,
-      refreshProviderState,
-      setProviderFamilyDomain,
-      setUser,
-      setOAuthError,
-    });
-
-    expect(events).toEqual(["selection", "settings", "provider-state"]);
-  });
-
-  it("Start Plan 选择收敛后统一刷新 Provider Runtime", async () => {
-    const { handleOAuthCallbackSuccess } = await import("@/root/useRootOAuthEffects.js");
-    const events: string[] = [];
-    const setUser = vi.fn();
-    const setOAuthError = vi.fn();
-    const refreshProviderState = vi.fn(async () => {
-      events.push("provider-state");
-    });
-    const refreshAppSettings = vi.fn(async () => {
-      events.push("settings");
-    });
-    const refreshLatestModelProviderFamilySelection = vi.fn(async () => {
-      events.push("selection");
-      return { kind: "start-plan" as const };
     });
     const setProviderFamilyDomain = vi.fn(async () => {});
     const platform = {
@@ -363,6 +351,7 @@ describe("refreshRestoredOAuthProviderFamilyAfterStartup", () => {
     expect(update).toHaveBeenCalledWith(expect.anything(), {
       providerFamilyDomain: undefined,
       providerFamilyConnectionSelections: { bigmodel: { kind: "individual-coding-plan" } },
+      providerFamilyDomainUpdatedAt: 0,
     });
   });
   it.each(["bigmodel", "zai"])(
@@ -469,7 +458,32 @@ describe("refreshRestoredOAuthProviderFamilyAfterStartup", () => {
     expect(update).toHaveBeenCalledWith(expect.anything(), {
       providerFamilyDomain: undefined,
       providerFamilyConnectionSelections: {},
+      providerFamilyDomainUpdatedAt: 0,
     });
     expect(refreshAppSettings).toHaveBeenCalledOnce();
   });
+});
+
+it("OAuth 查询版本必须在网络等待前捕获，同身份新操作拒绝旧回包", async () => {
+  const { refreshLatestModelProviderFamilySelectionAfterLogin } =
+    await import("@/root/oauthProviderFamilySelectionRefresh.js");
+  const events: string[] = [];
+  const { services, update } = createStartupRestoreServices({
+    events,
+    settings: { providerFamilyConnectionSelections: {} },
+  });
+  update.mockImplementationOnce(async (_patch, expected) => {
+    if (expected?.providerFamilyDomainUpdatedAt !== 1)
+      throw new Error("Account connection settings changed");
+  });
+  await expect(
+    refreshLatestModelProviderFamilySelectionAfterLogin({
+      provider: "bigmodel",
+      services: services as never,
+    }),
+  ).rejects.toThrow("Account connection settings changed");
+  expect(update).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ providerFamilyDomainUpdatedAt: 0 }),
+  );
 });

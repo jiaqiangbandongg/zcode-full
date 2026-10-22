@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 const resolver = vi.hoisted(() => vi.fn());
 vi.mock("@zcode/services/storage-startup", () => ({ resolveDefaultZCodeAgentCommand: resolver }));
-import { prepareSessionStorage } from "../src/host/storagePreparationProcesses.js";
+import { prepareSessionStorage } from "../src/host/database-startup/storagePreparationProcesses.js";
 
 it("uses a Host-owned Worker and waits for the preparation completion frame", async () => {
   const dir = await mkdtemp(join(tmpdir(), "zcode-preparation-worker-"));

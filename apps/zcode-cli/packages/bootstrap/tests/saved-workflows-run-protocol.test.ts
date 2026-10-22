@@ -6,11 +6,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  zcodeProtocolMethods,
-  zcodeWorkflowsForRunResultSchema,
-  zcodeWorkflowsSaveResultSchema,
-} from "@zcode/shared";
+import { zcodeWorkflowsForRunResultSchema, zcodeWorkflowsSaveResultSchema } from "@zcode/shared";
 import { parseSavedWorkflow, serializeSavedWorkflow } from "@zcode/core";
 import {
   findSavedWorkflowForRunOp,
@@ -95,11 +91,6 @@ afterEach(async () => {
 });
 
 describe("workflows/save", () => {
-  it("registers the method names", () => {
-    expect(zcodeProtocolMethods.workflowsSave).toBe("workflows/save");
-    expect(zcodeProtocolMethods.workflowsForRun).toBe("workflows/forRun");
-  });
-
   it("按 runId 取 journal 里的脚本原文逐字节写下去；元数据按 SaveWorkflow 同一套规则落 frontmatter", async () => {
     const context = contextWithRuns([{ runId: "run-1", scriptText: SCRIPT }]);
     const result = await saveSavedWorkflowFromRunOp(context, {

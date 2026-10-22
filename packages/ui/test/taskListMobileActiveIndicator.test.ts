@@ -133,7 +133,7 @@ describe("TaskList mobile active indicator", () => {
     expect(html).toContain("手机正在操作此任务");
   });
 
-  it("renders unread dot with sky colors", () => {
+  it("renders unread dot with the prototype blue token", () => {
     const html = renderTaskItem({
       task: createTaskMeta({ unreadAt: 100 }),
       isMobileActive: false,
@@ -141,8 +141,9 @@ describe("TaskList mobile active indicator", () => {
     });
 
     expect(html).toContain('data-unread-indicator="true"');
-    expect(html).toContain("bg-sky-500");
-    expect(html).toContain("dark:bg-sky-400");
+    // 原型 §2.D8：unread 点 7px + --blue 语义色（bg-icon-blue），不再用裸 sky 调色板。
+    expect(html).toContain("size-[7px]");
+    expect(html).toContain("bg-icon-blue");
     expect(html).not.toContain("bg-brand");
   });
 
@@ -165,14 +166,6 @@ describe("TaskList mobile active indicator", () => {
       html.indexOf('data-task-title-copy="original"'),
     );
     expect(html).not.toContain('title="手机正在查看的任务"');
-  });
-
-  it("keeps the phone marker out of the title flex flow", () => {
-    const html = renderTaskItem();
-
-    expect(html).toMatch(
-      /<span data-mobile-active-task="true" class="[^"]*absolute[^"]*" aria-label="手机正在操作此任务" data-state="closed" data-slot="tooltip-trigger">/,
-    );
   });
 
   it("keeps the phone marker mounted until React interaction state replaces it", () => {

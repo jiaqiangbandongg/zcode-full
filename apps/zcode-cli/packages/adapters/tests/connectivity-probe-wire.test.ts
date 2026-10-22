@@ -34,6 +34,12 @@ describe("connectivity probe wire contract", () => {
           },
         },
         {
+          requestSecurityState: {
+            createExecution: () => ({
+              protectTransport: ({ transport }) => transport,
+              take: () => [],
+            }),
+          },
           // 离线拦截所有请求，包含意外的鉴权/控制面请求；绝不回落真实账号网络。
           transport: async (input, init) => {
             const request = new Request(input, init);

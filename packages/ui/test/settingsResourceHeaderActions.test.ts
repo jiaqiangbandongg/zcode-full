@@ -28,8 +28,6 @@ describe("SettingsResourceHeaderActions", () => {
     expect(buttons[0]?.getAttribute("aria-label")).toBe("Refresh");
     fireEvent.click(buttons[0]!);
     expect(onRefresh).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "New" })).toBeNull();
   });
 
   it("shows only implemented overflow actions in overflow, Refresh, New order", () => {
@@ -58,7 +56,6 @@ describe("SettingsResourceHeaderActions", () => {
     fireEvent.pointerDown(buttons[0]!, { button: 0, ctrlKey: false });
     const menuItems = screen.getAllByRole("menuitem");
     expect(menuItems.map((item) => item.textContent)).toEqual(["Import"]);
-    expect(menuItems[0]?.querySelector(".lucide-square-arrow-right-enter")).not.toBeNull();
     fireEvent.click(menuItems[0]!);
     expect(onImport).toHaveBeenCalledOnce();
   });

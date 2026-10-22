@@ -20,7 +20,7 @@ import {
   TID_CRON_CREATE_OPEN,
   TID_V4_FEEDBACK_DISLIKE,
   TID_V4_FORK,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,

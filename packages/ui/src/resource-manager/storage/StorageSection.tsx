@@ -11,11 +11,13 @@ import {
   type StorageCleanResult,
   type StorageManagementBridge,
   type StorageRootId,
+} from "@zcode/shared";
+import {
   TID_RESOURCE_MANAGER_STORAGE_RESCAN,
   TID_RESOURCE_MANAGER_STORAGE_SECTION,
   TID_RESOURCE_MANAGER_STORAGE_STATUS,
   TID_RESOURCE_MANAGER_STORAGE_TOTAL,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { toast } from "@/components/ui/toast.js";
 import { useStorageUsage } from "./useStorageUsage.js";

@@ -1,0 +1,4 @@
+@import "@zcode/ui/styles.css";
+
+/* 共享样式只扫描 UI 包；Web 独立入口的状态类也必须参与 Tailwind 生成。 */
+@source "./**/*.{ts,tsx}";

@@ -192,6 +192,7 @@ function contentBlockToUserMediaParts(
 
     case "text":
     case "reasoning":
+    case "tool_reference":
     case "resource_link":
       return [];
   }

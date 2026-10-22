@@ -897,7 +897,6 @@ describe("zai family Team Plan 可见性对称化", () => {
     expect(teamItem).toBeDefined();
     // 关键：key 前缀必须是 zai-coding-plan，不能误用 bigmodel
     expect(teamItem?.key).toBe(`team:zai:zai-team-pro:zai-org:zai-project`);
-    expect(teamItem?.key).not.toContain("bigmodel");
     // providerName 应继承自 zai codingPlanItem
     expect(teamItem?.providerName).toBe("Z.ai");
     expect(teamItem?.teamPlanName).toBe("Zai Org");
@@ -1053,7 +1052,6 @@ describe("zai family Team Plan 可见性对称化", () => {
     // 关键：必须生成 zai teamPlan item，不能因为 bigmodelCodingPlanItem 不存在就整体短路
     expect(teamItem).toBeDefined();
     expect(teamItem?.key).toBe(`team:zai:zai-pro:zai-org-1:zai-proj-1`);
-    expect(teamItem?.key).not.toContain("bigmodel");
   });
 });
 

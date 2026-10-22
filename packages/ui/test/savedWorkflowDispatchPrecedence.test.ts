@@ -96,13 +96,8 @@ function buildContext(toolCall: Record<string, unknown>): ToolCallBlockRenderCon
 afterEach(cleanup);
 
 describe("saved-workflow dispatch precedence over tool family", () => {
-  it("confirms the premise: identity now reports the workflow family", () => {
-    // 前提断言——桩失效时下面几条会变成假绿，这里先把假想世界钉死。
-    expect(resolveToolCallIdentity({ toolName: "SaveWorkflow" }).family).toBe("workflow");
-    expect(resolveToolCallIdentity({ toolName: "ListSavedWorkflows" }).family).toBe("workflow");
-  });
-
   it("keeps SaveWorkflow on its own card, not the CreateWorkflow card", () => {
+    expect(resolveToolCallIdentity({ toolName: "SaveWorkflow" }).family).toBe("workflow");
     const renderer = resolveToolCallRenderer(
       buildContext({
         toolId: "tool-save-1",
@@ -118,6 +113,7 @@ describe("saved-workflow dispatch precedence over tool family", () => {
   });
 
   it("keeps ListSavedWorkflows on its own card, not the CreateWorkflow card", () => {
+    expect(resolveToolCallIdentity({ toolName: "ListSavedWorkflows" }).family).toBe("workflow");
     const renderer = resolveToolCallRenderer(
       buildContext({
         toolId: "tool-list-1",

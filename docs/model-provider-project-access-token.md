@@ -18,7 +18,7 @@
 ## 专用 Key 管理兼容契约
 
 - 个人仍按名称复用 zcode-api-key；同名条目缺少 ID 时失败，不重复创建。团队只复用名称 zcode-team-api-key、keyType=2 且 ID 非空的条目，创建响应也必须满足这三个条件，否则禁止继续换证。无关坏条目不影响有效条目。
-- 管理接口保留旧 Authorization：个人 BigModel 用原始登录 JWT，Z.AI 用 Bearer；团队 customerInfo 同个人，团队列表/创建两 family 均用原始登录 JWT，并保留组织项目头。只有 access_tokens 统一使用 Bearer。
+- customerInfo 两 family 均用原始登录 JWT，和登录身份核验一致，避免 Bearer 格式拒绝被误判为登录失效。Key 列表/创建保留旧 Authorization：个人 BigModel 用原始登录 JWT，Z.AI 用 Bearer；团队两 family 均用原始登录 JWT，并保留组织项目头。access_tokens 统一使用 Bearer。
 - 桌面个人选择非团队项目（projectType 去空白后不为 2），跳过无组织 ID 的候选；Standalone 保留默认机构/默认项目优先、否则首项的规则，不新增项目类型过滤。团队成员归属比较继续去除 ID 两端空白。
 - 项目选择策略由调用端明确传给公共换证客户端，参与内存与持久化 ID 作用域，防止桌面和 CLI 共用记录时覆盖彼此的选择。既有 Token owner、刷新和退出失效时序不变。
 - 验收覆盖错误团队创建响应、无关坏条目、个人同名坏 ID、两 family 管理/签发请求头、混合项目选择和跨策略 ID 隔离。

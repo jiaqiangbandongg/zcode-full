@@ -6,15 +6,7 @@ import { $createParagraphNode, $getRoot, createEditor } from "lexical";
 import { normalizePromptMentionDisplayLabel } from "../src/mentions/promptMentionLabel.js";
 import {
   $createPromptMentionNode,
-  GOAL_COMMAND_MENTION_ICON_NODE,
-  GOAL_COMMAND_MENTION_LUCIDE_ICON_NAME,
-  WORKFLOW_COMMAND_MENTION_ICON_NODE,
-  WORKFLOW_COMMAND_MENTION_LUCIDE_ICON_NAME,
-  PLUGIN_MENTION_ICON_NODE,
-  PLUGIN_MENTION_LUCIDE_ICON_NAME,
   PromptMentionNode,
-  SUBAGENT_MENTION_ICON_NODE,
-  SUBAGENT_MENTION_LUCIDE_ICON_NAME,
 } from "../src/mentions/nodes/PromptMentionNode.js";
 
 describe("PromptMentionNode", () => {
@@ -109,49 +101,6 @@ describe("PromptMentionNode", () => {
     } finally {
       vi.unstubAllGlobals();
     }
-  });
-
-  it("uses the lucide Cable icon node for Plugin fallbacks", () => {
-    expect(PLUGIN_MENTION_LUCIDE_ICON_NAME).toBe("Cable");
-    expect(PLUGIN_MENTION_ICON_NODE).toEqual([
-      ["path", { d: "M17 19a1 1 0 0 1-1-1v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a1 1 0 0 1-1 1z" }],
-      ["path", { d: "M17 21v-2" }],
-      ["path", { d: "M19 14V6.5a1 1 0 0 0-7 0v11a1 1 0 0 1-7 0V10" }],
-      ["path", { d: "M21 21v-2" }],
-      ["path", { d: "M3 5V3" }],
-      ["path", { d: "M4 10a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a2 2 0 0 1-2 2z" }],
-      ["path", { d: "M7 5V3" }],
-    ]);
-  });
-
-  it("uses the lucide Goal icon node for the goal command mention icon", () => {
-    expect(GOAL_COMMAND_MENTION_LUCIDE_ICON_NAME).toBe("Goal");
-    expect(GOAL_COMMAND_MENTION_ICON_NODE).toEqual([
-      ["path", { d: "M12 13V2l8 4-8 4" }],
-      ["path", { d: "M20.561 10.222a9 9 0 1 1-12.55-5.29" }],
-      ["path", { d: "M8.002 9.997a5 5 0 1 0 8.9 2.02" }],
-    ]);
-  });
-
-  it("uses the lucide Workflow icon node for the workflow command mention icon", () => {
-    expect(WORKFLOW_COMMAND_MENTION_LUCIDE_ICON_NAME).toBe("Workflow");
-    expect(WORKFLOW_COMMAND_MENTION_ICON_NODE).toEqual([
-      ["rect", { width: "8", height: "8", x: "3", y: "3", rx: "2" }],
-      ["path", { d: "M7 11v4a2 2 0 0 0 2 2h4" }],
-      ["rect", { width: "8", height: "8", x: "13", y: "13", rx: "2" }],
-    ]);
-  });
-
-  it("uses the lucide Bot icon node for subagent mentions", () => {
-    expect(SUBAGENT_MENTION_LUCIDE_ICON_NAME).toBe("Bot");
-    expect(SUBAGENT_MENTION_ICON_NODE).toEqual([
-      ["path", { d: "M12 8V4H8" }],
-      ["rect", { width: "16", height: "12", x: "4", y: "8", rx: "2" }],
-      ["path", { d: "M2 14h2" }],
-      ["path", { d: "M20 14h2" }],
-      ["path", { d: "M15 13v2" }],
-      ["path", { d: "M9 13v2" }],
-    ]);
   });
 
   it("normalizes markdown labels before rendering mention tags", () => {

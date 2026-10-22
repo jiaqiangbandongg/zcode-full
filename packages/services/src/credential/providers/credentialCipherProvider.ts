@@ -85,7 +85,10 @@ export function createCredentialCipherProvider(
       const parts = payload.split(".");
       const [ivRaw, authTagRaw, cipherRaw] = parts;
 
-      if (!ivRaw || !authTagRaw || !cipherRaw || parts.length !== 3) {
+      // Bug 根因：AES-GCM 加密空字符串时 cipherText 合法地为空，编码结果以点号结尾。
+      // 旧判定把空 cipherRaw 当成缺字段，Provider Sync 为无 API Key 条目保存 journal 后
+      // 就无法解密，连 before 回滚也会 fail-closed；这里只拒绝真正缺失的第三段。
+      if (!ivRaw || !authTagRaw || cipherRaw === undefined || parts.length !== 3) {
         throw createCredentialDecryptError("密文格式非法");
       }
 

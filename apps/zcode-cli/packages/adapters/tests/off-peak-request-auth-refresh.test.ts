@@ -1,3 +1,5 @@
+import { runWithModelInvocationContext } from "@zcode/contracts";
+import { TestAiSdkModelAdapter, TestProviderConfigFixture } from "./test-provider-config.js";
 import { describe, expect, it, vi } from "vitest";
 import { refreshOffPeakRequestAuth } from "../src/model/off-peak-request-auth.js";
 const scope = "a".repeat(64);
@@ -80,9 +82,7 @@ describe("闲时每次模型请求刷新 PAT", () => {
 });
 
 it("真实 runner 同一个闲时 Model 连续请求也向 owner 刷新，不只首次派发刷新", async () => {
-  const { runWithModelInvocationContext } = await import("@zcode/contracts");
-  const { TestAiSdkModelAdapter, TestProviderConfigFixture } =
-    await import("./test-provider-config.js");
+  // 将测试依赖在文件加载阶段准备好，断言只测每次请求刷新，不包含冷加载耗时。
   const seen: string[] = [];
   const adapter = new TestAiSdkModelAdapter({
     registry: new TestProviderConfigFixture({

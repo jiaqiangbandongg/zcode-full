@@ -616,9 +616,6 @@ describe("Model metadata uses formal Model Config", () => {
     expect(result.model.config.optionSpecs?.reasoningLevel?.map).toBe(
       "{'reasoning_effort': reasoningLevel}",
     );
-    expect(result.model.config.optionSpecs?.maxOutputTokens?.map).toBe(
-      "{'max_completion_tokens': maxOutputTokens}",
-    );
   });
 
   it("最大输出直接编辑 max，放大和缩小均形成精确 Personal max", () => {

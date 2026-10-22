@@ -43,9 +43,9 @@ mobile browser /remote
 
 对应实现：
 
-- `packages/web/src/webRemoteControlTransport.ts`
+- `packages/web/src/web-remote-control/adapters/webRemoteControlTransport.ts`
 - `packages/web/src/main.tsx`
-- `packages/desktop/src/main/webRemoteControlTransport.ts`
+- `packages/desktop/src/main/web-remote-relay/webRemoteControlTransport.ts`
 - `packages/desktop/src/main/webRemoteControlManager.ts`
 - `docs/web-remote-control/web-remote-control-architecture.md`
 
@@ -145,14 +145,14 @@ mobile terminal transport 现在也具备 `recoverConnection()` 和可恢复状�
 
 ## 用户可感知的断线场景
 
-| 场景 | 主要原因 | 当前表现 | 可优化方向 |
-| --- | --- | --- | --- |
-| 手机切到微信/浏览器后台几分钟再回来 | 页面 hidden / frozen / socket close | 刷新或失败页 | 前台恢复时自动重连并恢复 workspace/task |
-| 手机锁屏后回来 | 息屏导致 WebSocket 断开或 JS 暂停 | 刷新、卡住或提示 relay unavailable | Wake Lock + 恢复状态机 |
-| 移动网络从 Wi-Fi 切 5G | TCP/WebSocket 断开 | 请求超时或失败 | `online` 事件触发 reconnect + request replay |
-| relay 短暂抖动 | relay close / INTERNAL / waiting 误报 | desktop 可能恢复，mobile 可能失败 | mobile 使用同等重连策略 |
-| relay 单向通路 | mobile 发得到，收不到 desktop 响应 | bootstrap/list 超时 | 请求级超时诊断 + 重建 terminal socket |
-| 另一个手机扫码 | relay kick / session conflict | 当前手机被踢 | 保持终态失败，但文案说明原因 |
+| 场景                                | 主要原因                              | 当前表现                           | 可优化方向                                   |
+| ----------------------------------- | ------------------------------------- | ---------------------------------- | -------------------------------------------- |
+| 手机切到微信/浏览器后台几分钟再回来 | 页面 hidden / frozen / socket close   | 刷新或失败页                       | 前台恢复时自动重连并恢复 workspace/task      |
+| 手机锁屏后回来                      | 息屏导致 WebSocket 断开或 JS 暂停     | 刷新、卡住或提示 relay unavailable | Wake Lock + 恢复状态机                       |
+| 移动网络从 Wi-Fi 切 5G              | TCP/WebSocket 断开                    | 请求超时或失败                     | `online` 事件触发 reconnect + request replay |
+| relay 短暂抖动                      | relay close / INTERNAL / waiting 误报 | desktop 可能恢复，mobile 可能失败  | mobile 使用同等重连策略                      |
+| relay 单向通路                      | mobile 发得到，收不到 desktop 响应    | bootstrap/list 超时                | 请求级超时诊断 + 重建 terminal socket        |
+| 另一个手机扫码                      | relay kick / session conflict         | 当前手机被踢                       | 保持终态失败，但文案说明原因                 |
 
 ## 优化建议
 

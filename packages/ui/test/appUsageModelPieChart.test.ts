@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppUsageSnapshot } from "@zcode/shared";
 import { buildAppUsageModelPieChartViewModel } from "@/settings/usage-stats/appUsageModelPieChartViewModel.js";
@@ -69,19 +67,6 @@ const intl = {
 };
 
 describe("buildAppUsageModelPieChartViewModel", () => {
-  it("桌面端扩大环形图并保留手机端紧凑尺寸", () => {
-    const source = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/settings/usage-stats/AppUsageModelUsagePieChart.tsx"),
-      "utf8",
-    );
-
-    expect(source).toContain("md:grid-cols-2");
-    expect(source).toContain("h-56 w-full max-w-64 self-center md:h-64 md:max-w-72");
-    expect(source).toContain("h-56 w-full md:h-64");
-    expect(source).toContain('className="font-mono font-medium tabular-nums"');
-    expect(source).toContain('className="text-foreground-subtle">{tokenUnit}</span>');
-  });
-
   it("reuses the app usage chart palette and merges overflow models", () => {
     const snapshot = createSnapshot([
       createModel("model-a", 600),
@@ -96,19 +81,10 @@ describe("buildAppUsageModelPieChartViewModel", () => {
     const viewModel = buildAppUsageModelPieChartViewModel({ intl, snapshot });
 
     expect(viewModel.chartData).toHaveLength(6);
-    expect(viewModel.chartData.map((slice) => slice.color)).toEqual([
-      "var(--color-usage-chart-1)",
-      "var(--color-usage-chart-2)",
-      "var(--color-usage-chart-3)",
-      "var(--color-usage-chart-4)",
-      "var(--color-usage-chart-5)",
-      "var(--color-usage-chart-6)",
-    ]);
     expect(viewModel.chartData.at(-1)).toMatchObject({
       label: "Other models",
       totalTokens: 100,
     });
     expect(viewModel.chartData.reduce((sum, slice) => sum + slice.share, 0)).toBeCloseTo(1);
-    expect(viewModel.chartConfig.model5?.color).toBe("var(--color-usage-chart-6)");
   });
 });

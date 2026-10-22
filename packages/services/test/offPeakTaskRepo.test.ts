@@ -53,6 +53,24 @@ describe("OffPeakTaskRepo 状态机与调度守卫", () => {
     }
   });
 
+  it("persists the project execution directory snapshot across repository reopen", async () => {
+    const created = await repo.create(
+      makeParams({ projectId: "project-a", hostId: "local", additionalDirectories: ["/extra"] }),
+      { now: NOW },
+    );
+    expect(created).toMatchObject({
+      projectId: "project-a",
+      hostId: "local",
+      additionalDirectories: ["/extra"],
+    });
+    repo.close();
+    expect(await repo.get(created.offPeakTaskId)).toMatchObject({
+      workspacePath: "/tmp/ws",
+      projectId: "project-a",
+      additionalDirectories: ["/extra"],
+    });
+  });
+
   it("create + list + get：新建即 queued，字段与 workspaceKey 规则正确", async () => {
     const created = await repo.create(
       makeParams({

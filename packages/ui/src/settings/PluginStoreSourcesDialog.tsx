@@ -41,21 +41,21 @@ export function PluginStoreSourceRefreshFailure({
   );
 }
 
-/** 顶栏齿轮 → 市场源管理：列出已登记市场，支持刷新与移除（新增走 New 按钮）。 */
+/** 顶栏店铺图标 → 市场源管理：列出已登记市场，支持刷新与移除（新增走 New 按钮）。 */
 export function PluginStoreSourcesDialog({
   open,
   onOpenChange,
   marketplaces,
   onUpdateMarketplace,
   onRemoveMarketplace,
-  operationId,
+  activeOperations,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   marketplaces: ZCodePluginMarketplaceSummary[];
   onUpdateMarketplace: (marketplace: string) => void;
   onRemoveMarketplace: (marketplace: string) => void;
-  operationId: string | null;
+  activeOperations: ReadonlyArray<{ id: string }>;
 }) {
   const { intl, locale } = useZCodeIntl();
   const claudeCodePlugins = intl.formatMessage({
@@ -78,8 +78,12 @@ export function PluginStoreSourcesDialog({
             </p>
           ) : (
             sortedMarketplaces.map((marketplace) => {
-              const updating = operationId === `marketplace:update:${marketplace.id}`;
-              const removing = operationId === `marketplace:remove:${marketplace.id}`;
+              const updating = activeOperations.some(
+                (operation) => operation.id === `marketplace:update:${marketplace.id}`,
+              );
+              const removing = activeOperations.some(
+                (operation) => operation.id === `marketplace:remove:${marketplace.id}`,
+              );
               return (
                 <div
                   key={marketplace.id}

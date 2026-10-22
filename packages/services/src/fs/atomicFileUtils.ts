@@ -121,7 +121,8 @@ async function cleanupStaleTempFilesForTarget(
 
 /**
  * 使用临时文件 + rename 实现原子写入。
- * rename 在同文件系统上是原子的，可避免 read-modify-write 并发时的数据覆盖风险。
+ * rename 在同文件系统上是原子的，避免读者看到半份内容；read-modify-write 需由调用方
+ * 用 withAtomicFileLock 包住读取、合并及写入，并给内部原子写传 useFileLock: false。
  * 临时文件写在目标文件同目录下，避免 Windows 跨卷 rename 失败。
  */
 export async function atomicWriteText(

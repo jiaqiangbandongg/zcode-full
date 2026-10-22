@@ -3,8 +3,7 @@ import {
   applyDynamicWorkflowUserMode,
   createDynamicWorkflowClientConfig,
   DEFAULT_DYNAMIC_WORKFLOW_MODE,
-  isDynamicWorkflowModeEnabled,
-  isDynamicWorkflowOffered,
+  readDynamicWorkflowOfferedMode,
   normalizeDynamicWorkflowMode,
   resolveDynamicWorkflowClientConfig,
   ZCODE_DYNAMIC_WORKFLOW_MODE_ENV,
@@ -104,15 +103,9 @@ describe("normalizeDynamicWorkflowMode / isDynamicWorkflowModeEnabled", () => {
     expect(normalizeDynamicWorkflowMode(undefined)).toBeUndefined();
     expect(normalizeDynamicWorkflowMode(true)).toBeUndefined();
   });
-
-  it("本版本两个开启态折叠成同一个布尔", () => {
-    expect(isDynamicWorkflowModeEnabled("disabled")).toBe(false);
-    expect(isDynamicWorkflowModeEnabled("onDemand")).toBe(true);
-    expect(isDynamicWorkflowModeEnabled("alwaysOn")).toBe(true);
-  });
 });
 
-// DWG-18（launch.md「The user's choice」）：服务端给出可用性与默认值，用户只能在已提供的范围里选。
+// DWG-18（launch.md「The user's choice」）：服务端只给默认值，用户的明确选择永远生效。
 describe("applyDynamicWorkflowUserMode（DWG-18）", () => {
   const offer = (mode: "disabled" | "onDemand" | "alwaysOn") =>
     createDynamicWorkflowClientConfig(mode, "remote");
@@ -134,13 +127,20 @@ describe("applyDynamicWorkflowUserMode（DWG-18）", () => {
     });
   });
 
-  it("提供的是 disabled 时用户选择不生效，也不记 userMode", () => {
+  it("提供的是 disabled 时用户选择照样生效：disabled 只是默认值", () => {
     expect(applyDynamicWorkflowUserMode(offer("disabled"), "alwaysOn")).toEqual({
-      mode: "disabled",
-      enabled: false,
+      mode: "alwaysOn",
+      enabled: true,
       source: "remote",
       offeredMode: "disabled",
+      userMode: "alwaysOn",
     });
+    expect(
+      applyDynamicWorkflowUserMode(
+        createDynamicWorkflowClientConfig("disabled", "default"),
+        "onDemand",
+      ),
+    ).toMatchObject({ mode: "onDemand", enabled: true, source: "default", userMode: "onDemand" });
   });
 
   it.each([[undefined], [null], [""], ["bogus"], [1]])(
@@ -172,25 +172,25 @@ describe("applyDynamicWorkflowUserMode（DWG-18）", () => {
     });
   });
 
-  it("isDynamicWorkflowOffered 只看提供的模式，不看用户选择", () => {
+  it("readDynamicWorkflowOfferedMode 读提供的默认值（disabled 也算），不看用户选择", () => {
     expect(
-      isDynamicWorkflowOffered(applyDynamicWorkflowUserMode(offer("alwaysOn"), "disabled")),
-    ).toBe(true);
-    expect(isDynamicWorkflowOffered(offer("disabled"))).toBe(false);
+      readDynamicWorkflowOfferedMode(applyDynamicWorkflowUserMode(offer("alwaysOn"), "disabled")),
+    ).toBe("alwaysOn");
+    expect(readDynamicWorkflowOfferedMode(offer("disabled"))).toBe("disabled");
   });
 
-  it("isDynamicWorkflowOffered：没有 offeredMode 的快照（旧 Host）或读不懂的值按未提供", () => {
+  it("readDynamicWorkflowOfferedMode：没有 offeredMode 的快照（旧 Host）或读不懂的值返回 undefined", () => {
     // 新 UI（例如手机远控 bundle）连旧 Host 时，快照只有生效的 mode / enabled，没有 offeredMode；
     // 旧 Host 不认用户选择，所以不能把设置行摆出来。
     const legacy = { mode: "alwaysOn", enabled: true, source: "remote" } as unknown as Parameters<
-      typeof isDynamicWorkflowOffered
+      typeof readDynamicWorkflowOfferedMode
     >[0];
-    expect(isDynamicWorkflowOffered(legacy)).toBe(false);
+    expect(readDynamicWorkflowOfferedMode(legacy)).toBeUndefined();
     expect(
-      isDynamicWorkflowOffered({
+      readDynamicWorkflowOfferedMode({
         ...offer("alwaysOn"),
         offeredMode: "sometimes",
-      } as unknown as Parameters<typeof isDynamicWorkflowOffered>[0]),
-    ).toBe(false);
+      } as unknown as Parameters<typeof readDynamicWorkflowOfferedMode>[0]),
+    ).toBeUndefined();
   });
 });

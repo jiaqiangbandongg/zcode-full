@@ -9,15 +9,19 @@
 // - 单平台体积从 ~180MB 降到 ~16MB，且同一份 JS 跨平台通用；
 // - app-server 命令路径不会加载 @zcode/tui，所以这里天然不打包 TUI。
 //
-// 远端（SSH/WSL/Docker）没有 Electron，仍走 prepare:remote-assets 的原生二进制，互不影响。
+// 远端（SSH/WSL/Docker）没有 Electron，由 Source Server archive 自带目标 Node，互不影响。
 
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+// 修复原因：bootstrap 清理旧插件 dist 时使用 rmSync，漏导入会在构建前抛出 ReferenceError。
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runCommand } from "../../../scripts/spawn-command.mjs";
 import { stageAgentBundle } from "./stage-agent-bundle.mjs";
-import { isSharpRequiredByComputerUse, stageSharpIntoBundledAgents } from "./sharp-package-assets.mjs";
+import {
+  isSharpRequiredByComputerUse,
+  stageSharpIntoBundledAgents,
+} from "./sharp-package-assets.mjs";
 import { stageKoffiIntoBundledAgents } from "./koffi-package-assets.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +96,9 @@ const browserUseRequiredRuntimePaths = [
   "skills/control-browser/SKILL.md",
   "skills/web-gui-tester/SKILL.md",
 ];
+// 文档插件（documents / pdf / presentations / spreadsheets）的查看面板由共享包
+// @zcode/office-runtime 构建进各插件 dist/；插件包自身没有 TypeScript 源码。
+const officeViewerRuntimePaths = ["dist/server.mjs", "dist/ui/assets.json", "dist/ui/panel.html"];
 const officialPluginPackages = [
   {
     packageName: "@zcode/android-emulator-plugin",
@@ -104,8 +111,14 @@ const officialPluginPackages = [
   {
     packageName: "@zcode/documents-plugin",
     relativePath: "apps/zcode-cli/packages/documents-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/docx/SKILL.md"],
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/docx/SKILL.md",
+      "skills/docx-viewer/SKILL.md",
+    ],
+    runtimeBuildScript: "../office-runtime/scripts/build.mjs",
     stagedPath: "packages/documents-plugin",
   },
   {
@@ -118,22 +131,40 @@ const officialPluginPackages = [
   {
     packageName: "@zcode/pdf-plugin",
     relativePath: "apps/zcode-cli/packages/pdf-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pdf/SKILL.md"],
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pdf/SKILL.md",
+      "skills/pdf-viewer/SKILL.md",
+    ],
+    runtimeBuildScript: "../office-runtime/scripts/build.mjs",
     stagedPath: "packages/pdf-plugin",
   },
   {
     packageName: "@zcode/presentations-plugin",
     relativePath: "apps/zcode-cli/packages/presentations-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pptx/SKILL.md"],
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pptx/SKILL.md",
+      "skills/pptx-viewer/SKILL.md",
+    ],
+    runtimeBuildScript: "../office-runtime/scripts/build.mjs",
     stagedPath: "packages/presentations-plugin",
   },
   {
     packageName: "@zcode/spreadsheets-plugin",
     relativePath: "apps/zcode-cli/packages/spreadsheets-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/xlsx/SKILL.md"],
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/xlsx/SKILL.md",
+      "skills/xlsx-viewer/SKILL.md",
+    ],
+    runtimeBuildScript: "../office-runtime/scripts/build.mjs",
     stagedPath: "packages/spreadsheets-plugin",
   },
   {
@@ -316,25 +347,20 @@ function buildOfficialPluginRuntimes() {
 
 function buildOfficialPluginRuntimeForBootstrap(plugin) {
   const pluginRoot = resolve(repoRoot, plugin.relativePath);
-  const hasCompleteRuntime = plugin.requiredRuntimePaths.every((relativePath) =>
-    existsSync(resolve(pluginRoot, ...relativePath.split("/"))),
-  );
-  if (plugin.packageName !== BROWSER_USE_PLUGIN_PACKAGE_NAME && hasCompleteRuntime) {
-    console.log(
-      `[prepare:agent-bundle] reuse existing official plugin runtime: ${plugin.packageName}`,
-    );
-    return;
-  }
-
-  // bootstrap:with-remote 会连续构建 remote assets 和桌面 agent bundle。
+  // Bugfix: bootstrap:with-remote 会连续构建 remote assets 和桌面 agent bundle。
   // 通过 pnpm/filter 进入插件 build 时，tsc shim 在本地低内存环境中容易被 SIGKILL；
   // 这里仅在 bootstrap 开关下用当前 Node 直接执行等价 tsc + build-mcp，不改变插件自身 build 脚本。
-  // browser-use 的 server 与 browser-client 是同一发布对；即使旧 server.js 存在也必须重建，
-  // 否则会把旧 server 与当前 client（或缺失 client）一起 stage 到桌面安装包。
-  runCommand(process.execPath, ["../../node_modules/typescript/bin/tsc"], {
-    cwd: pluginRoot,
-    env: process.env,
-  });
+  // Bug 原因：过去除 browser-use 外只要 dist 文件齐全就复用，源码变化后 bootstrap 仍会
+  // 打包上一代插件 runtime；所有代码型官方插件都必须在本轮重建。
+  rmSync(resolve(pluginRoot, "dist"), { recursive: true, force: true });
+  // 文档插件没有自己的 tsconfig（源码在 office-runtime），直接跑 tsc 会因找不到工程配置失败；
+  // 只有带 tsconfig 的插件才需要这一步。
+  if (existsSync(resolve(pluginRoot, "tsconfig.json"))) {
+    runCommand(process.execPath, ["../../node_modules/typescript/bin/tsc"], {
+      cwd: pluginRoot,
+      env: process.env,
+    });
+  }
   runCommand(process.execPath, [plugin.runtimeBuildScript], {
     cwd: pluginRoot,
     env: process.env,
@@ -412,7 +438,9 @@ function stageBundledSkillPack() {
 
 function stageSharpForNodeReplPlugin() {
   if (!isSharpRequiredByComputerUse({ desktopPackageRoot: desktopRoot })) {
-    console.log("[prepare:agent-bundle] Computer Use package does not declare sharp, skip sharp staging");
+    console.log(
+      "[prepare:agent-bundle] Computer Use package does not declare sharp, skip sharp staging",
+    );
     return;
   }
   // `sharp` 仍然外部化——它包含无法内联的 native .node，运行时从**所在包**的 node_modules

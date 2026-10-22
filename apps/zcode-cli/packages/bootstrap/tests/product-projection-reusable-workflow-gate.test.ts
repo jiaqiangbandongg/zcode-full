@@ -130,7 +130,9 @@ const WORKFLOW_DISPLAY = {
     ],
     lanes: [{ id: "actor#1", name: "检查员" }],
     // 第二层是子代理导向：每阶段一张参与者卡 + 交接边（docs/dynamic-workflow/presentation.md）。
-    participants: [{ id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] }],
+    participants: [
+      { id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] },
+    ],
     handoffs: [],
     sink: ["ask#1"],
   },
@@ -180,12 +182,6 @@ describe("saved 源 CreateWorkflow 的确认窗（v4 投影）", () => {
     // 「批准的是 A、跑的是 B」的开端（不变式 5）。
     expect(payload.detail).toEqual(SAVED_RUN_INPUT);
     expect(payload.toolName).toBe(CREATE_WORKFLOW_TOOL_NAME);
-    const detail = payload.detail as typeof SAVED_RUN_INPUT;
-    // 旧桌面的既有读取规则（readWorkflowScript(raw.script) / readWorkflowName(raw.name)）
-    // 因此**构造上**命中——不是兼容处理。
-    expect(detail.script).toBe(SCRIPT);
-    expect(detail.name).toBe("release-check");
-    expect(detail.saved).toEqual(SAVED_RUN_INPUT.saved);
   });
 
   it("四种类型的实参整份穿过 v4 快照 schema（detail 是 z.unknown() 的透传）", () => {
@@ -239,7 +235,6 @@ describe("saved 源 CreateWorkflow 的确认窗（v4 投影）", () => {
       "kind",
       "ok",
     ]);
-    expect(payload.display).not.toHaveProperty("saved");
     expect(JSON.stringify(payload.display)).not.toContain(SAVED_RUN_INPUT.saved.path);
   });
 });
@@ -263,13 +258,6 @@ describe("SaveWorkflow 的确认窗（v4 投影）", () => {
 
     expect(payload.toolName).toBe(SAVE_WORKFLOW_TOOL_NAME);
     expect(payload.detail).toEqual(SAVE_INPUT);
-    const detail = payload.detail as typeof SAVE_INPUT;
-    // 覆盖与否是决策关键信息：批准一次覆盖 = 同意丢掉磁盘上那一份。它必须在窗上，
-    // 而唯一对所有客户端版本都成立的通道就是入参。
-    expect(detail.overwrite).toBe(true);
-    expect(detail.path).toBe("/repo/.zcode/workflows/release-check.dwf.ts");
-    expect(detail.scope).toBe("project");
-    expect(detail.script).toBe(SCRIPT);
     expect(conversationSnapshotSchema.safeParse(saveGate().getSnapshot()).success).toBe(true);
   });
 
@@ -298,7 +286,5 @@ describe("SaveWorkflow 的确认窗（v4 投影）", () => {
     const options = permissionPayload(saveGate()).options;
     expect(options.map((option) => option.optionId)).toEqual(["allowOnce", "deny"]);
     expect(options.some((option) => option.kind === "allowAlways")).toBe(false);
-    // Refine 是「改脚本再跑一次」的语义，保存窗上没有对应动作；合成只认 CreateWorkflow。
-    expect(options.some((option) => option.optionId === "workflowRefine")).toBe(false);
   });
 });

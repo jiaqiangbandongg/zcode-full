@@ -2,20 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   getRemoteConnectionCompletionDialogState,
   getRemoteConnectionDirectoryFailureState,
-  getRemoteConnectionDialogResumeStep,
   isRemoteConnectionFlowActive,
-  shouldResetRemoteConnectionOnOpen,
   type RemoteConnectionDialogSnapshot,
 } from "@/lib/remoteConnectionDialogState.js";
 
 const baseSnapshot: RemoteConnectionDialogSnapshot = {
-  currentStep: "kind",
+  currentStep: "device",
   loading: false,
   connectedSessionId: null,
 };
 
 describe("remoteConnectionDialogState", () => {
-  it("keeps minimized connecting flow active and resumes the connecting step", () => {
+  it("keeps minimized connecting flow active", () => {
     const snapshot: RemoteConnectionDialogSnapshot = {
       ...baseSnapshot,
       currentStep: "connecting",
@@ -23,8 +21,6 @@ describe("remoteConnectionDialogState", () => {
     };
 
     expect(isRemoteConnectionFlowActive(snapshot)).toBe(true);
-    expect(shouldResetRemoteConnectionOnOpen(snapshot)).toBe(false);
-    expect(getRemoteConnectionDialogResumeStep(snapshot)).toBe("connecting");
   });
 
   it("keeps connected directory selection active after minimizing", () => {
@@ -35,24 +31,20 @@ describe("remoteConnectionDialogState", () => {
     };
 
     expect(isRemoteConnectionFlowActive(snapshot)).toBe(true);
-    expect(shouldResetRemoteConnectionOnOpen(snapshot)).toBe(false);
-    expect(getRemoteConnectionDialogResumeStep(snapshot)).toBe("directory");
   });
 
-  it("resets idle flow when opened again", () => {
+  it("does not treat idle device selection as an active connection", () => {
     const snapshot: RemoteConnectionDialogSnapshot = {
       ...baseSnapshot,
-      currentStep: "kind",
+      currentStep: "device",
       loading: false,
       connectedSessionId: null,
     };
 
     expect(isRemoteConnectionFlowActive(snapshot)).toBe(false);
-    expect(shouldResetRemoteConnectionOnOpen(snapshot)).toBe(true);
-    expect(getRemoteConnectionDialogResumeStep(snapshot)).toBe("kind");
   });
 
-  it("keeps failed connecting step so users can see the failure context", () => {
+  it("does not treat the failed connecting step as an active connection", () => {
     const snapshot: RemoteConnectionDialogSnapshot = {
       ...baseSnapshot,
       currentStep: "connecting",
@@ -61,14 +53,35 @@ describe("remoteConnectionDialogState", () => {
     };
 
     expect(isRemoteConnectionFlowActive(snapshot)).toBe(false);
-    expect(shouldResetRemoteConnectionOnOpen(snapshot)).toBe(true);
-    expect(getRemoteConnectionDialogResumeStep(snapshot)).toBe("connecting");
   });
 
-  it("reopens minimized dialog at directory step after connection succeeds", () => {
+  it("reopens minimized dialog at the ready connecting step after connection succeeds", () => {
     expect(getRemoteConnectionCompletionDialogState("success")).toEqual({
       open: true,
+      step: "connecting",
+    });
+  });
+
+  it("jumps straight to the directory step for the online-device direct flow", () => {
+    // 原型 rail-foot：已有设备可从第 1 步直达第 5 步——在线卡「选择其他目录」成功后不在第 4 步停留。
+    expect(
+      getRemoteConnectionCompletionDialogState("success", {
+        directToDirectory: true,
+      }),
+    ).toEqual({
+      open: true,
       step: "directory",
+    });
+  });
+
+  it("stays on the connecting step when the direct flow fails", () => {
+    expect(
+      getRemoteConnectionCompletionDialogState("error", {
+        directToDirectory: true,
+      }),
+    ).toEqual({
+      open: true,
+      step: "connecting",
     });
   });
 

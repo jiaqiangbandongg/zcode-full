@@ -22,7 +22,11 @@ import { commandAdmissionOf } from "../executor.js";
 import { hasPromptInput, V4InputAdmissionRejectedError } from "../input-admission.js";
 import { requireRecord } from "../record-access.js";
 import type { V4CommandCoreHost, V4SessionRecordView } from "../types.js";
-import { startCanonicalIntent, stableAttachmentRefs } from "./canonical-intent-replay.js";
+import {
+  preflightCanonicalIntent,
+  stableAttachmentRefs,
+  startCanonicalIntent,
+} from "./canonical-intent-replay.js";
 import { preemptActiveTurnAndWait } from "./session-flow.js";
 
 const CONVERSATION_COMMAND_LOG_MODULE = "bootstrap.zcode_protocol_v4.commands";
@@ -139,6 +143,34 @@ async function editUserQuery(
   }
   // 附件映射在 rewind 前完成：引用失效要在截断历史之前暴露，避免半程失败。
   const attachments = await mapAttachmentRefsToTurnAttachments(record.app, attachmentRefs);
+  // 编辑重发按新的主动发送处理：只认本次重新 prepare 的卡（本会话 taskId、未过期），
+  // 且 Selection 必须真的指向加速 Provider，避免拿旧凭据或跨会话卡加速。
+  const highspeedEdit =
+    editTarget.intent.kind === "sendText" &&
+    payload.highspeedMeta !== undefined &&
+    payload.highspeedMeta.taskId === record.app.sessionId &&
+    payload.highspeedMeta.expiresAt > Date.now() &&
+    payload.modelSelection !== undefined &&
+    payload.modelExecution !== undefined &&
+    isHighspeedProviderId(payload.modelSelection.providerId)
+      ? {
+          card: payload.highspeedMeta,
+          modelSelection: payload.modelSelection,
+          execution: payload.modelExecution,
+        }
+      : undefined;
+  // Bug 根因：模型检查曾位于 branch cut 之后；modelUnavailable 会留下已持久化的历史截断，
+  // workspaceMode=rewind 还会先改文件。必须用本次真正重发的 canonical intent 在所有破坏性操作前预检。
+  await preflightCanonicalIntent(
+    host,
+    record,
+    envelope,
+    editTarget,
+    payload.newText,
+    attachmentRefs,
+    attachments,
+    highspeedEdit,
+  );
   const runtimeHasActiveTurn =
     record.app.runtime?.getActiveTurnInfo?.() !== undefined ||
     record.app.runtime?.getActiveForegroundExecutionId?.() !== undefined;
@@ -211,22 +243,6 @@ async function editUserQuery(
   if (!conversationRewindCommitted) {
     await submitConversationRewind(host, record, editTarget.transcriptMessageId);
   }
-  // 编辑重发按新的主动发送处理：只认本次重新 prepare 的卡（本会话 taskId、未过期），
-  // 且 Selection 必须真的指向加速 Provider，避免拿旧凭据或跨会话卡加速。
-  const highspeedEdit =
-    editTarget.intent.kind === "sendText" &&
-    payload.highspeedMeta !== undefined &&
-    payload.highspeedMeta.taskId === record.app.sessionId &&
-    payload.highspeedMeta.expiresAt > Date.now() &&
-    payload.modelSelection !== undefined &&
-    payload.modelExecution !== undefined &&
-    isHighspeedProviderId(payload.modelSelection.providerId)
-      ? {
-          card: payload.highspeedMeta,
-          modelSelection: payload.modelSelection,
-          execution: payload.modelExecution,
-        }
-      : undefined;
   try {
     await startCanonicalIntent(
       host,
@@ -291,7 +307,7 @@ async function editUserQuery(
 }
 
 /**
- * retryTurn：assistant target → messageId → rewind 截断 + 重发
+ * retryTurn：assistant target → canonical 输入 messageId → rewind 截断 + 重发
  * canonical user intent。intent 在 projection resolver 阶段、rewind **之前**完成解析，
  * 截断后不再回读可见文本或 transcript parent 猜测原输入。
  */
@@ -311,7 +327,18 @@ async function retryTurn(
   }
   const attachmentRefs = stableAttachmentRefs(resolution.editTarget);
   const attachments = await mapAttachmentRefsToTurnAttachments(record.app, attachmentRefs);
-  await submitConversationRewind(host, record, resolution.messageId);
+  // retry 与 edit 共用破坏性 branch cut；模型不可用时必须保留原活动分支。
+  await preflightCanonicalIntent(
+    host,
+    record,
+    envelope,
+    resolution.editTarget,
+    resolution.editTarget.intent.text,
+    attachmentRefs,
+    attachments,
+  );
+  // 从 assistant 就近回溯 user 会误选中途的合成提醒；使用已解析的原始输入边界。
+  await submitConversationRewind(host, record, resolution.editTarget.transcriptMessageId);
   await startCanonicalIntent(
     host,
     record,

@@ -1,10 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@zcode/zcode-cua-plugin",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "description": "ZCode CUA SDK and skill package; execution is provided by the shared node_repl host.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./scripts/computer-use-client.mjs",
   "scripts": {

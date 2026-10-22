@@ -1,0 +1,32 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -103,6 +103,12 @@
+   useLayoutEffect(() => {
+     const node = ref.current;
+     if (node) {
++      // 隐藏详情没有可测量的尺寸；逐个写样式再读几何会在批量挂载时反复刷新样式。
++      // 保留 presence 状态推进，展开和收起动画中的可见节点仍走原测量流程。
++      if (node.hidden) {
++        setIsPresent(present);
++        return;
++      }
+       originalStylesRef.current = originalStylesRef.current || {
+         transitionDuration: node.style.transitionDuration,
+         animationName: node.style.animationName
+diff --git a/dist/index.js b/dist/index.js
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -144,6 +144,12 @@
+   (0, import_react_use_layout_effect.useLayoutEffect)(() => {
+     const node = ref.current;
+     if (node) {
++      // 隐藏详情没有可测量的尺寸；逐个写样式再读几何会在批量挂载时反复刷新样式。
++      // 保留 presence 状态推进，展开和收起动画中的可见节点仍走原测量流程。
++      if (node.hidden) {
++        setIsPresent(present);
++        return;
++      }
+       originalStylesRef.current = originalStylesRef.current || {
+         transitionDuration: node.style.transitionDuration,
+         animationName: node.style.animationName

@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-new-project-sidebar",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-new-project-sidebar.test.ts",
+  "fixtures": [
+    {
+      "id": "ssh-new-project-title",
+      "description": "首发标题辅助请求。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与状态语义，仅固定新任务名称。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_NEW_PROJECT_SIDEBAR_WRITE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ssh-new-project-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"SSH sidebar first task\"}"
+        }
+      }
+    },
+    {
+      "id": "ssh-new-project-write",
+      "description": "首发真实 Write 工具请求，触发权限审批。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定首发工具请求验证真实远端审批和侧栏订阅，未伪造 runtime 状态。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSH_NEW_PROJECT_SIDEBAR_WRITE"],
+        "bodyExcludes": ["Generate a concise title", "toolu_ssh_new_project_write"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"ssh-new-project-write\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"fixture\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":1}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_ssh_new_project_write\",\"name\":\"Write\",\"input\":{}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"file_path\\\": \\\".zcode-e2e/ssh-new-project-sidebar/output.txt\\\", \\\"content\\\": \\\"SSH_NEW_PROJECT_FILE\\\\n\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":50}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "ssh-new-project-complete",
+      "description": "审批后真实工具回灌，切到草稿后才释放完成。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定切走先于后台完成的顺序，断言完成事件自动创建未读，不依赖模型时延。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SSH_NEW_PROJECT_SIDEBAR_WRITE", "toolu_ssh_new_project_write"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "E2E_SSH_NEW_PROJECT_SIDEBAR_FOREGROUND",
+          "E2E_SSH_NEW_PROJECT_SIDEBAR_NAVIGATION"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"ssh-new-project-complete\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"fixture\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":1}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"SSH_NEW_PROJECT_SIDEBAR_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 10,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":50}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "releaseAfterChunks": 1
+      }
+    },
+    {
+      "id": "ssh-new-project-foreground",
+      "description": "同一远程任务前台续发完成，再切新草稿保持已读。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定前台完成先于用户切走，真实 SSH 与持久未读链路不替换；Host 读取在途竞态由集成单测控制。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSH_NEW_PROJECT_SIDEBAR_FOREGROUND"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"ssh-new-project-foreground\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"fixture\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":1}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"SSH_NEW_PROJECT_FOREGROUND_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 10,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":50}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "releaseAfterChunks": 1
+      }
+    },
+    {
+      "id": "ssh-new-project-sibling-title",
+      "description": "首发标题辅助请求。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不参与状态语义，仅固定新任务名称。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_NEW_PROJECT_SIDEBAR_SIBLING"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ssh-new-project-sibling-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"SSH sidebar sibling task\"}"
+        }
+      }
+    },
+    {
+      "id": "ssh-new-project-sibling",
+      "description": "创建同一工作区的 T2，作为跨工作区点击目标。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定 T2 内容作为导航可见性断言，不参与后台完成时序。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSH_NEW_PROJECT_SIDEBAR_SIBLING"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "ssh-new-project-sibling",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "SSH_NEW_PROJECT_SIBLING_DONE"
+        }
+      }
+    },
+    {
+      "id": "ssh-new-project-navigation",
+      "description": "T1 后台完成时暂挂未读命令，跨工作区选择 B/T2 后释放。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "固定后台完成先于跨工作区任务点击；只控制 provider 终态与未读命令发送顺序，使用真实 SSH、Host 和 SQLite。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSH_NEW_PROJECT_SIDEBAR_NAVIGATION"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"ssh-new-project-navigation\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"fixture\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"output_tokens\":1}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"SSH_NEW_PROJECT_NAVIGATION_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 10,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":50}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "releaseAfterChunks": 1
+      }
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import { pluginUiStateKey } from "@/plugin-ui/adapters/pluginUiStateKey.js";
+import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
 import { getPluginUiSessionActions } from "./pluginUiSessionActions.js";
 import { logger } from "@/logger.js";
 import { createPluginUiMessagePortTransport } from "@/plugin-ui/adapters/messagePortTransport.js";
@@ -45,14 +47,35 @@ export function createPage(
   platform: Platform,
   services: Services,
 ): Page {
+  const reportUsage = (action: string, failed = false) => {
+    void reportAppTelemetryEvent(
+      platform,
+      {
+        elementName: failed ? "plugin_runtime_error" : "plugin_usage",
+        eventRegion: "app",
+        eventType: "result",
+        eventExtraDetail: {
+          schema_version: "1",
+          action,
+          plugin_id: input.presentation.pluginId,
+          plugin_component: "ui",
+          client_kind: "desktop",
+          ...(failed ? { error_category: "unknown", result: "failure" } : {}),
+        },
+      },
+      "plugin-ui",
+    );
+  };
   const bridge = services.pluginUiBridgeService!;
   const sandboxPlatform = platform.pluginSandbox!;
   const surfaceKey = key;
   const latest = { current: input };
   const listeners = new Set<() => void>();
+  let surfaceStateKey: string | undefined;
   let controller: PluginUiHostController | null = null;
   let releaseFeed: (() => void) | undefined;
   let releaseLease: (() => void) | undefined;
+  let executionKey = "";
   let disposed = false;
   let starting = false;
   let incarnation = 0;
@@ -87,6 +110,7 @@ export function createPage(
     appIdentity = handle.instance.appIdentity;
     patch({ handle });
     plane.mount(handle);
+    syncExecution();
   };
   const setHeight = (height: number) => patch({ height });
   const setError = (error: string) => patch({ error });
@@ -96,18 +120,42 @@ export function createPage(
     onVisibility(visible) {
       if (page.visible !== visible) pluginUiPages.visibility(page, visible);
       if (visible) ensure();
+      syncExecution();
     },
     onCrash() {
       void page.suspend(true);
       patch({ phase: "error", error: "MCP App page stopped" });
     },
   });
+  function syncExecution() {
+    // 握手完成和 session 空闲都不能证明插件内部已无工作；宿主保留页面时必须允许它执行。
+    const active = controller !== null;
+    plane.setExecutionActive(active);
+    const handle = snapshot.handle;
+    if (!handle || !sandboxPlatform.setExecutionActive) return;
+    const background = active && (!page.visible || document.hidden);
+    const nextKey = `${handle.sandboxId}:${handle.initId}:${background}`;
+    if (nextKey === executionKey) return;
+    executionKey = nextKey;
+    logger.lifecycle.info("[plugin-ui] background execution", {
+      sessionId: input.scope.sessionId,
+      sandboxId: handle.sandboxId,
+      active: background,
+    });
+    void sandboxPlatform
+      .setExecutionActive(handle.sandboxId, handle.initId, background)
+      .catch((error: unknown) => {
+        if (snapshot.handle !== handle || disposed) return;
+        logger.warn("[plugin-ui] background execution failed", { error: String(error) });
+      });
+  }
   async function ensure() {
     if (disposed || controller || starting || snapshot.phase === "error") return;
     starting = true;
     const epoch = ++incarnation;
     try {
       await releasing;
+      surfaceStateKey = await pluginUiStateKey(surfaceKey);
       if (disposed || epoch !== incarnation) return;
       await pluginUiPages.reserve(page);
     } catch (error) {
@@ -198,7 +246,7 @@ export function createPage(
         ...(latest.current.toolCancelled ? { toolCancelled: true } : {}),
       }),
       // widgetState 初值直接读宿主内存 store（唯一 owner），不经 props 再缓存一份；
-      // 端口投递时才读，离屏回收后重建也拿到页面最近一次主动保存的值。
+      // 端口投递时才读；切换展示位置仍使用同一 guest 与内存状态。
       getWidgetState: () => getPluginUiWidgetState(surfaceKey),
       getHostCapabilities: () =>
         buildPluginUiHostCapabilities({
@@ -208,7 +256,9 @@ export function createPage(
           canSample: Boolean(services?.pluginUiSamplingService && getPluginUiSessionActions(scope)),
           canSubscribeResources: true,
           canDownloadFile: Boolean(platformInteractions?.onDownloadFile),
-          ...(scope.scope.kind === "surface" ? { surfaceId: scope.scope.surfaceId } : {}),
+          ...(scope.scope.kind === "surface"
+            ? { surfaceId: scope.scope.surfaceId, surfaceStateKey }
+            : {}),
         }),
       ...platformInteractions,
       // 经 latest ref 转调，回调 identity 变化不触发 controller 重建；缺省回 -32601（端口层翻译成 ProtocolError）。
@@ -225,6 +275,8 @@ export function createPage(
       },
       onPhase: (next, detail) => {
         if (controller !== nextController) return;
+        if (next === "running" && snapshot.phase !== "running") reportUsage("ui_ready");
+        if (next === "error" && snapshot.phase !== "error") reportUsage("ui_open_request", true);
         // 生命周期事件每个沙箱只有几条，走 lifecycle 才能进主日志（排查用户现场用）。
         logger.lifecycle.info("[plugin-ui] lifecycle", {
           phase: next,
@@ -270,6 +322,7 @@ export function createPage(
     });
 
     controller = nextController;
+    reportUsage("ui_open_request");
     controller.start();
   }
   const task = buildPluginUiSessionKey(input.scope);
@@ -290,6 +343,7 @@ export function createPage(
     task,
     visible: false,
     snapshot: () => snapshot,
+    start: () => void ensure(),
     subscribe(listener) {
       listeners.add(listener);
       return () => {
@@ -336,6 +390,17 @@ export function createPage(
           controller?.updateHostContext(context);
         }
       }
+      page.updateToolFeed(next);
+    },
+    updateToolFeed(next) {
+      if (disposed) return;
+      latest.current = {
+        ...latest.current,
+        toolCallId: next.toolCallId,
+        toolInput: next.toolInput,
+        toolResult: next.toolResult,
+        toolCancelled: next.toolCancelled,
+      };
       const feed = JSON.stringify([
         next.toolCallId,
         next.toolInput,
@@ -350,15 +415,15 @@ export function createPage(
       }
     },
     async suspend(force = false) {
-      const candidate = controller;
-      if (!force && (starting || (candidate && !(await candidate.tryRecycle().catch(() => false)))))
-        return false;
-      // 审批接纳与后台回收在 Agent 原子裁决；等待期间替换的 controller 不受旧结果影响。
-      if (!force && candidate !== controller) return false;
+      // 编辑器的未保存文档在 guest 内存中；即使 session 空闲，也不能按离屏期限或容量回收。
+      // 管理器沿用 false 拒绝淘汰；删除、重载与来源失效仍显式 force 清理。
+      if (!force) return false;
       incarnation++;
       starting = false;
       const previous = controller;
       controller = null;
+      plane.setExecutionActive(false);
+      executionKey = "";
       const previousHandle = snapshot.handle;
       const offFeed = releaseFeed,
         offLease = releaseLease;
@@ -368,6 +433,7 @@ export function createPage(
       // 先前释放未完成时不能重新预备；反复重试也只等待同一个释放链。
       // Main 主动导航到 about:blank 会触发 navigation；先解除旧代际观察，避免回收被误报为崩溃。
       if (previousHandle) plane.prepareUnmount(previousHandle.sandboxId);
+      if (previous) reportUsage("ui_close");
       const closing = previous?.dispose();
       releasing = Promise.all([releasing, closing]).then(() => {
         if (previousHandle) plane.unmount(previousHandle.sandboxId);
@@ -376,11 +442,10 @@ export function createPage(
         pluginUiPages.released(page);
       });
       await releasing;
-      // 等待 Agent 回收答复时锚点可能重新可见；释放完成后由同一 owner 恢复，避免停在空页面。
-      if (!force && page.visible && !disposed) void ensure();
       return true;
     },
     destroy() {
+      document.removeEventListener("visibilitychange", syncExecution);
       workspaceEvents.dispose();
       clearPluginUiSurfaceFeed(key);
       disposed = true;
@@ -389,6 +454,7 @@ export function createPage(
       listeners.clear();
     },
   };
+  document.addEventListener("visibilitychange", syncExecution);
   return page;
 }
 

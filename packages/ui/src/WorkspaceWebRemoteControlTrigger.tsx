@@ -14,7 +14,7 @@ import { useWebRemoteControlStatus } from "@/hooks/useWebRemoteControlStatus.js"
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
-import { WebRemoteControlDialog } from "@/WebRemoteControlDialog.js";
+import { WebRemoteControlDialog } from "@/web-remote-control/index.js";
 import { useWebRemoteControlFeatureEnabled } from "@/WebRemoteControlFeatureProvider.js";
 
 type FormatMessage = ReturnType<typeof useZCodeIntl>["intl"]["formatMessage"];

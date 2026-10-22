@@ -2,7 +2,7 @@ import { Loader2Icon, Undo2Icon } from "lucide-react";
 import {
   TID_V4_EDIT_WORKSPACE_CONFLICT_CONVERSATION_ONLY,
   TID_V4_EDIT_WORKSPACE_CONFLICT_DIALOG,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import type { V4ConversationFileRewindPreviewResult } from "@zcode/shared/zcode-protocol-v4";
 import { Button } from "@/components/ui/button.js";
 import {

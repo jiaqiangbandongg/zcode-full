@@ -20,7 +20,7 @@ import {
 import { flushSync } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDownIcon } from "lucide-react";
-import { TID_V4_TIMELINE, TID_V4_TIMELINE_BOTTOM } from "@zcode/shared";
+import { TID_V4_TIMELINE, TID_V4_TIMELINE_BOTTOM } from "@zcode/shared/test-ids";
 import type {
   ApiRetryState,
   AttachmentRef,
@@ -49,7 +49,12 @@ import type { AssistantFeedbackHandler } from "@/v4/ConversationRowView.js";
 import { ConversationTurnNavigator } from "@/v4/ConversationTurnNavigator.js";
 import { syncConversationShareSelectionPanelLayout } from "@/v4/conversationShareSelectionPanelLayout.js";
 import type { ConversationRowRenderContext } from "@/v4/conversationRowContext.js";
-import { splitConversationTimelineLiveTail } from "@/v4/conversationTimelineLiveTail.js";
+import {
+  isSameConversationLatestTurnSummary,
+  resolveConversationLatestTurnSummary,
+  splitConversationTimelineLiveTail,
+  type ConversationLatestTurnSummary,
+} from "@/v4/conversationTimelineLiveTail.js";
 import { armHighspeedFooterExpiryClock } from "@/highspeed/highspeedFooterExpiryClock.js";
 import {
   getConversationContentWidthClassName,
@@ -326,6 +331,18 @@ export interface ConversationTimelineProps {
   centerEmptyStateWithDock?: boolean;
   /** 窄屏/粗指针视口保留紧凑居中布局，不复用桌面草稿安全间距。 */
   compactEmptyStateWithDock?: boolean;
+  /**
+   * Side Pane 完整视图浮窗形态：底部输入区不留内边距，输入框外壳即浮窗最外层；
+   * 输入区脱离滚动流贴在时间线底部，滚动容器（含滚动条）止于输入框上方。
+   */
+  floatingComposerDock?: boolean;
+  /** 浮窗形态下上报底部输入区实测高度，宿主据此裁剪收起态。 */
+  onComposerDockHeightChange?: (heightPx: number) => void;
+  /**
+   * 浮窗形态下上报最后一个回合的运行状态、运行时长与最终回答（同一个 render unit），
+   * 供输入框占位「工作中 N 秒」与回答气泡使用；值变化时才回调。
+   */
+  onLatestTurnSummaryChange?: (summary: ConversationLatestTurnSummary) => void;
   /** 右侧状态面板对消息列的布局模式；auto 由 conversation container query 裁决。 */
   summaryPanelLayout?: "none" | "auto" | "inline";
   conversationFindQuery?: string;
@@ -347,13 +364,7 @@ export interface ConversationTimelineProps {
     onAddToCurrentTask: (reference: ConversationSelectionReference) => void;
     onAskInSideChat: (reference: ConversationSelectionReference) => void;
   };
-  /** 分享选择阶段的本轮勾选状态；仅桌面分享时间线传入。 */
-  shareSelection?: {
-    eligibleRowIds: ReadonlySet<number>;
-    selectedRowIds: ReadonlySet<number>;
-    onToggle: (rowId: number) => void;
-  };
-  /** 分享选择流程存在时，左侧 rail 由分享面板或 reopen 按钮独占。 */
+  /** 范围编辑时，左侧 rail 由分享选择面板独占。 */
   hideTurnNavigator?: boolean;
 }
 
@@ -390,6 +401,9 @@ function ConversationTimelineImpl({
   headerSlot,
   centerEmptyStateWithDock = false,
   compactEmptyStateWithDock = false,
+  floatingComposerDock = false,
+  onComposerDockHeightChange,
+  onLatestTurnSummaryChange,
   summaryPanelLayout = "none",
   conversationFindQuery = "",
   conversationFindActiveIndex = -1,
@@ -401,7 +415,6 @@ function ConversationTimelineImpl({
   scrollToBottomActionRef,
   scrollToQueryActionRef,
   selectionActions,
-  shareSelection,
   hideTurnNavigator = false,
 }: ConversationTimelineProps) {
   const { intl } = useZCodeIntl();
@@ -468,6 +481,33 @@ function ConversationTimelineImpl({
     [renderUnits],
   );
   const hasRunningUnit = useMemo(() => renderUnits.some((unit) => unit.isRunning), [renderUnits]);
+  const latestTurnSummary = useMemo(
+    () => resolveConversationLatestTurnSummary(renderUnits),
+    [renderUnits],
+  );
+  // 回调随会话 owner 变化；换了回调必须重新上报，不能因值相同而跳过。
+  const reportedLatestTurnSummaryRef = useRef<{
+    callback: (summary: ConversationLatestTurnSummary) => void;
+    summary: ConversationLatestTurnSummary;
+  } | null>(null);
+  useEffect(() => {
+    if (!onLatestTurnSummaryChange) {
+      reportedLatestTurnSummaryRef.current = null;
+      return;
+    }
+    const reported = reportedLatestTurnSummaryRef.current;
+    if (
+      reported?.callback === onLatestTurnSummaryChange &&
+      isSameConversationLatestTurnSummary(reported.summary, latestTurnSummary)
+    ) {
+      return;
+    }
+    reportedLatestTurnSummaryRef.current = {
+      callback: onLatestTurnSummaryChange,
+      summary: latestTurnSummary,
+    };
+    onLatestTurnSummaryChange(latestTurnSummary);
+  }, [latestTurnSummary, onLatestTurnSummaryChange]);
   const nextHighspeedExpiryMs = useMemo(
     () => resolveNextHighspeedExpiryMs(rows, liveNowMs),
     [liveNowMs, rows],
@@ -561,6 +601,8 @@ function ConversationTimelineImpl({
   const [turnNavigatorHydrationRetryRevision, setTurnNavigatorHydrationRetryRevision] = useState(0);
   const timelineRootRef = useRef<HTMLDivElement>(null);
   const composerDockRef = useRef<HTMLDivElement>(null);
+  const floatingComposerDockRef = useRef(floatingComposerDock);
+  floatingComposerDockRef.current = floatingComposerDock;
   const shareSelectionPanelLayoutRef = useRef<{
     centerYPx: number;
     maxHeightPx: number;
@@ -614,6 +656,20 @@ function ConversationTimelineImpl({
       resizeObserver?.disconnect();
     };
   }, [backgroundScrollLocked, selectionPanelLayoutContainerRef, syncShareSelectionPanelLayout]);
+
+  const hasBottomDock = Boolean(bottomDock);
+  useLayoutEffect(() => {
+    // 完整视图浮窗收起态只露出底部输入区：由 dock 自身测量并上报高度（权限/问答卡片
+    // 替换输入框时高度随之变化），宿主不去猜 SessionPane 内部结构。
+    const dock = composerDockRef.current;
+    if (!onComposerDockHeightChange || !dock || !hasBottomDock) return;
+    const report = () => onComposerDockHeightChange(dock.getBoundingClientRect().height);
+    report();
+    if (typeof ResizeObserver === "undefined") return;
+    const resizeObserver = new ResizeObserver(report);
+    resizeObserver.observe(dock);
+    return () => resizeObserver.disconnect();
+  }, [hasBottomDock, onComposerDockHeightChange]);
 
   useEffect(() => {
     if (!hasRunningUnit) {
@@ -940,6 +996,8 @@ function ConversationTimelineImpl({
     if (!messageLayer) return;
 
     if (
+      // 浮窗形态下输入区不在滚动视口内，消息不会经过输入框，底部遮罩只会吃掉消息。
+      floatingComposerDockRef.current ||
       isAtBottom({
         scrollTop: element.scrollTop,
         viewportHeight: element.clientHeight,
@@ -971,6 +1029,27 @@ function ConversationTimelineImpl({
     messageLayer.style.maskSize = `100% ${viewportHeight}px`;
     messageLayer.style.webkitMaskSize = `100% ${viewportHeight}px`;
   }, []);
+
+  useLayoutEffect(() => {
+    // 修复原因：浮窗展开态输入区曾是滚动容器内的 sticky 层，滚动条一直延伸到输入框后面。
+    // 浮窗形态下输入区改为相对时间线根节点贴底（同一 DOM，不重挂载），滚动容器底边让出输入区高度。
+    const root = timelineRootRef.current;
+    const dock = composerDockRef.current;
+    if (!floatingComposerDock || !root || !dock) return;
+    const sync = () =>
+      root.style.setProperty(
+        "--v4-floating-composer-dock-height",
+        `${dock.getBoundingClientRect().height}px`,
+      );
+    sync();
+    if (scrollRef.current) syncMessageLayerMask(scrollRef.current);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(sync);
+    resizeObserver?.observe(dock);
+    return () => {
+      resizeObserver?.disconnect();
+      root.style.removeProperty("--v4-floating-composer-dock-height");
+    };
+  }, [floatingComposerDock, hasBottomDock, syncMessageLayerMask]);
 
   const syncTurnNavigatorViewport = useCallback(
     (element: HTMLDivElement) => {
@@ -1906,6 +1985,9 @@ function ConversationTimelineImpl({
           // 但原生滚动条、滚轮和键盘翻页都不再能移动背景，勾选目标不会漂走。
           backgroundScrollLocked && "!overflow-y-hidden",
           compactForRemoteControl && "min-w-0",
+          // 浮窗形态：滚动容器止于输入框上方 12px，消息底部再留 16px 空白。
+          floatingComposerDock &&
+            "mb-[calc(var(--v4-floating-composer-dock-height,0px)+12px)] pb-4",
           // 修复原因：Conversation turn map 覆盖 timeline 左侧 48px；表格增强滚动如果仍按
           // 普通 16px 边距借位，会有 32px 落到 turn map 下方，必须把完整占用计入左边界。
           turnNavigatorQueryRowIds.size >= 2 &&
@@ -2004,7 +2086,6 @@ function ConversationTimelineImpl({
                         onRetry={onRetry}
                         onFeedbackChange={onFeedbackChange}
                         onEdit={onEdit}
-                        shareSelection={shareSelection}
                       />
                     </div>
                   );
@@ -2035,7 +2116,6 @@ function ConversationTimelineImpl({
                     onRetry={onRetry}
                     onFeedbackChange={onFeedbackChange}
                     onEdit={onEdit}
-                    shareSelection={shareSelection}
                   />
                 </div>
               ) : null}
@@ -2070,11 +2150,15 @@ function ConversationTimelineImpl({
                 // sticky dock 是 z-20 的全宽透明层，过去会盖住 z-10 rail
                 // 在 composer 左侧留白内的按钮。外壳不接事件，只让实际内容列恢复命中。
                 "pointer-events-none z-20 flex w-full justify-center",
-                responsiveCenteredEmptyLayout
-                  ? "mt-3 shrink-0"
-                  : centeredEmptyLayout
-                    ? "shrink-0"
-                    : "sticky bottom-0",
+                // 浮窗形态：滚动容器与内容层都没有定位，absolute 的包含块是时间线根节点，
+                // 输入区贴在时间线底部、不随消息滚动，也不被滚动容器裁剪。
+                floatingComposerDock
+                  ? "absolute inset-x-0 bottom-0"
+                  : responsiveCenteredEmptyLayout
+                    ? "mt-3 shrink-0"
+                    : centeredEmptyLayout
+                      ? "shrink-0"
+                      : "sticky bottom-0",
               )}
             >
               <div
@@ -2084,7 +2168,8 @@ function ConversationTimelineImpl({
                   // ≥1280px 面板让位时降级为只过渡 transform，避免大范围跳变叠加位移抖动。
                   "pointer-events-auto relative z-10 w-full shrink-0 transition-[width,max-width,transform] duration-150 ease-out @min-[1280px]/conversation:transition-[transform]",
                   contentWidthClassName,
-                  !centeredEmptyLayout && "px-4 pb-4",
+                  // 浮窗形态下输入框外壳就是浮窗最外层，不留内边距。
+                  !centeredEmptyLayout && !floatingComposerDock && "px-4 pb-4",
                   !centeredEmptyLayout && summaryPanelInlineOffsetClassName,
                 )}
               >

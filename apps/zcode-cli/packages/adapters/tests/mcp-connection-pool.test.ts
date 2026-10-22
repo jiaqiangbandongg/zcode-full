@@ -9,6 +9,40 @@ import { createMcpConnectionPool } from "../src/mcp/pool.js";
 import { createMcpTelemetryTracker } from "../src/mcp/telemetry.js";
 
 describe("MCP connection pool isolation", () => {
+  it("shares startup waiters and rejects a released lease while another owner connects", async () => {
+    const ready = Promise.withResolvers<void>();
+    let initialized = false;
+    const source = { identity: "trusted", generation: 1 };
+    const connectServer = vi.fn(async () => {
+      await ready.promise;
+      initialized = true;
+      return { status: "connected" };
+    });
+    const adapter = {
+      connectServer,
+      waitForAppConnection: async () => (initialized ? source : null),
+      close: vi.fn(async () => {}),
+    } as unknown as McpPort;
+    const pool = createMcpConnectionPool({ createAdapter: () => adapter, idleGraceMs: 0 });
+    const a = pool.acquireLease({ sessionId: "a" });
+    const b = pool.acquireLease({ sessionId: "b" });
+    const config: McpServerConfig = { type: "stdio", command: "fixture", isolation: "workspace" };
+    const connecting = Promise.all([
+      a.connectServer("fixture", config),
+      b.connectServer("fixture", config),
+    ]);
+    const released = a.waitForAppConnection!("fixture");
+    const opening = b.waitForAppConnection!("fixture");
+    await a.close();
+    ready.resolve();
+    await connecting;
+    expect(await released).toBeNull();
+    expect(await opening).toEqual(source);
+    expect(connectServer).toHaveBeenCalledOnce();
+    await b.close();
+    await pool.close();
+  });
+
   it("reports one startup count snapshot for a session lease", async () => {
     const events: unknown[] = [];
     const telemetry = createMcpTelemetryTracker({

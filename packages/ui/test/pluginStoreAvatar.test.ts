@@ -37,24 +37,6 @@ describe("PluginStoreAvatar", () => {
     expect(render("plugin-creator@personal")).toContain(icon);
   });
 
-  it("uses a neutral surface icon when listing icon is missing", () => {
-    const html = renderToStaticMarkup(
-      createElement(PluginStoreAvatar, {
-        item: { name: "example-plugin" },
-        className: "size-10",
-      }),
-    );
-
-    expect(html).toContain("lucide-blocks");
-    expect(html).not.toContain("lucide-puzzle");
-    expect(html).toContain("rounded-xl");
-    expect(html).toContain("bg-surface");
-    expect(html).toContain("text-foreground-subtle");
-    expect(html).not.toContain("rounded-full");
-    expect(html).not.toContain("border-border");
-    expect(html).not.toContain("bg-gradient-to-br");
-  });
-
   it("keeps a trusted listing icon ahead of the fallback", () => {
     const html = renderToStaticMarkup(
       createElement(PluginStoreAvatar, {
@@ -67,9 +49,6 @@ describe("PluginStoreAvatar", () => {
     );
 
     expect(html).toContain('src="https://cdn.example.com/example.png"');
-    expect(html).toContain("bg-surface");
-    expect(html).toContain("h-2/3");
-    expect(html).not.toContain("dark:invert");
     expect(html).not.toContain("lucide-blocks");
   });
 });

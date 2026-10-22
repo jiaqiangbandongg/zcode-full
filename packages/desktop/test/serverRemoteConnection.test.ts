@@ -1,13 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AddressInfo } from "node:net";
+import { AddressInfo, Socket } from "node:net";
+import { once } from "node:events";
+import { Duplex } from "node:stream";
+import { chmod, mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { WebSocket, type RawData } from "ws";
 import { Emitter, Event, SocketProtocol, VSBuffer, type ISocket } from "@zcode/rpc";
-import { ServiceCollection, ISystemService, IZCodeAgentService } from "@zcode/services";
+import {
+  ServiceCollection,
+  ISystemService,
+  IZCodeAgentService,
+  IFileService,
+} from "@zcode/services";
+import { createFileService } from "../../services/src/file/fileService.js";
+import { prepareRemoteWorkspaceIdentity } from "../src/host/remoteWorkspacePreparation.js";
 import { createHttpServer } from "@zcode/server";
 import { createTopicResourcePeers, createTopicResourceRelayChannel } from "@zcode/services/node";
 import { connectViaProtocol, connectViaWebSocket } from "@zcode/client";
 import {
   connectServerRemote,
+  connectServerRemoteOverDuplex,
   resolveServerRemoteEndpoints,
 } from "../src/host/serverRemoteConnection.js";
 import { registerHostServiceResourceTelemetry } from "../src/host/hostServiceResourceTelemetry.js";
@@ -84,9 +97,164 @@ function rejectedWebSocketStatus(
   });
 }
 
+async function connectOpaqueDuplex(port: number): Promise<Duplex> {
+  const socket = await new Promise<Socket>((resolve, reject) => {
+    const connection = new Socket();
+    connection.once("error", reject);
+    connection.connect(port, "127.0.0.1", () => {
+      connection.off("error", reject);
+      resolve(connection);
+    });
+  });
+  const duplex = new Duplex({
+    read() {
+      socket.resume();
+    },
+    write(chunk, encoding, callback) {
+      if (socket.write(chunk, encoding)) callback();
+      else socket.once("drain", callback);
+    },
+    final(callback) {
+      socket.end(callback);
+    },
+    destroy(error, callback) {
+      socket.destroy();
+      callback(error);
+    },
+  });
+  socket.pause();
+  socket.on("data", (chunk) => {
+    if (!duplex.push(chunk)) socket.pause();
+  });
+  socket.once("end", () => duplex.push(null));
+  socket.once("error", (error) => duplex.destroy(error));
+  return duplex;
+}
+
 describe("server remote connection", () => {
   const servers: Array<{ close(callback?: (err?: Error) => void): void }> = [];
   const disposables: Array<{ dispose(): void }> = [];
+
+  async function startLoopbackServer(...args: Parameters<typeof createHttpServer>) {
+    const [services, port, options] = args;
+    // 默认 IPv6 监听却请求 IPv4 时，同端口的其他 IPv4 服务可能返回 HTML；夹具两端必须同址。
+    const server = createHttpServer(services, port, { ...options, host: "127.0.0.1" });
+    servers.push(server);
+    // 显式 host 的监听在异步完成后才有地址，不能提前读取随机端口。
+    await once(server, "listening");
+    return server;
+  }
+
+  // 远端 Server 支持 POSIX；Windows 运行器通过结构化错误单测覆盖 ELOOP 映射。
+  it.each(process.platform === "win32" ? ["ENOENT"] : ["ENOENT", "ELOOP"])(
+    "真实远端 File RPC 保留 %s，目录校验失败不关闭共享连接",
+    async (code) => {
+      const root = await mkdtemp(join(tmpdir(), "zcode-remote-stat-"));
+      const deleted = join(root, "deleted");
+      const surviving = join(root, "surviving");
+      try {
+        await mkdir(deleted);
+        await mkdir(surviving);
+        const services = new ServiceCollection().register(IFileService, createFileService());
+        const server = await startLoopbackServer(services, 0, { serverId: "directory-fixture" });
+        const address = server.address() as AddressInfo;
+        expect(address.address).toBe("127.0.0.1");
+        const connection = await connectServerRemote({
+          kind: "server",
+          url: `http://127.0.0.1:${address.port}`,
+        });
+        disposables.push(connection);
+        await rm(deleted, { recursive: true });
+        if (code === "ELOOP") await symlink(deleted, deleted, "dir");
+        await expect(connection.services.fileService.stat({ path: deleted })).rejects.toMatchObject(
+          {
+            code,
+          },
+        );
+        const bindIdentity = vi.fn();
+        await expect(
+          prepareRemoteWorkspaceIdentity(
+            connection.services.fileService,
+            {
+              workspacePath: deleted,
+              stableWorkspaceIdentity: `remote:server:directory-fixture:${deleted}`,
+            },
+            bindIdentity,
+          ),
+        ).rejects.toMatchObject({
+          code: "remote-workspace-directory-unavailable",
+          retryable: false,
+        });
+        expect(bindIdentity).not.toHaveBeenCalled();
+        await expect(
+          prepareRemoteWorkspaceIdentity(
+            connection.services.fileService,
+            {
+              workspacePath: surviving,
+              stableWorkspaceIdentity: `remote:server:directory-fixture:${surviving}`,
+            },
+            bindIdentity,
+          ),
+        ).resolves.toBeUndefined();
+        expect(bindIdentity).toHaveBeenCalledTimes(1);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0).each([0o000, 0o400, 0o100])(
+    "真实 File RPC 拒绝权限 %s 的叶目录，同设备其他项目与修复重试仍可用",
+    async (permissions) => {
+      const root = await mkdtemp(join(tmpdir(), "zcode-remote-permission-"));
+      const denied = join(root, "denied");
+      const surviving = join(root, "surviving");
+      try {
+        await mkdir(denied);
+        await mkdir(surviving);
+        const server = createHttpServer(
+          new ServiceCollection().register(IFileService, createFileService()),
+          0,
+          { serverId: "permission-fixture" },
+        );
+        servers.push(server);
+        const address = server.address() as AddressInfo;
+        const connection = await connectServerRemote({
+          kind: "server",
+          url: `http://127.0.0.1:${address.port}`,
+        });
+        disposables.push(connection);
+        await chmod(denied, permissions);
+        await expect(connection.services.fileService.stat({ path: denied })).resolves.toMatchObject(
+          {
+            type: "directory",
+          },
+        );
+        const bindIdentity = vi.fn();
+        const prepare = (workspacePath: string) =>
+          prepareRemoteWorkspaceIdentity(
+            connection.services.fileService,
+            {
+              workspacePath,
+              stableWorkspaceIdentity: `remote:server:permission-fixture:${workspacePath}`,
+            },
+            bindIdentity,
+          );
+        await expect(prepare(denied)).rejects.toMatchObject({
+          code: "remote-workspace-directory-unavailable",
+          retryable: false,
+        });
+        expect(bindIdentity).not.toHaveBeenCalled();
+        await expect(prepare(surviving)).resolves.toBeUndefined();
+        await chmod(denied, 0o500);
+        await expect(prepare(denied)).resolves.toBeUndefined();
+        expect(bindIdentity).toHaveBeenCalledTimes(2);
+      } finally {
+        await chmod(denied, 0o700);
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   afterEach(async () => {
     for (const disposable of disposables.splice(0)) {
@@ -109,6 +277,42 @@ describe("server remote connection", () => {
     servers.length = 0;
   });
 
+  it("URL 握手必须等待成员提交，成员已移除时释放未发布 socket", async () => {
+    const server = await startLoopbackServer(new ServiceCollection(), 0, {
+      serverId: "membership-server",
+      authRequired: true,
+      authToken: "token",
+    });
+    const address = server.address() as AddressInfo;
+    const commit = vi.fn(async (sourceServerId: string) => {
+      expect(sourceServerId).toBe("membership-server");
+      throw new Error("remote-project.host-removed");
+    });
+    await expect(
+      connectServerRemote(
+        { kind: "server", url: `http://127.0.0.1:${address.port}`, token: "token" },
+        { commitMembership: commit },
+      ).then((connection) => {
+        disposables.push(connection);
+        return connection;
+      }),
+    ).rejects.toThrow("remote-project.host-removed");
+    expect(commit).toHaveBeenCalledOnce();
+  });
+  it("URL 握手中止后不提交成员", async () => {
+    const commitMembership = vi.fn(async () => undefined);
+    const controller = new AbortController();
+    controller.abort();
+    const fetchImpl = vi.fn<typeof fetch>();
+    await expect(
+      connectServerRemote(
+        { kind: "server", url: "http://127.0.0.1:1" },
+        { signal: controller.signal, commitMembership, fetchImpl },
+      ),
+    ).rejects.toThrow();
+    expect(commitMembership).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
   it("resolves info and websocket endpoints from an HTTP server URL", () => {
     expect(resolveServerRemoteEndpoints("https://studio.example.com/zcode/")).toEqual({
       infoUrl: "https://studio.example.com/zcode/api/server-info",
@@ -129,8 +333,7 @@ describe("server remote connection", () => {
     const services = new ServiceCollection().register(IZCodeAgentService, {
       queryConversationCommandsV4: async () => ({ results: [] }),
     } as never);
-    const server = createHttpServer(services, 0, { topicResourcePeers: peers });
-    servers.push(server);
+    const server = await startLoopbackServer(services, 0, { topicResourcePeers: peers });
     const address = server.address() as AddressInfo;
     const validate = vi.fn(async () => undefined);
     const relay = createTopicResourceRelayChannel({
@@ -189,11 +392,10 @@ describe("server remote connection", () => {
         helloConversationV4: vi.fn(),
         initializeConversationV4: vi.fn(),
       } as never);
-    const server = createHttpServer(services, 0, {
+    const server = await startLoopbackServer(services, 0, {
       serverId: "studio",
       workspaces: [{ path: "/home/dev/project" }],
     });
-    servers.push(server);
     const address = server.address() as AddressInfo;
 
     const requestedPaths: string[] = [];
@@ -249,16 +451,52 @@ describe("server remote connection", () => {
     expect(info).toHaveBeenCalledOnce();
   });
 
+  it("runs the typed RPC handshake over one reusable Duplex channel", async () => {
+    const services = new ServiceCollection().register(ISystemService, {
+      info: vi.fn(async () => ({ homedir: "/home/alice", platform: "linux" })),
+      listIntegratedTerminalShells: vi.fn(async () => []),
+      probeIntranet: vi.fn(async () => ({
+        checkedAt: 1,
+        isIntranet: false,
+        reachedTargetCount: 0,
+        requiredSuccessCount: 1,
+        results: [],
+        strategy: "tcp-connect",
+        totalTargets: 0,
+      })),
+    });
+    const server = await startLoopbackServer(services, 0, {
+      serverId: "duplex-server",
+      authRequired: true,
+      authToken: "ingress-token",
+    });
+    const address = server.address() as AddressInfo;
+    let channelCount = 0;
+    const connection = await connectServerRemoteOverDuplex({
+      ingressToken: "ingress-token",
+      createConnection: async () => {
+        channelCount += 1;
+        return await connectOpaqueDuplex(address.port);
+      },
+    });
+    disposables.push(connection);
+    await expect(connection.services.systemService.info()).resolves.toMatchObject({
+      homedir: "/home/alice",
+    });
+    expect(connection.serverInfo.serverId).toBe("duplex-server");
+    expect(channelCount).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
+
   it("connector 使用 token 贯穿受保护的 capability endpoint 与 /ws/host", async () => {
     const services = new ServiceCollection().register(IZCodeAgentService, {
       helloConversationV4: vi.fn(),
       initializeConversationV4: vi.fn(),
     } as never);
-    const server = createHttpServer(services, 0, {
+    const server = await startLoopbackServer(services, 0, {
       authRequired: true,
       authToken: "secret-token",
     });
-    servers.push(server);
     const address = server.address() as AddressInfo;
     const requestedUrls: URL[] = [];
 
@@ -308,11 +546,10 @@ describe("server remote connection", () => {
             }
           : {}),
       };
-      const server = createHttpServer(
+      const server = await startLoopbackServer(
         new ServiceCollection().register(IZCodeAgentService, service as never),
         0,
       );
-      servers.push(server);
       const address = server.address() as AddressInfo;
       const connection = await connectServerRemote(
         { kind: "server", url: `http://127.0.0.1:${address.port}` },
@@ -368,8 +605,7 @@ describe("server remote connection", () => {
       helloConversationV4: vi.fn(),
       initializeConversationV4: vi.fn(),
     } as never);
-    const server = createHttpServer(services, 0);
-    servers.push(server);
+    const server = await startLoopbackServer(services, 0);
     const address = server.address() as AddressInfo;
     const httpBase = `http://127.0.0.1:${address.port}`;
     const wsHost = `ws://127.0.0.1:${address.port}/ws/host`;

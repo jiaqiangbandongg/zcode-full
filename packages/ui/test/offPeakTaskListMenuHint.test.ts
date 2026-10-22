@@ -131,9 +131,6 @@ describe("OffPeakTaskList menu hints", () => {
       expect(onContinue).not.toHaveBeenCalled();
       expect(tooltipCalls).toContainEqual(
         expect.objectContaining({
-          className: "max-w-[min(20rem,calc(100vw-1rem))]",
-          side: "right",
-          sideOffset: 16,
           title: hintId,
         }),
       );

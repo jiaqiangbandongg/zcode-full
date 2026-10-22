@@ -284,9 +284,8 @@ export function createMarketingTouchController(options: {
           release(state.banner);
         store.setState({ pending: false, phase: "idle", banner: next });
         await showPending();
-        // 新动作不改变领取资格；立即查询会与异步 confirm 竞争，可能用旧投放再次挡住目标页。
-        if (succeeded && action.type !== "copy_text" && action.type !== "navigate" && !disposed)
-          options.refresh();
+        // 只有领取会改变资格；外链等动作立即查询会与异步 confirm 竞争，使已关闭的旧弹窗重开。
+        if (succeeded && action.type === "claim_zcode_plan" && !disposed) options.refresh();
       }
     }
   }

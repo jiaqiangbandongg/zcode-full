@@ -14,6 +14,40 @@ const base = {
 };
 
 describe("ConversationTelemetryFact schema", () => {
+  it("Skill 名称字段允许新旧事实往返且拒绝非法类型", () => {
+    const fact = {
+      ...base,
+      kind: "tool.lifecycle",
+      phase: "completed",
+      toolCallId: "skill",
+      toolName: "Skill",
+    };
+    expect(conversationTelemetryFactSchema.parse(fact)).not.toHaveProperty("skillName");
+    expect(
+      conversationTelemetryFactSchema.parse(
+        JSON.parse(JSON.stringify({ ...fact, skillName: "local-skill" })),
+      ),
+    ).toMatchObject({ skillName: "local-skill" });
+    for (const skillName of [
+      "",
+      123,
+      null,
+      {},
+      "/private/key",
+      "demo\nsecret",
+      "demo ",
+      "https://example.com",
+      "sk-" + "a".repeat(49),
+      "a".repeat(65),
+    ]) {
+      expect(conversationTelemetryFactSchema.safeParse({ ...fact, skillName }).success).toBe(false);
+    }
+    expect(
+      conversationTelemetryFactSchema.safeParse({ ...fact, skillName: "demo", args: "private" })
+        .success,
+    ).toBe(false);
+  });
+
   it("Memory 元数据保持 boolean 且兼容旧 ACK/fact", () => {
     const ack = { commandId: "command-1", status: "accepted", revisionAtDecision: 0 };
     const fact = { ...base, kind: "turn.started" };

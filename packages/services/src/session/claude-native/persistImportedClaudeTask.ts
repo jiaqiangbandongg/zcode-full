@@ -1,12 +1,11 @@
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { ZCodeSessionFile, ZCodeTaskMeta } from "@zcode/shared";
+import type { ZCodeSessionFile } from "@zcode/shared";
 import { getLegacyTaskSessionSnapshotPath } from "#src/paths.js";
 import {
   parseLegacyTaskSessionFile,
   type LegacyTaskSessionFile,
 } from "#src/session/legacyTaskSessionFile.js";
-import type { TaskIndexRepo } from "#src/session/taskIndexRepo.js";
 
 const TASK_SEARCH_TEXT_MAX_CHARS = 200_000;
 
@@ -40,34 +39,6 @@ async function writeSessionFileAtomic(
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(tempPath, `${serialized}\n`, "utf-8");
   await rename(tempPath, filePath);
-}
-
-export async function persistImportedClaudeTask(params: {
-  taskIndexRepo: TaskIndexRepo;
-  sessionFile: LegacyTaskSessionFile;
-  /** 仅当导入目标 workspace 与筛选 workspace 一致时才写入，避免把当前 tab 的 identity 套到其它路径。 */
-  workspaceIdentity?: string;
-}): Promise<ZCodeTaskMeta> {
-  const parsed = parseLegacyTaskSessionFile(params.sessionFile);
-  const meta: LegacyTaskSessionFile["meta"] = {
-    ...parsed.meta,
-    ...(params.workspaceIdentity ? { workspaceIdentity: params.workspaceIdentity } : {}),
-  };
-  const indexMeta: ZCodeTaskMeta = {
-    ...meta,
-    // SQLite task index 的 mode 列仍是 NOT NULL；导入 snapshot 本身保持过滤后的缺省。
-    mode: meta.mode ?? "default",
-  };
-
-  await writeImportedClaudeTaskSnapshot({ sessionFile: { ...parsed, meta } });
-  return params.taskIndexRepo.syncTaskMeta({
-    meta: indexMeta,
-    // 用户删除/归档已导入会话后再次导入，旧 index 行会保留 archived/deleted。
-    // 重导入语义是恢复这条会话到列表中，因此这里显式取消隐藏状态。
-    archived: false,
-    deleted: false,
-    searchableText: buildSearchableTextFromMessages(parsed.messages),
-  });
 }
 
 export async function writeImportedClaudeTaskSnapshot(params: {

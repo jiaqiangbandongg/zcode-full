@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-media-preview",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-media-preview.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-media-title",
+      "description": "\u6807\u9898",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "\u6807\u9898\u4e0d\u5c5e\u4e8e\u65ad\u8a00"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_MEDIA_PREVIEW"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-media-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 media preview\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-media-main",
+      "description": "\u5176\u5b83",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "\u9996\u53d1/fork/edit"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_MEDIA_PREVIEW_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-media-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_MEDIA_PREVIEW_REPLY"
+        }
+      }
+    }
+  ]
+}

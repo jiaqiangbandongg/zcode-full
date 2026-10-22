@@ -72,7 +72,9 @@ export async function resumeFromStore(
 
   const traceContext = options?.traceContext ?? this.rootTraceContext;
   const persistedSession = await this.sessionStore.getSession(this.sessionId);
-  if (!persistedSession || persistedSession.time.archived !== undefined) {
+  // 删除 = CLI 软删除（time_deleted）。归档已归 Host 组织态，CLI 不再有归档列；
+  // 旧的 time.archived 判断永远为 false，这里改为拒绝恢复已软删除的会话。
+  if (!persistedSession || persistedSession.time.deleted !== undefined) {
     throw createCoreError(CoreErrorType.SessionNotFound, `Session not found: ${this.sessionId}`, {
       context: { sessionId: this.sessionId },
       recoverable: true,
@@ -153,6 +155,7 @@ export async function resumeFromStore(
     traceContext,
   );
   const hydration = await hydrateMessageHistoryFromSession({
+    logger: this.logger,
     artifactStore: this.artifactStore,
     branchCutAfterMessageId,
     history: this.messageHistory,

@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ContentPane } from "../src/app-transcript-components.js";
 import {
-  DARK_TUI_THEME,
   LIGHT_TUI_THEME,
   activeTuiTheme,
   getActiveTuiThemeMode,
   inferThemeModeFromTerminalColors,
   resolveTuiThemeMode,
   setActiveTuiThemeMode,
-  themeToLegacyPalette,
 } from "../src/theme/index.js";
 
 test("resolves theme preferences against terminal mode", () => {
@@ -18,16 +16,6 @@ test("resolves theme preferences against terminal mode", () => {
   assert.equal(resolveTuiThemeMode("auto", "light"), "light");
   assert.equal(resolveTuiThemeMode("auto", null), "dark");
   assert.equal(resolveTuiThemeMode(undefined, "light"), "light");
-});
-
-test("maps semantic themes to the legacy palette", () => {
-  const dark = themeToLegacyPalette(DARK_TUI_THEME);
-  const light = themeToLegacyPalette(LIGHT_TUI_THEME);
-
-  assert.equal(dark.background, "#0f1419");
-  assert.equal(dark.userMessageBackground, DARK_TUI_THEME.backgroundMessageUser);
-  assert.equal(light.background, "#f8fafc");
-  assert.equal(light.panelAlt, LIGHT_TUI_THEME.backgroundElement);
 });
 
 test("infers terminal theme mode from terminal background colors", () => {

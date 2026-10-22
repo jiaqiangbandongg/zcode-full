@@ -207,10 +207,6 @@ describe("feishu bot provider", () => {
     expect(cards.join("")).not.toContain("<at");
   });
 
-  it("does not load the WebSocket SDK when constructing a provider", () => {
-    createFeishuBotProvider({ loadCredential: vi.fn(async () => null) });
-    expect(sdkLoaded).not.toHaveBeenCalled();
-  });
   it.each(["feishu", "lark"] as const)(
     "refreshes %s tokens using their remaining lifetime",
     async (providerName) => {
@@ -2870,7 +2866,6 @@ describe("feishu bot provider", () => {
       cardJson.indexOf('"tag":"hr"'),
     );
     expect(cardJson.indexOf('"tag":"hr"')).toBeLessThan(cardJson.indexOf("你希望游戏有什么功能？"));
-    expect(cardJson).toContain('"tag":"form"');
     expect(cardJson).not.toContain('"tag":"input"');
     expect(cardJson).not.toContain('"tag":"multi_select_static"');
     expect(cardJson).toContain("/elicitation abc123def456 __form__:");

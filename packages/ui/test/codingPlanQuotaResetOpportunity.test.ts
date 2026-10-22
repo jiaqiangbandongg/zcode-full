@@ -128,18 +128,6 @@ describe("CodingPlanQuotaResetOpportunity", () => {
     cleanup();
   });
 
-  it("可重置额度按钮复用任务列表等待请求的确认色", () => {
-    renderOpportunity({
-      count: 1,
-      dialog: createDialogConfig(),
-      expiresAt: Date.now() + 20 * 60_000,
-    });
-
-    const button = screen.getByRole("button", { name: "1 次重置额度" });
-    expect(button.className).toContain("bg-interaction-confirmation-surface");
-    expect(button.className).toContain("text-interaction-confirmation-foreground");
-  });
-
   it("单个机会保持徽标文案和倒计时，点击同样打开重置弹框", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-13T10:00:00+08:00"));
@@ -151,9 +139,8 @@ describe("CodingPlanQuotaResetOpportunity", () => {
     });
 
     expect(screen.getByText("1 次重置额度")).toBeTruthy();
-    const countdown = screen.getByText("剩余 19 分 8 秒");
-    expect(countdown.className).toContain("font-normal");
-    expect(countdown.className).toContain("text-interaction-confirmation-foreground/80");
+    screen.getByText("剩余 19 分 8 秒");
+
     // 单机会不切换为「获得 N 次」的多机会文案，仅交互升级为按钮。
     expect(screen.queryByRole("button", { name: "获得1次重置额度" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -183,37 +170,6 @@ describe("CodingPlanQuotaResetOpportunity", () => {
     expect(screen.getByLabelText("剩余用量")).toBeTruthy();
     expect(screen.getByText("5 小时额度重置")).toBeTruthy();
     expect(screen.getByText("周额度重置")).toBeTruthy();
-  });
-
-  it.each([
-    [1, "grid-cols-1"],
-    [2, "grid-cols-2"],
-    [3, "grid-cols-3"],
-  ])("弹窗按 %i 个剩余额度项使用对应列数", (itemCount, expectedClass) => {
-    const baseConfig = createDialogConfig();
-    const usageItems = [
-      ...baseConfig.usageItems,
-      {
-        color: "var(--color-usage-chart-3)",
-        id: "monthly-tool",
-        label: "MCP 额度",
-        percentage: 75,
-        resetTime: "9月1日",
-        value: "75%",
-      },
-    ];
-    renderOpportunity({
-      count: 1,
-      dialog: createDialogConfig({
-        usageItems: usageItems.slice(0, itemCount),
-      }),
-      expiresAt: Date.now() + 20 * 60_000,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "1 次重置额度" }));
-    const grid = screen.getByLabelText("剩余用量").firstElementChild;
-    expect(grid?.className).toContain(expectedClass);
-    expect(grid?.className).toContain("max-sm:grid-cols-1");
   });
 
   it("弹框内只调用被点击额度的 reset，成功后展示反馈并收起已消费项", async () => {
@@ -375,7 +331,7 @@ describe("CodingPlanQuotaResetOpportunity", () => {
       fireEvent.click(screen.getByRole("button", { name: "重置 5 小时额度" }));
       await Promise.resolve();
     });
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(screen.getByRole("button", { name: "获得2次重置额度" }));
 
     act(() => vi.advanceTimersByTime(820));

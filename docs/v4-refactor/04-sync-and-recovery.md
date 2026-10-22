@@ -273,3 +273,5 @@ CLI queue 只保证当前进程内可靠。CLI restart 时，已 admitted 但尚
 `fault.command.queryUnavailable`，不能伪装成 `unknown`；`unknown` 本身不缓存。
 
 最终不变量：每条已提交输入必须且只能处于 `queue / guided row / transcript / explicit rejected|failed|discarded` 之一。ACK 丢失、gap、重连或 restart 都不能造成“UI 已清空、权威层无记录”。
+
+镜像不变量（renderer 侧）：一条输入一旦被权威接管（ACK accepted/duplicate，或 queue/row/marker 的 `sourceCommandId` 对账），composer 中属于这次提交的正文必须被清空，且这一义务不随 composer 组件实例消亡。传输层失败（如远端 ChannelClient dispose）只是“ACK 未知”，不是“未 admission”：正文可先恢复回草稿，但要把 `{commandId, text}` 登记到 `composerSubmissionSettlement`（模块级、仅内存），由它持有 registry resolution 订阅；pane 因断连卸载重建后，新 composer 回填草稿时向它认领结算。用户已在回填正文上继续编辑时不清空；failed/unknown/discarded 终态删除登记并保留正文。

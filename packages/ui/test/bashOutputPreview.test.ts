@@ -62,7 +62,6 @@ describe("Bash bounded output preview", () => {
       expect(html).not.toContain("1,234");
       expect(html).not.toContain("40,960");
       expect(html).not.toContain("约");
-      if (expanded) expect(html).toContain("whitespace-pre-wrap");
     },
   );
 });

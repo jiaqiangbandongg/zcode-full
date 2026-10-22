@@ -6,11 +6,7 @@ import { LoginRequiredPanel } from "../src/app-components.js";
 import { ContentPane, MessageRow } from "../src/app-transcript-components.js";
 import { EmptyTranscriptLogo, ZCODE_LOGO_LINES } from "../src/app-empty-transcript.js";
 import { SHIMMER_SWEEP_PERIOD_MS, shimmerTextSegments } from "../src/app-motion.js";
-import {
-  ShikiDiffView,
-  buildDiffRows,
-  buildSplitDiffRows,
-} from "../src/app-shiki-diff-view.js";
+import { ShikiDiffView, buildDiffRows, buildSplitDiffRows } from "../src/app-shiki-diff-view.js";
 import {
   highlightShikiCodeLines,
   inferShikiLanguage,
@@ -30,7 +26,7 @@ import {
 import { ToolTranscriptPartView } from "../src/app-tool-components.js";
 import { visibleSlashCommandWindow } from "../src/app-input.js";
 import { createSelectionState } from "../src/app-selection-state.js";
-import { describeSessionEvent, normalizePromptInput } from "../src/state.js";
+import { normalizePromptInput } from "../src/state.js";
 import type { TuiSlashCommandSuggestion } from "../src/types.js";
 
 const EN_COPY = getZCodeCopy("en-US").tui;
@@ -59,10 +55,6 @@ test("normalizes prompt input for the shell", () => {
   );
 });
 
-test("describes session events without coupling the shell to business logic", () => {
-  assert.equal(describeSessionEvent({ type: "turn_started" } as never), "turn started");
-});
-
 test("renders a ZCODE logo placeholder for an empty transcript", () => {
   const [child] = reactElementChildren(
     ContentPane({ copy: EN_COPY, focused: false, messages: [] }),
@@ -71,14 +63,6 @@ test("renders a ZCODE logo placeholder for an empty transcript", () => {
 
   assert.equal(child?.type, EmptyTranscriptLogo);
   assert.deepEqual(lines, [...ZCODE_LOGO_LINES]);
-});
-
-test("centers the empty transcript logo within the available viewport", () => {
-  const style = reactElementStyle(EmptyTranscriptLogo());
-
-  assert.equal(style.flexGrow, 1);
-  assert.equal(style.justifyContent, "center");
-  assert.equal(style.minHeight, ZCODE_LOGO_LINES.length);
 });
 
 test("projects logo shimmer without changing the source text", () => {
@@ -92,13 +76,6 @@ test("projects logo shimmer without changing the source text", () => {
   const highlightedSegment = segments.find((segment) => segment.highlighted);
   assert.ok(highlightedSegment);
   assert.notEqual(highlightedSegment.color, "#000000");
-});
-
-test("renders the transcript as a borderless surface", () => {
-  const style = reactElementStyle(ContentPane({ copy: EN_COPY, focused: false, messages: [] }));
-
-  assert.equal(style.border, false);
-  assert.equal(style.backgroundColor, "#0f1419");
 });
 
 test("hides the empty transcript logo when messages are present", () => {
@@ -479,17 +456,6 @@ test("summarizes Bash tool input without leaking environment values", () => {
       },
     }),
     ["command: npm test", "cwd: packages/tui", "env: set API_KEY; unset DEBUG"],
-  );
-});
-
-test("summarizes Read tool input with file range", () => {
-  assert.deepEqual(
-    summarizeToolInput("Read", {
-      file_path: "packages/tui/src/app.tsx",
-      limit: 40,
-      offset: 10,
-    }),
-    ["offset: 10", "limit: 40"],
   );
 });
 

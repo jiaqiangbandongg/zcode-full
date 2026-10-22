@@ -30,8 +30,6 @@ import {
   TID_SSH_CANCEL_BUTTON,
   TID_SSH_ERROR,
   TID_SSH_SUCCESS,
-  TID_WORKSPACE_LIST,
-  TID_WORKSPACE_OPEN_BUTTON,
   TID_SIDEBAR,
   TID_CHAT_VIEW,
   TID_CHAT_MESSAGES,
@@ -44,7 +42,7 @@ import {
   TID_WORKSPACE_HEADER,
   TID_WORKSPACE_TITLE,
   TID_WORKSPACE_PATH,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { sel } from "../helpers/selectors.js";
 
 class AppPage {
@@ -62,31 +60,9 @@ class AppPage {
     return $(sel(TID_LOGOUT_BUTTON));
   }
 
-  // ── Tab Bar ──
-  get tabBar(): ChainablePromiseElement {
-    return $(sel(TID_WORKSPACE_LIST));
-  }
-  get newTabButton(): ChainablePromiseElement {
-    return $(sel(TID_WORKSPACE_OPEN_BUTTON));
-  }
-  get workspaceList(): ChainablePromiseElement {
-    return $(sel(TID_WORKSPACE_LIST));
-  }
-
   // ── Sidebar ──
   get sidebar(): ChainablePromiseElement {
     return $(sel(TID_SIDEBAR));
-  }
-  // Bugfix: 侧栏已经从旧版“Files / Tasks”双标签切成一体化结构，
-  // 但部分 e2e 用例还在走旧命名。这里保留最小兼容映射，避免测试类型层继续引用失效属性。
-  get sidebarFilesTab(): ChainablePromiseElement {
-    return this.workspaceList;
-  }
-  get sidebarFilesContent(): ChainablePromiseElement {
-    return this.workspaceList;
-  }
-  get sidebarTasksContent(): ChainablePromiseElement {
-    return this.taskList;
   }
   // ── Workspace Header ──
   get workspaceHeader(): ChainablePromiseElement {

@@ -25,7 +25,7 @@ export interface DynamicWorkflowAvailabilitySnapshot {
   readonly enabled: boolean;
   /**
    * 未就绪或取数失败时为 null；`source` 只用于观测，区分「服务端关」与「本地覆盖」。
-   * `offeredMode` 是服务端提供的模式（设置行是否出现、哪个选项标「默认」），`mode` 是生效模式。
+   * `offeredMode` 是服务端提供的默认模式（哪个选项标「默认」），`mode` 是生效模式。
    */
   readonly config: DynamicWorkflowClientConfig | null;
 }

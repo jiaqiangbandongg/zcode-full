@@ -227,6 +227,34 @@ afterEach(async () => {
 });
 
 describe("useComposerAttachments eager upload", () => {
+  it("restores draft files into the target owner without reusing source upload references", async () => {
+    mocks.service = createTransferService().service;
+    const { root } = renderProbe({ attachmentSessionId: null, scopeId: "new-project" });
+    const file = new File(["content"], "draft.txt", { type: "text/plain" });
+    act(() =>
+      latestApi?.restoreDraftAttachments([
+        {
+          id: "source-id",
+          file,
+          filename: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          attachmentRef: { ref: "/old-session/upload" },
+          uploadStatus: "ready",
+        } as never,
+      ]),
+    );
+    expect(latestApi?.attachments).toHaveLength(1);
+    expect(latestApi?.attachments[0]).toMatchObject({
+      file,
+      filename: "draft.txt",
+      uploadStatus: "waitingSession",
+    });
+    expect(latestApi?.attachments[0]?.id).not.toBe("source-id");
+    expect(latestApi?.attachments[0]?.attachmentRef).toBeUndefined();
+    act(() => root.unmount());
+  });
+
   it("满 8 个后每次粘贴都提示，且点击添加不再打开文件选择器", async () => {
     mocks.service = createTransferService().service;
     const { root } = renderProbe({

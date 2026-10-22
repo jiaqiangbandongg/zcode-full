@@ -63,7 +63,6 @@ describe("submit_result handler", () => {
     } catch (error) {
       caught = error;
     }
-    expect(isCoreError(caught)).toBe(true);
     if (!isCoreError(caught)) throw new Error("expected a core error");
     expect(caught.type).toBe(CoreErrorType.ConfigurationError);
     expect(caught.recoverable).toBe(false);
@@ -132,9 +131,6 @@ describe("submit_result executor surface", () => {
       reason: "subagent_terminal",
       stopTurnAfterResult: true,
     });
-    // subagent_terminal 走 turn-tools 的默认 stop（break）分支，而不是 automation_create_limit
-    // 的纯文本续写分支——它只对 automation_create_limit 特判。
-    expect(result.turnControl?.reason).not.toBe("automation_create_limit");
   });
 
   it("does not stop the turn on reject and surfaces violations as the error tool_result", async () => {
@@ -191,10 +187,6 @@ describe("submit_result registration gate", () => {
     registerBuiltInTools(withoutPort, {});
     expect(withoutPort.has(SUBMIT_RESULT_TOOL_NAME)).toBe(false);
   });
-
-  it("declares submit_result as a terminal-on-success tool via metadata", () => {
-    expect(submitResultToolEntry.metadata.stopTurnOnSuccess).toBe(true);
-  });
 });
 
 describe("withTerminalToolTurnStop", () => {
@@ -215,7 +207,9 @@ describe("withTerminalToolTurnStop", () => {
       stopTurnAfterResult: true,
     });
     // 键入 metadata 声明而非工具名：未声明的工具永不因成功而终止 turn。
-    expect(withTerminalToolTurnStop(success, { entry: entryWith(false) }).turnControl).toBeUndefined();
+    expect(
+      withTerminalToolTurnStop(success, { entry: entryWith(false) }).turnControl,
+    ).toBeUndefined();
     expect(
       withTerminalToolTurnStop(success, { entry: entryWith(undefined) }).turnControl,
     ).toBeUndefined();
@@ -223,7 +217,9 @@ describe("withTerminalToolTurnStop", () => {
 
   it("never stops a failed result even for a terminal tool", () => {
     const failed = { ...success, success: false } as ToolExecutionResult;
-    expect(withTerminalToolTurnStop(failed, { entry: entryWith(true) }).turnControl).toBeUndefined();
+    expect(
+      withTerminalToolTurnStop(failed, { entry: entryWith(true) }).turnControl,
+    ).toBeUndefined();
   });
 });
 

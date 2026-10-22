@@ -20,6 +20,14 @@ describe("group remote task attachment", () => {
       remoteSessionId: "current",
     });
   });
+  it("rejects source-settings attachments without a workspace task scope", () => {
+    expect(() =>
+      bindBotGroupTaskScope(
+        { taskId: "task", workspaceIdentity: "forged", remoteSessionId: "forged" },
+        { kind: "source-settings", sourceServerId: "source" },
+      ),
+    ).toThrow("Source settings attachment does not provide bot task routing");
+  });
   it("keeps local task routing unchanged", () => {
     const params = { taskId: "task" };
     expect(bindBotGroupTaskScope(params, { kind: "local" })).toBe(params);

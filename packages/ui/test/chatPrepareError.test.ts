@@ -1,19 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCachedWorkspacePrepareUiError,
-  buildModelConfigMissingUiError,
   buildWorkspacePrepareUiError,
   getChatErrorMessage,
 } from "@/lib/chatPrepareError.js";
 
 describe("chatPrepareError", () => {
-  it("provider 等待态投影为 modelConfigMissing 草稿横幅错误", () => {
-    expect(buildModelConfigMissingUiError()).toEqual({
-      code: "model_config_missing",
-      message: "No usable model provider is configured.",
-    });
-  });
-
   it("能从结构化对象里提取 message，避免出现 [object Object]", () => {
     const message = getChatErrorMessage({
       code: -32000,

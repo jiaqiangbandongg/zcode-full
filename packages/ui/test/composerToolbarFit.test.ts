@@ -1,6 +1,50 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { fitComposerToolbar } from "@/prompt-editor/useComposerToolbarFit.js";
+import { createElement } from "react";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  fitComposerToolbar,
+  useComposerToolbarFit,
+} from "@/prompt-editor/useComposerToolbarFit.js";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+it("does not clone a full toolbar that already fits on mount or resize", () => {
+  let resized: ResizeObserverCallback | undefined;
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resized = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+    return { width: this.hasAttribute("data-composer-leading-content") ? 100 : 800 } as DOMRect;
+  });
+  const clone = vi.spyOn(Node.prototype, "cloneNode");
+  function Toolbar() {
+    const ref = useComposerToolbarFit();
+    return createElement(
+      "div",
+      { ref },
+      createElement(
+        "div",
+        { "data-composer-leading-actions": true },
+        createElement("div", { "data-composer-leading-content": true }, "Mode"),
+      ),
+    );
+  }
+  render(createElement(Toolbar));
+  resized?.([], {} as ResizeObserver);
+  expect(clone).not.toHaveBeenCalled();
+});
 
 // jsdom 不做排版：只替代几何读数，保留真实 DOM、裁决和各阶段的空间变化。
 function fixture() {
@@ -107,5 +151,88 @@ describe("composer toolbar fit", () => {
     f.fit(340);
     expect(f.root.dataset.composerProviderCompact).toBeUndefined();
     expect(f.root.dataset.composerModelIcon).toBeUndefined();
+  });
+});
+
+// Side Pane 完整视图浮窗的单行输入框：工具栏宽度随内容变化，不能测量，直接收到最后一级。
+describe("icon-only composer toolbar", () => {
+  it("宽度足够时也按同一顺序收到只留图标", () => {
+    const f = fixture();
+    f.root.getBoundingClientRect = () => ({ width: 2_000 }) as DOMRect;
+    fitComposerToolbar(f.root, { iconOnly: true });
+    expect(f.compact()).toEqual(["true", "true", "true", "icon"]);
+    expect(f.root.dataset.composerProviderCompact).toBe("true");
+    expect(f.root.dataset.composerModelIcon).toBe("true");
+  });
+
+  it("hook 不克隆测量；切回普通布局后按实际宽度恢复完整显示", () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
+      if (this.hasAttribute("data-composer-leading-content")) {
+        return { width: this.querySelector("[data-composer-compact]") ? 28 : 100 } as DOMRect;
+      }
+      return { width: 800 } as DOMRect;
+    });
+    const clone = vi.spyOn(Node.prototype, "cloneNode");
+    function Toolbar({ iconOnly }: { iconOnly: boolean }) {
+      const ref = useComposerToolbarFit({ iconOnly });
+      return createElement(
+        "div",
+        { ref, "data-testid": "toolbar" },
+        createElement(
+          "div",
+          { "data-composer-leading-actions": true },
+          createElement(
+            "div",
+            { "data-composer-leading-content": true },
+            createElement("button", { "data-composer-collapse-priority": "1" }, "Mode"),
+          ),
+        ),
+      );
+    }
+    const view = render(createElement(Toolbar, { iconOnly: true }));
+    const button = view.container.querySelector<HTMLElement>("button")!;
+    expect(button.dataset.composerCompact).toBe("true");
+    expect(view.getByTestId("toolbar").dataset.composerModelIcon).toBe("true");
+    expect(clone).not.toHaveBeenCalled();
+
+    view.rerender(createElement(Toolbar, { iconOnly: false }));
+    expect(button.dataset.composerCompact).toBeUndefined();
+    expect(view.getByTestId("toolbar").dataset.composerModelIcon).toBeUndefined();
+  });
+});
+
+// 合并入口只有完整、模型名＋绿条、图标＋绿条三态。
+describe("combined composer toolbar fit", () => {
+  it("shrinks Computer, Mode, Plan, then thinking, then model; expands in reverse", () => {
+    const f = fixture();
+    const thought = f.controls[3];
+    thought.remove();
+    const model = f.root.querySelector<HTMLElement>(".composer-model-trigger")!;
+    model.dataset.composerCombinedModel = "true";
+    model.dataset.composerCollapsePriority = "3";
+    model.querySelector(".composer-provider-prefix")?.remove();
+    model.getBoundingClientRect = () =>
+      ({
+        width: f.root.dataset.composerModelIcon ? 40 : model.dataset.composerCompact ? 216 : 280,
+      }) as DOMRect;
+    const trailing = f.root.querySelector<HTMLElement>("[data-composer-trailing-actions]")!;
+    trailing.getBoundingClientRect = () =>
+      ({ width: model.getBoundingClientRect().width + 28 }) as DOMRect;
+    for (const width of [620, 619, 547, 475, 403, 339, 180, 339, 403, 475, 547, 619, 620]) {
+      f.fit(width);
+      expect(f.controls[2].dataset.composerCompact === "true").toBe(width < 620);
+      expect(f.controls[0].dataset.composerCompact === "true").toBe(width < 548);
+      expect(f.controls[1].dataset.composerCompact === "true").toBe(width < 476);
+      expect(model.dataset.composerCompact === "true").toBe(width < 404);
+      expect(f.root.dataset.composerModelIcon === "true").toBe(width < 340);
+      expect(f.root.dataset.composerProviderCompact).toBeUndefined();
+    }
   });
 });

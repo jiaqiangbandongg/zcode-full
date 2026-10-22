@@ -121,7 +121,6 @@ test("collects all SEA upload binaries and reports missing files", async (t) => 
   const files = await collectSeaUploadFiles({
     distDir: directory,
   });
-  assert.equal(files.length, 6);
   assert.deepEqual(
     files.map((file) => file.fileName),
     [

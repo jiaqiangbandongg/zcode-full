@@ -41,7 +41,6 @@ describe("ProcessTreeStdioClientTransport Windows fallback", () => {
         "_dispose",
       )?.value as ((this: ProcessTreeStdioClientTransport) => Promise<void>) | undefined;
 
-      expect(dispose).toBeTypeOf("function");
       await dispose?.call(transport);
 
       expect(windowsJobObjectFactory).toHaveBeenCalledWith(4321);

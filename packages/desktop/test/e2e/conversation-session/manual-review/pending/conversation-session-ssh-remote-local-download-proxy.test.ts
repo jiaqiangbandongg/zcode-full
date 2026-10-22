@@ -1,14 +1,21 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { reloadElectronSessionPreservingBrowserProfile } from "#e2e/helpers/e2e-electron-reload";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { ZCODE_VERSION } from "@zcode/shared";
+import { sourceServerReleaseDescriptorSchema } from "@zcode/shared";
 import { clearAppData, seedSettings } from "../../../helpers/desktop-app.js";
 import { prepareV4ConversationE2E } from "../../../helpers/v4-conversation.js";
 import {
-  connectSSHWorkspace,
+  clickLastEnabledSSHDialogButton,
+  fillSSHPasswordSettings,
+  openSSHRemoteDialog,
   readHostProcesses,
   readSSHRuntimeConfig,
+  runSSHCommand,
+  selectSSHRemoteDirectory,
+  waitForRemoteTab,
+  waitForSSHDirectoryStep,
 } from "../../../helpers/ssh-remote-p0.js";
+import { resolveE2ERuntimePath } from "../../../helpers/e2e-runtime-paths.js";
 import {
   startRemoteAssetHttpProxy,
   type RemoteAssetHttpProxy,
@@ -30,87 +37,92 @@ const PROXY_NO_PROXY = [
   ".zcode-ai.com",
   "js.stripe.com",
 ].join(",");
-const REMOTE_ASSET_ENV_KEYS = [
-  "ZCODE_DEV_REMOTE_ASSET_USE_CDN",
-  "ZCODE_REMOTE_ASSET_CDN_BASE_URL",
-  "ZCODE_REMOTE_ASSET_CACHE_DIR",
-] as const;
 
 describe(`${CASE_MARKER}: SSH 本地下载遵循应用代理`, () => {
   let proxy: RemoteAssetHttpProxy | null = null;
-  let cacheDir: string | null = null;
-  const originalEnv = new Map<string, string | undefined>();
-
-  before(() => {
-    for (const key of REMOTE_ASSET_ENV_KEYS) {
-      originalEnv.set(key, process.env[key]);
-    }
-  });
+  const cacheDir = resolveE2ERuntimePath(CASE_MARKER, "cache");
+  const artifactDir = resolve(
+    process.env.ZCODE_E2E_ARTIFACT_DIR ?? ".e2e-artifacts/local-download-proxy",
+  );
 
   after(async () => {
     try {
+      await mkdir(artifactDir, { recursive: true });
+      await writeFile(
+        join(artifactDir, "proxy-request-paths.json"),
+        JSON.stringify({ proxyRequestPaths: proxy?.requestPaths ?? [] }, null, 2),
+      );
       await browser.electron.restoreAllMocks();
       await clearAppData();
     } finally {
       await proxy?.close();
-      proxy = null;
-      if (cacheDir) {
-        await rm(cacheDir, { recursive: true, force: true });
-        cacheDir = null;
-      }
-      restoreRemoteAssetEnv(originalEnv);
+      await rm(cacheDir, { recursive: true, force: true });
     }
   });
 
-  it("SSH-P0-CONN-04 本地 fresh manifest 只通过显式代理获取", async function () {
+  it("SSH-P0-CONN-04 Source Server descriptor/archive 通过显式代理安装", async function () {
     this.timeout(20 * 60_000);
+    // Bug 原因：worker 修改 process.env 无法影响 chromedriver 已创建的 Electron；必须在 WDIO 启动前设置。
+    expect(process.env.ZCODE_DEV_REMOTE_ASSET_USE_CDN).toBe("1");
+    expect(process.env.ZCODE_REMOTE_ASSET_CDN_BASE_URL).toBe(`http://${FAKE_CDN_HOST}`);
+    expect(process.env.ZCODE_REMOTE_ASSET_CACHE_DIR).toBe(cacheDir);
     const config = readSSHRuntimeConfig(CASE_MARKER);
     const workspacePath = config.workspacePaths[0];
+    const cleanTarget = await runSSHCommand(config, 'test ! -e "$HOME/.zcode/server/current.json"');
+    expect(cleanTarget.code).toBe(0);
+    const { version } = JSON.parse(
+      await readFile(resolve(DESKTOP_ROOT, "../../package.json"), "utf8"),
+    ) as { version: string };
+    const descriptor = sourceServerReleaseDescriptorSchema.parse(
+      JSON.parse(
+        await readFile(
+          join(MOCK_CDN_ROOT, "releases", version, "source-server-release.json"),
+          "utf8",
+        ),
+      ),
+    );
     proxy = await startRemoteAssetHttpProxy({
       expectedHost: FAKE_CDN_HOST,
       mockCdnRoot: MOCK_CDN_ROOT,
     });
-    cacheDir = await mkdtemp(join(tmpdir(), "zcode-e2e-remote-assets-proxy-"));
-
-    process.env.ZCODE_DEV_REMOTE_ASSET_USE_CDN = "1";
-    process.env.ZCODE_REMOTE_ASSET_CDN_BASE_URL = `http://${FAKE_CDN_HOST}`;
-    process.env.ZCODE_REMOTE_ASSET_CACHE_DIR = cacheDir;
-    await seedSettings({
-      httpProxy: proxy.proxyUrl,
-      httpProxyNoProxy: PROXY_NO_PROXY,
-    });
-
-    // 设置页代理按 Window Host 生命周期冻结；冷启动后再执行真实 SSH 向导。
-    await browser.reloadSession();
+    await rm(cacheDir, { recursive: true, force: true });
+    await seedSettings({ httpProxy: proxy.proxyUrl, httpProxyNoProxy: PROXY_NO_PROXY });
+    await reloadElectronSessionPreservingBrowserProfile(browser);
     await prepareV4ConversationE2E({ skipProvider: true });
     const initialHosts = await readHostProcesses();
     expect(initialHosts).toHaveLength(1);
 
-    const tab = await connectSSHWorkspace({
-      caseMarker: CASE_MARKER,
-      config,
-      workspacePath,
-    });
-
+    await openSSHRemoteDialog(CASE_MARKER);
+    await fillSSHPasswordSettings(config);
+    await clickLastEnabledSSHDialogButton(CASE_MARKER);
+    // 首连成功停在目录页；复用当前选择目录流程，不等待已停用的无项目聊天。
+    expect(await waitForSSHDirectoryStep(CASE_MARKER)).toBe("directory");
+    await selectSSHRemoteDirectory(workspacePath, CASE_MARKER);
+    const tab = await waitForRemoteTab({ caseMarker: CASE_MARKER, expectedPath: workspacePath });
     expect(tab.remoteSessionId).toBeTruthy();
     expect(tab.secretPersistedInTab).toBe(false);
-    expect(
-      proxy.requestPaths.some(
-        (path) =>
-          path.endsWith(`/${ZCODE_VERSION}/manifest-linux-x64.json`) ||
-          path.endsWith(`/${ZCODE_VERSION}/manifest-linux-arm64.json`),
-      ),
-    ).toBe(true);
+    const installed = await runSSHCommand(config, 'cat "$HOME/.zcode/server/current.json"');
+    expect(installed.code).toBe(0);
+    const current = JSON.parse(installed.stdout) as { archiveSha256: string };
+    const archive = descriptor.archives.find((item) => item.sha256 === current.archiveSha256);
+    expect(archive).toBeDefined();
+    expect(proxy.requestPaths).toContain(`/${version}/source-server-release.json`);
+    expect(proxy.requestPaths.some((path) => path.endsWith(`/${archive!.fileName}`))).toBe(true);
     expect(await readHostProcesses()).toEqual(initialHosts);
+    await mkdir(artifactDir, { recursive: true });
+    await writeFile(
+      join(artifactDir, "installed-release.json"),
+      JSON.stringify(
+        {
+          version,
+          archiveSha256: current.archiveSha256,
+          workspacePath,
+          remoteSessionId: tab.remoteSessionId,
+        },
+        null,
+        2,
+      ),
+    );
+    await browser.saveScreenshot(join(artifactDir, "connected.png"));
   });
 });
-
-function restoreRemoteAssetEnv(originalEnv: ReadonlyMap<string, string | undefined>): void {
-  for (const [key, value] of originalEnv) {
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-}

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-attachment-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-attachment-resume.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-attachment-resume.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "attachment-resume-first",
+      "description": "AR01 first: 附件冷恢复请求",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+    },
+    {
+      "id": "attachment-resume-hot",
+      "description": "AR01 hot: 附件冷恢复请求",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+    },
+    {
+      "id": "attachment-resume-cold",
+      "description": "AR01 cold: 附件冷恢复请求",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+    }
+  ]
+}

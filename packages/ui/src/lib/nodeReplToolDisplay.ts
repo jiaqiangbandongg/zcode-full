@@ -4,6 +4,7 @@ export type NodeReplOperation = "run" | "reset" | "add-module-dir";
 
 export interface NodeReplDisplayImage {
   base64: string;
+  src?: string;
   mimeType: string;
 }
 
@@ -289,15 +290,16 @@ function extractImages(values: unknown[]): NodeReplDisplayImage[] {
     // 使用 content 里的 {type:"image",data,mimeType}。专用 renderer 必须兼容两种历史形态。
     const base64 = readNonEmptyString(value.base64) ?? readNonEmptyString(value.data);
     const mimeType = readNonEmptyString(value.mimeType)?.trim();
-    if (!base64 || !mimeType || !IMAGE_MIME_TYPE_PATTERN.test(mimeType)) {
+    const src = readNonEmptyString(value.src);
+    if ((!base64 && !src) || !mimeType || !IMAGE_MIME_TYPE_PATTERN.test(mimeType)) {
       return;
     }
-    const key = `${mimeType}:${base64.length}:${base64.slice(0, 24)}`;
+    const key = src ?? `${mimeType}:${base64!.length}:${base64!.slice(0, 24)}`;
     if (seen.has(key)) {
       return;
     }
     seen.add(key);
-    images.push({ base64, mimeType });
+    images.push({ base64: base64 ?? "", mimeType, ...(src ? { src } : {}) });
   };
   const visit = (value: unknown): void => {
     if (!value || typeof value !== "object" || visited.has(value)) return;
@@ -307,7 +309,7 @@ function extractImages(values: unknown[]): NodeReplDisplayImage[] {
       return;
     }
     if (!isRecord(value)) return;
-    if (value.type === "image" || "base64" in value) addImage(value);
+    if (value.type === "image" || "base64" in value || "src" in value) addImage(value);
     for (const child of Object.values(value)) visit(child);
   };
 

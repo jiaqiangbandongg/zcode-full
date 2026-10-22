@@ -132,4 +132,31 @@ describe("provider endpoint routing fetch", () => {
     await expect(fetch(SOURCE_ZAI)).resolves.toMatchObject({ status: 204 });
     expect(capturedUrl).toBe("https://direct.example.test/v1/messages");
   });
+
+  it.each([
+    ["Request", () => new Request(SOURCE_ZAI)],
+    ["URL", () => new URL(SOURCE_ZAI)],
+    ["string", () => SOURCE_ZAI],
+  ])("applies decision headers to a %s input without RequestInit headers", async (_name, input) => {
+    let captured: Request | undefined;
+    const fetch = createProviderEndpointRoutingFetch({
+      fetch: vi.fn<typeof globalThis.fetch>(async (nextInput, nextInit) => {
+        captured = new Request(nextInput, nextInit);
+        return new Response(null, { status: 204 });
+      }),
+      routingPort: {
+        async resolve() {
+          return {
+            headers: { "X-ZCode-Authorization": "Bearer current-jwt" },
+            routed: true,
+            url: TARGET,
+          };
+        },
+      },
+    });
+
+    await fetch(input());
+
+    expect(captured?.headers.get("x-zcode-authorization")).toBe("Bearer current-jwt");
+  });
 });

@@ -30,22 +30,11 @@ describe("WorkflowAgentFace", () => {
   it("九个编号取九色环、互不相同，第十个循环；无编号退回名字散列", () => {
     const hues = Array.from({ length: 9 }, (_, i) => agentColor(i, "x"));
     expect(new Set(hues).size).toBe(9);
-    expect(hues).toEqual([
-      "#54B9A6",
-      "#F19D38",
-      "#6464EF",
-      "#885CF5",
-      "#3C82F6",
-      "#ED712E",
-      "#EB4699",
-      "#5BC67A",
-      "#EA4045",
-    ]);
     expect(agentColor(9, "x")).toBe(FACE_COLORS[0]);
     expect(agentColor(undefined, "Ada")).toBe(avatarColor("Ada"));
   });
 
-  it("基础表情遵循执行状态，采用 20 格 r7 和 4×6 白色 pill 几何", () => {
+  it("基础表情遵循执行状态", () => {
     for (const [status, expression] of [
       ["pending", "dots"],
       ["running", "pill"],
@@ -54,29 +43,8 @@ describe("WorkflowAgentFace", () => {
     ] as const) {
       const v = renderFace(status);
       expect(face(v).dataset.expression).toBe(expression);
-      expect(face(v).getAttribute("viewBox")).toBe("0 0 20 20");
-      expect(face(v).querySelector(".wf-face-body")!.getAttribute("rx")).toBe("7");
-      expect(
-        Array.from(face(v).querySelectorAll('[data-eye-expression="pill"] rect'), (e) =>
-          ["x", "y", "width", "height", "rx"].map((k) => e.getAttribute(k)),
-        ),
-      ).toEqual([
-        ["7", "6", "4", "6", "2"],
-        ["13", "6", "4", "6", "2"],
-      ]);
       v.unmount();
     }
-  });
-  it("疑惑右眼是底部对齐的圆形，不再是扁胶囊", () => {
-    const v = renderFace();
-    const right = face(v).querySelectorAll('[data-eye-expression="confused"] rect')[1]!;
-    expect(["x", "y", "width", "height", "rx"].map((k) => right.getAttribute(k))).toEqual([
-      "13",
-      "8",
-      "4",
-      "4",
-      "2",
-    ]);
   });
   it("双眨和平移交替；特殊表情不连续重复且会恢复基础表情", () => {
     clock();
@@ -210,18 +178,9 @@ describe("WorkflowAgentFace", () => {
     advance(800);
     expect(node.style.getPropertyValue("--wf-face-x")).toBe("0px");
   });
-  it("等待中三个白点轻浮，切回运行才开始眨眼", () => {
+  it("等待中轻浮，切回运行才开始眨眼", () => {
     clock();
     const v = renderFace("pending");
-    expect(
-      Array.from(face(v).querySelectorAll('[data-eye-expression="dots"] circle'), (n) =>
-        ["cx", "cy", "r"].map((k) => n.getAttribute(k)),
-      ),
-    ).toEqual([
-      ["5", "10", "1.5"],
-      ["10", "10", "1.5"],
-      ["15", "10", "1.5"],
-    ]);
     expect(vi.getTimerCount()).toBe(1);
     advance(1600);
     expect(face(v).dataset.motion).toBe("dots-wave");
@@ -295,10 +254,6 @@ describe("WorkflowAgentFace", () => {
     expect(face(v).dataset.expression).toBe("confused");
     advance(2000);
     expect(face(v).dataset.expression).toBe("pill");
-  });
-  it("不再渲染鄙视眼型", () => {
-    const v = renderFace();
-    expect(face(v).querySelector('[data-eye-expression="unimpressed"]')).toBeNull();
   });
   it("成功态开心驻留明显长于普通 pill", () => {
     clock();

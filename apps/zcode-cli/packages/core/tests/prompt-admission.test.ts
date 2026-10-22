@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createSessionId } from "@zcode/contracts";
 import { AgentRuntime } from "../src/runtime.js";
 import { createTestSessionEventStore } from "./test-event-store.js";
@@ -79,7 +79,6 @@ describe("AgentRuntime prompt admission", () => {
 
     if (first.kind !== "started") throw new Error("first prompt was not admitted");
     if (second.kind !== "queued") throw new Error("second prompt was not queued");
-    expect(second.kind).toBe("queued");
     expect(modelCalls).toBeLessThanOrEqual(1);
 
     modelGate.resolve(undefined);

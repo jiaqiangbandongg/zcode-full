@@ -6,6 +6,7 @@ import {
   credentialRecordSchema,
   credentialValueSchema,
   formatZodError,
+  isCredentialDecryptError,
 } from "@zcode/shared";
 import type { ICredentialService } from "./credential.js";
 import {
@@ -84,12 +85,46 @@ interface CredentialServiceDependencies {
   onDidMutate?: (event: { operation: "save" | "delete"; key: string }) => void;
 }
 
+/** Host 私有缓存恢复能力，不进入 Renderer 的 ICredentialService 契约。 */
+export interface LocalCredentialService extends ICredentialService {
+  recoverUnreadable(key: string, assertCurrent: () => void): Promise<string | null>;
+  save(key: string, value: string, assertCurrent?: () => void): Promise<void>;
+  delete(key: string, assertCurrent?: () => void): Promise<void>;
+}
+
 export function createCredentialService(
   dependencies: CredentialServiceDependencies = {},
-): ICredentialService {
+): LocalCredentialService {
   const cipherProvider = dependencies.cipherProvider ?? createCredentialCipherProvider();
 
   return {
+    async recoverUnreadable(key, assertCurrent) {
+      const validatedKey = credentialKeySchema.parse(key);
+      const credentialsFile = getCredentialsFile();
+      let deleted = false;
+      const value = await withFileLock(credentialsFile, async () => {
+        assertCurrent();
+        const creds = await readAll(credentialsFile);
+        assertCurrent();
+        const rawValue = creds[validatedKey];
+        if (rawValue === undefined) return null;
+        try {
+          return cipherProvider.decrypt(rawValue);
+        } catch (error) {
+          if (!isCredentialDecryptError(error)) throw error;
+        }
+        // 缓存复核与删除必须共用跨进程锁；分别 load/delete 会误删另一窗口已修复的记录。
+        // 此处仅处理调用方明确标记的派生缓存，不能因缓存损坏清理有效 OAuth 登录。
+        assertCurrent();
+        delete creds[validatedKey];
+        await writeAll(credentialsFile, creds);
+        deleted = true;
+        return null;
+      });
+      if (deleted) dependencies.onDidMutate?.({ operation: "delete", key: validatedKey });
+      return value;
+    },
+
     async load(key: string): Promise<string | null> {
       const validatedKey = credentialKeySchema.parse(key);
       const creds = await readAll();
@@ -101,7 +136,7 @@ export function createCredentialService(
       return cipherProvider.decrypt(rawValue);
     },
 
-    async save(key: string, value: string): Promise<void> {
+    async save(key: string, value: string, assertCurrent?: () => void): Promise<void> {
       const validatedKey = credentialKeySchema.parse(key);
       const validatedValue = credentialValueSchema.parse(value);
       const encryptedValue = cipherProvider.encrypt(validatedValue);
@@ -110,17 +145,20 @@ export function createCredentialService(
       // read-modify-write 丢更新；共享目录锁必须覆盖读取、变更和原子替换全过程。
       await withFileLock(credentialsFile, async () => {
         const creds = await readAll(credentialsFile);
+        // 请求可能在等待文件锁时失效，不能只依赖调用方进入 IO 前的代次检查。
+        assertCurrent?.();
         creds[validatedKey] = encryptedValue;
         await writeAll(credentialsFile, creds);
       });
       dependencies.onDidMutate?.({ operation: "save", key: validatedKey });
     },
 
-    async delete(key: string): Promise<void> {
+    async delete(key: string, assertCurrent?: () => void): Promise<void> {
       const validatedKey = credentialKeySchema.parse(key);
       const credentialsFile = getCredentialsFile();
       await withFileLock(credentialsFile, async () => {
         const creds = await readAll(credentialsFile);
+        assertCurrent?.();
         delete creds[validatedKey];
         await writeAll(credentialsFile, creds);
       });

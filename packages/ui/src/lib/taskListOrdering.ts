@@ -9,7 +9,7 @@ interface TaskListSortableItem {
   updatedAt: number;
 }
 
-function compareTaskListItemsByTime(
+export function compareTaskListItemsByTime(
   left: TaskListSortableItem,
   right: TaskListSortableItem,
   sortBy: TaskListTimeSortBy,

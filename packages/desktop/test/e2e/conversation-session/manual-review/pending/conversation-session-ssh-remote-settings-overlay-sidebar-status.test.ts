@@ -1,11 +1,11 @@
+import { releaseControlledReplay } from "#e2e/helpers/controlled-replay";
 import {
   TID_SETTINGS_BACK_BUTTON,
   TID_SETTINGS_PAGE,
   TID_TASK_ITEM,
   TID_TASK_SETTINGS_BUTTON,
-  TID_WORKSPACE_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -30,6 +30,7 @@ import {
   waitForV4AssistantMessageContaining,
   waitForV4ConversationState,
 } from "../../../helpers/v4-conversation.js";
+import { projectSectionSelector } from "../../../helpers/project-sidebar.js";
 
 const CASE_MARKER = "E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR";
 
@@ -44,50 +45,55 @@ interface SidebarRowIndicator {
 function readSidebarRowIndicator(task: SSHLifecycleTask): Promise<SidebarRowIndicator> {
   return browser.execute(
     (taskTestId, workspaceTestId) => {
-      const taskRow = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-        (element) => element.dataset.testid === taskTestId,
-      );
-      const workspaceRow = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-        (element) => element.dataset.testid === workspaceTestId,
-      );
+      const taskRow = document.querySelector<HTMLElement>(taskTestId);
+      const workspaceRow = document.querySelector<HTMLElement>(workspaceTestId);
       return {
         exists: Boolean(taskRow),
-        inWorkspace: Boolean(taskRow && workspaceRow?.closest("li")?.contains(taskRow)),
+        inWorkspace: Boolean(taskRow && workspaceRow?.contains(taskRow)),
         running: Boolean(taskRow?.querySelector(".animate-spin")),
         error: Boolean(taskRow?.querySelector('[data-error-indicator="true"]')),
       };
     },
-    testId(TID_TASK_ITEM, task.taskId),
-    testId(TID_WORKSPACE_ITEM, task.workspacePath),
+    // querySelector 接收 CSS selector；裸 test id 会被当作标签名而始终找不到任务。
+    sel(testId(TID_TASK_ITEM, task.taskId)),
+    projectSectionSelector(task.workspacePath),
   );
 }
 
 async function waitForSidebarRowRunning(task: SSHLifecycleTask, running: boolean): Promise<void> {
   let latest: SidebarRowIndicator | null = null;
-  await browser.waitUntil(
-    async () => {
-      latest = await readSidebarRowIndicator(task);
-      return latest.exists && latest.inWorkspace && !latest.error && latest.running === running;
-    },
-    {
-      timeout: 30_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: 侧栏 task 行 running 期望 ${String(running)}，实际 ${JSON.stringify(latest)}`,
-    },
-  );
+  try {
+    await browser.waitUntil(
+      async () => {
+        latest = await readSidebarRowIndicator(task);
+        return latest.exists && latest.inWorkspace && !latest.error && latest.running === running;
+      },
+      {
+        timeout: 30_000,
+        interval: 100,
+        timeoutMsg: `${CASE_MARKER}: 侧栏 task 行 running 期望 ${String(running)}`,
+      },
+    );
+  } catch (cause) {
+    throw new Error(
+      `${CASE_MARKER}: 侧栏 task 行 running 期望 ${String(running)}，实际 ${JSON.stringify(latest)}`,
+      { cause },
+    );
+  }
 }
 
-async function openAndCloseSettingsPage(workspacePath: string): Promise<void> {
+async function openAndCloseSettingsPage(task: SSHLifecycleTask): Promise<void> {
   await clickTestIdByDom(TID_TASK_SETTINGS_BUTTON, {
     timeout: 15_000,
     timeoutMsg: `${CASE_MARKER}: 没有找到设置页入口`,
   });
   await $(sel(TID_SETTINGS_PAGE)).waitForDisplayed({ timeout: 15_000 });
+  await waitForSidebarRowRunning(task, true);
   await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON, {
     timeout: 15_000,
     timeoutMsg: `${CASE_MARKER}: 设置页没有返回入口`,
   });
-  await waitForWorkspaceApp(workspacePath, 30_000);
+  await waitForWorkspaceApp(task.workspacePath, 30_000);
 }
 
 describe(`${CASE_MARKER}: opening Settings must not detach the remote sidebar sessions-index`, () => {
@@ -118,7 +124,7 @@ describe(`${CASE_MARKER}: opening Settings must not detach the remote sidebar se
     });
     await waitForSidebarRowRunning(task, false);
 
-    // 续发一轮（fixture 延迟 15s 返回），在运行中打开并关闭设置页。
+    // 续发由受控 fixture 保持运行，完成开关设置页和运行态断言后才释放。
     await selectV4TaskById(task.taskId, 30_000);
     await waitForRemoteTab({
       caseMarker: CASE_MARKER,
@@ -140,7 +146,7 @@ describe(`${CASE_MARKER}: opening Settings must not detach the remote sidebar se
     // 侧栏必须先证明自己在跟踪实时 phase（running 转圈），否则后面的收敛断言无意义。
     await waitForSidebarRowRunning(task, true);
 
-    await openAndCloseSettingsPage(workspaceA);
+    await openAndCloseSettingsPage(task);
     await waitForRemoteTab({
       caseMarker: CASE_MARKER,
       expectedIdentity: task.identity,
@@ -154,6 +160,13 @@ describe(`${CASE_MARKER}: opening Settings must not detach the remote sidebar se
       SSH_LIFECYCLE_TURN_TIMEOUT_MS,
       { afterIndex: requestStart - 1 },
     );
+    await waitForV4ConversationState(
+      (snapshot) => snapshot.taskId === task.taskId && snapshot.state === "streaming",
+      `${CASE_MARKER}: 设置页关闭前任务已经结束，未覆盖运行中的订阅恢复`,
+      15_000,
+    );
+    await waitForSidebarRowRunning(task, true);
+    await releaseControlledReplay("ssh-settings-overlay-a-follow");
     await waitForV4AssistantMessageContaining(task.followReply, SSH_LIFECYCLE_TURN_TIMEOUT_MS);
     await waitForV4ConversationState(
       (snapshot) =>

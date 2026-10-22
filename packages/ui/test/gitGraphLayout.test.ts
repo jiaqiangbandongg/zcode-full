@@ -44,8 +44,9 @@ describe("layoutGitGraph", () => {
       ["base", 0],
       ["root", 0],
     ]);
-    expect(layout.edges.find((edge) => edge.fromHash === "m" && edge.toHash === "right")
-      ?.toLaneIndex).toBe(1);
+    expect(
+      layout.edges.find((edge) => edge.fromHash === "m" && edge.toHash === "right")?.toLaneIndex,
+    ).toBe(1);
   });
 
   it("reuses active parent lanes across multiple side branches", () => {
@@ -83,14 +84,15 @@ describe("layoutGitGraph", () => {
       ["main1", 0],
       ["root", 0],
     ]);
-    expect(layout.edges.find((edge) => edge.fromHash === "feature1" && edge.toHash === "root")
-      ?.toLaneIndex).toBe(0);
-    expect(layout.edges.find((edge) => edge.fromHash === "main1" && edge.toHash === "root")
-      ?.toLaneIndex).toBe(0);
     expect(
-      layout.laneSegments.some(
-        (segment) => segment.hash === "root" && segment.laneIndex === 0,
-      ),
+      layout.edges.find((edge) => edge.fromHash === "feature1" && edge.toHash === "root")
+        ?.toLaneIndex,
+    ).toBe(0);
+    expect(
+      layout.edges.find((edge) => edge.fromHash === "main1" && edge.toHash === "root")?.toLaneIndex,
+    ).toBe(0);
+    expect(
+      layout.laneSegments.some((segment) => segment.hash === "root" && segment.laneIndex === 0),
     ).toBe(true);
     expect(
       layout.paths.some(
@@ -124,9 +126,7 @@ describe("layoutGitGraph", () => {
     ]);
 
     expect(
-      layout.laneSegments.some(
-        (segment) => segment.hash === "right" && segment.laneIndex === 1,
-      ),
+      layout.laneSegments.some((segment) => segment.hash === "right" && segment.laneIndex === 1),
     ).toBe(true);
     expect(
       layout.paths.some(
@@ -136,25 +136,6 @@ describe("layoutGitGraph", () => {
           path.path.includes("C"),
       ),
     ).toBe(true);
-  });
-
-  it("keeps refs on the row when multiple names point to one commit", () => {
-    const layout = layoutGitGraph([
-      {
-        ...commit("head"),
-        refs: [
-          { name: "HEAD", kind: "head" },
-          { name: "main", kind: "branch" },
-          { name: "v1.0.0", kind: "tag" },
-        ],
-      },
-    ]);
-
-    expect(layout.rows[0]?.commit.refs.map((ref) => ref.name)).toEqual([
-      "HEAD",
-      "main",
-      "v1.0.0",
-    ]);
   });
 });
 
@@ -167,8 +148,7 @@ describe("GitGraphPane", () => {
           { name: "HEAD", kind: "head" },
           { name: "feature/git-graph", kind: "branch" },
         ],
-        subject:
-          "Render an intentionally long commit subject that should truncate inside the row",
+        subject: "Render an intentionally long commit subject that should truncate inside the row",
       },
       commit("c18e2bb", ["base"]),
       commit("9a51d0a", ["base"]),

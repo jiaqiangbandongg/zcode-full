@@ -6,7 +6,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createElement, createRef, type ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER } from "@zcode/shared";
+import { TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER } from "@zcode/shared/test-ids";
 import type { CommandAck, WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
 import type { WorkflowRunCardSummary } from "@/ToolCallBlocks/shared.js";
 
@@ -372,7 +372,7 @@ describe("run 卡上的 Configure", () => {
     );
   }
 
-  it("在 Stop 之前、⤢ 之前；点它在自己下方开弹层，aria-expanded 跟着翻", () => {
+  it("在 Stop 之前；点它打开弹层，aria-expanded 跟着翻", () => {
     const view = renderCard(runState(), true);
     const configure = view.getByTestId("workflow-digest-configure");
     const cancel = view.getByTestId("workflow-digest-cancel");
@@ -385,7 +385,7 @@ describe("run 卡上的 Configure", () => {
     expect(screen.getByTestId("workflow-run-settings-popover")).toBeTruthy();
   });
 
-  it("点弹层里的空白不会让卡收起（弹层的点击不冒泡到卡身）", () => {
+  it("点弹层里的空白后弹层仍保持打开", () => {
     const view = renderCard(runState(), true);
     fireEvent.click(view.getByTestId("workflow-digest-configure"));
     fireEvent.click(screen.getByTestId("workflow-run-settings-consequence"));

@@ -31,7 +31,6 @@ describe("CronCreateAutomationCard output", () => {
         minute: 49,
       },
     });
-    expect(automation?.scheduleRule).toBeDefined();
 
     const schedule = describeAutomationCardSchedule(
       {

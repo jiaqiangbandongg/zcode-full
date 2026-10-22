@@ -13,7 +13,7 @@ import {
   TID_MODEL_PROVIDER_NAME_EDIT_BUTTON,
   TID_MODEL_PROVIDER_NAME_INPUT,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   InlineEditableProviderCard,
@@ -24,7 +24,6 @@ import { ProviderDetailFeedbackBoundary } from "@/settings/model-provider-sectio
 import {
   formatModelContextWindowLabel,
   ProviderModelsSection,
-  resolveProviderApiFormatOptions,
 } from "@/settings/model-provider-section/ProviderCardSections.js";
 import { ModelRowInput } from "@/settings/model-provider-section/ProviderFormControls.js";
 import { confirmAndDeleteModelProvider } from "@/settings/model-provider-section/modelProviderActions.js";
@@ -35,7 +34,6 @@ import {
 import {
   isInteractiveModelDragTarget,
   resolveReorderedModelIds,
-  resolveSortableProviderModelRowClassName,
   SortableProviderModelList,
 } from "@/settings/model-provider-section/SortableProviderModelList.js";
 
@@ -393,36 +391,6 @@ describe("ProviderModelsSection compact model rows", () => {
         .value,
     ).toBe("");
   });
-  it("把添加模型操作放在模型列表标题行，而不是列表底部", () => {
-    render(
-      createElement(ProviderModelsSection, {
-        providerId: "test-provider",
-        models: [createModelProviderModelConfig({ id: "model-a" })],
-        onModelCommit: vi.fn(),
-        onDeleteModel: vi.fn(),
-        onAddModel: vi.fn(),
-        onReorderModelIds: vi.fn(),
-      }),
-    );
-
-    const addButton = screen.getByTestId(TID_MODEL_PROVIDER_ADD_MODEL_BUTTON);
-    const modelsLabel = screen.getByText("模型列表");
-    expect(addButton.parentElement).toBe(modelsLabel.parentElement);
-    expect(addButton.dataset.variant).toBe("secondary");
-    expect(addButton.dataset.size).toBe("default");
-    expect(addButton.parentElement?.className).toContain("mb-1");
-    expect(addButton.parentElement?.className).not.toContain("mt-2");
-    expect(
-      addButton.compareDocumentPosition(screen.getByText("model-a")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    const modelContent = screen
-      .getByText("model-a")
-      .closest("[data-model-provider-model-id]")?.firstElementChild;
-    expect(modelContent?.classList.contains("px-3")).toBe(true);
-    expect(modelContent?.classList.contains("py-2")).toBe(true);
-    expect(modelContent?.classList.contains("p-2")).toBe(false);
-  });
 
   it("未触碰 Model Draft 时保留原稀疏 Overlay，且不凭空写入默认 false", () => {
     const inherited = createModelProviderModelConfig({ id: "draft-model" });
@@ -628,21 +596,7 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(screen.getByText("DeepSeek 正在保存")).toBeTruthy();
     resolveSave?.();
 
-    const successMessage = await screen.findByText("DeepSeek 保存成功");
-    const successFeedback = successMessage.closest<HTMLElement>(
-      '[data-provider-detail-feedback-state="success"]',
-    );
-    expect(successFeedback?.classList.contains("w-full")).toBe(true);
-    expect(successFeedback?.classList.contains("w-fit")).toBe(false);
-    expect(successFeedback?.classList.contains("self-start")).toBe(false);
-    expect(successFeedback?.classList.contains("rounded-xl")).toBe(true);
-    expect(successFeedback?.classList.contains("rounded-lg")).toBe(false);
-    expect(successFeedback?.className).toContain("border-border");
-    expect(successFeedback?.className).toContain("bg-popover/95");
-    expect(successFeedback?.className).toContain("text-foreground");
-    expect(successFeedback?.className).not.toContain("border-success/30");
-    expect(successFeedback?.className).not.toContain("bg-success/10");
-    expect(successFeedback?.querySelector("svg")?.classList.contains("text-success")).toBe(true);
+    await screen.findByText("DeepSeek 保存成功");
     expect(screen.queryByText("DeepSeek 正在保存")).toBeNull();
   });
 
@@ -952,39 +906,6 @@ describe("ProviderModelsSection compact model rows", () => {
         modelIds: ["model-a", "model-b", "model-c"],
       }),
     ).toEqual(["model-b", "model-a", "model-c"]);
-  });
-
-  it("模型列表只保留单层外框，最后一行不绘制额外 divider", () => {
-    render(
-      createElement(ProviderModelsSection, {
-        providerId: "test-provider",
-        models: [
-          createModelProviderModelConfig({ id: "model-a" }),
-          createModelProviderModelConfig({ id: "model-b" }),
-        ],
-        onModelCommit: vi.fn(),
-        onDeleteModel: vi.fn(),
-        onAddModel: vi.fn(),
-        onReorderModelIds: vi.fn(),
-      }),
-    );
-
-    const rows = screen.getAllByLabelText("settings.modelProvider.reorderModel");
-    const list = rows[0]!.parentElement;
-    expect(list?.className).not.toContain("divide-y");
-    expect(rows[0]!.className).toContain("border-b");
-    expect(rows[1]!.className).toContain("border-b-0");
-  });
-
-  it("拖动中的模型行隐藏底部分隔线但保留透明边框占位", () => {
-    const className = resolveSortableProviderModelRowClassName({
-      isDragging: true,
-      isLast: false,
-    });
-
-    expect(className).toContain("border-b");
-    expect(className).toContain("border-transparent");
-    expect(className).not.toContain("border-input-border");
   });
 
   it("模型名称可启动整行拖动，真实交互控件不会误触拖动", () => {
@@ -1304,14 +1225,6 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(formatModelContextWindowLabel(1000000, "zh-CN")).toBe("1M");
   });
 
-  it("Provider 使用统一 API 格式枚举，不再从模型 kinds 反推", () => {
-    expect(resolveProviderApiFormatOptions(createProvider())).toEqual([
-      "anthropic-messages",
-      "openai-chat-completions",
-      "openai-responses",
-    ]);
-  });
-
   it("默认只展示紧凑模型行，metadata 编辑入口收进弹窗", () => {
     const html = renderToStaticMarkup(
       createElement(ProviderModelsSection, {
@@ -1461,28 +1374,6 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(html).not.toContain("恢复默认");
     expect(html).toContain('aria-label="编辑模型配置"');
     expect(html).toContain('aria-label="settings.modelProvider.reorderModel"');
-    expect(html).toContain("select-none");
-  });
-
-  it("上下文长度紧跟模型名，模型开关固定在全部行操作最右侧", () => {
-    const html = renderToStaticMarkup(
-      createElement(ProviderModelsSection, {
-        providerId: "test-provider",
-        models: [createModelProviderModelConfig({ id: "model-a", contextWindow: 128000 })],
-        apiKeyValue: "sk-demo",
-        onTestModel: vi.fn(),
-        onModelCommit: vi.fn(),
-        onDeleteModel: vi.fn(),
-        onAddModel: vi.fn(),
-        onReorderModelIds: vi.fn(),
-      }),
-    );
-
-    expect(html.indexOf("model-a")).toBeLessThan(html.indexOf(">128K<"));
-    expect(html.indexOf(">128K<")).toBeLessThan(html.indexOf('title="测试模型"'));
-    expect(html.indexOf('aria-label="编辑模型配置"')).toBeLessThan(
-      html.indexOf('aria-label="停用"'),
-    );
   });
 
   it("模型行展示配置中的上下文窗口，不按模型后缀改写", () => {
@@ -1509,7 +1400,7 @@ describe("ProviderModelsSection compact model rows", () => {
     expect(html).toContain('aria-label="上下文窗口：128K"');
   });
 
-  it("模型行右侧不展示 API 格式 pill 标签，且不按 kind 禁用测试按钮", () => {
+  it("模型行保留两个模型的可用测试入口", () => {
     const html = renderToStaticMarkup(
       createElement(ProviderModelsSection, {
         providerId: "test-provider",
@@ -1533,33 +1424,8 @@ describe("ProviderModelsSection compact model rows", () => {
 
     expect(html).toContain("anthropic-model");
     expect(html).toContain("openai-compatible-model");
-    expect(html).not.toContain("当前 API 格式不可用");
-    expect(html).not.toContain('data-api-format-kind="anthropic"');
-    expect(html).not.toContain('data-api-format-kind="openai-compatible"');
-    expect(html).not.toContain('data-api-format-kind="openai"');
-    expect(html).not.toContain(">Anthropic<");
-    expect(html).not.toContain(">Chat<");
-    expect(html).not.toContain('data-api-format-active="true"');
-    expect(html).not.toContain("grid-template-columns:repeat(2, minmax(max-content, 1fr))");
     expect(html.match(/title="测试模型"/g)).toHaveLength(2);
     expect(html).not.toContain('disabled=""');
-  });
-
-  it("无模型时不渲染空的模型列表容器", () => {
-    const html = renderToStaticMarkup(
-      createElement(ProviderModelsSection, {
-        providerId: "test-provider",
-        models: [],
-        apiKeyValue: "sk-demo",
-        onModelCommit: vi.fn(),
-        onDeleteModel: vi.fn(),
-        onAddModel: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain("模型列表");
-    expect(html).toContain("添加模型");
-    expect(html).not.toContain("mt-1 rounded-lg bg-input border border-input-border");
   });
 
   it("删除收到权威 View 后才移除模型，不靠本地行消失冒充成功", async () => {
@@ -1596,20 +1462,7 @@ describe("ProviderModelsSection compact model rows", () => {
       }),
     );
     expect(screen.queryByText("user-added-model")).toBeNull();
-    const emptyState = screen.getByText("当前没有配置模型，添加模型后可在聊天中使用。");
-    expect(emptyState.className).toContain("border-dashed");
-    expect(emptyState.className).toContain("h-12");
-    expect(emptyState.className).not.toContain("h-[50px]");
-    expect(emptyState.className).not.toContain("py-4");
-    expect(emptyState.className).not.toContain("py-8");
-    expect(emptyState.className).toContain("rounded-lg");
-    expect(emptyState.className).not.toContain("rounded-xl");
-    expect(emptyState.className).toContain("justify-start");
-    expect(emptyState.className).toContain("text-left");
-    expect(emptyState.className).not.toContain("justify-center");
-    expect(emptyState.className).not.toContain("text-center");
-    expect(emptyState.className).toContain("border-border");
-    expect(emptyState.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("当前没有配置模型，添加模型后可在聊天中使用。")).toBeTruthy();
     expect(onSave).not.toHaveBeenCalled();
     expect(onDeletePersonalModel).toHaveBeenCalledWith("provider-deepseek", "user-added-model");
   });

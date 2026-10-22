@@ -365,6 +365,7 @@ export const jsToolEntry: ToolEntry = {
   capability:
     "Execute JavaScript in a persistent Node REPL (Code-Act); state persists on globalThis across calls",
   metadata: {
+    shouldDefer: true,
     name: "js",
     description: buildJsToolDescription(),
     readOnly: false,

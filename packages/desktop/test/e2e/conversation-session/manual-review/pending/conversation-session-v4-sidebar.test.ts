@@ -2,7 +2,7 @@
 // 保留 setup/assert，待改为左侧 task 列表既有菜单交互后再恢复正式门禁。
 // 证据层 L3：建会话 → 侧栏出现（snapshot/upsert delta）→ 重命名 → 侧栏标题更新
 // （renameSession → CLI meta → sessions-index.title 权威）→ 删除 → 侧栏消失（session.removed delta）。
-import { TID_TASK_ITEM } from "@zcode/shared";
+import { TID_TASK_ITEM } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   clickV4DeleteSession,

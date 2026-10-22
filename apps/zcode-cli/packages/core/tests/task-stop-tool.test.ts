@@ -7,6 +7,10 @@ import {
   createTurnId,
 } from "@zcode/contracts";
 import { PermissionService, defaultPermissionConfig } from "../src/permission/service.js";
+import {
+  isErrorForToolResult,
+  modelContentForToolResult,
+} from "../src/runtime/helpers/tool-result.js";
 import { createToolExecutor } from "../src/tool/executor.js";
 import { taskStopToolEntry } from "../src/tool/handlers/task-stop.js";
 import { createToolRegistry } from "../src/tool/registry.js";
@@ -16,9 +20,7 @@ describe("TaskStop tool", () => {
     const registry = createToolRegistry();
     registry.register(taskStopToolEntry);
 
-    const contract = registry
-      .toContracts()
-      .find((tool) => tool.name === TASK_STOP_TOOL_NAME);
+    const contract = registry.toContracts().find((tool) => tool.name === TASK_STOP_TOOL_NAME);
 
     expect(contract?.description).toBe(
       "\n- Stops a running background task by its ID\n- Takes a task_id parameter identifying the task to stop\n- Returns a success or failure status\n- Use this tool when you need to terminate a long-running task\n",
@@ -51,7 +53,6 @@ describe("TaskStop tool", () => {
       },
     );
 
-    expect(taskStopToolEntry.metadata.name).toBe(TASK_STOP_TOOL_NAME);
     // 模型自己停的：initiator 是 model，终态通知据此不会写成用户的决定。
     expect(stopped).toEqual(["task_123:strict:true:model"]);
     expect(output).toEqual({
@@ -155,6 +156,48 @@ describe("TaskStop tool", () => {
     expect(result.error?.message).toContain("explicitly disallowed");
     expect(stopped).toEqual([]);
   });
+
+  it.each(["exec_12345678", "exec_12345678-1234-4234-8234-123456789abc"])(
+    "keeps lookup failure for %s visible to the model as an error with full ID guidance",
+    async (taskId) => {
+      const sessionId = createSessionId("task-stop-lookup-failure");
+      const turnId = createTurnId("task-stop-lookup-failure");
+      const traceContext = createRootTraceContext({ sessionId, turnId });
+      const registry = createToolRegistry();
+      registry.register(taskStopToolEntry);
+      const lookedUp: string[] = [];
+      const executor = createToolExecutor({
+        backgroundTaskControlPort: {
+          async stopBackgroundTask(id) {
+            lookedUp.push(id);
+            return { ok: false, reason: "background_task_not_found", taskId: id };
+          },
+        },
+        emitEvent: async () => undefined,
+        permissionService: new PermissionService(defaultPermissionConfig),
+        registry,
+        sessionId,
+        turnId,
+        traceContext,
+      });
+
+      const result = await executor.execute(
+        {
+          id: createToolCallId("task-stop-lookup-failure"),
+          input: { task_id: taskId },
+          name: TASK_STOP_TOOL_NAME,
+        },
+        { traceContext },
+      );
+
+      expect(lookedUp).toEqual([taskId]);
+      expect(result.success).toBe(false);
+      expect(isErrorForToolResult(result)).toBe(true);
+      expect(modelContentForToolResult(result)).toBe(
+        `Invalid task ID "${taskId}". This lookup failure does not mean the task has completed or stopped; use the full task_id returned when the task started to stop it.`,
+      );
+    },
+  );
 
   it("registers invisible stop aliases", async () => {
     const registry = createToolRegistry();
@@ -312,7 +355,8 @@ describe("TaskStop tool", () => {
         code: 1,
         reason: "background_task_not_found",
       },
-      message: "No task found with ID: missing_task",
+      message:
+        'Invalid task ID "missing_task". This lookup failure does not mean the task has completed or stopped; use the full task_id returned when the task started to stop it.',
     });
   });
 

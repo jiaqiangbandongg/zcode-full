@@ -116,7 +116,7 @@ describe("subagent markdown helpers", () => {
     // cache/zcode-plugins-official 且没有安装记录，documents:visual-judge 在 Settings 永远不可见。
     const home = await makeTempHome();
     const workspacePath = join(home, "workspace");
-    const oldRoot = await writeOfficialPluginFixture(home, "documents", "0.1.9", "visual-judge");
+    await writeOfficialPluginFixture(home, "documents", "0.1.9", "visual-judge");
     const newRoot = await writeOfficialPluginFixture(home, "documents", "0.1.10", "visual-judge");
     const invalidRoot = await writeOfficialPluginFixture(home, "documents", "99.0", "visual-judge");
     await writeFile(
@@ -153,7 +153,6 @@ describe("subagent markdown helpers", () => {
       scope: "user",
       source: "plugin",
     });
-    expect(result.pluginAgents[0]?.path).not.toBe(join(oldRoot, "agents", "visual-judge.md"));
     expect(
       result.agents.filter((agent) => agent.source === "plugin").map((agent) => agent.name),
     ).toEqual(["documents:visual-judge", "visual-judge"]);
@@ -860,8 +859,6 @@ describe("createSubagentsService", () => {
       readOnly: false,
     });
     expect(result.agents.find((agent) => agent.name === "general-purpose")?.readOnly).toBe(true);
-    expect(result.agents.find((agent) => agent.name === "general-purpose")?.color).toBe("blue");
-    expect(result.agents.find((agent) => agent.name === "Explore")?.color).toBe("cyan");
     expect(result.agents.find((agent) => agent.name === "code-reviewer")?.readOnly).toBe(false);
   });
 
@@ -944,104 +941,18 @@ tools:
     expect(result.pluginAgents.every((agent) => agent.readOnly)).toBe(true);
   });
 
-  it("lists built-in official plugin agents from the official cache without an install record", async () => {
-    // Bug 根因：discoverPluginAgents 只读 installed_plugins.json，内置官方插件由 CLI seed 到
-    // cache/zcode-plugins-official 且没有安装记录，documents:visual-judge 在 Settings 永远不可见。
-    const home = await makeTempHome();
-    const workspacePath = join(home, "workspace");
-    const oldRoot = await writeOfficialPluginFixture(home, "documents", "0.1.2", "visual-judge");
-    const newRoot = await writeOfficialPluginFixture(home, "documents", "0.1.4", "visual-judge");
-    await mkdir(join(newRoot, "..", "0.1.4.backup-1"), { recursive: true });
-    await mkdir(join(newRoot, "..", ".seed-lock"), { recursive: true });
-    // ios-simulator 不在默认启用集合里，且 config 没有显式启用，必须被忽略。
-    await writeOfficialPluginFixture(home, "ios-simulator", "0.2.0", "simulator-runner");
-    // browser-use 默认启用，但被用户「卸载」进入 suppressedBuiltins，同样不能贡献 agent。
-    await writeOfficialPluginFixture(home, "browser-use", "0.5.0", "browser-auditor");
-    await writeFile(
-      join(home, ".zcode", "cli", "config.json"),
-      JSON.stringify({
-        plugins: {
-          suppressedBuiltins: ["browser-use@zcode-plugins-official"],
-        },
-      }),
-      "utf8",
-    );
-    const service = createSubagentsService({ homeDir: home, isDesktopRuntime: true });
-
-    const result = await service.list({ workspacePath, provider: "glm" });
-
-    expect(result.pluginAgents.map((agent) => agent.name)).toEqual(["documents:visual-judge"]);
-    expect(result.pluginAgents[0]).toMatchObject({
-      id: "plugin:documents@zcode-plugins-official:visual-judge",
-      pluginId: "documents@zcode-plugins-official",
-      pluginName: "documents",
-      // 多版本缓存共存时取数字感知最新的版本目录，而不是字典序首项。
-      path: join(newRoot, "agents", "visual-judge.md"),
-      scope: "user",
-      source: "plugin",
-    });
-    expect(result.pluginAgents[0]?.path).not.toBe(join(oldRoot, "agents", "visual-judge.md"));
-    expect(
-      result.agents.filter((agent) => agent.source === "plugin").map((agent) => agent.name),
-    ).toEqual(["documents:visual-judge", "visual-judge"]);
-  });
-
-  it("prefers the install record over the official cache for the same plugin id", async () => {
-    const home = await makeTempHome();
-    const workspacePath = join(home, "workspace");
-    await writeOfficialPluginFixture(home, "documents", "0.1.4", "visual-judge");
-    const installedRoot = join(home, "installed", "documents");
-    await mkdir(join(installedRoot, ".zcode-plugin"), { recursive: true });
-    await mkdir(join(installedRoot, "agents"), { recursive: true });
-    await writeFile(
-      join(installedRoot, ".zcode-plugin", "plugin.json"),
-      JSON.stringify({ name: "documents" }),
-      "utf8",
-    );
-    await writeFile(
-      join(installedRoot, "agents", "visual-judge.md"),
-      "---\nname: visual-judge\ndescription: installed visual-judge\n---\ninstalled prompt",
-      "utf8",
-    );
-    await writeFile(
-      join(home, ".zcode", "cli", "plugins", "installed_plugins.json"),
-      JSON.stringify({
-        version: 1,
-        plugins: [
-          {
-            id: "documents@zcode-plugins-official",
-            name: "documents",
-            marketplace: "zcode-plugins-official",
-            version: "9.9.9",
-            installPath: installedRoot,
-            scope: "user",
-          },
-        ],
-      }),
-      "utf8",
-    );
-    await writeFile(
-      join(home, ".zcode", "cli", "config.json"),
-      JSON.stringify({
-        plugins: { enabledPlugins: { "documents@zcode-plugins-official": true } },
-      }),
-      "utf8",
-    );
-    const service = createSubagentsService({ homeDir: home, isDesktopRuntime: true });
-
-    const result = await service.list({ workspacePath, provider: "glm" });
-
-    expect(result.pluginAgents.map((agent) => agent.path)).toEqual([
-      join(installedRoot, "agents", "visual-judge.md"),
-    ]);
-  });
-
   it("persists plugin agent model overrides by agent id and echoes them in list", async () => {
     const home = await makeTempHome();
     const workspacePath = join(home, "workspace");
-    const pluginRoot = await writeOfficialPluginFixture(home, "documents", "0.1.4", "visual-judge", {
-      model: "custom:custom-openai:gpt-5.4",
-    });
+    const pluginRoot = await writeOfficialPluginFixture(
+      home,
+      "documents",
+      "0.1.4",
+      "visual-judge",
+      {
+        model: "custom:custom-openai:gpt-5.4",
+      },
+    );
     const agentId = "plugin:documents@zcode-plugins-official:visual-judge";
     const service = createSubagentsService({ homeDir: home, isDesktopRuntime: true });
 
@@ -1075,7 +986,9 @@ tools:
     });
     // 运行时投影（规范名 + 裸名别名）与设置页资源投影必须回显同一覆盖，否则 @ 提及与设置页不一致。
     expect(
-      overridden.agents.filter((agent) => agent.source === "plugin").map((agent) => agent.modelSelection),
+      overridden.agents
+        .filter((agent) => agent.source === "plugin")
+        .map((agent) => agent.modelSelection),
     ).toEqual([selection, selection]);
 
     // 清除完整选择时一并清掉档位，回落到 md 声明；不恢复旧双 map 保存入口。

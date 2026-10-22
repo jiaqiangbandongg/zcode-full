@@ -33,6 +33,7 @@ type FallbackOutcome =
 function createFixture(
   options: {
     outcome?: FallbackOutcome;
+    wrapped?: boolean;
     streamFailure?: boolean;
     earlyWriteFailure?: "pending" | "running" | false;
     delayEarlySchedule?: boolean;
@@ -101,6 +102,7 @@ function createFixture(
     },
     metadata: {
       name: "StreamRead",
+      shouldDefer: options.wrapped,
       concurrentSafe: true,
       destructive: false,
       needsApproval: false,
@@ -114,6 +116,7 @@ function createFixture(
     sessionId,
     {
       mode: "yolo",
+      toolSearch: { mode: options.wrapped ? "local" : "off" },
       modelStreaming: "on",
       titleGeneration: { enabled: false },
     },
@@ -125,7 +128,16 @@ function createFixture(
         async *streamText(request) {
           requests.push(request);
           if (requests.length === 1) {
-            yield { type: "tool_call", toolCall: { id: CALL_ID, name: "StreamRead", input: {} } };
+            yield {
+              type: "tool_call",
+              toolCall: options.wrapped
+                ? {
+                    id: CALL_ID,
+                    name: "DeferredToolCall",
+                    input: { name: "StreamRead", input: {} },
+                  }
+                : { id: CALL_ID, name: "StreamRead", input: {} },
+            };
             if (options.delayEarlySchedule) await scheduleStarted.promise;
             else if (options.earlyWriteFailure !== false) await earlyFailure.promise;
             if (options.streamFailure) throw new Error("Model request timed out.");
@@ -249,6 +261,30 @@ describe("streaming tool attempt history", () => {
     expect(fixture.parts()).toHaveLength(1);
     expect(fixture.parts()[0]?.id).not.toBe(fixture.writes[0]?.id);
     expectSingleRead(await fixture.hydrate(), false, READ_OUTPUT);
+  });
+
+  it("preserves target part and wrapper model identity during failed stream recovery", async () => {
+    const fixture = createFixture({ wrapped: true, streamFailure: true });
+    await fixture.runtime.executeTurn("call the deferred tool");
+    expect(fixture.handler).not.toHaveBeenCalled();
+    const call = {
+      id: CALL_ID,
+      name: "DeferredToolCall",
+      input: { name: "StreamRead", input: {} },
+    };
+    for (const messages of [fixture.requests[1]!.messages, await fixture.hydrate()]) {
+      expect(messages.flatMap((message) => message.toolCalls ?? [])).toEqual([call]);
+      expect(messages.find((message) => message.role === "tool")).toMatchObject({
+        toolName: "DeferredToolCall",
+        toolCallId: CALL_ID,
+        isError: true,
+      });
+    }
+    expect(fixture.parts().at(-1)).toMatchObject({
+      tool: "StreamRead",
+      metadata: { modelCallWrapper: "DeferredToolCall" },
+      state: { input: {}, status: "error" },
+    });
   });
 
   it("selects the new synthetic result after stream failure", async () => {

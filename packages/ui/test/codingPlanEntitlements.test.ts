@@ -27,6 +27,18 @@ vi.mock("@/hooks/useUsageEntitlement.js", () => ({
       snapshot: null,
     };
   },
+  useUsageEntitlementWithService: (
+    _usageStatsService: unknown,
+    options: Record<string, unknown>,
+  ) => {
+    usageEntitlementCalls.push(options);
+    return {
+      error: null,
+      loading: false,
+      refresh: vi.fn(async () => undefined),
+      snapshot: null,
+    };
+  },
 }));
 
 function HookProbe({

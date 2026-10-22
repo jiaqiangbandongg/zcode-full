@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-chat-remote-folder-create",
+  "spec": "./test/e2e/conversation-session/conversation-session-chat-remote-folder-create.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-chat-remote-folder-create.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "chat-remote-folder-create-title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型响应以检查真实任务的 Host、项目与目录。"
+      }
+    },
+    {
+      "id": "chat-remote-folder-create-a-first",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型响应以检查真实任务的 Host、项目与目录。"
+      }
+    }
+  ]
+}

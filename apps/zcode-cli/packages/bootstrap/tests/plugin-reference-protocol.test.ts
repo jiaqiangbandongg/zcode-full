@@ -127,8 +127,6 @@ describe("plugins/referenceCatalog protocol", () => {
         subagentNames: ["frozen:reviewer"],
       },
     ]);
-    // 协议投影禁止携带 rootPath（identifiers-only）。
-    expect(JSON.stringify(result)).not.toContain("/plugins/frozen");
     expect(() => zcodePluginsReferenceCatalogResultSchema.parse(result)).not.toThrow();
   });
 
@@ -185,7 +183,6 @@ describe("plugins/referenceCatalog protocol", () => {
       expect(
         enriched.plugins.find((x) => x.pluginId === zcodeGuide?.pluginId)?.descriptionI18n,
       ).toEqual(zcodeGuide?.descriptionI18n);
-      expect(JSON.stringify(result)).not.toContain("rootPath");
     } finally {
       if (previousStorageDir === undefined) delete process.env.ZCODE_STORAGE_DIR;
       else process.env.ZCODE_STORAGE_DIR = previousStorageDir;

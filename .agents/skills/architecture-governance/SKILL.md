@@ -15,7 +15,7 @@ Use this skill before editing code in the ZCode repository. It is a design guide
 4. For changes to mutable state, asynchronous behavior, or module boundaries, make the relevant design decisions before coding:
    - **One owner:** name the single component that owns each piece of mutable state. Other layers read through its contract and send commands; they do not keep a second accepted queue, cache, or derived truth.
    - **One path:** reuse an existing command, service, hook, adapter, or contract when it already expresses the behavior. Do not create a parallel helper for the same responsibility.
-   - **Explicit boundaries:** choose the layer for every new file and the public contract for every cross-module edge. Keep `ui → hooks/services → app → domain → adapters` and keep IO out of domain.
+   - **Explicit boundaries:** choose the layer for every new file and the public contract for every cross-module edge. Layers from low to high are `contract < domain < app < adapters < ui`; a file may import only its own layer or lower ones through their public surface. `domain` is pure (no IO, no `await` on the world), `app` decides side effects through ports, `adapters` executes them, `ui` depends only on this module's `contract.ts`. Quick test: needs `await`? not domain. Knows it is sqlite / MessagePort / a timer? adapters.
    - **Explicit time:** for asynchronous or remote behavior, write the event order, owner/lease, idempotency key, stale-result rule, replay/resume boundary, and desktop versus mobile delivery kind before implementation.
    - **Bounded context:** use the relevant contracts, specs, and tests. A generated reading package helps when dependencies are unclear; do not require a whole-module reading pass for every local edit.
 5. If the change alters a public contract, ownership, or allowed dependency, record that decision in the relevant spec/contract before implementation. Editing files in two modules alone does not require a new document. Use the root task boundary for when to consult the user; ordinary authorized implementation choices proceed autonomously.
@@ -41,6 +41,14 @@ mobile: replayable ─ snapshot + gap repair ┘
 7. Run `pnpm architecture:check --changed` after editing. Report new violations separately from baseline violations; include owners and event-order assumptions when affected. Follow the root validation matrix, finish after required checks pass, and expand checks only for new edits, failures, or unresolved risks.
 
 The executable policy is `architecture-policy.yaml`; keep its detailed rule definitions there. Check the actual managed-module coverage before claiming the gate verifies a boundary: a passing result does not prove unconfigured modules or runtime semantics are correct. Use `pnpm architecture:baseline:update` only when a reviewed change intentionally changes the accepted legacy baseline. CI never refreshes baseline automatically.
+
+Every new source file under `packages/` or `apps/` must belong to a managed module (rule `unmanaged-new-file`). When the change needs a directory that is not managed yet, register it first:
+
+```text
+pnpm architecture:adopt <module-id> --root <dir> [--root <dir2>] --layer <domain|app|adapters|ui> [--owner <group>]
+```
+
+`adopt` infers `requires` from the real imports, scaffolds the five artifacts if missing, and registers the module in `architecture-policy.yaml` without touching existing comments. Fill `contract.ts` and `CONTRACT.md` before adding behavior; keep the module's public surface to one intent per method.
 
 For a new managed module, provide `module.ts`, `contract.ts`, `contract.example.ts`, `contract.test.ts`, and a short `CONTRACT.md`. Keep runtime and persistence details behind the contract. Prefer typed service calls for one-to-one interactions, commands for state changes, and typed events for broadcast facts.
 

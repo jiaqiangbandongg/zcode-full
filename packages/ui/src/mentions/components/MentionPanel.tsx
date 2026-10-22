@@ -7,7 +7,7 @@ import {
   TID_PROMPT_SUGGESTION_SECTION,
   TID_PROMPT_SUGGESTION_STATUS,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { Info, LoaderIcon } from "lucide-react";
 import {
@@ -37,6 +37,8 @@ export interface MentionPanelSection {
   loadingText?: string;
   loading?: boolean;
   errorText?: string | null;
+  /** 项目名称在单组搜索结果中也需要可见。 */
+  showHeader?: boolean;
 }
 
 interface MentionPanelProps {
@@ -86,7 +88,7 @@ export function buildVirtualRows(sections: MentionPanelSection[]): VirtualRow[] 
   const shouldRenderSectionHeader = sections.length > 1;
 
   for (const section of sections) {
-    if (shouldRenderSectionHeader && section.title.trim().length > 0) {
+    if ((shouldRenderSectionHeader || section.showHeader) && section.title.trim().length > 0) {
       rows.push({
         kind: "section_header",
         sectionId: section.id,

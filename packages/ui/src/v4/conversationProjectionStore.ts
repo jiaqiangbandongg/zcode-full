@@ -45,7 +45,11 @@ const RUNTIME_RECYCLE_RETRY_DELAYS_MS = [250, 1_000, 3_000] as const;
  * 延迟，又能尽快从“CLI 继续工作、订阅完全静默”的半开通道自愈。超时只恢复订阅，不重放命令。
  */
 export const ACCEPTED_INPUT_PROJECTION_GRACE_MS = 2_000;
-const ACCEPTED_INPUT_COMMAND_TYPES = new Set(["sendText"]);
+const ACCEPTED_INPUT_COMMAND_TYPES = new Set(["sendText", "editUserQuery"]);
+
+export function requiresAcceptedInputProjection(type: string): boolean {
+  return ACCEPTED_INPUT_COMMAND_TYPES.has(type);
+}
 
 /** 退避耗尽时展示给用户的 lastError（无底层 error 对象可引用的换代路径）。 */
 const RUNTIME_RECYCLED_ERROR = "ZCode agent runtime 已被回收，重连未成功";
@@ -61,7 +65,7 @@ function roundedDuration(startedAt: number, endedAt: number): number {
 /**
  * 是否为 runtime 换代/回收导致的瞬态 subscribe 失败。
  *
- * 三种文案都来自同一次回收：transport 关闭时 ZCodeProtocolClient.rejectAll 打断在途请求
+ * 已知文案都来自同一次回收：transport 关闭时 ZCodeProtocolClient.rejectAll 打断在途请求
  * （transport closed），复用已回收 client 时 assertNotDisposed 早退（client disposed），
  * 以及 runtime 尚未重新拉起时的 fail-fast（runtime is not running）。
  */
@@ -412,6 +416,7 @@ export class ConversationProjectionStore {
   async connect(
     options: {
       forceSnapshot?: boolean;
+      retryInitialization?: string;
       initialOverflowRetry?: boolean;
       rendererPrepareStartedAt?: number;
     } = {},
@@ -440,6 +445,9 @@ export class ConversationProjectionStore {
       const result = await this.transport.subscribe({
         topic: this.topic,
         base: snapshot ? { logEpoch: snapshot.logEpoch, seq: snapshot.seq } : undefined,
+        ...(options.retryInitialization
+          ? { retryInitialization: options.retryInitialization }
+          : {}),
       });
       if (generation !== this.generation || this.closed) {
         // 过期代际：这份订阅已无人消费，立即退订。
@@ -606,7 +614,10 @@ export class ConversationProjectionStore {
   retry(): Promise<void> {
     this.clearRuntimeRecycleRetry();
     this.runtimeRecycleRetryAttempt = 0;
-    return this.connect();
+    const initialization = this.state.snapshot?.runtimeInitialization;
+    return this.connect(
+      initialization?.status === "failed" ? { retryInitialization: initialization.attemptId } : {},
+    );
   }
 
   /** row command/query 的 epoch/entity authority 失效，复用 same-sub recovery 收敛。 */
@@ -1307,7 +1318,7 @@ export class ConversationProjectionStore {
   expectAcceptedInputProjection(commandId: string): void {
     if (this.closed || this.acceptedInputProjectionTimers.has(commandId)) return;
     const command = this.state.optimisticCommands.find((item) => item.commandId === commandId);
-    if (!command || !ACCEPTED_INPUT_COMMAND_TYPES.has(command.type)) return;
+    if (!command || !requiresAcceptedInputProjection(command.type)) return;
     if (hasAcceptedInputProjection(this.state.snapshot, commandId)) {
       this.settleCommand(commandId);
       return;
@@ -1367,7 +1378,7 @@ export class ConversationProjectionStore {
       }
     }
     const remaining = this.state.optimisticCommands.filter((command) =>
-      ACCEPTED_INPUT_COMMAND_TYPES.has(command.type)
+      requiresAcceptedInputProjection(command.type)
         ? !inputProjectionIds.has(command.commandId)
         : !acknowledged.has(command.commandId),
     );

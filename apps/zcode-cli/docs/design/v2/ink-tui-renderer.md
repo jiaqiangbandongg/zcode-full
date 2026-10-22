@@ -102,6 +102,9 @@ capability checks:
 - Ctrl+C exits the fullscreen TUI only after the user presses it twice in the
   confirmation window. The first press shows `Press Ctrl-C again to exit.`, and
   the confirmed second press aborts active work before closing the UI.
+- The startup screen owns Ctrl+C only while initialization is pending. Before
+  mounting the ready app, unmount the startup tree and release its keyboard
+  listener. After handoff, only the app handles the two-press exit sequence.
 - Escape never exits the fullscreen TUI. It pauses active output by cancelling
   the active turn when one is running, keeps approval/selection local cancel
   semantics, and is otherwise a no-op status hint.

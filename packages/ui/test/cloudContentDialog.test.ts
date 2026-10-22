@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createElement } from "react";
+import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
+import { cleanup, fireEvent, render as renderUi, screen, waitFor } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CloudContentDialog } from "@/components/cloud-content-dialog/CloudContentDialog.js";
 import type { CloudContentDialogPayload } from "@/components/cloud-content-dialog/cloudContentDialogTypes.js";
 
 afterEach(cleanup);
+const render = (ui: ReactNode) =>
+  renderUi(ui, {
+    wrapper: ({ children }) =>
+      createElement(ZCodeIntlProvider, { initialLocale: "en-US" }, children),
+  });
 const payload: CloudContentDialogPayload = {
   schemaVersion: 1,
   id: "new-feature",
@@ -96,23 +102,7 @@ describe("CloudContentDialog", () => {
     fireEvent.click(button.querySelector("b")!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
-  it("keeps action buttons text-only before and after copying", async () => {
-    render(
-      createElement(CloudContentDialog, {
-        payload,
-        open: true,
-        onClose: vi.fn(),
-        handlers: { copy_text: vi.fn() },
-        labels: { actionFailed: "Failed", copySucceeded: "Copied" },
-      }),
-    );
-    for (const button of screen.getAllByTestId("cloud-dialog-action")) {
-      expect(button.querySelector("svg")).toBeNull();
-    }
-    fireEvent.click(screen.getByText("Copy"));
-    await waitFor(() => expect(screen.getByText("Copied")).toBeTruthy());
-    expect(screen.getByText("Copied").querySelector("svg")).toBeNull();
-  });
+
   it("applies button theme without changing close actions", () => {
     const onClose = vi.fn();
     render(
@@ -152,62 +142,7 @@ describe("CloudContentDialog", () => {
     fireEvent.click(button);
     expect(onClose).toHaveBeenCalledOnce();
   });
-  it("removes the shell border and clips hero media to the top corners", () => {
-    render(
-      createElement(CloudContentDialog, {
-        payload,
-        open: true,
-        onClose: vi.fn(),
-        handlers: {},
-        labels: { actionFailed: "Failed" },
-      }),
-    );
-    expect(screen.getByTestId("cloud-content-dialog").classList.contains("border-0")).toBe(true);
-    expect(
-      screen.getByTestId("cloud-content-dialog").classList.contains("cloud-content-dialog"),
-    ).toBe(true);
-    expect(screen.getByTestId("cloud-content-dialog").className).not.toContain(
-      "[&_[data-slot=dialog-close]]:bg-popover",
-    );
-    expect(screen.getByTestId("cloud-content-dialog").className).toContain(
-      "[&_[data-slot=dialog-close]]:rounded-full",
-    );
-    const hero = screen.getByTestId("cloud-dialog-hero-slot");
-    expect(hero.classList.contains("rounded-t-2xl")).toBe(true);
-    expect(hero.classList.contains("overflow-hidden")).toBe(true);
-    expect(
-      document
-        .querySelector('[data-slot="dialog-overlay"]')!
-        .classList.contains("backdrop-filter-none!"),
-    ).toBe(false);
-  });
-  it("disables backdrop compositing only for interactive iframe dialogs", () => {
-    render(
-      createElement(CloudContentDialog, {
-        payload: {
-          ...payload,
-          dialog: {
-            ...payload.dialog,
-            hero: {
-              type: "interactive_bundle",
-              runtime: "zcode-hero-sandbox-v1",
-              resolvedUrl: "https://example.com/hero.html",
-              data: {},
-            },
-          },
-        },
-        open: true,
-        onClose: vi.fn(),
-        handlers: {},
-        labels: { actionFailed: "Failed" },
-      }),
-    );
-    expect(
-      document
-        .querySelector('[data-slot="dialog-overlay"]')!
-        .classList.contains("backdrop-filter-none!"),
-    ).toBe(true);
-  });
+
   it("supports an explicit focus target when async loading disabled the opener", async () => {
     const target = document.createElement("button");
     document.body.append(target);

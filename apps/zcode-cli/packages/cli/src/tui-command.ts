@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import type { ToolSearchMode } from "@zcode/contracts";
 import type { RunContext, GlobalOptions } from "@zcode/shared-types";
 import { resolveZCodeRuntimeEnv, type DynamicWorkflowMode } from "@zcode/shared";
 import { createNodeClipboardImageReader } from "./clipboard-image.js";
@@ -26,6 +27,7 @@ export const runTuiCommand = async (
   resumeRequest?: CliResumeRequest,
   toolDisallowlist?: readonly string[],
   forceMcs = false,
+  toolsearchMode: ToolSearchMode = "off",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
 ): Promise<number> => {
   try {
@@ -49,6 +51,7 @@ export const runTuiCommand = async (
       startupLocale,
       toolDisallowlist,
       forceMcs,
+      toolsearchMode,
       options.browserUse,
       options.browserExecutable,
       workflowMode,

@@ -12,7 +12,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
-import { TID_V4_SPLIT_DIVIDER } from "@zcode/shared";
+import { TID_V4_SPLIT_DIVIDER } from "@zcode/shared/test-ids";
 import { cn } from "@/components/lib/utils.js";
 import { clampSplitRatio, type SplitDirection } from "@/v4/paneLayoutTree.js";
 import { SPLIT_VAR_PREFIX } from "@/v4/workbenchLayout.js";

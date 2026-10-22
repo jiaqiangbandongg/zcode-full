@@ -117,12 +117,6 @@ describe("createActorSessionQuiescence", () => {
     expect(quiet).toEqual(new Set());
   });
 
-  it("从未登记过的会话不在静默集合里", async () => {
-    const ledger = createActorSessionQuiescence({ clock: manualSchedule().clock });
-    ledger.noteDisposed("sess-a", undefined);
-    expect((await ledger.quietSessions()).has("sess-unknown")).toBe(false);
-  });
-
   it("可重复询问（amend 之外没有别的读者，但账本不因一次询问而作废）", async () => {
     const timer = manualSchedule();
     const ledger = createActorSessionQuiescence({ clock: timer.clock });

@@ -29,7 +29,6 @@ describe("AgentRuntime lifecycle hooks", () => {
       inputId: "cmd-deferred",
     });
 
-    expect(result.kind).toBe("queued");
     if (result.kind !== "queued") {
       throw new Error(`unexpected deferred input result: ${result.kind}`);
     }
@@ -176,7 +175,6 @@ describe("AgentRuntime lifecycle hooks", () => {
     expect(sessionStartModels).toEqual(["provider-b/model-b"]);
     expect(capturedRequests[0]).toContain("session-start-context");
     expect(capturedRequests[0]).toContain("prompt-context:first");
-    expect(capturedRequests[1]).not.toContain("SessionStart:startup");
     expect(capturedRequests[1]).toContain("prompt-context:second");
   });
 
@@ -474,7 +472,6 @@ describe("AgentRuntime lifecycle hooks", () => {
         to: "agent_local_1",
       }),
     ]);
-    expect(capturedRequests[1]).toContain("msg-local-agent-1");
     expect(capturedRequests[1]).toContain(
       "Message msg-local-agent-1 (继续检查权限) sent to agent_local_1.",
     );

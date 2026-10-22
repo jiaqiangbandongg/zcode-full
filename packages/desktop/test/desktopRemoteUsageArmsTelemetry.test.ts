@@ -240,4 +240,25 @@ describe("desktop remote usage ARMS telemetry", () => {
 
     expect(logger.warn).toHaveBeenCalledTimes(2);
   });
+
+  it("兼容 DOM 类型环境返回的数字 interval handle", () => {
+    const clearInterval = vi.fn();
+    configureRemoteUsageArmsTelemetry({
+      armsCustomContext: {
+        deviceMid: "device-1",
+        platform: "darwin",
+        appVersion: "1.2.3",
+        armsEnv: "test",
+      },
+      getRemoteConnectionStats: () => ({ activeSessionCount: 0, activeTargetCount: 0 }),
+      sendCustom: vi.fn(),
+      logger: { warn: vi.fn() },
+      setInterval: () => 42,
+      clearInterval,
+    });
+
+    stopRemoteUsageArmsPeriodicSampling();
+
+    expect(clearInterval).toHaveBeenCalledWith(42);
+  });
 });

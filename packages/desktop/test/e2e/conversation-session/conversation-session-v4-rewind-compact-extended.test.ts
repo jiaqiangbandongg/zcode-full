@@ -1,5 +1,5 @@
 // PV4-18/PV4-19：compact-covered 附件 intent 重放，以及多 compact boundary 跨界 edit + cold restore。
-import { TID_V4_COMPOSER_INPUT, TID_V4_ROW } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT, TID_V4_ROW } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   setInputValueByTestIdDom,

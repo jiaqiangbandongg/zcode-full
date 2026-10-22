@@ -213,3 +213,16 @@ export interface IBotsService {
 }
 
 export const IBotsService = createServiceDescriptor<IBotsService>(ServiceChannels.Bots);
+
+/** Host 负责把旧线路身份解析到当前 Source；不允许 services 猜测连接目录。 */
+export interface BotRemoteWorkspaceResolution {
+  workspacePath: string;
+  workspaceIdentity: string;
+  target: import("@zcode/shared").RemoteTarget;
+  /** 只有当前窗口存在在线 logical session 才有值，用于 attachment 换代隔离。 */
+  runtimeKey?: string;
+}
+export type BotRemoteWorkspaceResolver = (
+  workspace: { workspacePath: string; workspaceIdentity: string },
+  purpose: "lookup" | "reconnect",
+) => Promise<BotRemoteWorkspaceResolution | null>;

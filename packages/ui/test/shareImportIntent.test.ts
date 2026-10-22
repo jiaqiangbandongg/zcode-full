@@ -7,6 +7,27 @@ import {
 } from "../src/root/shareImportIntent.js";
 
 describe("share import intent", () => {
+  it.each(["network", "service_unavailable", "unknown", "rate_limited"])(
+    "keeps transport failure %s retryable",
+    (kind) => {
+      expect(resolveShareImportFailurePresentation(kind).retryable).toBe(true);
+    },
+  );
+  it("keeps actual contract corruption non-retryable", () => {
+    expect(resolveShareImportFailurePresentation("invalid_contract")).toEqual({
+      messageId: "conversationShare.import.integrityFailed",
+      retryable: false,
+    });
+  });
+  it.each([
+    ["import_not_allowed", "conversationShare.import.notAllowed"],
+    ["not_found", "conversationShare.import.notFound"],
+    ["expired", "conversationShare.import.expired"],
+    ["unsupported_schema_version", "conversationShare.import.unsupportedVersion"],
+  ])("does not offer an ineffective retry for %s", (kind, messageId) => {
+    expect(resolveShareImportFailurePresentation(kind)).toEqual({ messageId, retryable: false });
+  });
+
   it("creates one stable request id for retries", () => {
     const intent = createShareImportIntent("share-1", () => "request-1");
     expect(intent).toEqual({
@@ -32,7 +53,7 @@ describe("share import intent", () => {
       retryable: false,
     });
     expect(resolveShareImportFailurePresentation("network")).toEqual({
-      messageId: "conversationShare.import.failed",
+      messageId: "conversationShare.error.network",
       retryable: true,
     });
   });

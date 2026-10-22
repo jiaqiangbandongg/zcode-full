@@ -62,9 +62,8 @@
 
 证据：
 
-- `scripts/docker-build-and-push-web-remote-control.sh:6-8`
+- 旧单版本远控发布脚本（已删除，保留本次审计的历史结论）
 - `scripts/docker-build-and-push-web-remote-control-test.sh:6-8`
-- `scripts/docker-build-and-push-web-remote-control-v3.sh:6-8`
 
 现状：
 

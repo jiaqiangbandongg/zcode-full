@@ -5,7 +5,7 @@ import type { ConversationSnapshot } from "@zcode/shared/zcode-protocol-v4";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 import { pendingCommandRegistry, type PendingCommandEntry } from "@/v4/pendingCommandRegistry.js";
-import { SessionPane } from "@/v4/SessionPane.js";
+import { SessionPane, type SessionPaneProps } from "@/v4/SessionPane.js";
 import { useModelSelectionServiceView } from "@/hooks/useModelSelectionView.js";
 
 type ProjectionState = {
@@ -131,6 +131,13 @@ const prewarmHookInputs = vi.hoisted(() => ({
 }));
 
 const servicesMock = vi.hoisted(() => ({
+  projectService: {
+    resolveSessionDirectories: vi.fn(async (task) => ({
+      ...task,
+      projectId: null,
+      additionalDirectories: [],
+    })),
+  },
   highspeedCardService: {
     // 本文件使用会在用例结束后销毁的极简 DOM；保持无关 Highspeed 查询 pending，
     // 避免其 Promise 回调在 window 清理后再次唤醒 React scheduler。
@@ -217,6 +224,7 @@ vi.mock("@/hooks/useSettingService.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useOptionalServices: () => null,
   useServices: () => servicesMock,
 }));
@@ -285,6 +293,13 @@ vi.mock("@/v4/composer/useDraftSessionPrewarm.js", () => ({
     prewarmHookInputs.current.push(params);
     return {
       binding: prewarmHookInputs.binding,
+      waitForSession: async () => {
+        if (prewarmHookInputs.binding) return prewarmHookInputs.binding;
+        const ack = (await params.dispatchCommand("createSession", {}, null)) as {
+          result: { sessionId: string };
+        };
+        return { sessionId: ack.result.sessionId, beginPromotion: () => true, promote: vi.fn() };
+      },
     };
   },
 }));
@@ -510,7 +525,11 @@ function installMinimalDom() {
   return createMinimalElement(documentMock, "div");
 }
 
-function renderPane(root: Root, sessionId: string | null): void {
+function renderPane(
+  root: Root,
+  sessionId: string | null,
+  props: Partial<SessionPaneProps> = {},
+): void {
   act(() => {
     root.render(
       createElement(
@@ -520,6 +539,7 @@ function renderPane(root: Root, sessionId: string | null): void {
           paneId: "workspace-main",
           sessionId,
           workspacePath: "/workspace",
+          ...props,
         }),
       ),
     );
@@ -527,6 +547,7 @@ function renderPane(root: Root, sessionId: string | null): void {
 }
 
 beforeEach(() => {
+  servicesMock.projectService.resolveSessionDirectories.mockClear();
   sessionCreateCapture.report.mockClear();
   recoveryCapture.entries = [];
   recoveryCapture.onResend = null;
@@ -541,7 +562,12 @@ beforeEach(() => {
   conversationMock.lease.store.expectAcceptedInputProjection.mockClear();
   conversationMock.currentLayer = null;
   conversationMock.currentSendCommand = null;
-  conversationMock.sendCommand.mockClear();
+  conversationMock.sendCommand.mockReset();
+  conversationMock.sendCommand.mockImplementation(async (envelope) => ({
+    commandId: envelope.commandId,
+    revisionAtDecision: 1,
+    status: "accepted" as const,
+  }));
   prewarmHookInputs.current = [];
   scrollFocus.composerProps = null;
   scrollFocus.queueProps = null;
@@ -567,6 +593,35 @@ afterEach(() => {
 });
 
 describe("SessionPane composer continuity", () => {
+  it.each([
+    ["selection_side_chat", true, "parent"],
+    ["interactive", false, "session-1"],
+    ["fork", false, "session-1"],
+  ] as const)("%s 发送按自身语义解析 Recent 归属", async (_kind, selectionSideChat, ownerId) => {
+    const root = createRoot(installMinimalDom());
+    mountedRoots.push(root);
+    projectionState.current = {
+      ...projectionState.current,
+      snapshot: { ...makeDraftSnapshot(), sessionId: "session-1" },
+    };
+    servicesMock.projectService.resolveSessionDirectories.mockImplementationOnce(async (task) => {
+      if (selectionSideChat && task.taskId === "session-1")
+        throw new Error("project.remote-project-required");
+      return { ...task, projectId: null, additionalDirectories: [] };
+    });
+    renderPane(root, "session-1", { selectionSideChat, rootSessionId: "parent" });
+    await act(async () => {
+      await scrollFocus.composerProps?.onSendText("follow up");
+    });
+    expect(servicesMock.projectService.resolveSessionDirectories).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: ownerId }),
+      expect.any(String),
+    );
+    expect(conversationMock.sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "sendText", sessionId: "session-1" }),
+    );
+  });
+
   it.each(["group", "project", "session"] as const)(
     "%s 首发只在 accepted 后报告，打开和后续发送不报告",
     async (source) => {
@@ -894,7 +949,12 @@ describe("SessionPane composer continuity", () => {
       loadingOlder: false,
     };
     renderPane(root, "session-1");
-    conversationMock.sendCommand.mockClear();
+    conversationMock.sendCommand.mockReset();
+    conversationMock.sendCommand.mockImplementation(async (envelope) => ({
+      commandId: envelope.commandId,
+      revisionAtDecision: 1,
+      status: "accepted" as const,
+    }));
 
     await act(async () => {
       await scrollFocus.composerProps?.onSendText("立即执行", {
@@ -911,9 +971,6 @@ describe("SessionPane composer continuity", () => {
           requestedDelivery: "startNow",
         }),
       }),
-    );
-    expect(conversationMock.sendCommand).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "sendQueuedNow" }),
     );
     expect(conversationMock.lease.store.expectAcceptedInputProjection).toHaveBeenCalledWith(
       conversationMock.sendCommand.mock.calls[0]?.[0].commandId,
@@ -969,7 +1026,12 @@ describe("SessionPane composer continuity", () => {
       expect.objectContaining({ type: "compact", sessionId: "session-1" }),
     );
 
-    conversationMock.sendCommand.mockClear();
+    conversationMock.sendCommand.mockReset();
+    conversationMock.sendCommand.mockImplementation(async (envelope) => ({
+      commandId: envelope.commandId,
+      revisionAtDecision: 1,
+      status: "accepted" as const,
+    }));
     await act(async () => {
       await scrollFocus.composerProps?.onSendText("新消息", {
         heldQueueDisposition: "clearQueueAndSend",

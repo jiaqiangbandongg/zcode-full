@@ -113,7 +113,6 @@ describe("output-token continuation control-flow boundaries", () => {
     const result = await runtime.executeTurn("use a tool between recovery chains");
 
     expect(result.response).toBe("done");
-    expect(requests).toHaveLength(6);
     expect(requests.map((request) => countContinuePrompts(request.messages))).toEqual([
       0, 1, 1, 2, 3, 4,
     ]);

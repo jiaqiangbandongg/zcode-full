@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "test/fixtures",
+    "outDir": "dist-testing",
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["test/fixtures/fake-relay-v2.ts"],
+  "references": [{ "path": "." }]
+}

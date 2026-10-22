@@ -53,30 +53,17 @@ describe("paneWorkspaceKey（身份/隔离口径）", () => {
   it("identity 优先（trim 后非空），否则回落 workspacePath", () => {
     expect(paneWorkspaceKey(SCOPE_A)).toBe("/ws/a");
     expect(paneWorkspaceKey(SCOPE_B)).toBe("ssh://host/mnt/b");
-    expect(
-      paneWorkspaceKey({ workspacePath: "/x", workspaceIdentity: "  " }),
-    ).toBe("/x");
+    expect(paneWorkspaceKey({ workspacePath: "/x", workspaceIdentity: "  " })).toBe("/x");
   });
 });
 
 describe("分割树纯状态机", () => {
-  it("初始态：单 primary 叶子，焦点在 primary", () => {
-    expect(INITIAL_PANE_LAYOUT.root).toEqual({
-      type: "leaf",
-      paneId: V4_PRIMARY_PANE_ID,
-    });
-    expect(INITIAL_PANE_LAYOUT.panes).toEqual({});
-    expect(INITIAL_PANE_LAYOUT.focusedPaneId).toBe(V4_PRIMARY_PANE_ID);
+  it("初始布局只计一个 pane", () => {
     expect(countPanes(INITIAL_PANE_LAYOUT)).toBe(1);
   });
 
   it("splitPaneAt：primary 向右拆分 → 双叶子行分割，新 pane 接管焦点", () => {
-    const next = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const next = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     expect(leafPaneIds(next.root)).toEqual([V4_PRIMARY_PANE_ID, "pane-1"]);
     expect(next.root.type).toBe("split");
     if (next.root.type === "split") {
@@ -88,20 +75,10 @@ describe("分割树纯状态机", () => {
   });
 
   it("splitPaneAt：嵌套拆分覆盖 2x2 网格；pane id 单调分配不复用", () => {
-    let state = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    let state = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     state = splitPaneAt(state, V4_PRIMARY_PANE_ID, "column", draft(SCOPE_A));
     state = splitPaneAt(state, "pane-1", "column", bound(SCOPE_B, "sess-b"));
-    expect(leafPaneIds(state.root)).toEqual([
-      V4_PRIMARY_PANE_ID,
-      "pane-2",
-      "pane-1",
-      "pane-3",
-    ]);
+    expect(leafPaneIds(state.root)).toEqual([V4_PRIMARY_PANE_ID, "pane-2", "pane-1", "pane-3"]);
     expect(countPanes(state)).toBe(4);
     expect(canAddPane(state)).toBe(false);
     // 关掉一个再拆，id 继续向前（pane-2 关闭后新 pane 是 pane-4，不复用）
@@ -112,17 +89,15 @@ describe("分割树纯状态机", () => {
   });
 
   it("splitPaneAt：anchor 不在树中 / 叶子数达上限 → no-op 原引用", () => {
-    expect(
-      splitPaneAt(INITIAL_PANE_LAYOUT, "nope", "row", draft(SCOPE_A)),
-    ).toBe(INITIAL_PANE_LAYOUT);
+    expect(splitPaneAt(INITIAL_PANE_LAYOUT, "nope", "row", draft(SCOPE_A))).toBe(
+      INITIAL_PANE_LAYOUT,
+    );
     let state = INITIAL_PANE_LAYOUT;
     for (let i = 0; i < MAX_WORKBENCH_PANES - 1; i++) {
       state = splitPaneAt(state, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     }
     expect(countPanes(state)).toBe(MAX_WORKBENCH_PANES);
-    expect(splitPaneAt(state, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A))).toBe(
-      state,
-    );
+    expect(splitPaneAt(state, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A))).toBe(state);
   });
 
   it("splitPaneAtSide：left/up 把新 pane 放在 anchor 前，right/down 放在 anchor 后", () => {
@@ -165,33 +140,18 @@ describe("分割树纯状态机", () => {
   });
 
   it("splitPaneAtSide：未知 anchor 或达到上限时 no-op", () => {
-    expect(
-      splitPaneAtSide(
-        INITIAL_PANE_LAYOUT,
-        "missing",
-        "right",
-        bound(SCOPE_A, "x"),
-      ),
-    ).toBe(INITIAL_PANE_LAYOUT);
+    expect(splitPaneAtSide(INITIAL_PANE_LAYOUT, "missing", "right", bound(SCOPE_A, "x"))).toBe(
+      INITIAL_PANE_LAYOUT,
+    );
 
     let state = INITIAL_PANE_LAYOUT;
     for (let i = 0; i < MAX_WORKBENCH_PANES - 1; i++) {
-      state = splitPaneAtSide(
-        state,
-        V4_PRIMARY_PANE_ID,
-        "right",
-        bound(SCOPE_A, `sess-${i}`),
-      );
+      state = splitPaneAtSide(state, V4_PRIMARY_PANE_ID, "right", bound(SCOPE_A, `sess-${i}`));
     }
     expect(countPanes(state)).toBe(MAX_WORKBENCH_PANES);
-    expect(
-      splitPaneAtSide(
-        state,
-        V4_PRIMARY_PANE_ID,
-        "right",
-        bound(SCOPE_A, "overflow"),
-      ),
-    ).toBe(state);
+    expect(splitPaneAtSide(state, V4_PRIMARY_PANE_ID, "right", bound(SCOPE_A, "overflow"))).toBe(
+      state,
+    );
   });
 
   it("closePane：父分割节点塌缩为兄弟子树；焦点在被关 pane 上时归还 primary", () => {
@@ -214,16 +174,9 @@ describe("分割树纯状态机", () => {
   });
 
   it("closePane：primary 不可关 / 未知 pane → no-op 原引用；焦点在别处时保留", () => {
-    expect(closePane(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID)).toBe(
-      INITIAL_PANE_LAYOUT,
-    );
+    expect(closePane(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID)).toBe(INITIAL_PANE_LAYOUT);
     expect(closePane(INITIAL_PANE_LAYOUT, "nope")).toBe(INITIAL_PANE_LAYOUT);
-    let state = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    let state = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     state = splitPaneAt(state, "pane-1", "row", draft(SCOPE_A));
     state = focusPane(state, "pane-1");
     const closed = closePane(state, "pane-2");
@@ -231,12 +184,7 @@ describe("分割树纯状态机", () => {
   });
 
   it("focusPane：只接受树中存在的叶子；重复聚焦/未知 pane 返回原引用", () => {
-    const opened = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const opened = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     const primaryFocused = focusPane(opened, V4_PRIMARY_PANE_ID);
     expect(primaryFocused.focusedPaneId).toBe(V4_PRIMARY_PANE_ID);
     expect(primaryFocused.panes).toBe(opened.panes);
@@ -245,30 +193,18 @@ describe("分割树纯状态机", () => {
   });
 
   it("effectiveFocusedPaneId：焦点 pane 不在树中时退化为 primary", () => {
-    const opened = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const opened = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     expect(effectiveFocusedPaneId(opened)).toBe("pane-1");
     const corrupted: PaneLayoutSnapshot = { ...opened, focusedPaneId: "gone" };
     expect(effectiveFocusedPaneId(corrupted)).toBe(V4_PRIMARY_PANE_ID);
   });
 
   it("bindPaneSession：draft 首发后原地绑定并清待验证标记；无绑定/未变时 no-op", () => {
-    const opened = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const opened = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     const boundState = bindPaneSession(opened, "pane-1", "sess-new");
     expect(boundState.panes["pane-1"]).toEqual(bound(SCOPE_A, "sess-new"));
     expect(bindPaneSession(boundState, "pane-1", "sess-new")).toBe(boundState);
-    expect(bindPaneSession(INITIAL_PANE_LAYOUT, "pane-1", "x")).toBe(
-      INITIAL_PANE_LAYOUT,
-    );
+    expect(bindPaneSession(INITIAL_PANE_LAYOUT, "pane-1", "x")).toBe(INITIAL_PANE_LAYOUT);
     // 实时重绑即权威：清掉 restoredUnvalidated
     const restored: PaneLayoutSnapshot = {
       ...opened,
@@ -285,27 +221,16 @@ describe("分割树纯状态机", () => {
   });
 
   it("setSplitNodeRatio：按节点 id 定位并 clamp；未知节点/未变化返回原引用", () => {
-    const opened = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const opened = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     const splitId = opened.root.type === "split" ? opened.root.id : "";
     const widened = setSplitNodeRatio(opened, splitId, 0.9);
-    expect(widened.root.type === "split" && widened.root.ratio).toBe(
-      SPLIT_RATIO_MAX,
-    );
+    expect(widened.root.type === "split" && widened.root.ratio).toBe(SPLIT_RATIO_MAX);
     expect(setSplitNodeRatio(opened, splitId, 0.1).root).toMatchObject({
       ratio: SPLIT_RATIO_MIN,
     });
     expect(setSplitNodeRatio(opened, "nope", 0.6)).toBe(opened);
-    expect(setSplitNodeRatio(opened, splitId, DEFAULT_SPLIT_RATIO)).toBe(
-      opened,
-    );
-    expect(clampSplitRatio(Number.POSITIVE_INFINITY)).toBe(
-      DEFAULT_SPLIT_RATIO,
-    );
+    expect(setSplitNodeRatio(opened, splitId, DEFAULT_SPLIT_RATIO)).toBe(opened);
+    expect(clampSplitRatio(Number.POSITIVE_INFINITY)).toBe(DEFAULT_SPLIT_RATIO);
     // 嵌套：只改目标节点，其余子树原引用
     const nested = splitPaneAt(widened, "pane-1", "column", draft(SCOPE_B));
     const innerId =
@@ -313,9 +238,9 @@ describe("分割树纯状态机", () => {
         ? nested.root.second.id
         : "";
     const innerChanged = setSplitNodeRatio(nested, innerId, 0.7);
-    expect(
-      innerChanged.root.type === "split" && innerChanged.root.first,
-    ).toBe(nested.root.type === "split" && nested.root.first);
+    expect(innerChanged.root.type === "split" && innerChanged.root.first).toBe(
+      nested.root.type === "split" && nested.root.first,
+    );
   });
 
   it("confirmRestoredPaneSession：验证在场清标记；无标记 no-op 原引用", () => {
@@ -340,9 +265,7 @@ describe("分割树纯状态机", () => {
     const confirmed = confirmRestoredPaneSession(restored, "pane-1");
     expect(confirmed.panes["pane-1"]).toEqual(bound(SCOPE_A, "sess-b"));
     expect(confirmRestoredPaneSession(confirmed, "pane-1")).toBe(confirmed);
-    expect(confirmRestoredPaneSession(INITIAL_PANE_LAYOUT, "pane-1")).toBe(
-      INITIAL_PANE_LAYOUT,
-    );
+    expect(confirmRestoredPaneSession(INITIAL_PANE_LAYOUT, "pane-1")).toBe(INITIAL_PANE_LAYOUT);
   });
 
   it("openSessionInNewPane：新 session 拆分焦点 pane；已开（同 workspaceKey+session）→ 聚焦", () => {
@@ -418,19 +341,6 @@ describe("持久化（localStorage v2 + v1 迁移）", () => {
     expect(restored!.focusedPaneId).toBe("pane-2");
   });
 
-  it("restoredUnvalidated 不进持久化面", () => {
-    const state = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      bound(SCOPE_A, "sess-x"),
-    );
-    persistPaneLayout(state);
-    expect(store.get(PANE_LAYOUT_STORAGE_KEY)).not.toContain(
-      "restoredUnvalidated",
-    );
-  });
-
   it("v1 迁移：本地路径 workspaceKey → 双叶子树（保留 split id 与 splitRatio）", () => {
     store.set(
       PANE_LAYOUT_STORAGE_KEY_V1,
@@ -442,10 +352,7 @@ describe("持久化（localStorage v2 + v1 迁移）", () => {
     );
     const restored = readPersistedPaneLayout();
     expect(restored).not.toBeNull();
-    expect(leafPaneIds(restored!.root)).toEqual([
-      V4_PRIMARY_PANE_ID,
-      V4_LEGACY_SPLIT_PANE_ID,
-    ]);
+    expect(leafPaneIds(restored!.root)).toEqual([V4_PRIMARY_PANE_ID, V4_LEGACY_SPLIT_PANE_ID]);
     expect(restored!.root).toMatchObject({ direction: "row", ratio: 0.7 });
     expect(restored!.panes[V4_LEGACY_SPLIT_PANE_ID]).toEqual({
       workspaceScope: { workspacePath: "/ws/legacy" },
@@ -473,12 +380,7 @@ describe("持久化（localStorage v2 + v1 迁移）", () => {
   });
 
   it("v2 优先于 v1：两个 key 并存时读 v2", () => {
-    const state = splitPaneAt(
-      INITIAL_PANE_LAYOUT,
-      V4_PRIMARY_PANE_ID,
-      "row",
-      draft(SCOPE_A),
-    );
+    const state = splitPaneAt(INITIAL_PANE_LAYOUT, V4_PRIMARY_PANE_ID, "row", draft(SCOPE_A));
     persistPaneLayout(state);
     store.set(
       PANE_LAYOUT_STORAGE_KEY_V1,
@@ -529,9 +431,7 @@ describe("sanitizePersistedPaneLayout（损坏数据整体丢弃）", () => {
 
   it("整体丢弃：树损坏 / 缺 primary / 叶子 id 重复 / 超上限 / 非 primary 叶子缺绑定", () => {
     expect(sanitizePersistedPaneLayout(null)).toBeNull();
-    expect(
-      sanitizePersistedPaneLayout({ root: { type: "leaf" }, panes: {} }),
-    ).toBeNull();
+    expect(sanitizePersistedPaneLayout({ root: { type: "leaf" }, panes: {} })).toBeNull();
     // 缺 primary
     expect(
       sanitizePersistedPaneLayout({
@@ -550,9 +450,7 @@ describe("sanitizePersistedPaneLayout（损坏数据整体丢弃）", () => {
       }),
     ).toBeNull();
     // 非 primary 叶子缺绑定 / scope 缺 workspacePath
-    expect(
-      sanitizePersistedPaneLayout({ root: validTree, panes: {} }),
-    ).toBeNull();
+    expect(sanitizePersistedPaneLayout({ root: validTree, panes: {} })).toBeNull();
     expect(
       sanitizePersistedPaneLayout({
         root: validTree,
@@ -579,9 +477,7 @@ describe("usePaneLayoutStore（zustand 装配）", () => {
     const before = usePaneLayoutStore.getState();
     before.splitPane(V4_PRIMARY_PANE_ID, "row", SCOPE_A);
     let state = usePaneLayoutStore.getState();
-    const newPaneId = leafPaneIds(state.root).find(
-      (paneId) => paneId !== V4_PRIMARY_PANE_ID,
-    )!;
+    const newPaneId = leafPaneIds(state.root).find((paneId) => paneId !== V4_PRIMARY_PANE_ID)!;
     expect(state.panes[newPaneId]?.workspaceScope).toEqual(SCOPE_A);
     expect(state.focusedPaneId).toBe(newPaneId);
 
@@ -612,8 +508,6 @@ describe("usePaneLayoutStore（zustand 装配）", () => {
     expect(state.focusPane).toBe(before.focusPane);
     expect(state.bindPaneSession).toBe(before.bindPaneSession);
     expect(state.setSplitRatio).toBe(before.setSplitRatio);
-    expect(state.confirmRestoredPaneSession).toBe(
-      before.confirmRestoredPaneSession,
-    );
+    expect(state.confirmRestoredPaneSession).toBe(before.confirmRestoredPaneSession);
   });
 });

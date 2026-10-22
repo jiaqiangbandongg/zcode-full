@@ -24,6 +24,7 @@ import type { PluginSandboxAssetSource } from "./protocol.js";
 import { createPluginSandboxRegistry } from "./registry.js";
 import { preparePluginSandboxSession } from "./session.js";
 import { sandboxCaptureSchema, scaleCaptureRect } from "./capture.js";
+import { DesktopBrowserScreenshotActivityController } from "@desktop/main/browserView/browserScreenshotActivityController.js";
 
 export interface PluginSandboxHost {
   clearBrowserData(): Promise<void>;
@@ -64,6 +65,40 @@ export function installPluginSandboxHost(input: {
   const detachByKey = new Map<string, () => void>();
   const watchedOwners = new Set<number>();
   const guests = new Map<string, WebContents>();
+  const activity = new DesktopBrowserScreenshotActivityController({
+    fromId: (id) => BrowserWindow.fromId(id),
+    fromWebContentsId: (id) => electronWebContents.fromId(id) ?? null,
+    log: (message) => input.logger?.warn(message),
+  });
+  const executions = new Map<string, { lease?: ReturnType<typeof activity.acquire> }>();
+  const releaseExecution = (sandboxId: string) => {
+    executions.get(sandboxId)?.lease?.release();
+    executions.delete(sandboxId);
+  };
+  const syncExecution = (sandboxId: string) => {
+    const state = executions.get(sandboxId);
+    const guest = guests.get(sandboxId);
+    if (!state || state.lease || !guest || guest.isDestroyed() || guest.isLoadingMainFrame())
+      return;
+    const owner = guest.hostWebContents;
+    const win = owner && BrowserWindow.fromWebContents(owner);
+    if (!win) return;
+    state.lease = activity.acquire({
+      windowId: win.id,
+      webContentsId: guest.id,
+      requestId: sandboxId,
+      reason: "plugin-execution",
+    });
+    // 隐藏页面仅需低频推进；不能全局关闭 backgroundThrottling，否则同窗空闲 guest 也会跑帧。
+    state.lease?.markPrepared?.();
+    state.lease?.invalidated?.addEventListener(
+      "abort",
+      () => {
+        if (executions.get(sandboxId) === state) releaseExecution(sandboxId);
+      },
+      { once: true },
+    );
+  };
   const stopping = new WeakMap<WebContents, Promise<void>>();
   const partitions = new Set<string>();
   let clearing = false;
@@ -101,6 +136,7 @@ export function installPluginSandboxHost(input: {
   // partition 持久且按可信 App 身份隔离：dispose 关闭 guest 和端口，
   // 不撤 protocol handler、不清存储；存储清理走已有清除所有数据入口。
   const onDispose = (record: PluginSandboxRecord) => {
+    releaseExecution(record.sandboxId);
     detachByKey.get(record.sandboxId)?.();
     detachByKey.delete(record.sandboxId);
     const guest = guests.get(record.sandboxId);
@@ -225,8 +261,14 @@ export function installPluginSandboxHost(input: {
         return;
       }
       guests.set(sandboxId, guest);
+      // dom-ready / did-finish-load 回调时仍可能处于 loading，早到的活动请求会被上面的守卫跳过。
+      // 以真正停止加载的事件承接待处理请求，不能依赖插件或 session 再发一次活动请求。
+      guest.on("did-stop-loading", () => syncExecution(sandboxId));
       guest.once("destroyed", () => {
-        if (guests.get(sandboxId) === guest) guests.delete(sandboxId);
+        if (guests.get(sandboxId) === guest) {
+          releaseExecution(sandboxId);
+          guests.delete(sandboxId);
+        }
       });
       // H14：宿主 webContents 销毁（窗口关闭 / 崩溃）时释放它名下全部登记；每个 owner 只挂一次。
       if (!watchedOwners.has(hostWebContents.id)) {
@@ -253,6 +295,31 @@ export function installPluginSandboxHost(input: {
   };
 
   ipcMain.handle(PlatformChannels.PluginSandboxOwnerWebContentsId, (event) => event.sender.id);
+  ipcMain.handle(
+    PlatformChannels.PluginSandboxExecutionActive,
+    (event, sandboxId: unknown, initId: unknown, active: unknown) => {
+      if (
+        typeof sandboxId !== "string" ||
+        typeof initId !== "number" ||
+        typeof active !== "boolean"
+      )
+        throw new Error("Invalid sandbox execution request");
+      const record = registry.get(sandboxId);
+      if (
+        !record ||
+        record.ownerWebContentsId !== event.sender.id ||
+        record.initId !== initId ||
+        record.contentKind === "gen-ui"
+      )
+        throw new Error("Sandbox execution is no longer available");
+      if (!active) {
+        releaseExecution(sandboxId);
+        return;
+      }
+      if (!executions.has(sandboxId)) executions.set(sandboxId, {});
+      syncExecution(sandboxId);
+    },
+  );
   ipcMain.handle(PlatformChannels.PluginSandboxCopyImage, async (event, value: unknown) => {
     const request = sandboxCaptureSchema.parse(value);
     const record = registry.get(request.sandboxId);

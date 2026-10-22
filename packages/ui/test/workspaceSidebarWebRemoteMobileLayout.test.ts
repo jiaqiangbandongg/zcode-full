@@ -1,298 +1,294 @@
 // @vitest-environment jsdom
-import { createElement, type ReactNode } from "react";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { IPlatformService } from "@zcode/shared";
+import { createElement } from "react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  ProjectSidebarProps,
+  ProjectTree,
+  RemoteProjectDirectory,
+} from "@/project-sidebar/contract.js";
+import { TooltipProvider } from "@/components/ui/tooltip.js";
+import { WorkspaceSidebar } from "@/WorkspaceSidebar.js";
+import { ProjectDirectoryProvider } from "@/project-sidebar/ProjectDirectoryProvider.js";
+const Sidebar = (props: ProjectSidebarProps) =>
+  createElement(
+    TooltipProvider,
+    null,
+    createElement(
+      ProjectDirectoryProvider,
+      { isDesktop: props.isDesktop },
+      createElement(WorkspaceSidebar, props),
+    ),
+  );
 
-const { setPendingSettingsSectionMock } = vi.hoisted(() => ({
-  setPendingSettingsSectionMock: vi.fn(),
+const fixture = vi.hoisted(() => {
+  const state = { tabs: [], activeWorkspaceIdentity: null, openSettingsTab: vi.fn() };
+  return {
+    state,
+    local: { projects: [], tasks: [] } as ProjectTree,
+    remote: { projects: [], tasks: [] } as ProjectTree,
+    directory: { hosts: [], entries: [] } as RemoteProjectDirectory,
+    sourceManagement: vi.fn(async () => ({ servers: [], profiles: [], states: [] })),
+    connectHost: vi.fn(),
+    removeHost: vi.fn(),
+    removeEntry: vi.fn(),
+    openUpgrade: vi.fn(),
+  };
+});
+vi.mock("@/hooks/useWorkspaceServices.js", () => {
+  const base = {
+    sourceServerManagementService: {
+      getSnapshot: fixture.sourceManagement,
+      onDidChangeState: () => ({ dispose() {} }),
+    },
+    projectService: {
+      // 真实离线 Host 没有在线 source，readTree 会失败；夹具按连接状态模拟，避免离线行仍被判为可编辑。
+      readTree: async (params?: { hostId?: string }) => {
+        if (!params?.hostId) return fixture.local;
+        if (
+          fixture.directory.hosts.some(
+            (host) => host.id === params.hostId && host.connectionStatus !== "online",
+          )
+        )
+          throw new Error("project.host-offline");
+        return fixture.remote;
+      },
+    },
+    remoteProjectService: {
+      readDirectory: async () => fixture.directory,
+      refreshEntry: async () => true,
+      connectHost: fixture.connectHost,
+      removeHost: fixture.removeHost,
+      removeEntry: fixture.removeEntry,
+    },
+    zcodeTaskService: { onDynamicWorkspaceEvent: () => () => ({ dispose: vi.fn() }) },
+    broadcastService: { onMessage: () => ({ dispose: vi.fn() }) },
+  };
+  return { useBaseWorkspaceServices: () => base };
+});
+vi.mock("@/store/TabStoreProvider.js", () => ({
+  useTabStore: (selector: (state: typeof fixture.state) => unknown) => selector(fixture.state),
+  useOptionalTabStore: (selector: (state: typeof fixture.state) => unknown) =>
+    selector(fixture.state),
+  // 项目目录的未读监听使用原 store 的订阅接口，布局夹具也需提供可释放的订阅。
+  useTabStoreApi: () => ({ getState: () => fixture.state, subscribe: () => () => {} }),
 }));
-
-vi.stubGlobal(
-  "ResizeObserver",
-  class ResizeObserverMock {
-    disconnect() {}
-    observe() {}
-    unobserve() {}
-  },
-);
-
-const workspaceTab = {
-  id: "tab-1",
-  kind: "workspace" as const,
-  label: "Project",
-  workspacePath: "/tmp/project",
-};
-
-const tabStoreState = {
-  activeTabId: workspaceTab.id,
-  tabs: [workspaceTab],
-  expandedWorkspacePaths: new Set([workspaceTab.workspacePath]),
-  activateTab: vi.fn(),
-  closeTab: vi.fn(),
-  collapseAllWorkspaceTabs: vi.fn(),
-  expandAllWorkspaceTabs: vi.fn(),
-  openSettingsTab: vi.fn(),
-  reorderWorkspaceTabs: vi.fn(),
-  toggleWorkspaceExpanded: vi.fn(),
-};
-
-vi.mock("@dnd-kit/core", () => ({
-  DndContext: ({ children }: { children: ReactNode }) => createElement("div", null, children),
-  DragOverlay: ({ children }: { children: ReactNode }) => createElement("div", null, children),
-  KeyboardSensor: function KeyboardSensor() {},
-  PointerSensor: function PointerSensor() {},
-  closestCenter: vi.fn(),
-  useSensor: vi.fn(() => ({})),
-  useSensors: vi.fn(() => []),
+vi.mock("@/store/zcodeSessionStore.js", () => ({
+  useZCodeSessionStore: Object.assign(
+    (selector: (state: unknown) => unknown) => selector({ workspaces: {} }),
+    {
+      subscribe: () => () => {},
+      // 新建在点击时读取组织上下文，不再订阅本地活动任务。
+      getState: () => ({ getWorkspaceState: () => ({ activeTaskId: null }) }),
+    },
+  ),
 }));
-
-vi.mock("@dnd-kit/sortable", () => ({
-  SortableContext: ({ children }: { children: ReactNode }) => createElement("div", null, children),
-  sortableKeyboardCoordinates: vi.fn(),
-  useSortable: vi.fn(() => ({
-    attributes: {},
-    isDragging: false,
-    listeners: {},
-    setActivatorNodeRef: vi.fn(),
-    setNodeRef: vi.fn(),
-    transform: null,
-    transition: undefined,
-  })),
-  verticalListSortingStrategy: {},
+vi.mock("@/store/StoreProvider.js", () => ({
+  useZCodeStoreWithDefault: () => true,
+  useZCodeStore: (selector: (state: unknown) => unknown) => selector({ setTheme: vi.fn() }),
 }));
-
-vi.mock("@/ControlHintTooltip.js", () => ({
-  ControlHintTooltip: ({ children }: { children: ReactNode }) => children,
+vi.mock("@/v4/useWorkspaceSessionsIndexItems.js", () => ({
+  useWorkspaceSessionsIndexItems: () => ({ items: [] }),
 }));
-
-vi.mock("@/NewTaskButtonGroup.js", () => ({
-  NewTaskButtonGroup: () => createElement("div", { "data-testid": "new-task-button-group" }),
-}));
-
-vi.mock("@/TaskSearchDialog.js", () => ({
-  TaskSearchDialog: () => null,
-}));
-
-vi.mock("@/BotsDialog.js", () => ({
-  BotsDialog: () => null,
-}));
-
-vi.mock("@/WebRemoteControlTaskIndex.js", () => ({
-  WebRemoteControlTaskIndex: ({
-    renderBeforePinnedTasks,
-  }: {
-    renderBeforePinnedTasks?: () => ReactNode;
-  }) => createElement("div", { "data-testid": "remote-task-index" }, renderBeforePinnedTasks?.()),
-}));
-
-vi.mock("@/WorkspaceArchivedTasksFlatSection.js", () => ({
-  WorkspaceArchivedTasksFlatSection: () =>
-    createElement("div", { "data-testid": "archived-tasks" }),
-}));
-
-vi.mock("@/WorkspacePinnedTasksSection.js", () => ({
-  WorkspacePinnedTasksSection: () => createElement("div", { "data-testid": "pinned-tasks" }),
-}));
-
-vi.mock("@/WorkspaceTimelineTasksSection.js", () => ({
-  WorkspaceTimelineTasksSection: () => createElement("div", { "data-testid": "timeline-tasks" }),
-}));
-
-vi.mock("@/WorkspaceGroupedTasksSection.js", () => ({
-  WorkspaceGroupedTasksSection: () => createElement("div", { "data-testid": "grouped-tasks" }),
-}));
-
-vi.mock("@/WorkspaceSidebarFooter.js", () => ({
-  WorkspaceSidebarFooter: () => createElement("footer", { "data-testid": "sidebar-footer" }),
-}));
-
-vi.mock("@/SortableWorkspaceSidebar.js", () => ({
-  SortableWorkspaceSidebarItem: ({ tab }: { tab: typeof workspaceTab }) =>
-    createElement("li", { "data-testid": "workspace-sidebar-item" }, tab.label),
-  restrictVerticalDragWithinContainer: vi.fn(),
-}));
-
-vi.mock("@/hooks/useWorkspaceTaskLists.js", () => ({
-  useWorkspaceTaskLists: () => ({
-    groups: [],
-    loadingByWorkspaceKey: {},
-  }),
-}));
-
 vi.mock("@/i18n/IntlProvider.js", () => ({
   useZCodeIntl: () => ({
-    intl: {
-      formatMessage: ({ id }: { id: string }) => id,
-    },
+    intl: { formatMessage: ({ id }: { id: string }) => id },
     localePreference: "en-US",
     setLocalePreference: vi.fn(),
   }),
 }));
-
-vi.mock("@/store/zcodeSessionStore.js", () => ({
-  selectWorkspaceZCodeState: () => ({ activeTaskId: "task-1" }),
-  useZCodeSessionStore: (selector: (state: { selectDraftProvider: () => void }) => unknown) =>
-    selector({ selectDraftProvider: vi.fn() }),
+vi.mock("@/hooks/useConfirmDialog.js", () => ({ useConfirmDialog: () => async () => true }));
+vi.mock("@/hooks/usePlatform.js", () => ({
+  useSelectDirectory: () => vi.fn(),
+  useOptionalPlatform: () => null,
 }));
-
-vi.mock("@/store/StoreProvider.js", () => ({
-  useZCodeStore: (selector: (state: { setTheme: () => void }) => unknown) =>
-    selector({ setTheme: vi.fn() }),
-}));
-
-vi.mock("@/store/TabStoreProvider.js", () => ({
-  useTabStore: (selector: (state: typeof tabStoreState) => unknown) => selector(tabStoreState),
-}));
-
 vi.mock("@/settings/CodingPlanUpgradeDialogProvider.js", () => ({
-  useCodingPlanUpgradeDialog: () => ({
-    openCodingPlanUpgrade: vi.fn(),
-  }),
+  useCodingPlanUpgradeDialog: () => ({ openCodingPlanUpgrade: fixture.openUpgrade }),
+}));
+vi.mock("@/components/manual-claim-plan/ManualClaimPlanBanner.js", () => ({
+  ManualClaimPlanBanner: () => null,
+}));
+vi.mock("@/WorkspaceSidebarFooter.js", () => ({
+  WorkspaceSidebarFooter: () => createElement("footer", {}, "Footer"),
+}));
+vi.mock("@/NewTaskButtonGroup.js", () => ({
+  NewTaskButtonGroup: ({ onCreateTask }: { onCreateTask(): void }) =>
+    createElement("button", { onClick: onCreateTask }, "New task"),
+}));
+vi.mock("@/project-sidebar/ProjectTaskRows.js", () => ({ ProjectTaskRows: () => null }));
+vi.mock("@/project-sidebar/useProjectTaskNavigation.js", () => ({
+  useProjectTaskNavigation: (props: ProjectSidebarProps) => props.onSelectTask,
 }));
 
-vi.mock("@/lib/settingsNavigation.js", () => ({
-  setPendingSettingsSection: setPendingSettingsSectionMock,
-}));
-
-function createSidebarProps(overrides: Record<string, unknown> = {}) {
+function props(overrides: Partial<ProjectSidebarProps> = {}): ProjectSidebarProps {
   return {
-    isDesktop: false,
-    isWindowsDesktop: false,
-    onCancelRemoteProject: vi.fn(async () => {}),
-    onConnectRemote: vi.fn(async () => ""),
-    onCreateTask: vi.fn(),
-    onLogin: vi.fn(),
-    onLogout: vi.fn(),
-    onReconnectRemoteWorkspace: vi.fn(async () => {}),
-    onSelectRemoteProject: vi.fn(async () => {}),
+    workspacePath: "/local",
+    theme: "light",
     onSelectTask: vi.fn(),
+    onCreateTask: vi.fn(),
+    onCreateConversationTask: vi.fn(),
+    onStartDraftInWorkspace: vi.fn(),
+    onOpenFolderFromWorkspaceMenu: vi.fn(),
+    onConnectRemote: vi.fn(async () => "logical"),
+    onSelectRemoteProject: vi.fn(async () => {}),
+    onCancelRemoteProject: vi.fn(async () => {}),
+    onReconnectRemoteWorkspace: vi.fn(async () => {}),
     reconnectingRemoteWorkspaceKeys: [],
     remoteWorkspaceErrorByWorkspaceKey: {},
-    selectedProvider: "codex",
-    theme: "light",
-    user: null,
-    webRemoteControlWorkspaceSwitcher: {
-      listWorkspaces: vi.fn(async () => ({ tasks: [], workspaces: [] })),
-      switchWorkspace: vi.fn(async () => {}),
-    },
-    workspacePath: workspaceTab.workspacePath,
+    onOpenCommandCenter: vi.fn(),
     ...overrides,
   };
 }
-
-async function createSidebarElement(overrides: Record<string, unknown> = {}) {
-  const { WorkspaceSidebar } = await import("@/WorkspaceSidebar.js");
-  // 快捷键特性后侧栏经 useShortcutCommandLabel → useSettings 读 ServiceContext 与 PlatformContext，
-  // 裸渲染需提供最小 ServiceProvider/PlatformProvider（onSettingsChanged 可选，空 platform 即可）
-  const { ServiceProvider } = await import("@/hooks/useServices.js");
-  const { PlatformProvider } = await import("@/hooks/usePlatform.js");
-  const { createSettingsTestServices } = await import("./lib/settingsTestServices.js");
-
-  return createElement(
-    ServiceProvider,
-    { services: createSettingsTestServices() },
-    createElement(
-      PlatformProvider,
-      { platform: {} as unknown as IPlatformService },
-      createElement(
-        WorkspaceSidebar,
-        createSidebarProps(overrides) as Parameters<typeof WorkspaceSidebar>[0],
-      ),
-    ),
-  );
+function remoteHost(online: boolean) {
+  fixture.remote = {
+    projects: [
+      {
+        id: "p",
+        hostId: "remote:server:s",
+        name: "Remote project",
+        roots: [],
+        position: 1,
+        pinned: false,
+        deleted: false,
+        nameOverridden: true,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    tasks: [],
+  };
+  fixture.directory = {
+    hosts: [
+      {
+        id: "remote:server:s",
+        membershipId: "m",
+        kind: "docker",
+        target: { kind: "docker", container: "dev" },
+        position: 1,
+        connectionStatus: online ? "online" : "offline",
+      },
+    ],
+    entries: [
+      {
+        id: "entry",
+        hostId: "remote:server:s",
+        projectId: "p",
+        name: "Remote project",
+        roots: [],
+        legacyWorkspace: null,
+        lastSyncedAt: 1,
+      },
+    ],
+  };
 }
-
-async function renderSidebar(overrides: Record<string, unknown> = {}) {
-  return renderToStaticMarkup(await createSidebarElement(overrides));
-}
-
-describe("WorkspaceSidebar Web remote mobile layout", () => {
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
+beforeEach(() => {
+  fixture.local = { projects: [], tasks: [] };
+  fixture.remote = { projects: [], tasks: [] };
+  fixture.directory = { hosts: [], entries: [] };
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+describe("virtual-project sidebar on desktop and mobile", () => {
+  it("reads the Controller project contract without calling the desktop-only Source management channel", async () => {
+    render(createElement(Sidebar, props({ isWebRemoteControl: true })));
+    await waitFor(() => expect(screen.queryByText("common.loading")).toBeNull());
+    expect(fixture.sourceManagement).not.toHaveBeenCalled();
   });
-
-  // Bugfix: 该用例需要 SSR WorkspaceSidebar；pre-push 全量并发时首次导入和渲染偶尔超过默认 5s。
-  // 子组件已经尽量 mock，剩余成本来自被测布局自身，局部放宽避免误报。
-  it("places remote tasks and workspace navigation in one mobile scroll area", async () => {
-    const html = await renderSidebar();
-
-    expect(html).toContain('data-web-remote-navigation-scroll="true"');
-    expect(html).toContain("max-md:overflow-y-auto");
-    expect(html).toContain('data-testid="remote-task-index"');
-    // Bugfix: 远控模式已把全局任务索引合并进主任务区，不再渲染重复的 workspace 列表项。
-    // 这里显式断言缺失，防止回归到“同屏两段列表”。
-    expect(html).not.toContain('data-testid="workspace-sidebar-item"');
-    expect(html).toContain("max-md:hidden");
-    expect(html).not.toContain("bots.title");
-    expect(html).not.toContain("workspace.openWorkspace");
-
-    const newTaskIndex = html.indexOf('data-testid="new-task-button-group"');
-    const filterIndex = html.indexOf("workspaceSidebar.taskViewOptions");
-    const topSearchIndex = html.indexOf("commandCenter.open");
-    const automationsIndex = html.indexOf("workspace.openScheduledSettings");
-    const pluginsIndex = html.indexOf("workspace.openPluginsSettings");
-    expect(newTaskIndex).toBeGreaterThan(-1);
-    expect(filterIndex).toBeGreaterThan(-1);
-    expect(topSearchIndex).toBeGreaterThan(newTaskIndex);
-    // D37：手机 /remote 不承载 Automations；合并 main 后不能恢复桌面入口。
-    expect(automationsIndex).toBe(-1);
-    expect(pluginsIndex).toBeGreaterThan(topSearchIndex);
-    expect(pluginsIndex).toBeLessThan(filterIndex);
-    expect(topSearchIndex).toBeLessThan(filterIndex);
-    expect(html.lastIndexOf("commandCenter.open")).toBe(topSearchIndex);
-  }, 15_000);
-
-  it("opens the workspace plugin marketplace from the home shortcut", async () => {
+  it("keeps plugin navigation immediately after automations and calls the selected destination", () => {
     const onOpenPluginStore = vi.fn();
-
-    render(await createSidebarElement({ onOpenPluginStore }));
-    fireEvent.click(screen.getByRole("button", { name: "workspace.openPluginsSettings" }));
-
-    expect(onOpenPluginStore).toHaveBeenCalledTimes(1);
-    expect(setPendingSettingsSectionMock).not.toHaveBeenCalled();
-    expect(tabStoreState.openSettingsTab).not.toHaveBeenCalled();
-  });
-
-  it("归档视图打开后将关闭按钮的 tooltip label 切换为 Close", async () => {
-
-    render(await createSidebarElement());
-    const archiveButton = screen.getByRole("button", {
-      name: "workspaceSidebar.toggleArchivedTasks",
-    });
-
-    fireEvent.click(archiveButton);
-
-    expect(screen.getByRole("button", { name: "common.close" })).toBe(archiveButton);
-  });
-
-  it("places plugins immediately after automations on the desktop home sidebar", async () => {
-
-    render(await createSidebarElement({ webRemoteControlWorkspaceSwitcher: undefined }));
-    const automationsButton = screen.getByRole("button", {
-      name: "workspace.openScheduledSettings",
-    });
-    const pluginsButton = screen.getByRole("button", {
-      name: "workspace.openPluginsSettings",
-    });
-
-    expect(pluginsButton.querySelector("svg")?.classList.contains("lucide-blocks")).toBe(true);
-    expect(
-      automationsButton.compareDocumentPosition(pluginsButton) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it("does not keep the removed task toolbar search state", () => {
-    const sidebarSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/WorkspaceSidebar.tsx"),
-      "utf8",
+    render(
+      createElement(
+        Sidebar,
+        props({ isDesktop: true, onOpenAutomations: vi.fn(), onOpenPluginStore }),
+      ),
     );
+    const scheduled = screen.getByText("workspace.openScheduledSettings");
+    const plugins = screen.getByText("workspace.openPluginsSettings");
+    expect(
+      scheduled.compareDocumentPosition(plugins) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(plugins);
+    expect(onOpenPluginStore).toHaveBeenCalledOnce();
+  });
+  it("inherits current organization at the top entry and keeps section new-task unclassified", () => {
+    const onCreateTask = vi.fn();
+    render(createElement(Sidebar, props({ onCreateTask })));
+    fireEvent.click(screen.getByText("New task"));
+    expect(onCreateTask).toHaveBeenNthCalledWith(1);
+    fireEvent.click(screen.getByTestId("virtual-project-new-task"));
+    expect(onCreateTask).toHaveBeenNthCalledWith(2, { projectId: null, taskGroupId: null });
+  });
+  it("shows the Relay V2 device header only when the remote switcher provides device navigation", async () => {
+    const chooseOtherDevice = vi.fn();
+    const switcher = {
+      listWorkspaces: vi.fn(),
+      switchWorkspace: vi.fn(),
+      deviceNavigation: { deviceName: "Mac", chooseOtherDevice },
+    } as unknown as NonNullable<ProjectSidebarProps["webRemoteControlWorkspaceSwitcher"]>;
+    const { unmount } = render(
+      createElement(
+        Sidebar,
+        props({ isWebRemoteControl: true, webRemoteControlWorkspaceSwitcher: switcher }),
+      ),
+    );
+    const device = screen.getByRole("button", { name: "webRemoteControl.switchDevice" });
+    const navigation = screen.getByTestId("sidebar-primary-navigation");
+    // 设备行是导航首行：位于“新建任务”之上。
+    expect(navigation.firstElementChild).toBe(device);
+    expect(
+      device.compareDocumentPosition(screen.getByText("New task")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(device);
+    expect(chooseOtherDevice).toHaveBeenCalledOnce();
+    unmount();
 
-    expect(sidebarSource).not.toContain("webRemoteTaskSearchOpen");
-    expect(sidebarSource).not.toContain("webRemoteTaskSearchQuery");
+    render(createElement(Sidebar, props({ isWebRemoteControl: true })));
+    await waitFor(() => expect(screen.queryByText("common.loading")).toBeNull());
+    expect(screen.queryByRole("button", { name: "webRemoteControl.switchDevice" })).toBeNull();
+  });
+  it("routes a retained remote project's new task to that Host", async () => {
+    remoteHost(true);
+    const onCreateTask = vi.fn();
+    render(createElement(Sidebar, props({ onCreateTask })));
+    const project = await screen.findByText("Remote project");
+    const section = project.closest("[data-project-id]") as HTMLElement;
+    fireEvent.click(within(section).getByTestId("virtual-project-create-task"));
+    expect(onCreateTask).toHaveBeenCalledWith({
+      hostId: "remote:server:s",
+      projectId: "p",
+      taskGroupId: null,
+    });
+    expect(fixture.sourceManagement).not.toHaveBeenCalled();
+  });
+  it("connects a retained Host through the narrow connection port", async () => {
+    remoteHost(false);
+    render(createElement(Sidebar, props()));
+    await screen.findByText("Remote project");
+    fireEvent.keyDown(screen.getByTestId("virtual-project-menu"), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "project.connect" }));
+    await waitFor(() => expect(fixture.connectHost).toHaveBeenCalledWith("remote:server:s"));
+    expect(fixture.sourceManagement).not.toHaveBeenCalled();
+  });
+  it("keeps an online remote project menu aligned with local projects", async () => {
+    remoteHost(true);
+    render(createElement(Sidebar, props()));
+    await screen.findByText("Remote project");
+    fireEvent.keyDown(screen.getByTestId("virtual-project-menu"), { key: "ArrowDown" });
+    await screen.findByRole("menuitem", { name: "project.delete" });
+    expect(screen.queryByRole("menuitem", { name: "project.removeEntry" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "project.addRemoteProject" })).toBeNull();
+  });
+  it("removes only the offline project entry without removing its Host", async () => {
+    remoteHost(false);
+    render(createElement(Sidebar, props()));
+    await screen.findByText("Remote project");
+    fireEvent.keyDown(screen.getByTestId("virtual-project-menu"), { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "project.removeEntry" }));
+    await waitFor(() => expect(fixture.removeEntry).toHaveBeenCalledWith("entry"));
+    expect(fixture.removeHost).not.toHaveBeenCalled();
+    expect(fixture.sourceManagement).not.toHaveBeenCalled();
   });
 });

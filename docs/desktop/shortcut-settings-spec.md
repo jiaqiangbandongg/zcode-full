@@ -178,7 +178,7 @@ useSettings.update({ shortcutBindings: {...} })
 
 - 沿用已注册的 shortcuts 分区（settingsPageConfig / settingsNavigation / SettingsPage 挂载已完成），重写 `ShortcutSettingsSection`：
   - **单行多绑定**：一个命令一行——左列命令名跨全部绑定垂直居中，键位列纵向列出每条绑定，操作列为「清空全部」垃圾桶。命令无绑定时显示「未分配」键帽（点击即录第一条）。
-  - **逐键键帽（shadcn Kbd 同款）**：绑定串经 `formatShortcutBindingLabelParts` 拆成逐键 token（macOS `["⇧","⌘","P"]`、Win/Linux `["Ctrl","Shift","P"]`，与展示 label 同一 token 序列），每个 token 独立渲染 `Kbd` 组件（`components/ui/kbd.tsx`：固定 `h-5 min-w-5` + flex 居中 + `font-sans`，符号键与字母键尺寸一致，避免 mono 字体符号回落造成的宽度参差），一次组合用 `KbdGroup`（gap-1）横排。自定义覆盖的命令键帽用品牌色。
+  - **逐键键帽**：绑定串经 `formatShortcutBindingLabelParts` 拆成逐键 token（macOS `["⇧","⌘","P"]`、Win/Linux `["Ctrl","Shift","P"]`，与展示 label 同一 token 序列），每个 token 独立渲染 `Kbd` 组件（`components/ui/kbd.tsx`：复用 `ControlShortcutBadge` 的 `h-4`、`rounded-md`、`bg-tooltip-tag` / `text-tooltip-tag-foreground` 与平台字体，增加 `min-w-4` 并居中，符号键与字母键尺寸一致），一次组合用 `KbdGroup`（gap-1）横排。自定义覆盖的命令键帽用品牌色。
   - 行内操作（当前阶段仅替换，暂不支持新增/删除绑定）：点击某条键帽或铅笔 = **替换该条**（录制态内嵌在该条目位置，成功后按生效列表下标整组写回 `buildShortcutOverridesWithBindingAt`；未分配命令录第一条走 `buildShortcutOverridesAfterAppend`）；垃圾桶 = **清空全部绑定**（覆盖写显式 `[]` = 未分配，不回退默认）。录制态 `Escape` 取消；`Backspace` 恢复默认（删除 overrides 条目，SG-03 默认键冲突预检保留）。`buildShortcutOverridesWithoutBindingAt`（删除单条）内核已就绪并具单测，UI 入口待后续开放。
   - **同命令重复拒绝**：录制的组合与本命令其他生效条目物理等价（`isSamePhysicalBinding`）时标红拒绝（add 比全部条目，replace 跳过正在替换的目标条）——一个命令挂同一组键没有意义。跨命令冲突/保留键策略不变（§7）。
   - 冲突标红：`text-destructive` + 占用者文案（语义色按 DESIGN.md 只用于真实校验问题）；hint 文案明示「冲突后直接重按新组合」。
@@ -189,6 +189,16 @@ useSettings.update({ shortcutBindings: {...} })
   - 文案全部走 i18n（zh-CN/en-US 同步补 key），替换原型中的硬编码中文。
 - 展示 label：`useShortcutCommandLabel(commandId)` 从生效表取首个绑定格式化为平台 label（macOS `⌘K` 风格、Win/Linux `Ctrl+K` 风格，沿用 keyboardShortcuts.ts 现有格式化习惯）；命令未分配（生效绑定为空）时返回空串，tooltip 不展示键位段、**不回退默认展示**——提示必须与实际生效一致。替换以下调用点：App.tsx:143-149（7 处）、NewTaskButtonGroup.tsx:16、WindowsCaptionMenuButton.tsx:238/243/260、WorkspaceSidebar.tsx:414、WorkspaceSidebarFooter.tsx:294/302。GitActionMenu 的 ⏎ 与 TaskSearchDialog 的 G/数字为对话框内部键，不在命令表，保持现状。
 - 双键展示：openCommandCenter 取生效表第一个绑定展示。
+
+### 设置页控件、窄屏与保存反馈
+
+- 搜索框复用 `SettingsSearchInput`；普通文本使用界面字体，捕获组合键保留等宽字体。按键按钮与清除按钮复用共享 Button。
+- 工具栏沿用设置页的换行布局；搜索在窄屏独占一行，恢复默认使用紧凑 outline 按钮。
+- 宽屏保留命令、键位、作用域、操作四列；窄屏改为命令/作用域在上、键位/操作在下。长命令、组合键与冲突提示允许换行，不裁切。
+- 保存状态由 ShortcutSettingsSection 持有；绑定事实继续来自 useSettings。提交开始即禁用全部修改入口，设置更新和快照刷新完成后恢复。搜索不受影响。
+- 保存失败展示可访问的错误提示，保留当前设置并恢复编辑；用户可重新操作，不自动重试。重置确认返回时仍须通过同一保存入口。
+- 保持原搜索语义：文本与按键条件 AND，捕获后 readOnly，清除按键后恢复原文本条件。
+- SC-13：深浅主题、宽屏/窄屏下检查搜索控件、键帽的非透明底色及共享高度/圆角、长键位、操作按钮与布局；SC-14：受控保存期间不可编辑，失败提示后可重新保存（组件测试控制 Promise，E2E 验证真实保存）。
 
 ## 9. useAppKeyboard 参数化
 

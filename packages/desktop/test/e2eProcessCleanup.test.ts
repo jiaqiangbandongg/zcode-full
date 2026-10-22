@@ -134,8 +134,9 @@ describe("desktop e2e process cleanup", () => {
     const hostSource = readFileSync(new URL("../src/host/index.ts", import.meta.url), "utf8");
 
     expect(hostSource).toMatch(
-      /async function disposeHostRemoteConnection[\s\S]*?connection\.disposeAndWait\(\{ timeoutMs: 5_000 \}\)[\s\S]*?name: "remote-registry-dispose"[\s\S]*?timeoutMs: 6_000/u,
+      /async function disposeHostRemoteConnection[\s\S]*?connection\.dispose\(\)[\s\S]*?name: "remote-registry-dispose"[\s\S]*?timeoutMs: 6_000/u,
     );
+    expect(hostSource).toContain('name: "source-server-manager-dispose"');
   });
 
   it("collects only the current run root and its child process tree", () => {
@@ -234,6 +235,86 @@ describe("desktop e2e process cleanup", () => {
         runId: "run-a",
       }),
     ).toEqual([13, 12, 11]);
+  });
+
+  it("recovers the complete renamed Electron tree from only its run-owned Chromium profile", () => {
+    const chromiumProfileRootDir = "/repo/.e2e-cache/run-a/chromium-profiles";
+    const processes = [
+      { command: "node wdio.conf.ts", pid: 9, ppid: 1 },
+      { command: "chromedriver --port=55089", pid: 10, ppid: 9 },
+      { command: "ZCode E2E", pid: 11, ppid: 10 },
+      {
+        command: `Electron Helper --type=gpu-process --user-data-dir=${chromiumProfileRootDir}/0-2`,
+        pid: 12,
+        ppid: 11,
+      },
+      { command: "Electron Helper", pid: 13, ppid: 11 },
+      { command: "node zcode-agent", pid: 14, ppid: 13 },
+      {
+        command: "chrome_crashpad_handler --database=/tmp/zcode-e2e-run-a/.zcode/crash",
+        pid: 15,
+        ppid: 1,
+      },
+      { command: "chromedriver --port=55090", pid: 20, ppid: 9 },
+      { command: "ZCode E2E", pid: 21, ppid: 20 },
+      {
+        command:
+          "Electron Helper --user-data-dir=/repo/.e2e-cache/run-a-other/chromium-profiles/0-2",
+        pid: 22,
+        ppid: 21,
+      },
+      {
+        command: `Electron Helper --user-data-dir=${chromiumProfileRootDir}-other/0-2`,
+        pid: 30,
+        ppid: 1,
+      },
+    ];
+    const identity = {
+      chromiumProfileRootDir,
+      currentPid: 9,
+      homeDir: "/tmp/zcode-e2e-run-a",
+      runId: "run-a",
+    };
+
+    expect(collectE2EProcessTreePids(processes, identity)).toEqual([15, 14, 13, 12, 11, 10]);
+    expect(
+      collectE2EProcessTreePids(processes, {
+        ...identity,
+        includeChromeDriverAncestors: false,
+      }),
+    ).toEqual([15, 14, 13, 12, 11]);
+  });
+
+  it("matches quoted Windows Chromium profile paths without matching neighboring directories", () => {
+    const processes = [
+      {
+        command: 'electron.exe --user-data-dir="C:\\E2E Cache\\run-a\\chromium-profiles\\0-2"',
+        pid: 10,
+        ppid: 1,
+      },
+      {
+        command:
+          'electron.exe --user-data-dir="C:\\E2E Cache\\run-a\\chromium-profiles-other\\0-2"',
+        pid: 20,
+        ppid: 1,
+      },
+    ];
+
+    expect(
+      collectE2EProcessTreePids(processes, {
+        chromiumProfileRootDir: "c:/e2e cache/run-a/chromium-profiles/",
+        currentPid: 999,
+        homeDir: "",
+      }),
+    ).toEqual([10]);
+  });
+
+  it("uses the entire current run profile root for worker cleanup", () => {
+    const wdioSource = readFileSync(new URL("../wdio.conf.ts", import.meta.url), "utf8");
+
+    expect(wdioSource).toMatch(
+      /listE2EProcessTreePids\(\{\s*chromiumProfileRootDir: E2E_CHROMIUM_USER_DATA_ROOT_DIR,/u,
+    );
   });
 
   it("does not climb from an E2E driver into an unrelated terminal process tree", () => {

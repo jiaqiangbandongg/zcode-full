@@ -9,6 +9,7 @@ import { PluginUiSidePaneView } from "@/plugin-ui/components/PluginUiSidePane.js
 
 type Props = {
   tab: PluginUiSidePaneTab;
+  visible: boolean;
   onOpenBrowserUrl?: (url: string) => void;
   /** 页面请求回到 inline 时宿主关闭本 tab。 */
   onCloseTab?: (tabId: string) => void;
@@ -21,7 +22,7 @@ function Content(props: Props & { scopeRef: PluginUiScopeRef }) {
 export const PluginUiSidePane = memo(function PluginUiSidePane(props: Props) {
   const scopeRef = useMemo(
     () => readPluginUiScopeRef(props.tab),
-    [props.tab.surfaceId, props.tab.toolCallId],
+    [props.tab.surfaceId, props.tab.toolCallId, props.tab.instanceId],
   );
   if (!scopeRef) return null;
   return (

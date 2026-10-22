@@ -82,8 +82,9 @@ function encodePosixOctal(value: string): string {
 function buildRemoteDeployLockCommand(lockDir: string, ownerToken: string): string {
   const scriptPath = `${lockDir}.holder-${ownerToken}.sh`;
   const script = buildRemoteDeployLockScript(lockDir, ownerToken);
-  // wsl.exe 会先经默认 shell 重组 `bash -lc` 参数，脚本里的局部 `$var`
-  // 会在真正的 shell 执行前被展开为空。用纯八进制内容落盘后再执行，同时保留 stdin 给 release marker。
+  // 历史原因：WSLBackend 曾以 `wsl.exe -- bash -lc` 启动，默认 shell 会先把脚本里的局部 `$var`
+  // 展开为空，所以这里改为纯八进制内容落盘后再执行。该根因已由 buildWslArgs 改用 `--exec` 修复
+  //（R3-ISSUE-024），落盘路径继续保留：三种 backend 共用一条命令，同时保留 stdin 给 release marker。
   // 锁脚本只使用 POSIX 语法，显式用 sh 执行，兼容 Alpine/BusyBox 等没有 bash 的远端。
   return [
     "set -eu",

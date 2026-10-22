@@ -141,8 +141,6 @@ test("renders expanded thought content with plus and minus markers", () => {
   assert.equal(thoughtPlaceholderLabel(part, EN_COPY), "Thought");
   assert.ok(lines.some((line) => line.includes("- Thought")));
   assert.ok(lines.some((line) => line.includes("private thinking")));
-  assert.equal(lines.some((line) => line.includes("hidden")), false);
-  assert.equal(collectRootStyle(frame).marginBottom, 1);
 });
 
 function createSessionEventState(): {
@@ -204,14 +202,6 @@ function collectTextLines(node: unknown): string[] {
 
   visit(node);
   return lines;
-}
-
-function collectRootStyle(node: unknown): Record<string, unknown> {
-  assert.equal(typeof node, "object");
-  assert.notEqual(node, null);
-  assert.ok("props" in node);
-  const element = node as { props?: { style?: Record<string, unknown> } };
-  return element.props?.style ?? {};
 }
 
 function sessionEvent(type: SessionEventType, payload: unknown): SessionEvent {

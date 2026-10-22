@@ -15,9 +15,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import {
   EmbeddedBrowserWebviewChannels,
   type BrowserViewScreenshotSurfacePreparePayload,
+} from "@zcode/shared";
+import {
   TID_BROWSER_ADDRESS_INPUT,
   TID_BROWSER_BACK_BUTTON,
-  TID_BROWSER_ELEMENT_PICKER_BUTTON,
   TID_BROWSER_LOAD_ERROR,
   TID_BROWSER_LOAD_ERROR_CERT_HINT,
   TID_BROWSER_RESPONSIVE_BUTTON,
@@ -37,7 +38,7 @@ import {
   TID_BROWSER_RESPONSIVE_ZOOM_OPTION,
   TID_BROWSER_RESPONSIVE_ZOOM_SELECT,
   TID_BROWSER_WEBVIEW,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { TooltipProvider } from "@/components/ui/tooltip.js";
 
 // 用 vi.hoisted 定义 mock 依赖，规避 vi.mock 工厂对外部变量的引用限制。
@@ -360,30 +361,6 @@ afterEach(() => {
 });
 
 describe("UnifiedBrowserView (<webview>)", () => {
-  it("webview 节点始终带固定白色背景", () => {
-    const markup = renderToStaticMarkup(
-      createElement(BrowserViewportSurface, {
-        browserRegionRef: { current: null },
-        browserState: INITIAL_BROWSER_STATE,
-        desktopZoomFactor: 1,
-        formatMessage: ({ id }) => id,
-        isEmptyBrowserState: false,
-        isComposed: true,
-        isResponsiveMode: false,
-        onRetryGuest: vi.fn(),
-        onViewportResize: vi.fn(),
-        onViewportSizeChange: vi.fn(),
-        onWebviewRef: vi.fn(),
-        showResizeWarning: false,
-        webviewGeneration: 0,
-        viewportSize: { width: 393, height: 852 },
-        viewportZoom: "fit",
-      }),
-    );
-
-    expect(markup).toContain('style="background-color:#fff"');
-  });
-
   it("延迟 guest 的空置态不创建 webview", () => {
     const markup = renderToStaticMarkup(
       createElement(BrowserViewportSurface, {
@@ -407,8 +384,6 @@ describe("UnifiedBrowserView (<webview>)", () => {
     );
 
     expect(markup).not.toContain("<webview");
-    expect(markup).toContain("lucide-globe");
-    expect(markup).not.toContain("lucide-loader");
   });
 
   it("新 human tab 与未提交地址草稿不创建 webview，回车后才创建并导航", () => {
@@ -466,12 +441,12 @@ describe("UnifiedBrowserView (<webview>)", () => {
     ).toEqual([0.5, 0.75, 1, 1.25, 1.5, 2]);
   });
 
-  it("Desktop zoom 全档位按 Electron guest surface 语义解析布局补偿", () => {
+  it("Desktop zoom 全档位用同一布局补偿，自然 viewport 不依赖 CDP metrics", () => {
     for (let zoomLevel = -3; zoomLevel <= 5; zoomLevel += 1) {
       const desktopZoomFactor = resolveDesktopZoomFactor(zoomLevel);
       const layout = resolveResponsiveBrowserGuestLayout(desktopZoomFactor);
-      expect(layout.layoutScale).toBeCloseTo(desktopZoomFactor < 1 ? 1 / desktopZoomFactor : 1);
-      expect(layout.transformScale).toBeCloseTo(desktopZoomFactor < 1 ? desktopZoomFactor : 1);
+      expect(layout.layoutScale).toBeCloseTo(1 / desktopZoomFactor);
+      expect(layout.transformScale).toBeCloseTo(desktopZoomFactor);
     }
     expect(resolveResponsiveBrowserGuestLayout(Number.NaN)).toEqual({
       layoutScale: 1,
@@ -982,8 +957,6 @@ describe("UnifiedBrowserView (<webview>)", () => {
     fireRenderProcessGone(originalWebview, "launch-failed", 72);
 
     const addressInput = screen.getByTestId(TID_BROWSER_ADDRESS_INPUT);
-    expect(addressInput.className).toContain("h-8");
-    expect(addressInput.className).toContain("rounded-full");
     fireEvent.change(addressInput, { target: { value: "https://example.com/after-failure" } });
     await act(async () => {
       fireEvent.submit(addressInput.closest("form")!);
@@ -1052,7 +1025,7 @@ describe("UnifiedBrowserView (<webview>)", () => {
     expect(onNavigationRequestHandled).toHaveBeenCalledWith(request.id);
   });
 
-  it("自由尺寸放大时重发 metrics 且不扩张 webview，缩小保留布局反补偿", async () => {
+  it("自由尺寸放大和缩小都按 1 / zoom 布局补偿，zoom 变化时重发 viewport", async () => {
     renderView("session-zoom", "task-zoom");
     const setZoomFactor = vi.fn();
     const webview = stubWebview(screen.getByTestId(TID_BROWSER_WEBVIEW), {
@@ -1077,14 +1050,17 @@ describe("UnifiedBrowserView (<webview>)", () => {
     await act(async () => {
       await Promise.resolve();
     });
+    // 放大档曾只靠 CDP metrics scale 补偿，CDP idle detach 后 guest 退回 viewport × zoom；
+    // 布局补偿必须在 renderer 完成，自然 viewport 才与 CDP 是否 attach 无关。
     const enlargeZoomFactor = resolveDesktopZoomFactor(1);
-    expect(webview.style.transform).toBe("");
-    expect(webview.style.position).toBe("");
-    expect(webview.style.width).toBe("");
-    expect(webview.style.height).toBe("");
+    const enlargeLayoutScale = 1 / enlargeZoomFactor;
+    expect(webview.style.transform).toBe(`scale(${enlargeZoomFactor})`);
+    expect(webview.style.position).toBe("absolute");
+    expect(Number.parseFloat(webview.style.width.slice(5))).toBeCloseTo(enlargeLayoutScale * 100);
+    expect(Number.parseFloat(webview.style.height.slice(5))).toBeCloseTo(enlargeLayoutScale * 100);
     expect(webview.dataset.browserCompositorScale).toBe(String(enlargeZoomFactor));
-    expect(webview.dataset.browserLayoutScale).toBe("1");
-    expect(webview.dataset.browserTransformScale).toBe("1");
+    expect(webview.dataset.browserLayoutScale).toBe(String(enlargeLayoutScale));
+    expect(webview.dataset.browserTransformScale).toBe(String(enlargeZoomFactor));
     const updateCountAfterEnter = h.updateViewport.mock.calls.length;
 
     let resolveViewportSync: (() => void) | undefined;
@@ -1099,11 +1075,11 @@ describe("UnifiedBrowserView (<webview>)", () => {
     });
     expect(setZoomFactor).toHaveBeenLastCalledWith(1);
     const secondEnlargeZoomFactor = resolveDesktopZoomFactor(2);
-    expect(webview.style.transform).toBe("");
+    expect(webview.style.transform).toBe(`scale(${secondEnlargeZoomFactor})`);
     expect(webview.dataset.browserCompositorScale).toBe(String(secondEnlargeZoomFactor));
-    expect(webview.style.position).toBe("");
-    expect(webview.dataset.browserLayoutScale).toBe("1");
-    expect(webview.dataset.browserTransformScale).toBe("1");
+    expect(webview.style.position).toBe("absolute");
+    expect(webview.dataset.browserLayoutScale).toBe(String(1 / secondEnlargeZoomFactor));
+    expect(webview.dataset.browserTransformScale).toBe(String(secondEnlargeZoomFactor));
     expect(h.updateViewport.mock.calls.length).toBeGreaterThan(updateCountAfterEnter);
     expect(h.updateViewport).toHaveBeenLastCalledWith({
       tabId: "session-zoom",
@@ -1115,8 +1091,8 @@ describe("UnifiedBrowserView (<webview>)", () => {
       resolveViewportSync?.();
       await Promise.resolve();
     });
-    // Desktop page zoom 的传播可能晚于 React effect；必须在 main 完成 metrics 后
-    // 再归一一次 guest zoom，锁住曾导致右侧、底部留白的竞态。
+    // Desktop page zoom 的传播可能晚于 React effect；必须在 main 完成 viewport 同步后
+    // 再归一一次 guest zoom，否则 guest 会按应用 zoom 重排。
     expect(setZoomFactor.mock.calls.length).toBeGreaterThan(zoomCallsBeforeMetricsResolved);
     expect(setZoomFactor).toHaveBeenLastCalledWith(1);
 
@@ -1136,9 +1112,9 @@ describe("UnifiedBrowserView (<webview>)", () => {
     act(() => {
       for (const listener of h.zoomListeners) listener({ zoomLevel: 2 });
     });
-    expect(webview.style.position).toBe("");
-    expect(webview.style.transform).toBe("");
-    expect(webview.dataset.browserLayoutScale).toBe("1");
+    expect(webview.style.position).toBe("absolute");
+    expect(webview.style.transform).toBe(`scale(${secondEnlargeZoomFactor})`);
+    expect(webview.dataset.browserLayoutScale).toBe(String(1 / secondEnlargeZoomFactor));
 
     fireEvent.click(screen.getByTestId(TID_BROWSER_RESPONSIVE_BUTTON));
     expect(setZoomFactor).toHaveBeenLastCalledWith(resolveDesktopZoomFactor(2));
@@ -1304,13 +1280,7 @@ describe("UnifiedBrowserView (<webview>)", () => {
   it("自由尺寸按钮位于元素选择左侧，切换模式不会重建 webview", () => {
     renderView();
     const responsiveButton = screen.getByTestId(TID_BROWSER_RESPONSIVE_BUTTON);
-    const elementPickerButton = screen.getByTestId(TID_BROWSER_ELEMENT_PICKER_BUTTON);
     const originalWebview = screen.getByTestId(TID_BROWSER_WEBVIEW);
-
-    expect(
-      responsiveButton.compareDocumentPosition(elementPickerButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
     expect(responsiveButton.getAttribute("aria-pressed")).toBe("false");
 
     fireEvent.click(responsiveButton);
@@ -1320,22 +1290,11 @@ describe("UnifiedBrowserView (<webview>)", () => {
     expect(viewport.dataset.responsiveHeight).toBe("852");
     expect(viewport.style.width).toBe("393px");
     expect(viewport.style.height).toBe("852px");
-    const responsiveToolbar = screen.getByTestId(TID_BROWSER_RESPONSIVE_TOOLBAR);
-    expect(responsiveToolbar.classList).toContain("h-8");
-    expect(responsiveToolbar.classList).toContain("bg-background");
-    expect(responsiveToolbar.classList).not.toContain("bg-surface");
-    expect(responsiveToolbar.classList).toContain("gap-1");
     const widthInput = screen.getByTestId(TID_BROWSER_RESPONSIVE_WIDTH_INPUT) as HTMLInputElement;
     const heightInput = screen.getByTestId(TID_BROWSER_RESPONSIVE_HEIGHT_INPUT) as HTMLInputElement;
-    expect(widthInput.classList).toContain("border-transparent");
-    expect(widthInput.classList).toContain("bg-transparent");
-    expect(widthInput.classList).toContain("hover:bg-hover");
-    expect(heightInput.classList).toContain("border-transparent");
-    expect(heightInput.classList).toContain("bg-transparent");
     expect(widthInput.value).toBe("393");
     expect(heightInput.value).toBe("852");
     const zoomSelect = screen.getByTestId(TID_BROWSER_RESPONSIVE_ZOOM_SELECT);
-    expect(zoomSelect.dataset.variant).toBe("ghost");
     expect(zoomSelect.textContent).toContain("browser.responsive.fitToWindow");
     expect(screen.queryByText("393 × 852")).toBeNull();
     expect(screen.getByTestId(TID_BROWSER_WEBVIEW)).toBe(originalWebview);
@@ -1989,7 +1948,6 @@ describe("UnifiedBrowserView (<webview>)", () => {
     ] as const;
     corners.forEach((corner, index) => {
       const handle = screen.getByTestId(corner.testId);
-      expect(handle.querySelector("svg")).toBeNull();
       dragResizeHandle(handle, index + 5, corner.delta);
       expect(viewport.style.width).toBe(corner.expected.width);
       expect(viewport.style.height).toBe(corner.expected.height);
@@ -2111,24 +2069,6 @@ describe("UnifiedBrowserView (<webview>)", () => {
     expect(h.updateViewport).toHaveBeenLastCalledWith({
       tabId: "session-1",
       viewport: null,
-    });
-  });
-
-  it("四边 separator 图标默认隐藏并在 hover / focus 显示", () => {
-    renderView();
-    fireEvent.click(screen.getByTestId(TID_BROWSER_RESPONSIVE_BUTTON));
-
-    [
-      TID_BROWSER_RESPONSIVE_RESIZE_LEFT,
-      TID_BROWSER_RESPONSIVE_RESIZE_WIDTH,
-      TID_BROWSER_RESPONSIVE_RESIZE_TOP,
-      TID_BROWSER_RESPONSIVE_RESIZE_HEIGHT,
-    ].forEach((testId) => {
-      const icon = screen.getByTestId(testId).querySelector("svg");
-      expect(icon).not.toBeNull();
-      expect(icon?.classList).toContain("opacity-0");
-      expect(icon?.classList).toContain("group-hover/resize-edge:opacity-100");
-      expect(icon?.classList).toContain("group-focus-visible/resize-edge:opacity-100");
     });
   });
 
@@ -2370,13 +2310,6 @@ describe("UnifiedBrowserView (<webview>)", () => {
     act(() => observer?.emit(700, 600));
     const warning = screen.getByRole("status");
     expect(warning.textContent).toBe("browser.resizeDuringOperationWarning");
-    expect(warning.classList).toContain("bg-popover");
-    expect(warning.classList).toContain("border-popover-border");
-    expect(warning.classList).toContain("shadow-md");
-    expect(warning.classList).not.toContain("bg-warning");
-    expect(warning.classList).toContain("pointer-events-none");
-    expect(warning.querySelector('[data-browser-resize-warning-accent="visible"]')).not.toBeNull();
-    expect(warning.querySelector("svg")?.classList).toContain("text-warning");
     expect(screen.getByTestId(TID_BROWSER_WEBVIEW).dataset.browserResizeDimmed).toBe("true");
 
     // 连续拖拽不会刷新 3 秒计时器或叠加第二条提示。

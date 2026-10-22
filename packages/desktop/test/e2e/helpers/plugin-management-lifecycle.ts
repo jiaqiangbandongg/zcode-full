@@ -3,17 +3,19 @@ import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
-  TID_PLUGIN_STORE_BROWSE,
-  TID_SETTINGS_PAGE,
-  TID_SETTINGS_SECTION_NAV,
-  TID_TASK_SETTINGS_BUTTON,
-  testId,
   type ZCodePluginsInstallResult,
   type ZCodePluginsListResult,
   type ZCodePluginsMarketplaceMutationResult,
   type ZCodePluginsOverviewResult,
   type ZCodePluginsReferenceCatalogResult,
 } from "@zcode/shared";
+import {
+  TID_PLUGIN_STORE_BROWSE,
+  TID_SETTINGS_PAGE,
+  TID_SETTINGS_SECTION_NAV,
+  TID_TASK_SETTINGS_BUTTON,
+  testId,
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clickTestIdByDom,
@@ -80,12 +82,13 @@ export function requirePluginManualReview(): void {
 
 export async function createPluginLifecycleFixture(
   version = "1.0.0",
+  withUi = false,
 ): Promise<PluginLifecycleFixture> {
   const { homeDir } = getE2EAppDataPaths();
   const marketplaceRoot = join(homeDir, "fixtures", "plugin-management-lifecycle-market");
   const pluginRoot = join(marketplaceRoot, "plugins", PLUGIN_LIFECYCLE_NAME);
   await rm(marketplaceRoot, { force: true, recursive: true });
-  await writeLifecyclePlugin(pluginRoot, version);
+  await writeLifecyclePlugin(pluginRoot, version, withUi);
   for (let index = 1; index <= 7; index += 1) {
     await writeSimplePlugin(
       join(marketplaceRoot, "plugins", `e2e-lifecycle-extra-${index}`),
@@ -93,6 +96,13 @@ export async function createPluginLifecycleFixture(
     );
   }
   await writeMarketplaceManifest(marketplaceRoot, version);
+  if (withUi) {
+    const path = join(marketplaceRoot, ".claude-plugin", "marketplace.json");
+    const catalog = await readJsonRecord(path);
+    const entries = catalog.plugins as Array<Record<string, unknown>>;
+    entries.find((entry) => entry.name === PLUGIN_LIFECYCLE_NAME)!.componentTypes = ["mcp", "ui"];
+    await writeJson(path, catalog);
+  }
   const managedPluginRoot = lifecycleManagedPluginRoot(homeDir);
   if (existsSync(dirname(dirname(managedPluginRoot)))) {
     // 已登记的 directory marketplace 会复制进 managed storage；失败恢复必须同步修复该副本。
@@ -403,9 +413,11 @@ export async function waitForDisplayedPluginControl(
 export async function addMarketplaceSourceThroughUi(source: string): Promise<void> {
   await waitForPluginControl("plugin-store-create");
   await browser.execute(() => {
-    document.querySelector<HTMLElement>('[data-testid="plugin-store-create"]')?.dispatchEvent(
-      new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }),
-    );
+    document
+      .querySelector<HTMLElement>('[data-testid="plugin-store-create"]')
+      ?.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }),
+      );
   });
   await waitForPluginControl("plugin-store-add-source-menu-item");
   await clickPluginControl("plugin-store-add-source-menu-item");
@@ -482,11 +494,16 @@ export async function setPluginEnabledThroughUi(
   enabled: boolean,
   entry: "detail" | "manage" = "detail",
 ): Promise<void> {
-  const testIdValue =
-    entry === "manage" ? "plugin-store-manage-enabled-switch" : "plugin-store-enabled-switch";
-  const current = await readPluginControlChecked(testIdValue, { pluginId });
-  if (current !== enabled) {
-    await clickPluginControl(testIdValue, { pluginId });
+  if (entry === "manage") {
+    const current = await readPluginControlChecked("plugin-settings-enabled-switch", { pluginId });
+    if (current !== enabled)
+      await clickPluginControl("plugin-settings-enabled-switch", { pluginId });
+  } else {
+    const list = await getPluginList();
+    if (list.plugins.find((plugin) => plugin.id === pluginId)?.enabled !== enabled) {
+      await clickPluginControl("plugin-store-item-menu", { pluginId });
+      await clickPluginControl("plugin-store-menu-enabled", { pluginId });
+    }
   }
   await waitUntilPluginList(
     (list) => list.plugins.some((plugin) => plugin.id === pluginId && plugin.enabled === enabled),
@@ -599,9 +616,16 @@ export async function clickPluginControl(
       { timeout: 30000 },
     );
   } catch (error) {
-    throw new Error(`Could not click ${testIdValue}: ${latest}`, {
-      cause: error,
-    });
+    const dialogs = await browser.execute(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('[role="alertdialog"], [role="dialog"]'))
+        .filter((element) => element.getBoundingClientRect().height > 0)
+        .map((element) => element.innerText.slice(0, 1000)),
+    );
+    await capturePluginManualReview("PLM-UI-FAIL", testIdValue).catch(() => {});
+    throw new Error(
+      `Could not click ${testIdValue}: ${latest}; dialogs=${JSON.stringify(dialogs)}`,
+      { cause: error },
+    );
   }
 }
 
@@ -742,6 +766,24 @@ export async function capturePluginManualReview(caseId: string, label: string): 
   );
   await mkdir(artifactDir, { recursive: true });
   const path = join(artifactDir, `${label.replaceAll(/[^a-z0-9-]/giu, "-")}.png`);
+  // 人工评审截图要反映稳定态：等有限时长的过渡/动画（分段切换、面板展开）结束，
+  // 否则会截到旧选中态与新内容并存的中间帧。无限循环的加载动画不参与判断。
+  await browser
+    .waitUntil(
+      async () =>
+        browser.execute(
+          () =>
+            document
+              .getAnimations()
+              .filter(
+                (animation) =>
+                  animation.playState === "running" &&
+                  animation.effect?.getTiming().iterations !== Infinity,
+              ).length === 0,
+        ),
+      { timeout: 3000, interval: 100 },
+    )
+    .catch(() => undefined);
   await browser.saveScreenshot(path);
   return path;
 }
@@ -1001,7 +1043,11 @@ async function callPluginTestAction<T>(
   return result.value as T;
 }
 
-async function writeLifecyclePlugin(pluginRoot: string, version: string): Promise<void> {
+async function writeLifecyclePlugin(
+  pluginRoot: string,
+  version: string,
+  withUi = false,
+): Promise<void> {
   await writeJson(join(pluginRoot, ".zcode-plugin", "plugin.json"), {
     name: PLUGIN_LIFECYCLE_NAME,
     version,
@@ -1019,6 +1065,21 @@ async function writeLifecyclePlugin(pluginRoot: string, version: string): Promis
         args: ["${ZCODE_PLUGIN_ROOT}/server.mjs", version],
       },
     },
+    ...(withUi
+      ? {
+          ui: {
+            surfaces: [
+              {
+                id: "panel",
+                title: "Lifecycle Panel",
+                server: "lifecycle",
+                resourceUri: "ui://lifecycle/panel.html",
+                availability: "session",
+              },
+            ],
+          },
+        }
+      : {}),
     userConfig: {
       [PLUGIN_LIFECYCLE_CONFIG_KEY]: {
         type: "string",
@@ -1065,7 +1126,7 @@ async function writeLifecyclePlugin(pluginRoot: string, version: string): Promis
       ],
     },
   });
-  await writeText(join(pluginRoot, "server.mjs"), buildDependencyFreeMcpServer(version));
+  await writeText(join(pluginRoot, "server.mjs"), buildDependencyFreeMcpServer(version, withUi));
 }
 
 async function writeSimplePlugin(pluginRoot: string, index: number): Promise<void> {
@@ -1116,7 +1177,9 @@ async function writeMarketplaceManifest(marketplaceRoot: string, version: string
   });
 }
 
-function buildDependencyFreeMcpServer(version: string): string {
+function buildDependencyFreeMcpServer(version: string, withUi = false): string {
+  const html =
+    '<!doctype html><html><body><h1 id="market-ui-ready">Connecting</h1><script>window.zcode.ready().then(() => { document.getElementById("market-ui-ready").textContent = "PLUGIN_MARKET_UI_READY"; });</script></body></html>';
   return `#!/usr/bin/env node
 import readline from "node:readline";
 const version = process.argv[2] || ${JSON.stringify(version)};
@@ -1126,7 +1189,7 @@ input.on("line", (line) => {
   let request;
   try { request = JSON.parse(line); } catch { return; }
   if (request.method === "initialize") {
-    send({ jsonrpc: "2.0", id: request.id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "e2e-plugin-lifecycle", version } } });
+    send({ jsonrpc: "2.0", id: request.id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {}, ${withUi ? "resources: {}," : ""} }, serverInfo: { name: "e2e-plugin-lifecycle", version } } });
     return;
   }
   if (request.method === "tools/list") {
@@ -1136,6 +1199,16 @@ input.on("line", (line) => {
   if (request.method === "tools/call") {
     send({ jsonrpc: "2.0", id: request.id, result: { content: [{ type: "text", text: ${JSON.stringify(PLUGIN_LIFECYCLE_RUNTIME_MARKER)} + "_" + version }] } });
     return;
+  }
+  ${
+    withUi
+      ? `if (request.method === "resources/list") {
+    send({ jsonrpc: "2.0", id: request.id, result: { resources: [{ uri: "ui://lifecycle/panel.html", name: "Lifecycle Panel", mimeType: "text/html;profile=mcp-app" }] } }); return;
+  }
+  if (request.method === "resources/read") {
+    send({ jsonrpc: "2.0", id: request.id, result: { contents: [{ uri: request.params.uri, mimeType: "text/html;profile=mcp-app", text: ${JSON.stringify(html)} }] } }); return;
+  }`
+      : ""
   }
   if (request.id !== undefined) send({ jsonrpc: "2.0", id: request.id, result: {} });
 });

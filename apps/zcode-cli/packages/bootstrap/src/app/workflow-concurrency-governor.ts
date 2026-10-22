@@ -14,11 +14,14 @@
 // 这里是治理器里**唯一**会碰时钟与定时器的地方：控制器只收 `now`；冷却到期要唤醒等待者，
 // 所以需要一个 setTimeout（可注入，unref）。
 
-import type {
-  ModelNetworkStatusEvent,
-  ModelRequestAdmission,
-  ModelRequestAdmissionTicket,
-  ModelRequestTarget,
+import { resolveWorkflowModelFailurePolicy } from "@zcode/adapters/model";
+import {
+  ModelErrorCode,
+  type ModelNetworkStatusEvent,
+  type ModelRequestAdmission,
+  type ModelRequestAdmissionTicket,
+  type ModelRequestFailedStatusEvent,
+  type ModelRequestTarget,
 } from "@zcode/contracts";
 import {
   ConcurrencyController,
@@ -271,9 +274,17 @@ export function createWorkflowConcurrencyGovernor(
           case "model_request_failed":
             // retryable:true 的 failed 紧随一条 retry_scheduled——那条才是信号。
             if (event.retryable) return;
+            // Stop 集（配额、认证…）不是并发信号，只终结尝试。曾经配额 429 走下面的限流分支：
+            // 1308 带的 Retry-After 指到额度窗口结束（可达数小时），冷却冻住整个桶、活得比停下的 run
+            // 还久；用户用重置卡恢复额度后 resume，子代理全卡在闸门上一个请求不发，主代理（observer
+            // 不看冷却）却照常工作，换模型（换桶）才继续。何时再试由用户决定，与 driver 读同一张策略表。
+            if (isWorkflowStopFailure(event)) {
+              settle((at) => bucket.controller.ended(at));
+              return;
+            }
             // 不可重试的限流：
             // 主对话 / 工具侧撞上 3008 这类被分类器判终止的 429，仍是一次字面意义上的并发信号——
-            // 只当「链结束」会让 cap 从未因它降过。配额码也走这一支：多减一次半，run 随即停下，无害。
+            // 只当「链结束」会让 cap 从未因它降过。
             if (event.reason === "rate_limited") {
               settle((at) =>
                 bucket.controller.throttled(at, epoch, "rate_limited", event.retryAfterMs),
@@ -417,6 +428,24 @@ export function createWorkflowConcurrencyGovernor(
       return buckets.get(key)?.controller.snapshot();
     },
   };
+}
+
+/**
+ * 不可重试的失败是否落在 workflow 策略表的 Stop 集里（docs/dynamic-workflow/concurrency.md
+ * 「Retry budget and the model-error policy」）。runner 与 driver 读的是同一个函数，三层对 Stop 集的
+ * 判断不会分叉；缺 `errorCode` 时按通用请求失败读，配额判定只看业务码。
+ */
+function isWorkflowStopFailure(event: ModelRequestFailedStatusEvent): boolean {
+  return (
+    resolveWorkflowModelFailurePolicy(
+      {
+        code: event.errorCode ?? ModelErrorCode.ModelRequestFailed,
+        reason: event.reason,
+        retryable: event.retryable,
+      },
+      event.providerErrorCode,
+    ).decision === "stop"
+  );
 }
 
 function abortedError(signal: AbortSignal): Error {

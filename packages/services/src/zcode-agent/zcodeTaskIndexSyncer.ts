@@ -1,15 +1,13 @@
+import { isAuxiliarySessionKind } from "@zcode/shared";
 /* eslint-disable max-lines -- task index 的 v4 帧摄入、snapshot upsert 和 workspace 广播必须共享同一份闭包状态。 */
-import { repairSubagentTaskIndex } from "#src/zcode-agent/repairSubagentTaskIndex.js";
+import { repairSubagentTaskIndex } from "#src/task-facts/repairSubagentTaskIndex.js";
 import {
-  deriveZCodeTaskStatusFromSessionSnapshot,
   generateTraceId,
   getZCodeUserVisibleMessages,
   isZCodeGoalContinuationReminderText,
   isZCodeModelOnlySyntheticUserMessage,
   resolveWorkspaceKey,
-  resolveZCodeVisibleSessionTitle,
   ZCODE_AGENT_PROVIDER_NOT_READY_CODE,
-  ZCODE_AGENT_PROVIDER,
   type ZCodeTaskGoal,
   type ZCodeTaskMode,
   type ZCodeTaskMeta,
@@ -46,6 +44,12 @@ import type {
 } from "./zcodeAgent.js";
 import { ZCODE_AGENT_RUNTIME_UNAVAILABLE_CODE } from "./zcodeAgent.js";
 import { formatTaskMetaModelSelectionFromSnapshot } from "./zcodeConfigOptions.js";
+
+import { createTaskFacts, type TaskFactMutation } from "#src/task-facts/index.js";
+import {
+  assertV4CommandAckOk,
+  createHostCommandEnvelope,
+} from "#src/zcode-agent/zcodeV4HostCommand.js";
 
 const logger = createServiceLogger("zcode-task-index-syncer");
 
@@ -92,23 +96,19 @@ export interface ZCodeTaskIndexReadyEvent {
 }
 
 export interface ZCodeTaskIndexSyncer {
+  mutateSessionFacts(
+    target: ZCodeAgentSessionTarget,
+    intent: TaskFactMutation,
+  ): Promise<ZCodeTaskMeta | null>;
+
   /**
    * 幂等地为指定 workspace 建立 v4 后台摄入订阅（sessions-index + workspace-config），
    * 把 CLI 权威投影的会话终态/标题/配置目录落到 task index sqlite 与 workspace 广播。
    * 同一 workspace 多次调用只会建立一次。
    */
   ensureWorkspaceSubscription(target: ZCodeAgentWorkspaceTarget): void;
-  /**
-   * 兼容入口（旧 shadow 订阅 API 形状）：session 维度的激活信号统一收敛为
-   * workspace 级 v4 订阅。options.includeSnapshot 在 v4 摄入下无对应语义（初始
-   * sessions-index snapshot 只静默补缺失行，不回放终态/广播），保留参数只为不动调用面。
-   */
-  ensureSessionSubscription(
-    target: ZCodeAgentSessionTarget,
-    options?: {
-      includeSnapshot?: boolean;
-    },
-  ): void;
+  /** session 维度的激活信号统一收敛为 workspace 级 v4 订阅；初始 snapshot 只静默补缺失行。 */
+  ensureSessionSubscription(target: ZCodeAgentSessionTarget): void;
   /**
    * 把一份 session snapshot 同步到 sqlite，并广播 workspace_task_list_changed。
    * desktop-continuous 路径上，zcodeSessionService 在 createSession/resumeSession/setModel
@@ -120,14 +120,13 @@ export interface ZCodeTaskIndexSyncer {
     options: {
       modelOverride?: string;
       thoughtLevelOverride?: string;
-      moveGroupedTaskToTop?: boolean;
       unreadSignal?: ZCodeWorkspaceTaskListChanged["unreadSignal"];
       /**
        * 设计修正：必填。切模型（task_model_changed）/快照收敛（task_status_changed）
        * 这类变更不得落到 task_meta_changed——后者会被 UI 当成归属相关变更
        * 触发全局 membership 重拉和列表整刷。
        */
-      broadcastReason: ZCodeWorkspaceTaskListChanged["reason"];
+      broadcastReason: ZCodeWorkspaceTaskListChanged["reason"] | null;
     },
   ): Promise<ZCodeTaskMeta>;
   /**
@@ -167,6 +166,8 @@ export interface ZCodeTaskIndexSyncer {
    * 手机 host command queue 只能以这个事件作为继续发送下一条的边界。
    */
   onSessionReadyEvent: Event<ZCodeTaskIndexReadyEvent>;
+  /** 仅观察已经存在的订阅，不为自动归档创建 runtime 或第二份 phase 状态。 */
+  activeTaskRefs(): Array<{ workspacePath: string; workspaceIdentity?: string; taskId: string }>;
   /** 释放所有 v4 订阅和 workspace emitter；不关闭注入的 taskIndexRepo。 */
   disposeAll(): void;
 }
@@ -194,42 +195,6 @@ function resolveTerminalUnreadSignal(
     return "background_terminal";
   }
   return undefined;
-}
-
-function taskStatusFromSummaryPhase(phase: SessionPhase): ZCodeTaskMeta["status"] {
-  switch (phase) {
-    case "running":
-    case "prewarming":
-      return "running";
-    case "completedSuccess":
-    case "completedInterrupted":
-      return "completed";
-    case "error":
-      return "error";
-    default:
-      return undefined;
-  }
-}
-
-function buildBaselineMetaFromSummary(
-  target: ZCodeAgentWorkspaceTarget,
-  summary: SessionSummary,
-): ZCodeTaskMeta {
-  const status = taskStatusFromSummaryPhase(summary.phase);
-  return {
-    taskId: summary.sessionId,
-    traceId: generateTraceId(summary.sessionId),
-    title: summary.title,
-    ...(summary.titleSource === "custom" ? { titleOverridden: true } : {}),
-    workspacePath: target.workspacePath,
-    workspaceIdentity: target.workspaceIdentity,
-    createdAt: summary.createdAt,
-    updatedAt: summary.lastActivityAt,
-    mode: "default",
-    provider: ZCODE_AGENT_PROVIDER,
-    ...(summary.parentSessionId ? { forkedFromTaskId: summary.parentSessionId } : {}),
-    ...(status ? { status } : {}),
-  };
 }
 
 interface WorkspaceIngestState {
@@ -502,7 +467,6 @@ export function createZCodeTaskIndexSyncer(
     target: ZCodeAgentSessionTarget,
     reason: string,
     options?: {
-      moveGroupedTaskToTop?: boolean;
       unreadSignal?: ZCodeWorkspaceTaskListChanged["unreadSignal"];
     },
   ): Promise<void> {
@@ -524,7 +488,6 @@ export function createZCodeTaskIndexSyncer(
       await syncSnapshotAndBroadcast(snapshot, {
         ...(options?.unreadSignal ? { unreadSignal: options.unreadSignal } : {}),
         broadcastReason: "task_status_changed",
-        moveGroupedTaskToTop: options?.moveGroupedTaskToTop,
       });
     } catch (error) {
       logger.warn(
@@ -568,11 +531,66 @@ export function createZCodeTaskIndexSyncer(
     });
   }
 
+  const taskFacts = createTaskFacts({
+    store: taskIndexRepo,
+    source: {
+      reconcile: async (target, sessionIds) => {
+        if (!agentService.reconcileSessionsIndexV4)
+          throw new Error("sessions-index.reconcile-unavailable");
+        return agentService.reconcileSessionsIndexV4({ ...target, sessionIds });
+      },
+      execute: async (target, intent) => {
+        const envelope =
+          intent.type === "delete"
+            ? createHostCommandEnvelope({
+                type: "deleteSession",
+                sessionId: target.taskId,
+                payload: {},
+              })
+            : createHostCommandEnvelope({
+                type: "renameSession",
+                sessionId: target.taskId,
+                payload: { title: intent.title },
+              });
+        const ack = await agentService.sendConversationCommandV4({
+          workspacePath: target.workspacePath,
+          workspaceIdentity: target.workspaceIdentity,
+          envelope,
+        });
+        assertV4CommandAckOk(envelope.type, ack, target.taskId);
+      },
+    },
+    changed: ({ target, meta, reason }) => emitWorkspaceTaskListChanged(target, meta, reason),
+  });
+
+  async function reconcileSnapshotOmissions(
+    state: WorkspaceIngestState,
+    snapshotSeq: number,
+  ): Promise<void> {
+    if (!agentService.reconcileSessionsIndexV4) return;
+    try {
+      await taskFacts.reconcile(
+        state.target,
+        new Set(state.summaries.keys()),
+        () => isLiveState(state) && state.indexSeq === snapshotSeq,
+      );
+    } catch (error) {
+      if (isLiveState(state))
+        logger.warn(undefined, "CLI 会话对账未完成，保留已有行和待交接意图", error);
+    }
+  }
+
+  const refreshSessionFacts = (target: ZCodeAgentSessionTarget) =>
+    taskFacts.refresh({ ...target, taskId: target.sessionId });
+  const mutateSessionFacts = (target: ZCodeAgentSessionTarget, intent: TaskFactMutation) =>
+    taskFacts.mutate({ ...target, taskId: target.sessionId }, intent);
+  const mirrorSummary = taskFacts.ingest;
+
   /** phase 终态迁移 → sqlite status 收敛 + 广播 + 回源正文索引。 */
   function applyTerminalTransition(
     target: ZCodeAgentSessionTarget,
     summary: SessionSummary,
-    options?: { moveGroupedTaskToTop?: boolean },
+    options?: { captureRepoSnapshot?: boolean },
   ): void {
     emitTerminalAndReady(target, summary);
     const failed = summary.phase === "error";
@@ -583,18 +601,8 @@ export function createZCodeTaskIndexSyncer(
       taskId: target.sessionId,
       unreadSignal: unreadSignal ?? null,
     });
-    const updatedAt = Date.now();
-    void taskIndexRepo
-      .applyAgentPatch({
-        workspacePath: target.workspacePath,
-        workspaceIdentity: target.workspaceIdentity,
-        taskId: target.sessionId,
-        // error 的 lastError 详情不在 sessions-index 摘要里，留给随后的回源 snapshot
-        // 写权威值（patch 不带 lastError 键 = 保留现值）；completed 沿旧语义清空。
-        patch: failed
-          ? { status: "error", updatedAt }
-          : { status: "completed", lastError: undefined, updatedAt },
-      })
+    // 活动时间和终态来自 CLI；Host 收帧时间不能把历史任务重新排到顶部。
+    void mirrorSummary(target, summary)
       .then((meta) => {
         if (meta) {
           // 之前只更新 sqlite 不广播，UI 监听 workspace_task_list_changed 收不到通知，
@@ -613,8 +621,7 @@ export function createZCodeTaskIndexSyncer(
         // 不经过 zcodeSessionService 的 op 驱动 snapshot 同步，行缺失/正文搜索/lastError
         // 全靠这里收敛；readSession(existing-only) 只读现有 runtime，不重新恢复 session。
         void resyncTaskIndexRowFromAgent(target, failed ? "phase.error" : "phase.completed", {
-          moveGroupedTaskToTop: options?.moveGroupedTaskToTop,
-          // patch 已广播时不能让随后的 snapshot 回源再次制造完成提醒；
+          // 修复原因：patch 已广播时不能让随后的 snapshot 回源再次制造完成提醒；
           // 行缺失时则把同一 signal 交给回源结果，保证提醒既不丢也不重复。
           ...(meta || !unreadSignal ? {} : { unreadSignal }),
         });
@@ -629,15 +636,8 @@ export function createZCodeTaskIndexSyncer(
   }
 
   /** 标题变化 → sqlite title patch；行缺失回源完整 snapshot（对齐旧 first_input 语义）。 */
-  function applyTitleChange(target: ZCodeAgentSessionTarget, title: string): void {
-    const updatedAt = Date.now();
-    void taskIndexRepo
-      .applyAgentPatch({
-        workspacePath: target.workspacePath,
-        workspaceIdentity: target.workspaceIdentity,
-        taskId: target.sessionId,
-        patch: { title, updatedAt },
-      })
+  function applyTitleChange(target: ZCodeAgentSessionTarget, summary: SessionSummary): void {
+    void mirrorSummary(target, summary)
       .then((meta) => {
         if (meta) {
           // 标题变更（首条消息/自动标题生成）与归属无关且每个任务必发，
@@ -646,12 +646,9 @@ export function createZCodeTaskIndexSyncer(
         } else {
           // draft session 不预写占位行；首个标题（旧 first_input）先于任何
           // snapshot upsert 到达时按完整 snapshot 回源，避免依赖空 session 占位行。
-          // v4 createSession 不经过 zcodeSessionService.createSession；首个标题到达且
-          // task index 尚无行，说明这是新会话首次落库。回源时必须同时写 grouped 顶层最小
-          // sort_order，否则缺序节点会被客户端补到列表末尾。
-          void resyncTaskIndexRowFromAgent(target, "meta.titleUpdated", {
-            moveGroupedTaskToTop: true,
-          });
+          // Bugfix: v4 createSession 不经过 zcodeSessionService.createSession；首个标题到达且
+          // task index 尚无行，说明这是新会话首次落库，必须回源写入完整 task 行。
+          void resyncTaskIndexRowFromAgent(target, "meta.titleUpdated", {});
         }
       })
       .catch((error) => {
@@ -663,7 +660,7 @@ export function createZCodeTaskIndexSyncer(
       });
   }
 
-  /** 单条 summary 对基线 diff：draft 跳过；terminal 迁移/标题变化各自收敛。 */
+  /** 单条持久化 summary 对基线 diff；terminal 迁移/标题变化各自收敛。 */
   function processSummary(
     state: WorkspaceIngestState,
     previous: SessionSummary | undefined,
@@ -671,12 +668,10 @@ export function createZCodeTaskIndexSyncer(
     _deliveryKind: TopicDeliveryKind,
   ): void {
     state.summaries.set(next.sessionId, next);
-    // draft 裁决：纯内存态、不落盘，也绝不进 task index sqlite。
-    if (next.phase === "draft") {
-      return;
-    }
+    // Bug 根因：CLI 已按 persistence 过滤未提交草稿；已接受输入在初始化期间 phase
+    // 仍为 draft。Host 再按执行 phase 过滤，会把新任务推迟到 Hook/TurnStarted 之后。
     const target = sessionTargetFrom(state.target, next.sessionId);
-    const becameVisibleTask = previous === undefined || previous.phase === "draft";
+    const becameVisibleTask = previous === undefined;
     // 终态迁移 = 基线里真实观察到非终态 → 终态。无基线的会话（冷恢复 hydration、
     // 断档降级后新出现的历史会话）不回放终态；活跃会话必先以 running/prewarming
     // 进入基线（gateway 每个事件都 fan-out），不会漏掉真实收口。
@@ -684,22 +679,29 @@ export function createZCodeTaskIndexSyncer(
       previous !== undefined && !isTerminalPhase(previous.phase) && isTerminalPhase(next.phase);
     if (becameTerminal) {
       applyTerminalTransition(target, next, {
-        moveGroupedTaskToTop: becameVisibleTask,
+        // Bug 根因：deliveryKind 只描述传输方式，不能证明完成副作用已经执行。state.summaries
+        // 已提供 workspace 生命周期幂等边界；running -> terminal 的 recovery 必须补投。
+        captureRepoSnapshot: true,
       });
       return;
     }
     if (becameVisibleTask) {
-      // v4 预热 session 从 draft 提升，或 online delta 首次出现新 session 时，
-      // 不经过 zcodeSessionService.createSession。此处是最早且不依赖标题时序的新任务边界；
-      // 立即回源写入 task 行与 grouped root 最小 sort_order，避免缺序节点落到末尾。
-      void resyncTaskIndexRowFromAgent(target, "session.became-visible", {
-        moveGroupedTaskToTop: true,
-      });
+      // 摘要已足以创建真实行；等待完整正文回源会再次依赖 TurnStarted，且误发 status
+      // 无法表达行集合新增。先提交同一 facts 镜像，再广播既有 task_created。
+      void mirrorSummary(target, next)
+        .then((meta) => {
+          if (meta) emitWorkspaceTaskListChanged(broadcastTargetFrom(target), meta, "task_created");
+        })
+        .catch((error) => logger.warn(undefined, "同步新会话事实失败", error));
       return;
     }
     const title = next.title.trim();
     if (title && (previous === undefined || previous.title !== next.title)) {
-      applyTitleChange(target, title);
+      applyTitleChange(target, next);
+    } else {
+      void mirrorSummary(target, next).catch((error) =>
+        logger.warn(undefined, "同步 CLI 会话事实失败", error),
+      );
     }
   }
 
@@ -707,11 +709,11 @@ export function createZCodeTaskIndexSyncer(
     state: WorkspaceIngestState,
     summaries: Iterable<SessionSummary>,
   ): Promise<void> {
-    const candidates = [...summaries].filter((summary) => summary.phase !== "draft");
+    const candidates = [...summaries];
     if (candidates.length === 0) return;
-    // 纯 V4 UI 不经过 zcodeSessionService.initializeWorkspace；若把首帧
-    // 当成“已有 sqlite 存量”的静默基线，远端新库就会永远是 0 行。这里只做原子
-    // insert-if-missing，不广播、不回放历史终态，也不覆盖已有产品壳状态；后续打开/
+    // Bugfix：纯 V4 UI 不经过 zcodeSessionService.initializeWorkspace，旧实现又把首帧
+    // 当成“已有 sqlite 存量”的静默基线，导致远端新库永远是 0 行。每次基线刷新 CLI
+    // 事实，不广播、不回放历史终态，也不覆盖已有产品壳状态；后续打开/
     // 收口时再由完整 snapshot 补 model、正文搜索等权威字段。
     // 防灾保护：历史会话可能很多，不能一次创建等量 Promise 挤占 host 事件循环。
     // 固定小批次写入；失败只汇总一条生产日志，避免逐会话错误再次制造日志风暴。
@@ -720,9 +722,7 @@ export function createZCodeTaskIndexSyncer(
     for (let offset = 0; offset < candidates.length; offset += INITIAL_BASELINE_SEED_BATCH_SIZE) {
       const batch = candidates.slice(offset, offset + INITIAL_BASELINE_SEED_BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map((summary) =>
-          taskIndexRepo.seedTaskMetaIfMissing(buildBaselineMetaFromSummary(state.target, summary)),
-        ),
+        batch.map((summary) => mirrorSummary(state.target, summary)),
       );
       for (const result of results) {
         if (result.status === "rejected") {
@@ -1022,7 +1022,9 @@ export function createZCodeTaskIndexSyncer(
         // 防止远端/新安装的空 sqlite 因纯 V4 路径永远没有存量。
         state.summaries = nextSummaries;
         state.seeded = true;
-        void seedMissingRowsFromInitialSnapshot(state, nextSummaries.values());
+        void seedMissingRowsFromInitialSnapshot(state, nextSummaries.values()).then(() =>
+          reconcileSnapshotOmissions(state, frame.toSeq),
+        );
         const generation = state.indexSubscriptionGeneration;
         void repairSubagentTaskIndex({
           target: state.target,
@@ -1048,6 +1050,7 @@ export function createZCodeTaskIndexSyncer(
       for (const summary of nextSummaries.values()) {
         processSummary(state, previousSummaries.get(summary.sessionId), summary, deliveryKind);
       }
+      void reconcileSnapshotOmissions(state, frame.toSeq);
       completeIndexRecoveryFrame(state, deliveryKind);
       return;
     }
@@ -1079,9 +1082,16 @@ export function createZCodeTaskIndexSyncer(
         );
         continue;
       }
-      // session.removed：会话删除的 sqlite 收口走 task 删除操作（adapter deleteTask /
-      // v4 deleteSession 命令的 host 侧收尾），这里只维护基线。
+      // 只有 CLI 明确删除事件才写删除事实；snapshot 缺席不能据此删除任务。
       state.summaries.delete(delta.sessionId);
+      const target = sessionTargetFrom(state.target, delta.sessionId);
+      void taskFacts
+        .removed({
+          workspacePath: target.workspacePath,
+          workspaceIdentity: target.workspaceIdentity,
+          taskId: delta.sessionId,
+        })
+        .catch((error) => logger.warn(undefined, "同步 CLI 删除事实失败", error));
     }
     state.indexSeq = frame.toSeq;
     state.indexHasAppliedBase = true;
@@ -1669,47 +1679,48 @@ export function createZCodeTaskIndexSyncer(
     options: {
       modelOverride?: string;
       thoughtLevelOverride?: string;
-      moveGroupedTaskToTop?: boolean;
       unreadSignal?: ZCodeWorkspaceTaskListChanged["unreadSignal"];
-      broadcastReason: ZCodeWorkspaceTaskListChanged["reason"];
+      broadcastReason: ZCodeWorkspaceTaskListChanged["reason"] | null;
     },
   ): Promise<ZCodeTaskMeta> {
-    const meta = buildMetaFromSnapshot(snapshot, options);
-    // 旧 child 标签页的显式 resume 仍会同步快照；只读详情不能重新写成主任务。
-    if (snapshot.session.sessionKind === "subagent_child") return meta;
-    // 同时把 snapshot.messages 里可见的聊天正文索引下去，
+    if (isAuxiliarySessionKind(snapshot.session.sessionKind))
+      return {
+        ...snapshot.session.workspace,
+        taskId: snapshot.session.sessionId,
+        traceId: snapshot.session.traceId ?? generateTraceId(snapshot.session.sessionId),
+        title: snapshot.session.title,
+        createdAt: snapshot.session.createdAt,
+        updatedAt: snapshot.session.updatedAt,
+        ...buildPresentationFromSnapshot(snapshot, options),
+      };
+    const target = { ...snapshot.session.workspace, taskId: snapshot.session.sessionId };
+    if (hasUserVisibleContent(snapshot)) {
+      await refreshSessionFacts({
+        ...snapshot.session.workspace,
+        sessionId: snapshot.session.sessionId,
+      });
+    }
+    const presentation = buildPresentationFromSnapshot(snapshot, options);
+    // Bugfix: 同时把 snapshot.messages 里可见的聊天正文索引下去，
     // 让 TaskSearchDialog 正文搜索能命中；旧 sqlite 行下次到这里时自然回填。
     const searchableText = buildSearchableTextFromSnapshot(snapshot);
-    // desktop-continuous 首发若先提交 task row、再补 grouped sort_order，
-    // sessions-index 会在两次写之间把缺序 task 暴露给 Renderer，产生先到底部再回顶部的跳动。
-    const { meta: persisted, initializedGroupedOrder } = options?.moveGroupedTaskToTop
-      ? await taskIndexRepo.syncTaskMetaAtGroupedTop({ meta, searchableText })
-      : {
-          meta: await taskIndexRepo.syncTaskMeta({ meta, searchableText }),
-          initializedGroupedOrder: false,
-        };
-    // createSession 刚回来时 snapshot 既没有 title 也没有 user message，
-    // 默认 title 会落成 "New session" 占位符。这种"还没有任何用户内容"的快照不应该广播给 UI，
-    // 否则侧边栏会先闪一下 "New session"，等 sendPrompt 完成后才换成真正的 prompt 文本。
-    // sqlite 行仍然要写，让后续标题更新走 applyAgentPatch 时能找到对应行；那次
-    // 标题触发的广播才是用户首次在列表里看到这个会话的时刻，标题直接就是 prompt 文本，不会闪。
-    if (!hasUserVisibleContent(snapshot)) {
-      if (initializedGroupedOrder) {
-        // 预热 session 从 draft 提升时，grouped 顺序会先于首标题落库。
-        // 即使暂时没有可广播的 task meta，也必须通知 renderer 重拉 structure；
-        // 否则 sessions-index 已显示 task、structure 仍缺序，当前进程会把它补到末尾。
-        emitWorkspaceTaskListChanged(
-          {
-            workspacePath: persisted.workspacePath,
-            workspaceIdentity: persisted.workspaceIdentity,
-            taskId: persisted.taskId,
-          },
-          undefined,
-          "task_created",
-        );
-      }
-      return persisted;
-    }
+    const persisted = await taskIndexRepo.updateTaskPresentation({
+      ...target,
+      presentation,
+      searchableText,
+    });
+    // 延迟持久化的草稿没有 CLI 行；只返回本次调用的展示值，不制造索引事实。
+    if (!persisted)
+      return {
+        ...target,
+        traceId: snapshot.session.traceId ?? generateTraceId(target.taskId),
+        title: snapshot.session.title,
+        createdAt: snapshot.session.createdAt,
+        updatedAt: snapshot.session.updatedAt,
+        ...presentation,
+      };
+    // 空草稿不是持久会话，不能提前制造列表行或任务变更广播。
+    if (!hasUserVisibleContent(snapshot) || options.broadcastReason === null) return persisted;
     emitWorkspaceTaskListChanged(
       {
         workspacePath: persisted.workspacePath,
@@ -1717,10 +1728,7 @@ export function createZCodeTaskIndexSyncer(
         taskId: persisted.taskId,
       },
       persisted,
-      // sessions-index 可见帧可能早于首次 grouped sort_order 落库。
-      // 首次初始化必须用 task_created 通知运行中的 grouped structure 缓存失效；
-      // 重复 snapshot 没有新增顺序，仍保留调用方原本的 status/title 语义。
-      initializedGroupedOrder ? "task_created" : options.broadcastReason,
+      options.broadcastReason,
       options.unreadSignal ? { unreadSignal: options.unreadSignal } : undefined,
     );
     return persisted;
@@ -1735,11 +1743,11 @@ export function createZCodeTaskIndexSyncer(
       return null;
     }
     try {
-      return await taskIndexRepo.updateTaskState({
+      return await taskIndexRepo.updateTaskPresentation({
         workspacePath: target.workspacePath,
         workspaceIdentity: target.workspaceIdentity,
         taskId: target.sessionId,
-        patch: { model: normalizedModel },
+        presentation: { model: normalizedModel },
       });
     } catch (error) {
       logger.warn(undefined, `同步 task 模型到 task index 失败 taskId=${target.sessionId}`, error);
@@ -1748,14 +1756,16 @@ export function createZCodeTaskIndexSyncer(
   }
 
   return {
+    activeTaskRefs() {
+      return [...workspaceIngests.values()].flatMap((state) =>
+        [...state.summaries.values()]
+          .filter((summary) => !isTerminalPhase(summary.phase))
+          .map((summary) => ({ ...state.target, taskId: summary.sessionId })),
+      );
+    },
     ensureWorkspaceSubscription,
 
-    ensureSessionSubscription(
-      target: ZCodeAgentSessionTarget,
-      _options?: {
-        includeSnapshot?: boolean;
-      },
-    ): void {
+    ensureSessionSubscription(target: ZCodeAgentSessionTarget): void {
       if (!target.sessionId || !target.workspacePath) {
         return;
       }
@@ -1765,6 +1775,7 @@ export function createZCodeTaskIndexSyncer(
       });
     },
 
+    mutateSessionFacts,
     syncSnapshotAndBroadcast,
 
     syncTaskModel,
@@ -1820,23 +1831,16 @@ export function createZCodeTaskIndexSyncer(
   };
 }
 
-function buildMetaFromSnapshot(
+function buildPresentationFromSnapshot(
   snapshot: ZCodeSessionStateSnapshot,
   options?: {
     modelOverride?: string;
     thoughtLevelOverride?: string;
   },
-): ZCodeTaskMeta {
+): Pick<ZCodeTaskMeta, "mode" | "model" | "thoughtLevel" | "lastError" | "target"> {
   const modelOverride = options?.modelOverride?.trim();
   const thoughtLevelOverride = options?.thoughtLevelOverride?.trim();
-  const meta: ZCodeTaskMeta = {
-    taskId: snapshot.session.sessionId,
-    traceId: snapshot.session.traceId ?? generateTraceId(snapshot.session.sessionId),
-    title: deriveTitleFromSnapshot(snapshot),
-    workspacePath: snapshot.session.workspace.workspacePath,
-    workspaceIdentity: snapshot.session.workspace.workspaceIdentity,
-    createdAt: snapshot.session.createdAt,
-    updatedAt: snapshot.session.updatedAt,
+  const meta: Pick<ZCodeTaskMeta, "mode" | "model" | "thoughtLevel" | "lastError" | "target"> = {
     mode: fromZCodeMode(snapshot.session.mode),
     // 用户显式切模型或历史模型不可用时，session 操作已经带了新的可用模型。
     // 这类场景要同步覆盖 sqlite 的 task model，否则下次恢复仍会从已删除的历史模型起跳；
@@ -1845,8 +1849,6 @@ function buildMetaFromSnapshot(
     // 历史 task 恢复时 snapshot.settings.thoughtLevel 可能仍是同 workspace 草稿态的最新值。
     // 当恢复入口已经带上 task-local thoughtLevel 时，sqlite 必须写入入口值，避免下次打开继续被污染。
     thoughtLevel: thoughtLevelOverride || snapshot.settings.thoughtLevel.current,
-    provider: ZCODE_AGENT_PROVIDER,
-    status: deriveZCodeTaskStatusFromSessionSnapshot(snapshot),
     lastError: snapshot.projection.lastError
       ? {
           code: snapshot.projection.lastError.code ?? snapshot.projection.lastError.type,
@@ -1872,15 +1874,7 @@ function buildMetaFromSnapshot(
   return meta;
 }
 
-function deriveTitleFromSnapshot(snapshot: ZCodeSessionStateSnapshot): string {
-  return resolveZCodeVisibleSessionTitle({
-    title: snapshot.session.title,
-    messages: snapshot.messages,
-    target: snapshot.projection.target,
-  });
-}
-
-// createSession 刚返回时 snapshot 既没有真实 title 也没有 user message，
+// Bugfix: createSession 刚返回时 snapshot 既没有真实 title 也没有 user message，
 // 把这种"空白会话"广播出去会让侧边栏先闪一个 "New session" 占位符。
 // 这里判断"是否已有用户可见内容"，没有就只写 sqlite 不广播，等真实 title 到了再广播。
 function hasUserVisibleContent(snapshot: ZCodeSessionStateSnapshot): boolean {

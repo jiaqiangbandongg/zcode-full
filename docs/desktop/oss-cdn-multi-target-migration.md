@@ -27,6 +27,8 @@ OSS_CONFIG_FILE=/etc/ossutil/new,/etc/ossutil/old-a,/etc/ossutil/old-b
 
 已发布版本，不再修改。旧 CDN/OSS 继续保留 stable feed、安装包、blockmap、`manifest-*.json` 和 `components/**`。
 
+R3 Source Server 版本不再新增 legacy manifest/components；这条保留规则仅用于既有客户端兼容，常规新版本流水线不得删除历史对象。
+
 ### 3.1.3 桥接版
 
 配置三组目标：

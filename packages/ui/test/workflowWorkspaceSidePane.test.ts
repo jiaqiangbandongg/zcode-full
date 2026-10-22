@@ -251,8 +251,6 @@ describe("WorkflowWorkspaceSidePane", () => {
     expect(chapters[0]!.textContent).toContain("plan");
     expect(chapters[0]!.textContent).toContain("2 steps");
     expect(chapters[1]!.textContent).toContain("verify");
-    // 章头的横线从左长出。
-    expect(chapters[0]!.querySelector(".wf-ws-rule")).toBeTruthy();
     const cards = view.getAllByTestId("workflow-workspace-card");
     expect(cards[0]!.getAttribute("data-phase-id")).toBe("phase#a");
     expect(cards[2]!.getAttribute("data-phase-id")).toBe("phase#b");

@@ -40,12 +40,55 @@ describe("resolveModelReference — 三档匹配", () => {
     expect(resolved.entry).toBe(entries[1]);
   });
 
-  it("第 2 档：裸模型名只挂在一个 provider 下就直接命中", () => {
+  it("第 2 档：裸模型名在当前会话的 provider 下有就取它", () => {
+    const entries = [entry("zhipu", "glm-4.6", { current: true }), entry("zhipu", "glm-4.6-flash")];
+    expect(expectOk(resolveModelReference("glm-4.6-flash", entries)).canonical).toBe(
+      "zhipu/glm-4.6-flash",
+    );
+  });
+
+  it("第 3 档：裸名只在别的 provider 下有 → other_provider，绝不悄悄跨账单", () => {
+    // 事故形状：会话跑在 team plan 上，`GLM-5.3-Flash` 只配在个人 key 下；旧规则「唯一就取」
+    // 让主代理自作主张的一个「轻量模型」把子代理全送去了另一张账单。
+    const entries = [
+      entry("team", "glm-5.3", { current: true }),
+      entry("personal", "glm-5.3-flash"),
+    ];
+    const failed = expectFailure(resolveModelReference("glm-5.3-flash", entries));
+    expect(failed.reason).toBe("other_provider");
+    expect(failed.message).toContain("session's provider (team)");
+    expect(failed.message).toContain("personal/glm-5.3-flash");
+    expect(failed.message).toContain("ask the user first");
+    expect(failed.candidates).toHaveLength(1);
+  });
+
+  it("全称照常跨 provider：那是用户点名时的写法", () => {
+    const entries = [
+      entry("team", "glm-5.3", { current: true }),
+      entry("personal", "glm-5.3-flash"),
+    ];
+    expect(expectOk(resolveModelReference("personal/glm-5.3-flash", entries)).canonical).toBe(
+      "personal/glm-5.3-flash",
+    );
+  });
+
+  it("当前 provider 下的同名条目被禁用时，裸名同样不溜去别的 provider", () => {
+    const entries = [
+      entry("team", "glm-5.3", { current: true }),
+      entry("team", "glm-5.3-flash", { disabledReason: "no key" }),
+      entry("personal", "glm-5.3-flash"),
+    ];
+    expect(expectFailure(resolveModelReference("glm-5.3-flash", entries)).reason).toBe(
+      "other_provider",
+    );
+  });
+
+  it("目录里没有 current 条目时没有边界可守：裸名唯一就取", () => {
     const entries = [entry("zhipu", "glm-4.6"), entry("openai", "gpt-5")];
     expect(expectOk(resolveModelReference("gpt-5", entries)).canonical).toBe("openai/gpt-5");
   });
 
-  it("第 3 档：裸名撞多个 provider 时，当前会话那一条胜出", () => {
+  it("第 2 档：裸名撞多个 provider 时，当前会话那一条胜出", () => {
     const entries = [
       entry("zhipu", "glm-4.6"),
       entry("bigmodel", "glm-4.6", { current: true }),
@@ -55,7 +98,7 @@ describe("resolveModelReference — 三档匹配", () => {
     expect(resolved.canonical).toBe("bigmodel/glm-4.6");
   });
 
-  it("第 3 档无当前项：回 ambiguous 并列出撞上的全部全称", () => {
+  it("无当前项且裸名撞多个 provider：回 ambiguous 并列出撞上的全部全称", () => {
     const entries = [entry("zhipu", "glm-4.6"), entry("openrouter", "glm-4.6")];
     const failed = expectFailure(resolveModelReference("glm-4.6", entries));
     expect(failed.reason).toBe("ambiguous");

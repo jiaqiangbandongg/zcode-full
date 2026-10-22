@@ -9,7 +9,7 @@
     {
       "kind": "app-config-seed",
       "path": "~/.zcode/v2/credentials.json",
-      "purpose": "隔离的 BigModel 旧资料、不同值的业务 token/JWT 与独立 Bot 凭据；本地 HTTP fixture 控制 userinfo HTTP 401 或 HTTP 200 + 业务 401。"
+      "purpose": "隔离的 BigModel/ZAI 资料、不同值的业务 token/JWT 与独立 Bot 凭据；本地 HTTP fixture 控制明确失效进入登录入口，或有效 ZAI 身份遇到业务空200/403时必须用裸 token 核验并保留登录。"
     }
   ],
   "requests": []

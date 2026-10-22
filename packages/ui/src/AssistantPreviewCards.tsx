@@ -291,60 +291,67 @@ function AssistantPreviewCardRow({
         }
       : null;
   return (
-    <div
-      className="flex w-full items-center gap-3 rounded-xl border border-card-border bg-card p-3 pr-4 text-foreground"
-      data-zcode-stream-animate="true"
-      style={
-        {
-          "--zcode-stream-animation-delay": `${animationDelayMs}ms`,
-        } as CSSProperties
+    <OpenSplitButton
+      renderCard={(button) => (
+        <div
+          className="flex w-full items-center gap-3 rounded-xl border border-card-border bg-card p-3 pr-4 text-foreground"
+          data-preview-card-title={card.title}
+          data-zcode-stream-animate="true"
+          style={
+            {
+              "--zcode-stream-animation-delay": `${animationDelayMs}ms`,
+            } as CSSProperties
+          }
+        >
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-background text-foreground-subtle">
+            {!renderAsFile && card.type === "website" ? (
+              <GlobeIcon className="size-6" />
+            ) : descriptor ? (
+              <FileDisplayIcon src={descriptor.fileIconSrc} size={24} />
+            ) : (
+              <FileTextIcon className="size-6" />
+            )}
+          </div>
+          <div className="min-w-0 flex flex-1 flex-col gap-1">
+            <div className="truncate text-ui-base font-medium leading-5">{card.title}</div>
+            <div className="truncate text-ui-base leading-5 text-foreground-subtlest">
+              {subtitle}
+            </div>
+          </div>
+          {button}
+        </div>
+      )}
+      target={
+        !renderAsFile && card.type === "website"
+          ? {
+              type: "website",
+              url: card.url,
+              // website 卡有两个来源——html 引用卡（file://）与 localhost
+              // 预览卡（http(s) 活服务）。localPath 直开只对前者生效；localhost 卡
+              // 必须继续把 URL 交给浏览器，否则丢路由/动态内容。
+              workspacePath,
+              localPath: card.url.startsWith("file:") ? card.filePath : undefined,
+            }
+          : {
+              type: "file",
+              path: filePath!,
+              title: card.title,
+              label: card.title,
+              // Preview Card 以前没有 CodeViewer scope，远程 Linux path
+              // 会被 OpenSplitButton 当成本地路径交给宿主编辑器。
+              previewSource:
+                card.type === "website"
+                  ? fileSource!
+                  : buildAssistantPreviewCardFileSource(card, {
+                      workspacePath,
+                      workspaceIdentity,
+                      workspaceRemoteSessionId,
+                    }),
+            }
       }
-    >
-      <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-background text-foreground-subtle">
-        {!renderAsFile && card.type === "website" ? (
-          <GlobeIcon className="size-6" />
-        ) : descriptor ? (
-          <FileDisplayIcon src={descriptor.fileIconSrc} size={24} />
-        ) : (
-          <FileTextIcon className="size-6" />
-        )}
-      </div>
-      <div className="min-w-0 flex flex-1 flex-col gap-1">
-        <div className="truncate text-ui-base font-medium leading-5">{card.title}</div>
-        <div className="truncate text-ui-base leading-5 text-foreground-subtlest">{subtitle}</div>
-      </div>
-      <OpenSplitButton
-        target={
-          !renderAsFile && card.type === "website"
-            ? {
-                type: "website",
-                url: card.url,
-                // website 卡有两个来源——html 引用卡（file://）与 localhost
-                // 预览卡（http(s) 活服务）。localPath 直开只对前者生效；localhost 卡
-                // 必须继续把 URL 交给浏览器，否则丢路由/动态内容。
-                localPath: card.url.startsWith("file:") ? card.filePath : undefined,
-              }
-            : {
-                type: "file",
-                path: filePath!,
-                title: card.title,
-                label: card.title,
-                // Preview Card 以前没有 CodeViewer scope，远程 Linux path
-                // 会被 OpenSplitButton 当成本地路径交给宿主编辑器。
-                previewSource:
-                  card.type === "website"
-                    ? fileSource!
-                    : buildAssistantPreviewCardFileSource(card, {
-                        workspacePath,
-                        workspaceIdentity,
-                        workspaceRemoteSessionId,
-                      }),
-              }
-        }
-        onOpenBrowserUrl={onOpenBrowserUrl}
-        onOpenFileLink={onOpenFileLink}
-        onOpenCodeViewer={onOpenCodeViewer}
-      />
-    </div>
+      onOpenBrowserUrl={onOpenBrowserUrl}
+      onOpenFileLink={onOpenFileLink}
+      onOpenCodeViewer={onOpenCodeViewer}
+    />
   );
 }

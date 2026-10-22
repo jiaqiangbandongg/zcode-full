@@ -248,6 +248,7 @@ export const saveWorkflowToolEntry: ToolEntry = {
   capability:
     "Typecheck a dynamic-workflow script and, once confirmed, save it into the project as a reusable definition",
   metadata: {
+    shouldDefer: true,
     name: SAVE_WORKFLOW_TOOL_NAME,
     description: SAVE_WORKFLOW_TOOL_DESCRIPTION,
     readOnly: false,

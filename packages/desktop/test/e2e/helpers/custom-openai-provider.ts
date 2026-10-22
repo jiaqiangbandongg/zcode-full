@@ -5,7 +5,7 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clickTestIdByDom,
@@ -17,6 +17,8 @@ import {
 import {
   resolveSeededReplayBaseUrl,
   seedCustomOpenAIChatCompletionsProvider,
+  seedCustomAnthropicMessagesProvider,
+  type SeedCustomOpenAIProviderOptions,
 } from "./custom-openai-provider-store.js";
 import { getUpstreamApiKey } from "./upstream-provider.js";
 import { reloadElectronSessionSafely } from "./e2e-electron-reload.js";
@@ -25,17 +27,12 @@ import { createAndConfigurePersonalProvider } from "./personal-provider-settings
 import { saveProviderModelMetadataDialog } from "./provider-model-metadata-dialog.js";
 
 export { seedCustomOpenAIChatCompletionsProvider, saveProviderModelMetadataDialog };
+export { seedCustomAnthropicMessagesProvider };
 
 interface CreateCustomOpenAIProviderOptions {
+  apiFormat?: "openai-chat-completions" | "anthropic-messages";
   baseURL?: string;
   modelId: string;
-  providerName: string;
-}
-
-interface SeedCustomOpenAIProviderOptions {
-  inputModalities?: readonly ("text" | "image" | "video" | "audio" | "pdf")[];
-  modelId: string;
-  providerId: string;
   providerName: string;
 }
 
@@ -58,6 +55,7 @@ export async function restartWithSeededOpenAIProviders(
 }
 
 export async function createCustomOpenAIChatCompletionsProvider({
+  apiFormat: explicitApiFormat,
   baseURL: explicitBaseURL,
   modelId,
   providerName,
@@ -71,7 +69,7 @@ export async function createCustomOpenAIChatCompletionsProvider({
 
   await openModelProviderSettings();
   await createAndConfigurePersonalProvider({
-    apiFormat: "openai-chat-completions",
+    apiFormat: explicitApiFormat ?? "openai-chat-completions",
     apiKey: getUpstreamApiKey(),
     baseURL,
     providerName,
@@ -83,12 +81,26 @@ export async function createCustomOpenAIChatCompletionsProvider({
   });
   await addModelThroughMetadataDialog(modelId);
 
-  return waitForCreatedOpenAIProvider(providerName, baseURL, modelId);
+  return waitForCreatedOpenAIProvider(providerName, baseURL, modelId, explicitApiFormat);
 }
 
 export async function refreshSeededOpenAIProvidersThroughSettings(
   providerNames: readonly string[],
+  options: { workspacePath?: string | null } = {},
 ) {
+  // 根因：全局草稿可处于未分类目录，设置返回不会跳到固定 ZCodeProject；旧 helper 因此白等 30 秒。
+  // 记录调用时的导航 owner，显式指定返回目标的调用仍保持原语义。
+  const workspacePath =
+    options.workspacePath ||
+    (await browser.execute(
+      () =>
+        (
+          window as Window & {
+            __zcodeTabStoreE2E?: { getState?: () => { activeWorkspacePath?: string | null } };
+          }
+        ).__zcodeTabStoreE2E?.getState?.().activeWorkspacePath ?? null,
+    )) ||
+    DEFAULT_WORKSPACE;
   await openModelProviderSettings();
   await browser.waitUntil(
     async () =>
@@ -128,7 +140,7 @@ export async function refreshSeededOpenAIProvidersThroughSettings(
     timeout: 15000,
     timeoutMsg: "设置页返回按钮没有出现",
   });
-  await waitForWorkspaceApp(DEFAULT_WORKSPACE, 30000);
+  await waitForWorkspaceApp(workspacePath, 30000);
 }
 
 async function openModelProviderSettings() {
@@ -191,6 +203,7 @@ async function waitForCreatedOpenAIProvider(
   providerName: string,
   baseURL: string,
   modelId: string,
+  apiFormat: CreateCustomOpenAIProviderOptions["apiFormat"] = "openai-chat-completions",
 ) {
   let latestProviders: E2EModelProviderSnapshot[] = [];
   await browser.waitUntil(
@@ -199,8 +212,9 @@ async function waitForCreatedOpenAIProvider(
       const provider = latestProviders.find((candidate) => candidate.name === providerName);
       return Boolean(
         provider &&
-        provider.apiFormat === "openai-chat-completions" &&
-        provider.defaultKind === "openai-compatible" &&
+        provider.apiFormat === apiFormat &&
+        provider.defaultKind ===
+          (apiFormat === "anthropic-messages" ? "anthropic" : "openai-compatible") &&
         provider.apiKey.trim() === getUpstreamApiKey() &&
         hasEndpoint(provider, baseURL) &&
         resolveE2EProviderRuntimeBaseUrl(provider) === baseURL &&

@@ -61,8 +61,32 @@
 - `@` 限定 files。
 - 搜索结果仍按命令、任务、文件分组展示，并保留搜索历史。
 
+## 任务行选中身份
+
+- cmdk 是面板选中状态的唯一持有者；React `key` 与 cmdk `value` 都必须使用稳定的行身份。
+- 最近任务的 `value` 使用 `recent-task:${workspaceKey}:${taskId}`；任务搜索结果使用 `task-result:${row.key}`，其中 `row.key` 已包含工作区身份、任务 ID 和有正文片段时的片段序号。
+- 标题、工作区显示名和搜索片段只用于展示和现有搜索匹配，不能作为选中身份。原因是同工作区的重名任务会得到相同文本，cmdk 按 `value` 判断选中时会同时高亮多行，并影响键盘定位。
+- 鼠标移动或键盘上下移动后，只允许目标行处于 `aria-selected=true`；Enter 和点击继续通过该行原有回调打开对应任务/正文片段。
+- 本地任务使用路径 fallback，远程任务使用 `workspaceIdentity?.trim() || workspacePath`；同路径、同标题甚至同任务 ID 的不同远程工作区不能共用选中值。
+- 这是共享 UI 内的行身份修复，不新增持久化或迁移，不改变桌面 continuous、手机 replayable、Host/CLI 的任务数据与事件边界。
+
+```text
+鼠标移动 / 键盘上下键 → cmdk 保存唯一行 value → 仅目标行选中 → 原有任务打开回调
+```
+
+### 回归用例
+
+| ID           | 前置状态与操作                                              | 断言                                                             |
+| ------------ | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| CC-SELECT-01 | 最近任务有三个同工作区的重名任务；依次 hover、上下键、Enter | 始终仅目标行选中，打开目标任务                                   |
+| CC-SELECT-02 | 搜索返回同标题、同工作区显示名、同正文片段的不同任务        | 每行可独立选中；不同远程 identity 和同任务的不同片段也可独立选中 |
+
+组件回归：`packages/ui/test/commandCenterSelection.test.ts`。
+桌面交互候选：`packages/desktop/test/e2e/ui-shell/manual-review/pending/command-center-selection.test.ts`，验证真实索引列表与 cmdk 鼠标/键盘交互；不发送模型请求。
+
 ## 视觉细节
 
+- 搜索框聚焦时只使用外层胶囊的 focus 边框和背景，内部输入元素不额外显示矩形 outline；深浅主题与窄屏保持一致。全局不再按弹窗、远程控件或设置导航强制添加 outline，命令中心不保留对应的 `!important` 局部覆盖。`ui-shell/manual-review/pending/command-center-focus.test.ts`（CC-FOCUS-01）独立检查内部 outline 为零、外层边框保留，不依赖任务列表数据。
 - Command Center 与 QuickPick 的列表 item 使用 `rounded-xl`，让键盘选中态和 hover 态更柔和。
 - 底层 `CommandItem` 保持 `rounded-lg` 默认值；Cmd+K/QuickPick 通过共享 item class 覆盖为更大圆角，避免影响其它命令列表。
 - 命令图标优先复用对应既有入口的 Lucide 图标；同一动作在 Header、Sidebar、Side pane 与 Cmd+K 中不能使用不同语义图标。

@@ -1,3 +1,4 @@
+import * as executionAdapters from "@zcode/adapters/exec";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +14,7 @@ describe("Workflow 内显式 Subagent 的有效选择", () => {
     "%s 的真实 Workflow child 调用 Agent 时继承公共解析端口",
     async (mode) => {
       const root = await mkdtemp(join(tmpdir(), "zcode-workflow-selection-"));
-      const store = createSqliteSessionStore({ dbPath: ":memory:" });
+      const store = await createSqliteSessionStore({ dbPath: ":memory:" });
       const parent = {
         providerId: "parent",
         modelId: "model",
@@ -28,6 +29,7 @@ describe("Workflow 内显式 Subagent 的有效选择", () => {
       const resolve = vi.fn(() => ({ effectiveSelection: effective }));
       const executed: string[] = [];
       let requestedChild = false;
+      const execution = vi.spyOn(executionAdapters, "createNodeExecutionAdapter");
       const app = await createRegistryBackedTestApp({
         env: { ZCODE_HOME: root },
         skipUserConfig: true,
@@ -85,6 +87,10 @@ describe("Workflow 内显式 Subagent 的有效选择", () => {
       });
       try {
         await app.runExpertWorkflow({ task: "Research with the researcher." });
+        expect(execution.mock.calls.length).toBeGreaterThanOrEqual(2);
+        for (const [options] of execution.mock.calls) {
+          expect(options?.bashOutputTempDir).toBe(tmpdir());
+        }
         expect(resolve).toHaveBeenCalledWith(original);
         expect(executed).toContain("new-account");
         expect(executed).not.toContain("old-account");
@@ -92,6 +98,7 @@ describe("Workflow 内显式 Subagent 的有效选择", () => {
         expect(app.runtime.getSessionModelSelection()).toEqual(parent);
         expect(app.runtime.getMode()).toBe(mode);
       } finally {
+        execution.mockRestore();
         await app.close?.();
         store.close();
         await rm(root, { recursive: true, force: true });

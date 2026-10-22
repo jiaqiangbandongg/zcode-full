@@ -92,6 +92,7 @@ export type ConversationShareFailureReasonCode =
   | "artifact_extension_missing"
   | "artifact_outside_workspace"
   | "artifact_changed"
+  | "content_unavailable"
   | "artifact_read_failed"
   // 已知容量超限：附件真实大小超过服务端 max_artifact_bytes 或通道可搬运上限。
   // 与 artifact_read_failed（不确定）不同，它在选择阶段就是确定阻断。
@@ -104,6 +105,14 @@ export type ConversationShareFailureReasonCode =
   | "invalid_conversation";
 
 export type ConversationShareFailureIssueCode =
+  | "authentication_required"
+  | "network"
+  | "service_unavailable"
+  | "rate_limited"
+  | "feature_disabled"
+  | "connection_unavailable"
+  | "invalid_contract"
+  | "disclosure_required"
   | ConversationShareFailureReasonCode
   | "rows_limit"
   | "artifact_count_limit"
@@ -395,6 +404,7 @@ export interface ImportConversationShareInput {
 
 /** 导入时落盘的公开 rows 副本；会话里的只读块靠它渲染，不回源。 */
 export interface ImportedConversationShare {
+  contentBlocks?: unknown[];
   shareId: string;
   contextId: string;
   title: string;

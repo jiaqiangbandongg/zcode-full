@@ -123,9 +123,11 @@ describe("未绑定模型的 Session 历史恢复", () => {
       },
       { eventStore: createTestSessionEventStore(), modelFactory: factory },
     );
-    await expect(runtime.executeTurn("not ready")).rejects.toThrow(
-      "Select a model before continuing",
-    );
+    // 执行边界统一包装错误，但必须保留缺少模型这一真实原因。
+    await expect(runtime.executeTurn("not ready")).rejects.toMatchObject({
+      message: "Model creation failed",
+      cause: expect.objectContaining({ message: "Select a model before continuing" }),
+    });
     expect(factory).not.toHaveBeenCalled();
     expect(runtime.getSessionModelSelection()).toBeUndefined();
   });

@@ -21,3 +21,21 @@
 - 下载由主进程显式触发：`electron-updater` 的 `autoDownload` 关闭，`update-available` 事件里根据 ready 版本判断是否调用 `downloadUpdate()`。下载进行中可以记住更高目标，但不并发启动另一次下载。
 - 版本比较使用 semver coercion，兼容 `v3.1.4` 这类版本字符串；无法解析时只在字符串不同的情况下视为需要下载。
 - 自动轮询从 `idle`、`update-available`、`update-downloaded` 发起。`checking` 与真正的 `download-progress` 仍然跳过，避免并发下载。macOS / Linux 仅在 ready 包版本等于当前目标时保留退出自动安装。
+- 安装的唯一状态由 main 的 `quitAndInstallState` 持有，依次为 `idle → preparing → installing`，失败后进入终态 `recovering` 并受控重启。确认安装时立即锁定已就绪包，后台 manifest 请求不参与安装准入；检查迟到结果与检查失败不能修改锁定包或误判为原生安装错误。
+- 下载事件先记录在对应 CancellationToken 上，下载 Promise 成功收口后才发布 ready。安装不等待网络工作：挂起的下载尚未 ready，已有 ready 不依赖后台检查结束；取消/失败下载不能发布陈旧 ready。
+- `preparing` 开始后不接受新的检查、下载或更新结果。Host/Agent 清理不能撤销，准备失败、准备期间 staging 错误及交接后的原生安装失败均受控重启，不能回到服务已销毁的旧窗口。恢复只执行一次，重复错误不重复重启。
+- `quitAndInstall()` 返回不代表安装结束；成功交接后保留 `installing`，原生 `before-quit` 放行，重复安装命令不重入。真实安装错误与带检查来源的错误分别处理，不用当前菜单猜测来源。
+- 本修复只改变 desktop main 更新生命周期，不修改 Host/Agent 退出屏障、手机 shared-host attachment 或 desktop continuous / web remote replayable 消息边界。
+
+```text
+下载 Promise 成功收口 → ready → 确认安装/锁定包 → preparing → installing → 退出
+                                  后台检查不参与等待   │          │
+                                                      └─失败─────┴→ recovering → 重启恢复
+```
+
+## 回归验证
+
+- 单测覆盖 macOS/Linux 安装调用返回后的退出放行、重复命令幂等以及同步/异步失败后重新就绪的重试。
+- 单测覆盖挂起检查不阻塞 ready 安装、下载完成后发布 ready、准备后目标锁定、原生错误与重复事件。Electron smoke 覆盖准备期间新版本事件与重复 IPC，确认 Host/Agent 清理后仍只交接一次安装。
+- Electron 进程级 smoke 使用真实 `MacUpdater.quitAndInstall()`、renderer IPC 与 `app.before-quit`，控制原生 staging 回调在安装调用返回后到达；断言安装仅发起一次且进程正常退出。原生更新器使用夹具，不替换用户应用或执行真实 ShipIt 安装。
+- 签名发布包的 ShipIt 文件替换和自动重启仍需发布前验证，不以 smoke 代替。

@@ -100,6 +100,10 @@ export const errorAttributionSchema = z
     statusCode: z.number().int().min(100).max(599).optional(),
     providerErrorCode: z.string().min(1).max(160).optional(),
     retryable: z.boolean().optional(),
+    /** string=使用该 Highspeed 卡，null=明确未使用，undefined=旧 Agent 未发布。 */
+    highspeedCardId: z.string().nullable().optional(),
+    /** true=本轮 Highspeed 失败已命中退回声明但无可用退回目标；Renderer 据此作废匹配卡。 */
+    highspeedFallbackUnavailable: z.boolean().optional(),
   })
   .strict();
 export type ErrorAttribution = z.infer<typeof errorAttributionSchema>;
@@ -468,7 +472,21 @@ export const workspaceHookAdmissionStateSchema = z.object({
 });
 export type WorkspaceHookAdmissionSnapshotState = z.infer<typeof workspaceHookAdmissionStateSchema>;
 
+// 冷历史可读不代表 runtime 已可执行；缺席兼容旧发送端。
+export const runtimeInitializationSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("initializing"), attemptId: z.string().min(1) }),
+  z.object({ status: z.literal("ready"), attemptId: z.string().min(1) }),
+  z.object({
+    status: z.literal("failed"),
+    attemptId: z.string().min(1),
+    reasonCode: z.string(),
+    message: z.string(),
+  }),
+]);
+export type RuntimeInitialization = z.infer<typeof runtimeInitializationSchema>;
+
 export const conversationSnapshotSchema = z.object({
+  runtimeInitialization: runtimeInitializationSchema.optional(),
   protocolVersion: z.literal(1),
   sessionId: z.string(),
   logEpoch: z.string(),

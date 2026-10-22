@@ -10,10 +10,6 @@ import {
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { rewriteMarkdownArtifactImageSources } from "@zcode/shared";
 import { sanitizeImageSourceForLog } from "@/components/ai-elements/image-preview-dialog.js";
-import {
-  imageThumbnailClassName,
-  imageThumbnailTriggerClassName,
-} from "@/components/ai-elements/image-thumbnail-gallery.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -52,22 +48,12 @@ describe("artifact-backed Markdown images", () => {
   });
 });
 
-describe("shared image thumbnail styles", () => {
-  it("单图使用半宽、高度上限和 xl 圆角", () => {
-    expect(imageThumbnailTriggerClassName).toContain("max-w-1/2");
-    expect(imageThumbnailClassName).toContain("max-h-90");
-    expect(imageThumbnailClassName).toContain("rounded-xl");
-    expect(imageThumbnailClassName).toContain("object-cover");
-  });
-});
-
 describe("sanitizeImageSourceForLog", () => {
   it("清除远程图片 URL 的身份、签名参数和 fragment", () => {
     const sanitized = sanitizeImageSourceForLog(
       "https://user:pass@example.com/a.png?token=secret#fragment",
     );
     expect(sanitized).toBe("https://example.com/a.png");
-    expect(sanitized).not.toMatch(/user|pass|token|secret|fragment/u);
   });
 
   it("不把 Base64 图片内容写入日志", () => {

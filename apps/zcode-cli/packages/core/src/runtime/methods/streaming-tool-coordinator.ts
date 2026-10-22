@@ -1,3 +1,5 @@
+import { resolveDeferredToolCall } from "../../tool/deferred-call.js";
+import type { ToolSearchExecutionContext } from "@zcode/contracts";
 import { TurnMachineImpl, createPartId } from "../deps.js";
 import type {
   MessageId,
@@ -44,21 +46,30 @@ export function createStreamingToolCoordinator(
   options: {
     assistantMessageId: MessageId;
     model: Model;
+    toolSearch?: ToolSearchExecutionContext;
     traceContext: TraceContext;
   },
 ) {
   const abortController = new AbortController();
   const handles = new Map<string, Promise<StreamedToolExecutionResult | undefined>>();
-  const acceptedToolCalls = new Map<string, ModelToolCall>();
+  const acceptedToolCalls = new Map<string, { call: ToolCall; error?: Error }>();
   let discardedReasoningBytes = 0;
   let discardedTextBytes = 0;
 
   const abortOnTurnCancel = () => abortController.abort();
   state.turnAbortSignal.addEventListener("abort", abortOnTurnCancel, { once: true });
 
+  const admit = (toolCall: ModelToolCall) => {
+    const accepted = acceptedToolCalls.get(toolCall.id);
+    if (accepted) return accepted;
+    const admission = resolveDeferredToolCall(toolCall, options.toolSearch, runtime.registry);
+    acceptedToolCalls.set(toolCall.id, admission);
+    return admission;
+  };
+
   const prepareAcceptedToolSettlement = async () => {
     abortController.abort();
-    const toolCalls = Array.from(acceptedToolCalls.values());
+    const toolCalls = Array.from(acceptedToolCalls.values(), ({ call }) => call);
     const settledResults = await collectCompletedResults(handles, toolCalls);
     const settledResultById = new Map(settledResults.map((result) => [result.toolCallId, result]));
     return {
@@ -89,6 +100,7 @@ export function createStreamingToolCoordinator(
     ]);
     state.turnMachine = new TurnMachineImpl(state.turnMachine.receiveModelResponse(""));
     await executeToolCallsForModelStep.call(runtime, state, {
+      toolSearch: options.toolSearch,
       assistantCreatedAt,
       assistantMessageId: options.assistantMessageId,
       modelTraceContext: options.traceContext,
@@ -106,12 +118,14 @@ export function createStreamingToolCoordinator(
   };
 
   return {
+    admit: (toolCall: ModelToolCall) => admit(toolCall).call,
     accept(toolCall: ModelToolCall) {
       // 保留 runtime admission 后的空名，使正常 finish 走 registry miss，断流则保留 synthetic interrupted error。
       const normalizedToolCall = { ...toolCall };
       if (normalizedToolCall.providerExecuted) return;
-      acceptedToolCalls.set(normalizedToolCall.id, normalizedToolCall);
-      if (!shouldExecuteToolDuringStream(runtime, normalizedToolCall)) return;
+      const admission = admit(normalizedToolCall);
+      const acceptedCall = admission.call;
+      if (admission.error || !shouldExecuteToolDuringStream(runtime, acceptedCall)) return;
       if (handles.has(normalizedToolCall.id)) return;
       const promise = executeDuringStream(runtime, state, {
         abortSignal: abortController.signal,
@@ -119,7 +133,8 @@ export function createStreamingToolCoordinator(
         // model admission 已去重；只读工具可能先落盘，序号必须来自全部本地声明。
         declarationIndex: acceptedToolCalls.size - 1,
         model: options.model,
-        toolCall: normalizedToolCall,
+        toolSearch: options.toolSearch,
+        toolCall: acceptedCall,
         traceContext: options.traceContext,
       }).catch(async (error) => {
         runtime.logger?.warn("Streaming tool execution fell back to end-of-stream execution", {
@@ -139,14 +154,10 @@ export function createStreamingToolCoordinator(
       abortController.abort();
       const status = reason === "cancelled" ? "tool_cancelled" : "tool_abandoned";
       await Promise.all(
-        Array.from(acceptedToolCalls.values()).map((toolCall) =>
+        Array.from(acceptedToolCalls.values()).map(({ call: toolCall }) =>
           emitStreamingToolLedgerUpdate(runtime, state.events, options.traceContext, {
             assistantMessageId: options.assistantMessageId,
-            toolCall: {
-              id: toolCall.id as ToolCallId,
-              input: toolCall.input,
-              name: toolCall.name,
-            },
+            toolCall,
             status,
             executionTiming: "during_stream",
             blockedReason: reason,
@@ -248,22 +259,19 @@ async function executeDuringStream(
     assistantMessageId: MessageId;
     declarationIndex: number;
     model: Model;
-    toolCall: ModelToolCall;
+    toolSearch?: ToolSearchExecutionContext;
+    toolCall: ToolCall;
     traceContext: TraceContext;
   },
 ): Promise<StreamedToolExecutionResult | undefined> {
   throwIfTurnAborted(state.turnAbortSignal);
-  const toolName = requireRuntimeToolCallName(options.toolCall, {
+  const toolCall = options.toolCall;
+  requireRuntimeToolCallName(toolCall, {
     logger: runtime.logger,
     model: options.model,
     source: "streamingToolCoordinator.executeDuringStream",
     traceContext: options.traceContext,
   });
-  const toolCall: ToolCall = {
-    id: options.toolCall.id as ToolCallId,
-    input: options.toolCall.input,
-    name: toolName,
-  };
   const partID = createPartId();
   const input = toRecordInput(toolCall.input);
   const metadata = mcpToolPartMetadata(
@@ -308,6 +316,7 @@ async function executeDuringStream(
   const execution = await runtime.executeTools([toolCall], schedule, {
     subagentModelOverride: state.subagentModelOverride,
     model: state.model,
+    toolSearch: options.toolSearch,
     automationTurn: isAutomationMutationRestrictedTurn(state),
     offPeakTurn: isOffPeakCreateRestrictedTurn(state),
     signal: options.abortSignal,
@@ -323,6 +332,9 @@ async function executeDuringStream(
           callID: toolCall.id,
           declarationIndex: options.declarationIndex,
           tool: toolCall.name,
+          metadata: toolCall.modelCallWrapper
+            ? { modelCallWrapper: toolCall.modelCallWrapper }
+            : undefined,
           state: {
             status: "running",
             input,

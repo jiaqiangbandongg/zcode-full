@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectWebRemoteControlMobileDeviceInfo } from "../src/webRemoteControlDeviceInfo.js";
+import { collectWebRemoteControlMobileDeviceInfo } from "#src/web-remote-control/index.js";
 
 describe("collectWebRemoteControlMobileDeviceInfo", () => {
   it("collects stable browser device info without requiring mobile-only APIs", () => {

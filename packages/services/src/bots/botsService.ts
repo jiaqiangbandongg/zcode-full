@@ -30,6 +30,7 @@ import type { IDisposable } from "@zcode/rpc";
 import { completeNewModelSelection } from "@zcode/provider";
 import {
   ALL_BOT_WORKSPACES,
+  parseRemoteWorkspaceIdentity,
   CONVERSATION_SELECTION_MAX_TEXT_LENGTH,
   generateTraceId,
   normalizeAgentProviderToZCodeAgent,
@@ -82,6 +83,15 @@ import {
   type Locale,
   type SelectionPrompt,
 } from "@zcode/shared";
+import type { BotRemoteRuntimeService } from "#src/bot-project-runtime/contract.js";
+import {
+  readProjectCatalog,
+  projectSelectionId,
+  type ProjectCatalogSnapshot,
+} from "#src/project-catalog/index.js";
+import type { IProjectService } from "#src/project/contract.js";
+import type { IRemoteProjectService } from "#src/remote-projects/contract.js";
+import { buildRemoteHostWorkspaceIdentity, remoteHostIdFromWorkspaceIdentity } from "@zcode/shared";
 import type { IZCodeTaskService } from "../session/zcodeTaskService.js";
 import { resolveProviderModeIdFromConfigOptions } from "#src/session/sessionModeOptions.js";
 import { deriveSessionTitle as deriveTaskTitle } from "#src/session/sessionTitle.js";
@@ -93,7 +103,6 @@ import type {
   IModelSelectionService,
   ModelSelectionView,
 } from "../model-provider/providerFacadeServices.js";
-import type { ZCodeAgentAppRuntimePreferences } from "../zcode-agent/zcodeAgent.js";
 import { createServiceLogger } from "#src/logger/serviceLogger.js";
 import type {
   BotBindCodeResult,
@@ -303,6 +312,9 @@ function validateBotConfig(config: BotsConfigFile, candidate: BotConfig): void {
 interface BotsServiceDeps {
   credentialService: ICredentialService;
   zcodeTaskService: IZCodeTaskService;
+  projectService: Pick<IProjectService, "readProjects" | "readTree" | "prepareSession">;
+  remoteProjectService?: Pick<IRemoteProjectService, "readDirectory">;
+  ownerHostId?: string;
   broadcastService?: IBroadcastService;
   settingService?: ISettingService;
   modelSelectionService: Pick<IModelSelectionService, "getView">;
@@ -313,25 +325,16 @@ interface BotsServiceDeps {
   runStartupBackgroundTasks?: boolean;
 }
 
-interface BotRemoteWorkspaceTarget {
-  workspacePath: string;
-  workspaceIdentity: string;
-}
-
-interface BotRemoteWorkspaceReconnectResult {
-  ok: boolean;
-  message?: string;
-}
-
-interface BotRemoteWorkspaceService {
-  isConnected(target: BotRemoteWorkspaceTarget): Promise<boolean>;
-  ensureConnected(target: BotRemoteWorkspaceTarget): Promise<BotRemoteWorkspaceReconnectResult>;
-  getZCodeTaskService?(target: BotRemoteWorkspaceTarget): Promise<IZCodeTaskService | null>;
-  getModelSelectionService?(
-    target: BotRemoteWorkspaceTarget,
-  ): Promise<Pick<IModelSelectionService, "getView"> | null>;
-  syncAppRuntimePreferences?(preferences: ZCodeAgentAppRuntimePreferences): Promise<void>;
-}
+type BotRemoteWorkspaceReconnectResult = Awaited<
+  ReturnType<BotRemoteRuntimeService["ensureConnected"]>
+>;
+type BotRemoteWorkspaceService = Pick<BotRemoteRuntimeService, "isConnected" | "ensureConnected"> &
+  Partial<Omit<BotRemoteRuntimeService, "isConnected" | "ensureConnected">> & {
+    resolveWorkspace?: (target: {
+      workspacePath: string;
+      workspaceIdentity: string;
+    }) => Promise<{ workspacePath: string; workspaceIdentity: string } | null>;
+  };
 
 interface PreparedTopicMessage {
   generation: number;
@@ -727,7 +730,6 @@ const DEFAULT_BOT_ZCODE_PROVIDER: ZCodeProvider = ZCODE_AGENT_PROVIDER;
 const BOT_FORCED_MODE = "yolo";
 const BOT_TYPING_INTERVAL_MS = 4_000;
 const BOT_TASK_META_RETRY_DELAYS_MS = [80, 160, 320] as const;
-const BOT_WORKSPACE_REFS_CACHE_TTL_MS = 5_000;
 const BOT_MAX_ATTACHMENTS_PER_MESSAGE = 4;
 const BOT_MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024;
 const BOT_ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 30_000;
@@ -819,10 +821,6 @@ export function createBotsService(
   const recentInboundDeliveryAtByKey = new Map<string, number>();
   const inboundProcessingQueuesByContext = new Map<string, Promise<void>>();
   let botStorageMigrationPromise: Promise<void> | null = null;
-  const cachedWorkspaceRefsByKey = new Map<
-    string,
-    { expiresAt: number; value: BotWorkspaceRef[] }
-  >();
   let cachedLocale: Locale | undefined;
   const providers: Record<BotProvider, BotProviderAdapter | null> = {
     telegram: createTelegramBotProvider({
@@ -918,33 +916,7 @@ export function createBotsService(
   }
 
   async function writeTelegramOffset(botId: string, offset: number): Promise<void> {
-    await serializeStateWrite(async () => {
-      const state = await repo.readState();
-      const existing = state.bots[botId];
-      if (existing) {
-        state.bots[botId] = {
-          ...existing,
-          telegramOffset: offset,
-          updatedAt: Date.now(),
-        };
-      } else {
-        const bot = findBot(await repo.readConfig(), botId);
-        const workspace = bot ? firstAllowedWorkspace(await listWorkspaceRefs(), bot) : null;
-        if (bot && workspace) {
-          state.bots[botId] = {
-            botId: botId,
-            workspacePath: workspace.workspacePath,
-            workspaceIdentity: workspace.workspaceIdentity,
-            workspaceId: workspace.id,
-            mode: "draft",
-            activeTaskId: null,
-            telegramOffset: offset,
-            updatedAt: Date.now(),
-          };
-        }
-      }
-      await repo.writeState(state);
-    });
+    await updateProviderCursor(botId, { telegramOffset: offset });
   }
 
   async function readWeixinGetUpdatesBuf(botId: string): Promise<string | undefined> {
@@ -952,32 +924,29 @@ export function createBotsService(
   }
 
   async function writeWeixinGetUpdatesBuf(botId: string, buf: string): Promise<void> {
+    await updateProviderCursor(botId, { weixinGetUpdatesBuf: buf });
+  }
+
+  async function updateProviderCursor(
+    botId: string,
+    patch: Pick<BotContextState, "telegramOffset" | "weixinGetUpdatesBuf">,
+  ): Promise<void> {
+    const bot = findBot(await repo.readConfig(), botId);
+    if (!bot) return;
+    const context = await readContext(
+      {
+        botId,
+        chatType: "private",
+        provider: bot.provider,
+        providerUserId: bot.providerUserId ?? "",
+      },
+      bot,
+    );
+    if (!context) return;
     await serializeStateWrite(async () => {
-      const state = await repo.readState();
-      const existing = state.bots[botId];
-      if (existing) {
-        state.bots[botId] = {
-          ...existing,
-          weixinGetUpdatesBuf: buf,
-          updatedAt: Date.now(),
-        };
-      } else {
-        const bot = findBot(await repo.readConfig(), botId);
-        const workspace = bot ? firstAllowedWorkspace(await listWorkspaceRefs(), bot) : null;
-        if (bot && workspace) {
-          state.bots[botId] = {
-            botId,
-            workspacePath: workspace.workspacePath,
-            workspaceIdentity: workspace.workspaceIdentity,
-            workspaceId: workspace.id,
-            mode: "draft",
-            activeTaskId: null,
-            weixinGetUpdatesBuf: buf,
-            updatedAt: Date.now(),
-          };
-        }
-      }
-      await repo.writeState(state);
+      await repo.updateContext(botId, (current) =>
+        current ? { ...current, ...patch, updatedAt: Date.now() } : undefined,
+      );
     });
   }
 
@@ -986,37 +955,24 @@ export function createBotsService(
     const state = await repo.readState();
     const existing = state.bots[getBotConversationKey(actor)];
     if (existing) {
-      const latestWorkspaces = await listWorkspaceRefs();
-      const canonicalWorkspace = resolveCanonicalContextWorkspace(existing, latestWorkspaces);
-      if (!canonicalWorkspace) {
-        return existing;
-      }
-      const currentWorkspaceKey = getWorkspaceKey(
-        existing.workspacePath,
-        existing.workspaceIdentity,
+      if (existing.hostId !== undefined) return existing;
+      // 旧 SSH alias 必须先由可信 Host 解析，再匹配项目；不能以相同路径猜测 Source。
+      const resolved = await normalizeWorkspaceRef(
+        createWorkspaceRef(existing.workspacePath, existing.workspaceIdentity),
       );
-      const nextWorkspaceId =
-        existing.workspaceId && existing.workspaceId !== currentWorkspaceKey
-          ? existing.workspaceId
-          : canonicalWorkspace.id;
-      const nextContext: BotContextState = {
-        ...existing,
-        workspacePath: canonicalWorkspace.workspacePath,
-        workspaceIdentity: canonicalWorkspace.workspaceIdentity,
-        workspaceId: nextWorkspaceId,
-      };
-      if (
-        nextContext.workspacePath === existing.workspacePath &&
-        nextContext.workspaceIdentity === existing.workspaceIdentity &&
-        nextContext.workspaceId === existing.workspaceId
-      ) {
-        return existing;
-      }
-      // Bugfix: 历史 Bot context 可能只有 workspacePath，没有持久化 remote workspaceIdentity。
-      // 这样 createTask 虽然还能成功，但后续 bots:task 广播会因为 identity 不匹配被 UI 丢弃，
-      // 最终表现成“第三方会话正常回复，侧栏任务列表却不刷新”。这里优先在服务层自愈旧 context。
-      await writeContext(nextContext);
-      return nextContext;
+      const next = upgradeLegacyContext(
+        {
+          ...existing,
+          workspacePath: resolved.workspacePath,
+          workspaceIdentity: resolved.workspaceIdentity,
+        },
+        await readProjectCatalog(deps),
+      );
+      return (
+        (await repo.updateContext(getBotConversationKey(actor), (current) =>
+          current?.hostId !== undefined ? current : { ...current, ...next },
+        )) ?? null
+      );
     }
     if (actor.chatType === "group") {
       if (!actor.threadId) return null;
@@ -1045,6 +1001,9 @@ export function createBotsService(
         workspacePath: parent.workspacePath,
         workspaceIdentity: parent.workspaceIdentity,
         workspaceId: parent.workspaceId,
+        projectId: parent.projectId,
+        hostId: parent.hostId,
+        additionalDirectories: parent.additionalDirectories,
         mode: "draft",
         activeTaskId: null,
         updatedAt: Date.now(),
@@ -1078,20 +1037,26 @@ export function createBotsService(
       });
       return (await repo.readState()).bots[getBotStateKey(topic)] ?? null;
     }
-    const workspace = firstAllowedWorkspace(await listWorkspaceRefs(), bot);
-    if (!workspace) {
-      return null;
-    }
-    return {
+    const workspaces = await listWorkspaceRefs();
+    const workspace = firstAllowedWorkspace(workspaces, {
+      ...bot,
+      allowedWorkspaces: normalizeConfiguredAllowedWorkspaces(bot.allowedWorkspaces, workspaces),
+    });
+    if (!workspace) return null;
+    const execution = await bindProject(workspace);
+    const context: BotContextState = {
       botId: bot.id,
-      workspacePath: workspace.workspacePath,
-      workspaceIdentity: workspace.workspaceIdentity,
-      workspaceId: workspace.id,
+      ...execution,
       mode: "draft",
       activeTaskId: null,
-      draftOptions: await buildInitializedDraftOptions(workspace),
+      draftOptions: await buildInitializedDraftOptions(execution),
       updatedAt: Date.now(),
     };
+    return (
+      (await repo.updateContext(bot.id, (current) =>
+        current?.hostId !== undefined ? current : { ...current, ...context },
+      )) ?? null
+    );
   }
 
   let stateWriteTail: Promise<void> = Promise.resolve();
@@ -1340,6 +1305,8 @@ export function createBotsService(
             : group?.taskIds;
         state.bots[key] = {
           ...context,
+          telegramOffset: latest?.telegramOffset ?? context.telegramOffset,
+          weixinGetUpdatesBuf: latest?.weixinGetUpdatesBuf ?? context.weixinGetUpdatesBuf,
           ...(!group
             ? {
                 privateBindingId:
@@ -2108,7 +2075,7 @@ export function createBotsService(
   }
 
   async function isRemoteWorkspaceConnected(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<boolean> {
     if (!context.workspaceIdentity) {
       return true;
@@ -2122,12 +2089,13 @@ export function createBotsService(
       .isConnected({
         workspacePath: context.workspacePath,
         workspaceIdentity: context.workspaceIdentity,
+        ...(context.hostId ? { hostId: context.hostId } : {}),
       })
       .catch(() => false);
   }
 
   async function reconnectRemoteWorkspaceForBot(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<BotRemoteWorkspaceReconnectResult> {
     if (!context.workspaceIdentity) {
       return { ok: true };
@@ -2141,11 +2109,12 @@ export function createBotsService(
     return deps.remoteWorkspaceService.ensureConnected({
       workspacePath: context.workspacePath,
       workspaceIdentity: context.workspaceIdentity,
+      ...(context.hostId ? { hostId: context.hostId } : {}),
     });
   }
 
   async function resolveZCodeTaskServiceForContext(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<IZCodeTaskService> {
     if (!context.workspaceIdentity) {
       return deps.zcodeTaskService;
@@ -2153,6 +2122,7 @@ export function createBotsService(
     const remoteZCodeTaskService = await deps.remoteWorkspaceService?.getZCodeTaskService?.({
       workspacePath: context.workspacePath,
       workspaceIdentity: context.workspaceIdentity,
+      ...(context.hostId ? { hostId: context.hostId } : {}),
     });
     if (remoteZCodeTaskService) {
       return remoteZCodeTaskService;
@@ -2166,12 +2136,13 @@ export function createBotsService(
   }
 
   async function resolveModelSelectionServiceForContext(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<Pick<IModelSelectionService, "getView">> {
     if (!context.workspaceIdentity) return deps.modelSelectionService;
     const service = await deps.remoteWorkspaceService?.getModelSelectionService?.({
       workspacePath: context.workspacePath,
       workspaceIdentity: context.workspaceIdentity,
+      ...(context.hostId ? { hostId: context.hostId } : {}),
     });
     if (service) return service;
     throw new BotAdminRequiredError(
@@ -2231,10 +2202,6 @@ export function createBotsService(
     );
   }
 
-  function clearCandidateCaches(): void {
-    cachedWorkspaceRefsByKey.clear();
-  }
-
   function markCurrentSelection(
     selection: SelectionPrompt,
     locale: Locale | undefined,
@@ -2274,7 +2241,7 @@ export function createBotsService(
   }
 
   async function listActiveTaskConfigOptions(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     taskId: string,
   ): Promise<ZCodeConfigOption[]> {
     const zcodeTaskService = await resolveZCodeTaskServiceForContext(context);
@@ -2367,7 +2334,7 @@ export function createBotsService(
   }
 
   async function readModelSelectionView(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     selection?: ModelSelection,
   ): Promise<ModelSelectionView | null> {
     const service = await resolveModelSelectionServiceForContext(context).catch(() => null);
@@ -2384,7 +2351,7 @@ export function createBotsService(
   }
 
   async function listModelSelectionProviderOptions(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<BotModelProviderOption[]> {
     const view = await readModelSelectionView(context);
     // 旧缓存没有 workspaceIdentity 隔离，远端断连时会显示其他 Host 的候选。
@@ -2443,7 +2410,7 @@ export function createBotsService(
 
   async function formatStatusModelLabel(
     model: string | undefined,
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): Promise<string> {
     if (!model) {
       return "-";
@@ -2586,7 +2553,7 @@ export function createBotsService(
   }
 
   async function buildInitializedDraftOptions(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     provider?: ZCodeProvider,
   ): Promise<BotDraftOptions> {
     const requestedProvider = normalizeAgentProviderToZCodeAgent(
@@ -3304,7 +3271,7 @@ export function createBotsService(
   }
 
   async function broadcastTaskListChange(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     taskId: string,
     event: BotTaskBroadcastPayload["event"],
     extras: Partial<
@@ -3337,7 +3304,7 @@ export function createBotsService(
   }
 
   async function broadcastTaskStreamEvent(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     event: ZCodeStreamEvent,
   ): Promise<void> {
     const payload: BotTaskStreamBroadcastPayload = {
@@ -3355,80 +3322,156 @@ export function createBotsService(
       .catch(() => undefined);
   }
 
-  async function listWorkspaceRefs(
-    params: BotListWorkspaceRefsParams = {},
-  ): Promise<BotWorkspaceRef[]> {
-    const cacheKey = params.currentWorkspace
-      ? getWorkspaceKey(
-          params.currentWorkspace.workspacePath,
-          params.currentWorkspace.workspaceIdentity,
-        )
-      : "__default__";
-    const nowMs = Date.now();
-    const cached = cachedWorkspaceRefsByKey.get(cacheKey);
-    if (cached && cached.expiresAt > nowMs) {
-      return cached.value;
-    }
-    const workspaceByKey = new Map<string, BotWorkspaceRef>();
-    if (params.currentWorkspace) {
-      workspaceByKey.set(
-        getWorkspaceKey(
-          params.currentWorkspace.workspacePath,
-          params.currentWorkspace.workspaceIdentity,
-        ),
-        params.currentWorkspace,
-      );
-    }
-
-    const settings = await deps.settingService?.get().catch(() => null);
-    for (const entry of settings?.lastWorkspaceSession ?? []) {
-      const workspace = createWorkspaceRef(
-        entry.workspacePath,
-        entry.kind === "remote" ? entry.workspaceIdentity : undefined,
-      );
-      workspaceByKey.set(
-        getWorkspaceKey(workspace.workspacePath, workspace.workspaceIdentity),
-        workspace,
-      );
-    }
-
-    const value = [...workspaceByKey.values()];
-    cachedWorkspaceRefsByKey.set(cacheKey, {
-      expiresAt: nowMs + BOT_WORKSPACE_REFS_CACHE_TTL_MS,
-      value,
+  async function normalizeWorkspaceRef(workspace: BotWorkspaceRef): Promise<BotWorkspaceRef> {
+    if (!workspace.workspaceIdentity || !deps.remoteWorkspaceService?.resolveWorkspace)
+      return workspace;
+    const resolved = await deps.remoteWorkspaceService.resolveWorkspace({
+      workspacePath: workspace.workspacePath,
+      workspaceIdentity: workspace.workspaceIdentity,
     });
-    return value;
+    if (
+      !resolved ||
+      (resolved.workspacePath === workspace.workspacePath &&
+        resolved.workspaceIdentity === workspace.workspaceIdentity)
+    )
+      return workspace;
+    return createWorkspaceRef(resolved.workspacePath, resolved.workspaceIdentity);
   }
 
-  function resolveCanonicalContextWorkspace(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "workspaceId">,
-    workspaces: readonly BotWorkspaceRef[],
-  ): BotWorkspaceRef | null {
-    const currentWorkspaceKey = getWorkspaceKey(context.workspacePath, context.workspaceIdentity);
-    const exactWorkspace = workspaces.find(
+  async function normalizeBotWorkspaceIdentities(bot: BotConfig): Promise<BotConfig> {
+    // 只迁移 Host 已证明的远端 alias；未知 key 原样保留，绝不按相同路径扩大授权。
+    const allowedWorkspaces = await Promise.all(
+      bot.allowedWorkspaces.map(async (key) => {
+        const parsed = parseRemoteWorkspaceIdentity(key);
+        if (!parsed) return key;
+        return (await normalizeWorkspaceRef(createWorkspaceRef(parsed.workspacePath, key))).id;
+      }),
+    );
+    return { ...bot, allowedWorkspaces };
+  }
+
+  async function listWorkspaceRefs(
+    _params: BotListWorkspaceRefsParams = {},
+  ): Promise<BotWorkspaceRef[]> {
+    return workspaceRefsFromCatalog(await readProjectCatalog(deps));
+  }
+
+  function workspaceRefsFromCatalog(catalog: ProjectCatalogSnapshot): BotWorkspaceRef[] {
+    const foreign = new Set(catalog.directory.hosts.map((host) => host.id));
+    return catalog.projects.map((project) => {
+      const workspacePath =
+        project.roots.find((root) => root.isPrimary)?.rootPath ?? project.roots[0]?.rootPath ?? "";
+      return {
+        id: projectSelectionId(project),
+        label: project.name,
+        projectId: project.id,
+        hostId: project.hostId,
+        workspacePath,
+        rootPaths: project.roots.map((root) => root.rootPath),
+        ...(foreign.has(project.hostId) && workspacePath
+          ? { workspaceIdentity: buildRemoteHostWorkspaceIdentity(project.hostId, workspacePath) }
+          : {}),
+      };
+    });
+  }
+
+  async function bindProject(
+    workspace: BotWorkspaceRef,
+  ): Promise<
+    Pick<
+      BotContextState,
+      | "projectId"
+      | "hostId"
+      | "workspacePath"
+      | "workspaceIdentity"
+      | "workspaceId"
+      | "additionalDirectories"
+    >
+  > {
+    // 菜单只是展示快照。重新读取仍保留的项目，再由 owner 解析，迟到点击不能复活入口。
+    const before = await readProjectCatalog(deps);
+    const current = workspaceRefsFromCatalog(before).find((item) => item.id === workspace.id);
+    if (!current?.projectId || !current.hostId)
+      throw new Error("Bot project is no longer available");
+    const execution = await deps.projectService.prepareSession({
+      projectId: current.projectId,
+      hostId: current.hostId,
+    });
+    const after = await readProjectCatalog(deps);
+    const host = before.directory.hosts.find((item) => item.id === current.hostId);
+    const retainedEntries = before.directory.entries.filter(
+      (entry) =>
+        entry.hostId === current.hostId &&
+        (entry.projectId === current.projectId ||
+          (entry.projectId === null &&
+            entry.legacyWorkspace &&
+            current.rootPaths?.includes(entry.legacyWorkspace.workspacePath))),
+    );
+    // 同一 ID 移除再添加也是新 admission；不能将旧 owner 的 prepare 结果保存为新绑定。
+    if (
+      !workspaceRefsFromCatalog(after).some((item) => item.id === current.id) ||
+      (host &&
+        (!after.directory.hosts.some(
+          (item) => item.id === host.id && item.membershipId === host.membershipId,
+        ) ||
+          !retainedEntries.some((entry) =>
+            after.directory.entries.some((item) => item.id === entry.id),
+          )))
+    )
+      throw new Error("Bot project was removed during binding");
+    return { ...execution, hostId: current.hostId, workspaceId: current.id };
+  }
+
+  function upgradeLegacyContext(
+    context: BotContextState,
+    catalog: ProjectCatalogSnapshot,
+  ): BotContextState {
+    const workspaces = workspaceRefsFromCatalog(catalog);
+    const identity = context.workspaceIdentity;
+    // 历史 canonical key 是执行身份，不能直接当作新 Source 的持库 host ID。
+    const legacyHostId = catalog.directory.entries.find(
+      (entry) =>
+        entry.legacyWorkspace?.workspaceIdentity === identity &&
+        entry.legacyWorkspace?.workspacePath === context.workspacePath,
+    )?.hostId;
+    const hostId = identity
+      ? (legacyHostId ?? remoteHostIdFromWorkspaceIdentity(identity))
+      : (deps.ownerHostId ?? "local");
+    const candidates = workspaces.filter(
       (workspace) =>
-        getWorkspaceKey(workspace.workspacePath, workspace.workspaceIdentity) ===
-        currentWorkspaceKey,
+        workspace.rootPaths?.includes(context.workspacePath) &&
+        (identity
+          ? workspace.hostId === hostId || workspace.workspaceIdentity === identity
+          : !workspace.workspaceIdentity),
     );
-    if (exactWorkspace) {
-      return exactWorkspace;
-    }
-    if (context.workspaceId) {
-      const workspaceById = workspaces.find((workspace) => workspace.id === context.workspaceId);
-      if (workspaceById) {
-        return workspaceById;
-      }
-    }
-    // Bugfix: path-only 旧状态只能靠 path 候选回填 remote identity。
-    // 这里只在同 path 候选唯一时才升级，避免把两个不同 remote workspace 错绑到同一身份。
-    // 已经带 workspaceIdentity 的远端 context 不能被同路径本地候选降级，否则 /workspace 会丢失远端项。
-    if (context.workspaceIdentity) {
-      return null;
-    }
-    const samePathWorkspaces = workspaces.filter(
-      (workspace) => workspace.workspacePath === context.workspacePath,
-    );
-    return samePathWorkspaces.length === 1 ? samePathWorkspaces[0]! : null;
+    // 旧 path-only 远端只在唯一候选时补身份；已有 cwd 永远不跟随项目主要目录。
+    const legacyRemote =
+      !identity && candidates.length === 0
+        ? workspaces.filter((workspace) => workspace.rootPaths?.includes(context.workspacePath))
+        : [];
+    const selected =
+      candidates.length === 1
+        ? candidates[0]
+        : legacyRemote.length === 1
+          ? legacyRemote[0]
+          : undefined;
+    const resolvedHostId = selected?.hostId ?? hostId ?? deps.ownerHostId ?? "local";
+    const workspaceIdentity =
+      identity ??
+      (selected?.workspaceIdentity && selected.hostId
+        ? buildRemoteHostWorkspaceIdentity(selected.hostId, context.workspacePath)
+        : undefined);
+    return {
+      ...context,
+      projectId: selected?.projectId ?? null,
+      hostId: resolvedHostId,
+      workspaceIdentity,
+      workspaceId:
+        selected?.id ??
+        context.workspaceId ??
+        getWorkspaceKey(context.workspacePath, workspaceIdentity),
+      additionalDirectories: [],
+    };
   }
 
   async function normalizeBotWorkspaceConfig(
@@ -3443,14 +3486,12 @@ export function createBotsService(
   }> {
     const workspaces = await listWorkspaceRefs({ currentWorkspace });
     const nextAllowedWorkspaces = normalizeConfiguredAllowedWorkspaces(
-      bot.allowedWorkspaces,
+      (await normalizeBotWorkspaceIdentities(bot)).allowedWorkspaces,
       workspaces,
     );
     const nextBot: BotConfig = {
       ...bot,
-      // Bugfix: workspace 候选项现在来自 settings.lastWorkspaceSession，不再写入 bot-config.json。
-      // 这里顺手把旧的 path-only workspace 授权升级成 workspaceIdentity key，避免 remote context 自愈后
-      // 授权侧还停留在旧路径语义，导致消息链路被误判成 workspaceOutOfScope。
+      // 旧路径授权只在项目候选唯一时交接；同 cwd 多项目不能扩大权限。
       allowedWorkspaces: nextAllowedWorkspaces,
     };
     const nextConfig: BotsConfigFile = {
@@ -3465,7 +3506,7 @@ export function createBotsService(
   }
 
   async function readTaskMeta(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     taskId: string,
   ): Promise<ZCodeTaskMeta | null> {
     const zcodeTaskService = await resolveZCodeTaskServiceForContext(context);
@@ -3480,59 +3521,22 @@ export function createBotsService(
     context: BotContextState,
     user: BotConfig,
   ): Promise<BotTaskSelectionEntry[]> {
-    const currentWorkspace = createWorkspaceRef(context.workspacePath, context.workspaceIdentity);
-    const currentWorkspaceKey = getWorkspaceKey(context.workspacePath, context.workspaceIdentity);
-    const workspaceRefs = context.group
-      ? [
-          ...new Map(
-            [
-              currentWorkspace,
-              ...Object.values(context.group.taskWorkspaces ?? {}).map((ref) =>
-                createWorkspaceRef(ref.workspacePath, ref.workspaceIdentity),
-              ),
-            ].map((ref) => [getWorkspaceKey(ref.workspacePath, ref.workspaceIdentity), ref]),
-          ).values(),
-        ]
-      : await listWorkspaceRefs({ currentWorkspace });
-    const allowedWorkspaces = filterAllowedWorkspaces(workspaceRefs, user.allowedWorkspaces);
-    const candidateWorkspaces = allowedWorkspaces.filter((workspace) => {
-      if (context.group) return true;
-      const workspaceKey = getWorkspaceKey(workspace.workspacePath, workspace.workspaceIdentity);
-      return (
-        workspaceKey === currentWorkspaceKey ||
-        (!context.workspaceIdentity && workspace.workspacePath === context.workspacePath)
-      );
-    });
-    const workspaces = candidateWorkspaces.length > 0 ? candidateWorkspaces : [currentWorkspace];
-    const entries = (
-      await Promise.all(
-        workspaces.map(async (workspace) => {
-          if (context.group && !(await isRemoteWorkspaceConnected(workspace))) return [];
-          const zcodeTaskService = await resolveZCodeTaskServiceForContext(workspace);
-          const tasks = await zcodeTaskService
-            .listTasks({
-              workspacePath: workspace.workspacePath,
-              workspaceIdentity: workspace.workspaceIdentity,
-            })
-            .catch(() => []);
-          return tasks.map((task) => ({
-            task,
-            workspacePath: workspace.workspacePath,
-            workspaceIdentity: workspace.workspaceIdentity,
-          }));
-        }),
+    if (context.workspaceId && !isWorkspaceAllowed(context.workspaceId, user.allowedWorkspaces))
+      return [];
+    const tree = await deps.projectService.readTree({ hostId: context.hostId });
+    const key = getWorkspaceKey(context.workspacePath, context.workspaceIdentity);
+    return tree.tasks
+      .filter(
+        (task) =>
+          task.projectId === (context.projectId ?? null) &&
+          getWorkspaceKey(task.workspacePath, task.workspaceIdentity) === key,
       )
-    ).flat();
-    const entryByKey = new Map<string, BotTaskSelectionEntry>();
-    for (const entry of entries) {
-      entryByKey.set(
-        `${getWorkspaceKey(entry.workspacePath, entry.workspaceIdentity)}:${entry.task.taskId}`,
-        entry,
-      );
-    }
-    return [...entryByKey.values()].filter(
-      (entry) => !context.group || context.group.taskIds.includes(entry.task.taskId),
-    );
+      .filter((task) => !context.group || context.group.taskIds.includes(task.taskId))
+      .map((task) => ({
+        task,
+        workspacePath: context.workspacePath,
+        workspaceIdentity: context.workspaceIdentity,
+      }));
   }
 
   function resolvePendingTaskSelectionEntry(
@@ -3568,7 +3572,12 @@ export function createBotsService(
   }
 
   function createCurrentWorkspaceRef(context: BotContextState): BotWorkspaceRef {
-    return createWorkspaceRef(context.workspacePath, context.workspaceIdentity);
+    return {
+      ...createWorkspaceRef(context.workspacePath, context.workspaceIdentity),
+      id: context.workspaceId ?? getWorkspaceKey(context.workspacePath, context.workspaceIdentity),
+      projectId: context.projectId ?? undefined,
+      hostId: context.hostId,
+    };
   }
 
   async function readContextActiveTaskMeta(
@@ -3664,7 +3673,7 @@ export function createBotsService(
   }
 
   async function readTerminalTaskMeta(
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
     taskId: string,
     eventType: "task_complete" | "task_error",
   ): Promise<ZCodeTaskMeta | null> {
@@ -6072,7 +6081,7 @@ export function createBotsService(
 
   function buildRemoteReconnectCommandKey(
     actor: BotActor,
-    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity">,
+    context: Pick<BotContextState, "workspacePath" | "workspaceIdentity" | "hostId">,
   ): string {
     return [
       actor.botId,
@@ -7725,6 +7734,8 @@ export function createBotsService(
       const task = await zcodeTaskService.createTask({
         workspacePath: auth.context.workspacePath,
         workspaceIdentity: auth.context.workspaceIdentity,
+        projectId: auth.context.projectId ?? null,
+        additionalDirectories: auth.context.additionalDirectories ?? [],
         provider: draftOptions.provider,
         modelSelection: submissionDraftOptions.modelSelection,
         // 修复原因：Bot 旧 createTask 走 legacy session/create，却紧接着用 v4 sendText，
@@ -7940,41 +7951,15 @@ export function createBotsService(
     user: BotConfig,
     value: string,
   ): Promise<BotTaskSelectionEntry | null> {
-    const pendingEntry = resolvePendingTaskSelectionEntry(message.actor, value);
-    if (context.group && pendingEntry && !context.group.taskIds.includes(pendingEntry.task.taskId))
-      return null;
-    if (pendingEntry) {
-      return pendingEntry;
-    }
     const entries = await listContextTaskSelectionEntries(context, user);
-    const selected = resolveOptionByValue(
-      entries.map((entry) => ({
-        id: entry.task.taskId,
-        label: entry.task.title,
-        entry,
-      })),
-      value,
+    // 旧菜单只解析 taskId，实际归属必须重读；snapshot 不得绕过项目与固定 cwd 边界。
+    const pending = resolvePendingTaskSelectionEntry(message.actor, value);
+    return (
+      resolveOptionByValue(
+        entries.map((entry) => ({ id: entry.task.taskId, label: entry.task.title, entry })),
+        pending?.task.taskId ?? value,
+      )?.entry ?? null
     );
-    if (selected) {
-      return selected.entry;
-    }
-    // 群历史必须封闭，不能用任意 taskId 绕过候选列表读取其他会话。
-    if (context.group) return null;
-    const zcodeTaskService = await resolveZCodeTaskServiceForContext(context);
-    const snapshot = await zcodeTaskService
-      .getTaskSnapshot({
-        taskId: value.trim(),
-        workspacePath: context.workspacePath,
-        workspaceIdentity: context.workspaceIdentity,
-      })
-      .catch(() => null);
-    return snapshot
-      ? {
-          task: snapshot.meta,
-          workspacePath: context.workspacePath,
-          workspaceIdentity: context.workspaceIdentity,
-        }
-      : null;
   }
 
   async function getContextTaskBlockReason(
@@ -8174,7 +8159,6 @@ export function createBotsService(
     },
     async saveConfig(config) {
       const savedConfig = await writeBotConfig(normalizeConfigBots(config));
-      clearCandidateCaches();
       telegramRuntime.scheduleRefresh(savedConfig);
       weixinRuntime.scheduleRefresh(savedConfig);
       feishuRuntime.scheduleRefresh(savedConfig);
@@ -8237,7 +8221,6 @@ export function createBotsService(
       const bots = config.bots.filter((item) => item.id !== bot.id);
       bots.push(bot);
       const savedConfig = await writeBotConfig({ ...config, bots });
-      clearCandidateCaches();
       telegramRuntime.scheduleRefresh(savedConfig);
       weixinRuntime.scheduleRefresh(savedConfig);
       feishuRuntime.scheduleRefresh(savedConfig);
@@ -8272,12 +8255,7 @@ export function createBotsService(
         ...config,
         bots: config.bots.map((item) => (item.id === bot.id ? nextBot : item)),
       });
-      await serializeStateWrite(async () => {
-        const state = await repo.readState();
-        delete state.bots[bot.id];
-        await repo.writeState(state);
-      });
-      clearCandidateCaches();
+      await repo.updateContext(bot.id, () => undefined);
       telegramRuntime.scheduleRefresh(savedConfig);
       weixinRuntime.scheduleRefresh(savedConfig);
       feishuRuntime.scheduleRefresh(savedConfig);
@@ -8305,14 +8283,9 @@ export function createBotsService(
         ...config,
         bots: config.bots.filter((item) => item.id !== botId),
       });
-      clearCandidateCaches();
       telegramRuntime.scheduleRefresh();
       weixinRuntime.scheduleRefresh();
-      await serializeStateWrite(async () => {
-        const state = await repo.readState();
-        delete state.bots[botId];
-        await repo.writeState(state);
-      });
+      await repo.updateContext(botId, () => undefined);
       if (bot?.credentialRef) {
         await deps.credentialService.delete(bot.credentialRef);
       }
@@ -8660,11 +8633,7 @@ export function createBotsService(
       }
     },
     async resetBotState(contextKey: string) {
-      await serializeStateWrite(async () => {
-        const state = await repo.readState();
-        delete state.bots[contextKey];
-        await repo.writeState(state);
-      });
+      await repo.updateContext(contextKey, () => undefined);
       await reconcilePrivateSynchronization(contextKey);
     },
     watchAutomationRun,
@@ -8940,12 +8909,9 @@ export function createBotsService(
               );
             if (!workspace)
               return [createOutbound(message.actor, msg(auth.locale, "workspaceMissing"))];
-            const context = {
-              ...auth.context,
-              workspacePath: workspace.workspacePath,
-              workspaceIdentity: workspace.workspaceIdentity,
-              workspaceId: workspace.id,
-            };
+            if (!isWorkspaceAllowed(workspace.id, synced.user.allowedWorkspaces))
+              return [createOutbound(message.actor, msg(auth.locale, "workspaceOutOfScope"))];
+            const context = { ...auth.context, ...(await bindProject(workspace)) };
             const draftContext = await writeDraftContext(
               context,
               await buildInitializedDraftOptions(context),
@@ -9494,9 +9460,6 @@ export function createBotsService(
             }
             const nextContext = {
               ...auth.context,
-              workspacePath: taskEntry.workspacePath,
-              workspaceIdentity: taskEntry.workspaceIdentity,
-              workspaceId: getWorkspaceKey(taskEntry.workspacePath, taskEntry.workspaceIdentity),
               mode: "task",
               activeTaskId: task.taskId,
             } satisfies BotContextState;

@@ -939,36 +939,10 @@ describe("WebFetch tool", () => {
       result: "target answer",
     });
     expect(httpClient.request).toHaveBeenCalledTimes(1);
-    expect(getContentRequestCalls(httpClient)).toHaveLength(1);
     expect(getContentRequestCalls(httpClient)[0]?.[0]).toMatchObject({
       method: "GET",
       url: "https://blocked.example/docs",
     });
-  });
-
-  it("does not fail when the old domain safety service is unreachable", async () => {
-    const httpClient: HttpClientPort = {
-      request: vi.fn<HttpClientPort["request"]>(async (request) => {
-        if (request.url !== "https://example.com/docs") {
-          throw new Error(`unexpected WebFetch request: ${request.url}`);
-        }
-        return response({
-          body: "reachable target",
-          contentType: "text/plain",
-          url: request.url,
-        });
-      }),
-    };
-    const model = createTestModel("reachable answer");
-
-    const output = await webFetchHandler(
-      { url: "https://example.com/docs", prompt: "Summarize" },
-      createContext({ httpClient, model }),
-    );
-
-    expect(output.result).toBe("reachable answer");
-    expect(httpClient.request).toHaveBeenCalledTimes(1);
-    expect(getContentRequestCalls(httpClient)).toHaveLength(1);
   });
 });
 

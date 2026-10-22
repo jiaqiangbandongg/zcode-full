@@ -130,7 +130,7 @@ Target Registry rebuilds itself
 Provisioning 必须先写入目标 Environment 的正式 Store，再由目标 Registry 重建。它不能直接构造 Registry、
 Model、Runtime Header，也不能成为每次模型请求的在线依赖。远端设置编辑和远端登录同样应调用目标
 Environment 的正式 Service，而不是把 Desktop Credential Store 当成远端鉴权源。当前同步是显式
-Local → Remote；本地登出或删除不会撤销已经写入远端的凭据。
+Local → Remote；当前 Provisioning 在本地 allowlist 凭据保存或删除成功后自动触发，下一次成功同步会按 replace 语义撤销远端同名 allowlist 凭据，非 allowlist 凭据保持不变。离线或同步失败期间不能把本地删除反馈当作远端已经撤销的证明，详见上述当前 Provisioning 规格。
 
 ## 不变量
 
@@ -149,3 +149,31 @@ Local → Remote；本地登出或删除不会撤销已经写入远端的凭据�
 - `docs/working-memory/provider-refactor/design/registry/configuration.md`
 - `docs/remote/zcode-agent-remote-deployment.md`
 - `docs/web-remote-control/web-remote-control-architecture.md`
+
+## 设置页应用配置归属（2026-09-16 修复 A2）
+
+激活远程工作区只改变工作区服务，不改变 Desktop 设置的所有者。设置页必须按使用者分别加载和保存：
+
+| 设置 | 读取与写入所有者 | 原因 |
+| --- | --- | --- |
+| Chromium 硬件加速、Windows 托盘、内置浏览器证书策略 | base Local Host | Desktop Main 启动时只读取本机 bootstrap 配置 |
+| 数据存储目录 | base Local Host | native picker 返回本机路径；复制和 bootstrap 指针必须在同一台机器 |
+| 集成终端 Shell 选择 | base Local Host | 候选由本机 systemService 枚举；本机 shell 路径不能写入 Source |
+| HTTP 代理、No Proxy、自定义 CA 路径 | base Local Host | 桌面渲染层、内置浏览器与本机子进程的启动配置；不隐式配置另一 Environment |
+| 终端 Profile 继承、终端字体 | 当前 workspace Environment | 由目标 terminalService 创建 PTY 时读取 |
+| 任务自动归档开关与天数 | 当前 workspace Environment | 由持有任务的目标 taskService 执行 |
+| Skills/MCP/Plugins/Hooks/Subagents | 既有目标 scope resolver | 保持 User、Source、workspace 的现有归属 |
+
+```text
+Desktop 设置页（可在远程 tab 打开）
+  ├─ 应用设置读取/保存 ──> base Local Host ──> 本机 setting.json ──> Main 冷启动
+  └─ 运行设置读取/保存 ──> workspace Source ──> Source setting.json ──> 目标服务
+native picker ── 本机目录 ──> Local Host.updateDataBaseDir ──> 本机复制成功后保存指针
+```
+
+- 修复首次错接点是 SettingsPage；不修改远程 ServiceCollection，不整体切换设置页 Provider。
+- 本机与 Source 加载相互独立；卸载或目标切换后忽略旧读取结果，防止旧 Source 覆盖新页面。
+- 写入/复制失败继续传播到现有反馈，不更新成功状态、不回落另一端、不增加重试。
+- 不自动迁移或删除先前错误写入 Source 的字段：不能据字段名判断它是否为远端用户有意配置。
+- Desktop 本地流程复用同一 base service。Web/手机保持既有 base services 和平台可见性；不新建 Host、连接或 Agent，不修改 continuous/replayable、queue、snapshot 或登录态。
+- 验证：分离 local/remote 替身的真实 SettingsPage 回调；SSH 单用例验证本机保存、Source 不被污染、Source 自动归档对照、native 目录迁移和 Electron 冷重启。Windows Shell/托盘以合同测试补充，不能等同 Windows 实机验证。

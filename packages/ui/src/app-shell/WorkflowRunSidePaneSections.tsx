@@ -7,7 +7,7 @@
 
 import { workflowRunStopReasonMessageId } from "@/components/workflow-graph/run-status-presentation.js";
 import { memo, type ReactNode } from "react";
-import type { WorkflowRunSaveSlots } from "@/components/workflow-timeline/WorkflowRunSaveControls.js";
+import type { WorkflowRunSaveSlots } from "@/project-workflow/WorkflowRunSaveControls.js";
 import {
   ArrowUpRightIcon,
   ListIcon,

@@ -36,19 +36,10 @@ it("点击权限设置后弹窗关闭再回调（否则 trigger 随 tab 隐藏�
   expect(await screen.findByTestId("browser-permission-popover")).toBeTruthy();
   fireEvent.click(screen.getByTestId("browser-permission-open-settings"));
   expect(onOpenSettings).toHaveBeenCalledWith("https://example.com");
-  await waitFor(() =>
-    expect(screen.queryByTestId("browser-permission-popover")).toBeNull(),
-  );
+  await waitFor(() => expect(screen.queryByTestId("browser-permission-popover")).toBeNull());
 });
 
-it("点击权限设置回调目标 origin；无回调时入口禁用", async () => {
-  const onOpenSettings = vi.fn();
-  renderEntry(onOpenSettings);
-  fireEvent.click(screen.getByTestId("browser-permission-trigger"));
-  fireEvent.click(await screen.findByTestId("browser-permission-open-settings"));
-  expect(onOpenSettings).toHaveBeenCalledWith("https://example.com");
-
-  cleanup();
+it("无回调时权限设置入口禁用", async () => {
   renderEntry(undefined);
   fireEvent.click(screen.getByTestId("browser-permission-trigger"));
   expect((await screen.findByTestId("browser-permission-open-settings")).disabled).toBe(true);

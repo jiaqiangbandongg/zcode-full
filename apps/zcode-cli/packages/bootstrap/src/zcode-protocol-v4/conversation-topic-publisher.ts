@@ -28,6 +28,7 @@ import type {
 } from "@zcode/shared/zcode-protocol-v4";
 import {
   DELIVERY_PROFILES,
+  statePatchSchema,
   PROTOCOL_V4_LIMITS,
   clampWorkflowRunsForLegacy,
   coalesceConversationDeltas,
@@ -288,6 +289,17 @@ export class ConversationTopicPublisher {
 
   getSnapshot(): ConversationSnapshot {
     return this.projection.getSnapshot();
+  }
+
+  /** 初始化只变化几次，沿既有 snapshot 恢复边界发布，不引入第二份事件流。 */
+  setRuntimeInitialization(
+    state: NonNullable<ConversationSnapshot["runtimeInitialization"]>,
+  ): void {
+    this.projection.setRuntimeInitialization(state);
+    this.wireSnapshotBytesUpperBound = this.measureWireSnapshotBytes(this.getWireSnapshot());
+    this.appendDeltas(this.currentSeq, [
+      { op: "state.updated", patch: statePatchSchema.parse(this.getSnapshot()) },
+    ]);
   }
 
   /** 测试/闸门共用的 logical TopicFrame 字节口径（不是裸 snapshot 大小）。 */
@@ -597,7 +609,11 @@ export class ConversationTopicPublisher {
       if (deltas === null) throw new ProjectionPayloadTooLargeError(candidateBytes);
       this.wireSnapshotBytesUpperBound = nextUpperBound;
     }
-    this.log.push({ seq: event.sequenceNumber, deltas });
+    this.appendDeltas(event.sequenceNumber, deltas);
+  }
+
+  private appendDeltas(seq: number, deltas: ConversationDelta[]): void {
+    this.log.push({ seq, deltas });
     while (this.log.length > this.retention) {
       const evicted = this.log.shift();
       if (evicted) this.floorSeq = evicted.seq;
@@ -663,8 +679,41 @@ export class ConversationTopicPublisher {
       }
     }
 
+    const previous = this.projection.getSnapshot();
+    if (previous.runtimeInitialization) {
+      // 首帧已对外发布，最终恢复不得让同一 epoch 的 seq/revision 倒退。
+      candidate.projection.setRuntimeInitialization(
+        previous.runtimeInitialization,
+        previous.seq + 1,
+        previous.revision + 1,
+      );
+    }
     this.projection = candidate.projection;
-    if (usedBatchHydration) {
+    const current = this.getSnapshot();
+    if (
+      previous.runtimeInitialization &&
+      previous.rows.window.length === current.rows.window.length &&
+      previous.rows.window.every(
+        (row, index) =>
+          row.rowId === current.rows.window[index]?.rowId &&
+          row.kind === current.rows.window[index]?.kind,
+      )
+    ) {
+      // 正常初始化只补控制/摘要，不能用尾窗 snapshot 丢掉用户已分页读出的历史与滚动锚点。
+      // 真正改变历史结构（如 compact 修复）仍走既有完整 snapshot 边界。
+      const deltas: ConversationDelta[] = [
+        { op: "state.updated", patch: statePatchSchema.parse(current) },
+      ];
+      current.rows.window.forEach((row, index) => {
+        if (JSON.stringify(row) !== JSON.stringify(previous.rows.window[index]))
+          deltas.push({ op: "row.upserted", row });
+      });
+      this.wireSnapshotBytesUpperBound = this.measureWireSnapshotBytes(this.getWireSnapshot());
+      this.appendDeltas(current.seq, deltas);
+      return;
+    }
+
+    if (usedBatchHydration || previous.runtimeInitialization) {
       // 批量重放会把派生 actions 延迟到最终 materialization；若允许客户端
       // 用逐事件旧快照的中间 base 续这份日志，batch 从未持有的旧 canEdit/canRetry 无法被
       // 定点撤销。rehydrate 本来就要求所有现有订阅 resync，因此在当前 seq 建立 snapshot

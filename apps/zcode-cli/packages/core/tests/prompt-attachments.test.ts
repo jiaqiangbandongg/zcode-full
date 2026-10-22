@@ -949,7 +949,6 @@ describe("prompt attachment provider content order", () => {
     expect(providerMessages[0]?.role).toBe("user");
     expect(JSON.stringify(providerMessages)).not.toContain("prompt_attachment");
     expect(JSON.stringify(providerMessages)).not.toContain("Result of calling the Read tool");
-    expect(JSON.stringify(providerMessages)).not.toContain(pastedContent.slice(0, 80));
   });
 
   it("resolves pasted temporary text files as local references without reading contents", async () => {

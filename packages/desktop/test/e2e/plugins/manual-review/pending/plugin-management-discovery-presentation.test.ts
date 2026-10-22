@@ -26,13 +26,13 @@ describe("PLM-LC-001/002 插件商店发现、入口与展示 E2E", () => {
     await clearAppData();
   });
 
-  it("覆盖默认分段、搜索、折叠、Card/Installed/Manage 入口与 pairwise 展示", async function () {
+  it("覆盖默认分段、搜索、折叠、Card/Manage 入口与 pairwise 展示", async function () {
     this.timeout(DISCOVERY_TIMEOUT_MS);
     requirePluginManualReview();
 
     const fixture = await createPluginLifecycleFixture();
     await openPluginSettings();
-    await setPluginPresentation({ locale: "zh-CN", theme: "zai-light", width: 1440, height: 1000 });
+    await setPluginPresentation({ locale: "zh-CN", theme: "zai-light", width: 1440, height: 720 });
 
     expect(await isPressed("plugin-store-segment-public")).toBe(true);
     await addLifecycleMarketplaceThroughUi(fixture);
@@ -63,22 +63,29 @@ describe("PLM-LC-001/002 插件商店发现、入口与展示 E2E", () => {
 
     await installPluginThroughUi(PLUGIN_LIFECYCLE_ID);
     await setInputValueByTestIdDom("plugin-store-search", "");
-    await waitForPluginControl("plugin-store-installed-strip");
-    await clickPluginControl("plugin-store-installed-item", { pluginId: PLUGIN_LIFECYCLE_ID });
+    expect(await hasPluginControl("plugin-store-installed-strip")).toBe(false);
+    await openPluginCard(PLUGIN_LIFECYCLE_ID);
     await waitForPluginControl("plugin-store-detail", { pluginId: PLUGIN_LIFECYCLE_ID });
     await clickPluginControl("plugin-store-detail-back");
     await openManageView();
-    await waitForPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_LIFECYCLE_ID });
+    await waitForPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_LIFECYCLE_ID });
     await capturePluginManualReview("PLM-LC-001", "manage-installed");
-    await clickPluginControl("plugin-store-manage-back");
+    await clickPluginControl("plugin-store-browse-all");
 
     await assertPluginStoreFitsViewport();
     await capturePluginManualReview("PLM-LC-002", "zh-zai-light-wide");
-    await setPluginPresentation({ locale: "en-US", theme: "zai-dark", width: 720, height: 900 });
+    await setPluginPresentation({ locale: "en-US", theme: "zai-dark", width: 720, height: 720 });
     await assertPluginStoreFitsViewport();
     expect(await hasPluginControl("plugin-store-create")).toBe(true);
     expect(await hasPluginControl("plugin-store-sources-open")).toBe(true);
     await capturePluginManualReview("PLM-LC-002", "en-zai-dark-narrow");
+    await clickPluginControl("desktop-top-nav-back");
+    await browser.waitUntil(async () => !(await hasPluginControl("plugin-store-root")), {
+      timeout: 15000,
+      timeoutMsg: "Market Back did not return to the chat view",
+    });
+    expect(await hasPluginControl("plugin-settings-scope-trigger")).toBe(false);
+    await capturePluginManualReview("PLM-LC-001", "back-to-chat");
   });
 });
 

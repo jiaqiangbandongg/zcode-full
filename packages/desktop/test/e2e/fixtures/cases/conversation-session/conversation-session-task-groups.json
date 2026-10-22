@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-task-groups",
+  "spec": "./test/e2e/conversation-session/conversation-session-task-groups.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-task-groups.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "grp06-first-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed response exercises the real Host/CLI creation and group placement, without testing model content."
+    },
+    {
+      "id": "grp06-pending-placement",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed response isolates group admission failure from the real Host/CLI accepted task and directory lifecycle."
+    }
+  ]
+}

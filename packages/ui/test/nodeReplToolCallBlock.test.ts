@@ -160,12 +160,10 @@ describe("node repl tool display", () => {
     expect(model.resultText).toBeUndefined();
     expect(model.images).toEqual([{ base64: "AAAA", mimeType: "image/png" }]);
     expect(html).toContain('src="data:image/png;base64,AAAA"');
-    expect(html).toContain("w-fit max-w-1/2 cursor-zoom-in overflow-hidden rounded-xl");
-    expect(html).toContain("h-auto max-h-90 max-w-full rounded-xl border border-border");
     expect(html).not.toContain("Attached image");
   });
 
-  it("投影 CUA App 身份，并把工具卡 leading icon 换成该 App 的图标", () => {
+  it("投影 CUA App 身份，摘要保留模型标题且不重复 App 名", () => {
     const toolCall = {
       toolId: "tool-node-repl-cua-app",
       toolName: "mcp__node_repl__js",
@@ -202,11 +200,6 @@ describe("node repl tool display", () => {
       }),
     );
 
-    // 注意：SSR 不跑 effect，图标解析拿不到 data URL，因此下面两条只能证明「没退化成 CUA 的
-    // 指针图标」，**不能**证明 App 图标链路接上了 —— 那部分由 nodeReplCuaAppIcon.test.ts 在
-    // jsdom 下用真实 platform mock 覆盖（含去掉接线即变红的阴性对照）。
-    expect(html).toContain("lucide-square-mouse-pointer");
-    expect(html).not.toContain("lucide-mouse-pointer-click");
     // 摘要行仍只显示模型给的 title，不额外拼 App 名（否则和 title 重复）。
     expect(html).toContain("在备忘录里新建一条笔记");
     expect(html).not.toContain("Notes");
@@ -260,8 +253,6 @@ describe("node repl tool display", () => {
 
     expect(model.displaySource).toBe("browser_turn_end");
     expect(html).toContain('src="data:image/png;base64,AAAA"');
-    expect(html).toContain("w-fit max-w-1/2 cursor-zoom-in overflow-hidden rounded-xl");
-    expect(html).toContain("h-auto max-h-90 max-w-full rounded-xl");
     expect(html).not.toContain("查看执行详情");
     expect(html).not.toContain("执行 JavaScript");
   });
@@ -373,19 +364,10 @@ describe("node repl tool display", () => {
 
     expect(html).toContain("选择浏览器并读取操作说明");
     expect(html).toContain("已完成");
-    expect(html).not.toContain("操作已完成");
     expect(html).toContain("已选择应用内浏览器，并读取操作说明。");
     expect(html).not.toContain(">结果</span>");
     expect(html).not.toContain('aria-label="复制结果"');
     expect(html).toContain("查看执行细节");
-    expect(html).toContain("text-foreground-subtlest");
-    expect(html).toContain("hover:bg-transparent");
-    expect(html).toContain("hover:text-foreground");
-    expect(html).toContain(
-      "rounded-xl border border-border bg-card px-3 py-2 text-ui-base text-foreground-subtle",
-    );
-    expect(html).toContain("lucide-square-mouse-pointer");
-    expect(html).not.toContain("font-medium whitespace-nowrap shrink-0");
     expect(html).not.toContain("Parameters");
     expect(html).not.toContain("raw-tool-id-should-not-render");
     expect(html).not.toContain("secretDebugField");

@@ -1,6 +1,8 @@
 # 内置浏览器自由尺寸视口
 
 > 2026-09-07 坐标与 CDP 重连契约补充见 [Desktop 缩放坐标 spec](2026-09-07-desktop-zoom-coordinate-spec.md)：保留 raster 补偿，输入按已应用 metrics scale 换算；Main 在设置/重放 viewport 时归一 guest zoom，截图临界区内不得跳过重放。
+>
+> 2026-10-16 起放大档也改为 renderer 布局补偿（webview 布局 ×1/zoom + scale(zoom)），CDP metrics 不再带 scale，输入不再乘倍率；下文 2026-07-22「guest metrics 放大补偿」已被取代，原因见同一 spec 的「CDP idle detach 后页面变大变小」。
 
 日期：2026-07-15（2026-07-16 补充截图像素、超时重入与横向滚动链语义；2026-07-17 补充顶部尺寸输入、预览缩放、高视口、越界反馈、默认 Fit、纵向滚动链、模型主动打开/resize 静默语义、全局缩放隔离与 guest 合成层覆盖/缩小布局补偿；2026-07-20 补充 Retina 宿主可见 surface 与 DPR=1 页面指标的解耦、按 tab 创建来源区分默认尺寸、截图 raster 尺寸自校正、截图首帧 CSS 1× 基准，以及动态尺寸的高质量宿主降采样；2026-07-22 补充 Desktop zoom 动态 Fit 重测、更正延迟 transform 误判，改为 guest metrics 放大补偿，并锁定 metrics 完成后的 guest zoom 归一时序；2026-07-24 补充负 Desktop zoom 下截图 surface 就绪尺寸的逻辑归一化；2026-08-03 补充拖拽中窗口失焦的取消语义；2026-08-05 补充多 tab 切换时 Fit 首帧稳定语义；2026-08-30 补充人类用户浏览器显示偏好的跨重启持久化及 Agent Browser Use 隔离）
 状态：已实现

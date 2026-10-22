@@ -1,14 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  TID_CHAT_MODEL_SELECT_ITEM,
-  TID_CHAT_MODEL_SELECT_TRIGGER,
-  encodeCustomModelValue,
-  testId,
-} from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT, TID_V4_COMPOSER_SEND } from "@zcode/shared/test-ids";
 import {
   clearAppData,
-  clickTestIdByWebDriver,
+  setInputValueByTestIdDom,
   getE2EAppDataPaths,
   readSettings,
 } from "../helpers/desktop-app.js";
@@ -18,7 +13,12 @@ import {
   waitForUpstreamNetworkCapture,
   waitForUpstreamNetworkRequestStarted,
 } from "../helpers/upstream-capture.js";
-import { UPSTREAM_MODEL, UPSTREAM_PROVIDER_ID } from "../helpers/upstream-provider.js";
+import {
+  UPSTREAM_MODEL,
+  UPSTREAM_PROVIDER_ID,
+  selectRegistryProviderModelById,
+  selectUpstreamThoughtLevelValue,
+} from "../helpers/upstream-provider.js";
 import {
   E2E_BIGMODEL_PLAN_PROVIDER_ID,
   E2E_BIGMODEL_START_PROVIDER_ID,
@@ -35,6 +35,7 @@ import {
   getV4ModelConfig,
   prepareV4ConversationE2E,
   sendV4Prompt,
+  switchV4Model,
   waitForV4ComposerSelectionReady,
   waitForV4Pane,
   waitForV4TimelineContaining,
@@ -50,7 +51,7 @@ describe("模型 Provider 重启恢复 E2E", () => {
     await prepareV4ConversationE2E({ skipProvider: true });
     await seedReplayProvider({
       id: UPSTREAM_PROVIDER_ID,
-      models: [UPSTREAM_MODEL],
+      models: [{ id: UPSTREAM_MODEL, reasoningLevel: { values: ["high", "max"], map: "{}" } }],
       name: "Upstream E2E",
     });
   });
@@ -84,15 +85,22 @@ describe("模型 Provider 重启恢复 E2E", () => {
         await seedBigModelOAuthCredential();
       },
     });
-    // 只写 Recent 不代表已经修改新版 Composer 草稿；用真实点选建立用户实际持久选择。
+    // 未提交改选只随非空文字草稿保存，空白 Composer 重启会读取原 Recent。
+    await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, "E2E_MODEL_PROVIDER_RESTART_R02 draft");
     await waitForV4ComposerSelectionReady();
-    await clickTestIdByWebDriver(TID_CHAT_MODEL_SELECT_TRIGGER);
-    await clickTestIdByWebDriver(
-      testId(
-        TID_CHAT_MODEL_SELECT_ITEM,
-        encodeCustomModelValue(E2E_BIGMODEL_PLAN_PROVIDER_ID, E2E_PLAN_NON_DEFAULT_MODEL),
-      ),
-    );
+    // 合并菜单只展示当前 Provider 的模型；通过 Provider 子菜单切换后再选择目标模型。
+    await selectRegistryProviderModelById(E2E_PLAN_NON_DEFAULT_MODEL, {
+      providerId: E2E_BIGMODEL_PLAN_PROVIDER_ID,
+      providerGroupKey: JSON.stringify([
+        "bigmodel",
+        "team-coding-plan",
+        "product-team-a",
+        "org-team-a",
+        "proj-team-a",
+      ]),
+      includePlainModelFallback: false,
+    });
+    await selectUpstreamThoughtLevelValue("max");
     await waitForSelectedModel(E2E_BIGMODEL_PLAN_PROVIDER_ID, E2E_PLAN_NON_DEFAULT_MODEL);
     await restartIntoWorkspacePreservingProfile(getE2EAppDataPaths().workspace);
     await waitForSelectedModel(E2E_BIGMODEL_PLAN_PROVIDER_ID, E2E_PLAN_NON_DEFAULT_MODEL);
@@ -131,7 +139,7 @@ describe("模型 Provider 重启恢复 E2E", () => {
     await assertPlanRequest("E2E_MODEL_PROVIDER_RESTART_R02");
   });
 
-  it("I27/MP-R03: 同 Family 的旧 Start Plan 选择回退 Configured Default", async function () {
+  it("I27/MP-R03: 同 Family 的失效旧选择留空，手动选择后可发送", async function () {
     this.timeout(180000);
     await seedPersistedModelSelection({
       modelId: E2E_PLAN_NON_DEFAULT_MODEL,
@@ -139,12 +147,11 @@ describe("模型 Provider 重启恢复 E2E", () => {
       reasoningLevel: "max",
     });
     await restartWithTeamPlanSelection();
-    await waitForSelectedModel(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
-    await waitForRestartedDraftModelReady(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
+    await assertUnavailableSelectionRequiresUserChoice();
     await assertRequestUsesModel("E2E_MODEL_PROVIDER_RESTART_R03", UPSTREAM_MODEL);
   });
 
-  it("I28/MP-R04: 已不可用 last-selected 回退 Configured Default", async function () {
+  it("I28/MP-R04: 已不可用 last-selected 留空，手动选择后可发送", async function () {
     this.timeout(180000);
     await seedPersistedModelSelection({
       modelId: "upstream-removed-e2e",
@@ -152,8 +159,7 @@ describe("模型 Provider 重启恢复 E2E", () => {
       reasoningLevel: "max",
     });
     await restartWithTeamPlanSelection();
-    await waitForSelectedModel(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
-    await waitForRestartedDraftModelReady(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
+    await assertUnavailableSelectionRequiresUserChoice();
     await assertRequestUsesModel("E2E_MODEL_PROVIDER_RESTART_R04", UPSTREAM_MODEL);
   });
 });
@@ -216,4 +222,17 @@ async function assertPlanRequest(marker: string) {
   await sendV4Prompt(prompt);
   await waitForV4TimelineContaining(E2E_REPLY_TOKEN);
   await waitForV4Pane((snapshot) => !snapshot.canStop, `${marker} 没有完成`, 90000);
+}
+
+async function assertUnavailableSelectionRequiresUserChoice() {
+  // Todo 71 已取消失效选择自动回退；必须验证禁发和用户显式修复，不能等待默认模型。
+  await browser.waitUntil(async () => !(await getV4ModelConfig()).model, {
+    timeout: 30_000,
+    timeoutMsg: "失效模型不应自动回退到默认模型",
+  });
+  await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, "E2E_INVALID_SELECTION_NOT_SENT");
+  expect(await $(`[data-testid="${TID_V4_COMPOSER_SEND}"]`).isEnabled()).toBe(false);
+  await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, "");
+  await switchV4Model(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL, "max");
+  await waitForRestartedDraftModelReady(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
 }

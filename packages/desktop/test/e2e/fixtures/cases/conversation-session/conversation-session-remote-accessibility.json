@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-remote-accessibility",
+  "spec": "./test/e2e/conversation-session/conversation-session-remote-accessibility.test.ts",
+  "providerRequestPolicy": "none",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-remote-accessibility.json"
+  ],
+  "fileFixtures": [],
+  "requests": []
+}

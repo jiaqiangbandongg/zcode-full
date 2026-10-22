@@ -12,11 +12,11 @@ vi.mock("@zcode/services/storage-startup", () => ({
     ).resolveZCodeAgentSpawnCwd(...(args as [never])),
   markTasksStoragePrepared: fixtures.mark,
 }));
-vi.mock("../src/host/storagePreparationProcesses.js", () => ({
+vi.mock("../src/host/database-startup/storagePreparationProcesses.js", () => ({
   prepareHostStorage: fixtures.host,
   prepareSessionStorage: fixtures.session,
 }));
-import { createHostDatabaseStartup } from "../src/host/hostDatabaseStartup.js";
+import { createHostDatabaseStartup } from "../src/host/database-startup/hostDatabaseStartup.js";
 
 it("prepares actual restored working directories before publishing services, without a fake workspace", async () => {
   const dir = await mkdtemp(join(tmpdir(), "zcode-startup-cwd-"));

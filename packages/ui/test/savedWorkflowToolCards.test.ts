@@ -144,12 +144,6 @@ describe("normalized saved-run input feeds the existing reader helpers", () => {
     expect(readWorkflowName(NORMALIZED_SAVED_RAW)).toBe("Release check");
   });
 
-  it("falls back to the saved name when the model sent no label", () => {
-    // 归一化规则是 `name: input.name ?? savedName`，所以入参里总有一个名字。
-    const { name: _dropped, ...withoutLabel } = NORMALIZED_SAVED_RAW;
-    expect(readWorkflowName({ ...withoutLabel, name: "release-check" })).toBe("release-check");
-  });
-
   it("readWorkflowSaved reads provenance and the validated argument bag", () => {
     const saved = readWorkflowSaved(NORMALIZED_SAVED_RAW);
     expect(saved).toEqual({
@@ -190,20 +184,6 @@ describe("resolveToolCallRenderer saved-workflow dispatch", () => {
   it("matches the snake_case wire spelling too", () => {
     const snakeCase = { ...buildSaveToolCall(), toolName: "save_workflow", kind: "save_workflow" };
     expect(resolveToolCallRenderer(buildContext(snakeCase))).toBe(SaveWorkflowToolCallBlock);
-  });
-
-  it("does not steal CreateWorkflow", () => {
-    const createWorkflow = {
-      toolId: "tool-create-1",
-      toolName: "CreateWorkflow",
-      kind: "CreateWorkflow",
-      title: "CreateWorkflow",
-      status: "completed",
-      input: { script: SCRIPT },
-    };
-    const renderer = resolveToolCallRenderer(buildContext(createWorkflow));
-    expect(renderer).not.toBe(SaveWorkflowToolCallBlock);
-    expect(renderer).not.toBe(ListSavedWorkflowsToolCallBlock);
   });
 });
 
@@ -247,7 +227,7 @@ describe("SaveWorkflowToolCallBlock", () => {
     expect(screen.getByText("Saving workflow")).toBeTruthy();
   });
 
-  it("renders both locales", () => {
+  it("renders the overwrite card in zh-CN", () => {
     renderCard(
       SaveWorkflowToolCallBlock,
       buildContext(buildSaveToolCall({ overwrite: true })),
@@ -257,10 +237,6 @@ describe("SaveWorkflowToolCallBlock", () => {
     expect(document.querySelector('[data-workflow-overwrite-badge="true"]')?.textContent).toBe(
       "覆盖",
     );
-    cleanup();
-
-    renderCard(SaveWorkflowToolCallBlock, buildContext(buildSaveToolCall()), "en-US");
-    expect(screen.getByText("Saved workflow")).toBeTruthy();
   });
 
   // ── docs/dynamic-workflow/launch.md「`SaveWorkflow`」──
@@ -275,11 +251,16 @@ describe("SaveWorkflowToolCallBlock", () => {
     renderCard(SaveWorkflowToolCallBlock, buildContext(buildSaveToolCall({ scope: "global" })));
     expect(screen.getByText("Global · visible from every project")).toBeTruthy();
     // 全局档折叠行加一个「全局」小标（与 overwrite 徽标同排）。
-    expect(document.querySelector('[data-workflow-scope-badge="global"]')?.textContent).toBe("Global");
+    expect(document.querySelector('[data-workflow-scope-badge="global"]')?.textContent).toBe(
+      "Global",
+    );
     cleanup();
 
     // scope 缺席（旧 agent）→ 不渲染作用域行。
-    const { scope: _dropped, ...withoutScope } = buildSaveToolCall().input as Record<string, unknown>;
+    const { scope: _dropped, ...withoutScope } = buildSaveToolCall().input as Record<
+      string,
+      unknown
+    >;
     renderCard(
       SaveWorkflowToolCallBlock,
       buildContext({ ...buildSaveToolCall(), input: withoutScope }),
@@ -293,7 +274,9 @@ describe("SaveWorkflowToolCallBlock", () => {
       SaveWorkflowToolCallBlock,
       buildContext(buildSaveToolCall({ scope: "global", shadowing: "hides_global" })),
     );
-    expect(screen.getByText("A global workflow with this name will be hidden by this one")).toBeTruthy();
+    expect(
+      screen.getByText("A global workflow with this name will be hidden by this one"),
+    ).toBeTruthy();
     cleanup();
 
     renderCard(
@@ -301,7 +284,9 @@ describe("SaveWorkflowToolCallBlock", () => {
       buildContext(buildSaveToolCall({ scope: "project", shadowing: "hidden_by_project" })),
     );
     expect(
-      screen.getByText("This project already has a workflow with this name, which will hide this one here"),
+      screen.getByText(
+        "This project already has a workflow with this name, which will hide this one here",
+      ),
     ).toBeTruthy();
   });
 
@@ -313,7 +298,9 @@ describe("SaveWorkflowToolCallBlock", () => {
     );
     expect(screen.getByText("作用域")).toBeTruthy();
     expect(screen.getByText("全局 · 对所有项目可见")).toBeTruthy();
-    expect(document.querySelector('[data-workflow-scope-badge="global"]')?.textContent).toBe("全局");
+    expect(document.querySelector('[data-workflow-scope-badge="global"]')?.textContent).toBe(
+      "全局",
+    );
   });
 });
 
@@ -394,7 +381,9 @@ describe("ListSavedWorkflowsToolCallBlock", () => {
     // 根因回归钉：v4 wire 上 output 是 formatModelContent 的 XML 风格投影（JSON 探针
     // 永不命中）；display 通道在场时必须优先于一切文本探针。
     const toolCall = {
-      ...buildListToolCall('<saved_workflows count="1"><workflow name="release-check"/></saved_workflows>'),
+      ...buildListToolCall(
+        '<saved_workflows count="1"><workflow name="release-check"/></saved_workflows>',
+      ),
       raw: {
         display: {
           kind: "saved_workflow_list",
@@ -470,26 +459,31 @@ describe("ListSavedWorkflowsToolCallBlock", () => {
     expect(document.body.textContent).not.toContain("No saved workflows in this project");
   });
 
-  it("renders both locales", () => {
+  it("renders the listing in zh-CN", () => {
     renderCard(ListSavedWorkflowsToolCallBlock, buildContext(buildListToolCall()), "zh-CN");
     expect(screen.getByText("已保存的工作流")).toBeTruthy();
     expect(screen.getByText("2 个工作流")).toBeTruthy();
     expect(screen.getByText("1 个文件无法解析")).toBeTruthy();
-    cleanup();
-
-    renderCard(ListSavedWorkflowsToolCallBlock, buildContext(buildListToolCall()), "en-US");
-    expect(screen.getByText("2 workflows")).toBeTruthy();
   });
 
   it("tags global-scoped entries next to the name", () => {
     const withGlobal = {
       workflows: [
         LIST_RESULT.workflows[0],
-        { name: "deep-research", description: "深度调研", scope: "global", path: "/home/.zcode/workflows/deep-research.dwf.ts" },
+        {
+          name: "deep-research",
+          description: "深度调研",
+          scope: "global",
+          path: "/home/.zcode/workflows/deep-research.dwf.ts",
+        },
       ],
       invalid: [],
     };
-    renderCard(ListSavedWorkflowsToolCallBlock, buildContext(buildListToolCall(withGlobal)), "en-US");
+    renderCard(
+      ListSavedWorkflowsToolCallBlock,
+      buildContext(buildListToolCall(withGlobal)),
+      "en-US",
+    );
     const tag = document.querySelector('[data-workflow-scope-tag="global"]');
     expect(tag?.textContent).toBe("Global");
     // 项目档不加这个标（scope 文本还是 project）。

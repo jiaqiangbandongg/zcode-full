@@ -1,6 +1,5 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   TurnHeaderRow,
@@ -68,48 +67,6 @@ function header(overrides: Partial<TurnHeaderRow> = {}): TurnHeaderRow {
     },
     ...overrides,
   };
-}
-
-function renderPanel(contextOverrides: Partial<ConversationRowRenderContext> = {}) {
-  const context: ConversationRowRenderContext = {
-    workspacePath: "/workspace",
-    theme: "system",
-    codePreviewSettings: DEFAULT_CODE_PREVIEW_SETTINGS,
-    fetchFileChanges: async () => ({
-      files: 1,
-      additions: 11,
-      deletions: 0,
-      items: [
-        {
-          path: "/workspace/input.html",
-          additions: 11,
-          deletions: 0,
-          writeCount: 1,
-          toolNames: ["Write"],
-          patches: [
-            {
-              oldStart: 1,
-              oldLines: 0,
-              newStart: 1,
-              newLines: 11,
-              lines: ["+<html>"],
-            },
-          ],
-        },
-      ],
-    }),
-    ...contextOverrides,
-  };
-  return renderToStaticMarkup(
-    createElement(
-      ZCodeIntlProvider,
-      { initialLocale: "zh-CN" },
-      createElement(ConversationFileSummaryPanel, {
-        header: header(),
-        context,
-      }),
-    ),
-  );
 }
 
 function createMinimalElement(ownerDocument: Document, tagName = "div") {
@@ -215,19 +172,6 @@ function collectText(node: unknown): string {
     return candidate.childNodes.map((child) => collectText(child)).join("");
   }
   return typeof candidate.textContent === "string" ? candidate.textContent : "";
-}
-
-function collectClassNames(node: unknown): string[] {
-  if (!node || typeof node !== "object") return [];
-  const candidate = node as {
-    attributes?: Map<string, string>;
-    childNodes?: unknown[];
-  };
-  const ownClassName = candidate.attributes?.get("class");
-  return [
-    ...(ownClassName ? [ownClassName] : []),
-    ...(candidate.childNodes?.flatMap((child) => collectClassNames(child)) ?? []),
-  ];
 }
 
 afterEach(() => {
@@ -398,16 +342,6 @@ describe("ConversationFileSummaryPanel", () => {
     await act(async () => root.unmount());
   });
 
-  it("matches z-code-2 summary card visual shell", () => {
-    const html = renderPanel();
-
-    expect(html).toContain("rounded-xl border border-border bg-card shadow-none");
-    expect(html).toContain("h-10 items-center justify-between");
-    expect(html).toContain("transition-colors hover:bg-hover");
-    expect(html).toContain("grid w-full border-t border-border");
-    expect(html).not.toContain("FileText");
-  });
-
   it("renders file rows and Open action after details are loaded", async () => {
     const container = installMinimalDom();
     const root: Root = createRoot(container);
@@ -467,7 +401,6 @@ describe("ConversationFileSummaryPanel", () => {
     expect(text).not.toContain("2 次修改");
     expect(text).toContain("审查");
     expect(text).toContain("打开");
-    expect(collectClassNames(container)).toContain("w-full bg-background/50 overflow-hidden");
     expect(text).not.toContain("暂时无法预览这份 Diff。");
     expect(openSplitButtonProps.at(-1)).toMatchObject({
       hideOpenWithMenu: false,

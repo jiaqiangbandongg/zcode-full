@@ -259,6 +259,10 @@ export interface Session {
 }
 
 export interface TurnSteerInput {
+  /** 临时执行的选型不可成为普通 Session 续跑默认；不包含请求凭据。 */
+  modelSelectionScope?: "execution";
+  /** 仅加速卡输入携带普通模型快照，不含凭据；用于接纳时更新 Session。 */
+  highspeedFallbackSelection?: ModelSelection;
   input: string;
   inputId?: string;
   queryId?: QueryId;
@@ -303,7 +307,10 @@ export interface HighspeedMessageMetadata {
   toolDurationMs?: number;
   otherDurationMs?: number;
   fallbackAt?: number;
-  fallbackReason?: "highspeed_card_expired" | "highspeed_request_failed";
+  fallbackReason?:
+    | "highspeed_card_expired"
+    | "highspeed_request_failed"
+    | "highspeed_selection_unavailable";
 }
 
 /** 协议无关的输入 intent metadata；bootstrap v4 在事件边界组装为 ConversationInputIntent。 */

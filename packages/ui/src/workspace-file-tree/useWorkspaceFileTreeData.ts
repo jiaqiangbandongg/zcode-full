@@ -606,7 +606,16 @@ export function useWorkspaceFileTreeData({
     });
     void loadGitStatus({ workspaceGeneration });
     return () => {
+      // 原因：卸载只释放 watcher 仍会留下排队刷新和迟到请求，关闭后不能继续读取旧工作区。
+      workspaceGenerationRef.current += 1;
+      requestVersionRef.current += 1;
+      gitStatusRequestVersionRef.current += 1;
       cancelRefreshBatch();
+      pendingWatchRefreshPathsRef.current.clear();
+      if (watchRefreshTimerRef.current) {
+        clearTimeout(watchRefreshTimerRef.current);
+        watchRefreshTimerRef.current = null;
+      }
     };
   }, [cancelRefreshBatch, loadDirectory, loadGitStatus, workspaceIdentity, workspacePath]);
 

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-tool-presentation",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-tool-presentation.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-share-tool-presentation.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "share-tool-fetch-call",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "tool-use",
+      "syntheticReason": "固定触发 Fetch 与 Bash；Fetch 的私网目标在 IO 前失败，整个用例不访问真实网站。"
+    },
+    {
+      "id": "share-tool-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "工具结果回填后固定结束本轮，避免依赖真实模型。"
+    },
+    {
+      "id": "share-tool-title",
+      "kind": "title",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "为独立 replay 用例提供固定标题。"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import {
   TID_CHAT_GOAL_VERIFICATION_MARKER,
   TID_CHAT_MESSAGES,
   TID_CHAT_USER_MESSAGE,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   clickChatStop,

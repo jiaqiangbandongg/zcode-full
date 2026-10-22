@@ -350,7 +350,9 @@ describe("browser-client facade", () => {
     });
 
     it("does not reuse a parent/child-host tab", async () => {
-      const { calls, facade } = reuseFacade([{ tabId: "t-1", url: "https://shop.example.com/cart" }]);
+      const { calls, facade } = reuseFacade([
+        { tabId: "t-1", url: "https://shop.example.com/cart" },
+      ]);
       const tab = await facade.open("https://example.com");
       expect(tab.id).toBe("t-new");
       expect(calls).toEqual([
@@ -389,7 +391,12 @@ describe("browser-client facade", () => {
         if (command.method === "newTab") {
           return {
             ok: true,
-            tab: { tabId: "t-new", url: "about:blank", title: "", viewport: { width: 1280, height: 720 } },
+            tab: {
+              tabId: "t-new",
+              url: "about:blank",
+              title: "",
+              viewport: { width: 1280, height: 720 },
+            },
             elapsedMs: 1,
           } satisfies BrowserCommandResult;
         }
@@ -455,7 +462,6 @@ describe("browser-client facade", () => {
       // 时会被隐藏成 undefined，文档指引直接踩空。必须走真实代理路径验证。
       const { calls, facade } = reuseFacade([{ tabId: "t-1", url: "https://example.com/docs" }]);
       const runtime = facade.asRuntimeObject();
-      expect(typeof runtime.open).toBe("function");
       const tab = await runtime.open("https://example.com/docs");
       expect(tab.id).toBe("t-1");
       expect(calls).toEqual([
@@ -626,7 +632,7 @@ describe("browser-client facade", () => {
     });
   });
 
-  it("current()/listTabs()/tab(id) keep compatibility shortcuts", async () => {
+  it("current()/listTabs() keep compatibility shortcuts", async () => {
     const execute = vi.fn(async (command: BrowserCommand): Promise<BrowserCommandResult> => {
       if (command.method === "list") {
         return {
@@ -654,7 +660,6 @@ describe("browser-client facade", () => {
     const browsers = createFacade(execute);
     await expect(browsers.current()).resolves.toMatchObject({ tabId: "t-2" });
     await expect(browsers.listTabs()).resolves.toHaveLength(2);
-    expect(browsers.tab("t-9").tabId).toBe("t-9");
   });
 
   it("direct methods return payloads and raw methods preserve BrowserCommandResult", async () => {

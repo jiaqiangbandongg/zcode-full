@@ -179,6 +179,41 @@ publisher(parent) -> parent timeline/index/legacy delivery
 
 ## 冷恢复、列表隔离与用户输入准入（3.12.2）
 
+### 远端子会话的项目目录解析
+
+子会话不进入主任务索引，不能用 childSessionId 查询主任务项目归属来决定能否订阅。
+Host 使用同一 Agent 的只读 `session/list(sessionIds)` 查询持久化类型与父子关系；
+按下表确认辅助会话类型后沿父链找到主任务，再由现有项目服务校验项目、Host 和目录。
+子会话未单独保存 workspace identity 时，CLI 精确 ID 查询只在 child cwd 相同且持久化父链证明
+属于请求 workspace 后返回；显式的不同身份仍拒绝。普通列表继续排除 child，查询不回写身份或激活 runtime。
+每个会话必须与当前 attachment 的 workspace identity 和 cwd 相符；父关系缺失、成环或跨工作区时拒绝。
+普通远端主任务仍必须有项目，不按 ID 前缀或旧索引行识别子会话，不补建子会话 task 行，也不扩大目录范围。
+
+| 持久化类型 | 项目解析 | 主列表 | 用户输入 |
+| --- | --- | --- | --- |
+| `interactive`、`fork`、`workflow_parent` | 自身任务的项目 | 可见 | 保持原有准入 |
+| `subagent_child`、`workflow_child` | 校验父链后使用所属主任务项目 | 隐藏 | 只读 |
+| `selection_side_chat` | 校验父链后使用所属主任务项目 | 隐藏 | 可聊天，保留辅助对话自己的命令限制 |
+| `nested_workflow_child` | 按持久化工作流子会话处理；不新增创建入口 | 隐藏 | 只读 |
+
+2026-10-19 回归：原修复仅识别 `subagent_child`，工作流与辅助对话仍以 child ID 查项目。
+项目继承与只读准入分别判断类型，不能用 `parentID` 或同一个只读开关代替；混合父链逐层校验，
+即使旧 child 索引有项目也不能跳过 CLI 父链。普通 fork 可拥有自己的项目，必须在 fork 处停止继承。
+辅助对话续发前保存 Recent 配置时，UI 使用侧栏记录的所属主会话查询项目，发送目标仍是 child；
+不能拿未入主索引的 child 查询项目，也不能把普通会话或 fork 的 Recent 改写到父项目。
+
+```text
+桌面 continuous / 手机 replayable → 同一 Host → Agent 持久化会话类型
+  ├─ 主任务 → 原项目目录校验
+  └─ 子会话 → 校验持久化父链身份 → 所属主任务项目目录校验
+```
+
+父子关系只由 CLI 会话存储持有，项目归属只由 Host 项目库持有；查询不新增缓存、队列或 runtime，
+冷恢复与运行中订阅使用同一路径。回归覆盖远端运行中/已完成 child、重订阅、两种 clientMode、
+旧 child 索引、无项目主任务，以及父链缺失、成环和跨 workspace 的拒绝。
+
+### 冷恢复类型与主列表隔离
+
 根因：3.12.1 回收 detached child publisher 后，打开详情进入冷恢复；bootstrap 创建
 record 时遗漏持久化 taskType，默认 interactive，sessions-index 将 child 当主任务广播。
 
@@ -196,20 +231,20 @@ child 完成 → publisher 回收 → subscribe → 读取持久化 taskType →
 ```
 
 用户发起的 sendText、retry/edit、goal 续跑等输入命令在 session_input / input_history 写入前
-拒绝 subagent_child；已激活 child 返回 reasonCode `guard.subagentReadOnly`，尚无独立 record 的
+拒绝 subagent_child、workflow_child、nested_workflow_child；已激活 child 返回 reasonCode `guard.subagentReadOnly`，尚无独立 record 的
 运行中 child 沿用既有 `proto.sessionNotFound` 拒绝，绝不为发送输入额外激活 runtime。Agent 工具正常派发 child
 仍由父 runtime 驱动，不经过用户协议输入准入；workspace-only 文件撤销保留既有边界。
 
 历史污染修复由 Host task index syncer 在 workspace 首次权威 sessions-index 基线到达后执行：
 对本地已有而基线缺失的 task 分批调用只读 session/list(sessionIds)，从 Agent 持久化元数据
-确认 subagent_child 后，仅标记对应 task index 为不可见并清理分组/排序引用；不删除 Agent
+确认表中隐藏的辅助会话类型后，仅标记对应 task index 为不可见并清理分组/排序引用；不删除 Agent
 session、message、part。查询不创建 runtime、不读取 transcript、不改变归属。远端身份必须
 贯穿 workspaceIdentity / remoteSessionId，异步结果仅应用于仍有效的订阅代际；旧 Agent 不支持
 显式查询、缺失 session 或查询失败时保留索引，下一次 workspace 基线再尝试。不得根据基线缺失
 或 parentID 单独删除。普通 session/list 继续只返回主列表类型；显式 sessionIds 查询返回匹配
 workspace 的持久化身份（含隐藏类型），单批最多 64 个，includeArchived 沿用现有含义。
 
-完整 snapshot 同步也不得将 subagent_child 写成主任务；对于已打开的旧污染标签页，后端
+完整 snapshot 同步也不得将表中隐藏类型写成主任务；对于已打开的旧污染只读子代理标签页，后端
 准入仍拒绝输入。修复不新增 accepted queue、timer、owner，不改变 continuous/replayable 边界。
 
 验收：SAT27 覆盖 warm / grace 回收 / 父释放 / 冷启动后的详情重开及列表隔离；SAT28 覆盖用户

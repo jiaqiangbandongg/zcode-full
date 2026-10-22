@@ -17,24 +17,20 @@ import { decodeSessionRow } from "../codecs.js";
 import { encodeJson } from "../json.js";
 import type { SessionRow } from "../rows.js";
 
-export function createSession(
-  db: DatabaseSync,
-  input: CreateSessionInput,
-): SessionInfo {
+export function createSession(db: DatabaseSync, input: CreateSessionInput): SessionInfo {
   const now = Date.now();
   const timeCreated = input.time?.created ?? now;
   const timeUpdated = input.time?.updated ?? timeCreated;
 
-  db
-    .prepare(
-      `
+  db.prepare(
+    `
       insert into session (
         id, project_id, workspace_id, parent_id, trace_id, task_type, slug, directory, path,
         title, title_source, title_message_id, version,
         share_url, summary_additions, summary_deletions, summary_files, summary_diffs,
         revert, permission, time_created, time_updated, time_title_updated,
-        time_compacting, time_archived
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, null, null, null, ?, ?, ?, ?, null, null)
+        time_compacting
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, null, null, null, null, ?, ?, ?, ?, null)
       on conflict(id) do update set
         project_id = excluded.project_id,
         workspace_id = excluded.workspace_id,
@@ -53,27 +49,26 @@ export function createSession(
         time_title_updated = excluded.time_title_updated,
         time_updated = excluded.time_updated
       `,
-    )
-    .run(
-      input.id,
-      input.projectID,
-      input.workspaceID ?? null,
-      input.parentID ?? null,
-      input.traceID ?? null,
-      input.taskType ?? "interactive",
-      input.slug,
-      input.directory,
-      input.path ?? null,
-      input.title,
-      input.titleSource ?? "first_input",
-      input.titleMessageID ?? null,
-      input.version,
-      input.shareURL ?? null,
-      encodeJson(input.permission),
-      timeCreated,
-      timeUpdated,
-      input.titleSource || input.titleMessageID ? timeUpdated : null,
-    );
+  ).run(
+    input.id,
+    input.projectID,
+    input.workspaceID ?? null,
+    input.parentID ?? null,
+    input.traceID ?? null,
+    input.taskType ?? "interactive",
+    input.slug,
+    input.directory,
+    input.path ?? null,
+    input.title,
+    input.titleSource ?? "first_input",
+    input.titleMessageID ?? null,
+    input.version,
+    input.shareURL ?? null,
+    encodeJson(input.permission),
+    timeCreated,
+    timeUpdated,
+    input.titleSource || input.titleMessageID ? timeUpdated : null,
+  );
 
   return mustGetSession(db, input.id);
 }
@@ -82,87 +77,67 @@ export async function updateSession(
   db: DatabaseSync,
   input: UpdateSessionInput,
 ): Promise<SessionInfo> {
-  const current = await getSession(db, input.id);
-  if (!current) {
-    throw new Error(`Session not found: ${input.id}`);
+  const fields: string[] = [];
+  const values: SQLInputValue[] = [];
+  const set = (column: string, value: SQLInputValue | undefined) => {
+    if (value === undefined) return;
+    fields.push(`${column} = ?`);
+    values.push(value);
+  };
+  // Bug 根因：先读整行再 await 会用旧快照覆盖并发标题、权限和结果；只更新本次输入拥有的列。
+  set("directory", input.directory);
+  set("path", input.path);
+  set("title", input.title);
+  set("title_source", input.titleSource);
+  set("title_message_id", input.titleMessageID);
+  set("share_url", input.shareURL);
+  set("last_outcome", input.lastOutcome);
+  if (input.summary !== undefined) {
+    set("summary_additions", input.summary?.additions ?? null);
+    set("summary_deletions", input.summary?.deletions ?? null);
+    set("summary_files", input.summary?.files ?? null);
+    set("summary_diffs", encodeJson(input.summary?.diffs));
   }
-
-  const summary =
-    input.summary === undefined
-      ? {
-          additions: current.summaryAdditions,
-          deletions: current.summaryDeletions,
-          files: current.summaryFiles,
-          diffs: current.summaryDiffs,
-        }
-      : input.summary;
-  const now = Date.now();
+  if (input.revert !== undefined) set("revert", encodeJson(input.revert));
+  if (input.permission !== undefined) set("permission", encodeJson(input.permission));
+  set("time_compacting", input.timeCompacting);
   if (
-    input.title !== undefined &&
-    input.expectedTitleSources &&
-    input.expectedTitleSources.length > 0 &&
-    !input.expectedTitleSources.includes(current.titleSource ?? "first_input")
+    input.title !== undefined ||
+    input.titleSource !== undefined ||
+    input.titleMessageID !== undefined
   ) {
-    return current;
+    set("time_title_updated", Date.now());
   }
-  const titleChanged = input.title !== undefined && input.title !== current.title;
-  const nextTitleSource = input.titleSource ?? current.titleSource ?? "first_input";
-
-  db
-    .prepare(
-      `
-      update session set
-        directory = ?,
-        path = ?,
-        title = ?,
-        title_source = ?,
-        title_message_id = ?,
-        share_url = ?,
-        summary_additions = ?,
-        summary_deletions = ?,
-        summary_files = ?,
-        summary_diffs = ?,
-        revert = ?,
-        permission = ?,
-        time_title_updated = ?,
-        time_compacting = ?,
-        time_archived = ?,
-        -- 修复原因：路径自愈可能携带并发读取前的旧时间，不能回退真实活动时间。
-        time_updated = max(time_updated, ?)
-      where id = ?
-      `,
-    )
-    .run(
-      input.directory ?? current.directory,
-      input.path === undefined ? (current.path ?? null) : input.path,
-      input.title ?? current.title,
-      nextTitleSource,
-      input.titleMessageID === undefined
-        ? (current.titleMessageID ?? null)
-        : input.titleMessageID,
-      input.shareURL === undefined ? (current.shareURL ?? null) : input.shareURL,
-      summary === null ? null : (summary.additions ?? null),
-      summary === null ? null : (summary.deletions ?? null),
-      summary === null ? null : (summary.files ?? null),
-      summary === null ? null : encodeJson(summary.diffs),
-      input.revert === undefined ? encodeJson(current.revert) : encodeJson(input.revert),
-      input.permission === undefined ? encodeJson(current.permission) : encodeJson(input.permission),
-      titleChanged || input.titleSource !== undefined || input.titleMessageID !== undefined
-        ? now
-        : (current.time.titleUpdated ?? null),
-      input.timeCompacting === undefined ? (current.time.compacting ?? null) : input.timeCompacting,
-      input.timeArchived === undefined ? (current.time.archived ?? null) : input.timeArchived,
-      input.timeUpdated ?? now,
-      input.id,
-    );
-
+  // 标题及组织态不代表会话活动；活动时间只由消息/终态显式提交，且禁止回退。
+  if (input.timeUpdated !== undefined) {
+    fields.push("time_updated = max(time_updated, ?)");
+    values.push(input.timeUpdated);
+  }
+  if (fields.length) {
+    values.push(input.id);
+    const sources = input.title !== undefined ? input.expectedTitleSources : undefined;
+    const guard = sources?.length
+      ? ` and coalesce(title_source, 'first_input') in (${sources.map(() => "?").join(",")})`
+      : "";
+    if (sources?.length) values.push(...sources);
+    db.prepare(`update session set ${fields.join(",")} where id=?${guard}`).run(...values);
+  }
   return mustGetSession(db, input.id);
 }
 
-export function getSession(
+export function softDeleteSession(
   db: DatabaseSync,
   sessionID: SessionId,
-): SessionInfo | null {
+  timeDeleted: number,
+): void {
+  // 软删除保持幂等，并保留 message/part 及活动时间；旧 create/upsert 不能清除此字段。
+  db.prepare("update session set time_deleted = coalesce(time_deleted, ?) where id = ?").run(
+    timeDeleted,
+    sessionID,
+  );
+}
+
+export function getSession(db: DatabaseSync, sessionID: SessionId): SessionInfo | null {
   const row = db.prepare("select * from session where id = ?").get(sessionID) as
     | SessionRow
     | undefined;
@@ -173,7 +148,7 @@ export async function listSessions(
   db: DatabaseSync,
   input: ListSessionsInput = {},
 ): Promise<SessionInfo[]> {
-  const clauses: string[] = [];
+  const clauses: string[] = ["time_deleted is null"];
   const values: SQLInputValue[] = [];
 
   if (input.projectID) {
@@ -212,10 +187,6 @@ export async function listSessions(
   if (taskTypes.length > 0) {
     clauses.push(`task_type in (${taskTypes.map(() => "?").join(", ")})`);
     values.push(...taskTypes);
-  }
-
-  if (!input.includeArchived) {
-    clauses.push("time_archived is null");
   }
 
   const where = clauses.length > 0 ? `where ${clauses.join(" and ")}` : "";
@@ -337,9 +308,10 @@ export async function clearRevert(db: DatabaseSync, sessionID: SessionId): Promi
 }
 
 export function touchSession(db: DatabaseSync, sessionID: SessionId, timeUpdated: number): void {
-  db
-    .prepare("update session set time_updated = max(time_updated, ?) where id = ?")
-    .run(timeUpdated, sessionID);
+  db.prepare("update session set time_updated = max(time_updated, ?) where id = ?").run(
+    timeUpdated,
+    sessionID,
+  );
 }
 
 function normalizeSessionTaskTypes(taskTypes: readonly SessionTaskType[] | undefined): string[] {

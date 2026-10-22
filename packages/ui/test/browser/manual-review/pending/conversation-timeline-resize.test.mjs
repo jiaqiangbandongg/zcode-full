@@ -81,9 +81,19 @@ for (const mobile of [false, true])
             true,
           );
         });
-        await page.goto(`${origin}fixture?mobile=${mobile}&theme=${theme}`);
+        await page.goto(
+          `${origin}fixture?mobile=${mobile}&theme=${theme}&heavy=${process.env.ZCODE_RESIZE_HEAVY_TOOLS === "1"}`,
+        );
         const timeline = page.getByTestId("v4-timeline");
         await timeline.waitFor();
+        if (process.env.ZCODE_RESIZE_HEAVY_TOOLS === "1") {
+          await page.getByRole("button", { name: "Tools", exact: true }).click();
+          await page.waitForFunction(
+            () =>
+              document.querySelectorAll('[data-testid^="tool-summary-trigger-resize-tool-"]')
+                .length === 134,
+          );
+        }
         const state = () =>
           timeline.evaluate((e) => ({
             following: e.dataset.following,

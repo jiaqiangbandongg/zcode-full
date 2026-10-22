@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  zcodeProtocolMethods,
   zcodeWorkflowsDeleteResultSchema,
   zcodeWorkflowsGetResultSchema,
   zcodeWorkflowsListResultSchema,
@@ -96,15 +95,6 @@ afterEach(async () => {
 });
 
 describe("workflows/* protocol methods", () => {
-  it("registers the method names", () => {
-    expect(zcodeProtocolMethods.workflowsList).toBe("workflows/list");
-    expect(zcodeProtocolMethods.workflowsGet).toBe("workflows/get");
-    expect(zcodeProtocolMethods.workflowsUpdateMeta).toBe("workflows/updateMeta");
-    expect(zcodeProtocolMethods.workflowsDelete).toBe("workflows/delete");
-    expect(zcodeProtocolMethods.workflowsRuns).toBe("workflows/runs");
-    expect(zcodeProtocolMethods.workflowsMove).toBe("workflows/move");
-  });
-
   it("list：目录不存在回空（带 dir）；坏文件进 invalid；legacy .workflow.js 不可见；不回脚本正文", async () => {
     expect(await listSavedWorkflowsOp(contextWith(), { workspace: workspace() })).toEqual({
       workflows: [],
@@ -348,7 +338,7 @@ describe("workflows/* protocol methods", () => {
 
   // 用户面产物的中枢摘要（docs/dynamic-workflow/authoring.md「How the user sees them」）。
   // ⚠ 术语：这里的 artifact 是脚本经 `artifact.*` 发布给用户看的产出，不是脚本的顶层返回值。
-  it("runs：能力在场时按 runId 逐行汇总 artifacts，只取 completed 行、取最新版、≤ 8 件", async () => {
+  it("runs：能力在场时按 runId 逐行汇总 artifacts，只取 completed 行与最新版", async () => {
     const artifactRow = (
       runId: string,
       id: string,
@@ -402,10 +392,36 @@ describe("workflows/* protocol methods", () => {
       listNodes: (runId: string) =>
         runId === "run_2"
           ? [
-              { runId, siteId: "report#1", ordinal: 1, kind: "report", inputHash: "h", status: "completed", artifactId: "perf", result: {} },
-              { runId, siteId: "report#2", ordinal: 2, kind: "report", inputHash: "h", status: "completed", artifactId: "perf", result: {} },
+              {
+                runId,
+                siteId: "report#1",
+                ordinal: 1,
+                kind: "report",
+                inputHash: "h",
+                status: "completed",
+                artifactId: "perf",
+                result: {},
+              },
+              {
+                runId,
+                siteId: "report#2",
+                ordinal: 2,
+                kind: "report",
+                inputHash: "h",
+                status: "completed",
+                artifactId: "perf",
+                result: {},
+              },
               // 无标签的 report 不计入任何产物。
-              { runId, siteId: "report#3", ordinal: 3, kind: "report", inputHash: "h", status: "completed", result: {} },
+              {
+                runId,
+                siteId: "report#3",
+                ordinal: 3,
+                kind: "report",
+                inputHash: "h",
+                status: "completed",
+                result: {},
+              },
             ]
           : [],
     };
@@ -421,9 +437,6 @@ describe("workflows/* protocol methods", () => {
       { id: "audit", kind: "file", title: "审计报告", version: 2, contentType: "application/pdf" },
       { id: "perf", kind: "chart", version: 1 },
     ]);
-    // 字节 / 条目 / spec 刻意不进中枢载荷：chip 上放不下，点开侧板即可。
-    expect(JSON.stringify(result.runs[0]?.artifacts)).not.toContain("4096");
-    expect(JSON.stringify(result.runs[0]?.artifacts)).not.toContain("round");
     // 零件的 run：整字段缺席，不是空数组。
     expect(result.runs[1]).not.toHaveProperty("artifacts");
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveWebRemoteControlInitialTheme } from "@web/webRemoteControlThemeSeed.js";
+import { resolveWebRemoteControlInitialTheme } from "#src/web-remote-control/index.js";
 
 describe("resolveWebRemoteControlInitialTheme", () => {
   it("uses the QR theme only when mobile localStorage has no theme", () => {

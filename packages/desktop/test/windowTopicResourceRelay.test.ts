@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ServiceCollection, type IBotsService } from "@zcode/services";
+import { ServiceCollection, IZCodeAgentService, type IBotsService } from "@zcode/services";
 import { createWindowTopicResourceRelay } from "../src/host/windowTopicResourceRelay.js";
 
 const request = {
@@ -15,8 +15,8 @@ const request = {
 };
 describe("window topic resource authority", () => {
   it("binds channel sends to the physical remote connection", async () => {
-    const peer = new ServiceCollection();
-    const other = new ServiceCollection();
+    const peer = new ServiceCollection().register(IZCodeAgentService, {} as never);
+    const other = new ServiceCollection().register(IZCodeAgentService, {} as never);
     let current = peer;
     const reply = vi.fn(async () => ({
       status: "sent",
@@ -24,7 +24,7 @@ describe("window topic resource authority", () => {
       providerMessageId: "om_sent",
     }));
     const relay = createWindowTopicResourceRelay({
-      getPeerServices: () => peer,
+      getPeerAgentService: () => peer.get(IZCodeAgentService),
       resolveServices: () => current,
       getBots: () =>
         ({
@@ -54,10 +54,10 @@ describe("window topic resource authority", () => {
   it("rejects a request resolved to another remote connection before Bot IO", async () => {
     const read = vi.fn();
     const validate = vi.fn();
-    const peer = new ServiceCollection();
-    const other = new ServiceCollection();
+    const peer = new ServiceCollection().register(IZCodeAgentService, {} as never);
+    const other = new ServiceCollection().register(IZCodeAgentService, {} as never);
     const relay = createWindowTopicResourceRelay({
-      getPeerServices: () => peer,
+      getPeerAgentService: () => peer.get(IZCodeAgentService),
       resolveServices: () => other,
       getBots: () =>
         ({ readTopicResource: read, validateTopicResource: validate }) as unknown as IBotsService,
@@ -68,14 +68,14 @@ describe("window topic resource authority", () => {
     relay.dispose();
   });
   it("uses the current logical session and rechecks it after download", async () => {
-    const peer = new ServiceCollection();
+    const peer = new ServiceCollection().register(IZCodeAgentService, {} as never);
     let online = true;
     const resolve = vi.fn(() => {
       if (!online) throw new Error("Disconnected");
       return peer;
     });
     const relay = createWindowTopicResourceRelay({
-      getPeerServices: () => peer,
+      getPeerAgentService: () => peer.get(IZCodeAgentService),
       resolveServices: resolve,
       getBots: () =>
         ({

@@ -58,6 +58,7 @@ export async function emitToolCallResult(
   display: ToolResultDisplayPayload | undefined,
   perf: ToolExecutionTelemetry | undefined,
   skillMetadata: SkillTelemetryMetadata | undefined,
+  pluginId?: string,
 ): Promise<void> {
   await deps.emitEvent({
     id: crypto.randomUUID() as any,
@@ -70,6 +71,7 @@ export async function emitToolCallResult(
     payload: {
       toolCallId: toolCall.id,
       ...(skillMetadata ? { skillMetadata } : {}),
+      ...(pluginId ? { pluginId } : {}),
       result: {
         success: true,
         content: serialization.content,
@@ -93,6 +95,7 @@ export async function emitToolCallError(
   turnId: TurnId | undefined,
   error: ToolExecutionResult["error"],
   skillMetadata?: SkillTelemetryMetadata,
+  pluginId?: string,
 ): Promise<void> {
   await deps.emitEvent({
     id: crypto.randomUUID() as any,
@@ -106,6 +109,7 @@ export async function emitToolCallError(
       toolCallId,
       error,
       ...(skillMetadata ? { skillMetadata } : {}),
+      ...(pluginId ? { pluginId } : {}),
     },
   });
 }

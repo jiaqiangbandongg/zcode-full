@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { decodeConversationShareRows } from "@zcode/shared";
+import { toolCallDisplaySchema } from "@zcode/shared/zcode-protocol-v4";
 import type { ConversationRow } from "@zcode/shared";
 import { describe, expect, it } from "vitest";
 
@@ -339,5 +342,43 @@ describe("conversation share public projection", () => {
     expect(projection.rows.find((row) => row.kind === "toolCall")?.output).toEqual({
       text: "head...tail",
     });
+  });
+});
+
+// 与 zcode-server 的 testdata/workflow-displays.json 同步，覆盖跨语言分享契约。
+const workflowDisplays: unknown[] = JSON.parse(
+  await readFile(new URL("./fixtures/workflow-displays.json", import.meta.url), "utf8"),
+);
+
+describe("workflow display public projection", () => {
+  it.each(workflowDisplays)("保留完整展示并可在落地页/导入端解码：%j", (fixture) => {
+    const display = toolCallDisplaySchema.parse(fixture);
+    const rows = rowsWithCompletedSubagent();
+    const tool = rows.find((row) => row.kind === "toolCall")!;
+    tool.display = display;
+    const projection = build(rows);
+    const published = projection.rows.find((row) => row.kind === "toolCall")!;
+    expect(published.display).toEqual(display);
+    expect(published.output).toEqual(tool.output);
+    const decoded = decodeConversationShareRows(projection.rows);
+    expect(decoded.unsupportedCount).toBe(0);
+    expect(decoded.rows.find((row) => row.kind === "toolCall")).toEqual(published);
+    // 公开快照不能继续引用源 session 的嵌套可变展示。
+    expect(published.display).not.toBe(display);
+    if (display.kind === "create_workflow" && published.display?.kind === "create_workflow") {
+      expect(published.display.causalityGraph).not.toBe(display.causalityGraph);
+    }
+  });
+
+  it("未知嵌套 display 字段在预检投影阶段拒绝", () => {
+    const rows = rowsWithCompletedSubagent();
+    const tool = rows.find((row) => row.kind === "toolCall")!;
+    tool.display = {
+      kind: "create_workflow",
+      ok: true,
+      errorCount: 0,
+      diagnostics: [{ line: 0, column: 0, code: 1, message: "test", secret: "private" }],
+    } as unknown as typeof tool.display;
+    expectBuildFailure(rows, "invalid_conversation");
   });
 });

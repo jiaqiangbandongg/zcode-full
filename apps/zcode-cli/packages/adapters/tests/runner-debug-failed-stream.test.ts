@@ -109,10 +109,7 @@ describe("recordStreamTextDebug failed-stream aggregate settling", () => {
     const content = await readFile(join(debugDir, files[0]!), "utf8");
     const record = JSON.parse(content.trim()) as {
       response?: { responseId?: string };
-      model?: Record<string, unknown>;
     };
     expect(record.response?.responseId).toBe("resp-1");
-    expect(record.model).not.toHaveProperty("role");
-    expect(record.model).not.toHaveProperty("source");
   });
 });

@@ -37,8 +37,7 @@ function createUnsignedJwt(payload: Record<string, unknown>): string {
 describe("BrowserOAuthCredentialRepo", () => {
   it("saves and restores a complete ZAI web session", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
 
     repo.saveTokenSet(
       {
@@ -70,8 +69,7 @@ describe("BrowserOAuthCredentialRepo", () => {
 
   it("clears partial ZAI sessions instead of restoring them", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
 
     localStorage.setItem("oauth:active_provider", "zai");
     localStorage.setItem("zcodejwttoken", "jwt-token");
@@ -87,8 +85,7 @@ describe("BrowserOAuthCredentialRepo", () => {
   // 所以 BigModel 登录必须能独立存取，不能被 zai 的 key 段和判定挡掉。
   it("saves and restores a complete BigModel web session", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
 
     repo.saveTokenSet({ zcodeJwtToken: "jwt-token", accessToken: "bigmodel-token" }, "bigmodel");
     repo.saveUserInfo({ user_id: "53291785835589288", name: "Ada" }, "bigmodel");
@@ -107,8 +104,7 @@ describe("BrowserOAuthCredentialRepo", () => {
 
   it("切换 provider 时清掉上一个身份的残片", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
 
     repo.saveTokenSet({ zcodeJwtToken: "jwt-zai", zaiAccessToken: "zai-token" }, "zai");
     repo.saveUserInfo({ user_id: "uuid-1", name: "Ada" }, "zai");
@@ -124,30 +120,36 @@ describe("BrowserOAuthCredentialRepo", () => {
     expect(repo.loadCachedSession()?.id).toBe("53291785835589288");
   });
 
-  it("记住并归还本次跳出去登录用的 provider", () => {
+  it("只读返回当前 provider 的账号展示资料，缺 JWT 或资料损坏也不清理存储", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
 
-    expect(repo.loadPendingProvider()).toBeNull();
-    repo.savePendingProvider("bigmodel");
-    expect(repo.loadPendingProvider()).toBe("bigmodel");
-    // 只进 sessionStorage，不落 localStorage
-    expect(localStorage.getItem("oauth_pending_provider")).toBeNull();
-    repo.clearPendingProvider();
-    expect(repo.loadPendingProvider()).toBeNull();
+    expect(repo.loadActiveAccount()).toBeNull();
+    repo.saveUserInfo(
+      { user_id: "53291785835589288", name: "Ada", avatar: "https://example.com/a.png" },
+      "bigmodel",
+    );
+    repo.setActiveProvider("bigmodel");
+    expect(repo.loadActiveAccount()).toEqual({
+      provider: "bigmodel",
+      userInfo: {
+        id: "53291785835589288",
+        username: "Ada",
+        displayName: "Ada",
+        avatarUrl: "https://example.com/a.png",
+      },
+    });
 
-    sessionStorage.setItem("oauth_pending_provider", "not-a-provider");
-    expect(repo.loadPendingProvider()).toBeNull();
+    localStorage.setItem("oauth:bigmodel:user_info", "{not json");
+    expect(repo.loadActiveAccount()).toBeNull();
+    // 展示读取不是登录门禁：不能像 loadCachedSessionState 那样顺手清理残缺凭据。
+    expect(localStorage.getItem("oauth:active_provider")).toBe("bigmodel");
+    expect(localStorage.getItem("oauth:bigmodel:user_info")).toBe("{not json");
   });
 
   it("clears an expired JWT session and requests reauthentication", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo(
-      { localStorage, sessionStorage },
-      { now: () => 2_000_000 },
-    );
+    const repo = new BrowserOAuthCredentialRepo({ localStorage }, { now: () => 2_000_000 });
 
     localStorage.setItem("oauth:active_provider", "zai");
     localStorage.setItem("zcodejwttoken", createUnsignedJwt({ exp: 1_000 }));
@@ -164,18 +166,79 @@ describe("BrowserOAuthCredentialRepo", () => {
     expect(localStorage.getItem("oauth:zai:user_info")).toBeNull();
   });
 
-  it("stores pending nonce in session storage only", () => {
+  it("登录记录跨标签页可取回，取出即删，清理登录凭据时保留", () => {
     const localStorage = new MemoryStorage();
-    const sessionStorage = new MemoryStorage();
-    const repo = new BrowserOAuthCredentialRepo({ localStorage, sessionStorage });
+    const tabA = new BrowserOAuthCredentialRepo({ localStorage });
+    const tabB = new BrowserOAuthCredentialRepo({ localStorage });
+    const login = {
+      nonce: "nonce-1",
+      provider: "bigmodel" as const,
+      redirectUri: "https://zcode.z.ai/remote/v4?sid=device-1",
+    };
 
-    repo.savePendingNonce("nonce-1");
+    tabA.savePendingLogin(login);
+    // 回调页可能先跑登录门禁，残缺凭据清理不能顺带删掉进行中的登录。
+    tabB.clearAll();
 
-    expect(repo.loadPendingNonce()).toBe("nonce-1");
-    expect(localStorage.getItem("oauth_pending_nonce")).toBeNull();
+    expect(tabB.takePendingLogin("nonce-1")).toEqual(login);
+    expect(tabB.takePendingLogin("nonce-1")).toBeNull();
+    expect(localStorage.getItem("oauth_pending_logins")).toBeNull();
+  });
 
-    repo.clearPendingNonce();
+  it("只取 nonce 匹配的登录记录，不匹配时不改动其他记录", () => {
+    const localStorage = new MemoryStorage();
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
+    const loginA = { nonce: "a", provider: "zai" as const, redirectUri: "https://zcode.z.ai/a" };
+    const loginB = {
+      nonce: "b",
+      provider: "bigmodel" as const,
+      redirectUri: "https://zcode.z.ai/b",
+    };
+    repo.savePendingLogin(loginA);
+    repo.savePendingLogin(loginB);
+    const stored = localStorage.getItem("oauth_pending_logins");
 
-    expect(repo.loadPendingNonce()).toBeNull();
+    expect(repo.takePendingLogin("unknown")).toBeNull();
+    expect(localStorage.getItem("oauth_pending_logins")).toBe(stored);
+    expect(repo.takePendingLogin("a")).toEqual(loginA);
+    expect(repo.takePendingLogin("b")).toEqual(loginB);
+  });
+
+  it("最多保留最近 5 条登录记录", () => {
+    const localStorage = new MemoryStorage();
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
+    for (let index = 0; index < 6; index += 1) {
+      repo.savePendingLogin({
+        nonce: `nonce-${index}`,
+        provider: "zai",
+        redirectUri: "https://zcode.z.ai/remote/v4",
+      });
+    }
+
+    expect(repo.takePendingLogin("nonce-0")).toBeNull();
+    expect(repo.takePendingLogin("nonce-1")).not.toBeNull();
+    expect(repo.takePendingLogin("nonce-5")).not.toBeNull();
+  });
+
+  it("损坏或字段不完整的登录记录视为不存在", () => {
+    const localStorage = new MemoryStorage();
+    const repo = new BrowserOAuthCredentialRepo({ localStorage });
+
+    localStorage.setItem("oauth_pending_logins", "{not json");
+    expect(repo.takePendingLogin("nonce-1")).toBeNull();
+
+    localStorage.setItem(
+      "oauth_pending_logins",
+      JSON.stringify([
+        { nonce: "nonce-1", provider: "not-a-provider", redirectUri: "https://zcode.z.ai" },
+        { nonce: "nonce-2", provider: "zai", redirectUri: " " },
+      ]),
+    );
+    expect(repo.takePendingLogin("nonce-1")).toBeNull();
+    expect(repo.takePendingLogin("nonce-2")).toBeNull();
+
+    const login = { nonce: "nonce-3", provider: "zai" as const, redirectUri: "https://zcode.z.ai" };
+    repo.savePendingLogin(login);
+    expect(repo.takePendingLogin("nonce-3")).toEqual(login);
   });
 });

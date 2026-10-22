@@ -527,3 +527,32 @@ async function writeSkill(dir: string, name: string, description: string): Promi
     ["---", `name: ${name}`, `description: ${description}`, "---", "", "# Body"].join("\n"),
   );
 }
+
+describe("附加目录技能", () => {
+  it("保留同名能力，以目录限定名加载，并且不读取附加目录祖先", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zcode-additional-skills-"));
+    try {
+      const main = join(root, "frontend"),
+        extra = join(root, "backend");
+      for (const dir of [main, extra, root]) {
+        const skill = join(dir, ".agents", "skills", "review");
+        await mkdir(skill, { recursive: true });
+        await writeFile(
+          join(skill, "SKILL.md"),
+          `---\nname: review\ndescription: review\n---\n${dir}`,
+        );
+      }
+      const adapter = createNodeSkillAdapter({
+        homeDirectory: join(root, "home"),
+        additionalDirectories: [extra, extra, main],
+      });
+      const result = await adapter.discoverSkills({ workingDirectory: main });
+      expect(result.skills).toHaveLength(2);
+      expect(result.skills.map((s) => s.qualifiedName)).toContain("backend/review");
+      const loaded = await adapter.loadSkill({ workingDirectory: main, name: "backend/review" });
+      expect(loaded.content).toBe(extra);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -19,6 +19,8 @@ import {
   type JsonSchema,
 } from "@zcode/contracts";
 import type { ToolEntry } from "../types.js";
+import { deferredToolCallEntry } from "./deferred-tool-call.js";
+import { toolSearchToolEntry } from "./tool-search.js";
 import { readToolEntry } from "./read.js";
 import { writeToolEntry } from "./write.js";
 import { editToolEntry } from "./edit.js";
@@ -76,6 +78,8 @@ import { createToolRuleNameSet } from "../tool-visibility.js";
 // 统一隐藏 Glob/Grep，并通过 Bash find/grep 接管搜索。
 
 export const builtInTools: ToolEntry[] = [
+  toolSearchToolEntry,
+  deferredToolCallEntry,
   readToolEntry,
   writeToolEntry,
   editToolEntry,

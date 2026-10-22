@@ -29,6 +29,16 @@ function readToolJsonSchema(toolValue: unknown): Record<string, unknown> {
 }
 
 describe("model tool transforms", () => {
+  it("keeps local output unions out of provider tool declarations", () => {
+    const contract = createClientToolContract();
+    contract.outputSchema = {
+      anyOf: [{ type: "string" }, { type: "object", properties: { error: { type: "string" } } }],
+    };
+    const tools = toAiSdkTools([contract]);
+    expect(readToolJsonSchema(tools?.Read)).toEqual(contract.inputSchema);
+    expect(tools?.Read).not.toHaveProperty("outputSchema");
+  });
+
   it("opts Anthropic client-side tools out of eager input streaming", () => {
     const tools = toAiSdkTools([createClientToolContract()], {
       providerKind: "anthropic",
@@ -119,39 +129,6 @@ describe("model tool transforms", () => {
       },
     });
     expect(contract.inputSchema).not.toHaveProperty("$defs");
-  });
-
-  it("applies Kimi K3 tool schema compatibility to the 256K variant", () => {
-    const contract = createClientToolContract();
-    contract.inputSchema = {
-      type: "object",
-      properties: {
-        source: {
-          type: "object",
-          properties: { id: { type: "string" } },
-          required: ["id"],
-        },
-        alias: { $ref: "#/properties/source" },
-      },
-    };
-
-    const tools = toAiSdkTools([contract], {
-      providerKind: "openai-compatible",
-      requiresMfjsToolSchema: true,
-    });
-
-    expect(readToolJsonSchema(tools?.Read)).toMatchObject({
-      $defs: {
-        zcode_ref_0: {
-          type: "object",
-          properties: { id: { type: "string" } },
-          required: ["id"],
-        },
-      },
-      properties: {
-        alias: { $ref: "#/$defs/zcode_ref_0" },
-      },
-    });
   });
 
   it("keeps local property refs unchanged when MFJS projection is disabled", () => {

@@ -1,4 +1,5 @@
 import type { IServiceAccessor } from "@zcode/services";
+import type { RemoteTarget } from "@zcode/shared";
 
 export function buildRemoteWorkspaceSessionServices(
   baseServices: IServiceAccessor,
@@ -7,6 +8,9 @@ export function buildRemoteWorkspaceSessionServices(
   return {
     ...baseServices,
     fileService: remoteServices.fileService,
+    // 根因：遗漏此覆盖会用本机输出根目录校验远端 HTML，合法文件也被判越界。
+    // 文件读取走执行端；useGenUi 的状态与沙箱仍取 desktop base services。
+    genUiService: remoteServices.genUiService,
     mediaPreviewService: remoteServices.mediaPreviewService,
     gitService: remoteServices.gitService,
     gitCheckpointService: remoteServices.gitCheckpointService,
@@ -58,4 +62,18 @@ export function buildServerRemoteWorkspaceSessionServices(
   // Server remote 连接的是完整运行中的 ZCode server；workspace/runtime/model-provider
   // 等状态以 server 为准，本地 renderer 只保留窗口与 UI shell 状态。
   return remoteServices;
+}
+
+export function buildRemoteWorkspaceSessionServicesForRegistration(params: {
+  baseServices: IServiceAccessor;
+  remoteServices: IServiceAccessor;
+  targetKind: RemoteTarget["kind"];
+  sourceServerId?: string;
+}): IServiceAccessor {
+  // Bug 根因：Source Server 可以通过 SSH/WSL/Docker transport 到达，target.kind 仍描述
+  // 线路而不是服务权威。Host 注入 sourceServerId 后必须使用完整远端服务集合；只有尚未
+  // 识别为 Source 的 legacy attachment 才保留 desktop-attached mixed services。
+  return params.targetKind === "server" || params.sourceServerId?.trim()
+    ? buildServerRemoteWorkspaceSessionServices(params.baseServices, params.remoteServices)
+    : buildRemoteWorkspaceSessionServices(params.baseServices, params.remoteServices);
 }

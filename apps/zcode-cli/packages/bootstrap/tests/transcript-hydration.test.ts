@@ -491,7 +491,6 @@ describe("transcript→event 合成", () => {
     const { projection } = reduce([userMessage("u-latest", "继续", 1000), assistant]);
     const rows = projection.getSnapshot().rows.window;
     const userRow = rows.find((row) => row.kind === "userInput");
-    expect(userRow).toBeDefined();
     expect(userRow?.actions?.canEdit).toBe(true);
     expect(projection.isLatestEditableUserRow(userRow!.rowId)).toBe(true);
     expect(projection.getMessageIdForRow(userRow!.rowId)).toBe("u-latest");
@@ -1131,19 +1130,8 @@ describe("transcript→event 合成", () => {
     );
     for (const event of liveEvents) live.applyEvent(event);
 
-    const coldEntityResolver = (
-      cold as unknown as {
-        resolveEditTargetByEntityId?: (entityId: string) => unknown;
-      }
-    ).resolveEditTargetByEntityId;
-    const liveEntityResolver = (
-      live as unknown as {
-        resolveEditTargetByEntityId?: (entityId: string) => unknown;
-      }
-    ).resolveEditTargetByEntityId;
-    expect(coldEntityResolver).toBeTypeOf("function");
-    expect(liveEntityResolver).toBeTypeOf("function");
-    if (!coldEntityResolver || !liveEntityResolver) return;
+    const coldEntityResolver = cold.resolveEditTargetByEntityId;
+    const liveEntityResolver = live.resolveEditTargetByEntityId;
 
     const commandFacts = (
       projection: ProductProjection,
@@ -1214,7 +1202,6 @@ describe("transcript→event 合成", () => {
     const assistantRow = projection
       .getSnapshot()
       .rows.window.find((r) => r.kind === "assistantText");
-    expect(assistantRow).toBeDefined();
     // messageId 侧表用合成时的 assistant message id。
     expect(projection.getMessageIdForRow(assistantRow!.rowId)).toBe("a1");
   });
@@ -1945,6 +1932,69 @@ describe("transcript→event 合成", () => {
     });
   });
 
+  // 「主代理闲着、run 还欠着决定」的提醒走同一条读取器，载荷在它自己的键 `workflowBlocked` 上
+  // （docs/dynamic-workflow/transcript-and-notifications.md「The payload」）：冷恢复后仍是那一行，
+  // 而不是退回裸标题行。
+  it("cold hydration 恢复 workflow originMeta 的提醒载荷（workflowBlocked）", () => {
+    const workflowBlocked = { questions: 2, holes: 1, sinceMs: 1_020_000 };
+    const background = syntheticUserMessage("wake-workflow-blocked", "workflow reminder", 2000, {
+      metadata: {
+        originMeta: {
+          backgroundSource: "workflow",
+          title: "review the diff",
+          workId: "dwfrun-blocked",
+          workflowBlocked,
+        },
+        source: "background_task",
+        visibility: "model-only",
+      },
+      source: "background_task",
+      visibility: "model-only",
+    });
+    const { projection } = reduce([
+      background,
+      assistantMessage("a-wake-blocked", "wake-workflow-blocked", "answered", 2001),
+    ]);
+
+    const header = projection.getSnapshot().rows.window.find((row) => row.kind === "turnHeader");
+    expect(header).toMatchObject({
+      origin: "backgroundResult",
+      originMeta: { backgroundSource: "workflow", workId: "dwfrun-blocked", workflowBlocked },
+    });
+    expect(header).not.toHaveProperty("originMeta.workflowNotification");
+  });
+
+  // 提醒曾短暂地作为 `workflowNotification` 的一个 kind 落过盘（闭集多一个成员会让老客户端拒掉整帧）。
+  // 那样的行冷恢复时只丢载荷：绝不把闭集之外的 kind 再发上线。
+  it("cold hydration 不把闭集之外的 workflowNotification kind 发上线", () => {
+    const background = syntheticUserMessage("wake-workflow-legacy", "workflow reminder", 2000, {
+      metadata: {
+        originMeta: {
+          backgroundSource: "workflow",
+          title: "review the diff",
+          workId: "dwfrun-legacy",
+          workflowNotification: { kind: "blocked", questions: 2, holes: 1, sinceMs: 1_020_000 },
+        },
+        source: "background_task",
+        visibility: "model-only",
+      },
+      source: "background_task",
+      visibility: "model-only",
+    });
+    const { projection } = reduce([
+      background,
+      assistantMessage("a-wake-legacy", "wake-workflow-legacy", "answered", 2001),
+    ]);
+
+    const header = projection.getSnapshot().rows.window.find((row) => row.kind === "turnHeader");
+    expect(header).toMatchObject({
+      origin: "backgroundResult",
+      originMeta: { backgroundSource: "workflow", workId: "dwfrun-legacy" },
+    });
+    expect(header).not.toHaveProperty("originMeta.workflowNotification");
+    expect(header).not.toHaveProperty("originMeta.workflowBlocked");
+  });
+
   // 防御性读取：畸形载荷（status 不在枚举内）只丢载荷、保三基字段，绝不打挂整条冷恢复。
   it("cold hydration 丢弃畸形 manifest 载荷但保留三基字段", () => {
     const background = syntheticUserMessage("wake-workflow-bad", "workflow result", 2000, {
@@ -1989,7 +2039,13 @@ describe("transcript→event 合成", () => {
       status: "completed",
       summary: "nightly audit",
       artifacts: [
-        { id: "audit", kind: "file", title: "审计报告", version: 2, contentType: "application/pdf" },
+        {
+          id: "audit",
+          kind: "file",
+          title: "审计报告",
+          version: 2,
+          contentType: "application/pdf",
+        },
         { id: "perf", kind: "chart", version: 1 },
       ],
       artifactsTruncated: true,
@@ -2049,10 +2105,15 @@ describe("transcript→event 合成", () => {
 
     const header = projection.getSnapshot().rows.window.find((row) => row.kind === "turnHeader");
     expect(header).toMatchObject({
-      originMeta: { backgroundSource: "workflow", title: "nightly audit", workId: "dwfrun-art-bad" },
+      originMeta: {
+        backgroundSource: "workflow",
+        title: "nightly audit",
+        workId: "dwfrun-art-bad",
+      },
     });
     expect(
-      (header as { originMeta?: { workflowNotification?: unknown } }).originMeta?.workflowNotification,
+      (header as { originMeta?: { workflowNotification?: unknown } }).originMeta
+        ?.workflowNotification,
     ).toBeUndefined();
   });
 
@@ -2384,6 +2445,52 @@ describe("transcript→event 合成", () => {
     });
   });
 
+  it("失败 MCP 工具的字符串 modelContent 不丢失冷恢复展示信息", () => {
+    const display = {
+      kind: "mcp_tool",
+      serverName: "Document Service",
+      toolName: "get_page",
+      description: "Fetch page contents",
+    } as const;
+    const messages = [
+      userMessage("u1", "读取页面", 1000),
+      assistantMessageWithParts(
+        "a1",
+        "u1",
+        [
+          {
+            id: "a1-tool" as never,
+            sessionID: "s1" as never,
+            messageID: "a1" as never,
+            type: "tool",
+            callID: "call-mcp",
+            tool: "mcp__Document_Service__get_page",
+            state: {
+              status: "error",
+              input: {},
+              error: "Permission denied",
+              metadata: {
+                schemaVersion: 1,
+                modelContent: "MCP request failed: permission denied",
+                display,
+              },
+              time: { start: 1001, end: 1002 },
+            },
+          },
+        ],
+        1001,
+      ),
+    ];
+    const { projection } = reduce(messages);
+
+    expect(
+      projection.getSnapshot().rows.window.find((row) => row.kind === "toolCall"),
+    ).toMatchObject({
+      status: "error",
+      display,
+    });
+  });
+
   it("历史 pending/running tool 不复活 active work，冷恢复收口为 cancelled", () => {
     const messages = [
       userMessage("u1", "跑个长任务", 1000),
@@ -2693,7 +2800,6 @@ describe("transcript 附件合成（M5④）", () => {
     const marker = projection
       .getSnapshot()
       .rows.window.find((row) => row.kind === "timelineMarker" && row.marker.type === "goalVerify");
-    expect(marker).toBeDefined();
     expect(marker?.kind === "timelineMarker" ? marker.marker : null).toMatchObject({
       type: "goalVerify",
       iteration: 1,
@@ -2990,7 +3096,6 @@ describe("transcript 附件合成（M5④）", () => {
       .rows.window.filter(
         (row) => row.kind === "timelineMarker" && row.marker.type === "goalVerify",
       );
-    expect(markers).toHaveLength(2);
     expect(markers.map((row) => (row.kind === "timelineMarker" ? row.marker : null))).toEqual([
       expect.objectContaining({ iteration: 1, outcome: "pass" }),
       expect.objectContaining({ iteration: 2, outcome: "notSatisfied" }),

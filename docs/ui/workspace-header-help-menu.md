@@ -15,6 +15,7 @@ Workspace header action 区在终端按钮左侧提供轻量帮助菜单，作�
 菜单分为两组，不显示分组标题，仅桌面端在两组之间放一条分隔线。
 
 第一组从上到下：
+
 1. 产品文档：打开 `https://zcode.z.ai/docs`。
 2. 用户社群：走 `IPlatformService.openCommunity()`。
 3. 问题上报：打开内置反馈表单，保持 `type=bug`、`module=其它`、`includeLogs=true` 和截图行为。
@@ -45,6 +46,9 @@ Workspace header action 区在终端按钮左侧提供轻量帮助菜单，作�
 
 - 不复用通用问题上报表单，避免截图、日志、问题描述等 bug 语义干扰用户。
 - 弹窗包含引导文案、必填的“需求描述”和“期望的解决方案”、可选联系方式。
+- 必填标题的红色 `*` 与问题上报复用同一标记组件，使用 `aria-hidden`，避免读屏将装饰符号读入标题。
+- 两个必填输入框通过 `required`、`aria-required` 和本地化可访问名称表达字段语义，不依赖读出星号。
+- FB-REQ-A11Y-01：`feedback-upload-privacy.test.ts` 的真实帮助菜单用例覆盖中英文、宽窄窗口、深浅主题，检查两个星号可见且对辅助技术隐藏、空表单禁止提交；不提交真实需求工单。
 - “重置内容”位于底部左侧；“取消”和“提交需求”位于底部右侧。
 - 两个必填字段都有内容后才允许提交。
 - 提交时把两个字段组织成结构化 Markdown description，并通过 feedback service 创建 `feature` 类型工单。

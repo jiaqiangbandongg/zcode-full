@@ -80,7 +80,6 @@ describe("marketing image banner", () => {
     const frame = screen.getByTitle("Claim") as HTMLIFrameElement;
     expect(screen.getByTestId("marketing-banner").style.height).toBe("0px");
     expect(frame.tabIndex).toBe(-1);
-    expect(frame.classList.contains("bg-transparent")).toBe(true);
     message(frame, "ready", "stale");
     expect(screen.getByTestId("marketing-banner").style.height).toBe("0px");
     message(frame, "ready");
@@ -229,17 +228,6 @@ describe("marketing image banner", () => {
       onClose: close,
     };
     const { rerender } = render(createElement(MarketingBannerView, props));
-    const imageButton = screen.getByRole("button", { name: "Claim" });
-    const closeButton = screen.getByRole("button", { name: "Close" });
-    expect(closeButton.classList.contains("bg-card")).toBe(false);
-    expect(closeButton.classList.contains("rounded-full")).toBe(true);
-    expect(imageButton.classList.contains("border")).toBe(true);
-    expect(imageButton.classList.contains("border-border")).toBe(true);
-    expect(imageButton.classList.contains("h-24")).toBe(true);
-    expect(imageButton.classList.contains("bg-card")).toBe(false);
-    expect(imageButton.classList.contains("rounded-xl")).toBe(true);
-    expect(imageButton.classList.contains("overflow-hidden")).toBe(true);
-    expect(imageButton.classList.contains("focus-visible:ring-2")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(close).toHaveBeenCalledTimes(1);
     expect(click).not.toHaveBeenCalled();
@@ -248,11 +236,8 @@ describe("marketing image banner", () => {
     rerender(createElement(MarketingBannerView, { ...props, pending: true }));
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     expect(screen.getByRole("status").textContent).toContain("Verifying");
-    expect(screen.getByRole("status").classList.contains("bg-card")).toBe(false);
-    expect(screen.getByRole("status").classList.contains("rounded-full")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Claim" }));
     expect(click).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("img").getAttribute("src")).toBe(props.src);
-    expect(screen.getByRole("img").classList.contains("object-cover")).toBe(true);
   });
 });

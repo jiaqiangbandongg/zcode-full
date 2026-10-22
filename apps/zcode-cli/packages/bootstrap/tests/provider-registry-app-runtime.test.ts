@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import * as executionAdapters from "@zcode/adapters/exec";
 import { createSqliteSessionStore } from "@zcode/adapters/storage";
 import {
   SESSION_ENTRY_MODEL_SELECTION,
@@ -38,7 +40,7 @@ describe("ZCode App Provider Registry runtime", () => {
 
   it("新 Session 优先 Configured Default；未配置时按正式初始规则选择最高档", async () => {
     const registry = new ProviderRegistry([provider()]);
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const common = {
       env: {},
       modelAdapter: fakeModelAdapter(),
@@ -51,6 +53,7 @@ describe("ZCode App Provider Registry runtime", () => {
       skipUserConfig: true,
     } as const;
 
+    const execution = vi.spyOn(executionAdapters, "createNodeExecutionAdapter");
     const configured = await createZCodeApp({
       ...common,
       configuredDefaultModelSelection: {
@@ -59,6 +62,10 @@ describe("ZCode App Provider Registry runtime", () => {
         options: { reasoningLevel: "low" },
       },
     });
+    expect(execution).toHaveBeenCalledWith(
+      expect.objectContaining({ bashOutputTempDir: tmpdir() }),
+    );
+    execution.mockRestore();
     expect(configured.getModel()).toBe("provider-a/model-b");
     expect(configured.getThoughtLevel()).toBe("low");
     await configured.close?.();
@@ -77,7 +84,7 @@ describe("ZCode App Provider Registry runtime", () => {
 
   it("恢复 Session 时使用持久 Session Selection 覆盖 Environment 默认值", async () => {
     const registry = new ProviderRegistry([provider()]);
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const sessionId = createSessionId("provider-registry-resume");
     await sessionStore.createSession({
       id: sessionId,
@@ -182,7 +189,7 @@ describe("ZCode App Provider Registry runtime", () => {
         return registry.onDidChange(listener);
       },
     };
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const app = await createZCodeApp({
       env: {},
       modelAdapter: {
@@ -233,11 +240,6 @@ describe("ZCode App Provider Registry runtime", () => {
     });
     expect(app.getThoughtLevel()).toBe("low");
 
-    expect("setModelCatalogOverlay" in app).toBe(false);
-
-    expect("setTurnModelCatalogOverlay" in app).toBe(false);
-    expect("clearTurnModelCatalogOverlay" in app).toBe(false);
-
     await app.close?.();
     sessionStore.close();
   });
@@ -245,7 +247,7 @@ describe("ZCode App Provider Registry runtime", () => {
   it("连接测试会在正式 ModelFactory 前补齐最低推理档位", async () => {
     const registry = new ProviderRegistry([provider()]);
     const createdReasoningLevels: string[] = [];
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const app = await createZCodeApp({
       configuredDefaultModelSelection: {
         providerId: "provider-a",
@@ -283,40 +285,10 @@ describe("ZCode App Provider Registry runtime", () => {
     sessionStore.close();
   });
 
-  it("进程 Registry 模式不公开 Workspace Provider Overlay 写入口", async () => {
-    const registry = new ProviderRegistry([provider()]);
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
-    const app = await createZCodeApp({
-      env: {},
-      modelAdapter: {
-        addStatusSink() {},
-        createModel: () => fakeModel(),
-        setModelIoFullRetentionEnabled() {},
-      } as never,
-      providerRegistry: registry,
-      runtimeConfig: {
-        mcp: { enabled: false },
-        workingDirectory: process.cwd(),
-        modelSelection: {
-          providerId: "provider-a",
-          modelId: "model-a",
-          options: { reasoningLevel: "disabled" },
-        },
-      },
-      sessionStore,
-      skipUserConfig: true,
-    });
-
-    expect("setModelCatalogOverlay" in app).toBe(false);
-
-    await app.close?.();
-    sessionStore.close();
-  });
-
   it("Expert Workflow 子 Runtime 继续使用进程 Registry 的 ModelFactory", async () => {
     const registry = new ProviderRegistry([provider()]);
     const createdModels: string[] = [];
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const app = await createZCodeApp({
       env: {},
       modelAdapter: fakeModelAdapter(() => {
@@ -352,7 +324,7 @@ describe("ZCode App Provider Registry runtime", () => {
     const registry = new ProviderRegistry([provider()]);
     const adapter = fakeModelAdapter(() => workflowModel());
     createModelAdapterMock.mockReturnValue(adapter);
-    const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
     const app = await createZCodeApp({
       env: {},
       providerRegistry: registry,

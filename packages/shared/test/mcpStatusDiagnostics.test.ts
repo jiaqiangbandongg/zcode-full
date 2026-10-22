@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  MCP_SERVER_FAILURE_KINDS,
-  zcodeMcpServerStatusSnapshotSchema,
-} from "../src/zcode-protocol/index.js";
+import { zcodeMcpServerStatusSnapshotSchema } from "../src/zcode-protocol/index.js";
 
 describe("MCP status diagnostics protocol", () => {
   it("accepts structured failure diagnostics and keeps legacy snapshots compatible", () => {
@@ -31,29 +28,7 @@ describe("MCP status diagnostics protocol", () => {
     ).not.toHaveProperty("failureKind");
   });
 
-  it("enumerates every user-facing failure kind and rejects empty request ids", () => {
-    expect(MCP_SERVER_FAILURE_KINDS).toEqual([
-      "config_invalid",
-      "runtime_unavailable",
-      "process_start_failed",
-      "network_unreachable",
-      "connection_timeout",
-      "protocol_negotiation_failed",
-      "tool_list_failed",
-      "unexpected_disconnect",
-      "oauth_authorization_failed",
-      "official_origin_untrusted",
-      "not_authenticated",
-      "coding_plan_required",
-      "server_not_found",
-      "server_unavailable",
-      "rate_limited",
-      "server_internal_error",
-      "protocol_error",
-      "status_unavailable",
-      "connection_failed",
-    ]);
-
+  it("rejects empty request ids", () => {
     expect(
       zcodeMcpServerStatusSnapshotSchema.safeParse({
         serverRequestId: "",

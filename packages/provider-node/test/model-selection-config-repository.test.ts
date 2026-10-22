@@ -74,25 +74,6 @@ describe("NodeModelSelectionConfigRepository", () => {
     repository.dispose();
   });
 
-  it("saves and reloads a configured default", async () => {
-    const root = await mkdtemp(join(tmpdir(), "zcode-model-selection-config-"));
-    roots.push(root);
-    const filePath = join(root, "provider_config.json");
-    const repository = selectionRepository(filePath);
-
-    await repository.saveConfiguredDefault({
-      providerId: "provider-b",
-      modelId: "model-b",
-      options: { reasoningLevel: "high" },
-    });
-    expect(await repository.read()).toEqual({
-      providerId: "provider-b",
-      modelId: "model-b",
-      options: { reasoningLevel: "high" },
-    });
-    repository.dispose();
-  });
-
   it("损坏 Personal 读取降级但保留原文件，禁止默认保存覆盖它", async () => {
     const root = await mkdtemp(join(tmpdir(), "zcode-model-selection-config-"));
     roots.push(root);

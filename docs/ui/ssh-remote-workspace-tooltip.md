@@ -1,21 +1,8 @@
-# SSH Remote Workspace Tooltip
+# 远程项目连接详情
 
-## Goal
+SSH 专用 tooltip 已由统一远程项目详情替代；当前合同见 [平铺项目导航 · RDUX-12](../remote/project-first-remote-navigation-spec.md#21a-侧栏详情与设备菜单rdux-12)。SSH、WSL、Docker、Direct Server 共用同一展示模型。
 
-没有 SSH config alias 的远程 workspace 仍需要能在左侧任务列表里区分服务器。用户 hover SSH 远程 workspace 的侧栏 tab 主标签区域时，显示连接信息 tooltip。
-
-## Behavior
-
-- 仅 SSH remote workspace 显示该 tooltip；本地、WSL、Docker workspace 保持现状。
-- tooltip 展示非敏感连接信息：
-  - `Alias`：仅当 `remoteTarget.sshConfigAlias` 存在时显示。
-  - `Host`：显示 `username@host:port`，端口缺省时按 SSH 默认端口 `22` 展示。
-  - `Path`：显示当前远程 workspace 路径。
-- tooltip 只用于识别 workspace，不参与排序、去重、持久化 key 或 workspace identity 计算。
-- 右侧已有操作按钮的 tooltip（新建任务、文件树、重连、错误日志）保持不变。
-
-## Implementation Notes
-
-- 数据来源为 `WorkspaceTabState.remoteTarget` 和 `workspacePath`，不读取凭据，也不显示密码、私钥路径或 passphrase。
-- 仅修改 UI 展示层，不新增或修改 ZCode session/task realtime、snapshot、queue、stream、owner command 或 web remote-control 状态。
-- 桌面端与 Web 端共用 `packages/ui` 组件；手机远控任务首页不使用桌面侧栏，不受该 tooltip 影响。
+- 设备标签点击立即打开可操作详情，悬停 400ms 打开同一个浮层。锚定项目整行右侧，Escape、外部点击或移出未固定详情后关闭；菜单关闭不残留提示。
+- 详情显示项目名、设备名、连接描述、完整远端路径、状态及原因，不显示密码、私钥路径、passphrase 或 URL token。会话头部名称与路径与此一致。
+- 连接沿用原项目目录意图；断开作用于设备；编辑复用连接编辑框；管理进入设置并一次性滚动、聚焦目标设备卡。
+- 展示名不参与排序、去重或 workspace identity 计算；浮层属于 UI，不改变 task、snapshot、queue、owner 或 desktop continuous / mobile replayable 链路。

@@ -107,7 +107,7 @@ describe("Bash progress product projection", () => {
       expect.objectContaining({ workId: "background-1", status: "running" }),
     );
   });
-  it("ignores child tool mirrors in the parent while child topics use normal progress", () => {
+  it("ignores child tool mirrors in the parent", () => {
     const parent = harness();
     expect(
       parent.apply(SessionEventType.ToolCallProgress, {
@@ -117,9 +117,6 @@ describe("Bash progress product projection", () => {
       }),
     ).toEqual([]);
     expect(parent.row().outputPreview).toBeUndefined();
-    const child = harness();
-    child.progress();
-    expect(child.row().outputPreview).toEqual(preview);
   });
   it("does not create a row for unknown or invalid previews", () => {
     const h = harness();

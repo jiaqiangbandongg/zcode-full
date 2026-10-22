@@ -514,3 +514,89 @@ describe("V4ConversationProvider remote readiness", () => {
     expect(remote.attachmentReadV4).toHaveBeenCalledOnce();
   });
 });
+
+it("断线保留当前会话 owner，冷启动仍只挂载占位且不获取本地服务", () => {
+  const root = createRoot(installMinimalDom());
+  mountedRoots.push(root);
+  const services = makeServices("offline-base");
+  const remote = makeServices("offline-remote");
+  const workspaceIdentity = "remote:server:offline-device:/workspace/app";
+  const mounted = vi.fn();
+  const disposed = vi.fn();
+  const placeholderMounted = vi.fn();
+  function ConversationOwner() {
+    useEffect(() => {
+      mounted();
+      return disposed;
+    }, []);
+    return null;
+  }
+  registerBaseWorkspaceServices(services);
+  act(() =>
+    root.render(
+      createElement(
+        TestProviders,
+        { services },
+        createElement(
+          V4ConversationProvider,
+          {
+            workspacePath: "/workspace/app",
+            workspaceIdentity,
+            sessionId: "task-a",
+            unavailableFallback: createElement(MountProbe, { onMount: placeholderMounted }),
+          },
+          createElement(ConversationOwner),
+        ),
+      ),
+    ),
+  );
+  expect(placeholderMounted).toHaveBeenCalledOnce();
+  expect(mounted).not.toHaveBeenCalled();
+  act(() => {
+    registerRemoteWorkspaceSession({ sessionId: "offline-session", services: remote });
+    bindRemoteWorkspaceIdentity(workspaceIdentity, "offline-session");
+  });
+  expect(mounted).toHaveBeenCalledOnce();
+  act(() => useRemoteWorkspaceSessionStore.setState({ sessionsById: {} }));
+  expect(disposed).not.toHaveBeenCalled();
+  expect(placeholderMounted).toHaveBeenCalledOnce();
+  act(() => registerRemoteWorkspaceSession({ sessionId: "offline-session", services: remote }));
+  expect(mounted).toHaveBeenCalledOnce();
+});
+
+it.each([true, false])(
+  "断线后切换会话只渲染占位，不让新会话向留存的旧服务订阅（显式会话：%s）",
+  (explicitSession) => {
+    const root = createRoot(installMinimalDom());
+    mountedRoots.push(root);
+    const services = makeServices("gate-base");
+    const remote = makeServices("gate-remote");
+    const workspaceIdentity = "remote:server:gate:/repo";
+    registerBaseWorkspaceServices(services);
+    registerRemoteWorkspaceSession({ sessionId: "gate-session", services: remote });
+    bindRemoteWorkspaceIdentity(workspaceIdentity, "gate-session");
+    const subscribe = vi.fn();
+    function Subscription({ id }: { id: string }) {
+      useEffect(() => subscribe(id), [id]);
+      return null;
+    }
+    const renderSession = (id: string) =>
+      createElement(
+        TestProviders,
+        { services },
+        createElement(
+          V4ConversationProvider,
+          {
+            workspacePath: "/repo",
+            workspaceIdentity,
+            ...(explicitSession ? { sessionId: id } : {}),
+          },
+          createElement(Subscription, { id }),
+        ),
+      );
+    act(() => root.render(renderSession("task-a")));
+    act(() => useRemoteWorkspaceSessionStore.setState({ sessionsById: {} }));
+    act(() => root.render(renderSession("task-b")));
+    expect(subscribe.mock.calls).toEqual([["task-a"]]);
+  },
+);

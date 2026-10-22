@@ -95,6 +95,22 @@ Body 为 Anthropic Messages，`model` 必须与卡绑定 model 一致。客户�
 （mid-conversation system、provider-native WebSearch、图片/视频输入）。加速只改变速度，
 不得让同一会话的能力面随本轮是否加速而抖动。
 
+Highspeed 与 Off-Peak Provider 是当前 Coding Plan 连接的派生执行入口，不拥有独立权益。它们的发布状态
+必须继承所选母体 Provider 在同一轮 Account Provider 解析后的**最终权益结果**：母体本轮明确可用时发布，
+明确不可用时下架；母体查询为 `unknown` 时，先按 Account Provider 的 last-known-good 规则解析母体，
+再把最终结果投影给派生 Provider。禁止直接把原始 `unknown` 当成无权益，否则会出现母体仍可抽卡、派生
+Provider 已从 Registry 下架的分裂状态。last-known-good 只在同一登录账号、同一 Team
+`organization/project/product` 身份内有效；账号或 Team 身份变化后，母体和派生入口都必须 fail-closed，
+不得复活旧权益。
+
+```text
+Coding Plan 原始查询            母体最终发布结果             派生执行入口
+available                 -> available                 -> available
+unavailable               -> unavailable               -> unavailable
+unknown + 同身份旧权益     -> last-known-good available -> available
+unknown + 身份已变化       -> fail-closed unavailable   -> unavailable
+```
+
 一次 Turn 可能因工具调用产生多次 Messages 请求。任一次 Highspeed 请求失败时——卡过期的
 `HTTP 400 / provider_code=3402`、鉴权失败、限流、5xx、网络错误、超时、流中断等**任何失败**——Agent
 必须保留已完成的工具结果和对话上下文，将该 Turn 剩余的模型请求切回发送前的原始 session 模型，
@@ -104,15 +120,72 @@ Renderer 仅提示一次：卡过期提示“加速卡已到期，本轮后续�
 
 该降级由 `modelExecution.selectionFallback` 声明式表达：
 `{ providerId, rules: [{ reason, providerErrorCode? }], target? }`。规则按声明顺序匹配，首个命中的规则
-决定退回原因；`providerErrorCode` 缺省表示该 provider 的任何失败。加速卡声明两条规则：
+决定退回原因；`providerErrorCode` 缺省表示该 provider 的任何失败。加速卡声明两条请求期规则：
 `3402 → highspeed_card_expired`，其余 `→ highspeed_request_failed`。Core 只在失败来自本轮 execution
 Selection 指向的 provider 时才降级（不按 provider id 前缀、模型名或错误文案硬编码），且只降一次。
 
-退回目标按顺序解析：**先取声明的 `target`，再取 runtime 的会话常驻 `modelSelection`**。`target` 是发起方
+同一声明还覆盖请求发出前的模型创建期。仅当本轮是 execution-scoped Selection、Selection provider
+等于声明 provider，且创建错误严格为 `ProviderNotFound` 或 `ModelNotFound` 时，Core 才按相同候选顺序
+创建退回模型并继续本轮，同时发布原因 `highspeed_selection_unavailable` 的
+`TurnExecutionModelFallback`。普通会话 Selection、其他创建错误，以及退回目标自身创建失败均不得被吞掉；
+所有候选均失败时按最后一个普通模型候选的真实创建错误结束本轮，并记录 `warn`，不得再把 Highspeed
+Registry 错误展示给用户。创建期退回成功后必须清除本轮退回声明，普通模型后续失败不能二次退回。
+
+任一已归因到 Highspeed 的创建期或请求期失败，都表示当前卡不应继续锁定 Composer。Renderer 观察到
+`TurnExecutionModelFallback` 后，必须按事件所属输入的 `cardId` 调用 Highspeed Service 作废卡。若退回目标
+也无法创建、未产生该事件，Core 在该 Turn 的 `TurnError` 里发布 `error.attribution.highspeedFallbackUnavailable=true`
+（创建期与请求期的无处可退都发布），V4 投影到 `control.lastError.attribution`；Renderer 只在
+`highspeedCardId` 等于当前卡且该字段为 true 时作废当前卡，不按错误码推断——请求期 3402/网络失败的 `code`
+是 provider 错误码而非目录错误；上下文超窗、用户取消、本地 runtime 失败不参与退回，也不带该字段。Service
+只在当前卡 ID 匹配时清卡，旧事件不得清除随后抽到的新卡，并保留 `nextDrawAt` 冷却事实，避免下一次发送立即
+重新抽卡形成失败循环。模型锁定与加速视觉只从 Service 的当前卡状态派生，匹配卡作废后立即退出 Highspeed
+状态并解锁。退回成功时不得显示错误 Banner，只提示一次已切回原模型；退回后的普通模型也失败时按其真实错误
+结束本轮，但此时 Composer 已解锁，用户可以更换模型继续工作。
+
+错误终态清卡必须使用执行事实中的卡归因。Highspeed 命令的 `intent.highspeed.cardId` 是本轮唯一卡身份；
+CLI 在生成 `TurnError` 时把它写入 `error.attribution.highspeedCardId`，V4 再投影到
+`control.lastError.attribution.highspeedCardId`。
+Renderer 只在该值等于当前卡 ID 且 `highspeedFallbackUnavailable` 为 true 时作废卡，不再通过 `rows.window`
+反查输入行。模型创建失败时也必须先发布 `TurnStarted` 并持久化已接纳的用户输入，再发布 `TurnError`；显式错误
+归因仍用于作废准确的卡，不能以历史窗口是否包含该 userInput 作为关联依据。
+`inputId` 仍是 TurnError 的通用输入锚点，但不承担 Highspeed 卡归因。没有 `highspeedCardId` 字段的旧 Agent
+只能按 `provider_not_found` / `model_not_found` 目录错误码、并以发卡时间为下界保守清卡。
+
+破坏性 `editUserQuery` / `retryTurn` 在 branch cut 与 workspace rewind 前必须完成一次模型准入检查；提交
+branch cut 后不得再次用可变 Provider Registry 拒绝同一 replacement input。若 Registry 在预检后、Core
+创建模型前变化，Core 可以以 `model_creation` 失败结束该轮，但必须先把 replacement input 提升为可恢复的
+权威 user row。最终状态只能是“新输入 + 明确错误”，不得只留下历史截断或已回退的工作区。
+
+创建失败轮不复制落库流程。Core 只记下原始创建错误，再走普通轮的同一条生命周期：`TurnStarted`、
+`UserPromptSubmit` hook、附件解析和 user row 落库。错误终态只由主生命周期的同一个 catch 写入。
+模型创建失败后不得初始化 Context 或运行 `SessionStart` hook：两者依赖可用模型且位于输入持久化之前，失败会覆盖
+原始创建错误并再次丢失已接纳输入；`SessionStart` 也不得被失败轮消费，必须留给下一次可创建模型的 Turn。
+
+```text
+Core 创建模型失败 ──> 记下原始错误（不写终态）──> 跳过 Context 初始化与 SessionStart hook
+  └─> TurnStarted ──> UserPromptSubmit hook ─┬─ 拦截 ──> completed(success, stopReason)，输入不落库（普通轮规则）
+                                             └─ 放行 ──> 附件解析 + user row 落库 ──> 抛出原始错误
+                                                                                       │
+主生命周期 catch（唯一错误终态写入点）<─────────────────────────────────────────────────┘
+  ├─ 普通失败（含落库失败）──> TurnError(model_creation, 原始创建错误)；落库错误只记 warn
+  ├─ 用户 Stop ──> completed(cancelled)，与普通轮一致
+  └─ 宿主 fault（经 abort signal 传入）──> TurnError(fault code)，与普通轮一致
+```
+
+该轮不进入 model step，所以拒绝 guide（`turn_not_steerable`），guide 改投普通 queue。该轮也不应用提交里的
+模型选择、mode 和 plan，不计入 goal 目标轮次。`/compact` 不产生 user row：创建失败时直接发布
+`TurnError(model_creation)`，不发布 `TurnStarted`。
+
+新 Agent 对每个 `TurnError` 都发布三态归因：字符串表示本轮使用的卡，`null` 表示本轮没有使用 Highspeed，
+字段缺失只表示旧 Agent。普通排队轮的目录错误因此是 `null`，不得清除持卡期间的无关卡；归因到旧卡的滞留
+错误也不得清除当前卡。兼容旧 Agent：字段缺失时保留目录错误码与发卡时间下界的保守清卡行为；该路径下
+普通轮目录错误仍可能误清卡，但只存在于新 App 连接旧 Agent 的过渡期。
+
+退回目标按顺序解析：**先取声明的 `target`，再取本轮接纳前复制的会话常驻 `modelSelection`**。`target` 是发起方
 抽卡时的提交选择（Composer 当前模型与思考档位），也就是本轮若不加速本会绑定为会话选择的那一份，加速卡
-必须填写它；会话常驻选择只是兜底——execution 作用域从不改写它，正常情况下两者相同。候选目标不得是本轮
+必须填写它；会话常驻选择只是兜底——接纳用户消息时绑定普通提交选择，正常情况下两者相同。候选目标不得是本轮
 execution provider 本身；目标在 Registry 中不可解析时跳到下一候选。两者都无法解析时无处可退，本轮按真实
-错误失败，不得掩埋根因，且 Core 必须记录一条带原因的 `warn`。退回不构造额外执行快照，也不需要
+错误失败，不得掩埋根因，且 Core 必须记录一条带原因的 `warn`。Core 将会话候选保存为加速卡专用的 `highspeedFallbackSelection` 快照，后续用户输入更新 Session 不得改变旧轮的退回目标；不需要
 overlay/模型还原接口；退回请求走用户自己的常规鉴权，不再携带本次执行的 `requestAuth`。
 
 回归约束（退回目标必须随声明下发）：退回目标曾只依赖 runtime 会话常驻选择。桌面重启后冷恢复若落在
@@ -120,6 +193,19 @@ Provider Registry 刚就绪、账号权益尚未解析的窗口内，持久化�
 不绑定；随后若只发送加速轮（execution 作用域不绑定会话选择），runtime 就一直没有常驻选择，卡过期
 （3402）时降级静默跳过，整轮按 `highspeed card is invalid` 失败并弹出错误横幅。发起方在抽卡时明确知道
 原模型，所以目标由发起方声明，不再押注 runtime 状态。
+
+ACK 准入约束：Highspeed execution Selection 可延迟到 Core 解析，以允许加速模型临时缺失时走创建期退回；
+Bootstrap 在接受输入前必须确认 execution Selection 或声明的 `selectionFallback.target` 至少一个存在于当前 Worker
+Provider Registry。execution Selection 可用时，不得仅因退回目标缺失而拒绝；两者都不可解析时，必须在 ACK 前以
+`modelUnavailable` 拒绝，不得先接受输入再只发布 `TurnError(model_creation)`。Renderer 对本次 Highspeed 准入拒绝
+必须作废匹配卡、退出加速状态并解锁模型选择器，同时让 Composer 恢复正文与附件，不显示 Turn Error 或通用发送
+错误 Banner。ACK 表示输入已经被可靠接纳；UI watchdog 不能用于恢复尚未产生 `TurnStarted` / userInput 投影的输入。
+
+`editUserQuery` / `retryTurn` 会持久化 active branch cut，`workspaceMode=rewind` 还会先修改工作区文件。它们必须基于
+本次即将重发的 canonical intent 和 execution 材料，在 stop active turn、文件回退和 branch cut 之前执行同一份模型
+准入检查。准入失败时不得改变活动历史或工作区。预检与实际重发必须复用同一套准入规则，不能让普通发送与编辑重发
+分别判断“可用模型”。Highspeed `editUserQuery` 被接受后沿用 conversation protocol 的 accepted-input projection recovery：
+若 branch cut 已可见而 replacement user row 静默，只恢复同一 owned subscription，不重放命令、不补造消息，也不恢复旧分支。
 
 降级边界：
 
@@ -142,9 +228,9 @@ Provider Registry 刚就绪、账号权益尚未解析的窗口内，持久化�
 - **不降级的失败**：用户取消（整轮按取消收口）、上下文超窗（交给 reactive compact；退回同模型同窗口
   只会再超一次），以及事件持久化、投影等本地 runtime 失败。兜底规则的“任何失败”只表示已明确归因到本轮
   execution provider 的 provider/network 请求失败，不能把无归因的本地异常误判成加速端点故障。
-- **轮内一次、跨轮再试**：降级后本轮剩余请求全部使用会话模型；退回后的会话模型若再失败，按真实错误
-  整轮失败。下一次用户发送重新走 Highspeed prepare，卡仍有效且属于本 Task 时再次尝试加速；非到期类
-  失败不作废卡，代价是每轮最多一个快速失败的加速请求。
+- **轮内一次、失败即退卡**：降级后本轮剩余请求全部使用会话模型；退回后的会话模型若再失败，按其真实
+  错误结束本轮。Highspeed 创建或请求失败一经归因，当前匹配卡立即作废并保留冷却，下一轮不得复用同一张卡；
+  这样即使普通模型也失败，Composer 也已退出 Highspeed 状态，用户可以选择其他模型恢复工作。
 - **冷恢复终态**：被退回的加速 attempt 必须持久化为统一的 stream-recovery discarded 边界，而不是普通
   `completed` assistant。若进程在退回模型产生最终 assistant 前退出，冷恢复将本 Turn 收口为 interrupted；若
   后续已有正常完成 assistant，则恢复为 success 且不产生错误 Banner。工具 anchor 仍按上一条成对恢复。
@@ -155,11 +241,26 @@ Provider Registry 刚就绪、账号权益尚未解析的窗口内，持久化�
   这是已知取舍，若要排除需另行定义统计规则。
 
 ```text
-Highspeed request -- any failure --> preserve current Turn context/tools
-                                         |
-                                         +--> notify Renderer once (card expired / request failed)
-                                         +--> remaining model requests use original session model
-                                         +--> complete Turn metrics remain share-eligible
+execution Selection
+        |
+        +-- create ProviderNotFound / ModelNotFound
+        |       +--> original session model created
+        |       |       +--> emit selection_unavailable
+        |       |       +--> invalidate matching card + unlock selector
+        |       +--> no candidate created
+        |               +--> fail with the ordinary model's real error
+        |               +--> TurnError.attribution.highspeedFallbackUnavailable
+        |               +--> invalidate matching card + unlock selector
+        |
+        +-- request failure --> preserve current Turn context/tools
+                                +--> fallback target created
+                                |       +--> notify Renderer once (card expired / request failed)
+                                |       +--> invalidate matching card + unlock selector
+                                |       +--> remaining requests use original session model
+                                +--> no fallback target
+                                        +--> fail with the original provider error (e.g. 3402)
+                                        +--> TurnError.attribution.highspeedFallbackUnavailable
+                                        +--> invalidate matching card + unlock selector
 ```
 
 ### 2.3 分享
@@ -216,17 +317,28 @@ User        Renderer coordinator       Highspeed service/API       Session comma
 8. 当前 Task 正在运行时，新的用户输入仍必须按既有 `queue` 语义准入，不得因为携带
    `modelSelection` / `modelExecution` 被拒绝。运行态必须以 Core `activeTurn` 为最终事实；即使 adapter
    controller 或投影路由尚未同步，只要 Core 仍有 active turn 就必须入队，禁止误走
-   `startNow`。队列只持久化不含凭据的 Highspeed 卡元数据与加速 `modelSelection`；
-   `modelExecution` 里的卡 JWT 仅保存在 CLI 进程内存（按 `sourceCommandId` 暂存），
-   并在该输入提升为新 Turn 时才冻结进本轮执行上下文。宿主不提供暂存能力时必须整体退回
-   会话模型，不留半程加速。
+   `startNow`。`QueueItem.modelSelection` 的唯一语义是发送前的普通提交 Selection，它与 mode、Plan
+   一样可持久化、冷恢复并在撤回编辑时恢复到 Composer；不得写入 `account:*-highspeed-card` 这类
+   单轮执行 Selection。`selectionFallback.target` 只有在 Provider Family 不是 Highspeed 时才可作为
+   普通提交 Selection；所有队列写入路径必须共用同一个普通 Selection resolver。若 target 被旧版本或
+   异常载荷污染为 Highspeed Provider，必须改用会话常驻的普通 Selection，禁止把内部 Provider 写入
+   `QueueItem.modelSelection`。队列可持久化不含凭据的 Highspeed 卡元数据；加速 `modelSelection` 与
+   `modelExecution` 必须作为同一个 execution bundle，仅按 `sourceCommandId` 驻留 CLI 进程内存，
+   并在该输入提升为新 Turn 时才冻结进本轮执行上下文。入队准入只提交普通 Selection 与卡元数据，
+   不携带 `modelExecution`。宿主不提供暂存能力时必须整体退回 QueueItem 自身的普通 Selection，
+   不留半程加速。
 9. Highspeed 队列项提升时必须再次校验 `expiresAt`：卡仍有效时，自动消费优先复用 CLI
-   内存中暂存的执行材料；用户点击“立即发送”时，Renderer 必须基于同一张当前有效卡重新准备
-   `modelSelection` + `modelExecution` 并随 `sendQueuedNow` 补充提交，避免临时内存状态缺失导致有效卡
-   被误降级；补供材料必须同卡（`cardId`/`taskId` 一致），跨卡一律忽略，避免换凭据。卡已
-   过期，或重新准备后执行材料仍不可用时，必须同时移除该轮 Highspeed 标记并把 `modelSelection`
-   改写回会话常驻 Selection——只删卡标记会让本轮带着加速 provider 却没有任何凭据。无论哪种
-   情况，用户输入都不得丢失或阻断后续 FIFO。
+   内存中暂存的 execution bundle；用户点击“立即发送”时，Renderer 必须以 QueueItem 自身的普通
+   Selection 为准备输入，基于同一张当前有效卡重新准备 `modelSelection` + `modelExecution` 并随
+   `sendQueuedNow` 补充提交，避免临时内存状态缺失导致有效卡被误降级；补供材料必须同卡
+   （`cardId`/`taskId` 一致），跨卡一律忽略，避免换凭据。提升边界使用 bundle 中的加速 Selection，
+   但 `selectionFallback.target` 必须固定为 QueueItem 的普通 Selection。卡已过期，或重新准备后
+   execution bundle 仍不可用时，只移除该轮 Highspeed 标记，直接使用 QueueItem 已持久化的普通
+   Selection；不得回看可能已被后续输入修改的 Session Selection。仅对旧版本已错误持久化
+   `account:*-highspeed-card` 的 QueueItem 做迁移兼容，且只按 Provider Family 识别，不依赖是否带卡
+   元数据（旧版本的污染重发可能产生不带卡元数据的此类项）：提升时改写为会话常驻 Selection；撤回
+   编辑时不恢复该 Selection，Composer 保留当前选择；禁止把内部 Provider 暴露到错误面或 Composer。
+   无论哪种情况，用户输入都不得丢失或阻断后续 FIFO。
 10. 用户编辑最后一条真实输入并重发时，必须按一次新的主动发送处理：Renderer 在提交
     `editUserQuery` 前重新执行当前 Task 的 Highspeed prepare，并把本次得到的卡元数据与
     单轮 `modelSelection` + `modelExecution` 一起提交。CLI 侧只接受本会话（`taskId` 等于当前
@@ -265,20 +377,26 @@ User        Renderer coordinator       Highspeed service/API       Session comma
     `modelSelection` 同源：优先取提交选择的 `providerId/modelId/reasoningLevel`，缺失字段再按
     会话投影 → 草稿 → 初始草稿逐字段回落。切换模型后的首次发送必须按新选择做 admission——新
     provider/model 不满足 draw 门禁（规则 11/14）时不发起 draw、本轮按提交选择普通发送，禁止沿用
-    会话旧组合抽卡后把用户的提交选择覆盖成卡模型。edit 重发与队列提升（规则 13 语义）不带提交
-    选择，继续按会话常驻 Selection prepare。
+    会话旧组合抽卡后把用户的提交选择覆盖成卡模型。历史 edit 重发没有普通提交选择时按会话常驻
+    Selection prepare；队列手动提升必须显式传入 QueueItem 自身的普通 Selection，禁止回看可能已被
+    后续 admission 改写的 Session Selection。
 
 ```text
 running Highspeed turn
         |
-        +-- next user prompt --> queue(card metadata + highspeed modelSelection)
-        |                        + retainQueuedTurnExecution(sourceCommandId, modelExecution)
-                                      |
-                                      +-- auto promote while valid --> readQueuedTurnExecution -> freeze into turn
-                                      |
-                                      +-- manual promote ----------> same-card refreshed modelExecution
-                                      |
-                                      `-- expired/execution missing --> rewrite modelSelection back to session
+        +-- next user prompt --> queue(card metadata + ordinary submission modelSelection)
+        |                        + retainQueuedTurnExecution(
+        |                            sourceCommandId,
+        |                            highspeed modelSelection + modelExecution
+        |                          )
+        |                             |
+        |                             +-- auto promote while valid --> freeze bundle into turn
+        |                             |
+        |                             +-- manual promote ----------> refresh from queued ordinary Selection
+        |                             |
+        |                             `-- expired/bundle missing --> use queued ordinary Selection
+        |
+        `-- edit queued prompt --> restore ordinary Selection to Composer
 ```
 
 ```text
@@ -340,7 +458,7 @@ MVP 不新增 session 数据库物理列。`message.data` 中的用户消息 `me
 `sessionId + sourceCommandId` 记录运行中统计：
 
 - `fallbackAt` 仅在 Turn 内发生加速请求失败降级时出现（`fallbackReason` 同时记录原因：
-  `highspeed_card_expired` / `highspeed_request_failed`，Renderer 据此选择提示文案，与 `fallbackAt`
+  `highspeed_card_expired` / `highspeed_request_failed` / `highspeed_selection_unavailable`，Renderer 据此选择提示文案，与 `fallbackAt`
   同一事件写入、同一规则持久化与恢复），用于跨桌面 continuous 与手机 replayable
   一致投影到期提示；它不改变该 Turn 的分享资格和完整统计口径。它是权威 metadata 字段：CLI 在终态
   耗时持久化时把 live 投影中已产生的 `fallbackAt` 一并写入 transcript，`HighspeedMetricsUpdated`
@@ -445,8 +563,18 @@ priority = normal
 - `share-success`
 - `share-refresh`
 - `share-expired`
+- `hit-invalid-model`（创建期 fallback 专项）
+- `hit-queue-edit`（Highspeed 队列编辑专项）
 
-Mock 只替换 Highspeed draw/share transport，不修改 session deliveryKind，也不另起 Agent runtime/host。Mock 抽中时仍返回 `accelerated` 业务状态，用于验证卡片消费、模型锁定、消息标识、统计和分享；但不得下发 Highspeed 的 `modelSelection` / `modelExecution`，消息流继续使用当前 session 的普通 provider/model 与原推理接口，避免 Mock 卡请求真实 Highspeed 推理端点后无数据返回。
+Mock 只替换 Highspeed draw/share transport，不修改 session deliveryKind，也不另起 Agent runtime/host。普通 Mock
+抽中时仍返回 `accelerated` 业务状态，用于验证卡片消费、模型锁定、消息标识、统计和分享；但不得下发
+Highspeed 的 `modelSelection` / `modelExecution`，消息流继续使用当前 session 的普通 provider/model 与原推理
+接口，避免 Mock 卡请求真实 Highspeed 推理端点后无数据返回。仅有两个专项例外会下发真实 Highspeed
+`modelSelection` / `modelExecution`：`hit-invalid-model` 的 Selection 指向目录外模型，用于验证创建期声明式
+fallback；`hit-queue-edit` 使用目录内模型和可控慢流，用于验证队列只持久化普通 Selection，临时 Highspeed
+execution 只在提升边界应用。两个例外都不改变其他 Mock 的边界。普通 Mock 的卡没有 execution
+bundle：Task 运行中再次发送而入队的输入，提升时按 §3 规则 9 的“bundle 不可用”处理，移除 Highspeed
+标记并使用 QueueItem 的普通 Selection。因此普通 Mock 的消息标识只覆盖直接开始的 Turn。
 
 为缩短本地手工验证周期，Mock 时间窗口固定为：
 
@@ -463,18 +591,26 @@ Real send        -> Highspeed modelSelection+Execution -> Highspeed 推理接口
 Desktop E2E 按 spec 文件在 Electron 启动前注入场景（wdio `beforeSession` 写入
 `ZCODE_HIGHSPEED_MOCK_SCENARIO`，映射表见 `test/e2e/helpers/highspeed-mock-env.ts`）。Mock 场景在
 Host 进程内固定，且 draw 后有 2 分钟冷却，因此一个 spec 文件只对应一个场景、只完成一次 draw；
-新增场景必须新增 spec 文件并登记映射，未登记的 spec 不装配 Mock，避免普通会话意外抽到卡。三个用例
-共用同一套准备流程（Coding Plan 凭据、Team scope、会话模型），`hit-fast` 用例同时是资格链路的
+新增场景必须新增 spec 文件并登记映射，未登记的 spec 不装配 Mock，避免普通会话意外抽到卡。表中用例共用
+同一套准备流程（Coding Plan 凭据、Team scope、会话模型），`hit-fast` 用例同时是资格链路的
 正向对照。模型请求保持 Team Coding Plan 内建的 HTTPS Endpoint，由 wdio 的 Coding Plan 数据面代理
 回放：官方版本的请求安全校验按不可用降级处理，每轮按最后一条 user message 的标记取 case-local
 fixture。不得把 Provider 改写成 HTTP Mock Endpoint——Team Coding Plan 强制官方版本的请求安全校验，且只接受
 HTTPS，改写后每轮都会在 model creation 阶段失败：
 
-| 用例      | spec 文件                                                  | 场景                | 断言                                                                                                                                                                                                                                                   |
-| --------- | ---------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| HS-E2E-01 | `conversation-session-highspeed-card.test.ts`              | `hit-fast`          | 命中后输入框进入 Highspeed、完成态带 Highspeed 标识、按 `activation` 入场；切回 Task 按 `restore` 呈现（§9.2）                                                                                                                                         |
-| HS-E2E-02 | `conversation-session-highspeed-card-draw-timeout.test.ts` | `hit-after-timeout` | 首轮 draw 超出 1s 预算：本轮普通发送、不带 Highspeed 标识；迟到的卡保留，同 Task 下一轮直接加速并带 Highspeed 标识（§1、§3 规则 6）。不断言首轮期间输入框状态：草稿首发的 pane 可能在迟到卡落地后才绑定 session，经快照按 `restore` 呈现该卡属合法展示 |
-| HS-E2E-03 | `conversation-session-highspeed-card-draw-miss.test.ts`    | `miss`              | 未抽中的首轮与冷却期内的下一轮都普通发送，输入框始终不进入 Highspeed、无 Highspeed 标识（§3 规则 4）                                                                                                                                                   |
+| 用例      | spec 文件                                                             | 场景                | 断言                                                                                                                                                                                                                                                   |
+| --------- | --------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| HS-E2E-01 | `conversation-session-highspeed-card.test.ts`                         | `hit-fast`          | 命中后输入框进入 Highspeed、完成态带 Highspeed 标识、按 `activation` 入场；切回 Task 按 `restore` 呈现（§9.2）                                                                                                                                         |
+| HS-E2E-02 | `conversation-session-highspeed-card-draw-timeout.test.ts`            | `hit-after-timeout` | 首轮 draw 超出 1s 预算：本轮普通发送、不带 Highspeed 标识；迟到的卡保留，同 Task 下一轮直接加速并带 Highspeed 标识（§1、§3 规则 6）。不断言首轮期间输入框状态：草稿首发的 pane 可能在迟到卡落地后才绑定 session，经快照按 `restore` 呈现该卡属合法展示 |
+| HS-E2E-03 | `conversation-session-highspeed-card-draw-miss.test.ts`               | `miss`              | 未抽中的首轮与冷却期内的下一轮都普通发送，输入框始终不进入 Highspeed、无 Highspeed 标识（§3 规则 4）                                                                                                                                                   |
+| HS-E2E-04 | `conversation-session-highspeed-card-admission-retains-draft.test.ts` | `hit-invalid-model` | ACK 前因加速模型不可用而拒绝发送，保留并恢复输入正文；作废匹配卡、退出 Highspeed，并解锁模型选择器（§2.2）                                                                                                                                             |
+| HS-E2E-05 | `conversation-session-highspeed-card-fallback-unlocks-model.test.ts`  | `hit-invalid-model` | 加速模型创建失败后自动退回普通模型并完成；作废匹配卡、退出 Highspeed、解锁模型选择器，只显示一次降级 Toast，不显示错误 Banner（§2.2）                                                                                                                  |
+| HS-E2E-06 | `conversation-session-highspeed-queue-edit.test.ts`                   | `hit-queue-edit`    | Highspeed 运行中再次发送并入队；撤回编辑恢复普通 Coding Plan Selection，修改后重发仍入队；不得在 Composer、Session 或错误 Banner 中暴露 `account:*-highspeed-card`（§3 规则 8/9/15）                                                                   |
+
+HS-E2E-04/05/06 当前位于 `manual-review/pending/`，尚未转正进入 CI；转正沿用 `e2e-case-lifecycle` 流程。
+HS-E2E-06 转正前还要把 `hit-queue-edit` 的首轮慢流接到真实请求链路：该场景走 Highspeed execution
+Selection，请求打到 Highspeed 推理接口而非 Team Coding Plan Endpoint，现有数据面代理只回放后者，且不支持
+`chunks/offsetMs` 分块延迟；缺少该回放时用例无法证明“流式中入队 → 撤回 → 重发”。
 
 ## 8. 多端与恢复边界
 

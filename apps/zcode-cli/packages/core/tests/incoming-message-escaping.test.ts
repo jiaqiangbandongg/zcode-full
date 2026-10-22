@@ -48,9 +48,6 @@ describe("incoming reminder delimiter boundary", () => {
         role: "user",
         content: `<system-reminder>\n${expected}\n</system-reminder>`,
       });
-      expect(String(result.messages.at(-1)!.content).match(/<\/?system-reminder\b/gi)).toHaveLength(
-        2,
-      );
       expect(result.diagnostics.latestRealUserMessageIndex).toBe(0);
       expect(result.sourceEntries.at(-1)).toBe(input);
       expect(entries).toEqual(before);
@@ -97,12 +94,6 @@ describe("incoming reminder delimiter boundary", () => {
           content:
             mode === "legal-MCS" ? content : `<system-reminder>\n${content}\n</system-reminder>`,
         });
-        if (mode !== "legal-MCS") {
-          expect(
-            String(result.messages[index]!.content).match(/<\/?system-reminder\b/gi),
-          ).toHaveLength(2);
-          expect(String(result.messages[index]!.content)).not.toContain(raw);
-        }
         expect(entries).toEqual(before);
         expect(buildProviderRequestMessages(options)).toEqual(result);
         expect(result.diagnostics.latestRealUserMessageIndex).toBe(

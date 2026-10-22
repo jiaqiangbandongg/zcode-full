@@ -1,4 +1,4 @@
-import { TID_TASK_SETTINGS_BUTTON } from "@zcode/shared";
+import { TID_TASK_SETTINGS_BUTTON } from "@zcode/shared/test-ids";
 import { sel } from "./selectors.js";
 
 // 新隔离 profile 的职业引导会覆盖工作区；通过真实 UI 完成，不伪造业务记录。

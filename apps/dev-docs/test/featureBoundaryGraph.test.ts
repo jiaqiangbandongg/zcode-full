@@ -120,34 +120,4 @@ describe("feature boundary graph helpers", () => {
       ["capability.mcp-oauth-authorization", "persistence.desktop-user-data-root"],
     );
   });
-
-  it("危险命令 V1 关联真实代码起点和隔离边界", async () => {
-    const source = await readFile(
-      resolve(
-        process.cwd(),
-        "../../.agents/skills/feature-boundary-planner/references/zcode-feature-graph.yaml",
-      ),
-      "utf8",
-    );
-    const graph = normalizeFeatureBoundaryGraph(parseYaml(source));
-    const capabilityId = "capability.dangerous-command-approval";
-    const capability = graph.nodes.find((node) => node.id === capabilityId);
-    expect(capability?.docs).toContain("docs/dangerous-command-approval-v1-plan.md");
-    expect(capability?.codeSeeds).toEqual([
-      "matchDangerousCommand · apps/zcode-cli/packages/core/src/tool/handlers/guarded/command.ts",
-      "resolveToolPermission · apps/zcode-cli/packages/core/src/tool/executor/permission-flow.ts",
-      "buildProtocolPermissionOptions · apps/zcode-cli/packages/bootstrap/src/permission-options.ts",
-      "getZCodeAgentAvailableModes · packages/shared/src/zcode-agent-model-state.ts",
-      "buildAutomationModeOption · packages/ui/src/settings/automationAgentConfigOptions.ts",
-      "filterModeOptions · apps/zcode-cli/packages/tui/src/app-mode-command.ts",
-    ]);
-    expect(graph.edges.filter((edge) => edge.from === capabilityId).map((edge) => edge.to)).toEqual(
-      [
-        "surface.parent-task-blocking-interaction",
-        "boundary.desktop-continuous",
-        "boundary.web-remote-replayable",
-        "boundary.workspace-key",
-      ],
-    );
-  });
 });

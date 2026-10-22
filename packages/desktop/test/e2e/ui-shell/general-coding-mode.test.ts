@@ -9,12 +9,12 @@ import {
   TID_TASK_SETTINGS_BUTTON,
   TID_TERMINAL_TOGGLE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByDom } from "../helpers/desktop-app.js";
 import { prepareV4ConversationE2E } from "../helpers/v4-conversation.js";
 
 // MODE-01/02/03：只操作应用 UI 和本地 PTY，不发送模型请求。
-describe("通用与编程模式 M1", () => {
+describe("办公与编程模式 M1", () => {
   before(async () => {
     await prepareV4ConversationE2E({ skipProvider: true });
   });
@@ -27,12 +27,13 @@ describe("通用与编程模式 M1", () => {
   it("MODE-01 设置页与头像菜单共用偏好，刷新后保留", async () => {
     await clickTestIdByDom(TID_TASK_SETTINGS_BUTTON);
     await $(`[data-testid="${TID_SETTINGS_PAGE}"]`).waitForDisplayed();
-    await clickTestIdByDom(testId(TID_SETTINGS_SECTION_NAV, "appearance"));
+    // 界面模式已迁到常规设置并更名 office，旧 appearance/general 断言无法进入待测交互。
+    await clickTestIdByDom(testId(TID_SETTINGS_SECTION_NAV, "general"));
     const select = '[role="combobox"][aria-label="界面模式"]';
     await $(select).waitForDisplayed();
     await $(select).click();
-    await clickText('[role="option"]', "通用模式");
-    await waitForMode("general");
+    await clickText('[role="option"]', "办公模式");
+    await waitForMode("office");
     await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON);
     await switchMode("coding");
     await browser.refresh();
@@ -42,7 +43,7 @@ describe("通用与编程模式 M1", () => {
   });
 
   it("MODE-02/03 隐藏新建入口，保留已打开审查、终端和 PTY", async () => {
-    await switchMode("general");
+    await switchMode("office");
     await clickTestIdByDom(TID_SIDE_PANE_TOGGLE);
     await $('[data-side-pane-open-tab-item="browser"]').waitForDisplayed();
     expect(await $('[data-side-pane-open-tab-item="review"]').isExisting()).toBe(false);
@@ -53,26 +54,24 @@ describe("通用与编程模式 M1", () => {
     await $('[data-side-pane-open-tab-item="review"]').click();
     await $('[data-side-pane-tab-id="git"]').waitForDisplayed();
     await $("[data-side-pane-add-tab-trigger]").click();
-    await $('[data-side-pane-add-item="terminal"]').click();
+    await $('[data-state="active"] [data-side-pane-open-tab-item="terminal"]').click();
     await $('[data-side-pane-tab-id^="terminal:"]').waitForDisplayed();
     await clickTestIdByDom(TID_TERMINAL_TOGGLE);
     await browser.waitUntil(async () => (await terminalHeight()) > 50);
     const before = await readTabs();
     const terminalId = before.find((tab) => tab.id.startsWith("terminal:"))!.id;
 
-    await switchMode("general");
+    await switchMode("office");
     expect(await readTabs()).toEqual(before);
     expect(await terminalHeight()).toBeGreaterThan(50);
     expect(await $(`[data-testid="${TID_TERMINAL_TOGGLE}"]`).isExisting()).toBe(false);
     expect(await $('button[aria-label="新建终端"]').isExisting()).toBe(false);
     await $("[data-side-pane-add-tab-trigger]").click();
-    expect(await $('[data-side-pane-add-item="terminal"]').isExisting()).toBe(false);
+    expect(
+      await $('[data-state="active"] [data-side-pane-open-tab-item="terminal"]').isExisting(),
+    ).toBe(false);
     expect(await visibleTexts('[role="menuitem"]')).not.toContain("审查");
-    await browser.keys("Escape");
-    // 等待 Radix 菜单退出，避免终端点击落到仍在退场的“浏览器”菜单项上。
-    await browser.waitUntil(
-      async () => !(await $('[data-slot="dropdown-menu-content"]').isExisting()),
-    );
+    await $(`[data-side-pane-tab-id="${terminalId}"]`).click();
 
     const terminalInput = $("[data-workspace-side-frame] .xterm-helper-textarea");
     await terminalInput.waitForExist();
@@ -102,7 +101,7 @@ describe("通用与编程模式 M1", () => {
       async () => (await readTabs()).find((tab) => tab.id === "git")?.active === true,
     );
     await switchMode("coding");
-    await switchMode("general");
+    await switchMode("office");
     expect((await readTabs()).find((tab) => tab.id === "git")?.active).toBe(true);
     expect((await readTabs()).map((tab) => tab.id)).toContain(terminalId);
 
@@ -117,7 +116,7 @@ describe("通用与编程模式 M1", () => {
   });
 });
 
-async function switchMode(mode: "general" | "coding") {
+async function switchMode(mode: "office" | "coding") {
   // Radix 的退出动画期间仍有旧菜单层；等待它卸载，避免下一次点击被当作关闭旧层。
   await browser.waitUntil(
     async () => !(await $('[data-slot="dropdown-menu-content"]').isExisting()),
@@ -125,7 +124,7 @@ async function switchMode(mode: "general" | "coding") {
   await $(`[data-testid="${TID_LOGIN_TRIGGER}"]`).waitForDisplayed();
   await $(`[data-testid="${TID_LOGIN_TRIGGER}"]`).click();
   await clickText('[role="menuitem"]', "界面模式");
-  await clickText('[role="menuitemradio"]', mode === "general" ? "通用模式" : "编程模式");
+  await clickText('[role="menuitemradio"]', mode === "office" ? "办公模式" : "编程模式");
   await browser.keys("Escape");
   await waitForMode(mode);
   await browser.waitUntil(

@@ -28,6 +28,20 @@
 - 过滤在桌面 `desktop-continuous` 和手机 `web-remote-replayable` 共用的渲染单元上执行，不改写两类 delivery 的快照、gap 恢复或消息顺序。
 - conversation work items 会把连续的非只读 Shell 派生为 `Execute` UI 分组；该父节点不是协议工具调用，展开后继续复用单条 `ExecuteToolCallBlock`。PermissionDialog 不经过该聚合路径，仍按真实 tool call 单独审批和展示。
 
+## 收起详情的测量边界
+
+侧栏开关会改变会话宽度，虚拟列表可能重新挂载历史轮次。收起的工具详情仍保留 Radix 的 DOM、ARIA 和动画生命周期，但完全隐藏的节点不应写入测量样式或读取几何尺寸；可见、正在收起及 `forceMount` 内容继续按原流程测量。不得以移除首次展开动画、减少历史内容或改变展开记忆来换取性能。
+
+```text
+侧栏宽度变化 → timeline 测高与虚拟窗口更新 → 历史工具挂载
+  完全隐藏 → 保留折叠状态，跳过无效测量
+  展开 / 收起动画中 / forceMount → 原尺寸测量与 Presence 生命周期
+```
+
+影响层为 presentation，修正在 `@radix-ui/react-collapsible` 的尺寸测量边界；ESM 与 CommonJS 同步。工具、消息历史、项目分组和 Accordion 共用该依赖，需检查初始闭合、默认展开、鼠标/键盘切换、嵌套、快速反向切换和 `forceMount`。`ToolLayout` 仍持有工具展开记忆，Radix 持有动画 presence，`ConversationTimeline` 仍是滚动 owner。手机 Web 共用展示组件，协议、权限、工具执行和 continuous/replayable 传输不变，因此不扩展这些不受影响的组合。
+
+SPT05 验收以真实 DOM 几何调用和动画事件为证据：批量收起工具初次/再次挂载时隐藏节点的测量为零；展开与收起动画、详情内容、键盘和展开记忆保持；默认展开及 `forceMount` 的高度变量仍有效。桌面/手机、深浅主题与中英文共同验证。耗时记录用于前后比较，不使用机器相关绝对时长作为通过标准。时间线 resize 的跟随、离底及会话位置沿用 SRM10 回归。
+
 ## 扩展方式
 
 - 新增 kind 专用优化时，优先在 `toolDisplay.ts` 里增加 strategy
@@ -37,6 +51,9 @@
 
 ## 专用 Tool Renderer
 
+- `ToolSearch` 按精确工具名使用搜索摘要卡，复用 WebSearch 的图标、运行状态和失败提示。卡片始终不可展开，不渲染参数、搜索结果、schema 或原始数据。
+- 摘要使用输入 `query`：`select:Read,TodoWrite` 展示为“搜索工具：Read, TodoWrite”，关键词查询保留原文；输入尚未到达或为空时只显示“搜索工具”。中英文共用同一渲染路径，长查询沿用搜索卡的单行省略。
+- 该分流仅属于 UI，不把 ToolSearch 加入通用 search family 或 Explore 聚合，不改变工具结果、模型请求及持久化。桌面实时与冷恢复、手机 Web 共用该 renderer。
 - `Node REPL` / Browser Use 工具的展开布局保持透明，并与工具摘要正文保持同一水平基线；不得在 `ToolLayout` 的详情间距之外再次叠加整块横向 padding。文本结果内容块和“查看执行细节”展开后的代码/错误栈分别使用 `bg-card border border-border rounded-xl`；图片、“查看执行细节”按钮和折叠布局本身留在卡片外。单行、非 JSON、长度不超过 160 字符的短结果使用普通次级正文展示；JSON、多行或更长的日志继续使用带复制/换行操作的 CodeBlock。图片结果在消息流展开区始终使用单列，避免窄桌面栏和手机 Web 中被响应式断点切成过窄的双列缩略图；大图查看器行为保持不变。
 - `CUA` 工具的展开区只展示面向用户的动作、结果、失败原因、建议、截图、权限、环境、列表和应用状态，不提供完整 tool call JSON 的“查看原始数据”入口。原始 input、output、display 和生命周期元数据仍按既有协议与持久化链路保留，只是不进入桌面端与手机 Web 共用的 CUA 展开界面；其他工具 renderer 的原始数据能力不受影响。
 - `ReadSessionContext` 通过 `ReadSessionContextToolCallBlock` 渲染，不走 fallback 的 `Parameters` / `Result` JSON 块。
@@ -100,3 +117,9 @@
 - V4 product projection 必须把 CUA、file diff 等通用 display 保留在 `ToolCallRow.output.display`；`ToolCallRow.display` 只保留既有 `node_repl_images` 专用通道。UI adapter 优先读取 `output.display`，并兼容旧 Node REPL 顶层 display。
 - CUA display v1 的 `input` 仅作为旧历史记录兼容字段继续可读；新事件不再重复写入。工具调用自身的 `ToolCallRow.input` 是唯一输入事实源，UI 解析旧 display 时丢弃其中的副本。
 - UI 读取 display 时必须同时覆盖桌面 `desktop-continuous` 的实时 raw event 与手机 `web-remote-replayable` 的持久化 metadata；不得把 replayable 恢复数据拼接进 desktop continuous 主链路，也不得绕过现有 snapshot/gap 恢复边界。
+
+## WebFetch 与公开工具展示
+
+WebFetch 独立归入 web-fetch family。摘要使用网页图标、Fetch/Fetching（中文：网页抓取/正在抓取）和目标 URL；不使用 prompt，不展开。明确历史 fetch/web_fetch/webfetch 别名兼容；不按 URL 输入猜分类。权限预览复用 WebFetch renderer；Explore 子项复用 URL 文本提取函数，再由探索分组渲染。
+
+App 与分享复用工具 renderer 注册表及分组 presentation。App 通过 capabilities 注入文件媒体、应用图标、模型 provider 名称和 agent 颜色；插件交互通过 render context 的 pluginUi 注入；公开展示仅注入资源 URL 与安全外链。纯展示层不能静态导入服务、平台、插件 runtime。Fetch 仍属于只读探索分组。

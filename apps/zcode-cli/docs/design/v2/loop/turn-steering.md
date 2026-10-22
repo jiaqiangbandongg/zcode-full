@@ -198,6 +198,7 @@ user row 之后。
 - `expectedTurnId` mismatch 被拒绝并发 `turn_steer_rejected`。
 - empty input 被拒绝。
 - compact/rewind turn 被拒绝为 `turn_not_steerable`。
+- 模型创建失败轮只落库已接纳输入，不进入 model step，guide 无法被消费；同样拒绝为 `turn_not_steerable`，调用方改走队列。
 - queued/drained events 顺序稳定，payload 包含 pending input id 和 target turn id。
 - reducer 能从 queued/drained/discarded 重建 `pendingSteerInputs` 作为 live/diagnostic projection。
 - resume 不恢复 queued-but-not-drained input，也不能把历史 queued event 注入下一次 model request。

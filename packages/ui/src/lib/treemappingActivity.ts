@@ -149,7 +149,7 @@ function inferReadAction(toolCall: TaskChatToolCall): "file" | "directory" | "se
   if (identity.family === "file-read") {
     return "file";
   }
-  if (identity.family === "search") {
+  if (identity.family === "search" || identity.family === "web-fetch") {
     return identity.toolName === "Glob" ? "directory" : "search";
   }
 

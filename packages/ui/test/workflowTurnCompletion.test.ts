@@ -85,7 +85,7 @@ describe("resolveWorkflowTurnCompletion", () => {
     expect(resolveWorkflowTurnCompletion(terminal(status), {})).toBeUndefined();
   });
 
-  it("升级通知、载荷缺席、bash / subagent 通知、普通用户轮都不是", () => {
+  it("升级通知、载荷缺席、bash 通知、普通用户轮和缺失轮头都不是", () => {
     expect(
       resolveWorkflowTurnCompletion(
         header({

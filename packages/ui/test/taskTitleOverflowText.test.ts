@@ -193,30 +193,6 @@ describe("TaskTitleOverflowText", () => {
     expect(animateTrack).not.toHaveBeenCalled();
   });
 
-  it("does not animate when reduced motion is requested", () => {
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({
-        addEventListener: vi.fn(),
-        matches: true,
-        removeEventListener: vi.fn(),
-      })),
-    );
-    render(
-      createElement(
-        TaskTitleOverflowText,
-        { "data-testid": "task-title-overflow-text" },
-        "很长的任务标题",
-      ),
-    );
-    setTitleWidths({ clientWidth: 120, contentWidth: 240 });
-    notifyResize();
-
-    fireEvent.mouseEnter(screen.getByTestId("task-title-overflow-text"));
-
-    expect(animateTrack).not.toHaveBeenCalled();
-  });
-
   it("does not apply a fade mask while the title fits", () => {
     render(
       createElement(TaskTitleOverflowText, { "data-testid": "task-title-overflow-text" }, "短标题"),

@@ -45,7 +45,6 @@ describe("Bash result display", () => {
       stdout: "中".repeat(60000),
       persistedOutputPath: "/file",
     });
-    expect(display?.kind).toBe("bash_output");
     if (display?.kind !== "bash_output") throw new Error("missing display");
     expect(display.truncated).toBe(true);
     expect(Buffer.byteLength(display.output)).toBeLessThanOrEqual(150000);

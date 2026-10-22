@@ -1,3 +1,4 @@
+import { SidebarNativeTooltip } from "@/ControlHintTooltip.js";
 import { useCodingPlanEntryGate } from "@/settings/CodingPlanEntryButton.js";
 /* eslint-disable max-lines -- footer 套餐徽标、升级入口与 entitlement 探测共用同一份
    provider 选择与 family 过滤上下文，拆文件会让 zai/bigmodel 对称性难以追踪。 */
@@ -6,8 +7,8 @@ import {
   BUILTIN_MODEL_PROVIDER_IDS,
   normalizeProviderFamilyDomain,
   resolveModelProviderFamilyIdByProviderId,
-  TID_SIDEBAR_CODING_PLAN_USAGE_BUTTON,
 } from "@zcode/shared";
+import { TID_SIDEBAR_CODING_PLAN_USAGE_BUTTON } from "@zcode/shared/test-ids";
 import { BarChart3Icon, RocketIcon } from "lucide-react";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu.js";
 import {
@@ -169,16 +170,12 @@ export function useWorkspaceSidebarFooterUsageSummaryState({
     // footer badge 和升级入口都需要识别 Team Plan。
     // Team 项目上下文只在企业 pricing/customerInfo 返回，账号级头像徽标也不能被当前连接方式卡住。
     enabled:
-      enabled &&
-      !providerSourcesLoading &&
-      bigmodelFamilyAllowed &&
-      Boolean(bigmodelTeamProvider),
+      enabled && !providerSourcesLoading && bigmodelFamilyAllowed && Boolean(bigmodelTeamProvider),
     authenticated: true,
     family: "bigmodel",
   });
   const zaiEnterpriseProducts = useEnterpriseCodingPlanProducts({
-    enabled:
-      enabled && !providerSourcesLoading && zaiFamilyAllowed && Boolean(zaiTeamProvider),
+    enabled: enabled && !providerSourcesLoading && zaiFamilyAllowed && Boolean(zaiTeamProvider),
     authenticated: true,
     family: "zai",
   });
@@ -500,11 +497,13 @@ export function WorkspaceSidebarFooterPlanBadge({
   }
 
   return (
-    <span
-      className="min-w-0 max-w-20 shrink truncate rounded-full border border-border bg-surface px-1 py-px text-ui-xs font-medium leading-normal text-foreground-subtle"
-      title={label}
-    >
-      {label}
-    </span>
+    <SidebarNativeTooltip>
+      <span
+        className="min-w-0 max-w-20 shrink truncate rounded-full border border-border bg-surface px-1 py-px text-ui-xs font-medium leading-normal text-foreground-subtle"
+        title={label}
+      >
+        {label}
+      </span>
+    </SidebarNativeTooltip>
   );
 }

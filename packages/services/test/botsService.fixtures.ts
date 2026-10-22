@@ -21,6 +21,8 @@ import type { IZCodeTaskService } from "../src/session/zcodeTaskService.js";
 import type { IBroadcastService } from "../src/broadcast/broadcast.js";
 import type { ICredentialService } from "../src/credential/credential.js";
 import type { ISettingService } from "../src/setting/setting.js";
+import type { VirtualProject } from "../src/project/contract.js";
+import { remoteHostIdFromWorkspaceIdentity } from "@zcode/shared";
 import { createBotsService as createBotsServiceImpl } from "../src/bots/botsService.js";
 
 afterEach(() => {
@@ -56,6 +58,17 @@ export function createMemoryRepo(config: BotsConfigFile, state?: BotsStateFile) 
       currentState = nextState;
       return currentState;
     },
+    async updateContext(
+      botId: string,
+      update: (
+        current: BotsStateFile["bots"][string] | undefined,
+      ) => BotsStateFile["bots"][string] | undefined,
+    ) {
+      const next = update(currentState.bots[botId]);
+      if (next) currentState.bots[botId] = next;
+      else delete currentState.bots[botId];
+      return next;
+    },
   };
 }
 
@@ -67,7 +80,7 @@ export function createLegacyTaskService(): IZCodeTaskService {
       taskId: "task-1",
       title: "Task 1",
       workspacePath: "/tmp/workspace",
-      workspaceIdentity: "ssh://host/tmp/workspace",
+      workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
       provider: "glm",
     })),
     sendPrompt: vi.fn(async () => undefined),
@@ -97,7 +110,7 @@ export function createLegacyTaskService(): IZCodeTaskService {
       taskId: "task-1",
       title: "Task 1",
       workspacePath: "/tmp/workspace",
-      workspaceIdentity: "ssh://host/tmp/workspace",
+      workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
       provider: "glm",
     })),
     switchAgent: vi.fn(async () => ({
@@ -105,7 +118,7 @@ export function createLegacyTaskService(): IZCodeTaskService {
         taskId: "task-1",
         title: "Task 1",
         workspacePath: "/tmp/workspace",
-        workspaceIdentity: "ssh://host/tmp/workspace",
+        workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
         provider: "glm",
       },
       provider: "glm",
@@ -160,7 +173,6 @@ export function createSettingService(settings: {
     })),
     update: vi.fn(async () => undefined),
     updateDataBaseDir: vi.fn(async () => undefined),
-    ensureDefaultProject: vi.fn(async (path: string) => ({ path, created: false })),
   } as unknown as ISettingService;
 }
 
@@ -297,8 +309,8 @@ function createZCodeWorkspaceState(
   return {
     workspace: {
       workspacePath: "/tmp/workspace",
-      workspaceIdentity: "ssh://host/tmp/workspace",
-      workspaceKey: "ssh://host/tmp/workspace",
+      workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
+      workspaceKey: "remote:server:test-owner:/tmp/workspace",
     },
     settings,
   };
@@ -331,12 +343,13 @@ export function createZCodeSessionService(
 export function createBotsService(
   deps: Omit<
     Parameters<typeof createBotsServiceImpl>[0],
-    "zcodeSessionService" | "zcodeTaskService"
+    "zcodeSessionService" | "zcodeTaskService" | "projectService"
   > & {
     zcodeTaskService?: IZCodeTaskService;
     /** 旧测试名保留为别名；真实注入的是 ZCode task service。 */
     legacyTaskService?: IZCodeTaskService;
     zcodeSessionService?: IZCodeSessionService;
+    projectService?: Parameters<typeof createBotsServiceImpl>[0]["projectService"];
   },
 ): ReturnType<typeof createBotsServiceImpl> {
   const {
@@ -351,14 +364,14 @@ export function createBotsService(
     deps.modelSelectionService ??
     createModelSelectionService([{ id: "glm", name: "GLM", models: ["default"] }]);
   return createBotsServiceImpl({
-    // Bots 不再持久化 workspace 候选项；测试默认从 settings.lastWorkspaceSession 提供当前工作区。
+    ...createBotProjectServices(undefined, (target) => zcodeTaskService.listTasks(target)),
     settingService: createSettingService({
       locale: "zh-CN",
       lastWorkspaceSession: [
         {
           kind: "remote",
           workspacePath: "/tmp/workspace",
-          workspaceIdentity: "ssh://host/tmp/workspace",
+          workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
         },
       ],
     }),
@@ -372,6 +385,94 @@ export function createBotsService(
     ...rest,
     zcodeTaskService,
   });
+}
+
+/** 显式项目服务夹具；生产候选不得从 settings/tab 历史恢复。 */
+export function createBotProjectServices(
+  workspaces = [
+    {
+      workspacePath: "/tmp/workspace",
+      workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
+    } as { workspacePath: string; workspaceIdentity?: string },
+  ],
+  readTasks?: (target: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+  }) => ReturnType<IZCodeTaskService["listTasks"]>,
+) {
+  const projects: VirtualProject[] = workspaces.map((workspace, index) => ({
+    id: `project-${index}`,
+    hostId: workspace.workspaceIdentity
+      ? remoteHostIdFromWorkspaceIdentity(workspace.workspaceIdentity)!
+      : "local",
+    name: workspace.workspacePath.split("/").at(-1)!,
+    roots: [{ rootPath: workspace.workspacePath, position: 0, isPrimary: true }],
+    nameOverridden: false,
+    position: index,
+    pinned: false,
+    deleted: false,
+    createdAt: 1,
+    updatedAt: 1,
+  }));
+  const hosts = [
+    ...new Set(projects.map((project) => project.hostId).filter((id) => id !== "local")),
+  ];
+  return {
+    projectService: {
+      readTree: vi.fn(async (input?: { hostId?: string }) => ({
+        projects: projects.filter((project) => project.hostId === (input?.hostId ?? "local")),
+        tasks: (
+          await Promise.all(
+            projects.map(async (project, index) =>
+              project.hostId !== (input?.hostId ?? "local")
+                ? []
+                : ((await readTasks?.(workspaces[index]!)) ?? []).map((task) => ({
+                    ...task,
+                    projectId: project.id,
+                    hostId: project.hostId,
+                    pinned: false,
+                    archived: false,
+                  })),
+            ),
+          )
+        ).flat(),
+      })),
+      readProjects: vi.fn(async (input?: { hostId?: string }) =>
+        projects.filter((project) => project.hostId === (input?.hostId ?? "local")),
+      ),
+      prepareSession: vi.fn(async (input?: { projectId?: string; hostId?: string }) => {
+        const index = projects.findIndex(
+          (project) =>
+            project.id === input?.projectId && project.hostId === (input?.hostId ?? "local"),
+        );
+        if (index < 0) throw new Error("project missing");
+        return { ...workspaces[index]!, projectId: projects[index]!.id, additionalDirectories: [] };
+      }),
+    },
+    remoteProjectService: {
+      readDirectory: vi.fn(async () => ({
+        hosts: hosts.map((id) => ({
+          id,
+          membershipId: id,
+          kind: "server" as const,
+          target: null,
+          position: 0,
+          connectionStatus: "online" as const,
+        })),
+        entries: projects
+          .filter((project) => project.hostId !== "local")
+          .map((project) => ({
+            id: project.id,
+            projectId: project.id,
+            hostId: project.hostId,
+            name: project.name,
+            roots: project.roots,
+            legacyWorkspace: null,
+            lastSyncedAt: 1,
+          })),
+      })),
+    },
+  };
 }
 
 export const baseConfig: BotsConfigFile = {

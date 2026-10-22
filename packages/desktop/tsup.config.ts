@@ -192,6 +192,7 @@ const desktopTsupBundleSecurityOptions = resolveDesktopTsupBundleSecurityOptions
 function createSharedDefines() {
   return {
     __ZCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
+    __ZCODE_MIN_COMPATIBLE_VERSION__: JSON.stringify(buildMetadata.minCompatibleVersion),
     __ZCODE_COMMIT__: JSON.stringify(buildMetadata.buildCommitId),
     __ZCODE_BUILD_TIME__: JSON.stringify(buildMetadata.buildTime),
     __ZCODE_ENV__: JSON.stringify(zcodeEnv),
@@ -254,6 +255,8 @@ export default defineConfig([
     outDir: "out",
     format: "esm",
     platform: "node",
+    // node:sqlite 只有带前缀的内置入口；tsup 去掉 node: 会错误加载第三方 sqlite 包。
+    removeNodeProtocol: false,
     target: "node22",
     // undici 如果被 main ESM bundle 直接内联，运行时会落到它内部的 CommonJS require("assert")，
     // Electron 加载 main 产物时会报 Dynamic require of "assert" is not supported。
@@ -300,6 +303,8 @@ export default defineConfig([
     outDir: "out",
     format: "cjs",
     platform: "node",
+    // node:sqlite 只有带前缀的内置入口；tsup 去掉 node: 会错误加载第三方 sqlite 包。
+    removeNodeProtocol: false,
     target: "node22",
     external: ["electron"],
     noExternal: ["@zcode/shared"],
@@ -339,11 +344,13 @@ export default defineConfig([
     name: "host",
     entry: {
       "host/index": "src/host/index.ts",
-      "host/tasksStorageWorker": "src/host/tasksStorageWorker.ts",
+      "host/tasksStorageWorker": "src/host/database-startup/tasksStorageWorker.ts",
     },
     outDir: "out",
     format: "esm",
     platform: "node",
+    // node:sqlite 只有带前缀的内置入口；tsup 去掉 node: 会错误加载第三方 sqlite 包。
+    removeNodeProtocol: false,
     target: "node22",
     // host 与 main 共用同一套 services 图，继续内联 undici 会在 Electron ESM runtime 里触发同样的 dynamic require 崩溃。
     // 这里同样保留为外部依赖，避免 desktop 开发态和打包态 host 进程启动失败。
@@ -373,6 +380,8 @@ export default defineConfig([
     outDir: "out",
     format: "esm",
     platform: "node",
+    // node:sqlite 只有带前缀的内置入口；tsup 去掉 node: 会错误加载第三方 sqlite 包。
+    removeNodeProtocol: false,
     target: "node22",
     // 与 host 同构：常驻 cron scheduler 进程复用 @zcode/services（tasks-index + cron），
     // 同样保留 undici 等为外部依赖，避免 Electron ESM runtime 的 dynamic require 崩溃。

@@ -38,12 +38,17 @@ function normalizeDockerOutput(raw: string): string {
 }
 
 function buildDockerExecArgs(containerName: string, commandArgs: string[]): string[] {
+  // 直接 exec/read 跳过容器枚举后失去了隐式校验；在组装 argv 处拒绝选项形态和非法引用。
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(containerName)) {
+    throw new Error("Invalid Docker container reference");
+  }
   return ["exec", "-i", containerName, ...commandArgs];
 }
 
 export class DockerBackend implements IRemoteBackend {
   private readonly dockerCommand = resolveDockerCommand();
   private readonly options: DockerConnectOptions;
+  private availabilityPromise: Promise<void> | null = null;
   private resolvedInfoPromise: Promise<ResolvedDockerInfo> | null = null;
 
   constructor(options: DockerConnectOptions) {
@@ -167,13 +172,17 @@ export class DockerBackend implements IRemoteBackend {
   }
 
   async exec(command: string): Promise<StdioStream> {
-    await this.ensureAvailable();
-    const resolvedInfo = await this.resolveInfo();
+    // Bug 原因：`docker exec` 本身接受名称、完整 ID 和 ID 前缀，也会权威报告 daemon/
+    // container 状态。旧实现却在每条命令前先跑 `docker version`，首次再跑两次 `docker ps`
+    // 和一次 home 探测；冷启动 Source 的单 round-trip probe 因而被放大成五条 CLI 命令。
+    // 纯 exec 不解析远端路径，直接使用用户已确认的 container ref；需要 `~` 展开为本地
+    // 路径的 read/upload 仍走 resolveInfo 的严格校验。
+    const containerRef = this.options.container.trim();
 
     return new Promise((resolve, reject) => {
       const child = spawn(
         this.dockerCommand,
-        buildDockerExecArgs(resolvedInfo.containerName, ["sh", "-lc", command]),
+        buildDockerExecArgs(containerRef, ["sh", "-lc", command]),
         {
           stdio: "pipe",
           windowsHide: true,
@@ -229,6 +238,19 @@ export class DockerBackend implements IRemoteBackend {
   }
 
   async readFile(remotePath: string): Promise<string> {
+    if (remotePath === "~" || remotePath.startsWith("~/")) {
+      // Source ingress token 等内部文件本来就以 home 相对路径表达；shell 在容器内能权威
+      // 展开 `$HOME`，无需先用 docker ps + docker exec 解析同一个 container/home。
+      const shellPath =
+        remotePath === "~" ? '"$HOME"' : `"$HOME"/${quotePosixShellArg(remotePath.slice(2))}`;
+      return normalizeDockerOutput(
+        await this.execDirectInContainer(this.options.container.trim(), [
+          "sh",
+          "-lc",
+          `cat ${shellPath}`,
+        ]),
+      );
+    }
     const resolvedInfo = await this.resolveInfo();
     const resolvedRemotePath = this.resolveLinuxPath(remotePath, resolvedInfo.homeDir);
     return normalizeDockerOutput(
@@ -241,10 +263,21 @@ export class DockerBackend implements IRemoteBackend {
   }
 
   private async ensureAvailable(): Promise<void> {
-    const available = await isDockerAvailable();
-    if (!available) {
-      throw new Error("当前系统未检测到可用的 Docker 环境");
+    if (!this.availabilityPromise) {
+      // Bug 原因：Source probe 内的每条 Docker exec 都重复执行 `docker version`；首次解析
+      // container/home 又重复 `docker ps`。应用冷启动峰值下，四五个 CLI round-trip 会让
+      // 单个本地 Docker Source 在真正 probe 前就耗尽 10 秒预算。Backend 生命周期内只需
+      // 探测一次 daemon；失败清空 promise，后续显式重试仍可重新检测。
+      this.availabilityPromise = isDockerAvailable()
+        .then((available) => {
+          if (!available) throw new Error("当前系统未检测到可用的 Docker 环境");
+        })
+        .catch((error) => {
+          this.availabilityPromise = null;
+          throw error;
+        });
     }
+    await this.availabilityPromise;
   }
 
   private async resolveInfo(): Promise<ResolvedDockerInfo> {
@@ -255,7 +288,7 @@ export class DockerBackend implements IRemoteBackend {
     this.resolvedInfoPromise = (async () => {
       const container = await this.resolveContainer();
       const homeDir = normalizeDockerOutput(
-        await this.execDirect(["sh", "-lc", "printf %s ~"]),
+        await this.execDirectInContainer(container.name, ["sh", "-lc", "printf %s ~"]),
       ).trim();
 
       return {
@@ -329,10 +362,17 @@ export class DockerBackend implements IRemoteBackend {
 
   private async execDirect(commandArgs: string[]): Promise<string> {
     const container = await this.resolveContainer();
+    return await this.execDirectInContainer(container.name, commandArgs);
+  }
+
+  private async execDirectInContainer(
+    containerName: string,
+    commandArgs: string[],
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       execFile(
         this.dockerCommand,
-        buildDockerExecArgs(container.name, commandArgs),
+        buildDockerExecArgs(containerName, commandArgs),
         {
           encoding: "utf8",
           maxBuffer: DOCKER_EXEC_MAX_BUFFER,

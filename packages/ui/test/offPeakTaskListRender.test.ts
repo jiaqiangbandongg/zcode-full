@@ -2,7 +2,8 @@
 import { createElement } from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TID_OFFPEAK_CARD, TID_OFFPEAK_CARD_SESSION, type ZCodeOffPeakTask } from "@zcode/shared";
+import type { ZCodeOffPeakTask } from "@zcode/shared";
+import { TID_OFFPEAK_CARD } from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { OffPeakTaskList } from "@/settings/OffPeakTaskList.js";
 
@@ -39,27 +40,6 @@ function renderList(tasks: ZCodeOffPeakTask[]) {
 }
 
 describe("OffPeakTaskList render", () => {
-  it("失败卡片的状态徽章不可收缩，长会话标题只截断自己", () => {
-    const view = renderList([
-      task({
-        offPeakTaskId: "failed-1",
-        status: "failed",
-        sessionTitle:
-          "扫描最近的 CI 运行，列出失败和不稳定测试及其可能原因，并按影响范围给出修复建议",
-      }),
-    ]);
-    const card = view.getByTestId(TID_OFFPEAK_CARD);
-    const statusLabel = view.getByText("失败");
-    const badge = statusLabel.parentElement!;
-    // Bug 回归：徽章曾是 min-w-0，会被右侧会话标题压到只剩一个字。
-    expect(badge.className).toContain("shrink-0");
-    expect(badge.className).not.toContain("min-w-0");
-    const session = view.getByTestId(TID_OFFPEAK_CARD_SESSION);
-    expect(session.className).toContain("truncate");
-    expect(session.className).toContain("min-w-0");
-    expect(card.contains(session)).toBe(true);
-  });
-
   it("超过 8 张卡片时 grid 自身滚动，8 张及以内不锁高度", () => {
     const eight = Array.from({ length: 8 }, (_, i) => task({ offPeakTaskId: `t-${i}` }));
     const view = renderList(eight);

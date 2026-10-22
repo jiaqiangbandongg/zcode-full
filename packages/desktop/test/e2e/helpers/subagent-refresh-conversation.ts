@@ -4,7 +4,7 @@ import {
   waitForV4UserMessageContaining,
   getV4Messages,
 } from "./v4-conversation.js";
-import { TID_CHAT_ERROR_BANNER } from "@zcode/shared";
+import { TID_CHAT_ERROR_BANNER } from "@zcode/shared/test-ids";
 import { readSubagentCapture } from "./subagent-refresh-capture.js";
 
 export async function assertSubagentTurnFailed(marker: string, error: string) {

@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,9 +16,7 @@ import {
   isSkippableWorkspaceFileListError,
 } from "../src/file/fileService.js";
 import { setDataBaseDir } from "../src/paths.js";
-import {
-  unpackWorkspaceFileEntries,
-} from "@zcode/shared/workspaceFileEntriesCodec";
+import { unpackWorkspaceFileEntries } from "@zcode/shared/workspaceFileEntriesCodec";
 import type { IFileService } from "../src/file/file.js";
 
 // 分块拉全量（测试语义等价旧单次 listWorkspaceFiles）。
@@ -177,32 +183,6 @@ describe("fileService", () => {
         type: "directory",
         isSymbolicLink: true,
       });
-    });
-
-    it("marks symlink metadata for directory entries", async () => {
-      const rootPath = makeTempDir("zcode-readdir-symlink-meta-");
-      const targetPath = join(rootPath, "target");
-      const linkPath = join(rootPath, "linked-dir");
-      mkdirSync(targetPath);
-      symlinkSync(targetPath, linkPath, process.platform === "win32" ? "junction" : "dir");
-
-      const service = createFileService();
-      const entries = await service.readdir({ path: rootPath });
-
-      expect(entries).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "target",
-            type: "directory",
-            isSymbolicLink: false,
-          }),
-          expect.objectContaining({
-            name: "linked-dir",
-            type: "directory",
-            isSymbolicLink: true,
-          }),
-        ]),
-      );
     });
 
     it("returns empty array for an empty directory", async () => {
@@ -907,7 +887,9 @@ describe("fileService", () => {
         },
       });
 
-      expect(unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath)).toEqual([]);
+      expect(unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath)).toEqual(
+        [],
+      );
     });
 
     it("returns empty array when hidden directory descendants and env files provide no candidates", async () => {
@@ -950,14 +932,13 @@ describe("fileService", () => {
         writeFileSync(join(rootPath, "src", "Program.cs"), "");
 
         const service = createFileService();
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         // 自动创建暂时停用，内存中的 gitignore + 默认规则仍剪枝 obj/bin。
-        expect(entries.map((e) => e.relativePath)).toEqual([
-          "src",
-          ".gitignore",
-          "src/Program.cs",
-        ]);
+        expect(entries.map((e) => e.relativePath)).toEqual(["src", ".gitignore", "src/Program.cs"]);
         // 规则文件自身是工具配置，不进入候选。
         expect(existsSync(join(rootPath, ".zcodeignore"))).toBe(false);
       });
@@ -971,7 +952,10 @@ describe("fileService", () => {
         writeFileSync(join(rootPath, "dist", "bundle.js"), "");
 
         const service = createFileService();
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         // .gitignore 未声明 node_modules：内存默认段仍剪枝（行为兼容）。
         expect(entries.map((e) => e.relativePath)).toEqual([".gitignore"]);
@@ -989,7 +973,10 @@ describe("fileService", () => {
         const service = createFileService();
         const preview = await service.readWorkspaceFileSearchIgnore({ rootPath });
         await service.writeWorkspaceFileSearchIgnore({ rootPath, content: preview.content });
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         // 去重：gitignore 区已有 node_modules/ 与 coverage，默认段不再重复写这两条
         // ——文件中每条规则最多一份，删除 gitignore 区那一行即完全放开。
@@ -1007,7 +994,10 @@ describe("fileService", () => {
         writeFileSync(join(rootPath, "keep.ts"), "");
 
         const service = createFileService();
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         expect(entries.map((e) => e.relativePath)).toEqual(["keep.ts"]);
         expect(existsSync(join(rootPath, ".zcodeignore"))).toBe(false);
@@ -1030,7 +1020,10 @@ describe("fileService", () => {
         writeFileSync(join(rootPath, "main.ts"), "");
 
         const service = createFileService();
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         // ! 反选恢复 logs/keep.log；anchored /build 只剪根 build，sub/build 保留；*.tmp 排除文件。
         // logs/* 不排除 logs 目录自身（git 语义：只匹配其下内容）。
@@ -1052,7 +1045,10 @@ describe("fileService", () => {
         writeFileSync(join(rootPath, ".zcodeignore"), "!node_modules/\n");
 
         const service = createFileService();
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
 
         expect(entries.map((e) => e.relativePath)).toEqual([
           "node_modules",
@@ -1080,7 +1076,10 @@ describe("fileService", () => {
         mkdirSync(join(rootPath, "custom"));
         writeFileSync(join(rootPath, "custom", "x.txt"), "");
         writeFileSync(join(rootPath, "ok.txt"), "");
-        const entries = unpackWorkspaceFileEntries(await readAllPacked(service, rootPath), rootPath);
+        const entries = unpackWorkspaceFileEntries(
+          await readAllPacked(service, rootPath),
+          rootPath,
+        );
         // custom/ 被写入的规则剪枝；.gitignore 本身保持可搜（现有行为）。
         expect(entries.map((e) => e.relativePath)).toEqual([".gitignore", "ok.txt"]);
       });
@@ -1131,24 +1130,6 @@ describe("fileService", () => {
         // gitignore 区与自定义区原样保留。
         expect(reset.content).toContain("out/");
         expect(reset.content).toContain("my-private-assets/");
-      });
-
-      it("reset re-adds builtin rule after it was removed from .gitignore", async () => {
-        const rootPath = makeTempDir("zcode-file-service-reset-readd-");
-        // 创建时 gitignore 声明了 node_modules/ → 默认段去重未写入。
-        writeFileSync(join(rootPath, ".gitignore"), "node_modules/\n");
-        const service = createFileService();
-        const initial = await service.readWorkspaceFileSearchIgnore({ rootPath });
-        expect(initial.content.match(/^node_modules\/$/gm)).toHaveLength(1);
-
-        // 用户从 .gitignore 删掉该行后恢复默认：默认段按新 gitignore 重算，补回兜底。
-        writeFileSync(join(rootPath, ".gitignore"), "");
-        await service.writeWorkspaceFileSearchIgnore({ rootPath, content: initial.content });
-        const reset = await service.applyWorkspaceFileSearchIgnoreTransform({
-          rootPath,
-          transform: "reset-defaults",
-        });
-        expect(reset.content.match(/^node_modules\/$/gm)).toHaveLength(1);
       });
 
       it("falls back to full template rebuild when section markers are missing", async () => {

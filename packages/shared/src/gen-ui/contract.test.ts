@@ -6,9 +6,17 @@ import {
   buildGenUiModelContext,
   stripGenUiModelContext,
   genUiTweakSchema,
+  genUiStyleVariablesSchema,
 } from "./contract.js";
 
 describe("Gen UI boundaries", () => {
+  it("limits the style extension to Gen UI CSS string variables", () => {
+    expect(genUiStyleVariablesSchema.parse({ "--gen-ui-primary": "#000" })).toEqual({
+      "--gen-ui-primary": "#000",
+    });
+    expect(genUiStyleVariablesSchema.safeParse({ "--color-primary": "#000" }).success).toBe(false);
+    expect(genUiStyleVariablesSchema.safeParse({ "--gen-ui-input": 1 }).success).toBe(false);
+  });
   it("accepts executor absolute paths but rejects URLs and document traversal", () => {
     for (const path of ["/project/example.html", "C:\\project\\example.html"]) {
       expect(genUiReferenceSchema.parse({ path }).path).toBe(path);

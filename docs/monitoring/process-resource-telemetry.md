@@ -11,10 +11,11 @@
 本节固定 R1–R7、N1/N2 的修复语义，执行结果另记；影响面见
 [复审修复影响与验证](./process-resource-telemetry-fixes.md)。
 
-- **R1 / N2**：独立 Server 在 `/api/server-info` 的 `capabilities.processResourceTelemetry` 可选字段
+- **R1 / N2**：Server 在 `/api/server-info` 的 `capabilities.processResourceTelemetry` 可选字段
   声明支持这组资源旁路事件。Host 仅向声明支持的 Server 订阅；旧 Server 缺字段时继续正常连接，
-  跳过遥测订阅。两个 Server 实现都声明能力。本地及随 Desktop 配套部署的 SSH/WSL/Docker
-  保持原订阅路径，不增加版本号判断、UI 提示或协议主版本变更。
+  跳过遥测订阅。两个 Server 实现都声明能力。本地保持原订阅路径；R3 的 SSH/WSL/Docker
+  会复用版本兼容的 Source Server，也必须检查能力，并在重连换代后重新检查和订阅。
+  不增加版本号判断、UI 提示或协议主版本变更。
 - **R2**：CLI 为每条慢 Bash 完成事实生成随机 `completionToken`，只在协议内传递。
   main 是唯一去重 owner，使用最多 1024 项的近期集合，使同一事实经多个连接、多个 window Host
   到达时只上报一次。不同 token 的相同指标仍各计一次；token 不进入 ARMS，也不新增业务日志；显式开启的原始协议诊断 tap 保留既有帧记录语义。
@@ -806,8 +807,8 @@ SSH/WSL/Docker 保留原订阅路径。旧 Server 的通用 RPC 未知事件行�
 
 ## Out of Scope
 
-- **`cua_helper` 角色**。Windows Helper 由 Host fork，但运行的是外部 pinned 包 zcode-cua-helper-runtime
-  的代码，自采需要改上游并走 `bump:producer` 原子升级；macOS Helper.app 由 launchd 拉起，不在进程树里，
+- **`cua_helper` 角色**。Windows Helper 由 Host fork，运行的是 workspace 包 `packages/zcode-cua`
+  构建出的 Helper runtime，自采需要改该包的 Helper 入口；macOS Helper.app 由 launchd 拉起，不在进程树里，
   Host 只能靠 `ps` 采。二期方案：Helper runtime 在已有 health 心跳中自报 CPU 与 RSS，零外部进程。
 - 在 zcode-server 侧另起独立的 MCP / Bash 探针。远端 CLI 自己产生的资源事实沿既有 trusted Host relay 转发，已由 08 / 09 接线。
 - Windows 上的 MCP CPU 与 Bash 进程树。方向是一个零外部进程的原生扩展（GetProcessMemoryInfo /

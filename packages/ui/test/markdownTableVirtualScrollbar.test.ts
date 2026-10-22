@@ -12,7 +12,6 @@ describe("resolveMarkdownTableVirtualScrollMax", () => {
     });
 
     expect(scrollMax).toBeCloseTo(1.2578125, 8);
-    expect(scrollMax).toBeGreaterThan(1);
   });
 
   it("does not report overflow at or below the existing one-pixel threshold", () => {

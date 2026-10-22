@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-highspeed-card-fallback-unlocks-model",
+  "spec": "./test/e2e/conversation-session/conversation-session-highspeed-card-fallback-unlocks-model.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-highspeed-card-fallback-unlocks-model.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "highspeed-invalid-model-fallback",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定普通模型的成功响应，用于验证 Highspeed 创建期失败后的退回、卡作废和 Composer 解锁；不调用真实套餐。"
+    }
+  ]
+}

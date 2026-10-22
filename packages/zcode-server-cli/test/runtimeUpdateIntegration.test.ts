@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ZCODE_VERSION } from "@zcode/shared";
 import { requestControl } from "../src/ipc/controlClient.js";
 import { resolveCanonicalServerLayout, resolveServerLayout } from "../src/runtime/paths.js";
 import { ReleaseManager } from "../src/runtime/releaseManager.js";
+import { waitForServerStopped } from "../src/runtime/shutdownWait.js";
 
 async function waitForReady(
   controlEndpoint: string,
@@ -220,4 +222,129 @@ describe.skipIf(process.platform === "win32")("runtime update integration", () =
       });
     }
   }, 30_000);
+
+  it("replaces the old Supervisor before an online update reports success", async () => {
+    const root = await mkdtemp(join(process.platform === "win32" ? tmpdir() : "/tmp", "zuh-e2e-"));
+    const layout = resolveServerLayout(join(root, ".zcode", "server"));
+    const releases = new ReleaseManager(layout);
+    await releases.ensure();
+    const fixture = fileURLToPath(new URL("./fixtures/coreWiringFixture.mjs", import.meta.url));
+    const mainEntry = fileURLToPath(new URL("../src/main.ts", import.meta.url));
+    const oldRelease = {
+      version: "3.8.0-test",
+      releaseDir: join(layout.releasesDir, "release-a"),
+      releaseId: "release-a",
+    };
+    const targetRelease = {
+      version: ZCODE_VERSION,
+      releaseDir: join(layout.releasesDir, "release-b"),
+      releaseId: "release-b",
+    };
+    for (const release of [oldRelease, targetRelease]) {
+      const runtimeRoot = join(release.releaseDir, "runtime");
+      await mkdir(runtimeRoot, { recursive: true });
+      await symlink(process.execPath, join(runtimeRoot, "node"));
+      await symlink(fixture, join(runtimeRoot, "server-core.js"));
+      await writeFile(join(runtimeRoot, "zcode.cjs"), "", "utf8");
+      await writeFile(
+        join(runtimeRoot, "package.json"),
+        `${JSON.stringify({ type: "module" })}\n`,
+        "utf8",
+      );
+      await writeFile(
+        join(runtimeRoot, "server-cli.js"),
+        `await import(${JSON.stringify(new URL("../src/main.ts", import.meta.url).href)});\n`,
+        "utf8",
+      );
+    }
+    await releases.writePending(oldRelease);
+    await releases.applyPending();
+    const wiringOutput = join(root, "handoff-wiring.jsonl");
+    const childEnv = {
+      ...process.env,
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--import", "tsx"].filter(Boolean).join(" "),
+      ZCODE_SERVER_SKIP_SERVICE_REGISTRATION: "1",
+      ZCODE_TEST_CORE_VERSION: ZCODE_VERSION,
+      ZCODE_TEST_WIRING_OUTPUT: wiringOutput,
+    };
+    const oldSupervisor = spawn(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        mainEntry,
+        "serve",
+        "--supervisor",
+        "--server-root",
+        layout.serverRoot,
+        "--json",
+      ],
+      { env: childEnv, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let oldDiagnostics = "";
+    oldSupervisor.stdout.on("data", (chunk) => {
+      oldDiagnostics += String(chunk);
+    });
+    oldSupervisor.stderr.on("data", (chunk) => {
+      oldDiagnostics += String(chunk);
+    });
+    const oldExited = new Promise<number | null>((resolve) => oldSupervisor.once("exit", resolve));
+    try {
+      await waitForReady(layout.controlEndpoint).catch((error) => {
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}\n${oldDiagnostics}`,
+        );
+      });
+      await waitForCondition(() => oldDiagnostics.includes('"state":"ready"'));
+      const oldLock = JSON.parse(await readFile(layout.lockFile, "utf8")) as { pid: number };
+      await releases.writePending(targetRelease);
+
+      const update = spawn(
+        join(targetRelease.releaseDir, "runtime", "node"),
+        [
+          join(targetRelease.releaseDir, "runtime", "server-cli.js"),
+          "update",
+          "--force",
+          "--server-root",
+          layout.serverRoot,
+          "--json",
+        ],
+        { env: childEnv, stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let updateOutput = "";
+      update.stdout.on("data", (chunk) => {
+        updateOutput += String(chunk);
+      });
+      update.stderr.on("data", (chunk) => {
+        updateOutput += String(chunk);
+      });
+      const updateExit = await new Promise<number | null>((resolve) =>
+        update.once("exit", resolve),
+      );
+
+      expect(updateExit, updateOutput).toBe(0);
+      expect(JSON.parse(updateOutput.trim().split("\n").at(-1) ?? "{}")).toMatchObject({
+        applied: true,
+        version: ZCODE_VERSION,
+      });
+      await expect(oldExited).resolves.toBe(0);
+      const newLock = JSON.parse(await readFile(layout.lockFile, "utf8")) as { pid: number };
+      expect(newLock.pid).not.toBe(oldLock.pid);
+      await expect(
+        requestControl(layout.controlEndpoint, { command: "runtime-identity" }),
+      ).resolves.toEqual({
+        supervisorVersion: ZCODE_VERSION,
+        supervisorReleaseId: "release-b",
+        activeReleaseVersion: ZCODE_VERSION,
+        activeReleaseId: "release-b",
+        coreVersion: ZCODE_VERSION,
+        coreReleaseId: "release-b",
+      });
+    } finally {
+      await requestControl(layout.controlEndpoint, { command: "stop" }).catch(() => undefined);
+      await waitForServerStopped(layout).catch(() => undefined);
+      await Promise.race([oldExited, new Promise<void>((resolve) => setTimeout(resolve, 1_000))]);
+      if (oldSupervisor.exitCode === null) oldSupervisor.kill("SIGKILL");
+    }
+  }, 45_000);
 });

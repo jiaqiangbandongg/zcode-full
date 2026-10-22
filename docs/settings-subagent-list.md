@@ -11,6 +11,47 @@ The Subagents settings list is an independent Agent capabilities entry. It uses 
 - New is placed beside the Installed heading. New inherits the selected page scope; Edit shows the resource scope but does not allow changing it.
 - Workspace identity is carried together with workspace path when listing or mutating workspace resources. The path remains the filesystem target and identity remains the isolation key.
 
+### User authority when a remote conversation is active
+
+User means the base Host's user configuration. Opening Settings from an SSH/WSL/Docker
+conversation or project must not redirect User reads or writes to that remote workspace.
+The selected scope owns the service target; the last active tab is only a possible execution
+context, never the authority of User configuration.
+
+```text
+User                 -> base services             -> base Host user agents
+selected Workspace   -> identity/session services -> selected project agents
+explicit Source User -> SourceSettingsAttachment  -> selected Source user agents
+```
+
+- Lists, model choices, edits, creation, deletion and plugin inventory use the same scope
+  authority. Ordinary User plugin initialization may use an available local workspace,
+  but must never send a remote path to the base Host. Without a local workspace, direct
+  User agents and model choices remain available; no remote workspace is borrowed or created.
+- A User mutation refreshes already loaded subagent contexts belonging to that service
+  authority, including local contexts while a remote tab is active. Workspace mutations
+  refresh only the matching workspace identity. A stale response from a previous target
+  must not overwrite the current projection.
+- An explicit Source User remains separate from its conversation backing workspace. A
+  remote `default` workspace is a workspace scope, not a substitute Source User option.
+- This correction uses existing service injection and attachments. It creates no Host or
+  stream state and preserves desktop `continuous` and mobile `replayable` delivery.
+
+Regression coverage: `subagentsSection.test.ts` checks User creation with remote active,
+same-path remote identities, offline targets and plugin initialization; `subagentsStore.test.ts`
+checks authority-scoped refresh. `conversation-session-r3-settings-scopes.test.ts` checks
+real GUI creation and both local/remote filesystem destinations. Source User availability
+and labels remain a separate acceptance item.
+
+The SSH regression must distinguish connection completion from directory selection:
+`waitForSSHDirectoryStep` reports `closed` when the conversation flow unmounts the
+wizard, and `directory` only when the directory step is visible. The case asserts
+`closed` before checking the conversation identity/session; closing the wizard alone
+does not prove a successful connection. Installation/boundary confirmations remain
+handled, and connection errors fail immediately. Project flows still verify the
+directory step and selected workspace. This is a test-helper contract only; Host and
+desktop/mobile delivery behavior do not change.
+
 ## Resource groups
 
 - `Installed` contains directly-created agents for the selected scope.

@@ -4,7 +4,17 @@
 
 桌面和宽屏 Web 保持侧栏，将原本共用外框的会话与 Side Pane 拆成独立面板；窗口根背景、侧栏保持原语义。
 
-Workspace layout 的平台圆角：Windows 为 5px，macOS Sequoia 及更早版本为 6px，Tahoe 26+ 为 12px，未知 macOS 版本暂用 6px；Linux 和 Web 为 `xl`（12px）。设置页保留既有平台半径。
+Workspace layout 的平台圆角：Windows 为 `rounded-md`（默认 6px），macOS Sequoia 及更早版本为 6px，Tahoe 26+ 为 12px，未知 macOS 版本暂用 6px；Linux 和 Web 为 `xl`（12px）。Windows 设置页同步使用 6px。
+
+SPT-E2E-000 的圆角 token 验收区分 Side Pane 状态：展开时仅检查 Side Pane 外框的 `rounded-md` / `rounded-l-md`，会话外框通过 `--workspace-panel-radius` 保持独立面板圆角；收起后再检查会话外框的 chrome token。两种状态均检查实际计算圆角，避免把展开状态的动态变量误判为缺少 token。
+
+## 平台外沿尺寸（2026-10-09，取代下文历史尺寸）
+
+- Windows 工作区右侧、底部、顶部额外间隔和 Sidebar 收起后的左留白均为 6px；Linux 均保留 4px，主面板圆角保留 12px。
+- Windows 设置页同步右侧、底部和顶部 6px 留白与 6px 圆角；导航与内容相接的左侧不增加间距。macOS、Web、手机保持现有规则。
+- 新任务、会话、插件、Automations 复用共享工作区边界，终端和 Side Pane 同步圆角；面板之间的 4px 拖动热区不变。
+- 拖动指示线保留 2px、foreground-subtlest/50、沿边延伸及现有显隐规则。Sidebar 指示线端点按平台外沿留白加圆角内缩，Windows 为 12px，Linux 为 16px。
+- SPT-E2E-000 验证平台尺寸、收起左留白和拖动，UP-00 验证设置页；平台函数单测覆盖 Linux、Windows 能力未知、普通和最大化窗口。
 
 macOS 版本必须通过 `IPlatformService.getDesktopWindowChromeState` 查询并订阅窗口状态事件，再由 `useAppChromeState` 传入工作区圆角计算。此前 hook 排除了 macOS，导致所有 macOS 都走未知版本的 6px 分支；桌面各平台共用已有查询/事件 revision 防覆盖机制，Web 不查询桌面状态。回归测试须运行真实 hook，验证异步查询后的 Sequoia/Tahoe 圆角及订阅清理，不能只给半径函数注入版本。
 
@@ -42,6 +52,12 @@ Window / Sidebar / transparent body layout
 - 底部终端 tab 同样使用 ghost：选中背景 hover 不变，内容用 mask 淡出；关闭按钮参与普通 flex 布局，仅在选中、hover、focus-within 时显示，隐藏时保留占位，mask 不随显示状态左移。Tab 间距为 4px，宽度跟随内容，最大 144px，不设置固定宽度或最小宽度。「终端」标题保持原样，shell 名称使用普通辅助文字，不使用 pill 背景、圆角或内边距。
 - 新任务、普通会话、插件、Automations 都使用同一主面板边界，不创建第二份业务状态。
 - 手机远控保持单列/覆盖抽屉路径，无额外双面板间距；响应式收缩不能挤掉输入区或造成横向滚动。
+
+- Windows 验证通过：SPT-E2E-000 `desktop-e2e-20261009070445229-p20968-57b667c6addfb7fa`；UP-00 `desktop-e2e-20261009070918592-p12424-e7971ff15e21066b`。65 项相关单测通过、1 项既有跳过；typecheck、typecheck:e2e、lint 和架构检查通过。Linux/macOS 真机、手机实际浏览器及插件/Automations 页面逐页视觉待补，已有平台和手机布局单测通过。
+
+## 桌面拖动指示线颜色（2026-10-09）
+
+Sidebar、Side Pane 和底部终端统一使用 `resize-handle` token：浅色主题 sky-500、深色主题 sky-400；覆盖 macOS、Windows、Linux 桌面端。Web 保留 foreground-subtlest/50，手机隐藏规则不变。保留 2px 粗细、圆润端点、沿边长度及 hover、键盘聚焦、拖动时显示，默认隐藏。不改变 4px 热区或拖动逻辑。SPT-E2E-000 在双主题验证三条指示线颜色、长度、显隐及实际拖动。
 
 ## 兼容边界
 
@@ -160,3 +176,15 @@ Windows/Linux 复用同一内联窗控组件，28px 按钮、16px 图标、2px �
 - 2026-09-10 MR !2586 CR-01：修复 macOS 窗口状态查询被 hook 守卫跳过。新增两条真实 hook 回归先失败后通过；26 项相关单测、typecheck、lint（44 个既有警告、0 错误）通过。Windows Electron SPT-E2E-000 通过，运行 ID desktop-e2e-20260910-040930-907。macOS 原生视觉与手机实机未验证。
 
 - Workspace Sidebar 底部 footer 左内边距保持 16px（`pl-4`），右内边距为 12px（`pr-3`）；上下内边距不变。此覆盖仅由 Workspace 调用方传入，Settings 复用的 footer 保持默认左右 16px（`px-4`）。
+
+2026-10-09 圆角补正：Windows 工作区及设置页统一为 6px，保留 6px 外沿留白，Sidebar 指示线端点为 12px。50 项相关单测通过；Windows SPT-E2E-000 run desktop-e2e-20261009071323579-p14952-58feeab7544382d9 和 UP-00 run desktop-e2e-20261009071448683-p19548-4169d17082d86dfb 均通过。typecheck、typecheck:e2e、lint 和架构检查通过。
+
+2026-10-09 指示线颜色验证：Windows 双主题 SPT-E2E-000 通过（desktop-e2e-20261009071748019-p456-09549c1404406786），39 项相关单测、typecheck、typecheck:e2e、lint 与架构检查通过；Linux/macOS 真机待补。
+
+## 平台圆角 token（2026-10-12）
+
+Windows 和旧版本 macOS 的 6px 面板圆角使用 `rounded-md`，Windows 非原生圆角路径的左侧使用 `rounded-l-md`。设置页复用同一 token。保留平台半径计算中的 6px、拖动指示线内缩和其他平台半径；桌面与手机布局、交互不变。Logo 底座沿用现有 `rounded`。单测验证 token 选择，E2E 同时验证平台 class 与计算后的圆角。
+
+验证记录：44 项相关单测通过；typecheck、typecheck:e2e、lint（0 errors）及架构检查通过。macOS SPT-E2E-000 尝试在 ChromeDriver 下载阶段因代理证书校验失败退出，0 项用例执行；Windows/Linux 真机与手机浏览器未执行。本次不改变平台半径计算或布局事件。
+
+窗控回归边界：OccupationOnboarding 全屏引导继续使用 4px 顶部/右侧偏移；设置页的独立面板按 Windows 6px、Linux 4px 外沿留白定位窗控。两者保持相同的 1px 边框补偿、48px 高度和 8px 横向内边距。旧测试误把两种容器的偏移强制相等，改为分别检查各自偏移与共享尺寸，不改变界面。

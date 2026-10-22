@@ -1,3 +1,5 @@
+import { DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
+import { openWorkspaceDraftFromSidebar } from "../helpers/workspace-agent-warmup.js";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -7,7 +9,7 @@ import {
   TID_V4_MODEL_CONFIG,
   TID_V4_SESSION_PANE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   getE2EAppDataPaths,
@@ -30,7 +32,6 @@ import {
   getV4ConfigProjection,
   selectV4TaskById,
   sendV4Prompt,
-  startNewV4Draft,
   V4_MAIN_PANE_ID,
   waitForV4CompactMarker,
   waitForV4Pane,
@@ -66,12 +67,13 @@ describe("上下文窗口与输出预算冷恢复 E2E", () => {
 
     // 先通过真实 UI/协议创建并完成 1M 会话；再创建一个 parking 会话保持选中，
     // 这样重启后目标会话尚未 resume，可在点击前安装首投影记录器。
-    await startNewV4Draft();
+    // 启动夹具已经是目标目录的空草稿，直接首发，避免无意义地替换预热中的草稿。
     await sendV4Prompt(CREATE_HISTORY_MARKER);
     await waitForV4TimelineContaining(CREATE_HISTORY_REPLY);
     const targetSessionId = await waitForBoundSession("真实 1M 历史会话没有创建成功");
 
-    await startNewV4Draft();
+    // 冷恢复夹具固定在项目目录；全局新建会创建独立 cwd，不能复用该目录的记录器。
+    await openWorkspaceDraftFromSidebar(DEFAULT_WORKSPACE);
     await sendV4Prompt(PARKING_MARKER);
     await waitForV4TimelineContaining(PARKING_REPLY);
     const parkingSessionId = await waitForBoundSession("parking 会话没有创建成功");

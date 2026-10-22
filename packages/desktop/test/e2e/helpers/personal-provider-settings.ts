@@ -9,7 +9,7 @@ import {
   TID_MODEL_PROVIDER_NAV_ITEM,
   TID_MODEL_PROVIDER_TEMPLATE_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import type { ProviderApiType } from "@zcode/provider";
 import {
   clickTestIdByDom,
@@ -114,14 +114,37 @@ export async function createAndConfigurePersonalProvider({
     timeoutMsg: "新供应商 API Key 输入框没有出现",
   });
 
+  // API Key 的 blur 才提交连接草稿；旧 helper 用打开格式菜单触发 blur，
+  // 保存后的详情重渲染会关闭刚打开的菜单。先提交并确认保存，再执行下一步。
+  await browser.execute((testId) => {
+    document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)?.blur();
+  }, TID_MODEL_PROVIDER_API_KEY_INPUT);
+  await browser.waitUntil(
+    async () =>
+      (await readModelProviders()).some(
+        (provider) =>
+          provider.name === providerName &&
+          provider.apiKey === apiKey &&
+          provider.endpoints.baseURL === baseURL,
+      ),
+    { timeout: 15_000, timeoutMsg: "新供应商连接字段没有保存完成" },
+  );
   if (apiFormat) {
     await clickTestIdByWebDriver(TID_MODEL_PROVIDER_API_FORMAT_TRIGGER, {
       timeout: 15_000,
       timeoutMsg: "新供应商 API 格式下拉没有出现",
     });
-    await clickTestIdByWebDriver(testId(TID_MODEL_PROVIDER_API_FORMAT_ITEM, apiFormat), {
-      timeout: 15_000,
-      timeoutMsg: `新供应商 API 格式选项没有出现: ${apiFormat}`,
-    });
+    const itemId = testId(TID_MODEL_PROVIDER_API_FORMAT_ITEM, apiFormat);
+    await waitForTestIdByDom(itemId, { timeout: 15_000 });
+    // Personal overlay 未写 type 时继承 Template，旧 snapshot 的默认协议不是有效配置。
+    // 从实际菜单读取选中状态，避免把继承的模板协议误判为目标协议。
+    if ((await $(`[data-testid="${itemId}"]`).getAttribute("data-state")) === "checked") {
+      await browser.keys("Escape");
+    } else {
+      await clickTestIdByWebDriver(itemId, {
+        timeout: 15_000,
+        timeoutMsg: `新供应商 API 格式选项没有出现: ${apiFormat}`,
+      });
+    }
   }
 }

@@ -385,7 +385,6 @@ describe("ProviderRuntime", () => {
 
     const selectionListener = vi.fn();
     const subscription = runtime.modelSelection.onDidChange(selectionListener);
-    expect(subscription).toHaveProperty("dispose");
 
     await runtime.providerSettings.refresh("account-provider-ready");
     expect((await runtime.modelSelection.getView()).providers).toHaveLength(1);

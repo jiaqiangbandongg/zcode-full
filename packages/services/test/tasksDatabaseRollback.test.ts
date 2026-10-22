@@ -19,7 +19,7 @@ it("DB109-01/09/10/13：八表内容保留，旧版读取新增/更新任务无�
   const offPeak = new OffPeakTaskRepo(path);
   const db = new DatabaseSync(path);
   try {
-    runTasksDatabaseMigrations(db);
+    await runTasksDatabaseMigrations(db, path);
     db.exec(`DELETE FROM tasks_schema_migration WHERE id='0002_provider_selection';
       INSERT INTO tasks(workspace_key,workspace_path,workspace_identity,task_id,title,created_at,updated_at,meta_json)
       VALUES('ssh:a:/same','/same','ssh:a:/same','session','旧会话标题',1,2,'{"unknown":"附件引用"}');
@@ -42,7 +42,7 @@ it("DB109-01/09/10/13：八表内容保留，旧版读取新增/更新任务无�
       "off_peak_tasks",
     ];
     const before = preservedTables.map((table) => db.prepare(`SELECT * FROM ${table}`).all());
-    runTasksDatabaseMigrations(db);
+    await runTasksDatabaseMigrations(db, path);
     expect(preservedTables.map((table) => db.prepare(`SELECT * FROM ${table}`).all())).toEqual(
       before,
     );

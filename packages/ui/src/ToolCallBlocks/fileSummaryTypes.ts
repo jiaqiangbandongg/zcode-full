@@ -1,5 +1,5 @@
 import type { PluginUiToolBinding } from "@/plugin-ui/contract.js";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
 import type { MessageFileLinkTarget } from "@/components/ai-elements/message.js";
 import type { CodePreviewSettings } from "@/lib/codePreviewSettings.js";
@@ -9,6 +9,12 @@ import type { TaskChatToolCallTreeNode } from "@/lib/toolCallTree.js";
 import type { ToolDisplayModel } from "@/lib/toolDisplay.js";
 import type { Theme } from "@/useTheme.js";
 import type { OpenPlanDetailSideTabRequest } from "@/lib/workspaceSidePane.js";
+// Bugfix：这里曾写成类型位置的内联动态 import 写法（在 typeof 后跟圆括号包模块名）。
+// TS 编译期会擦除它，但 share 闭包守卫（shareBuildBoundary.test）的动态 import 正则
+// 不区分类型/值与注释，把它当成值导入后，整个 ToolCallBlocks.tsx 大桶（含 plugin-ui
+// 桶 → services/provider）被误判进 web-share 闭包。顶层 import type 同样不产生运行时
+// 边，且能被守卫正确跳过。注释里也不要出现该字面写法，正则同样会命中注释文本。
+import type { ToolCallBlock } from "@/ToolCallBlocks.js";
 
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -202,6 +208,7 @@ export interface WorkflowDraftPosition {
 }
 
 export interface ToolCallBlockRenderContext {
+  nestedToolRenderer: ComponentType<Parameters<typeof ToolCallBlock>[0]>;
   isOfficeMode?: boolean;
   toolCallNode: TaskChatToolCallTreeNode;
   workspacePath: string;

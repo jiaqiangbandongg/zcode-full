@@ -7,6 +7,7 @@ import {
   type ZCodeProvider,
 } from "@zcode/shared";
 import { logger } from "@/logger.js";
+import { getServiceAuthorityId } from "@/store/serviceAuthorityKey.js";
 
 export interface SubagentsContextSnapshot {
   workspacePath: string;
@@ -50,9 +51,11 @@ let nextRequestId = 0;
 export function getSubagentsContextKey(
   workspacePath: string,
   provider: ZCodeProvider,
-  workspaceIdentity?: string | null,
+  workspaceIdentity: string | null | undefined,
+  subagentsService: ISubagentsService,
 ): string {
-  return `${workspaceIdentity?.trim() || workspacePath}::${normalizeAgentProviderToZCodeAgent(provider)}`;
+  const authority = getServiceAuthorityId(subagentsService);
+  return `${authority}::${workspaceIdentity?.trim() || workspacePath}::${normalizeAgentProviderToZCodeAgent(provider)}`;
 }
 
 function updateContext(
@@ -99,7 +102,12 @@ async function loadContext(
 ): Promise<void> {
   const provider = normalizeAgentProviderToZCodeAgent(params.provider);
   const workspaceIdentity = params.workspaceIdentity?.trim() || undefined;
-  const key = getSubagentsContextKey(params.workspacePath, provider, workspaceIdentity);
+  const key = getSubagentsContextKey(
+    params.workspacePath,
+    provider,
+    workspaceIdentity,
+    params.subagentsService,
+  );
   const existing = get().contexts[key];
   const requestId = ++nextRequestId;
   latestRequestIds.set(key, requestId);
@@ -166,8 +174,13 @@ async function loadContext(
 export const useSubagentsContextStore = create<SubagentsContextStoreState>((set, get) => ({
   contexts: {},
   async initialize(workspacePath, provider, subagentsService, workspaceIdentity) {
-    const key = getSubagentsContextKey(workspacePath, provider, workspaceIdentity);
-    // 多个可见 pane 会各自挂载 Subagents 消费者。旧单例把“当前 workspace”
+    const key = getSubagentsContextKey(
+      workspacePath,
+      provider,
+      workspaceIdentity,
+      subagentsService,
+    );
+    // Bugfix：多个可见 pane 会各自挂载 Subagents 消费者。旧单例把“当前 workspace”
     // 当成全局可变字段，跨 workspace pane 会互相触发 initialize；按 workspaceKey+provider
     // 分桶后，每个 effect 只订阅自己的稳定快照。
     if (get().contexts[key]) return;
@@ -189,7 +202,12 @@ export const useSubagentsContextStore = create<SubagentsContextStoreState>((set,
       await subagentsService.setEnabled({ agentId, enabled });
       await get().refresh(workspacePath, provider, subagentsService, workspaceIdentity);
     } catch (error) {
-      const key = getSubagentsContextKey(workspacePath, provider, workspaceIdentity);
+      const key = getSubagentsContextKey(
+        workspacePath,
+        provider,
+        workspaceIdentity,
+        subagentsService,
+      );
       const message = error instanceof Error ? error.message : String(error);
       set((state) => {
         const existing = state.contexts[key];

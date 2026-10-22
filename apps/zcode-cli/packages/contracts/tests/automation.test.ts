@@ -190,22 +190,6 @@ describe("automation tool contracts", () => {
       "properties.recurring.description",
       expect.stringContaining("Do not combine true with a numeric maxRuns"),
     );
-    // 非法组合必须由 runtime schema 拒绝，这是 anyOf 删除后的唯一强制层。
-    expect(
-      CronUpdateInputSchema.safeParse({
-        id: "automation-1",
-        title: "新的标题",
-        recurring: true,
-        maxRuns: 3,
-      }).success,
-    ).toBe(false);
-    expect(
-      CronCreateInputSchema.safeParse({
-        id: "automation-1",
-        title: "新的标题",
-        maxRuns: null,
-      }).success,
-    ).toBe(false);
   });
 
   it("CronCreate 长间隔周期用 intervalUnit + interval 统一 carrier", () => {

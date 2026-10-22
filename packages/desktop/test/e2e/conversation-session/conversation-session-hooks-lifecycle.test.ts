@@ -11,7 +11,7 @@ import {
   TID_V4_HOOK_DETAILS_CONTENT,
   TID_V4_HOOK_DETAILS_TRIGGER,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -50,15 +50,16 @@ import {
   getV4ComposerText,
   prepareV4ConversationE2E,
   sendV4Prompt,
-  startNewV4Draft as startEmptyV4Draft,
   waitForV4AssistantMessageContaining,
   waitForV4Pane,
   waitForV4TimelineContaining,
 } from "../helpers/v4-conversation.js";
+import { openWorkspaceDraftFromSidebar } from "../helpers/workspace-agent-warmup.js";
 
 const STOP_STEP = (index: number) => `${HOOKS_CASE_MARKERS.stopCap}_STEP_${index}`;
 async function startNewV4Draft() {
-  await startEmptyV4Draft();
+  // 全局新建会分配独立 cwd；本场景的 Hook 文件与轨迹约定属于固定项目目录。
+  await openWorkspaceDraftFromSidebar(DEFAULT_WORKSPACE);
   // Hook 用例不测试默认模型；每份新草稿显式选择，不能依赖旧 Recent 自动回填。
   await selectUpstreamModel();
   await selectUpstreamThoughtLevel();

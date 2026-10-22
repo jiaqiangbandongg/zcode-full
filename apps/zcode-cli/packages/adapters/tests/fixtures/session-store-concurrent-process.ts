@@ -1,7 +1,7 @@
 import { openStartupSqliteSessionStore } from "../../src/storage/index.ts";
 
 process.send?.({ type: "ready" });
-process.once("message", (message: { dbPath?: unknown; type?: unknown }) => {
+process.once("message", async (message: { dbPath?: unknown; type?: unknown }) => {
   if (message.type !== "start" || typeof message.dbPath !== "string") {
     process.exitCode = 1;
     process.disconnect?.();
@@ -9,7 +9,7 @@ process.once("message", (message: { dbPath?: unknown; type?: unknown }) => {
   }
 
   try {
-    const store = openStartupSqliteSessionStore({ dbPath: message.dbPath });
+    const store = await openStartupSqliteSessionStore({ dbPath: message.dbPath });
     const migrationIds = store.debugMigrationIds();
     store.close();
     process.send?.({ result: { migrationIds, ok: true }, type: "result" });

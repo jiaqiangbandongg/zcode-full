@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project-mentions",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project-mentions.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-virtual-project-mentions.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "vp14-existing-task",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "A fixed reply creates one real persisted task for composer project mentions; model generation quality is outside this case."
+    }
+  ]
+}

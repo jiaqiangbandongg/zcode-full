@@ -29,7 +29,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
   let root: string;
   let path: string;
   let db: DatabaseSync;
-  let store: ReturnType<typeof createSqliteSessionStore> | undefined;
+  let store: Awaited<ReturnType<typeof createSqliteSessionStore>> | undefined;
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "zcode-readability-"));
     path = join(root, "session.sqlite");
@@ -107,7 +107,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
       seedMessage(id, { model });
     }
     const before = readOld();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const current = await readCurrent();
     expect(current).toHaveLength(3);
     for (const message of current) {
@@ -122,7 +122,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
     const disk = db.prepare("SELECT * FROM message ORDER BY id").all();
     const ledger = db.prepare("SELECT * FROM schema_migration ORDER BY id").all();
     store.close();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(await readCurrent()).toEqual(current);
     expect(db.prepare("SELECT * FROM message ORDER BY id").all()).toEqual(disk);
     expect(db.prepare("SELECT * FROM schema_migration ORDER BY id").all()).toEqual(ledger);
@@ -135,7 +135,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
     { providerId: "p" },
     { providerId: "p", modelId: "m", options: { reasoningLevel: 3 } },
   ])("已记账后出现无效新选择 %j：不回读旧值，不阻断协议，内容保留", async (modelSelection) => {
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const ledger = db.prepare("SELECT * FROM schema_migration ORDER BY id").all();
     store.close();
     store = undefined;
@@ -166,7 +166,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
     }
     const old = readOld();
     const disk = db.prepare("SELECT * FROM message ORDER BY id").all();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const [message] = await readCurrent();
     expect(message.info.model).toBeUndefined();
     expect(message.parts).toEqual(
@@ -183,7 +183,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
   });
 
   it("真实 restore CLI 导入后可被旧 Reader 打开，再升级不重迁也能读取正文", async () => {
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const ledger = db.prepare("SELECT * FROM schema_migration ORDER BY id").all();
     store.close();
     store = undefined;
@@ -225,7 +225,7 @@ describe("DB109：配置可失效，回滚和再升级的内容读取不可报�
       "导入问题正文",
       "导入回答正文",
     ]);
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(
       (await readCurrent())
         .flatMap((message) => message.parts)

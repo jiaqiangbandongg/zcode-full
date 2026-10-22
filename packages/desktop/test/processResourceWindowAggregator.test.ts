@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  PROCESS_RESOURCE_MAX_SAMPLES_PER_WINDOW,
   ProcessResourceWindowAggregator,
   type ProcessRoleSample,
 } from "@desktop/main/processResourceWindowAggregator";
@@ -114,7 +113,6 @@ describe("ProcessResourceWindowAggregator", () => {
     }
 
     const [report] = aggregator.drain();
-    expect(PROCESS_RESOURCE_MAX_SAMPLES_PER_WINDOW).toBe(32);
     expect(report?.sampleCount).toBe(32);
     // 截断保留最近样本，peak 反映最后一段窗口的真实峰值。
     expect(report?.cpuPercentPeak).toBe(39);

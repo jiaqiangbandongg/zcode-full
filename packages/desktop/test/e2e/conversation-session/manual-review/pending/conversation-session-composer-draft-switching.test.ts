@@ -13,6 +13,7 @@ import {
 } from "../../../helpers/conversation-session.js";
 import { getV4ComposerDraftScopeSnapshot } from "../../../helpers/conversation-session-store.js";
 import { setV4ComposerText } from "../../../helpers/v4-conversation.js";
+import { startDraftFromProject } from "../../../helpers/project-sidebar.js";
 
 interface DraftExpectation {
   attachmentFilenames: string[];
@@ -29,6 +30,8 @@ describe("会话区 composer 草稿切换保留 E2E", () => {
     this.timeout(260000);
 
     await prepareConversationE2E();
+    // 本例验证同一项目内的 session/草稿附件；任务入口的换目录由 PD01/02 单独断言。
+    await startDraftFromProject(DEFAULT_WORKSPACE);
 
     const runId = Date.now();
     const completedPrompt = `E2E_COMPOSER_DRAFT_COMPLETED_SEED_${runId}: Reply with exactly "${E2E_REPLY_TOKEN}" and no other text.`;

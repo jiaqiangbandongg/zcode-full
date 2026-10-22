@@ -1,0 +1,796 @@
+[
+  {
+    "rowId": 1,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939593350,
+    "createdAtSeq": 3,
+    "kind": "turnHeader",
+    "origin": "userInput",
+    "executionKind": "agent",
+    "sourceCommandId": "fixture-id-1",
+    "historyRoundCount": 5,
+    "state": "completedSuccess",
+    "startedAt": 1788939593350,
+    "endedAt": 1788939772378,
+    "activeMs": 179028
+  },
+  {
+    "rowId": 2,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939593350,
+    "createdAtSeq": 3,
+    "kind": "userInput",
+    "text": "USER_QUERY",
+    "origin": "realUser",
+    "sourceCommandId": "fixture-id-1",
+    "rootSourceCommandId": "fixture-id-1",
+    "clientId": "fixture-id-2"
+  },
+  {
+    "rowId": 6,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939603434,
+    "createdAtSeq": 13,
+    "kind": "assistantText",
+    "assistantResponseId": "msg_mttsg8a2_aa6ed8cd-2b96-4f0a-adf5-559726d4c0b3",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  },
+  {
+    "rowId": 9,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939654202,
+    "createdAtSeq": 22,
+    "kind": "assistantText",
+    "assistantResponseId": "fixture-id-3",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  },
+  {
+    "rowId": 10,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939593370,
+    "createdAtSeq": 25,
+    "kind": "toolCall",
+    "assistantResponseId": "fixture-id-3",
+    "toolCallId": "create-failed",
+    "toolName": "CreateWorkflow",
+    "status": "success",
+    "inputText": "{}",
+    "input": {
+      "name": "军棋游戏"
+    },
+    "display": {
+      "kind": "create_workflow",
+      "ok": false,
+      "errorCount": 9,
+      "diagnostics": []
+    },
+    "startedAt": 1788939593371,
+    "endedAt": 1788939593372
+  },
+  {
+    "rowId": 12,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939695896,
+    "createdAtSeq": 31,
+    "kind": "assistantText",
+    "assistantResponseId": "msg_mttsi7mg_a9c9a5b0-cb1f-45a7-87ed-d229441d1dc7",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  },
+  {
+    "rowId": 13,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939593379,
+    "createdAtSeq": 34,
+    "kind": "toolCall",
+    "assistantResponseId": "msg_mttsi7mg_a9c9a5b0-cb1f-45a7-87ed-d229441d1dc7",
+    "toolCallId": "create-completed",
+    "toolName": "CreateWorkflow",
+    "status": "success",
+    "inputText": "{}",
+    "input": {
+      "name": "军棋游戏"
+    },
+    "display": {
+      "kind": "create_workflow",
+      "ok": true,
+      "errorCount": 0,
+      "diagnostics": [],
+      "causalityGraph": {
+        "steps": [
+          {
+            "id": "ask#1",
+            "kind": "ask",
+            "label": "architect",
+            "line": 180,
+            "column": 30,
+            "lane": "actor#1",
+            "phase": "phase#1"
+          },
+          {
+            "id": "ask#2",
+            "kind": "ask",
+            "label": "reviewer",
+            "line": 186,
+            "column": 29,
+            "lane": "actor#2",
+            "phase": "phase#1"
+          },
+          {
+            "id": "ask#3",
+            "kind": "ask",
+            "label": "architect",
+            "line": 190,
+            "column": 19,
+            "lane": "actor#1",
+            "phase": "phase#1",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#4",
+            "kind": "ask",
+            "label": "reviewer",
+            "line": 193,
+            "column": 27,
+            "lane": "actor#2",
+            "phase": "phase#1",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#5",
+            "kind": "ask",
+            "label": "engine",
+            "line": 210,
+            "column": 34,
+            "lane": "actor#3",
+            "phase": "phase#2"
+          },
+          {
+            "id": "world-read#1",
+            "kind": "world-read",
+            "label": "run npm",
+            "line": 214,
+            "column": 25,
+            "lane": "workspace",
+            "phase": "phase#2",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#6",
+            "kind": "ask",
+            "label": "engine",
+            "line": 220,
+            "column": 16,
+            "lane": "actor#3",
+            "phase": "phase#2",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#7",
+            "kind": "ask",
+            "label": "AI 工程师",
+            "line": 247,
+            "column": 40,
+            "lane": "actor#4",
+            "phase": "phase#3"
+          },
+          {
+            "id": "ask#8",
+            "kind": "ask",
+            "label": "服务器工程师",
+            "line": 248,
+            "column": 40,
+            "lane": "actor#5",
+            "phase": "phase#3"
+          },
+          {
+            "id": "ask#9",
+            "kind": "ask",
+            "label": "客户端工程师",
+            "line": 249,
+            "column": 40,
+            "lane": "actor#6",
+            "phase": "phase#3"
+          },
+          {
+            "id": "world-read#2",
+            "kind": "world-read",
+            "label": "run npm",
+            "line": 252,
+            "column": 29,
+            "lane": "workspace",
+            "phase": "phase#3"
+          },
+          {
+            "id": "ask#10",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 268,
+            "column": 18,
+            "lane": "actor#7",
+            "phase": "phase#4"
+          },
+          {
+            "id": "world-read#3",
+            "kind": "world-read",
+            "label": "run npm",
+            "line": 271,
+            "column": 25,
+            "lane": "workspace",
+            "phase": "phase#4",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#11",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 274,
+            "column": 22,
+            "lane": "actor#7",
+            "phase": "phase#4",
+            "repeat": "serial"
+          },
+          {
+            "id": "world-read#4",
+            "kind": "world-read",
+            "label": "run node",
+            "line": 279,
+            "column": 25,
+            "lane": "workspace",
+            "phase": "phase#4",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#12",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 285,
+            "column": 20,
+            "lane": "actor#7",
+            "phase": "phase#4",
+            "repeat": "serial"
+          },
+          {
+            "id": "ask#13",
+            "kind": "ask",
+            "label": "verifier",
+            "line": 295,
+            "column": 33,
+            "lane": "actor#8",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#14",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 300,
+            "column": 20,
+            "lane": "actor#7",
+            "phase": "phase#5"
+          },
+          {
+            "id": "world-read#5",
+            "kind": "world-read",
+            "label": "run npm",
+            "line": 303,
+            "column": 26,
+            "lane": "workspace",
+            "phase": "phase#5"
+          },
+          {
+            "id": "world-read#6",
+            "kind": "world-read",
+            "label": "run node",
+            "line": 306,
+            "column": 28,
+            "lane": "workspace",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#15",
+            "kind": "ask",
+            "label": "verifier",
+            "line": 310,
+            "column": 33,
+            "lane": "actor#8",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#16",
+            "kind": "ask",
+            "label": "verifier",
+            "line": 314,
+            "column": 33,
+            "lane": "actor#8",
+            "phase": "phase#5"
+          },
+          {
+            "id": "world-read#7",
+            "kind": "world-read",
+            "label": "read README.md",
+            "line": 323,
+            "column": 28,
+            "lane": "workspace",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#17",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 328,
+            "column": 20,
+            "lane": "actor#7",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#18",
+            "kind": "ask",
+            "label": "reader",
+            "line": 333,
+            "column": 27,
+            "lane": "actor#9",
+            "phase": "phase#5"
+          },
+          {
+            "id": "ask#19",
+            "kind": "ask",
+            "label": "integrator",
+            "line": 337,
+            "column": 22,
+            "lane": "actor#7",
+            "phase": "phase#5"
+          }
+        ],
+        "lanes": [
+          {
+            "id": "workspace"
+          },
+          {
+            "id": "actor#1",
+            "name": "架构师",
+            "line": 176,
+            "column": 19
+          },
+          {
+            "id": "actor#2",
+            "name": "方案评审员",
+            "line": 182,
+            "column": 18
+          },
+          {
+            "id": "actor#3",
+            "name": "规则引擎工程师",
+            "line": 206,
+            "column": 16
+          },
+          {
+            "id": "actor#4",
+            "name": "AI 工程师",
+            "line": 247,
+            "column": 3
+          },
+          {
+            "id": "actor#5",
+            "name": "服务器工程师",
+            "line": 248,
+            "column": 3
+          },
+          {
+            "id": "actor#6",
+            "name": "客户端工程师",
+            "line": 249,
+            "column": 3
+          },
+          {
+            "id": "actor#7",
+            "name": "集成工程师",
+            "line": 263,
+            "column": 20
+          },
+          {
+            "id": "actor#8",
+            "name": "独立验收员",
+            "line": 294,
+            "column": 18
+          },
+          {
+            "id": "actor#9",
+            "name": "文档初读员",
+            "line": 332,
+            "column": 18
+          }
+        ],
+        "participants": [
+          {
+            "id": "phase#1:actor#1",
+            "phase": "phase#1",
+            "lane": "actor#1",
+            "steps": [
+              "ask#1",
+              "ask#3"
+            ]
+          },
+          {
+            "id": "phase#1:actor#2",
+            "phase": "phase#1",
+            "lane": "actor#2",
+            "steps": [
+              "ask#2",
+              "ask#4"
+            ]
+          },
+          {
+            "id": "phase#2:actor#3",
+            "phase": "phase#2",
+            "lane": "actor#3",
+            "steps": [
+              "ask#5",
+              "ask#6"
+            ]
+          },
+          {
+            "id": "phase#2:workspace",
+            "phase": "phase#2",
+            "lane": "workspace",
+            "steps": [
+              "world-read#1"
+            ]
+          },
+          {
+            "id": "phase#3:actor#4",
+            "phase": "phase#3",
+            "lane": "actor#4",
+            "steps": [
+              "ask#7"
+            ]
+          },
+          {
+            "id": "phase#3:actor#5",
+            "phase": "phase#3",
+            "lane": "actor#5",
+            "steps": [
+              "ask#8"
+            ]
+          },
+          {
+            "id": "phase#3:actor#6",
+            "phase": "phase#3",
+            "lane": "actor#6",
+            "steps": [
+              "ask#9"
+            ]
+          },
+          {
+            "id": "phase#3:workspace",
+            "phase": "phase#3",
+            "lane": "workspace",
+            "steps": [
+              "world-read#2"
+            ]
+          },
+          {
+            "id": "phase#4:actor#7",
+            "phase": "phase#4",
+            "lane": "actor#7",
+            "steps": [
+              "ask#10",
+              "ask#11",
+              "ask#12"
+            ]
+          },
+          {
+            "id": "phase#4:workspace",
+            "phase": "phase#4",
+            "lane": "workspace",
+            "steps": [
+              "world-read#3",
+              "world-read#4"
+            ]
+          },
+          {
+            "id": "phase#5:actor#8",
+            "phase": "phase#5",
+            "lane": "actor#8",
+            "steps": [
+              "ask#13",
+              "ask#15",
+              "ask#16"
+            ]
+          },
+          {
+            "id": "phase#5:workspace",
+            "phase": "phase#5",
+            "lane": "workspace",
+            "steps": [
+              "world-read#5",
+              "world-read#6",
+              "world-read#7"
+            ]
+          },
+          {
+            "id": "phase#5:actor#9",
+            "phase": "phase#5",
+            "lane": "actor#9",
+            "steps": [
+              "ask#18"
+            ]
+          },
+          {
+            "id": "phase#5:actor#7",
+            "phase": "phase#5",
+            "lane": "actor#7",
+            "steps": [
+              "ask#14",
+              "ask#17",
+              "ask#19"
+            ]
+          }
+        ],
+        "handoffs": [
+          {
+            "from": "phase#1:actor#1",
+            "to": "phase#1:actor#2"
+          },
+          {
+            "from": "phase#1:actor#2",
+            "to": "phase#1:actor#1",
+            "types": [
+              "SpecReview"
+            ]
+          },
+          {
+            "from": "phase#2:actor#3",
+            "to": "phase#2:workspace"
+          },
+          {
+            "from": "phase#2:workspace",
+            "to": "phase#2:actor#3",
+            "types": [
+              "WorldRunResult"
+            ]
+          },
+          {
+            "from": "phase#3:actor#4",
+            "to": "phase#3:workspace"
+          },
+          {
+            "from": "phase#3:actor#5",
+            "to": "phase#3:workspace"
+          },
+          {
+            "from": "phase#3:actor#6",
+            "to": "phase#3:workspace"
+          },
+          {
+            "from": "phase#4:actor#7",
+            "to": "phase#4:workspace"
+          },
+          {
+            "from": "phase#4:workspace",
+            "to": "phase#4:actor#7",
+            "types": [
+              "WorldRunResult"
+            ]
+          },
+          {
+            "from": "phase#5:actor#8",
+            "to": "phase#5:workspace"
+          },
+          {
+            "from": "phase#5:workspace",
+            "to": "phase#5:actor#8"
+          },
+          {
+            "from": "phase#5:workspace",
+            "to": "phase#5:actor#9",
+            "types": [
+              "string"
+            ]
+          },
+          {
+            "from": "phase#5:actor#9",
+            "to": "phase#5:actor#7",
+            "types": [
+              "ReadFeedback"
+            ]
+          },
+          {
+            "from": "phase#5:actor#7",
+            "to": "phase#5:workspace"
+          }
+        ],
+        "phases": [
+          {
+            "id": "phase#1",
+            "name": "设计整体架构与规则口径",
+            "line": 174,
+            "column": 1
+          },
+          {
+            "id": "phase#2",
+            "name": "实现规则引擎并通过单元测试",
+            "line": 204,
+            "column": 1
+          },
+          {
+            "id": "phase#3",
+            "name": "并行开发 AI、服务器与网页客户端",
+            "line": 242,
+            "column": 1
+          },
+          {
+            "id": "phase#4",
+            "name": "集成联调并跑通冒烟测试",
+            "line": 261,
+            "column": 1
+          },
+          {
+            "id": "phase#5",
+            "name": "独立验收并完善使用说明",
+            "line": 292,
+            "column": 1
+          }
+        ],
+        "phaseEdges": [
+          {
+            "from": "phase#1",
+            "to": "phase#2"
+          },
+          {
+            "from": "phase#2",
+            "to": "phase#3"
+          },
+          {
+            "from": "phase#3",
+            "to": "phase#4"
+          },
+          {
+            "from": "phase#4",
+            "to": "phase#5"
+          }
+        ],
+        "exits": [
+          "phase#2",
+          "phase#5"
+        ],
+        "sink": [
+          "ask#16"
+        ]
+      }
+    },
+    "startedAt": 1788939593380,
+    "endedAt": 1788942289809
+  },
+  {
+    "rowId": 15,
+    "turnId": "turn-1",
+    "productTurnId": "turn-1",
+    "visibility": "visible",
+    "createdAt": 1788939763859,
+    "createdAtSeq": 40,
+    "kind": "assistantText",
+    "assistantResponseId": "msg_mttsjo2b_44069414-38bb-448f-bdce-bd9b4a9302f3",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  },
+  {
+    "rowId": 16,
+    "turnId": "turn-2",
+    "productTurnId": "turn-2",
+    "visibility": "visible",
+    "createdAt": 1788942289809,
+    "createdAtSeq": 45,
+    "kind": "turnHeader",
+    "origin": "backgroundResult",
+    "executionKind": "agent",
+    "historyRoundCount": 1,
+    "state": "completedSuccess",
+    "startedAt": 1788942289809,
+    "endedAt": 1788942303127,
+    "activeMs": 13318,
+    "originMeta": {
+      "backgroundSource": "workflow",
+      "workId": "run-completed",
+      "title": "军棋游戏:人机对战 + 双人联网",
+      "workflowNotification": {
+        "kind": "terminal",
+        "status": "completed",
+        "summary": "军棋游戏:人机对战 + 双人联网",
+        "artifacts": [
+          {
+            "id": "progress",
+            "kind": "board",
+            "title": "军棋项目进度看板",
+            "version": 1
+          },
+          {
+            "id": "report",
+            "kind": "markdown",
+            "title": "军棋项目交付报告",
+            "version": 1,
+            "contentType": "text/markdown"
+          },
+          {
+            "id": "readme",
+            "kind": "file",
+            "title": "军棋游戏 · 启动与玩法说明",
+            "version": 1,
+            "contentType": "text/markdown"
+          }
+        ],
+        "durationMs": 2525893
+      }
+    }
+  },
+  {
+    "rowId": 18,
+    "turnId": "turn-2",
+    "productTurnId": "turn-2",
+    "visibility": "visible",
+    "createdAt": 1788942290585,
+    "createdAtSeq": 49,
+    "kind": "assistantText",
+    "assistantResponseId": "msg_mttu1tp5_d855feed-ed55-41e3-8d73-17623f15269b",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  },
+  {
+    "rowId": 19,
+    "turnId": "turn-3",
+    "productTurnId": "turn-3",
+    "visibility": "visible",
+    "createdAt": 1789035744197,
+    "createdAtSeq": 54,
+    "kind": "turnHeader",
+    "origin": "userInput",
+    "executionKind": "agent",
+    "sourceCommandId": "fixture-id-4",
+    "historyRoundCount": 1,
+    "state": "completedSuccess",
+    "startedAt": 1789035744197,
+    "endedAt": 1789035762244,
+    "activeMs": 18047
+  },
+  {
+    "rowId": 20,
+    "turnId": "turn-3",
+    "productTurnId": "turn-3",
+    "visibility": "visible",
+    "createdAt": 1789035744197,
+    "createdAtSeq": 54,
+    "kind": "userInput",
+    "text": "USER_QUERY",
+    "origin": "realUser",
+    "sourceCommandId": "fixture-id-4",
+    "rootSourceCommandId": "fixture-id-4",
+    "clientId": "fixture-id-5"
+  },
+  {
+    "rowId": 22,
+    "turnId": "turn-3",
+    "productTurnId": "turn-3",
+    "visibility": "visible",
+    "createdAt": 1789035744211,
+    "createdAtSeq": 58,
+    "kind": "assistantText",
+    "assistantResponseId": "msg_mtvdouz6_161903b8-1050-424a-a557-0bff3f6fc13d",
+    "text": "ASSISTANT_FINAL",
+    "state": "complete"
+  }
+]

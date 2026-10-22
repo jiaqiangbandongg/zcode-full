@@ -179,24 +179,8 @@ async function executeBashHandler(
   const progressTiming: BashProgressTiming = {};
   const commandTelemetry = startBashCommandTelemetry(parsed, context);
   const runOptions = createExecutionRunOptions(context, progressTiming, commandTelemetry);
-  // 后台命令完成后 runTaskNotificationBatch 会另起一轮通知 turn，该 turn 不带
-  // turnExecutionModel，闲时 turn 结束/失败后就会落到用户自己的套餐上跑完整 agent loop。
-  // 与 subagent runner 的 BACKGROUND_UNAVAILABLE 对称：闲时 turn 拒绝显式后台，也关闭超时自动转后台。
-  const backgroundDisabled = context.offPeakTurn === true;
-  if (parsed.run_in_background && backgroundDisabled) {
-    throw createCoreError(
-      CoreErrorType.ToolExecutionFailed,
-      "Idle-time tasks do not support background commands. Run this command in the foreground without run_in_background.",
-      {
-        context: {
-          toolCallId: context.toolCallId,
-          toolName: "Bash",
-        },
-        recoverable: true,
-      },
-    );
-  }
-  const eligibleForAutoBackground = !backgroundDisabled && isBashAutoBackgroundEligible(parsed);
+  // 闲时后台归属由 Runtime 生命周期保留，Bash 复用普通显式/超时后台路径。
+  const eligibleForAutoBackground = isBashAutoBackgroundEligible(parsed);
   const backgroundLifecyclePort = supportsBashBackgroundLifecycle(executionPort)
     ? executionPort
     : undefined;

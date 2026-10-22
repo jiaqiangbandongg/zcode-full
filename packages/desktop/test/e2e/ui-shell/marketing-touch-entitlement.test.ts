@@ -1,5 +1,5 @@
+import { BUILTIN_MODEL_PROVIDER_IDS, encodeCustomModelValue } from "@zcode/shared";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
   TID_CHAT_MODEL_SELECT_TRIGGER,
@@ -11,9 +11,8 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_SUBAGENT_ROW,
   TID_TASK_SETTINGS_BUTTON,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   waitForDefaultWorkspaceReady,

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-first-submit-visibility",
+  "spec": "./test/e2e/conversation-session/conversation-session-first-submit-visibility.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-first-submit-visibility.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "first-submit-visibility-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "后台标题不参与首发时序，只提供稳定回复，避免未匹配请求重试干扰后续用例。"
+    },
+    {
+      "id": "first-submit-visibility",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证首发 UI 提交顺序，模型回复只用于完成真实发送路径。"
+    }
+  ]
+}

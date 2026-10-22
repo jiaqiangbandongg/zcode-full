@@ -64,6 +64,7 @@ interface Stub {
   /** 模拟 record.updatedAt：每条活动事件都会 bump，摘要因此条条有变化。 */
   lastActivityAt?: number;
   drafts?: Set<string>;
+  executeCommand?: ConstructorParameters<typeof ConversationV4Gateway>[0]["executeCommand"];
   loadPersistedEvents?: (sessionId: string) => Promise<{
     events: SessionEvent[];
     synthesized: boolean;
@@ -85,7 +86,7 @@ function makeGateway(stub: Stub, opts: { withIndexHooks: boolean }) {
         }
         stub.frames.push(wire.frame);
       },
-      executeCommand: async () => undefined,
+      executeCommand: (...args) => stub.executeCommand?.(...args) ?? Promise.resolve(undefined),
       loadPersistedEvents: async (sessionId) =>
         stub.loadPersistedEvents?.(sessionId) ?? { events: [], synthesized: false },
       ...(opts.withIndexHooks
@@ -121,6 +122,76 @@ function indexFrames(stub: Stub): SessionsIndexTopicFrame[] {
 }
 
 describe("ConversationV4Gateway sessions-index 集成", () => {
+  it.each(["sendText", "createSession"] as const)(
+    "FSV01：%s 首发提升后不等待下一条 runtime 事件发布摘要",
+    async (type) => {
+      const stub: Stub = {
+        frames: [],
+        sessions: new Set(["live-1"]),
+        sessionWorkspace: new Map([["live-1", "ws-1"]]),
+        stored: [],
+        drafts: new Set(["live-1"]),
+      };
+      const gateway = makeGateway(stub, { withIndexHooks: true });
+      gateway.ingest(
+        "live-1",
+        event("live-1", 1, SessionEventType.SessionCreated, {
+          mode: "default",
+          contextWindow: 200_000,
+        }),
+      );
+      await gateway.subscribeSessionsIndex({
+        topic: "sessions-index/ws-1",
+        connectionId: "desktop",
+        clientMode: "desktop-continuous",
+      });
+      gateway.ingest(
+        "live-1",
+        event("live-1", 2, SessionEventType.SessionTitleUpdated, {
+          previousTitle: "",
+          source: "first_input",
+          title: "first",
+        }),
+      );
+      expect(indexFrames(stub)).toHaveLength(0);
+      stub.executeCommand = async () => {
+        stub.drafts!.delete("live-1");
+        return type === "createSession"
+          ? { type: "createSession", sessionId: "live-1" }
+          : { type: "inputAccepted", inputId: "first", delivery: "startNow" };
+      };
+      const command = {
+        commandId: "first",
+        clientId: "client",
+        sessionId: type === "createSession" ? null : "live-1",
+        type,
+        payload:
+          type === "createSession"
+            ? { workspaceId: "ws-1", firstInput: { text: "first" } }
+            : { text: "first" },
+        issuedAt: 1,
+      };
+      const ack = await gateway.handleCommand(command);
+      expect(ack.status).toBe("accepted");
+      expect(indexFrames(stub)).toMatchObject([
+        {
+          payload: {
+            kind: "deltas",
+            deltas: [
+              {
+                op: "session.upserted",
+                session: { sessionId: "live-1", title: "first", phase: "draft" },
+              },
+            ],
+          },
+        },
+      ]);
+      await gateway.handleCommand(command);
+      expect(indexFrames(stub)).toHaveLength(1);
+      gateway.dispose();
+    },
+  );
+
   it("saturated mobile index subscriber does not block desktop and drains only itself", async () => {
     const stub: Stub = {
       frames: [],
@@ -637,7 +708,6 @@ describe("ConversationV4Gateway sessions-index 集成", () => {
       }),
     );
     const emitted = indexFrames(stub).slice(before);
-    expect(emitted.length).toBeGreaterThan(0);
     const deltaFrame = emitted.find((f) => f.payload.kind === "deltas");
     expect(deltaFrame).toBeDefined();
     if (deltaFrame?.payload.kind === "deltas") {
@@ -697,7 +767,7 @@ describe("ConversationV4Gateway sessions-index 集成", () => {
     expect(emitted.length).toBe(1);
   });
 
-  it("disposeSession → session.removed 增量帧", async () => {
+  it("关闭运行实例不发删除事件，列表仍保留持久化会话", async () => {
     const stub: Stub = {
       frames: [],
       sessions: new Set(["live-1"]),
@@ -719,6 +789,40 @@ describe("ConversationV4Gateway sessions-index 集成", () => {
     });
     const before = indexFrames(stub).length;
     gateway.disposeSession("live-1");
+    expect(indexFrames(stub).slice(before)).toEqual([]);
+    const next = await gateway.subscribeSessionsIndex({
+      topic: "sessions-index/ws-1",
+      connectionId: "conn-2",
+      clientMode: "web-remote-replayable",
+    });
+    expect(next.initialFrame?.payload).toMatchObject({
+      kind: "snapshot",
+      snapshot: { sessions: [expect.objectContaining({ sessionId: "live-1" })] },
+    });
+  });
+
+  it("disposeSession → session.removed 增量帧", async () => {
+    const stub: Stub = {
+      frames: [],
+      sessions: new Set(["live-1"]),
+      sessionWorkspace: new Map([["live-1", "ws-1"]]),
+      stored: [],
+    };
+    const gateway = makeGateway(stub, { withIndexHooks: true });
+    gateway.ingest(
+      "live-1",
+      event("live-1", 1, SessionEventType.SessionCreated, {
+        mode: "default",
+        contextWindow: 200_000,
+      }),
+    );
+    await gateway.subscribeSessionsIndex({
+      topic: "sessions-index/ws-1",
+      connectionId: "conn-1",
+      clientMode: "desktop-continuous",
+    });
+    const before = indexFrames(stub).length;
+    gateway.disposeSession("live-1", { deleted: true });
     const emitted = indexFrames(stub).slice(before);
     const removed = emitted.find(
       (f) =>
@@ -755,7 +859,7 @@ describe("ConversationV4Gateway sessions-index 集成", () => {
 
     // disposeSession 的删除必须更新无订阅者 publisher；否则已有 publisher 会把已删除会话
     // 带进下一次 snapshot，造成任务复活。
-    gateway.disposeSession("live-1");
+    gateway.disposeSession("live-1", { deleted: true });
 
     const second = await gateway.subscribeSessionsIndex({
       topic: "sessions-index/ws-1",
@@ -877,6 +981,43 @@ describe("ConversationV4Gateway sessions-index 集成", () => {
   });
 });
 
+describe("sessions-index reconciliation", () => {
+  it("validates and delegates a bounded read without creating a conversation runtime", async () => {
+    let received: unknown;
+    const gateway = new ConversationV4Gateway({
+      sessionExists: () => false,
+      emitWireFrame: () => {},
+      executeCommand: (...args) => stub.executeCommand?.(...args) ?? Promise.resolve(undefined),
+      reconcileSessions: async (params) => {
+        received = params;
+        return {
+          sessions: [
+            {
+              sessionId: "deleted",
+              exists: true,
+              deleted: true,
+              title: "removed",
+              titleSource: "custom",
+              createdAt: 1,
+              updatedAt: 2,
+              lastOutcome: "error",
+            },
+            { sessionId: "missing", exists: false, deleted: false },
+          ],
+        };
+      },
+    });
+    expect(
+      await gateway.reconcileSessions({ workspaceId: "/w", sessionIds: ["deleted", "missing"] }),
+    ).toMatchObject({ sessions: [{ deleted: true }, { exists: false }] });
+    expect(received).toEqual({ workspaceId: "/w", sessionIds: ["deleted", "missing"] });
+    await expect(
+      gateway.reconcileSessions({ workspaceId: "/w", sessionIds: Array(257).fill("s") }),
+    ).rejects.toThrow();
+    gateway.dispose();
+  });
+});
+
 // ── 工作流进度事件的 fan-out 节流（14-sessions-index「事件 fan-out 节奏」）──
 // 现场事故：一次 run 在 8s 内发出 4000 条 DynamicWorkflowRunProgress，每条都 bump
 // record.updatedAt，旧实现于是条条 flush 一帧 sessions-index 增量 → 宿主重算 task 行 →
@@ -889,7 +1030,11 @@ describe("ConversationV4Gateway sessions-index 工作流进度节流", () => {
   const WINDOW_MS = 250;
   const RUN_ID = "dwfrun-1";
 
-  function progress(seq: number, eventType: string, payload: Record<string, unknown>): SessionEvent {
+  function progress(
+    seq: number,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): SessionEvent {
     return event("live-1", seq, SessionEventType.DynamicWorkflowRunProgress, {
       runId: RUN_ID,
       toolCallId: "tc-1",

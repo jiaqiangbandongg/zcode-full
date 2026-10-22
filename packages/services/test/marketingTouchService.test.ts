@@ -132,10 +132,4 @@ describe("MarketingTouchService boot request sequence", () => {
     await f.service.query({ locale: "en-US" });
     expect(sequences(f)).toEqual(["0", null, "1"]);
   });
-
-  it("starts at zero in a freshly initialized process module", async () => {
-    const f = fixture(createService);
-    await f.service.query({ locale: "en-US" });
-    expect(sequences(f)).toEqual(["0"]);
-  });
 });

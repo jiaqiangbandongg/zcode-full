@@ -105,9 +105,8 @@ export function useResponsiveBrowserViewportControl({
     wasResponsiveModeForZoomRef.current = isResponsiveMode;
     lastDesktopZoomFactorRef.current = desktopZoomFactor;
     if (!isResponsiveMode || !wasResponsiveMode || !zoomChanged) return;
-    // Electron 放大 Desktop page zoom 后，guest native raster 仍按缩放前的
-    // backing 尺寸输出。zoom 每次变化都重发同一 viewport，让 main 从可信
-    // BrowserWindow 读取当前 zoom factor 并重放 metrics；不把 zoom 写入 Agent viewport 状态。
+    // Electron 会把新的 Desktop page zoom 传播到 guest，时机可能晚于 React effect。
+    // zoom 每次变化都重发同一 viewport，让 main 在串行边界再次把 guest zoom 归一为 1。
     updateControlledViewport(responsiveViewportSize);
   }, [desktopZoomFactor, isResponsiveMode, responsiveViewportSize, updateControlledViewport]);
 
@@ -126,22 +125,11 @@ export function useResponsiveBrowserViewportControl({
         responsiveViewportSizeRef.current = { ...payload.viewport };
         setResponsiveViewportSize({ ...payload.viewport });
         applyResponsiveMode(true);
-        // Agent 创建/设置 viewport 的 main 路径不经过 renderer IPC；只在当前窗口
-        // 处于放大档位时回送一次，让 main 补入可信 zoom factor。默认/缩小不需要回声。
-        if (desktopZoomFactor > 1) updateControlledViewport(payload.viewport);
         return;
       }
       applyResponsiveMode(false);
     });
-  }, [
-    applyResponsiveMode,
-    browserKey,
-    desktopZoomFactor,
-    onAgentViewportChange,
-    platform,
-    sessionId,
-    updateControlledViewport,
-  ]);
+  }, [applyResponsiveMode, browserKey, onAgentViewportChange, platform, sessionId]);
 
   const toggleResponsiveMode = useCallback(() => {
     onViewportResize();

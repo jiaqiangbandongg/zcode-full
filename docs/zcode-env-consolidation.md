@@ -13,7 +13,8 @@
 - `test`：测试环境，使用测试 API / OAuth endpoint，允许展示测试专用菜单。
 - `production`：正式环境，使用正式 API / OAuth endpoint，隐藏测试专用菜单。
 
-本地开发不是产品环境。未显式设置 `ZCODE_ENV` 时默认按 `test` 运行；本地调试能力
+本地开发不是产品环境。通用构建器未显式设置 `ZCODE_ENV` 时默认按 `test` 运行；
+桌面默认启动和远程初始化入口显式选择 production，具体规则见下文。本地调试能力
 由运行形态判断，例如 Electron 是否 packaged、Vite dev mode 或专用 debug 开关。
 
 ## 配置规则
@@ -63,6 +64,9 @@ renderer、host/service 和 agent 里的 ZCode API、远控链接、zcode-plan O
 - `pnpm dev:desktop` 默认等同于 `pnpm dev:desktop:prod`。
 - `pnpm dev:desktop:test` 显式注入 `ZCODE_ENV=test`。
 - `pnpm dev:desktop:prod` 显式注入 `ZCODE_ENV=production`。
+- `pnpm bootstrap:with-remote` 在 `ZCODE_ENV` 未设置或空白时向全部构建子进程注入
+  `production`；显式 `test|production` 保留，非法值在任何初始化动作前拒绝。
+  测试环境产物应搭配 `pnpm dev:desktop:test`，详见 [Bootstrap 命令](bootstrap.md)。
 - CI 未传 `ZCODE_ENV` 时默认 `production`。
 - CI 只接受 `ZCODE_ENV=test|production`，不再读取
   `ZCODE_DESKTOP_BUILD_ENV*` 或 `ZCODE_API_ENV`。

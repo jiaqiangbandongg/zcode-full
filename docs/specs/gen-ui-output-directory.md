@@ -31,9 +31,25 @@ Gen UI 初始化抛错，并连带阻断依赖同一上下文初始化的技能�
 
 另一处误解是把生成目录分组当作读取隔离，导致 fork 的消息保留父会话路径后无法展示。
 
-本次移除工作区包含关系限制及跨 session/workspace 文件读取限制，不修改 skill、
-固定根目录选择、fork 复制规则或远程服务路由。桌面 continuous 与手机 replayable 链路保持原有
-边界；HTML 仍由执行端 Host 读取，widget state 仍属于桌面宿主。
+移除工作区包含关系限制及跨 session/workspace 文件读取限制，不修改 skill、
+固定根目录选择或 fork 复制规则。
+
+SSH / WSL / Docker / Server 的 HTML 读取必须经过远端 `gen-ui` RPC 通道。
+Desktop Host 的转发注册与 RPC 合同必须包含该通道；legacy mixed services 合并时也必须
+显式选用远端 `genUiService`，不能因展开本机 services 而拿本机输出根目录校验远端路径。
+读取失败原样返回，不回落到本机读取，也不删除输出根目录校验。
+
+```text
+Gen UI 卡片 → workspace services → Desktop Host 转发 → Source gen-ui.readDocument
+                                                         ↓
+                                              执行端输出根目录校验 / 读取
+Gen UI 卡片 → desktop base services → widget state / prepareSandbox → 桌面沙箱
+```
+
+workspace identity、session ID 和文件路径沿用原请求；不增加缓存、重试或文件复制。
+桌面 continuous 与手机 replayable 链路保持原有边界。手机没有 Gen UI sandbox 时继续显示
+既有桌面专用提示；不扩展手机 RPC allowlist。HTML 仍由执行端 Host 读取，widget state
+仍属于桌面宿主。
 
 ## 回归验证
 
@@ -44,3 +60,8 @@ Gen UI 初始化抛错，并连带阻断依赖同一上下文初始化的技能�
 - 现有 Electron Gen UI E2E 将工作区设为输出根目录的祖先，验证真实文件读取、
   渲染和页面交互；切换会话时引用同一个父会话文件，验证 fork 历史的加载语义。
   这是远程身份的本地夹具，不代表真实 SSH 传输或完整 fork 命令验证。
+- 远程服务回归通过 Source → Desktop Host → Renderer 两段真实 RPC，覆盖 SSH / WSL /
+  Docker / Server、legacy 合并、原始身份透传和读取错误透传；手机通道仍拒绝 Gen UI。
+- Electron 夹具使用不同的本机与执行端输出根目录，并使用生产 Renderer 服务合并函数。
+  验证远端 HTML 渲染、跨会话重挂载、widget state 保存在桌面，以及无 sandbox 的手机提示。
+  该夹具验证服务路由和真实 Electron 沙箱，不代替真实 SSH 网络或跨操作系统实机验证。

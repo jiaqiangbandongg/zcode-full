@@ -45,6 +45,19 @@ ready Android target, then start a GUI Android Emulator only when no target is
 ready. P0 does not expose a user-configurable UI backend; UI automation uses
 Android SDK `adb` and UI Automator commands.
 
+## Marketplace classification
+
+The catalog's optional `publisherType` (`official` or `community`) describes who
+maintains a plugin within the ZCode marketplace. It does not grant trust or
+change installation identity, paths, or user/workspace configuration. Personal
+marketplaces remain personal regardless of their self-declared publisher type.
+
+Catalog `componentTypes` may advertise `ui` before installation. Installed UI
+capability comes from validated manifest `ui.surfaces`, including when disabled;
+`plugins/listUiSurfaces` continues to return only enabled entries. Store listing
+`category` remains the independent usage category. See the market interaction
+spec in the root `docs/plugins/` directory for presentation and scope semantics.
+
 ## Storage Layout
 
 ZCode stores plugin state under the CLI storage root:

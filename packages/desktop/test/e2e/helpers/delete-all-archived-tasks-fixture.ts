@@ -2,10 +2,10 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { seedTaskIndexRowAuthorityFixture } from "./task-list-row-authority-fixture.js";
 
-export function seedDeleteAllArchivedTasksFixture(
+export async function seedDeleteAllArchivedTasksFixture(
   options: Parameters<typeof seedTaskIndexRowAuthorityFixture>[0],
-): void {
-  seedTaskIndexRowAuthorityFixture(options);
+): Promise<void> {
+  await seedTaskIndexRowAuthorityFixture(options);
   // Node 的 SQLite 只有同步接口；在隔离 HOME、Host 启动前准备真实列表数据。
   const database = new DatabaseSync(join(options.e2eHomeDir, ".zcode", "v2", "tasks-index.sqlite"));
   try {

@@ -1,5 +1,6 @@
 /* oxlint-disable eslint(max-lines) -- input attachment staging and preview artifact discovery share one immutable snapshot boundary. */
 import { createHash } from "node:crypto";
+import { isWorkflowShareFallbackRow } from "#src/conversation-share/conversationShareWorkflowSnapshot.js";
 
 import {
   buildConversationPreviewArtifactCandidates,
@@ -183,7 +184,8 @@ async function discoverPreviewArtifacts(options: {
   }
   const assistantTextByProductTurnId = new Map<string, string[]>();
   for (const row of options.selectedRows) {
-    if (row.kind !== "assistantText" || !row.productTurnId) continue;
+    if (row.kind !== "assistantText" || !row.productTurnId || isWorkflowShareFallbackRow(row))
+      continue;
     const texts = assistantTextByProductTurnId.get(row.productTurnId) ?? [];
     texts.push(row.text);
     assistantTextByProductTurnId.set(row.productTurnId, texts);

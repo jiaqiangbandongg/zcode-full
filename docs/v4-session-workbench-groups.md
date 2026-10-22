@@ -1,9 +1,8 @@
 # v4 Session Workbench Groups
 
-状态：**已实现，2026-07-17 再次确认产品边界**。Task 列表向对话区边缘拖拽
-仍是正式分屏入口，支持跨 workspace 组合和 renderer-local group 恢复；
-2026-07-13 只下线 pane chrome 上的显式“向右拆分 / 向下拆分”按钮，不代表
-workbench 整体退役。
+状态：**创建入口已全部下线（2026-10-16）**。Task 列表拖到对话区边缘与右键
+「在分屏打开」不再创建或扩展 group（见 `docs/v4-split-pane-workbench.md`）；
+已有 group 仍可恢复、聚焦和关闭 pane。下文保留原设计作为现有 group 的行为合同。
 
 ## 功能摘要
 

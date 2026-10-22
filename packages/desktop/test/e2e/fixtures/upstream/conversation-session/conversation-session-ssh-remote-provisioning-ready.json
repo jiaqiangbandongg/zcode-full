@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-provisioning-ready",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-provisioning-ready.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-ssh-ready-title",
+      "description": "远端 task 标题生成固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题内容不属于本 case 语义，只需保持 task row 稳定。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_SSH_READY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-ssh-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-r3-ssh-ready-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH Remote P0\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-r3-ssh-ready-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "r3-ssh-ready-first",
+      "description": "workspace A 首发固定回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": ["E2E_R3_SSH_READY_PROMPT"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"chatcmpl-ssh-a1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-r3-ssh-ready-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_R3_SSH_READY_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-ssh-a1\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-r3-ssh-ready-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":8,\"total_tokens\":40}}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

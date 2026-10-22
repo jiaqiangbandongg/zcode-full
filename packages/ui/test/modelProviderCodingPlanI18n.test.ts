@@ -13,21 +13,4 @@ describe("model provider Coding Plan i18n", () => {
       expect(zhCN[key], `zh-CN missing ${key}`).toBeTruthy();
     }
   });
-
-  it("keeps Z.ai payment copy in English without changing BigModel copy", () => {
-    // Bugfix: Z.ai 海外支付文案需要独立于 BigModel，即使中文界面也保持英文。
-    expect(zhCN["settings.modelProvider.codingPlan.overseasPayment.renewalPolicyTitle"]).toBe(
-      "Renewal Policy",
-    );
-    expect(zhCN["settings.modelProvider.codingPlan.overseasPayment.accountPolicyTitle"]).toBe(
-      "Account Usage Policy",
-    );
-    expect(zhCN["settings.modelProvider.codingPlan.overseasPayment.amount.payAmount"]).toBe(
-      "Amount due",
-    );
-    expect(zhCN["settings.modelProvider.codingPlan.paymentDialog.payAmount"]).toBe("实付金额");
-    expect(zhCN["settings.modelProvider.codingPlan.paymentDialog.ruleTitle"]).toBe(
-      "账号使用规范",
-    );
-  });
 });

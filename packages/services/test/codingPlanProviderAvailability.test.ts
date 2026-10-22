@@ -132,10 +132,10 @@ describe("codingPlanProviderAvailability", () => {
   );
 
   describe.each(["zai", "bigmodel"] as const)("%s 个人套餐缺 Key 的分类", (family) => {
-    it.each([true, false])("有本地登录信息=%s；不能将取 Key 失败当成未连接", async (loggedIn) => {
+    it("缺少 PAT 时返回未知，且不读取本地登录信息", async () => {
       const request = vi.fn();
       const load = vi.fn(async (key: string) =>
-        key === `oauth:${family}:user_info` && loggedIn ? "local-user-info" : null,
+        key === `oauth:${family}:user_info` ? "local-user-info" : null,
       );
       await expect(
         validateCodingPlanProviderAvailability(

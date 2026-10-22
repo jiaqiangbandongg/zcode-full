@@ -8,6 +8,7 @@ import type {
 import type { IUsageStatsService } from "@zcode/services";
 import { useOptionalBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useStableAccountAccess } from "@/hooks/useStableAccountAccess.js";
+import { useZCodeStoreWithDefault } from "@/store/StoreProvider.js";
 import { logger } from "@/logger.js";
 import {
   readCachedUsageEntitlementSnapshot,
@@ -160,7 +161,6 @@ export function useUsageEntitlementWithService(
   const latestSnapshotRef = useRef<UsageEntitlementSnapshot | null>(null);
   // Web/SSR 场景可能只渲染侧栏或设置入口，没有挂载 ServiceProvider。
   // 这里降级为空快照，避免 Usage banner 因服务上下文缺失阻断整棵 UI。
-  const enabled = (options.enabled ?? true) && Boolean(usageStatsService);
   const includeSubscription = options.includeSubscription ?? false;
   const preferredProviderId = options.preferredProviderId;
   // Provider Settings schema 每次解析会产生等值新对象，不能因引用变化重启权益请求。
@@ -168,7 +168,17 @@ export function useUsageEntitlementWithService(
   const allowDisabledPreferredProvider = options.allowDisabledPreferredProvider === true;
   const requirePreferredProvider = options.requirePreferredProvider === true;
   const allowEnvApiKey = options.allowEnvApiKey;
-  const cacheKey = options.cacheKey?.trim() ?? "";
+  const authScope = useZCodeStoreWithDefault(
+    (store) => (store.user ? `${store.user.id}:${store.authSessionSeq}` : "signed-out"),
+    "unscoped",
+  );
+  const enabled =
+    (options.enabled ?? true) && Boolean(usageStatsService) && authScope !== "signed-out";
+  const suppliedCacheKey = options.cacheKey?.trim() ?? "";
+  const freshnessCacheKey =
+    authScope === "unscoped" ? suppliedCacheKey : `${suppliedCacheKey}:auth:${authScope}`;
+  // 保留空 cacheKey 的不落盘合同；账号隔离仍适用于共享请求和快照。
+  const cacheKey = suppliedCacheKey ? freshnessCacheKey : "";
   const refreshOnMount = options.refreshOnMount ?? false;
   const mountRefreshReason = options.mountRefreshReason ?? "initial";
   const requestOptions = useMemo(
@@ -193,15 +203,26 @@ export function useUsageEntitlementWithService(
   const freshnessKey = useMemo(
     () =>
       buildEntitlementFreshnessKey({
-        cacheKey,
+        cacheKey: freshnessCacheKey,
         options: requestOptions,
       }),
-    [cacheKey, requestOptions],
+    [freshnessCacheKey, requestOptions],
   );
+
+  // 原因：effect 清理之前也可能收到旧回包；请求归属必须跟随渲染时的服务、身份和 enabled。
+  const requestScope = useMemo(() => ({}), [usageStatsService, enabled, freshnessKey]);
+  const currentRequestScope = useRef<object | null>(requestScope);
+  currentRequestScope.current = requestScope;
+  useEffect(() => {
+    currentRequestScope.current = requestScope;
+    return () => {
+      if (currentRequestScope.current === requestScope) currentRequestScope.current = null;
+    };
+  }, [requestScope]);
 
   const refresh = useCallback(
     async (refreshOptions: UsageEntitlementRefreshOptions = {}) => {
-      if (!enabled || !usageStatsService) {
+      if (!enabled || !usageStatsService || currentRequestScope.current !== requestScope) {
         return;
       }
       const reason = refreshOptions.reason ?? "manual";
@@ -301,7 +322,11 @@ export function useUsageEntitlementWithService(
               ? { ...requestOptions, invalidateBalanceCache: true }
               : requestOptions,
         });
-        if (requestVersionRef.current !== requestVersion || !sharedRequest.isCurrent()) {
+        if (
+          currentRequestScope.current !== requestScope ||
+          requestVersionRef.current !== requestVersion ||
+          !sharedRequest.isCurrent()
+        ) {
           return;
         }
         publishSharedEntitlementSnapshot({
@@ -326,7 +351,11 @@ export function useUsageEntitlementWithService(
         });
         writeCachedUsageEntitlementSnapshot({ cacheKey, snapshot });
       } catch (error) {
-        if (requestVersionRef.current !== requestVersion || !sharedRequest.isCurrent()) {
+        if (
+          currentRequestScope.current !== requestScope ||
+          requestVersionRef.current !== requestVersion ||
+          !sharedRequest.isCurrent()
+        ) {
           return;
         }
         recordSharedEntitlementFailure({
@@ -367,7 +396,7 @@ export function useUsageEntitlementWithService(
         });
       }
     },
-    [cacheKey, enabled, freshnessKey, requestOptions, usageStatsService],
+    [cacheKey, enabled, freshnessKey, requestOptions, usageStatsService, requestScope],
   );
 
   useEffect(() => {
@@ -378,6 +407,7 @@ export function useUsageEntitlementWithService(
       usageStatsService,
       freshnessKey,
       listener: (snapshot, error) => {
+        if (currentRequestScope.current !== requestScope) return;
         latestSnapshotRef.current = snapshot;
         setState({
           snapshot,
@@ -386,7 +416,7 @@ export function useUsageEntitlementWithService(
         });
       },
     });
-  }, [enabled, freshnessKey, usageStatsService]);
+  }, [enabled, freshnessKey, usageStatsService, requestScope]);
 
   useEffect(() => {
     if (!enabled) {
@@ -450,9 +480,9 @@ export function useUsageEntitlementWithService(
   ]);
 
   return {
-    snapshot: state.snapshot,
-    loading: state.loading,
-    error: state.error,
+    snapshot: enabled && activeFreshnessKeyRef.current === freshnessKey ? state.snapshot : null,
+    loading: enabled && state.loading,
+    error: enabled && activeFreshnessKeyRef.current === freshnessKey ? state.error : null,
     refresh,
   };
 }

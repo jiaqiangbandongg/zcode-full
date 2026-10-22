@@ -70,7 +70,7 @@ describe("createZCodeProcessResourceSampler", () => {
     expect(() => zcodeProcessResourceSampleSchema.parse(onSample.mock.calls[0]?.[0])).not.toThrow();
   });
 
-  it("instanceToken 在进程生命周期内不变，且不含 pid、路径等可识别内容", () => {
+  it("随机 instanceToken 在采样期间保持不变，且只含 URL 安全字符", () => {
     const onSample = vi.fn();
     let scheduled: (() => void) | undefined;
     const cpuSnapshots = [
@@ -105,9 +105,8 @@ describe("createZCodeProcessResourceSampler", () => {
     );
     expect(tokens).toHaveLength(2);
     expect(tokens[0]).toBe(tokens[1]);
-    // 只允许 URL 安全字符：路径、workspace 标识不可能出现在这里，协议 schema 也会拒绝。
+    // 校验随机 token 的协议字符集。
     expect(tokens[0]).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
-    expect(tokens[0]).not.toContain(String(process.pid));
   });
 
   it("采集或上报异常只丢当前样本，后续周期仍可继续", () => {

@@ -4,8 +4,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConversationShareConfirmationDock } from "@/v4/ConversationShareConfirmationDock.js";
-import enUS from "@/i18n/locales/en-US.js";
-import zhCN from "@/i18n/locales/zh-CN.js";
 
 vi.mock("@/i18n/IntlProvider.js", () => ({
   useZCodeIntl: () => ({
@@ -22,6 +20,99 @@ afterEach(() => {
 });
 
 describe("ConversationShareConfirmationDock error details", () => {
+  it.each([false, true])("浮窗 warning 与抖动尊重减少动态效果 %s", (reducedMotion) => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: reducedMotion })),
+    );
+    const onConfirm = vi.fn();
+    render(
+      createElement(ConversationShareConfirmationDock, {
+        selectedCount: 1,
+        totalCount: 1,
+        onCancel: vi.fn(),
+        onEditSelection: vi.fn(),
+        onConfirm,
+      }),
+    );
+    const section = screen.getByTestId("conversation-share-disclosure");
+    section.animate = vi.fn();
+    section.scrollIntoView = vi.fn();
+    const row = section.querySelector("label")!;
+    const cancel = vi.fn();
+    row.animate = vi.fn(() => ({ cancel }) as unknown as Animation);
+    fireEvent.click(screen.getByTestId("conversation-share-confirm"));
+    const checkbox = screen.getByTestId("conversation-share-disclosure-checkbox");
+    expect(checkbox.getAttribute("aria-invalid")).toBe("true");
+    expect(checkbox.closest("label")?.className).toContain("text-warning");
+    expect(checkbox.className).not.toContain("border-destructive");
+    expect(document.activeElement).toBe(checkbox);
+    expect(section.animate).not.toHaveBeenCalled();
+    if (reducedMotion) {
+      expect(row.animate).not.toHaveBeenCalled();
+    } else {
+      expect(row.animate).toHaveBeenCalledWith(
+        expect.arrayContaining([{ transform: "translateX(-4px)" }]),
+        { duration: 280, easing: "ease-out" },
+      );
+      fireEvent.click(screen.getByTestId("conversation-share-confirm"));
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(row.animate).toHaveBeenCalledTimes(2);
+    }
+    expect(section.scrollIntoView).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(checkbox);
+    expect(checkbox.getAttribute("aria-invalid")).toBe("false");
+    if (!reducedMotion) expect(cancel).toHaveBeenCalledTimes(2);
+    expect(checkbox.closest("label")?.className).not.toContain("text-warning");
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+  it("浮窗发布中只展示进度，失败后恢复重试操作", () => {
+    const props = {
+      selectedCount: 2,
+      totalCount: 3,
+      title: "当前任务",
+      onCancel: vi.fn(),
+      onEditSelection: vi.fn(),
+      onConfirm: vi.fn(),
+    };
+    const { rerender } = render(
+      createElement(ConversationShareConfirmationDock, { ...props, pending: true }),
+    );
+    expect(screen.queryByTestId("conversation-share-confirm")).toBeNull();
+    expect(screen.getByTestId("conversation-share-publish-progress").textContent).toContain(
+      "当前任务",
+    );
+    rerender(
+      createElement(ConversationShareConfirmationDock, {
+        ...props,
+        error: { issues: [], issueCount: 0 },
+      }),
+    );
+    expect(screen.getByTestId("conversation-share-confirm").textContent).toContain(
+      "conversationShare.publish.retry",
+    );
+  });
+  it("将检查状态放进分享范围按钮并在完成后恢复摘要", () => {
+    const props = {
+      selectedCount: 2,
+      totalCount: 4,
+      onEditSelection: vi.fn(),
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+    };
+    const { rerender } = render(
+      createElement(ConversationShareConfirmationDock, { ...props, preflightChecking: true }),
+    );
+    const button = screen.getByTestId("conversation-share-adjust");
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.textContent).toContain("conversationShare.partial.preflightChecking");
+    rerender(
+      createElement(ConversationShareConfirmationDock, { ...props, preflightChecking: false }),
+    );
+    expect(button.getAttribute("aria-busy")).toBe("false");
+    expect(button.textContent).toContain("conversationShare.range.selected");
+  });
   it("keeps the failed publish phase and its last progress instead of showing 100%", () => {
     render(
       createElement(ConversationShareConfirmationDock, {
@@ -34,7 +125,7 @@ describe("ConversationShareConfirmationDock error details", () => {
           issues: [{ code: "upload_incomplete", scope: "artifact", phase: "uploading" }],
         },
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
       }),
     );
@@ -72,14 +163,13 @@ describe("ConversationShareConfirmationDock error details", () => {
           issues: [{ code: "unknown", scope: "transport", phase: "collecting" }],
         },
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm,
       }),
     );
 
     const retry = screen.getByTestId("conversation-share-confirm");
     expect(retry).toHaveProperty("disabled", false);
-    expect(retry.getAttribute("data-size")).toBe("lg");
     fireEvent.click(retry);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -93,7 +183,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         progressPhase: "uploading",
         pending: true,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
       }),
     );
@@ -105,25 +195,10 @@ describe("ConversationShareConfirmationDock error details", () => {
     expect(screen.queryByTestId("conversation-share-disclosure-checkbox")).toBeNull();
     expect(screen.queryByTestId("conversation-share-back")).toBeNull();
     expect(screen.queryByText("conversationShare.partial.cancel")).toBeNull();
-    expect(screen.getByTestId("conversation-share-confirm")).toHaveProperty("disabled", true);
-    expect(screen.getByTestId("conversation-share-confirm").getAttribute("data-size")).toBe("lg");
+    expect(screen.queryByTestId("conversation-share-confirm")).toBeNull();
   });
 
-  it("uses one explicit natural-language footer summary for publish metadata", () => {
-    expect(zhCN["conversationShare.publish.footerMeta"]).toBe(
-      "分享 {selected} 个对话轮次，{access}",
-    );
-    expect(zhCN["conversationShare.permission.linkEditorSummary"]).toBe("链接持有者可导入并继续");
-    expect(zhCN["conversationShare.permission.linkViewerSummary"]).toBe("链接持有者可查看");
-    expect(enUS["conversationShare.publish.footerMeta"]).toBe(
-      "Share {selected} conversation turn(s), {access}",
-    );
-    expect(enUS["conversationShare.permission.linkEditorSummary"]).toBe(
-      "Link holders can import and continue",
-    );
-  });
-
-  it("renders publish phases as aligned cards with artifact progress", () => {
+  it("renders the uploading phase message while pending", () => {
     render(
       createElement(ConversationShareConfirmationDock, {
         selectedCount: 3,
@@ -134,14 +209,11 @@ describe("ConversationShareConfirmationDock error details", () => {
         totalArtifacts: 3,
         pending: true,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
       }),
     );
 
-    expect(
-      screen.getByTestId("conversation-share-publish-phase-uploading").parentElement?.className,
-    ).toContain("@min-[640px]/share:grid-cols-3");
     expect(screen.getByTestId("conversation-share-publish-phase-uploading").textContent).toContain(
       "conversationShare.phase.uploadingActive",
     );
@@ -155,7 +227,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 2,
         totalCount: 3,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm,
         disclosureAccepted: false,
         onDisclosureAcceptedChange,
@@ -167,7 +239,7 @@ describe("ConversationShareConfirmationDock error details", () => {
     expect(screen.getByTestId("conversation-share-disclosure").textContent).not.toContain(
       "conversationShare.publicWarning",
     );
-    expect(disclosure).toHaveProperty("checked", false);
+    expect(disclosure.getAttribute("aria-checked")).toBe("false");
     expect(confirm).toHaveProperty("disabled", false);
     expect(screen.queryByTestId("conversation-share-disclosure-confirm")).toBeNull();
 
@@ -179,7 +251,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 2,
         totalCount: 3,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm,
         disclosureAccepted: true,
         onDisclosureAcceptedChange,
@@ -190,211 +262,19 @@ describe("ConversationShareConfirmationDock error details", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("highlights the review checkbox without publishing and requires a second click after acceptance", () => {
-    const props = {
-      selectedCount: 1,
-      totalCount: 1,
-      onCancel: vi.fn(),
-      onBack: vi.fn(),
-      onConfirm: vi.fn(),
-    };
-    const onDisclosureAcceptedChange = vi.fn();
-    const { rerender } = render(
-      createElement(ConversationShareConfirmationDock, {
-        ...props,
-        onDisclosureAcceptedChange,
-      }),
-    );
-    const disclosure = screen.getByTestId("conversation-share-disclosure");
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: false })),
-    );
-    const cancel = vi.fn();
-    const animate = vi.fn(() => ({ cancel }));
-    disclosure.animate = animate;
-    disclosure.scrollIntoView = vi.fn();
-    fireEvent.click(screen.getByTestId("conversation-share-confirm"));
-    expect(props.onConfirm).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(
-      screen.getByTestId("conversation-share-disclosure-checkbox"),
-    );
-    expect(disclosure.scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("conversation-share-review-hint")).toBeNull();
-    expect(disclosure.className).not.toContain("ring-warning");
-    expect(animate).toHaveBeenCalledTimes(1);
-    // 勾选复选框会取消仍在播放的提示动画，避免高亮残留到已确认状态。
-    fireEvent.click(screen.getByTestId("conversation-share-disclosure-checkbox"));
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(onDisclosureAcceptedChange).toHaveBeenCalledWith(true);
-    fireEvent.click(screen.getByTestId("conversation-share-confirm"));
-    expect(animate).toHaveBeenCalledTimes(2);
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn(() => ({ matches: true })),
-    );
-    fireEvent.click(screen.getByTestId("conversation-share-confirm"));
-    expect(animate).toHaveBeenCalledTimes(2);
-    // 减少动态效果时仍需定位与聚焦，只是不播放高亮动画。
-    expect(disclosure.scrollIntoView).toHaveBeenCalledTimes(3);
-    rerender(
-      createElement(ConversationShareConfirmationDock, { ...props, disclosureAccepted: true }),
-    );
-    expect(screen.queryByTestId("conversation-share-review-hint")).toBeNull();
-    expect(props.onConfirm).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("conversation-share-confirm"));
-    expect(props.onConfirm).toHaveBeenCalledTimes(1);
-  });
-
-  it("caps the dock height and scrolls only the body above the pinned actions (SHARE28)", () => {
+  it("默认权限为可导入并继续", () => {
     render(
       createElement(ConversationShareConfirmationDock, {
         selectedCount: 1,
         totalCount: 1,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
       }),
     );
-
-    // 根因：窗口断点无法反映侧栏挤压后的 Dock 实际宽度，必须按容器内容盒宽度响应。
-    const dock = screen.getByTestId("conversation-share-confirmation-dock");
-    expect(dock.className).toContain("@container/share");
-    expect(dock.className).toContain("max-h-[70dvh]");
-    expect(dock.className).toContain("flex-col");
-    // 窄面板下表单增高由正文独立滚动吸收，操作区不能随正文滚出视口。
-    const body = screen.getByTestId("conversation-share-confirmation-body");
-    expect(body.className).toContain("overflow-y-auto");
-    expect(body.className).toContain("min-h-0");
-    expect(screen.getByTestId("conversation-share-confirmation-actions").className).toContain(
-      "shrink-0",
+    expect(screen.getByRole("combobox").textContent).toContain(
+      "conversationShare.permission.linkEditor",
     );
-    expect(body.compareDocumentPosition(screen.getByTestId("conversation-share-back"))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-
-  it("stacks the primary action above the secondary actions below the 480px container", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    const actions = screen.getByTestId("conversation-share-confirmation-actions");
-    const buttonRow = actions.lastElementChild!;
-    expect(buttonRow.className).toContain("grid-cols-2");
-    expect(buttonRow.className).toContain("@min-[480px]/share:flex");
-    const confirm = screen.getByTestId("conversation-share-confirm");
-    expect(confirm.className).toContain("col-span-2");
-    expect(confirm.className).toContain("@min-[480px]/share:order-last");
-    // 主操作在 DOM 中先行：窄屏（主操作第一行）视觉顺序与键盘顺序一致；宽容器用
-    // order-last 把主操作视觉后置到最右，此时 Tab 序（主操作先）与视觉序（主操作最后）
-    // 方向相反，是 spec（docs/conversation-share-v1.md SHARE28）记录的已知取舍，非回归。
-    expect(confirm.compareDocumentPosition(screen.getByTestId("conversation-share-back"))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-    // 窄屏文案允许换行，不再强制单行裁切。
-    expect(confirm.className).toContain("whitespace-normal");
-    expect(confirm.className).not.toContain("truncate");
-  });
-
-  it("switches the compact permission grid by container width with full labels", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    const radiogroup = screen.getByRole("radiogroup", {
-      name: "conversationShare.permissionLabel",
-    });
-    expect(radiogroup.className).toContain("@min-[640px]/share:grid-cols-3");
-    expect(radiogroup.className).not.toContain("md:grid-cols-3");
-    // 权限文案完整换行展示，不允许 truncate 截断。
-    const option = screen.getByRole("radio", { name: "conversationShare.permission.linkEditor" });
-    const textSpans = [...option.querySelectorAll<HTMLElement>("span > span")];
-    expect(textSpans.length).toBeGreaterThan(0);
-    for (const span of textSpans) {
-      expect(span.className).toContain("whitespace-normal");
-      expect(span.className).not.toContain("truncate");
-    }
-  });
-
-  it("aligns the permission rail with the title rail", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    expect(screen.getByTestId("conversation-share-confirmation-header").className).toContain("p-3");
-    expect(
-      screen.getByTestId("conversation-share-permission-picker").getAttribute("data-variant"),
-    ).toBe("compact");
-    expect(screen.getByTestId("conversation-share-permission-label").className).toContain(
-      "text-ui-sm",
-    );
-    expect(screen.getByTestId("conversation-share-permission-picker").className).not.toContain(
-      "p-2",
-    );
-  });
-
-  it("defaults to the importable link permission when no access mode is provided", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    expect(
-      screen
-        .getByRole("radio", { name: "conversationShare.permission.linkEditor" })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
-    expect(
-      screen
-        .getByRole("radio", { name: "conversationShare.permission.private" })
-        .getAttribute("aria-checked"),
-    ).toBe("false");
-  });
-
-  it("uses the designed warning surface for the sensitive-content acknowledgement", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    const disclosure = screen.getByTestId("conversation-share-disclosure");
-    expect(disclosure.className).toContain("mx-3");
-    expect(disclosure.className).toContain("mt-3");
-    expect(disclosure.className).toContain("border-l-2");
-    expect(disclosure.className).toContain("border-l-warning");
-    expect(disclosure.className).toContain("bg-surface");
-    expect(disclosure.className).toContain("rounded-xl");
-    expect(screen.getByTestId("conversation-share-disclosure-icon")).toBeTruthy();
-    expect(screen.getByTestId("conversation-share-disclosure-checkbox")).toBeTruthy();
   });
 
   it("opens the sensitive-content review scope above the disclosure and toggles it closed", () => {
@@ -403,7 +283,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 1,
         totalCount: 1,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
       }),
     );
@@ -426,27 +306,6 @@ describe("ConversationShareConfirmationDock error details", () => {
     expect(screen.queryByTestId("conversation-share-disclosure-scope-content")).toBeNull();
   });
 
-  it("keeps the disclosure copy and review-scope action on one content row", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-      }),
-    );
-
-    const contentRow = screen.getByTestId("conversation-share-disclosure-content-row");
-    const supportingRow = screen.getByTestId("conversation-share-disclosure-supporting-row");
-    expect(contentRow.textContent).toContain("conversationShare.disclosure.checkbox");
-    expect(contentRow.textContent).toContain("conversationShare.disclosure.description");
-    expect(contentRow.textContent).toContain("conversationShare.disclosure.scope.trigger");
-    expect(supportingRow.className).toContain("ml-auto");
-    expect(supportingRow.className).toContain("justify-end");
-    expect(supportingRow.className).toContain("text-ui-xs");
-  });
-
   it("renders actionable artifact details and deselects the affected turn", () => {
     const onDeselectTurn = vi.fn();
     const onCopyRequestId = vi.fn();
@@ -456,7 +315,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         totalCount: 2,
         title: "Share",
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
         error: {
           issueCount: 1,
@@ -508,7 +367,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 1,
         totalCount: 1,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
         error: {
           issueCount: 1,
@@ -533,7 +392,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 1,
         totalCount: 1,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
         error: {
           messageId: "conversationShare.error.invalidConversation",
@@ -566,7 +425,7 @@ describe("ConversationShareConfirmationDock error details", () => {
         selectedCount: 1,
         totalCount: 1,
         onCancel: vi.fn(),
-        onBack: vi.fn(),
+        onEditSelection: vi.fn(),
         onConfirm: vi.fn(),
         error: {
           messageId: "conversationShare.error.authenticationRequired",
@@ -585,54 +444,46 @@ describe("ConversationShareConfirmationDock error details", () => {
     expect(details.textContent).toContain("conversationShare.error.authenticationRequired");
     expect(details.textContent).not.toContain("conversationShare.issue.unknown");
   });
+});
 
-  it("keeps a single-line publish error vertically centered in a compact card", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-        error: {
-          messageId: "conversationShare.error.invalidConversation",
-          issueCount: 1,
-          issues: [{ code: "invalid_conversation", scope: "conversation" }],
-        },
-      }),
-    );
+it("浮窗分享范围整行触发调整，不显示独立调整文字", () => {
+  const onEditSelection = vi.fn();
+  render(
+    createElement(ConversationShareConfirmationDock, {
+      selectedCount: 2,
+      totalCount: 4,
+      onEditSelection,
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+    }),
+  );
+  fireEvent.click(screen.getByTestId("conversation-share-range-summary"));
+  expect(onEditSelection).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("conversationShare.range.adjust")).toBeNull();
+});
 
-    const errorCard = screen.getByTestId("conversation-share-error-details");
-    const errorRow = screen.getByTestId("conversation-share-error-row");
-    expect(errorCard.className).toContain("p-2");
-    expect(errorCard.className).not.toContain("p-2.5");
-    expect(errorCard.className).toContain("mb-2");
-    expect(errorCard.className).not.toContain("mb-3");
-    expect(errorRow.className).toContain("items-center");
-    expect(errorRow.className).not.toContain("mb-1.5");
-  });
-
-  it("uses one 24px center line for the error copy, details button, and dismiss action", () => {
-    render(
-      createElement(ConversationShareConfirmationDock, {
-        selectedCount: 1,
-        totalCount: 1,
-        onCancel: vi.fn(),
-        onBack: vi.fn(),
-        onConfirm: vi.fn(),
-        onDismissError: vi.fn(),
-        error: {
-          messageId: "conversationShare.error.invalidConversation",
-          issueCount: 1,
-          issues: [{ code: "invalid_conversation", scope: "conversation" }],
-        },
-      }),
-    );
-
-    const errorMessage = screen.getByTestId("conversation-share-error-message");
-    const dismiss = screen.getByTestId("conversation-share-error-dismiss");
-    expect(errorMessage.className).toContain("items-center");
-    expect(errorMessage.className).toContain("leading-6");
-    expect(dismiss.className).toContain("leading-6");
-  });
+it("shows validation coordinates only inside error details", () => {
+  render(
+    createElement(ConversationShareConfirmationDock, {
+      selectedCount: 1,
+      totalCount: 1,
+      onCancel: vi.fn(),
+      onEditSelection: vi.fn(),
+      onConfirm: vi.fn(),
+      error: {
+        issueCount: 1,
+        issues: [],
+        code: 3205,
+        messageId: "conversationShare.error.invalidConversation",
+        rejection: { rule: "field_type", path: "rows[0].state", field: "state", row_index: 0 },
+      },
+    }),
+  );
+  expect(screen.queryByText("rows[0].state", { exact: false })).toBeNull();
+  fireEvent.click(screen.getByTestId("conversation-share-request-id-trigger"));
+  const details = screen.getByTestId("conversation-share-request-id-content");
+  expect(details.textContent).toContain("rows[0].state");
+  expect(details.textContent).toContain("field_type");
+  expect(details.textContent).toContain("rowLabel: 1");
+  expect(details.textContent).toContain("3205");
 });

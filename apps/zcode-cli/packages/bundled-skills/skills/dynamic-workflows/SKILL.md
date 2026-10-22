@@ -103,9 +103,15 @@ escalating instead of faking — so write the role and the standard of judgement
 those rules out. Every subagent has the same tools; what it may do with them is said in the
 ask: a reviewer that must not touch the code is told "do not edit any file".
 
-**Per-subagent model**, only when asked or a light tier is obvious (judges, routers):
+**Per-subagent model**, only when the user asked for one, with the name they used:
 `agent("judge", { model: "GLM-5.3-Flash" })`, ids from `ListModels`. A literal or a `model()`
 ModelRef; to route, map the router's typed key to a `model()` table (`patterns.md` #13).
+NEVER move a subagent to a model under another provider on your own — not for a judge, not
+because it looks cheaper; another provider is another bill. When a lighter model would
+clearly fit (one-turn judges, routers) and the user has not said, ask them first, before
+the call: name the model and the provider, say what it would save, and go with their answer.
+Their yes is the request; write it as the full `providerId/modelId` (a bare name never
+crosses providers).
 
 **Where each item goes next.** A run with more than one stage is a pipeline: an item leaves
 its stage as soon as it is done, and the next stage takes it while the rest are still being
@@ -1088,7 +1094,12 @@ Either way the user confirms the run, and the confirmation shows the actual scri
 - `subagent_model`: the model the subagents run on, as `providerId/modelId` or a bare model
   id (optionally `$reasoningLevel`). Set it only when the user asks for a specific model;
   pass the name they used, and if the tool cannot resolve it, pick from the ids it lists or
-  `ListModels`. You stay on the session model either way.
+  `ListModels`. NEVER set a model under another provider the user did not ask for: a bare
+  name resolves only within the session's provider, and crossing to another one is written
+  as the full `providerId/modelId`, which you write only when the user named that model.
+  If you think a cheaper or faster model elsewhere would serve the run, ask the user before
+  calling — model, provider, what it saves — and treat their yes as the request. You stay
+  on the session model either way.
 
 This tool starts a new run. To change a run that exists — errored, completed, stopped or
 still running — call `AmendWorkflow` (§13, §16.4), never `CreateWorkflow` again.
@@ -1479,8 +1490,9 @@ same call, so never `TaskStop` it first and never rewrite it from scratch with
   `max_concurrency`, against a run that is still going, retunes that run in place instead of
   starting a new one: same run, nothing stopped, nothing re-run.
 - `subagent_model`: omit to keep the predecessor's choice, pass `null` to put the subagents
-  back on the session model, pass a model id to change it (only when the user asks).
-  `ListModels` lists the ids.
+  back on the session model, pass a model id to change it (only when the user asks; never
+  a model under another provider the user did not name — ask them first if you think one
+  would help). `ListModels` lists the ids.
 
 Changing only a setting on a running run still stops it; what it had in flight runs again in
 the new run, except that a named subagent whose unfinished ask you did not change picks that
@@ -1501,7 +1513,9 @@ and call again with `path`.
 **Confirmation.** A run this session started (through `CreateWorkflow`, a previous
 `AmendWorkflow` or the workflows hub) is amended without a confirmation window, even while
 it is running. A run the user stopped, or a run another session started, asks the user
-first. The result names the run that was superseded (if one was stopped) and the new run's
+first, and so does an amendment that would put subagents on a provider neither the session
+nor the run used (a model you name under another provider, in `subagent_model` or in the
+script): that choice is the user's, and the window is where they make it. The result names the run that was superseded (if one was stopped) and the new run's
 id. The superseded run sends no notification of its own; the new run notifies when it
 settles. Do not wait for it or poll it with `TaskOutput`.
 

@@ -1,4 +1,4 @@
-import { TID_V4_TIMELINE } from "@zcode/shared";
+import { TID_V4_TIMELINE } from "@zcode/shared/test-ids";
 import { DEFAULT_WORKSPACE, waitForWorkspaceApp } from "../helpers/desktop-app.js";
 import { restartWithSeededOpenAIProviders } from "../helpers/custom-openai-provider.js";
 import {

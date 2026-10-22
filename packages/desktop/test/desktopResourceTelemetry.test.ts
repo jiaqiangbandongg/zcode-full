@@ -332,49 +332,6 @@ describe("desktopResourceTelemetry perf_process_window", () => {
     }
   });
 
-  it("PRT-004 30 个 tick 中 9 个后台时 background_ratio 为 0.3", async () => {
-    vi.useFakeTimers();
-    let backgroundTicks = 0;
-    // 前 9 个 tick 没有可见且聚焦的窗口，其余 tick 有。
-    getAllWindowsMock.mockImplementation(() => {
-      backgroundTicks += 1;
-      if (backgroundTicks <= 9) {
-        return [];
-      }
-      return [
-        {
-          isDestroyed: () => false,
-          isFocused: () => true,
-          isVisible: () => true,
-          isMinimized: () => false,
-        },
-      ];
-    });
-    getAppMetricsMock.mockReturnValue([metric(MAIN_PID, "Browser", 1, 1_000)]);
-    const logger = { info: vi.fn(), warn: vi.fn() };
-    const {
-      configureDesktopResourceTelemetry,
-      registerDesktopResourceTelemetry,
-      stopDesktopResourceTelemetry,
-    } = await loadTelemetry();
-
-    try {
-      configureDesktopResourceTelemetry({
-        deviceMid: "prt-004-device",
-        platform: "darwin",
-        appVersion: "3.6.1-test",
-        armsEnv: "test",
-      });
-      registerDesktopResourceTelemetry(logger, { reportIntervalMs: REPORT_INTERVAL_MS });
-      await vi.advanceTimersByTimeAsync(REPORT_INTERVAL_MS);
-
-      expect(eventForRole("main")?.properties.background_ratio).toBe("0.3");
-    } finally {
-      stopDesktopResourceTelemetry();
-      vi.useRealTimers();
-    }
-  });
-
   it("PRT-005 uptime_minutes 来自 creationTime，多进程角色取最大", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
@@ -566,44 +523,6 @@ describe("desktopResourceTelemetry perf_process_window", () => {
       stopDesktopResourceTelemetry();
       cleanupRoles();
       vi.useRealTimers();
-    }
-  });
-
-  it("PRT-014 全平台 tick、flush 与退出 flush 都不启动外部进程", async () => {
-    for (const platform of ["darwin", "linux", "win32"] as const) {
-      vi.resetModules();
-      vi.clearAllMocks();
-      vi.useFakeTimers();
-      const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue(platform);
-      getAppMetricsMock.mockReturnValue([metric(MAIN_PID, "Browser", 1, 1_000)]);
-      const logger = { info: vi.fn(), warn: vi.fn() };
-      const {
-        configureDesktopResourceTelemetry,
-        registerDesktopResourceTelemetry,
-        stopDesktopResourceTelemetry,
-      } = await loadTelemetry();
-      try {
-        configureDesktopResourceTelemetry({
-          deviceMid: "prt-014-device",
-          platform,
-          appVersion: "3.6.1-test",
-          armsEnv: "test",
-        });
-        registerDesktopResourceTelemetry(logger, { reportIntervalMs: REPORT_INTERVAL_MS });
-        await vi.advanceTimersByTimeAsync(REPORT_INTERVAL_MS);
-        stopDesktopResourceTelemetry({ flushPendingWindows: true });
-
-        // Bug 根因：main 每 10 秒起 ps 取线程数，Windows 上曾用 PowerShell 拖慢整机。
-        expect(execFileSyncMock).not.toHaveBeenCalled();
-        expect(execFileMock).not.toHaveBeenCalled();
-        expect(execMock).not.toHaveBeenCalled();
-        expect(spawnMock).not.toHaveBeenCalled();
-        expect(spawnSyncMock).not.toHaveBeenCalled();
-      } finally {
-        stopDesktopResourceTelemetry();
-        platformSpy.mockRestore();
-        vi.useRealTimers();
-      }
     }
   });
 

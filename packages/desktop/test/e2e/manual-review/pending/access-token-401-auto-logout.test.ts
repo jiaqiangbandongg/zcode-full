@@ -1,8 +1,17 @@
 import { readFile } from "node:fs/promises";
-import { DesktopCommandIds, PlatformChannels } from "@zcode/shared";
+import { PlatformChannels } from "@zcode/shared";
+import {
+  TID_OAUTH_LOGIN_BUTTON,
+  TID_LOGIN_USE_API_KEY_BUTTON,
+  TID_WORKSPACE_HEADER,
+} from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths } from "../../helpers/desktop-app.js";
+import { dismissOccupationOnboarding } from "../../helpers/occupation-onboarding.js";
 
 const responseStatus = process.env.ZCODE_E2E_AUTH_EXPIRY_HTTP_STATUS === "200" ? 200 : 401;
+const emptyRejection = process.env.ZCODE_E2E_AUTH_EXPIRY_RESPONSE_KIND === "empty";
+const provider = process.env.ZCODE_E2E_AUTH_EXPIRY_PROVIDER === "zai" ? "zai" : "bigmodel";
+const preserveSession = process.env.ZCODE_E2E_AUTH_VALIDATION_HEADER === "1";
 
 describe("用户资料 access token 登录过期", () => {
   after(async () => {
@@ -10,9 +19,42 @@ describe("用户资料 access token 登录过期", () => {
     await clearAppData();
   });
 
-  it(`AUTH-06: 真实 Host 请求 HTTP ${responseStatus} + 业务 401 后清理当前登录并复用过期弹窗`, async () => {
+  it(`AUTH-06: ${preserveSession ? "ZAI 有效身份遇到业务异常仍保留登录" : `${provider} HTTP ${responseStatus} ${emptyRejection ? "空正文" : "业务401"} 后清理并进入登录入口`}`, async () => {
     const baseUrl = process.env.ZCODE_E2E_ACCESS_TOKEN_401_URL;
     if (!baseUrl) throw new Error("缺少隔离 userinfo HTTP fixture");
+
+    if (preserveSession) {
+      await browser.waitUntil(
+        async () => {
+          const status = (await (await fetch(`${baseUrl}/__e2e/status`)).json()) as {
+            ordinaryBusinessRequestCount: number;
+            rawIdentityRequestCount: number;
+            rejectedIdentityHeaderCount: number;
+          };
+          return (
+            status.rejectedIdentityHeaderCount > 0 ||
+            (status.ordinaryBusinessRequestCount > 0 && status.rawIdentityRequestCount > 0)
+          );
+        },
+        { timeout: 30_000, timeoutMsg: "Host 没有完成异常业务请求与裸 token 身份核验" },
+      );
+      await dismissOccupationOnboarding();
+      // 等待启动进入工作区，避免只观察首次核验、漏掉后续 PAT 资料读取造成的误退出。
+      await browser
+        .$(`[data-testid="${TID_WORKSPACE_HEADER}"]`)
+        .waitForDisplayed({ timeout: 10_000 });
+      const status = (await (await fetch(`${baseUrl}/__e2e/status`)).json()) as {
+        rejectedIdentityHeaderCount: number;
+      };
+      expect(status.rejectedIdentityHeaderCount).toBe(0);
+      const credentials = await readCredentials();
+      expect(credentials["oauth:active_provider"]).toBe("zai");
+      for (const key of ["oauth:zai:access_token", "oauth:zai:user_info", "zcodejwttoken"])
+        expect(credentials[key]).toBeDefined();
+      expect(credentials["bot:e2e:credential"]).toBe("e2e-independent-bot-token");
+      expect(await expiredAlertCount()).toBe(0);
+      return;
+    }
 
     await browser.waitUntil(
       async () => {
@@ -23,10 +65,13 @@ describe("用户资料 access token 登录过期", () => {
       { timeout: 30_000, timeoutMsg: "Host 没有使用业务 access token 请求 userinfo" },
     );
     const before = await readCredentials();
-    expect(before["oauth:active_provider"]).toBe("bigmodel");
+    expect(before["oauth:active_provider"]).toBe(provider);
     expect(await expiredAlertCount()).toBe(0);
 
-    await fetch(`${baseUrl}/__e2e/reject?status=${responseStatus}`, { method: "POST" });
+    await fetch(
+      `${baseUrl}/__e2e/reject?status=${responseStatus}&empty=${emptyRejection ? "1" : "0"}`,
+      { method: "POST" },
+    );
     const fixtureStatus = (await (await fetch(`${baseUrl}/__e2e/status`)).json()) as {
       rejectionStatus: number;
       rejected: boolean;
@@ -42,9 +87,9 @@ describe("用户资料 access token 登录过期", () => {
         const credentials = await readCredentials();
         return [
           "oauth:active_provider",
-          "oauth:bigmodel:access_token",
-          "oauth:bigmodel:refresh_token",
-          "oauth:bigmodel:user_info",
+          `oauth:${provider}:access_token`,
+          `oauth:${provider}:refresh_token`,
+          `oauth:${provider}:user_info`,
           "zcodejwttoken",
         ].every((key) => !(key in credentials));
       },
@@ -52,8 +97,7 @@ describe("用户资料 access token 登录过期", () => {
     );
     expect((await readCredentials())["bot:e2e:credential"]).toBe("e2e-independent-bot-token");
 
-    // 测试原因：仅 mock app.relaunch/quit 仍会先执行真实 Host 关闭屏障，导致
-    // ChromeDriver 收尾超时。业务断言完成后在 IPC 边界记录重启命令，不实际重启。
+    // 修复后应直接重新登录；记录 IPC 确认不会绕回旧的重启流程。
     await browser.electron.execute((electron, channel) => {
       const state = globalThis as typeof globalThis & { __oauth401Commands?: string[] };
       state.__oauth401Commands = [];
@@ -70,16 +114,23 @@ describe("用户资料 access token 登录过期", () => {
       button.click();
     });
     await browser.waitUntil(
-      async () => {
-        const commands = await browser.electron.execute(
-          () =>
-            (globalThis as typeof globalThis & { __oauth401Commands?: string[] })
-              .__oauth401Commands ?? [],
-        );
-        return commands.length === 1 && commands[0] === DesktopCommandIds.RelaunchApp;
-      },
-      { timeout: 10_000, timeoutMsg: "确认后没有复用原 RelaunchApp" },
+      async () =>
+        browser.execute(
+          (ids) =>
+            ids.some((id) => {
+              const element = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+              return element !== null && element.getBoundingClientRect().height > 0;
+            }),
+          [TID_OAUTH_LOGIN_BUTTON, TID_LOGIN_USE_API_KEY_BUTTON],
+        ),
+      { timeout: 10_000, timeoutMsg: "确认后没有进入 Welcome 登录入口" },
     );
+    const commands = await browser.electron.execute(
+      () =>
+        (globalThis as typeof globalThis & { __oauth401Commands?: string[] }).__oauth401Commands ??
+        [],
+    );
+    expect(commands).toEqual([]);
   });
 });
 

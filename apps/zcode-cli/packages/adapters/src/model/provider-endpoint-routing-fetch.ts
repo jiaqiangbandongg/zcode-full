@@ -28,24 +28,24 @@ export function createProviderEndpointRoutingFetch(options: {
     }
 
     const rewrittenInput = rewriteInput(input, decision.url);
-    if (rewrittenInput instanceof Request) {
-      rewrittenInput.headers.delete("host");
-    }
-    return await options.fetch(rewrittenInput, withoutHostHeader(init));
+    return await options.fetch(rewrittenInput, routedRequestInit(input, init, decision.headers));
   };
 }
 
-function withoutHostHeader(
+function routedRequestInit(
+  input: Parameters<ProviderEndpointRoutingFetch>[0],
   init: Parameters<ProviderEndpointRoutingFetch>[1],
+  decisionHeaders: Readonly<Record<string, string>> | undefined,
 ): Parameters<ProviderEndpointRoutingFetch>[1] {
-  if (!init?.headers) {
+  const inputHeaders = input instanceof Request ? input.headers : undefined;
+  if (!init?.headers && !inputHeaders && !decisionHeaders) {
     return init;
   }
-  const headers = new Headers(init.headers);
-  if (!headers.has("host")) {
-    return init;
-  }
+  const headers = new Headers(init?.headers ?? inputHeaders);
   headers.delete("host");
+  for (const [name, value] of Object.entries(decisionHeaders ?? {})) {
+    headers.set(name, value);
+  }
   return { ...init, headers };
 }
 

@@ -202,7 +202,7 @@ describe("runLineageActiveMs — 对着真实 sqlite journal", () => {
 
   it("多世 + 修订链：真库上的求和只算活着的那几段", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-elapsed-"));
-    const store = createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
+    const store = await createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
     try {
       const journal = resolveDynamicWorkflowJournalStore(store as never);
       expect(journal).toBeDefined();

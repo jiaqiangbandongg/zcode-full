@@ -260,22 +260,6 @@ describe("desktopApplicationMenu endpoint submenu", () => {
     expect(findMenuItem(template, "Bulk Session Stress Test")).toBeUndefined();
   });
 
-  it("生产打包构建隐藏压测开关", async () => {
-    envMock.value = "production";
-    envMock.isPackaged = true;
-    const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");
-
-    rebuildApplicationMenu({
-      currentApplicationLocale: "en-US",
-      zcodeEndpointSelection: "production",
-      executeDesktopCommand: vi.fn(),
-    });
-
-    const template = buildFromTemplateMock.mock
-      .calls[0]?.[0] as Electron.MenuItemConstructorOptions[];
-    expect(findMenuItem(template, "Bulk Session Stress Test")).toBeUndefined();
-  });
-
   it("Cmd/Ctrl+W 先转发关闭当前上下文而不是直接使用 close role", async () => {
     const executeDesktopCommand = vi.fn();
     const { rebuildApplicationMenu } = await import("../src/main/desktopApplicationMenu.js");

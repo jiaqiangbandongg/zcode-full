@@ -1,6 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import { BROWSER_VIEWPORT_LIMITS } from "@zcode/shared";
 import {
-  BROWSER_VIEWPORT_LIMITS,
   TID_BROWSER_RESPONSIVE_RESIZE_CORNER,
   TID_BROWSER_RESPONSIVE_RESIZE_CORNER_BOTTOM_LEFT,
   TID_BROWSER_RESPONSIVE_RESIZE_CORNER_TOP_LEFT,
@@ -9,7 +9,7 @@ import {
   TID_BROWSER_RESPONSIVE_RESIZE_LEFT,
   TID_BROWSER_RESPONSIVE_RESIZE_TOP,
   TID_BROWSER_RESPONSIVE_RESIZE_WIDTH,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { GripHorizontalIcon, GripVerticalIcon } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 

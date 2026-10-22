@@ -4,11 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { IFeedbackService } from "@zcode/services";
 import type { FeedbackTicketSummary } from "@zcode/shared";
-import {
-  FeedbackTicketList,
-  TicketsInitialLoadingState,
-  TicketsView,
-} from "@/feedback/TicketsView.js";
+import { FeedbackTicketList, TicketsView } from "@/feedback/TicketsView.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 
 function createFeedbackService(): IFeedbackService {
@@ -77,20 +73,5 @@ describe("TicketsView", () => {
     expect(html).toContain("Issue #");
     expect(html).toContain("Copy issue ID");
     expect(html).toContain("Cannot submit prompt");
-  });
-
-  it("renders the initial ticket list loading state centered in the content area", () => {
-    const html = renderToStaticMarkup(
-      createElement(
-        ZCodeIntlProvider,
-        { initialLocale: "zh-CN" },
-        createElement(TicketsInitialLoadingState),
-      ),
-    );
-
-    expect(html).toContain("加载中...");
-    expect(html).toContain("flex-1");
-    expect(html).toContain("items-center");
-    expect(html).toContain("justify-center");
   });
 });

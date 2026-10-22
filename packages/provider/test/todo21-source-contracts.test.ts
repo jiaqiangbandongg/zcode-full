@@ -139,17 +139,4 @@ describe("Todo 21 source contracts", () => {
       mode: "off-peak",
     });
   });
-
-  it("Model 没有 visibility", () => {
-    expect(() =>
-      parsePersonalModelConfigRules([
-        {
-          type: "provider-model",
-          providerId: "provider-a",
-          modelId: "model-a",
-          config: { visibility: "hidden" },
-        },
-      ]),
-    ).toThrow();
-  });
 });

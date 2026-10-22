@@ -1583,6 +1583,7 @@ class NodeMcpAdapter implements McpPort {
           // 原判据是 `type !== "sse"`，把 stdio 一起放了进来，等于这道门槛在 stdio 上为零。
           // 注意这不是在挡凭证外泄（那由 origin 校验负责），而是在挡**结果伪造**。
           config.type === "http" && config.auth?.type === ZCODE_OFFICIAL_MCP_AUTH_TYPE,
+          config.alwaysLoad,
         ),
       );
       const negotiatedProtocolEra = client.getProtocolEra();
@@ -2194,6 +2195,17 @@ class NodeMcpAdapter implements McpPort {
       if (!listeners.size) this.appConnectionListeners.delete(name);
     };
   }
+  async waitForAppConnection(
+    name: string,
+  ): Promise<{ identity: string; generation: number } | null> {
+    const record = this.records.get(name);
+    if (!record) return null;
+    const generation = this.connectionGenerations.get(name) ?? 0;
+    // 会话恢复先于 MCP 握手完成；复用已有连接任务，避免首次打开把 connecting 误判为失败。
+    await record.connecting;
+    return this.isCurrentConnection(name, generation) ? this.appConnectionSnapshot(name) : null;
+  }
+
   appConnectionSnapshot(name: string): { identity: string; generation: number } | null {
     const record = this.records.get(name);
     if (!record?.client || record.status.status !== "connected") return null;

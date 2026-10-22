@@ -200,6 +200,30 @@ skills、commands、agents、hooks、MCP servers 名称与可选描述。它不�
 hooks，也不解析运行时变量。已安装插件必须优先读本地 cache/安装目录；未安装候选才可
 按需解析 marketplace source。
 
+调度约束：插件读请求 `plugins/describe`、`plugins/list`、`plugins/overview` 不进入 Agent
+连接的串行请求队列，也不等待此前排队请求开始，收到后立即处理，所以详情页和新建右侧标签页的
+推荐区不会排在长时间安装、更新之后。describe 只在 marketplace manifest 缺失、需要拉取并写入时
+进入 plugin storage lock。list/overview 是同步 handler，执行中不让出事件循环；内置插件 seed
+只在内容变化时写盘，并有跨进程 seed 锁，因此不会与安装跨 await 的读改写交错。install、update、
+setEnabled、configure 等写操作仍保持串行：setEnabled、configure 不持存储锁，靠串行队列与安装的
+配置写入错开。
+
+```mermaid
+sequenceDiagram
+  participant UI
+  participant Q as 串行队列
+  participant L as storage lock
+  participant D as 读请求分支
+  UI->>Q: plugins/install A（下载中）
+  Q->>L: 持锁
+  UI->>Q: plugins/install B
+  Note over Q: B 等 A 完成
+  UI->>D: plugins/describe、list、overview（立即处理）
+  D-->>UI: 组件与列表（不等安装）
+  L-->>Q: A 完成后释放
+  Q->>L: B 持锁
+```
+
 Bugfix 约束：`plugins/describe` 的 MCP 与 hook 枚举口径必须对齐真实 plugin loader，
 不能只读取 `plugin.json` 内联字段。MCP server 名称需要来自插件根目录 `.mcp.json` 与
 `manifest.mcpServers` 的合并结果；Hook 事件名需要来自 `hooks/hooks.json` 与

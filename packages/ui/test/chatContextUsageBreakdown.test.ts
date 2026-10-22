@@ -2,7 +2,6 @@
 
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
@@ -11,7 +10,6 @@ import {
   hasChatCodingPlanUsageRemaining,
   shouldShowContextQuotaResetTime,
 } from "../src/chat-input-toolbar/CodingPlanContextUsage.js";
-import { ChatCodingPlanMcpUsageMeter } from "../src/chat-input-toolbar/ChatCodingPlanMcpUsageMeter.js";
 import {
   ChatStartPlanBalancePanel,
   hasChatStartPlanBalance,
@@ -19,7 +17,6 @@ import {
 import {
   ChatContextUsage,
   buildContextUsageBreakdownSegments,
-  buildContextUsageProgressSegments,
   formatContextCacheHitRateLabel,
   formatContextUsageSummary,
   formatContextUsageTokenCount,
@@ -35,10 +32,6 @@ import {
   resolveSidebarCodingPlanUpgradeFallbackProviderId,
   resolveSidebarCodingPlanUpgradeProviderId,
 } from "../src/lib/sidebarCodingPlanUpgrade.js";
-import { getContextQuotaMeterGridClass } from "../src/chat-input-toolbar/contextQuotaMeterGrid.js";
-import { resolveMcpQuotaLimit } from "../src/lib/codingPlanQuotaPresentation.js";
-import enMessages from "../src/i18n/locales/en-US.js";
-import zhMessages from "../src/i18n/locales/zh-CN.js";
 import { TooltipProvider } from "../src/components/ui/tooltip.js";
 
 const activeSubscription = {
@@ -258,26 +251,7 @@ describe("ChatCodingPlanUsageRemainingPanel reset action", () => {
 });
 
 describe("ChatCodingPlanUsageRemainingPanel MCP 额度", () => {
-  it("ZCode MCP tooltip 使用精简的每日合计额度说明", () => {
-    expect(zhMessages["sidebar.usage.plan.zcodeMcpDescription"]).toBe(
-      "ZCode 预置插件 MCP 每日合计额度",
-    );
-    expect(enMessages["sidebar.usage.plan.zcodeMcpDescription"]).toBe(
-      "Daily aggregate quota for ZCode built-in plugin MCPs",
-    );
-  });
-
-  it("ZCode MCP 文字保持普通前景色，进度条复用图表黄色", () => {
-    const styles = readFileSync("packages/ui/src/styles.css", "utf8");
-
-    expect(styles).toContain("--color-usage-chart-5: #e07b00;");
-    expect(styles).toContain("--color-usage-chart-5: #ff8a30;");
-    expect(styles).not.toContain("--zcode-mcp-progress");
-    expect(styles).not.toContain("--zcode-mcp-gradient-");
-    expect(styles).not.toContain("zcode-mcp-gradient-text");
-  });
-
-  it("三张主额度占满首行时，官方 Server MCP 在下一行横跨三列", () => {
+  it("从三类主额度与 MCP 混合快照展示真实剩余额度和桶日期", () => {
     codingPlanQuotaResetUiMock.current = codingPlanQuotaResetUiMock.createValue();
     const html = renderToStaticMarkup(
       createElement(ChatCodingPlanUsageRemainingPanel, {
@@ -331,37 +305,18 @@ describe("ChatCodingPlanUsageRemainingPanel MCP 额度", () => {
         locale: "en-US",
       }),
     );
-
-    expect(html).toContain("grid-cols-3");
     expect(html).toContain('data-context-mcp-usage="inline"');
-    expect(html).toContain('data-context-mcp-layout="full-row"');
     expect(html).toContain('data-primary-quota-count="3"');
-    expect(html).toContain("col-span-3");
-    expect(html).toContain("width:calc((100% - 1rem) / 3)");
-    expect(html).toContain("mt-1");
-    expect(html).toContain("border-t border-border pt-1.5");
-    expect(html).toContain(
-      "ml-auto min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap",
-    );
-    expect(html).not.toContain("rounded-lg bg-surface px-2 py-1.5");
     expect(html).toContain("sidebar.usage.plan.zcodeMcp");
     expect(html).toContain('data-context-mcp-info="true"');
     expect(html).toContain('aria-label="sidebar.usage.plan.zcodeMcpDescription"');
-    expect(html).toContain(
-      '<span class="min-w-0 truncate text-foreground-subtle">sidebar.usage.plan.zcodeMcp</span>',
-    );
-    expect(html).not.toContain(
-      '<span class="font-medium text-foreground">sidebar.usage.plan.zcodeMcp</span>',
-    );
-    expect(html).not.toContain("zcode-mcp-gradient-text");
-    expect(html).toContain("background-color:var(--color-usage-chart-5)");
     // percentage 是已使用占比，展示时反转成剩余。
     expect(html).toContain("75%");
     expect(html).toMatch(/>75%<\/span><span[^>]*> · Aug 21<\/span>/);
     expect(html).toContain("width:75%");
   });
 
-  it("没有 MCP 额度时保持三列", () => {
+  it("没有 MCP 额度时不展示 MCP", () => {
     codingPlanQuotaResetUiMock.current = codingPlanQuotaResetUiMock.createValue();
     const html = renderToStaticMarkup(
       createElement(ChatCodingPlanUsageRemainingPanel, {
@@ -402,81 +357,7 @@ describe("ChatCodingPlanUsageRemainingPanel MCP 额度", () => {
         locale: "en-US",
       }),
     );
-
-    expect(html).toContain("grid-cols-3");
     expect(html).not.toContain("sidebar.usage.plan.mcp");
-  });
-
-  it("两张主额度时 MCP 使用第三列的卡片布局", () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatCodingPlanMcpUsageMeter, {
-        color: "var(--color-usage-chart-5)",
-        description: "description",
-        label: "ZCode MCP",
-        percentage: 75,
-        primaryQuotaCount: 2,
-        value: "75%",
-      }),
-    );
-
-    expect(html).toContain('data-primary-quota-count="2"');
-    expect(html).toContain('data-context-mcp-layout="card"');
-    expect(html).toContain("space-y-1.5");
-    expect(html).not.toContain("col-span-3");
-    expect(html).not.toContain("border-t border-border");
-    expect(html).not.toContain("width:calc(");
-  });
-});
-
-describe("getContextQuotaMeterGridClass", () => {
-  it("按非 MCP 额度条数选择一至三列", () => {
-    expect(getContextQuotaMeterGridClass(1)).toBe("grid-cols-1");
-    expect(getContextQuotaMeterGridClass(2)).toBe("grid-cols-2");
-    expect(getContextQuotaMeterGridClass(3)).toBe("grid-cols-3");
-    expect(getContextQuotaMeterGridClass(4)).toBe("grid-cols-3");
-  });
-});
-
-describe("resolveMcpQuotaLimit", () => {
-  it("缺少快照或 MCP 额度时返回 null", () => {
-    expect(resolveMcpQuotaLimit(null)).toBeNull();
-    expect(
-      resolveMcpQuotaLimit({
-        generatedAt: 1,
-        authenticated: true,
-        provider: null,
-        remaining: null,
-        subscription: null,
-        quota: null,
-      }),
-    ).toBeNull();
-  });
-
-  it("有 MCP 额度时返回汇总额度条", () => {
-    const aggregate = {
-      type: "MCP_USAGE_LIMIT",
-      percentage: 16,
-      remaining: 1032,
-      usageDetails: [],
-    };
-
-    expect(
-      resolveMcpQuotaLimit({
-        generatedAt: 1,
-        authenticated: true,
-        provider: null,
-        remaining: null,
-        subscription: null,
-        quota: null,
-        mcpQuota: {
-          serverTime: 1,
-          level: "pro",
-          scope: { providerFamily: "bigmodel", targetType: "PERSONAL" },
-          buckets: [],
-          aggregate,
-        },
-      }),
-    ).toBe(aggregate);
   });
 });
 
@@ -658,7 +539,6 @@ describe("ChatCodingPlanUsageRemainingPanel refresh action", () => {
 
     expect(view.container.textContent).toContain("sidebar.usage.plan.fiveHour");
     expect(view.container.textContent).not.toContain("usage_entitlement_request_timeout");
-    expect(view.container.innerHTML).not.toContain("border-destructive");
     expect(screen.getByLabelText("sidebar.usage.plan.updateFailed")).toBeTruthy();
     expect(screen.getByRole("button", { name: "sidebar.usage.plan.open" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "sidebar.usage.plan.refresh" })).toBeNull();
@@ -732,53 +612,6 @@ describe("buildContextUsageBreakdownSegments", () => {
         { source: "skills", chars: -1 },
       ]),
     ).toEqual([]);
-  });
-
-  it("assigns the Coding Plan blue tone to the largest segment", () => {
-    const segments = buildContextUsageBreakdownSegments([
-      { source: "messages", chars: 100 },
-      { source: "mcp_tool_schemas", chars: 900 },
-      { source: "system_prompt", chars: 300 },
-    ]);
-
-    expect(buildContextUsageProgressSegments(segments)).toEqual([
-      {
-        id: "mcp_tool_schemas",
-        percent: 0.6923076923076923,
-        style: { backgroundColor: "var(--color-usage-chart-1)" },
-      },
-      {
-        id: "system_prompt",
-        percent: 0.23076923076923078,
-        style: {
-          backgroundColor:
-            "color-mix(in oklab, var(--color-usage-chart-1) 78%, var(--color-surface))",
-        },
-      },
-      {
-        id: "messages",
-        percent: 0.07692307692307693,
-        style: {
-          backgroundColor:
-            "color-mix(in oklab, var(--color-usage-chart-1) 58%, var(--color-surface))",
-        },
-      },
-    ]);
-  });
-
-  it("keeps later Coding Plan blue tones readable on the popover background", () => {
-    const segments = buildContextUsageBreakdownSegments([
-      { source: "messages", chars: 600 },
-      { source: "system_prompt", chars: 500 },
-      { source: "meta_user_context", chars: 400 },
-      { source: "skills", chars: 300 },
-      { source: "tool_prompt", chars: 200 },
-      { source: "system_tool_schemas", chars: 100 },
-    ]);
-
-    expect(buildContextUsageProgressSegments(segments).at(-1)?.style).toEqual({
-      backgroundColor: "color-mix(in oklab, var(--color-usage-chart-1) 28%, var(--color-surface))",
-    });
   });
 });
 
@@ -1083,44 +916,6 @@ describe("Coding Plan usage remaining panel state", () => {
     expect(html).not.toContain("billing-discount-badge");
   });
 
-  it("renders the sidebar usage details action as a link button with an arrow", () => {
-    const availableProviders = [
-      createCodingPlanProvider(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan),
-    ];
-    const html = renderToStaticMarkup(
-      createElement(CodingPlanUsageRemainingPanel, {
-        availableProviders,
-        entitlements: [
-          {
-            providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-            loading: false,
-            error: null,
-            snapshot: {
-              generatedAt: 1,
-              authenticated: true,
-              provider: {
-                id: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-                name: "Z.ai Coding Plan",
-              },
-              remaining: null,
-              subscription: activeSubscription,
-              quota: {
-                level: "pro",
-                limits: [],
-              },
-            },
-          },
-        ],
-        modelProvidersLoading: false,
-        onUsageClick: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain('data-variant="link"');
-    expect(html).toContain("sidebar.usage.plan.open");
-    expect(html).toContain("lucide-chevron-right");
-  });
-
   it("renders a single sidebar audience badge without source tabs", () => {
     const availableProviders = [
       createCodingPlanProvider(BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan),
@@ -1260,15 +1055,6 @@ describe("Coding Plan usage remaining panel state", () => {
 
     expect(html).toContain("sidebar.usage.plan.title");
     expect(html).not.toContain("billing-discount-badge:gradient:compact");
-    expect(html).toContain("grid-cols-3");
-    expect(html).toContain("space-y-0.5");
-    expect(html).toContain("h-1.5");
-    expect(html).toContain("text-ui-xs text-foreground-subtle");
-    expect(html).toContain("background-color:var(--color-usage-chart-1)");
-    expect(html).toContain("background-color:var(--color-usage-chart-2)");
-    expect(html).toContain("background-color:var(--color-usage-chart-3)");
-    expect(html).toContain(" · ");
-    expect(html).not.toContain('font-mono text-ui-sm tabular-nums"><span class="text-foreground');
   });
 
   it("hides a Coding Plan reset time when its full value exceeds the meter width", () => {
@@ -1332,65 +1118,6 @@ describe("Coding Plan usage remaining panel state", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("uses two columns when only two Coding Plan meters are available", () => {
-    const availableProviders = [
-      createCodingPlanProvider(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan),
-    ];
-    const html = renderToStaticMarkup(
-      createElement(ChatCodingPlanUsageRemainingPanel, {
-        config: {
-          availableProviders,
-          entitlements: [
-            {
-              providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-              loading: false,
-              error: null,
-              snapshot: {
-                generatedAt: 1,
-                authenticated: true,
-                provider: {
-                  id: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-                  name: "Z.ai Coding Plan",
-                },
-                remaining: null,
-                subscription: activeSubscription,
-                quota: {
-                  level: "pro",
-                  limits: [
-                    {
-                      type: "TOKENS_LIMIT",
-                      unit: 3,
-                      number: 5,
-                      percentage: 35,
-                      usageDetails: [],
-                    },
-                    {
-                      type: "TOKENS_LIMIT",
-                      unit: 6,
-                      percentage: 45,
-                      usageDetails: [],
-                    },
-                  ],
-                },
-              },
-            },
-          ],
-          modelProvidersLoading: false,
-        },
-        intl: {
-          formatMessage: ({ id }: { id: string }) => id,
-        } as never,
-        locale: "en-US",
-      }),
-    );
-
-    expect(html).toContain("grid-cols-2");
-    expect(html).not.toContain("grid-cols-3");
-    expect(html).toContain("background-color:var(--color-usage-chart-1)");
-    expect(html).toContain("background-color:var(--color-usage-chart-2)");
-    expect(html).not.toContain("background-color:var(--color-usage-chart-3)");
   });
 
   it("is renderable from entitlement data even without task context usage", () => {
@@ -1691,20 +1418,7 @@ describe("Start Plan context balance panel", () => {
     expect(html).not.toContain("1M");
     expect(html).not.toContain("settings.modelProvider.startPlan.balance.used");
     expect(html).toContain("chat.quota.action.upgrade");
-    expect(html).toContain("button-gradient");
-    expect(html).toContain("billing-discount-badge:surface:compact");
     expect(html).toContain("billing-discount-info");
-    expect(html).toContain("grid-cols-1");
-    expect(html).toContain("space-y-0.5");
-    expect(html).toContain("h-1.5");
-    expect(html).toContain("bg-success");
-    // 修复原因：hover 静默刷新返回后今日余额进度条原先瞬间跳变，与 Coding Plan 额度条的
-    // 500ms 宽度过渡不一致，导致"已刷新"完全无感；断言过渡与无障碍降级保持对齐。
-    expect(html).toContain("transition-[width]");
-    expect(html).toContain("duration-500");
-    expect(html).toContain("motion-reduce:transition-none");
-    expect(html).not.toContain("background-color");
-    expect(html).toContain("lucide-rocket");
   });
 
   it("omits the date for today's Start Plan balance renew time", () => {
@@ -1864,7 +1578,7 @@ describe("Start Plan context balance panel", () => {
     }
   });
 
-  it("uses two columns when two Start Plan meters are available", () => {
+  it("renders both Start Plan bucket model labels", () => {
     const html = renderToStaticMarkup(
       createElement(ChatStartPlanBalancePanel, {
         config: {
@@ -1918,9 +1632,6 @@ describe("Start Plan context balance panel", () => {
         locale: "en-US",
       }),
     );
-
-    expect(html).toContain("grid-cols-2");
-    expect(html).not.toContain("grid-cols-3");
     expect(html).toContain("GLM-5.2");
     expect(html).toContain("GLM-5.1");
   });

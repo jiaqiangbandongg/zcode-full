@@ -4,6 +4,7 @@ import {
   restartIntoWorkspace,
   seedBigModelConnectionSelection,
   seedBigModelOAuthCredential,
+  seedHighspeedLoginCredential,
   seedPersistedModelSelection,
   waitForSelectedModel,
 } from "./model-provider-restart.js";
@@ -47,7 +48,7 @@ declare global {
 
 /**
  * Highspeed 抽卡 case 的共用准备：Coding Plan 凭据、Team scope、会话模型与 Host Mock 场景
- * （场景按 spec 文件注入，见 highspeed-mock-env.ts）。三个 case 走同一条准备链路，
+ * （场景按 spec 文件注入，见 highspeed-mock-env.ts）。相关 case 走同一条准备链路，
  * `hit-fast` case 因此同时是资格链路的正向对照，未抽中类 case 的否定断言不会空转通过。
  */
 export async function prepareHighspeedDrawWorkspace() {
@@ -57,6 +58,9 @@ export async function prepareHighspeedDrawWorkspace() {
   await skipOccupationOnboardingIfPresent();
   await prepareV4ConversationE2E({ skipProvider: true });
   await seedBigModelOAuthCredential();
+  // Highspeed 推理与 draw 共用双凭据；普通抽卡 mock 会绕过推理鉴权，创建期退回 case 不会。
+  // 缺少登录 JWT 时 prepareTurn 会在注入 execution Selection 前降级，测试无法进入目标失败点。
+  await seedHighspeedLoginCredential();
   // Provider 重构后连接方式按 family 记录结构化 selection（不再是 `coding-plan:<id>` 字符串键），
   // 且 E2E_BIGMODEL_PLAN_PROVIDER_ID 就是 Team Coding Plan，Team scope 必须一并 seed，
   // 否则加速卡请求期解析不到账号访问上下文。
@@ -72,7 +76,8 @@ export async function prepareHighspeedDrawWorkspace() {
   await seedPersistedModelSelection({
     modelId: HIGHSPEED_E2E_MODEL,
     providerId: E2E_BIGMODEL_PLAN_PROVIDER_ID,
-    reasoningLevel: "medium",
+    // 旧夹具的 medium 已不在 GLM-5.3 目录中，会在抽卡前被发送校验拦住。
+    reasoningLevel: "high",
   });
 
   await restartIntoWorkspace();

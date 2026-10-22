@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-directory-resilience",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-directory-resilience.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-directory-resilience.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-directory-reconnect-title",
+      "description": "SSH directory resilience task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "ssh-directory-reconnect-main",
+      "description": "SSH directory resilience 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "用固定回复准备和续聊真实远端历史，目录故障由专属 SSH 目标构造。"
+    }
+  ]
+}

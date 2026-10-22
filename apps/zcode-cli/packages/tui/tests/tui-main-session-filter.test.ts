@@ -17,14 +17,6 @@ function eventFrom(sessionId: string, type: SessionEventType = SessionEventType.
   return { ...createSessionEvent(type, sessionId as never, {}), sessionId } as SessionEvent;
 }
 
-test("main-session events pass the gate", () => {
-  assert.equal(isMainSessionEvent(eventFrom(MAIN), MAIN), true);
-});
-
-test("actor/child-session events are dropped", () => {
-  assert.equal(isMainSessionEvent(eventFrom(ACTOR), MAIN), false);
-});
-
 test("every noisy actor event kind is dropped, not just some", () => {
   // 用户看到的噪音就是这几类：流式增量、工具调用（submit_result 走 tool_call_*）、回合终结。
   for (const type of [

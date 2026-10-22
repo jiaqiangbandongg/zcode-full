@@ -58,6 +58,29 @@ manual-review/live provider，并
 每个 shard 有独立 HOME、run id、artifact、network capture 和 Chromium profile。同一
 shard 内不能直接提高 WDIO `maxInstances`，否则多个 worker 会重置同一个 HOME。
 
+### 进程身份与回收
+
+macOS 上 Electron main 的命令行可能只剩 `ZCode E2E`，不再保留 run id 和 HOME 参数。
+运行时采样确认：Chromium 子进程仍带有当前 run 的 `--user-data-dir`，但该目录位于
+run cache 而非 HOME。仅按 HOME 和 run id 扫描会漏掉 main，只命中独立的 crashpad 等
+进程，导致退出屏障失败并阻塞后续 worker。
+
+清理身份必须包含当前 run 独占的 Chromium profile 根目录，覆盖该 run 下所有 worker
+profile。路径匹配必须遵守目录边界并兼容 Windows 分隔符，不能命中相邻 run 或相似前缀。
+
+```text
+当前 run 的 profile -> Chromium 子进程 -> Electron main -> ChromeDriver
+                                            |
+                                            v
+                                      收集完整子进程树
+HOME / run id -> 独立或孤儿进程 ------------> 退出屏障 -> 下一个 worker
+```
+
+仅允许从已确认身份的子进程补齐 Electron/ChromeDriver 父链，不允许只凭进程名称清理。
+单 session reload 仍须保留 ChromeDriver。单测覆盖丢失启动参数、相邻 run 隔离和
+Windows 路径；session lifecycle E2E 使用真实进程快照验证无显式 main PID 时仍能找到
+main，并通过连续 worker 运行验证退出屏障。
+
 ```text
 pnpm test:e2e（默认）
   -> e2e-report build

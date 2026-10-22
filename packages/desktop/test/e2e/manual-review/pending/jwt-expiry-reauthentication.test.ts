@@ -1,9 +1,6 @@
 import { readFile } from "node:fs/promises";
-import {
-  TID_OAUTH_LOGIN_BUTTON,
-  testId,
-  ZAI_PROVIDER_ID,
-} from "@zcode/shared";
+import { ZAI_PROVIDER_ID } from "@zcode/shared";
+import { TID_OAUTH_LOGIN_BUTTON, testId } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   getE2EAppDataPaths,

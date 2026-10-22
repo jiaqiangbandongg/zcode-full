@@ -188,6 +188,14 @@ Agent(SDK)                                    Helper
   根**——dev 残留在场时静默选中未签名包会让设置页恒「拉起失败」且伪装成权限问题
   （2026-09-22 ZCT-2102352739585175552）。dev 运行时额外兼容 `dev/` 根下装成稳定名的
   一键 bundle（2026-09-10 修复意图保留）。候选缺失 → 按拉起失败路径走安装引导。
+- darwin 拉起前必须先经安装器，与 SDK 首调路径同一语义：包内 Helper
+  （`resolveBundledCuaHelperAppPath`，打包态为 `Contents/Resources/cua-helper/…`）存在时，
+  先 `createCanonicalCuaHelperInstaller(...).ensureInstalled()`（签名 / Team / buildId 校验，
+  不匹配则同路径原子替换，保住 TCC 授权），再拉起**安装器返回的路径**；安装失败按拉起失败
+  降级（`idle:true` + warn 日志），**不得回退去拉已安装的旧副本**。只有包内 Helper 不存在
+  （dev 运行时）才按上一条枚举已安装候选。
+  反例（2026-09-29 真机，打包版 3.14.3）：设置页直接 `open` 已装的 3.14.1 Helper
+  （IPC v2），broker 拒绝新客户端（IPC v3），App 自带的新 Helper 永远装不上。
 - win32 删除 "only available on macOS" 短路（权限真值查询逻辑本身是平台无关的 broker
   方法调用）。
 
@@ -244,6 +252,7 @@ Agent(SDK)                                    Helper
 | MC-7 | win32 | 双 Agent 并发首调 | 同时 ensure | pipe 单实例；第二 fork 失败无害；连同一 Helper |
 | MC-8 | 两平台 | Helper 已重启/换代 | spawn env 与既有 Agent 凭据 | 传输路径恒定（同 socket/pipe），Helper 换代不换发凭据；darwin authority 按 spawn 铸造、各 agent 可不同，属既有语义 |
 | MC-9 | win32 | 未开对话 | 直接进设置页 | probe → Host fork → 权限真值；失败则 idle:true 降级 |
+| MC-10 | darwin | 打包版，已装旧 buildId 的 Helper | 直接进设置页 | 先 ensureInstalled 替换为包内 Helper 再拉起；安装失败 idle:true 降级，不拉旧副本 |
 
 回归红线（沿隔离规范 §7，继续有效）：
 

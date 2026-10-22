@@ -549,13 +549,6 @@ describe("Semantic Memory selection and content", () => {
     });
     expect(notYetStale[0]?.header).toBe(`Memory: ${path}:`);
 
-    const oneDayOld = await readRecalledMemories({
-      entries: [manifestEntry("database-test-policy.md", { mtimeMs: 100 })],
-      fileSystem: new RecallFileSystem({ [path]: file(content, 100) }),
-      nowMs: 100 + DAY_MS + 1,
-    });
-    expect(oneDayOld[0]?.header).toBe(`Memory: ${path}:`);
-
     const staleAtTwoDays = await readRecalledMemories({
       entries: [manifestEntry("database-test-policy.md", { mtimeMs: 100 })],
       fileSystem: new RecallFileSystem({ [path]: file(content, 100) }),

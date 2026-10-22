@@ -1,5 +1,6 @@
 import { access, readdir, readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
+import { decodeCustomModelValue, encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
@@ -13,10 +14,8 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_SUBAGENT_ROW,
   TID_TASK_SETTINGS_BUTTON,
-  decodeCustomModelValue,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -83,8 +82,8 @@ const USER_REMOVED_MODEL = {
   thoughtLevel: "high",
 };
 const USER_AGENT_ROOT = join(resolveE2EStorageRoot(), "agents");
-const PLUGIN_JUDGE_AGENT_NAME = "document-skills:judge";
-const PLUGIN_JUDGE_AGENT_ID = "plugin:document-skills@zcode-plugins-official:judge";
+const PLUGIN_JUDGE_AGENT_NAME = "documents:visual-judge";
+const PLUGIN_JUDGE_AGENT_ID = "plugin:documents@zcode-plugins-official:visual-judge";
 const WORKSPACE_AGENT_ROOT = join(DEFAULT_WORKSPACE, ".zcode", "agents");
 const SUBAGENT_FORM_SELECTOR = `form:has(input[type="text"]):has(${sel(
   TID_CHAT_MODEL_SELECT_TRIGGER,
@@ -120,7 +119,7 @@ describe("Settings subagent 创建/编辑文件持久化 E2E", () => {
     await createCustomAgent(USER_CREATED, USER_AGENT_ROOT);
     await editCustomAgent(USER_CREATED, USER_UPDATED, USER_AGENT_ROOT);
 
-    await selectSubagentScope(basename(DEFAULT_WORKSPACE));
+    await selectSubagentScope(DEFAULT_WORKSPACE);
     await createCustomAgent(WORKSPACE_CREATED, WORKSPACE_AGENT_ROOT);
     await editCustomAgent(WORKSPACE_CREATED, WORKSPACE_UPDATED, WORKSPACE_AGENT_ROOT);
   });
@@ -128,7 +127,7 @@ describe("Settings subagent 创建/编辑文件持久化 E2E", () => {
   it("SE-02: 切换模型时物化 catalog 默认档位", async function () {
     this.timeout(CASE_TIMEOUT_MS);
 
-    await selectSubagentScope("User");
+    await selectSubagentScope("user");
 
     const generalScope = sel(testId(TID_SUBAGENT_ROW, "general-purpose"));
     // 从已有显式覆盖切换到另一模型后，只观察默认档位，不触发 effort 控件。
@@ -146,12 +145,12 @@ describe("Settings subagent 创建/编辑文件持久化 E2E", () => {
 
   it("SE-04: 内置官方插件 subagent 可见并按 agent id 持久化 model/effort 覆盖", async function () {
     this.timeout(CASE_TIMEOUT_MS);
-    await selectSubagentScope("User");
+    await selectSubagentScope("user");
     // 官方插件没有安装记录；真实 CLI seed 后，Settings 也必须发现相同的只读 profile。
     const judgeRowTestId = testId(TID_SUBAGENT_ROW, PLUGIN_JUDGE_AGENT_NAME);
     await waitForTestIdByDom(judgeRowTestId, {
       timeout: 30_000,
-      timeoutMsg: "Settings 未列出 document-skills:judge",
+      timeoutMsg: "Settings 未列出 documents:visual-judge",
     });
     const cacheRoot = join(
       resolveE2EStorageRoot(),
@@ -159,13 +158,13 @@ describe("Settings subagent 创建/编辑文件持久化 E2E", () => {
       "plugins",
       "cache",
       "zcode-plugins-official",
-      "document-skills",
+      "documents",
     );
     const artifacts = await Promise.all(
       (await readdir(cacheRoot, { withFileTypes: true }))
         .filter((entry) => entry.isDirectory())
         .map(async (entry) => {
-          const path = join(cacheRoot, entry.name, "agents", "judge.md");
+          const path = join(cacheRoot, entry.name, "agents", "visual-judge.md");
           return (await fileExists(path)) ? { path, content: await readFile(path, "utf8") } : null;
         }),
     );
@@ -338,7 +337,7 @@ async function persistBuiltInOverrides() {
     (state) => readBuiltInModelValue(state, "general-purpose") === PRIMARY_MODEL,
     "general-purpose model 没有写入 agents-state.json",
   );
-  // high 是该模型展示出的 catalog 默认档；显式点击仍必须形成持久化选择。
+  // high 是非默认档；显式点击必须覆盖自动补全的 max，并形成持久化选择。
   await selectThoughtLevelInScope(generalScope, "high");
   await waitForAgentsState(
     (state) => readBuiltInReasoningLevel(state, "general-purpose") === "high",
@@ -461,31 +460,28 @@ async function saveCustomAgentForm(name: string) {
   await waitForTestIdByDom(testId(TID_SUBAGENT_ROW, name));
 }
 
-async function selectSubagentScope(label: string) {
+async function selectSubagentScope(scopeKey: string) {
+  // 作用域标签包含设备名；使用稳定 key，避免显示文案变化导致菜单保持打开并污染后续用例。
   const trigger = $('[data-plugin-scope-trigger="true"]');
   await trigger.waitForClickable({ timeout: 15_000 });
   await trigger.click();
   await browser.waitUntil(
     () =>
-      browser.execute((expectedLabel) => {
+      browser.execute((key) => {
         const item = Array.from(
           document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
-        ).find((candidate) => candidate.innerText.trim() === expectedLabel);
+        ).find((candidate) => candidate.dataset.pluginScopeKey === key);
         if (!item) return false;
         item.click();
         return true;
-      }, label),
-    {
-      timeout: 15_000,
-      timeoutMsg: `Subagent scope 菜单没有出现 ${label}`,
-    },
+      }, scopeKey),
+    { timeout: 15_000, timeoutMsg: `Subagent scope 菜单没有出现 ${scopeKey}` },
   );
   await browser.waitUntil(
-    async () => (await $('[data-plugin-scope-trigger="true"]').getText()).includes(label),
-    {
-      timeout: 15_000,
-      timeoutMsg: `Subagent scope 没有切换到 ${label}`,
-    },
+    async () =>
+      (await $('[data-plugin-scope-trigger="true"]').getAttribute("data-plugin-scope-key")) ===
+      scopeKey,
+    { timeout: 15_000, timeoutMsg: `Subagent scope 没有切换到 ${scopeKey}` },
   );
 }
 

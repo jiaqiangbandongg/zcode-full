@@ -239,6 +239,10 @@ Todo103 补充验收：DT-01 的替代任务使用当前 Model Selection View �
 
 DF-01 verification (2026-09-07): macOS Desktop WDIO passed (`desktop-e2e-20260907040958265-p60496-c535b8967f7e59a1`). HTTP 200/400 business failures, body/header log ID, update rejection, streaming circuit status, and localized error rendering are covered by 124 passing unit tests. Typecheck, Desktop E2E typecheck, and lint passed (43 warnings, 0 errors). Pending case is not promoted. Live Feishu, Windows/Linux, mobile devices, and delivery-failure DOM interaction remain unverified; existing connection-error DOM regression CF-01 passed in macOS Desktop WDIO.
 
+## R3 Bot 身份回归（A3）
+
+`BOT-E2E-RW-02`：pending；Host resolver + Bot bridge + Main 精确路由合同与 Bot service synthetic 场景。覆盖 stable/legacy、同路径跨 Source、权限 key、runtime 换代。执行证据见 `packages/desktop/.e2e-artifacts/bot-identity-fix-20260916/`；不包含真实第三方消息投递和手机 relay。
+
 ## Group collaboration additions
 
 | Case          | Status  | Required evidence                                                        |
@@ -771,15 +775,14 @@ CLI 工具契约、当前执行输入绑定、来源持久化、反向协议，�
 证据必须分别标记 service synthetic、真实 CLI、Desktop DOM、手机 replayable 与 live tenant；
 本轮证据如下，不沿用旧通过次数。没有重新开启重复成功回执修复。
 
-
-| Case | 当前证据 | 结论 |
-| --- | --- | --- |
-| MN-02 / FN-01 | `conversation-session-bot-channel-worker.test.ts`：真实 CLI 工具、反向 RPC、两次原生提及、无来源桌面续聊；真实 text delta 丢帧，终态仍完整回传一次 | passed，formal |
-| TP-04 / TP-05 | `conversation-session-bot-topic-worker.test.ts`：收到真实流后自动停止，完成停止后才提交下一条；真实 ReadSessionContext 结果、落盘文件字节及跨任务拒绝 | passed，formal |
-| GR-02 正常晋升 / PS-01 | `conversation-session-bot-continuous-worker.test.ts`：群排队自然晋升并引用正确消息；真实 IM 首轮及 desktop service 续聊各回传一次 | passed，formal |
-| GR-UI-01 | `feishu-bound-groups-ui.test.ts`：Desktop 实际点击、RPC 保存、话题计数和其他群/机器人不变 | passed，formal |
-| TP-03 | 飞书/Lark × 是否明确提及共四场景：可信消息边界、真实 run 来源、引用当前提问、审批 @ 管理员、问答按提及决定 @ | passed，pending |
-| GR-02/04 旧 Desktop runtime | v3 状态文件、职业引导和新 Provider 分组夹具已更新；队列展示、取消、来源详情与已收到操作执行至通过；群草稿 `/mode yolo` 失败 | failed，不算全 case 通过 |
+| Case                        | 当前证据                                                                                                                                              | 结论                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| MN-02 / FN-01               | `conversation-session-bot-channel-worker.test.ts`：真实 CLI 工具、反向 RPC、两次原生提及、无来源桌面续聊；真实 text delta 丢帧，终态仍完整回传一次    | passed，formal           |
+| TP-04 / TP-05               | `conversation-session-bot-topic-worker.test.ts`：收到真实流后自动停止，完成停止后才提交下一条；真实 ReadSessionContext 结果、落盘文件字节及跨任务拒绝 | passed，formal           |
+| GR-02 正常晋升 / PS-01      | `conversation-session-bot-continuous-worker.test.ts`：群排队自然晋升并引用正确消息；真实 IM 首轮及 desktop service 续聊各回传一次                     | passed，formal           |
+| GR-UI-01                    | `feishu-bound-groups-ui.test.ts`：Desktop 实际点击、RPC 保存、话题计数和其他群/机器人不变                                                             | passed，formal           |
+| TP-03                       | 飞书/Lark × 是否明确提及共四场景：可信消息边界、真实 run 来源、引用当前提问、审批 @ 管理员、问答按提及决定 @                                          | passed，pending          |
+| GR-02/04 旧 Desktop runtime | v3 状态文件、职业引导和新 Provider 分组夹具已更新；队列展示、取消、来源详情与已收到操作执行至通过；群草稿 `/mode yolo` 失败                           | failed，不算全 case 通过 |
 
 新 worker case 的实际路径为 `packages/desktop/test/e2e/conversation-session/manual-review/pending/`；
 其他候选在 `packages/desktop/test/e2e/bots/manual-review/pending/`。
@@ -799,7 +802,6 @@ checker 对结果 marker 的提示不代表输入匹配缺失，结果 marker �
 2. TP-05 调试时旧 `readSessionMessages` 接口出现当前 CLI 返回结构与旧 schema 不匹配（messageId/sessionId 对 id/sessionID 等）。最终文件核验读取隔离 CLI SQLite 的真实 completed tool result，不绕过 ReadSessionContext 下载；该旧查询接口问题未在本次测试维护中修复。
 3. 实际手机 replayable、SSH、Windows/Linux、真实飞书/Lark 租户通知与另一机器人响应未验证。成功的 Node Host/CLI 测试不冒充 Electron UI，窄窗口不冒充手机。
 4. 初始验证时所有新增 case 保持 pending；随后用户确认转正，最终状态见下节。必要检查仍有失败，因此不自动 commit。
-
 
 GR-UI-01 最终隔离配置保留缺密钥的绑定引用，避免自动触发扫码注册；
 `desktop-e2e-20260923072504683-p46231-87bcca99bca1deb4` 中该项通过，截图可见两群开关与 2/0 话题数。

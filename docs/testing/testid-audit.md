@@ -92,7 +92,7 @@
 
 2. 在组件根元素加 `data-testid`：
    ```tsx
-   import { TID_PERMISSION_DIALOG } from "@zcode/shared";
+   import { TID_PERMISSION_DIALOG } from "@zcode/shared/test-ids";
    
    <Confirmation data-testid={TID_PERMISSION_DIALOG} ...>
    ```

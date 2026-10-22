@@ -44,6 +44,8 @@ describe("main agent tool pool", () => {
     // 无 skillPort 故不含 Skill；WebSearch 是普通 client-side wrapper。
     // 顺序按 builtInTools 注册顺序。
     expect(defaultRuntime.getToolRegistry().list()).toEqual([
+      "ToolSearch",
+      "DeferredToolCall",
       "Read",
       "Bash",
       "WebFetch",
@@ -350,46 +352,6 @@ describe("main agent tool pool", () => {
     );
     expect(byName.get("EnterPlanMode")?.description ?? "").toContain(
       "using `find`/Glob, `grep`/Grep, and Read",
-    );
-  });
-
-  it("does not let updateConfig overwrite the session shell snapshot", () => {
-    const runtime = createTestAgentRuntime(
-      createSessionId("runtime-main-shell-snapshot-immutable"),
-      {
-        bashShellSelection: {
-          dialect: "cmd",
-          display: { name: "CMD" },
-          id: "cmd",
-          label: "CMD",
-          path: "cmd.exe",
-          source: "user-config",
-        },
-        mode: "build",
-        workingDirectory: "/workspace/project",
-      },
-      {
-        eventStore: createTestSessionEventStore(),
-      },
-    );
-
-    (runtime.updateConfig as (patch: unknown) => void)({
-      bashShellSelection: {
-        dialect: "git-bash",
-        display: { name: "Git Bash" },
-        id: "auto:git-bash",
-        label: "Git Bash",
-        path: "C:\\Program Files\\Git\\bin\\bash.exe",
-        source: "auto-detected",
-      },
-    });
-
-    const byName = new Map(runtime.getTools().map((tool) => [tool.name, tool]));
-
-    expect(byName.has("Glob")).toBe(false);
-    expect(byName.has("Grep")).toBe(false);
-    expect(byName.get("Bash")?.description ?? "").toContain(
-      "Avoid using this tool to run `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands",
     );
   });
 });

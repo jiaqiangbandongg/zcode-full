@@ -32,6 +32,13 @@ function fixture(
       defaultHeaders: { AUTHORIZATION: "Bearer default-old-key", "X-API-KEY": "default-old-key" },
     },
     {
+      // 旧夹具依赖不完整凭据绕过校验；此处注入中性端口，安全合同由独立用例验证。
+      requestSecurityState: {
+        createExecution: () => ({
+          protectTransport: ({ transport }) => transport,
+          take: () => [],
+        }),
+      },
       transport: async (input, init) => {
         requests.push(new Request(input, init));
         // 捕获真实 SDK 最终请求头；不访问网络，不依赖各协议的成功响应格式。
@@ -46,7 +53,7 @@ function fixture(
     parseProviderConfig({
       group: "standard-personal",
       access,
-      api: { type: apiType, baseUrl: "https://open.bigmodel.cn/api/anthropic", headers },
+      api: { type: apiType, baseUrl: "https://model.example/api/anthropic", headers },
     }),
   );
   if (!provider.ok) throw new Error("invalid auth fixture");
@@ -97,7 +104,7 @@ describe.each(API_TYPES)("%s 请求期账号鉴权", (apiType) => {
   it.each(["api-key", "zhipu-coding-plan-api-key"] as const)(
     "%s 保留自定义认证头",
     async (type) => {
-      // 使用合法 PAT 形状隔离官方版本请求安全校验的旧路径，access 类型仍是手工 Key。
+      // access 类型决定认证头优先级；手工 Key 必须保留调用方自定义头。
       const { requests, bound } = fixture(apiType, { type, apiKey: TOKEN }, STATIC_HEADERS[0]!);
       await capture(
         bound.resolveRequest({ options: OPTIONS, requestAuth: { apiKey: TOKEN } }).model,

@@ -6,7 +6,7 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByDom, readSettings } from "../helpers/desktop-app.js";
 import { listConversationToolGroups } from "../helpers/conversation-session-tool-groups.js";
 import { ensureToolCrossProductFullAccessMode } from "../helpers/conversation-session-tool-cross-product.js";

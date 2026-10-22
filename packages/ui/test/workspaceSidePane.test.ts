@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   activateBrowserSidePane,
+  activateNewTabSidePane,
+  activateSidePaneTab,
   activateDeveloperToolsSidePane,
+  activatePluginMarketSidePane,
   applyBrowserUseSidePaneEvent,
   applyBrowserUseSidePaneVisibilityEvent,
   BROWSER_USE_OPERATION_INDICATOR_DURATION_MS,
-  closeAllSidePaneTabs,
   closeCodeViewerSidePane,
   closeOtherSidePaneTabs,
   closeSidePaneTab,
   getActiveSelectionSideChatTab,
   getActiveSidePaneTab,
   getVisibleSidePaneTabs,
-  isSidePaneTabVisibleForParent,
-  isWorkspaceGlobalSidePaneTab,
+  isSidePaneTabVisibleInScope,
   markBrowserUseSidePaneTabOperation,
   normalizeWorkspaceSidePaneState,
   openSelectionSideChatPane,
@@ -30,13 +31,15 @@ import {
   openOrActivateBrowserSidePaneByUrl,
   findBrowserSidePaneTabByUrl,
   openCodeViewerSidePane,
+  openFileManagerSidePane,
+  navigateFileManagerSidePane,
   openCodeViewerSidePanes,
   openTerminalSidePane,
   reorderSidePaneTab,
   resolveActiveTabForOwner,
   resolveSidePaneScopeState,
   restoreSidePaneTab,
-  selectSidePaneTabsForParent,
+  selectSidePaneTabsForScope,
   syncSubagentSessionSidePaneTabs,
   shouldMountSidePaneContent,
   applyBrowserTabResidencyEvent,
@@ -49,6 +52,73 @@ import {
 } from "../src/lib/workspaceSidePane.js";
 
 describe("workspaceSidePane", () => {
+  it("keeps a navigated file tab when reopening its original path", () => {
+    const original = { type: "file", title: "one.ts", path: "/workspace/one.ts" } as const;
+    const first = openCodeViewerSidePane(null, original);
+    const tabId = first.activeTabId;
+    const navigated = navigateFileManagerSidePane(first, tabId, {
+      type: "file",
+      title: "two.ts",
+      path: "/workspace/two.ts",
+    });
+    const reopened = openCodeViewerSidePane(navigated, original);
+    expect(reopened.tabs).toHaveLength(2);
+    expect(reopened.tabs[0]).toMatchObject({ id: tabId, source: { path: "/workspace/two.ts" } });
+    expect(reopened.activeTabId).not.toBe(tabId);
+    expect(openCodeViewerSidePane(reopened, original).tabs).toHaveLength(2);
+  });
+
+  it("navigates only the requested file manager and preserves its task scope", () => {
+    const target = {
+      workspacePath: "/workspace",
+      workspaceIdentity: "remote:one",
+      workspaceRemoteSessionId: "session-one",
+    };
+    const first = stampSidePaneTabsOwnership(openFileManagerSidePane(null, target), {
+      ownerTaskId: "task-one",
+      workspaceKey: "remote:one",
+    })!;
+    const second = openFileManagerSidePane(first, target);
+    const next = navigateFileManagerSidePane(second, first.activeTabId, {
+      type: "file",
+      title: "a.ts",
+      path: "/workspace/a.ts",
+    });
+    expect(next?.activeTabId).toBe(second.activeTabId);
+    expect(next?.tabs[0]).toMatchObject({
+      id: first.activeTabId,
+      ownerTaskId: "task-one",
+      workspaceKey: "remote:one",
+      target,
+      source: { path: "/workspace/a.ts" },
+    });
+    expect(next?.tabs[1]).toMatchObject({ source: null });
+  });
+
+  it("新标签页支持多开、重新激活与独立关闭", () => {
+    const first = activateNewTabSidePane(null);
+    const second = activateNewTabSidePane(first);
+    expect(second.tabs).toHaveLength(2);
+    expect(second.tabs[0]!.id).not.toBe(second.tabs[1]!.id);
+    expect(second.activeTabId).toBe(second.tabs[1]!.id);
+    const focused = activateSidePaneTab(second, first.tabs[0]!);
+    expect(focused.tabs).toHaveLength(2);
+    expect(getActiveSidePaneTab(focused)?.id).toBe(first.activeTabId);
+    const closed = closeSidePaneTab(focused, first.activeTabId);
+    expect(closed?.activeTabId).toBe(second.activeTabId);
+    expect(closeSidePaneTab(closed, second.activeTabId)).toBeNull();
+  });
+
+  it("新标签页只属于创建时的工作区与对话", () => {
+    const scope = { workspaceKey: "workspace-a", ownerTaskId: "task-a" };
+    const state = stampSidePaneTabsOwnership(activateNewTabSidePane(null), scope)!;
+    const tab = state.tabs[0]!;
+    expect(isSidePaneTabVisibleInScope(tab, scope)).toBe(true);
+    expect(isSidePaneTabVisibleInScope(tab, { ...scope, ownerTaskId: "task-b" })).toBe(false);
+    expect(isSidePaneTabVisibleInScope(tab, { ...scope, workspaceKey: "workspace-b" })).toBe(false);
+    expect(normalizeWorkspaceSidePaneState(state)).toEqual(state);
+  });
+
   const viewerSource = {
     type: "file" as const,
     title: "demo.ts",
@@ -605,8 +675,18 @@ describe("workspaceSidePane", () => {
       type: "plan-detail",
       toolCallId: "tool-plan-b",
     });
-    expect(getVisibleSidePaneTabs(second, "parent-a")).toHaveLength(2);
-    expect(getVisibleSidePaneTabs(second, "parent-b")).toHaveLength(0);
+    expect(
+      getVisibleSidePaneTabs(second.tabs, {
+        workspaceKey: second.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toHaveLength(2);
+    expect(
+      getVisibleSidePaneTabs(second.tabs, {
+        workspaceKey: second.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toHaveLength(0);
   });
 
   it("run 详情 tab 的落点（追记「五枚药丸与一扇门」）：随请求落、再开不带就删键、openedAt 刷新", () => {
@@ -695,8 +775,18 @@ describe("workspaceSidePane", () => {
       runId: "dwfrun-b",
     });
     // 可见性按 owning conversation 收窄，照 plan-detail。
-    expect(getVisibleSidePaneTabs(secondRun, "parent-a")).toHaveLength(2);
-    expect(getVisibleSidePaneTabs(secondRun, "parent-b")).toHaveLength(0);
+    expect(
+      getVisibleSidePaneTabs(secondRun.tabs, {
+        workspaceKey: secondRun.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toHaveLength(2);
+    expect(
+      getVisibleSidePaneTabs(secondRun.tabs, {
+        workspaceKey: secondRun.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toHaveLength(0);
   });
 
   it("同一个 runId 在不同 workspace / 不同 parent 下互不复用", () => {
@@ -735,9 +825,18 @@ describe("workspaceSidePane", () => {
       runId: "dwfrun-1",
     });
     const tab = state.tabs[0]!;
-    expect(isWorkspaceGlobalSidePaneTab(tab)).toBe(false);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-a")).toBe(true);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-b")).toBe(false);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toBe(true);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toBe(false);
 
     // GC 语义（照 plan-detail：无 GC）。事件日志读的是 journal，不是 workflowRuns 投影，
     // 所以被 8-run 上限淘汰的 run 仍有完整可读的事件日志——那恰恰是用户会留着这个 tab
@@ -761,9 +860,9 @@ describe("workspaceSidePane", () => {
       runId: "dwfrun-1",
     });
     // 先把 active 挪到一个当前 parent 下不可见的位置，逼 select 走 findLast 分支。
-    const selected = selectSidePaneTabsForParent(
+    const selected = selectSidePaneTabsForScope(
       { ...withRun, activeTabId: "missing" },
-      "parent-a",
+      { workspaceKey: "/workspace", ownerTaskId: "parent-a" },
     );
     expect(selected?.activeTabId).toBe("workflow-run:%2Fworkspace:parent-a:dwfrun-1");
   });
@@ -871,11 +970,30 @@ describe("workspaceSidePane", () => {
     });
     const tab = state.tabs[0]!;
 
-    expect(isWorkspaceGlobalSidePaneTab(tab)).toBe(false);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-a")).toBe(true);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-b")).toBe(false);
-    expect(getVisibleSidePaneTabs(state, "parent-a")).toHaveLength(1);
-    expect(getVisibleSidePaneTabs(state, "parent-b")).toHaveLength(0);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toBe(true);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toBe(false);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toHaveLength(1);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toHaveLength(0);
     expect(
       resolveActiveTabForOwner(state, { ownerTaskId: "parent-a", workspaceKey: "/workspace" }),
     ).toBe(tab.id);
@@ -927,9 +1045,9 @@ describe("workspaceSidePane", () => {
       siteId: "actor#1",
       ordinal: 1,
     });
-    const selected = selectSidePaneTabsForParent(
+    const selected = selectSidePaneTabsForScope(
       { ...withActor, activeTabId: "missing" },
-      "parent-a",
+      { workspaceKey: "/workspace", ownerTaskId: "parent-a" },
     );
     expect(selected?.activeTabId).toContain("workflow-actor-session:");
   });
@@ -1011,11 +1129,30 @@ describe("workspaceSidePane", () => {
     });
     const tab = state.tabs[0]!;
 
-    expect(isWorkspaceGlobalSidePaneTab(tab)).toBe(false);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-a")).toBe(true);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-b")).toBe(false);
-    expect(getVisibleSidePaneTabs(state, "parent-a")).toHaveLength(1);
-    expect(getVisibleSidePaneTabs(state, "parent-b")).toHaveLength(0);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toBe(true);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toBe(false);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toHaveLength(1);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toHaveLength(0);
   });
 
   it("子会话那套回收绝不吃产物 tab（产物的字节发布即钉住，run 被淘汰也还看得见）", () => {
@@ -1044,9 +1181,9 @@ describe("workspaceSidePane", () => {
       runId: "dwfrun-1",
       artifactId: "book",
     });
-    const selected = selectSidePaneTabsForParent(
+    const selected = selectSidePaneTabsForScope(
       { ...withArtifact, activeTabId: "missing" },
-      "parent-a",
+      { workspaceKey: "/workspace", ownerTaskId: "parent-a" },
     );
     expect(selected?.activeTabId).toContain("workflow-artifact:");
   });
@@ -1138,11 +1275,30 @@ describe("workspaceSidePane", () => {
       runId: "dwfrun-1",
     });
     const tab = state.tabs[0]!;
-    expect(isWorkspaceGlobalSidePaneTab(tab)).toBe(false);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-a")).toBe(true);
-    expect(isSidePaneTabVisibleForParent(tab, "parent-b")).toBe(false);
-    expect(getVisibleSidePaneTabs(state, "parent-a")).toHaveLength(1);
-    expect(getVisibleSidePaneTabs(state, "parent-b")).toHaveLength(0);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toBe(true);
+    expect(
+      isSidePaneTabVisibleInScope(tab, {
+        workspaceKey: tab.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toBe(false);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-a",
+      }),
+    ).toHaveLength(1);
+    expect(
+      getVisibleSidePaneTabs(state.tabs, {
+        workspaceKey: state.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "parent-b",
+      }),
+    ).toHaveLength(0);
   });
 
   it("子会话那套回收绝不吃脚本 transcript tab；切回对话时它与 workflow run 同档参与优先激活", () => {
@@ -1161,7 +1317,10 @@ describe("workspaceSidePane", () => {
         validChildSessionIds: [],
       }),
     ).toBe(state);
-    const selected = selectSidePaneTabsForParent({ ...state, activeTabId: "missing" }, "parent-a");
+    const selected = selectSidePaneTabsForScope(
+      { ...state, activeTabId: "missing" },
+      { workspaceKey: "/workspace", ownerTaskId: "parent-a" },
+    );
     expect(selected?.activeTabId).toContain("workflow-workspace:");
   });
 
@@ -1178,6 +1337,13 @@ describe("workspaceSidePane", () => {
         },
       ],
     });
+  });
+
+  it("reuses the plugin market tab and preserves other panels", () => {
+    const first = activatePluginMarketSidePane(activateDeveloperToolsSidePane(null));
+    const second = activatePluginMarketSidePane(first);
+    expect(second.tabs.map((tab) => tab.type)).toEqual(["developer-tools", "plugin-market"]);
+    expect(second.activeTabId).toBe("plugin-market");
   });
 
   it("keeps browser and code viewer side by side and activates browser", () => {
@@ -1839,10 +2005,6 @@ describe("workspaceSidePane", () => {
     });
   });
 
-  it("closes every side pane tab", () => {
-    expect(closeAllSidePaneTabs()).toBeNull();
-  });
-
   it("restores a closed tab as the active tab", () => {
     const state = restoreSidePaneTab(null, {
       id: "browser:a",
@@ -2324,6 +2486,94 @@ describe("workspaceSidePane", () => {
     });
   });
 
+  describe("所有标签类型的归属契约", () => {
+    const base = {
+      id: "tab",
+      workspaceKey: "ssh://one/repo",
+      workspacePath: "/repo",
+      ownerTaskId: "owner",
+      parentSessionId: "parent",
+      rootSessionId: "root",
+      sessionId: "session",
+      childSessionId: "child",
+      title: "Title",
+      runId: "run",
+      toolCallId: "call",
+      ordinal: 1,
+    };
+    // 每个类型都明确归属；新增类型时必须补齐这张验收表，不能落入默认公共分支。
+    const cases = {
+      browser: { tab: { ...base, type: "browser" }, owner: "owner" },
+      "browser-permissions": {
+        tab: { ...base, type: "browser-permissions", origin: "https://a.test" },
+        owner: "owner",
+      },
+      "code-viewer": {
+        tab: { ...base, type: "code-viewer", source: viewerSource, sourceKey: "file" },
+        owner: "owner",
+      },
+      whiteboard: { tab: { ...base, type: "whiteboard", boardId: "board" }, owner: "owner" },
+      "model-trajectory": {
+        tab: { ...base, type: "model-trajectory", taskId: "target" },
+        owner: "owner",
+      },
+      terminal: { tab: { ...base, type: "terminal" }, owner: "owner" },
+      "browser-use": { tab: { ...base, type: "browser-use", tabId: "logical" }, owner: "session" },
+      "bash-output": { tab: { ...base, type: "bash-output", workId: "work" }, owner: "root" },
+      "subagent-session": {
+        tab: { ...base, type: "subagent-session", subagentType: "Explore" },
+        owner: "root",
+      },
+      "subagent-directory": { tab: { ...base, type: "subagent-directory" }, owner: "root" },
+      "selection-side-chat": { tab: { ...base, type: "selection-side-chat" }, owner: "parent" },
+      "plan-detail": { tab: { ...base, type: "plan-detail", markdown: "plan" }, owner: "parent" },
+      "plugin-ui": {
+        tab: { ...base, type: "plugin-ui", pluginId: "example", resourceUri: "ui://example/app" },
+        owner: "parent",
+      },
+      "workflow-run": { tab: { ...base, type: "workflow-run" }, owner: "parent" },
+      "workflow-directory": { tab: { ...base, type: "workflow-directory" }, owner: "parent" },
+      "workflow-actor-session": {
+        tab: { ...base, type: "workflow-actor-session", siteId: "actor" },
+        owner: "parent",
+      },
+      "workflow-workspace": { tab: { ...base, type: "workflow-workspace" }, owner: "parent" },
+      "workflow-artifact": {
+        tab: { ...base, type: "workflow-artifact", artifactId: "artifact" },
+        owner: "parent",
+      },
+      git: { tab: { ...base, id: "git", type: "git" }, owner: null },
+      "developer-tools": {
+        tab: { ...base, id: "developer-tools", type: "developer-tools" },
+        owner: null,
+      },
+      // 插件市场是工作区级标签：同一工作区的各对话共用，跨工作区隔离。
+      "plugin-market": {
+        tab: { ...base, id: "plugin-market", type: "plugin-market" },
+        owner: null,
+      },
+      treemapping: { tab: { ...base, id: "treemapping", type: "treemapping" }, owner: null },
+    } satisfies Record<
+      WorkspaceSidePaneTab["type"],
+      { tab: WorkspaceSidePaneTab; owner: string | null }
+    >;
+    for (const [type, { tab, owner }] of Object.entries(cases)) {
+      it(`${type} 的显示与关闭后选择使用相同工作区和 owner`, () => {
+        const scope = { workspaceKey: base.workspaceKey, ownerTaskId: owner ?? "any" };
+        expect(isSidePaneTabVisibleInScope(tab, scope)).toBe(true);
+        expect(isSidePaneTabVisibleInScope(tab, { ...scope, workspaceKey: "ssh://two/repo" })).toBe(
+          false,
+        );
+        expect(isSidePaneTabVisibleInScope(tab, { ...scope, ownerTaskId: "other" })).toBe(
+          owner === null,
+        );
+        expect(
+          selectSidePaneTabsForScope({ tabs: [tab], activeTabId: "missing" }, scope)?.activeTabId,
+        ).toBe(tab.id);
+      });
+    }
+  });
+
   describe("按 (项目, 对话) 隔离", () => {
     // 便捷构造可见性作用域；workspaceKey 缺省 null（tab.workspaceKey==null 时对任意项目可见）。
     const scope = (ownerTaskId: string | null, workspaceKey: string | null = null) => ({
@@ -2611,4 +2861,23 @@ describe("workspaceSidePane", () => {
       ).toBeNull();
     });
   });
+});
+
+it("站点设置独立标签按 workspace/owner/origin 复用，不替换网页", () => {
+  const browser = activateBrowserSidePane(null, {
+    initialUrl: "https://site.test",
+    ownerTaskId: "task-a",
+    workspaceKey: "ssh:a",
+  });
+  const options = { origin: "https://site.test", ownerTaskId: "task-a", workspaceKey: "ssh:a" };
+  const opened = openBrowserPermissionsSidePane(browser, options);
+  expect(opened.tabs).toHaveLength(2);
+  expect(opened.tabs[0]).toEqual(browser.tabs[0]);
+  expect(openBrowserPermissionsSidePane(opened, options)).toEqual(opened);
+  expect(
+    openBrowserPermissionsSidePane(opened, { ...options, workspaceKey: "ssh:b" }).tabs,
+  ).toHaveLength(3);
+  expect(
+    openBrowserPermissionsSidePane(opened, { ...options, ownerTaskId: "task-b" }).tabs,
+  ).toHaveLength(3);
 });

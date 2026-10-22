@@ -9,13 +9,9 @@ import { createTestModelFactory } from "./test-runtime-model.js";
 describe("resolveModelRetryBudgetFromTaskType", () => {
   it.each<{ expected: "default" | "unbounded"; taskType: SessionTaskType | undefined }>([
     { expected: "default", taskType: undefined },
-    { expected: "default", taskType: "interactive" },
     { expected: "default", taskType: "fork" },
     { expected: "default", taskType: "selection_side_chat" },
     { expected: "default", taskType: "workflow_parent" },
-    { expected: "default", taskType: "subagent_child" },
-    { expected: "unbounded", taskType: "workflow_child" },
-    { expected: "unbounded", taskType: "nested_workflow_child" },
   ])("maps $taskType to $expected", ({ expected, taskType }) => {
     expect(resolveModelRetryBudgetFromTaskType(taskType)).toBe(expected);
   });

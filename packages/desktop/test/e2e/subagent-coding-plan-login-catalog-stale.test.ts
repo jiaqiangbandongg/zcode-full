@@ -1,6 +1,10 @@
+import type { ModelSelectionView } from "@zcode/provider";
 import {
   BUILTIN_MODEL_PROVIDER_IDS,
-  BUILTIN_PROVIDER_TEMPLATE_IDS,
+  decodeCustomModelValue,
+  encodeCustomModelValue,
+} from "@zcode/shared";
+import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
   TID_CHAT_MODEL_SELECT_TRIGGER,
@@ -12,28 +16,23 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_SUBAGENT_ROW,
   TID_TASK_SETTINGS_BUTTON,
-  decodeCustomModelValue,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
-import {
-  DEFAULT_WORKSPACE,
-  clearAppData,
-  clickTestIdByDom,
-  waitForTestIdByDom,
-} from "./helpers/desktop-app.js";
+} from "@zcode/shared/test-ids";
+import { clearAppData, clickTestIdByDom, waitForTestIdByDom } from "./helpers/desktop-app.js";
 import { UPSTREAM_MODEL, UPSTREAM_PROVIDER_ID } from "./helpers/upstream-provider.js";
 import { sel } from "./helpers/selectors.js";
+import { dismissOccupationOnboarding } from "#e2e/helpers/occupation-onboarding";
 
 const CASE_TIMEOUT_MS = 240_000;
 const CUSTOM_MODEL = encodeCustomModelValue(UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL);
+// 登录后的目录以当前内置配置的 GLM-5.3 为准，旧 release payload 不再定义模型成员。
 const CODING_PLAN_MODEL = encodeCustomModelValue(
   BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-  "GLM-5.2",
+  "GLM-5.3",
 );
 const GENERAL_PURPOSE_SCOPE = sel(testId(TID_SUBAGENT_ROW, "general-purpose"));
 
-interface WorkspaceCatalogSnapshot {
+interface ModelCatalogSnapshot {
   models: Array<{
     defaultThoughtLevel: string | null;
     providerId: string | null;
@@ -57,27 +56,25 @@ describe("BigModel 登录后 Subagent runtime catalog 滞后", () => {
 
     const loginSurface = await waitForInitialLoginSurface();
     if (loginSurface === "workspace") {
-      const seededRuntime = await waitForWorkspaceCatalogSeeded();
+      await openSubagentSettings();
+      const seededRuntime = await waitForModelCatalogSeeded();
+      expect(findCatalogModel(seededRuntime, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL)).not.toBeNull();
       expect(
-        findWorkspaceModel(seededRuntime, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
-      ).not.toBeNull();
-      expect(
-        findWorkspaceModel(
+        findCatalogModel(
           seededRuntime,
           BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-          "GLM-5.2",
+          "GLM-5.3",
         ),
       ).toBeNull();
-      await markSeededWorkspaceCatalogReady();
-      const runtimeBeforeLogin = await waitForWorkspaceCatalogReady();
+      const runtimeBeforeLogin = await waitForModelCatalogReady();
       expect(
-        findWorkspaceModel(runtimeBeforeLogin, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
+        findCatalogModel(runtimeBeforeLogin, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
       ).not.toBeNull();
       expect(
-        findWorkspaceModel(
+        findCatalogModel(
           runtimeBeforeLogin,
           BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-          "GLM-5.2",
+          "GLM-5.3",
         ),
       ).toBeNull();
       await startBigModelLoginFromSettings();
@@ -95,16 +92,15 @@ describe("BigModel 登录后 Subagent runtime catalog 滞后", () => {
       timeoutMsg: "BigModel OAuth callback 后没有进入已登录工作区",
     });
 
-    const runtimeAfterOAuth = await waitForWorkspaceCatalogSeeded();
-    expect(
-      findWorkspaceModel(runtimeAfterOAuth, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
-    ).not.toBeNull();
-    await markSeededWorkspaceCatalogReady();
     await openSubagentSettings();
-    const runtimeBeforeSelection = await waitForWorkspaceCatalogReady();
+    const runtimeAfterOAuth = await waitForModelCatalogSeeded();
     expect(
-      findWorkspaceModel(runtimeBeforeSelection, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
-    ).toEqual(expect.objectContaining({ thoughtLevels: expect.arrayContaining(["high", "max"]) }));
+      findCatalogModel(runtimeAfterOAuth, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL),
+    ).not.toBeNull();
+    const runtimeBeforeSelection = await waitForModelCatalogReady();
+    expect(findCatalogModel(runtimeBeforeSelection, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL)).toEqual(
+      expect.objectContaining({ thoughtLevels: expect.arrayContaining(["high", "max"]) }),
+    );
     await selectModelInScope(GENERAL_PURPOSE_SCOPE, CUSTOM_MODEL);
     await waitForReasoningControl("supported");
 
@@ -121,20 +117,20 @@ describe("BigModel 登录后 Subagent runtime catalog 滞后", () => {
     try {
       await waitForReasoningControl("supported");
     } catch (error) {
-      const runtime = await readWorkspaceCatalogSnapshot();
+      const runtime = await readModelCatalogSnapshot();
       throw new Error(
-        `登录后 Coding Plan reasoning effort 应立即可用；workspaceCatalog=${JSON.stringify(runtime)}`,
+        `登录后 Coding Plan reasoning effort 应立即可用；modelSelectionView=${JSON.stringify(runtime)}`,
         { cause: error },
       );
     }
 
-    const runtimeAfterSelection = await readWorkspaceCatalogSnapshot();
+    const runtimeAfterSelection = await readModelCatalogSnapshot();
     expect(runtimeAfterSelection.status).toBe("ready");
     expect(
-      findWorkspaceModel(
+      findCatalogModel(
         runtimeAfterSelection,
         BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-        "GLM-5.2",
+        "GLM-5.3",
       ),
     ).toEqual(expect.objectContaining({ thoughtLevels: expect.arrayContaining(["high", "max"]) }));
   });
@@ -159,6 +155,11 @@ async function waitForInitialLoginSurface(): Promise<"welcome" | "workspace"> {
   } | null = null;
   await browser.waitUntil(
     async () => {
+      // 隔离 HOME 首次启动会先显示职业引导，不能把它误判成登录页未加载。
+      if (await $('[data-testid="onboarding-page"]').isExisting()) {
+        await dismissOccupationOnboarding();
+        return false;
+      }
       latest = await browser.execute(
         (oauthLoginButtonId, loginTriggerId) => {
           const hasOAuthButton = Boolean(
@@ -209,7 +210,7 @@ async function startBigModelLoginFromSettings() {
     timeoutMsg: "设置页没有模型供应商分区入口",
   });
   await clickTestIdByDom(
-    testId(TID_MODEL_PROVIDER_NAV_ITEM, `preset:${BUILTIN_PROVIDER_TEMPLATE_IDS.bigmodel}`),
+    testId(TID_MODEL_PROVIDER_NAV_ITEM, `preset:${BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan}`),
     {
       timeout: 20_000,
       timeoutMsg: "模型供应商设置没有 BigModel Coding Plan 入口",
@@ -303,107 +304,83 @@ async function openSubagentSettings(): Promise<void> {
   });
 }
 
-async function waitForWorkspaceCatalogReady(): Promise<WorkspaceCatalogSnapshot> {
-  let latest: WorkspaceCatalogSnapshot = { models: [], status: null };
+async function waitForModelCatalogReady(): Promise<ModelCatalogSnapshot> {
+  let latest: ModelCatalogSnapshot = { models: [], status: null };
   await browser.waitUntil(
     async () => {
-      latest = await readWorkspaceCatalogSnapshot();
+      latest = await readModelCatalogSnapshot();
       return (
         latest.status === "ready" &&
-        findWorkspaceModel(latest, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL) !== null
+        findCatalogModel(latest, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL) !== null
       );
     },
     {
       timeout: 60_000,
-      timeoutMsg: `workspace runtime catalog 未就绪或缺少自定义模型: ${JSON.stringify(latest)}`,
+      timeoutMsg: `Local Host Model Selection View 未就绪或缺少自定义模型: ${JSON.stringify(latest)}`,
     },
   );
   return latest;
 }
 
-async function waitForWorkspaceCatalogSeeded(): Promise<WorkspaceCatalogSnapshot> {
-  let latest: WorkspaceCatalogSnapshot = { models: [], status: null };
+async function waitForModelCatalogSeeded(): Promise<ModelCatalogSnapshot> {
+  let latest: ModelCatalogSnapshot = { models: [], status: null };
   await browser.waitUntil(
     async () => {
-      latest = await readWorkspaceCatalogSnapshot();
-      return findWorkspaceModel(latest, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL) !== null;
+      latest = await readModelCatalogSnapshot();
+      return findCatalogModel(latest, UPSTREAM_PROVIDER_ID, UPSTREAM_MODEL) !== null;
     },
     {
       timeout: 60_000,
-      timeoutMsg: `登录前 workspace catalog 快照缺少自定义模型: ${JSON.stringify(latest)}`,
+      timeoutMsg: `登录前 Local Host Model Selection View 快照缺少自定义模型: ${JSON.stringify(latest)}`,
     },
   );
   return latest;
 }
 
-async function markSeededWorkspaceCatalogReady(): Promise<void> {
-  const updated = await browser.execute((workspacePath) => {
-    const state = (
-      window as typeof window & {
-        __zcodeSessionStoreE2E?: {
-          getState?: () => {
-            setConfigOptionsStatus?: (path: string, status: "ready") => void;
-          };
+async function readModelCatalogSnapshot(): Promise<ModelCatalogSnapshot> {
+  return browser.execute(
+    (rowId) => {
+      type Fiber = {
+        memoizedProps?: {
+          modelSelectionView?: ModelSelectionView;
+          modelSelectionLoading?: boolean;
         };
+        return?: Fiber;
+      };
+      const row = document.querySelector(`[data-testid="${rowId}"]`);
+      if (!row) return { models: [], status: null };
+      const fiberKey = Object.keys(row).find((key) => key.startsWith("__reactFiber$"));
+      let fiber = fiberKey ? (row as unknown as Record<string, Fiber>)[fiberKey] : undefined;
+      // Settings 已由 Local Host View 驱动；旧 workspace configOptions 不再承载模型目录。
+      // 只读页面实际消费的 props，不再人为写入 ready，避免掩盖登录后的刷新问题。
+      while (fiber) {
+        const props = fiber.memoizedProps;
+        if (props?.modelSelectionView) {
+          return {
+            models: props.modelSelectionView.providers.flatMap((provider) =>
+              provider.models.map((model) => ({
+                defaultThoughtLevel: null,
+                providerId: provider.providerId,
+                thoughtLevels: [...(model.config.optionSpecs.reasoningLevel?.values ?? [])],
+                value: `${provider.providerId}/${model.modelId}`,
+              })),
+            ),
+            status: props.modelSelectionLoading ? "loading" : "ready",
+          };
+        }
+        fiber = fiber.return;
       }
-    ).__zcodeSessionStoreE2E?.getState?.();
-    if (!state?.setConfigOptionsStatus) return false;
-    // E2E 启动夹具已预置真实 Agent catalog 内容，但不会同步 ready 标记；
-    // 本 case 只补齐“登录前 catalog 已稳定”的前置状态，不改模型目录本身。
-    state.setConfigOptionsStatus(workspacePath, "ready");
-    return true;
-  }, DEFAULT_WORKSPACE);
-  expect(updated).toBe(true);
+      return { models: [], status: null };
+    },
+    testId(TID_SUBAGENT_ROW, "general-purpose"),
+  );
 }
 
-async function readWorkspaceCatalogSnapshot(): Promise<WorkspaceCatalogSnapshot> {
-  return browser.execute((workspacePath) => {
-    type BrowserModelOption = {
-      modelDefaultThoughtLevel?: string;
-      modelProviderId?: string;
-      modelThoughtLevels?: string[];
-      value?: string;
-    };
-    type BrowserConfigOption = {
-      category?: string;
-      id?: string;
-      options?: BrowserModelOption[];
-      type?: string;
-    };
-    const store = (
-      window as typeof window & {
-        __zcodeSessionStoreE2E?: {
-          getState?: () => {
-            getWorkspaceState?: (path: string) => {
-              configOptions?: BrowserConfigOption[] | null;
-              configOptionsStatus?: string;
-            };
-          };
-        };
-      }
-    ).__zcodeSessionStoreE2E;
-    const workspace = store?.getState?.().getWorkspaceState?.(workspacePath);
-    const modelOption = workspace?.configOptions?.find(
-      (option) =>
-        option.type === "select" && (option.category === "model" || option.id === "model"),
-    );
-    return {
-      models: (modelOption?.options ?? []).map((option) => ({
-        defaultThoughtLevel: option.modelDefaultThoughtLevel ?? null,
-        providerId: option.modelProviderId ?? null,
-        thoughtLevels: option.modelThoughtLevels ?? null,
-        value: option.value ?? "",
-      })),
-      status: workspace?.configOptionsStatus ?? null,
-    };
-  }, DEFAULT_WORKSPACE);
-}
-
-function findWorkspaceModel(
-  snapshot: WorkspaceCatalogSnapshot,
+function findCatalogModel(
+  snapshot: ModelCatalogSnapshot,
   providerId: string,
   modelId: string,
-): WorkspaceCatalogSnapshot["models"][number] | null {
+): ModelCatalogSnapshot["models"][number] | null {
   return (
     snapshot.models.find(
       (model) =>

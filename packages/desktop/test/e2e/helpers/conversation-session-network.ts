@@ -21,6 +21,7 @@ export interface UpstreamToolResultSnapshot {
 
 export interface UpstreamRequestEvidence {
   fixtureId: string | null;
+  requestHost: string | null;
   path: string;
   requestJson: unknown;
   responseBodyBytes: number;
@@ -28,6 +29,7 @@ export interface UpstreamRequestEvidence {
   responseTextPreview: string | null;
   startedAt: string;
   status: E2ENetworkCaptureArtifact["records"][number]["status"];
+  statusCode: number | null;
 }
 
 export async function countUpstreamRequestsContaining(text: string) {
@@ -85,6 +87,7 @@ export async function getUpstreamRequestEvidence(
     )
     .map((record) => ({
       fixtureId: record.replay?.fixtureId ?? null,
+      requestHost: record.requestHeaders.host ?? null,
       path: record.path,
       requestJson: record.requestJson,
       responseBodyBytes: record.responseBodyBytes,
@@ -92,6 +95,7 @@ export async function getUpstreamRequestEvidence(
       responseTextPreview: record.responseTextPreview ?? null,
       startedAt: record.startedAt,
       status: record.status,
+      statusCode: record.statusCode ?? null,
     }));
 }
 
@@ -100,28 +104,17 @@ export async function getLatestUpstreamToolResultByToolCallId(
 ): Promise<UpstreamToolResultSnapshot | null> {
   const artifact = await readUpstreamCaptureArtifact();
   const records = artifact?.records ?? [];
-  for (
-    let recordIndex = records.length - 1;
-    recordIndex >= 0;
-    recordIndex -= 1
-  ) {
-    const result = readUpstreamToolResultFromRequest(
-      records[recordIndex]?.requestJson,
-      toolCallId,
-    );
+  for (let recordIndex = records.length - 1; recordIndex >= 0; recordIndex -= 1) {
+    const result = readUpstreamToolResultFromRequest(records[recordIndex]?.requestJson, toolCallId);
     if (result) return result;
   }
   return null;
 }
 
 /** 返回首个匹配 provider 请求实际暴露的工具名，用于核对 turn-scoped 工具权限边界。 */
-export async function getUpstreamRequestToolNames(
-  query: UpstreamRequestQuery,
-): Promise<string[]> {
+export async function getUpstreamRequestToolNames(query: UpstreamRequestQuery): Promise<string[]> {
   const record = await findUpstreamRequestRecord(query);
-  return readUpstreamRequestTools(record?.requestJson)
-    .map(readUpstreamToolName)
-    .filter(Boolean);
+  return readUpstreamRequestTools(record?.requestJson).map(readUpstreamToolName).filter(Boolean);
 }
 
 /** 返回首个匹配 provider 请求里的原始工具 contract，覆盖 description 与 input schema。 */
@@ -164,15 +157,8 @@ export async function findLastUpstreamRequestIndex(
   return null;
 }
 
-export async function waitForUpstreamRequestContaining(
-  text: string,
-  timeout = 30000,
-) {
-  await waitForUpstreamRequest(
-    { includes: [text] },
-    `没有捕获到 上游 请求 body: ${text}`,
-    timeout,
-  );
+export async function waitForUpstreamRequestContaining(text: string, timeout = 30000) {
+  await waitForUpstreamRequest({ includes: [text] }, `没有捕获到 上游 请求 body: ${text}`, timeout);
 }
 
 export async function waitForUpstreamRequest(
@@ -207,10 +193,7 @@ export async function waitForUpstreamRequest(
   }
 }
 
-export async function expectNoUpstreamRequestForTextWithin(
-  text: string,
-  durationMs: number,
-) {
+export async function expectNoUpstreamRequestForTextWithin(text: string, durationMs: number) {
   const before = await countUpstreamRequestsContaining(text);
   await browser.pause(durationMs);
   const after = await countUpstreamRequestsContaining(text);
@@ -259,12 +242,8 @@ function matchesUpstreamRequest(
     !captureContainsText(record.requestJson, "Generate a concise title") &&
     (query.includes ?? []).every((text) => captureContainsText(record.requestJson, text)) &&
     !(query.excludes ?? []).some((text) => captureContainsText(record.requestJson, text)) &&
-    (query.lastUserMessageIncludes ?? []).every((text) =>
-      latestUserMessageText.includes(text),
-    ) &&
-    !(query.lastUserMessageExcludes ?? []).some((text) =>
-      latestUserMessageText.includes(text),
-    )
+    (query.lastUserMessageIncludes ?? []).every((text) => latestUserMessageText.includes(text)) &&
+    !(query.lastUserMessageExcludes ?? []).some((text) => latestUserMessageText.includes(text))
   );
 }
 
@@ -276,9 +255,7 @@ function isUpstreamModelRequestPath(path: string): boolean {
 
 async function findUpstreamRequestRecord(query: UpstreamRequestQuery) {
   const artifact = await readUpstreamCaptureArtifact();
-  return (
-    artifact?.records.find((record) => matchesUpstreamRequest(record, query)) ?? null
-  );
+  return artifact?.records.find((record) => matchesUpstreamRequest(record, query)) ?? null;
 }
 
 function readUpstreamRequestTools(requestJson: unknown): unknown[] {
@@ -325,13 +302,24 @@ export function readUpstreamToolResultFromRequest(
   if (!requestJson || typeof requestJson !== "object") return null;
   const messages = (requestJson as { messages?: unknown }).messages;
   if (!Array.isArray(messages)) return null;
-  for (
-    let messageIndex = messages.length - 1;
-    messageIndex >= 0;
-    messageIndex -= 1
-  ) {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
     const message = messages[messageIndex];
     if (!message || typeof message !== "object") continue;
+    const openAiMessage = message as {
+      role?: unknown;
+      tool_call_id?: unknown;
+      content?: unknown;
+      is_error?: unknown;
+    };
+    if (openAiMessage.role === "tool" && openAiMessage.tool_call_id === toolCallId) {
+      // Chat Completions 使用独立 tool 消息，不放在 Anthropic content[].tool_result。
+      // 标准 OpenAI 没有错误布尔字段，调用方还须核对预期输出，不能仅凭 isError=false 判成功。
+      return {
+        content: readMessageContentText(openAiMessage.content),
+        isError: openAiMessage.is_error === true,
+        toolCallId,
+      };
+    }
     const content = (message as { content?: unknown }).content;
     if (!Array.isArray(content)) continue;
     for (let partIndex = content.length - 1; partIndex >= 0; partIndex -= 1) {
@@ -343,10 +331,7 @@ export function readUpstreamToolResultFromRequest(
         tool_use_id?: unknown;
         type?: unknown;
       };
-      if (
-        record.type !== "tool_result" ||
-        record.tool_use_id !== toolCallId
-      ) {
+      if (record.type !== "tool_result" || record.tool_use_id !== toolCallId) {
         continue;
       }
       return {

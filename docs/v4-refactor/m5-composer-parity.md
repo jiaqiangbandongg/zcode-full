@@ -227,6 +227,9 @@ workspace-default 旧 RPC 的 buildWorkspaceState 热路径）；工具条读会
   `{ workspaceKey, paneId, transportGeneration }`：同一事件循环内的组件重挂、StrictMode effect 重放
   必须复用同一个 pending/ready 预热，不得再次排入 `createSession`。真实卸载后的重新挂载若旧创建
   尚在飞，则必须等待旧 owner 退休完成。
+  模型 readiness 归属本次草稿检查生命周期：从正式会话进入草稿的首帧即为 checking，
+  不得先复用旧 ready 启动预热，再由 effect 回收。同路径再次进入草稿或切换模型目录服务时，
+  旧检查和旧首发复查的迟到结果不得覆盖当前检查。
   `draftRuntimeInvalidationVersion` 连续变化时只保留最新目标代；旧创建尚在飞时必须等其 ACK 后先发
   清理，再创建最新代，任意时刻同 owner 最多一个 `createSession` 在途。
 - **绑定语义不变**：pane 对外仍是 draft（shell 的 activeTaskId 仍 null，WorkspaceHeader
@@ -253,8 +256,37 @@ workspace-default 旧 RPC 的 buildWorkspaceState 热路径）；工具条读会
   ACK accepted 后再转成 `promoted`，明确拒绝或失效则转成 `discarded`。MCP 初始化、hooks 或 transport
   回压都可能让 Agent 已开始运行而 renderer 仍在等待 ACK，owner cleanup 在这个窗口内不得把该
   session 当成未使用 draft 删除。
-  预热缺席/失效（CLI 重启内存会话消失、sendText 被拒）→ 回落既有
-  `createSession + config` 路径，语义不丢。
+  **2026-09-15 单一创建归属修正**：首发必须向同一个预热 owner 等待当前创建任务，
+  不得把 `binding === null` 当成“没有创建”而另发 `createSession`。普通文本、附件、
+  shared context 和 `/goal` 共用此入口；配置仍在创建时初始化，首发携带点击时冻结的 Submission。
+  创建失败时本次提交失败并保留草稿；后台有界重试与用户显式重试仍由原 owner 管理，
+  不再另设发送侧创建入口。等待期间 workspace、
+  transport、invalidation 变化或真实卸载后，旧提交不得发送到新会话。首发 admission 结果未知时
+  保留原 binding 的 pending 生命周期，禁止换会话自动重发。
+  新草稿订阅已经建立、但旧创建仍在 retiring 时，本次首发先等待旧创建收口，再等待
+  当前订阅的创建；不能把 retiring 本身当成用户切换。等待资格按草稿订阅生命周期身份
+  校验，不能仅比较 invalidationVersion：即使版本相同，离开后再次进入也不能接续旧提交。
+  任一等待期间发生真实离开、workspace/transport 或版本变化，原提交都必须失效。
+
+  ```mermaid
+  sequenceDiagram
+    participant D as 草稿预热 owner
+    participant S as 点击发送
+    participant C as CLI
+    D->>C: createSession（唯一创建）
+    S->>D: 等待当前创建任务
+    C-->>D: session A
+    D-->>S: 同一代 binding A
+    S->>C: sendText / goal（A，冻结的 Submission）
+    C-->>S: accepted
+    S->>D: promote A，绑定详情页
+  ```
+
+  回归覆盖：延迟创建 ACK 时先点击发送，释放 ACK 前只有一条 createSession；释放后首条
+  admission 指向同一 session，覆盖普通文本、附件/context、goal、失败、换代和同步重挂。
+  桌面 continuous 与手机 shared-host replayable 均复用 UI owner；不改变 Host/runtime、
+  accepted input queue 或 stream 恢复边界。
+
 - **清理**：未首发就切走（选中其他任务/切 workspace/关分屏/卸载）→ `deleteSession`
   预热会话；effect cleanup 先给同 owner 的同步重挂一次接管机会，确认为真实离开后再清理。
   只有仍处于 `draft` 的预热会话允许自动删除；`promotion-pending`、`promoted`、`discarded` 都禁止

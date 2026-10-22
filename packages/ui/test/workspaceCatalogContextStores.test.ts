@@ -54,8 +54,8 @@ describe("workspace catalog context stores", () => {
       useSubagentsContextStore.getState().initialize(workspacePath, "glm", service, identityB),
     ]);
 
-    const keyA = getSubagentsContextKey(workspacePath, "glm", identityA);
-    const keyB = getSubagentsContextKey(workspacePath, "glm", identityB);
+    const keyA = getSubagentsContextKey(workspacePath, "glm", identityA, service);
+    const keyB = getSubagentsContextKey(workspacePath, "glm", identityB, service);
     expect(useSubagentsContextStore.getState().contexts[keyA]?.agents[0]?.name).toBe(
       "agent-shared-path-host-a",
     );

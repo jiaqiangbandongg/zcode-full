@@ -209,7 +209,7 @@ export interface ZCodeWorkspaceTaskListChanged {
   workspacePath: string;
   workspaceIdentity?: string;
   taskId?: string;
-  reason: "auto_archive" | "realtime_sync" | TaskRealtimeReason;
+  reason: TaskRealtimeReason;
   taskMeta?: ZCodeTaskMeta;
   /** Host 已确认该终态应制造后台未读；普通 status/resume/snapshot 收敛不得携带。 */
   unreadSignal?: "background_terminal";

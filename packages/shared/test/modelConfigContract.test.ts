@@ -4,7 +4,6 @@ import {
   modelPropertiesDataSchema,
   completeEnumOptionSpecDataSchema,
 } from "@zcode/shared/model-config";
-import { zcodeModelFormatPropertiesSchema } from "../src/zcode-protocol/index.js";
 
 describe("共享 Model 数据合同", () => {
   it("拒绝未发布的旧格式名字，不双读、不静默丢字段", () => {
@@ -22,17 +21,6 @@ describe("共享 Model 数据合同", () => {
         false,
       );
     }
-  });
-  it("协议只投影媒体格式，直接复用同一字段 schema，不复制约束", () => {
-    for (const key of ["inputFormat", "outputFormat"] as const) {
-      expect(zcodeModelFormatPropertiesSchema.shape[key]).toBe(
-        completeModelPropertiesDataSchema.shape[key],
-      );
-    }
-    expect(Object.keys(zcodeModelFormatPropertiesSchema.shape)).toEqual([
-      "inputFormat",
-      "outputFormat",
-    ]);
   });
 
   it("公共合同不把缺省/null补成默认能力，不放宽完整模型", () => {

@@ -14,6 +14,7 @@ This file is meant for coding agents. When generating or editing UI in this repo
 The dedicated `text-ui-*` scale is a mandatory repository-wide constraint for application interface typography:
 
 - UI components must use `text-ui-xl`, `text-ui-lg`, `text-ui-base`, `text-ui-caption`, `text-ui-sm`, or `text-ui-xs`.
+- The shared Settings section heading may use the dedicated `text-ui-settings-title` / `lg:text-ui-settings-title-lg` role defined below.
 - Do not introduce Tailwind's built-in `text-base`, `text-sm`, or `text-xs` for application UI.
 - Do not introduce arbitrary UI font sizes such as `text-[13px]` or inline `font-size` values.
 - The only content-level exceptions are code, Diff, and terminal rendering that consume their independent numeric font-size settings. Their surrounding controls, labels, headers, and metadata must still use `text-ui-*`.
@@ -89,6 +90,8 @@ Default light and dark CSS variables still exist as fallback foundations, but ne
   Low-elevation container surface.
 - **Surface Hover**: `--color-surface-hover`
   Hover state for low-elevation surfaces.
+- **Remote Continuity Panel**: `--color-remote-continuity-panel`, `--color-remote-continuity-panel-surface`, `--color-remote-continuity-panel-foreground`, `--color-remote-continuity-panel-subtle`
+  Reserved for the first-connect local-offline / remote-running comparison. It stays dark in both themes so the handoff remains visually stable; do not reuse it as a generic dark card.
 - **Card**: `--color-card`
   Standard content card background.
 - **Card Selected**: `--color-card-selected`
@@ -117,6 +120,8 @@ Default light and dark CSS variables still exist as fallback foundations, but ne
 
 ### Border colors
 
+- **Desktop Resize Handle**: `--color-resize-handle` uses sky-500 in light themes and sky-400 in dark themes. Use only for desktop workspace resize indicators; retain the existing geometry and interaction states.
+
 - **Border**: `--color-border`
   Default border and separator.
 - **Border Hover**: `--color-border-hover`
@@ -132,6 +137,9 @@ Default light and dark CSS variables still exist as fallback foundations, but ne
 - **Success**: `--color-success` with `--color-success-foreground`
 - **Warning**: `--color-warning` with `--color-warning-foreground`
 - **Destructive**: `--color-destructive` with `--color-destructive-foreground`
+- **Success surface**: `--color-success-surface` with `--color-success-surface-foreground`
+- **Warning surface**: `--color-warning-surface` with `--color-warning-surface-foreground`
+- **Destructive surface**: `--color-destructive-surface` with `--color-destructive-surface-foreground`
 - **Idle-time task**: `--color-idle-task` with `--color-idle-task-surface`
   Use only for idle-time queue and paused tags so they remain visually distinct
   from the green scheduled-task treatment.
@@ -139,6 +147,7 @@ Default light and dark CSS variables still exist as fallback foundations, but ne
 - **Diff Removed**: `--color-diff-removed` with `--color-diff-removed-foreground`
 
 Use semantic colors only for actual semantic states. Do not borrow success, warning, or destructive colors just to make a block feel louder.
+Use `*-surface` for translucent state chips and banners; pair it with the matching `*-surface-foreground` and never add ad-hoc alpha in a component. Surface foreground values must preserve at least 4.5:1 contrast across shipped themes.
 
 ### Blocking interaction colors
 
@@ -260,20 +269,27 @@ Each `text-ui-*` utility maps to the corresponding `--text-ui-*` CSS token.
 
 All interface typography must use the dedicated `text-ui-*` scale. The Appearance setting controls `--ui-font-size`, whose default is `14px`:
 
-| Token | Formula | Default |
-| --- | --- | ---: |
-| `text-ui-xl` | `--ui-font-size + 4px` | 18px |
-| `text-ui-lg` | `--ui-font-size + 2px` | 16px |
-| `text-ui-base` | `--ui-font-size` | 14px |
-| `text-ui-caption` | `--ui-font-size - 1px` | 13px |
-| `text-ui-sm` | `--ui-font-size - 2px` | 12px |
-| `text-ui-xs` | `--ui-font-size - 4px` | 10px |
-| `text-ui-2xs` | `--ui-font-size - 5px` | 9px |
+| Token             | Formula                | Default |
+| ----------------- | ---------------------- | ------: |
+| `text-ui-xl`      | `--ui-font-size + 4px` |    18px |
+| `text-ui-lg`      | `--ui-font-size + 2px` |    16px |
+| `text-ui-base`    | `--ui-font-size`       |    14px |
+| `text-ui-caption` | `--ui-font-size - 1px` |    13px |
+| `text-ui-sm`      | `--ui-font-size - 2px` |    12px |
+| `text-ui-xs`      | `--ui-font-size - 4px` |    10px |
+| `text-ui-2xs`     | `--ui-font-size - 5px` |     9px |
 
 `text-ui-2xs` is a restricted exception below the `text-ui-xs` floor: it is permitted
 only for graph **axis furniture** — timebase tick labels, channel codes, and unit
 suffixes in the workflow timeline — never for content, labels, or metadata.
 Treat any other use as a design-system defect.
+
+The shared Settings section heading uses `text-ui-settings-title` with
+`lg:text-ui-settings-title-lg`: `--ui-font-size + 10px` / `+ 16px` (24px / 30px
+at the default setting), with line-height ratios of `4 / 3` / `1.2` (32px / 36px
+by default). These tokens preserve the larger responsive heading while following
+the interface font setting. They are reserved for this page heading; ordinary
+section titles and controls retain the standard scale.
 
 `text-mobile-input-safe` is a fixed 16px platform-compatibility token. It is
 reserved for editable controls on mobile Web surfaces where iOS focus zoom must
@@ -288,14 +304,14 @@ be prevented, and therefore does not scale with `--ui-font-size`.
 
 The `text-ui-*` scale expresses stable semantic roles. Choose a token by content role rather than by isolated visual preference:
 
-| Token | Primary roles |
-| --- | --- |
-| `text-ui-xl` | Markdown `h1` and equivalent first-level reading headings |
-| `text-ui-lg` | Markdown `h2` and equivalent second-level reading headings |
-| `text-ui-base` | Markdown `h3`-`h6`, body copy, common buttons, workspace and section titles, and other primary UI text |
+| Token             | Primary roles                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `text-ui-xl`      | Markdown `h1` and equivalent first-level reading headings                                                    |
+| `text-ui-lg`      | Markdown `h2` and equivalent second-level reading headings                                                   |
+| `text-ui-base`    | Markdown `h3`-`h6`, body copy, common buttons, workspace and section titles, and other primary UI text       |
 | `text-ui-caption` | Compact supporting copy that must remain one step below body text, such as the New Task feature announcement |
-| `text-ui-sm` | Secondary copy, supporting information, helper text, Tooltip copy, and Markdown inline code |
-| `text-ui-xs` | Tooltip keyboard shortcuts, badges, compact labels, counters, and very weak metadata |
+| `text-ui-sm`      | Secondary copy, supporting information, helper text, Tooltip copy, and Markdown inline code                  |
+| `text-ui-xs`      | Tooltip keyboard shortcuts, badges, compact labels, counters, and very weak metadata                         |
 
 - Markdown `h3`-`h6` share `text-ui-base`; distinguish their hierarchy through weight: `h3`-`h4` use `font-semibold`, `h5` uses `font-medium`, and `h6` uses `font-normal`.
 - Body copy and common controls normally use `text-ui-base font-normal`; titles and labels may strengthen weight without changing their semantic size role.
@@ -369,6 +385,7 @@ The following explicit exceptions may retain `rounded-2xl`; do not extend them t
 
 - **Main chat input shell**: the actual `ChatPromptEditor` input shell may use `rounded-2xl`. Its drag overlay matches the shell because it covers the same surface, rather than introducing a nested container.
 - **Conversation status floating panel**: the shared shell may retain `rounded-2xl` across collapsed and expanded presentations.
+- **Side Pane full-view floating composer**: in Side Pane full view the main chat input shell floats on its own (no outer frame); the drawer that slides out from behind it and the answer bubble shown above it use `rounded-2xl` to match the shell; the minimized state and the answer bubble's close button are deliberate circles (`rounded-full`).
 - **Toast**: the independent notification shell may retain `rounded-2xl`.
 - **Brand icon backplates**: welcome-screen brand art and plugin-detail icons may retain `rounded-2xl` as part of their icon shape. This is not a general exception for icon buttons or content cards.
 
@@ -380,11 +397,11 @@ These exceptions do not automatically grant `2xl` to nested controls or content 
 
 Buttons, menu trigger buttons, ordinary Input, Textarea, and Select triggers default to `rounded-lg`. Adjust them according to the nearest rounded parent container:
 
-| Nearest rounded parent | Control radius |
-| --- | --- |
-| None, or `rounded-xl` and above | `rounded-lg` |
-| `rounded-lg` | `rounded-md` |
-| `rounded-md` / `rounded-sm` | `rounded-sm` |
+| Nearest rounded parent          | Control radius |
+| ------------------------------- | -------------- |
+| None, or `rounded-xl` and above | `rounded-lg`   |
+| `rounded-lg`                    | `rounded-md`   |
+| `rounded-md` / `rounded-sm`     | `rounded-sm`   |
 
 Control size and primary/secondary action emphasis do not independently change radius.
 
@@ -594,7 +611,7 @@ adding breakpoint overrides.
 ## Accessibility and Internationalization
 
 - Support keyboard navigation as a first-class interaction path.
-- Preserve visible focus behavior through the repo's established focus styling patterns.
+- Preserve the repo's established component focus styling. Do not add a shared `!important` outline to dialog descendants, remote controls, or settings navigation. Composite inputs use their existing outer border or ring without an additional inner outline. This also applies in forced-colors mode; test IDs are not styling contracts.
 - Ensure contrast remains safe in light, dark, and Zai modes.
 - Write layouts that tolerate longer translations.
 - Avoid icon-only meaning when a text label is practical.
@@ -628,3 +645,11 @@ adding breakpoint overrides.
 - use semantic error or success colors for non-semantic decoration
 - create components that only look correct in one theme
 - trade clarity for visual novelty in tool-heavy screens
+
+## Remote connection progress (RDUX-03)
+
+`--color-progress-surface` / `--color-progress-surface-foreground` express work in progress, including connecting, automatic recovery and updating. Use `bg-progress-surface` with `text-progress-surface-foreground`; the foreground can also color progress indicators and borders. Four themes define the pair and all parent backgrounds must retain a 4.5:1 text contrast.
+
+Remote state mapping: connected → success (neutral cloud in project rows); connecting/updating → progress; disconnected → neutral surface/subtle foreground; needs attention → warning; failed → destructive. SSH/WSL/Docker tokens are reserved for connection type labels, never connection status. Always include visible status text outside the connected state; recovery attempts are visible text. See the remote device UX specification for the authoritative mapping and glossary.
+
+远程可读辅助文字：`--color-remote-foreground-muted` / `text-remote-foreground-muted` 用于远程向导、设备卡和日志辅助文字、侧栏设备标签与设置导航；侧栏共享的任务/项目视图切换、分组操作及搜索快捷键也沿用此可读辅助文字等级，浅色 `#595959`、深色 `#b3b3b3`，在 sidebar / popover / surface / card / selected / background 上保持至少 4.5:1。Zai Light SSH 类型标签前景为 `#0867ce`，保持与 `#ebf4ff` 底色至少 4.5:1。

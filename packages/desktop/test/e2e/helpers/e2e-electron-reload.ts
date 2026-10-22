@@ -116,6 +116,7 @@ export async function reloadElectronSessionSafely(
 /** 完整重启 Electron，同时显式复用同一 userData，避免空 profile 掩盖恢复行为。 */
 export async function reloadElectronSessionPreservingBrowserProfile(
   browser: WebdriverIO.Browser,
+  options: E2EElectronProcessExitOptions = {},
 ): Promise<string> {
   const userDataDir = (await browser.electron.execute((electron) =>
     electron.app.getPath("userData"),
@@ -131,7 +132,7 @@ export async function reloadElectronSessionPreservingBrowserProfile(
       `--user-data-dir=${userDataDir}`,
     ],
   };
-  await reloadElectronSessionSafely(browser);
+  await reloadElectronSessionSafely(browser, options);
   return (await browser.electron.execute((electron) => electron.app.getPath("userData"))) as string;
 }
 

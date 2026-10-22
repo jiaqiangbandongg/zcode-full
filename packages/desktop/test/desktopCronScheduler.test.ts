@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import { utilityProcess as electronUtilityProcess } from "electron";
+import { hostCronRunMessageSchema, hostOffPeakRunMessageSchema } from "@zcode/shared";
 import { spawnCronScheduler } from "../src/main/desktopCronScheduler.js";
 
 vi.mock("electron", () => ({
@@ -21,6 +22,47 @@ class MockSchedulerProcess extends EventEmitter {
 }
 
 describe("desktopCronScheduler", () => {
+  it.each(["cron", "offpeak"] as const)(
+    "forwards and validates the saved %s project directory snapshot",
+    async (kind) => {
+      const child = new MockSchedulerProcess();
+      const host = { postMessage: vi.fn() };
+      vi.mocked(electronUtilityProcess.fork).mockReturnValue(child as never);
+      const scheduler = spawnCronScheduler({
+        hostProcessLocalEnv: {},
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+        resolveDispatchHost: () => host as never,
+      });
+      const execution = {
+        workspacePath: "/frozen",
+        workspaceIdentity: "remote:server:s:/frozen",
+        projectId: "p",
+        hostId: "remote:server:s",
+        additionalDirectories: [],
+      };
+      child.emit("message", {
+        ...execution,
+        type: `${kind}-dispatch-request`,
+        prompt: "run",
+        ...(kind === "cron"
+          ? { automationId: "a", runId: "r" }
+          : {
+              offPeakTaskId: "o",
+              permissionMode: "default",
+              modelSelection: { providerId: "p", modelId: "m" },
+            }),
+      });
+      const frame = host.postMessage.mock.calls[0]?.[0];
+      expect(frame).toMatchObject(execution);
+      expect(
+        (kind === "cron" ? hostCronRunMessageSchema : hostOffPeakRunMessageSchema).parse(frame),
+      ).toMatchObject(execution);
+      const disposing = scheduler.dispose();
+      child.emit("exit", 0);
+      await disposing;
+    },
+  );
+
   it("立即执行时直接向 scheduler 发送 wake 消息", () => {
     const child = new MockSchedulerProcess();
     vi.mocked(electronUtilityProcess.fork).mockReturnValue(child as never);

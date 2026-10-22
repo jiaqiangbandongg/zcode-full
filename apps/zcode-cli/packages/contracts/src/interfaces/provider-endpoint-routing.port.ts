@@ -1,6 +1,7 @@
 import type { TraceContext } from "../tracing/tracer.js";
 
 export interface ProviderEndpointRoutingDecision {
+  headers?: Readonly<Record<string, string>>;
   routed: boolean;
   url: string;
 }

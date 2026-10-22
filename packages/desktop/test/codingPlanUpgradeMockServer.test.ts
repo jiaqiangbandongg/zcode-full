@@ -196,6 +196,45 @@ describe("Coding Plan upgrade E2E mock server", () => {
     ]);
   });
 
+  it("营销升级在领取前可查询项目凭据，同时保持个人无订阅", async () => {
+    server = await startCodingPlanUpgradeMockServer("manual-claim-experience", {
+      marketingTouch: true,
+    });
+    const customer = await fetchJson<{ data: { organizations: unknown[] } }>(
+      `${server.baseUrl}/api/biz/customer/getCustomerInfo`,
+    );
+    expect(customer.data.organizations).toEqual([
+      { organizationId: "org-e2e", projects: [{ projectId: "proj-e2e", projectType: 0 }] },
+    ]);
+    expect(await fetchJson(`${server.baseUrl}/api/biz/subscription/list`)).toMatchObject({
+      data: [],
+    });
+    await resetCodingPlanUpgradeMockServer(server.baseUrl, "manual-claim-experience");
+    expect(await fetchJson(`${server.baseUrl}/api/biz/customer/getCustomerInfo`)).toMatchObject({
+      data: { organizations: [] },
+    });
+  });
+
+  it.each(["personal-sold-out", "personal-system-busy"] as const)(
+    "%s keeps credentials queryable while entitlement reports no plan",
+    async (scenario) => {
+      server = await startCodingPlanUpgradeMockServer(scenario);
+      const customer = await fetchJson<{ data: { organizations: unknown[] } }>(
+        `${server.baseUrl}/api/biz/customer/getCustomerInfo`,
+      );
+      expect(customer.data.organizations).toEqual([
+        { organizationId: "org-e2e", projects: [{ projectId: "proj-e2e", projectType: 0 }] },
+      ]);
+      expect(await fetchJson(`${server.baseUrl}/api/biz/subscription/list`)).toMatchObject({
+        data: [],
+      });
+      expect(await fetchJson(`${server.baseUrl}/api/monitor/usage/quota/limit`)).toMatchObject({
+        code: 404,
+        data: null,
+      });
+    },
+  );
+
   it("injects query/report faults without losing the request ledger and clears them on reset", async () => {
     server = await startCodingPlanUpgradeMockServer("manual-claim-experience", {
       marketingTouch: true,
@@ -268,6 +307,41 @@ describe("Coding Plan upgrade E2E mock server", () => {
     );
     expect(preview.code).toBe(503);
   });
+
+  it.each([false, true])(
+    "isolates marketing across worker resets (initial=%s)",
+    async (initial) => {
+      server = await startCodingPlanUpgradeMockServer("personal-sold-out", {
+        marketingTouch: initial,
+      });
+      const base = server.baseUrl;
+      await resetCodingPlanUpgradeMockServer(base, "manual-claim-experience", {
+        marketingTouch: true,
+      });
+      const delivery = await fetchJson<{ data: { deliveries: unknown[] } }>(
+        `${base}/api/v1/marketing/touch`,
+      );
+      expect(delivery.data.deliveries).toHaveLength(2);
+      await fetchJson(`${base}/__e2e/marketing/reset`, { method: "POST", body: "{}" });
+
+      await resetCodingPlanUpgradeMockServer(base, "personal-system-busy");
+      const disabled = await fetchJson<{ data: { deliveries: unknown[] } }>(
+        `${base}/api/v1/marketing/touch`,
+      );
+      expect(disabled.data.deliveries).toEqual([]);
+      expect((await fetch(`${base}/__e2e/marketing/state`)).status).toBe(404);
+
+      await resetCodingPlanUpgradeMockServer(base, "manual-claim-experience", {
+        marketingTouch: true,
+      });
+      const fresh = await fetchJson<{ data: { deliveries: unknown[] } }>(
+        `${base}/api/v1/marketing/touch`,
+      );
+      expect(fresh.data.deliveries).toHaveLength(2);
+      const ledger = await fetchJson<{ events: unknown[] }>(`${base}/__e2e/marketing/state`);
+      expect(ledger.events).toEqual([]);
+    },
+  );
 
   it("keeps the old Start Plan bucket until the scheduled claim bucket becomes ready", async () => {
     server = await startCodingPlanUpgradeMockServer("manual-claim-experience");

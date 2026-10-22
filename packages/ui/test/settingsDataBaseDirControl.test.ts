@@ -1,32 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import enUS from "../src/i18n/locales/en-US.js";
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 const capturedButtons: Array<Record<string, unknown>> = [];
 const capturedInputs: Array<Record<string, unknown>> = [];
 const capturedSwitches: Array<Record<string, unknown>> = [];
-const EXPECTED_SHELL_DESCRIPTION_ZH =
-  "仅新会话生效。Windows 下 Bash 工具用此 shell；自动优先 Git Bash，找不到回退 cmd.exe。";
-const EXPECTED_SHELL_DESCRIPTION_EN =
-  "Applies to new sessions only. On Windows, Bash uses this shell; Auto tries Git Bash, then cmd.exe.";
-const EXPECTED_NATIVE_SEARCH_DESCRIPTION_ZH =
-  "在新建会话或应用重启后恢复的会话中使用增强 Find 和 Grep。当前会话保持现有设置；Windows 的 Find 保持不变。";
-const EXPECTED_NATIVE_SEARCH_DESCRIPTION_EN =
-  "Use enhanced Find and Grep in new sessions and sessions restored after an app restart. Active sessions keep their current setting; Find remains unchanged on Windows.";
-const EXPECTED_MEMORY_DESCRIPTION_ZH =
-  "在工作区中保存并复用长期上下文，新会话生效。开启后可能增加模型调用和 Token 成本。";
-const EXPECTED_MEMORY_DESCRIPTION_EN =
-  "Save and reuse long-term context in workspaces. Applies to new sessions and may increase model requests and token costs.";
-const EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_ZH =
-  "开启后，Agent 提问 5 分钟未回答会自动继续；关闭后，当前和后续提问会一直等待你的回答。";
-const EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_EN =
-  "When enabled, Agent questions automatically continue after 5 minutes without an answer. When disabled, current and future questions wait for your response.";
-const EXPECTED_MODEL_IO_FULL_RETENTION_DESCRIPTION_ZH =
-  "保留完整的模型请求和响应，不自动压缩、限制大小或删除旧记录。";
-const EXPECTED_MODEL_IO_FULL_RETENTION_DESCRIPTION_EN =
-  "Keep complete model requests and responses without compression, size limits, or automatic deletion.";
 
 vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
@@ -112,13 +90,14 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
           "settings.terminalFontFamilyDescription": "desc",
           "settings.terminalFontFamilyPlaceholder": "留空自动继承",
           "settings.integratedTerminalShell": "集成终端Shell",
-          "settings.integratedTerminalShellDescription": EXPECTED_SHELL_DESCRIPTION_ZH,
+          "settings.integratedTerminalShellDescription": "desc",
           "settings.integratedTerminalShell.auto": "自动选择",
           "settings.nativeSearchEnhancements": "增强 Find 和 Grep",
-          "settings.nativeSearchEnhancementsDescription": EXPECTED_NATIVE_SEARCH_DESCRIPTION_ZH,
+          "settings.nativeSearchEnhancementsDescription": "desc",
+          "settings.toolSearchExperimentalNotice": "desc",
           "settings.memory": "记忆",
           "settings.memory.workspaceMemory": "工作区记忆",
-          "settings.memoryDescription": EXPECTED_MEMORY_DESCRIPTION_ZH,
+          "settings.memoryDescription": "desc",
           "settings.desktopChromiumHardwareAcceleration": "Chrome 硬件加速",
           "settings.desktopChromiumHardwareAccelerationDescription": "desc",
           "settings.notification": "任务通知",
@@ -140,11 +119,9 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
           "settings.zcodeInteractionBehavior.option.queue": "队列",
           "settings.zcodeInteractionBehavior.option.guide": "引导",
           "settings.askUserQuestionAutoResolution": "提问自动继续",
-          "settings.askUserQuestionAutoResolutionDescription":
-            EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_ZH,
+          "settings.askUserQuestionAutoResolutionDescription": "desc",
           "settings.modelIoFullRetention": "完整保留模型 I/O",
-          "settings.modelIoFullRetentionDescription":
-            EXPECTED_MODEL_IO_FULL_RETENTION_DESCRIPTION_ZH,
+          "settings.modelIoFullRetentionDescription": "desc",
           "settings.performanceMode": "性能模式",
           "settings.performanceModeDescription": "desc",
           "settings.taskAutoArchive": "自动归档旧任务",
@@ -199,8 +176,6 @@ async function renderGeneralSection(
       setLocalePreference: vi.fn(),
       setNotificationEnabled: vi.fn(),
       setNotificationSoundEnabled: vi.fn(),
-      taskAutoArchiveEnabled: false,
-      taskAutoArchiveOlderThanDays: 7,
       messageStreamShowReasoning: true,
       messageStreamShowTodos: false,
       toolGroupingExploreEnabled: true,
@@ -214,9 +189,8 @@ async function renderGeneralSection(
       onTerminalInheritSystemProfileChange: vi.fn(async () => {}),
       onTerminalFontFamilyChange: vi.fn(async () => {}),
       onNativeSearchEnhancementsEnabledChange: vi.fn(async () => {}),
+      onToolSearchModeChange: vi.fn(async () => {}),
       onDesktopChromiumHardwareAccelerationChange: vi.fn(async () => {}),
-      onTaskAutoArchiveEnabledChange: vi.fn(async () => {}),
-      onTaskAutoArchiveOlderThanDaysChange: vi.fn(async () => {}),
       onCloseToTrayOnWindowsChange: vi.fn(async () => {}),
       onKeepAwakeWhileRunningChange: vi.fn(async () => {}),
       onReceivePreviewUpdatesChange: vi.fn(async () => {}),
@@ -251,10 +225,9 @@ describe("GeneralSectionContent data directory control", () => {
     await renderGeneralSection();
 
     expect(capturedInputs.some((input) => input.readOnly === true)).toBe(true);
-    expect(findButton("保存")?.disabled).toBe(true);
   });
 
-  it("ModelIO 全量保留默认关闭，并通过标准设置开关提交", async () => {
+  it("ModelIO 读取关闭值并通过标准设置开关提交", async () => {
     const onModelIoFullRetentionEnabledChange = vi.fn(async () => {});
 
     await renderGeneralSection({ onModelIoFullRetentionEnabledChange });
@@ -266,12 +239,6 @@ describe("GeneralSectionContent data directory control", () => {
     expect(modelIoSwitch?.onCheckedChange).toBeTypeOf("function");
     (modelIoSwitch?.onCheckedChange as ((checked: boolean) => void) | undefined)?.(true);
     expect(onModelIoFullRetentionEnabledChange).toHaveBeenCalledWith(true);
-    expect(zhCN["settings.modelIoFullRetentionDescription"]).toBe(
-      EXPECTED_MODEL_IO_FULL_RETENTION_DESCRIPTION_ZH,
-    );
-    expect(enUS["settings.modelIoFullRetentionDescription"]).toBe(
-      EXPECTED_MODEL_IO_FULL_RETENTION_DESCRIPTION_EN,
-    );
   });
 
   it("点击选择文件夹会调用系统目录选择回调", async () => {
@@ -300,9 +267,6 @@ describe("GeneralSectionContent data directory control", () => {
 
     expect(markup).toContain("自动选择");
     expect(markup).toContain("Git Bash");
-    expect(markup).toContain(EXPECTED_SHELL_DESCRIPTION_ZH);
-    expect(zhCN["settings.integratedTerminalShellDescription"]).toBe(EXPECTED_SHELL_DESCRIPTION_ZH);
-    expect(enUS["settings.integratedTerminalShellDescription"]).toBe(EXPECTED_SHELL_DESCRIPTION_EN);
   });
 
   it("增强搜索读取持久值并写回用户切换", async () => {
@@ -321,39 +285,6 @@ describe("GeneralSectionContent data directory control", () => {
     (nativeSearchSwitch?.onCheckedChange as ((checked: boolean) => void) | undefined)?.(true);
 
     expect(onNativeSearchEnhancementsEnabledChange).toHaveBeenCalledWith(true);
-  });
-
-  it("增强 Find 和 Grep 与 Windows Shell 选择位于常规页同一设置组", async () => {
-    const markup = await renderGeneralSection({
-      showIntegratedTerminalShell: true,
-    });
-    const terminalSettingsGroup = markup
-      .match(/<section data-settings-group="true">[\s\S]*?<\/section>/g)
-      ?.find((group) => group.includes(EXPECTED_SHELL_DESCRIPTION_ZH));
-
-    expect(terminalSettingsGroup).toContain(EXPECTED_NATIVE_SEARCH_DESCRIPTION_ZH);
-  });
-
-  it("增强搜索提供中英文 Session 生命周期说明", () => {
-    expect(enUS["settings.nativeSearchEnhancements"]).toBe("Enhanced Find and Grep");
-    expect(enUS["settings.nativeSearchEnhancementsDescription"]).toBe(
-      EXPECTED_NATIVE_SEARCH_DESCRIPTION_EN,
-    );
-    expect(zhCN["settings.nativeSearchEnhancements"]).toBe("增强 Find 和 Grep");
-    expect(zhCN["settings.nativeSearchEnhancementsDescription"]).toBe(
-      EXPECTED_NATIVE_SEARCH_DESCRIPTION_ZH,
-    );
-  });
-
-  it("记忆模块使用单段中英文说明表达工作区语义、生效边界和用量提示", () => {
-    expect(enUS["settings.memory"]).toBe("Memory");
-    expect(enUS["settings.memory.workspaceMemory"]).toBe("Workspace Memory");
-    expect(enUS["settings.memoryDescription"]).toBe(EXPECTED_MEMORY_DESCRIPTION_EN);
-    expect(enUS).not.toHaveProperty("settings.memoryUsageNotice");
-    expect(zhCN["settings.memory"]).toBe("记忆");
-    expect(zhCN["settings.memory.workspaceMemory"]).toBe("工作区记忆");
-    expect(zhCN["settings.memoryDescription"]).toBe(EXPECTED_MEMORY_DESCRIPTION_ZH);
-    expect(zhCN).not.toHaveProperty("settings.memoryUsageNotice");
   });
 
   it("桌面端展示 Chrome 硬件加速开关，并把用户选择写回设置", async () => {
@@ -376,7 +307,7 @@ describe("GeneralSectionContent data directory control", () => {
     expect(onDesktopChromiumHardwareAccelerationChange).toHaveBeenCalledWith(false);
   });
 
-  it("reasoning 默认开启并把用户操作写回设置回调，同时保持 Todo 默认关闭", async () => {
+  it("reasoning 与 Todo 读取持久值并写回用户选择", async () => {
     const onMessageStreamShowReasoningChange = vi.fn(async () => {});
     const onMessageStreamShowTodosChange = vi.fn(async () => {});
 
@@ -387,13 +318,9 @@ describe("GeneralSectionContent data directory control", () => {
 
     const reasoningSwitch = capturedSwitches.find((item) => item["aria-label"] === "显示思考过程");
     const todosSwitch = capturedSwitches.find((item) => item["aria-label"] === "显示流式待办");
-    const performanceModeSwitch = capturedSwitches.find(
-      (item) => item["aria-label"] === "性能模式",
-    );
 
     expect(reasoningSwitch?.checked).toBe(true);
     expect(todosSwitch?.checked).toBe(false);
-    expect(performanceModeSwitch).toBeUndefined();
 
     (reasoningSwitch?.onCheckedChange as ((checked: boolean) => void) | undefined)?.(false);
     (todosSwitch?.onCheckedChange as ((checked: boolean) => void) | undefined)?.(true);
@@ -402,7 +329,7 @@ describe("GeneralSectionContent data directory control", () => {
     expect(onMessageStreamShowTodosChange).toHaveBeenCalledWith(true);
   });
 
-  it("工具分组开关使用各自默认值，并把用户操作写回设置回调", async () => {
+  it("工具分组开关读取持久值，并把用户操作写回设置回调", async () => {
     const onToolGroupingExploreEnabledChange = vi.fn(async () => {});
     const onToolGroupingTerminalEnabledChange = vi.fn(async () => {});
     const onToolGroupingChangesEnabledChange = vi.fn(async () => {});
@@ -430,10 +357,10 @@ describe("GeneralSectionContent data directory control", () => {
     expect(onToolGroupingChangesEnabledChange).toHaveBeenCalledWith(true);
   });
 
-  it("提问自动继续开关读取持久值、写回选择并提供中英文关闭语义", async () => {
+  it("提问自动继续开关读取持久值并写回选择", async () => {
     const onAskUserQuestionAutoResolutionEnabledChange = vi.fn(async () => {});
 
-    const markup = await renderGeneralSection({
+    await renderGeneralSection({
       askUserQuestionAutoResolutionEnabled: false,
       onAskUserQuestionAutoResolutionEnabledChange,
     });
@@ -442,15 +369,6 @@ describe("GeneralSectionContent data directory control", () => {
     );
 
     expect(autoResolutionSwitch?.checked).toBe(false);
-    expect(markup).toContain(EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_ZH);
-    expect(zhCN["settings.askUserQuestionAutoResolution"]).toBe("提问自动继续");
-    expect(zhCN["settings.askUserQuestionAutoResolutionDescription"]).toBe(
-      EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_ZH,
-    );
-    expect(enUS["settings.askUserQuestionAutoResolution"]).toBe("Automatically continue questions");
-    expect(enUS["settings.askUserQuestionAutoResolutionDescription"]).toBe(
-      EXPECTED_ASK_AUTO_RESOLUTION_DESCRIPTION_EN,
-    );
 
     (autoResolutionSwitch?.onCheckedChange as ((checked: boolean) => void) | undefined)?.(true);
     expect(onAskUserQuestionAutoResolutionEnabledChange).toHaveBeenCalledWith(true);

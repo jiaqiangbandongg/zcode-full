@@ -2,6 +2,13 @@
  * 安全边界约束：本文件被匿名公开分享页（packages/web/src/share）直接引用，新增依赖必须考虑
  * 公开页 bundle 体积与无 Desktop 宿主（window.zcode / PlatformProvider / tab store）的运行环境；
  * Desktop 专属能力（如 open-with 子树）一律由消费方经组件注入，不得静态 import。 */
+import { ToolPresentation } from "@/ToolCallBlocks/ToolPresentation.js";
+import {
+  useToolPresentationCapabilities,
+  ToolPresentationCapabilitiesProvider,
+} from "@/ToolCallBlocks/presentationCapabilities.js";
+import { toolCallRowToLegacyNode } from "@/v4/toolCallRowAdapter.js";
+import type { ShareToolPresentationPayload } from "@zcode/shared";
 import {
   createContext,
   Fragment,
@@ -14,18 +21,12 @@ import {
   useMemo,
   useState,
 } from "react";
+import { ChevronRightIcon, FileTextIcon, InfoIcon } from "lucide-react";
 import {
-  ChevronRightIcon,
-  FilePenLineIcon,
-  FileTextIcon,
-  FilesIcon,
-  InfoIcon,
-  MonitorIcon,
-  SearchIcon,
-  SquareTerminalIcon,
-  WrenchIcon,
-} from "lucide-react";
-import { getCompactToolCallStatusMessageId, type Locale } from "@zcode/shared";
+  conversationShareContentEnvelopeSchema,
+  decodeConversationShareContentBlocks,
+  type Locale,
+} from "@zcode/shared";
 import type {
   ArtifactRow,
   AssistantTextRow,
@@ -47,7 +48,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible.js";
 import { TooltipProvider } from "@/components/ui/tooltip.js";
-import { ToolLayout } from "@/ToolCallBlocks/ToolLayout.js";
+import {
+  ConversationShareWorkflow,
+  hasConversationShareWorkflowDisplay,
+} from "@/v4/ConversationShareWorkflow.js";
 import { ConversationUserInputBody } from "@/v4/ConversationUserInputBody.js";
 import { ConversationUserInputContent } from "@/v4/ConversationUserInputContent.js";
 import { PluginReferenceIconProvider } from "@/v4/pluginReferenceIconContext.js";
@@ -64,7 +68,6 @@ import type { AssistantWorkRow, ConversationTurnFlowItem } from "@/v4/conversati
 import type { ConversationTurnWorkSegment } from "@/v4/conversationTurnWorkSegments.js";
 import { formatConversationWorkDuration } from "@/v4/conversationWorkDuration.js";
 import { normalizeConversationShareMarkdown } from "@/v4/conversationShareMarkdown.js";
-import { resolveToolCallIdentity } from "@/lib/toolIdentity.js";
 import {
   DEFAULT_CODE_PREVIEW_SETTINGS,
   type CodePreviewSettings,
@@ -80,7 +83,11 @@ import { isAbsoluteFilePath, joinFilePath } from "@/lib/path.js";
 // 公开页 bundle，因此打开动作组件改由 Desktop 消费方经 artifactOpenAction 注入。
 import type { OpenSplitButtonTarget } from "@/OpenSplitButton.js";
 
+import { ConversationShareContent } from "@/v4/ConversationShareContent.js";
+import { logger } from "@/logger.js";
+
 export interface ConversationShareReadonlyTimelineProps {
+  contentBlocks?: readonly unknown[];
   rows: readonly ConversationRow[];
   locale?: Locale;
   theme?: Theme;
@@ -193,6 +200,64 @@ function resolveImportedArtifactPath(
   return joinFilePath(workspacePath, segments.join("/"));
 }
 
+function UserInputAttachment({
+  attachment,
+  artifactUrls,
+}: {
+  attachment: NonNullable<UserInputRow["attachments"]>[number];
+  artifactUrls: ReadonlyMap<string, string>;
+}) {
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string>();
+  const url = artifactUrls.get(attachment.ref.split("/").at(-1) ?? "");
+  const previewUrl = attachment.previewRef
+    ? artifactUrls.get(attachment.previewRef.split("/").at(-1) ?? "")
+    : undefined;
+  const imageSrc = attachment.mime.startsWith("image/") ? (previewUrl ?? url) : undefined;
+  // Bug 根因：只读分享把所有输入附件都画成文件 pill，丢失了已上传图片的展示。
+  // 复用公开 manifest 地址取图；不读取原宿主文件，失败时仍保留原附件下载入口。
+  if (imageSrc && failedPreviewUrl !== imageSrc) {
+    return (
+      <a
+        href={url}
+        target={url ? "_blank" : undefined}
+        rel={url ? "noopener noreferrer" : undefined}
+        aria-disabled={url ? undefined : "true"}
+        title={attachment.fileName}
+        className="block size-24 max-w-full overflow-hidden rounded-lg border border-border bg-surface hover:border-border-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-input-border-focused"
+      >
+        <img
+          src={imageSrc}
+          alt={attachment.fileName}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="size-full object-contain"
+          onError={() => {
+            setFailedPreviewUrl(imageSrc);
+            // 签名下载地址可能含凭据，诊断仅记录 MIME，不输出 URL 或附件名。
+            logger.warn("[share-input-image] preview failed", { mime: attachment.mime });
+          }}
+        />
+      </a>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target={url ? "_blank" : undefined}
+      rel={url ? "noopener noreferrer" : undefined}
+      aria-disabled={url ? undefined : "true"}
+      className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui-sm text-foreground hover:bg-surface-hover"
+      data-v4-user-input-attachment-pill="true"
+    >
+      <FileTextIcon aria-hidden="true" className="size-4 shrink-0" />
+      <span className="min-w-0 max-w-64 truncate">{attachment.fileName}</span>
+      <span className="shrink-0 text-foreground-subtlest">
+        {formatAttachmentSize(attachment.bytes)}
+      </span>
+    </a>
+  );
+}
+
 function UserInputPresentation({
   row,
   artifactUrls,
@@ -200,33 +265,20 @@ function UserInputPresentation({
   row: UserInputRow;
   artifactUrls: ReadonlyMap<string, string>;
 }) {
-  const attachments = (row.attachments ?? []).map((attachment) => {
-    const artifactId = attachment.ref.split("/").at(-1) ?? "";
-    return { attachment, url: artifactUrls.get(artifactId) };
-  });
+  const attachments = row.attachments ?? [];
   return (
     <div className="flex flex-col items-end" data-conversation-share-row-kind="userInput">
       {attachments.length > 0 ? (
         <div
-          className="mb-2 flex max-w-xl flex-wrap justify-end gap-2"
+          className="mb-2 flex w-full max-w-xl flex-wrap items-start justify-end gap-2"
           data-v4-user-input-attachments="true"
         >
-          {attachments.map(({ attachment, url }) => (
-            <a
-              key={attachment.ref}
-              href={url}
-              target={url ? "_blank" : undefined}
-              rel={url ? "noopener noreferrer" : undefined}
-              aria-disabled={url ? undefined : "true"}
-              className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-ui-sm text-foreground hover:bg-surface-hover"
-              data-v4-user-input-attachment-pill="true"
-            >
-              <FileTextIcon aria-hidden="true" className="size-4 shrink-0" />
-              <span className="min-w-0 max-w-64 truncate">{attachment.fileName}</span>
-              <span className="shrink-0 text-foreground-subtlest">
-                {formatAttachmentSize(attachment.bytes)}
-              </span>
-            </a>
+          {attachments.map((attachment, index) => (
+            <UserInputAttachment
+              key={`${attachment.ref}-${index}`}
+              attachment={attachment}
+              artifactUrls={artifactUrls}
+            />
           ))}
         </div>
       ) : null}
@@ -299,41 +351,33 @@ const ReasoningPresentation = memo(function ReasoningPresentation({ row }: { row
   );
 });
 
-function resolveToolStatusLabel(
-  status: ToolCallRow["status"],
-  formatMessage: (descriptor: { id: string }) => string,
+const ToolSnapshotContext = createContext<ReadonlyMap<number, ShareToolPresentationPayload>>(
+  new Map(),
+);
+function toolNodeWithSnapshot(
+  row: ToolCallRow,
+  snapshot: ShareToolPresentationPayload | undefined,
+  resourceUrl: (ref: string) => string | undefined,
 ) {
-  const compactState =
-    status === "inputStreaming" || status === "pendingApproval"
-      ? "input-streaming"
-      : status === "running"
-        ? "input-available"
-        : status === "success"
-          ? "output-available"
-          : "output-error";
-  return formatMessage({
-    id: getCompactToolCallStatusMessageId(
-      compactState,
-      status === "cancelled" ? "stopped" : undefined,
-    ),
+  const node = toolCallRowToLegacyNode(row);
+  if (!snapshot) return node;
+  const images = snapshot.images?.flatMap((image) => {
+    const src = resourceUrl(image.resource_id);
+    return src ? [{ src, mimeType: image.mime_type }] : [];
   });
+  node.toolCall.raw = {
+    ...(node.toolCall.raw as Record<string, unknown>),
+    ...(snapshot.display ? { display: snapshot.display } : {}),
+    ...(images?.length ? { sharedImages: images, sharedImageSrc: images[0]!.src } : {}),
+    ...(snapshot.app_name ? { cuaApp: { name: snapshot.app_name } } : {}),
+  };
+  return node;
 }
-
-function readToolInputSummary(input: unknown, keys: readonly string[]): string | null {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
-  const record = input as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return null;
-}
-
 const ToolCallPresentation = memo(function ToolCallPresentation({
   row,
   theme,
   codePreviewSettings,
-  artifactNames,
+  artifactNames: _artifactNames,
   onOpenExternalUrl,
 }: {
   row: ToolCallRow;
@@ -342,76 +386,28 @@ const ToolCallPresentation = memo(function ToolCallPresentation({
   artifactNames: ReadonlyMap<string, string>;
   onOpenExternalUrl: (url: string) => void;
 }) {
-  const { intl } = useZCodeIntl();
-  const output = row.output?.text?.trim();
-  const markdown = useMemo(
-    () => (output ? normalizeConversationShareMarkdown(output, artifactNames) : ""),
-    [artifactNames, output],
+  const snapshots = useContext(ToolSnapshotContext);
+  const { resourceUrl } = useToolPresentationCapabilities();
+  const snapshot = snapshots.get(row.rowId);
+  const node = useMemo(
+    () => toolNodeWithSnapshot(row, snapshot, resourceUrl ?? (() => undefined)),
+    [row, snapshot, resourceUrl],
   );
-  const statusLabel = resolveToolStatusLabel(row.status, intl.formatMessage);
-  const identity = useMemo(
-    () => resolveToolCallIdentity({ toolName: row.toolName, kind: row.toolName, input: row.input }),
-    [row.input, row.toolName],
-  );
-  const searchSummary =
-    identity.family === "search"
-      ? readToolInputSummary(row.input, ["query", "pattern", "prompt"])
-      : null;
-  const presentation =
-    identity.family === "search"
-      ? {
-          icon: <SearchIcon className="size-4 shrink-0" aria-hidden="true" />,
-          kindLabel: intl.formatMessage({ id: "chat.toolCall.kind.search" }),
-          primaryText: searchSummary ?? statusLabel,
-        }
-      : identity.family === "shell"
-        ? {
-            icon: <SquareTerminalIcon className="size-4 shrink-0" aria-hidden="true" />,
-            kindLabel: intl.formatMessage({ id: "chat.toolCall.kind.terminal" }),
-            primaryText: statusLabel,
-          }
-        : identity.family === "file-read"
-          ? {
-              icon: <FileTextIcon className="size-4 shrink-0" aria-hidden="true" />,
-              kindLabel: intl.formatMessage({ id: "chat.toolCall.kind.read" }),
-              primaryText: statusLabel,
-            }
-          : identity.family === "file-write"
-            ? {
-                icon: <FilePenLineIcon className="size-4 shrink-0" aria-hidden="true" />,
-                kindLabel: intl.formatMessage({ id: "chat.toolCall.kind.edit" }),
-                primaryText: statusLabel,
-              }
-            : {
-                icon: <WrenchIcon className="size-4 shrink-0" aria-hidden="true" />,
-                kindLabel: row.toolName,
-                primaryText: statusLabel,
-              };
-  const content: ReactNode = markdown ? (
-    <MessageResponse
-      theme={theme}
-      codePreviewSettings={codePreviewSettings}
-      renderZCodeFileCitations={false}
-      onOpenExternalUrl={onOpenExternalUrl}
-    >
-      {markdown}
-    </MessageResponse>
-  ) : (
-    <span className="text-ui-sm text-foreground-subtle">{statusLabel}</span>
-  );
-  const isRunning =
-    row.status === "inputStreaming" || row.status === "pendingApproval" || row.status === "running";
+  if (hasConversationShareWorkflowDisplay(row))
+    return (
+      <div data-conversation-share-row-kind="toolCall" data-conversation-selectable="true">
+        <ConversationShareWorkflow row={row} theme={theme} />
+      </div>
+    );
   return (
     <div data-conversation-share-row-kind="toolCall" data-conversation-selectable="true">
-      <ToolLayout
-        toolId={row.toolCallId}
-        icon={presentation.icon}
-        kindLabel={presentation.kindLabel}
-        primaryText={presentation.primaryText}
-        isRunning={isRunning}
-        canToggle={Boolean(markdown)}
-        content={content}
-        disableSummaryContentAnimation
+      <ToolPresentation
+        toolCallNode={node}
+        theme={theme}
+        codePreviewSettings={codePreviewSettings}
+        onOpenBrowserUrl={onOpenExternalUrl}
+        authoritativeAgentType={snapshot?.agent_type}
+        showTodoToolCalls={false}
       />
     </div>
   );
@@ -599,9 +595,9 @@ function GroupedToolPresentation({
   item,
   theme,
   codePreviewSettings,
-  artifactUrls,
+  artifactUrls: _artifactUrls,
   artifactNames,
-  labels,
+  labels: _labels,
   onOpenExternalUrl,
 }: {
   item: GroupedToolItem;
@@ -612,89 +608,47 @@ function GroupedToolPresentation({
   labels: ReadonlyLabels;
   onOpenExternalUrl: (url: string) => void;
 }) {
-  const { intl } = useZCodeIntl();
-  const rows = item.rows;
-  const groupLabel =
-    item.kind === "cuaGroup"
-      ? labels.computerUse
-      : item.kind === "exploreGroup"
-        ? labels.explore
-        : item.kind === "executeGroup"
-          ? labels.execute
-          : labels.changes;
-  const groupIcon =
-    item.kind === "cuaGroup" ? (
-      <MonitorIcon className="size-4 shrink-0" aria-hidden="true" />
-    ) : item.kind === "executeGroup" ? (
-      <SquareTerminalIcon className="size-4 shrink-0" aria-hidden="true" />
-    ) : item.kind === "changesGroup" ? (
-      <FilesIcon className="size-4 shrink-0" aria-hidden="true" />
-    ) : (
-      <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
-    );
-  const hasRunningRow = rows.some(
-    (row) =>
-      row.status === "inputStreaming" ||
-      row.status === "pendingApproval" ||
-      row.status === "running",
-  );
-  const hasFailedRow = rows.some((row) => row.status === "error" || row.status === "cancelled");
-  const groupStatus: ToolCallRow["status"] = hasRunningRow
-    ? "running"
-    : hasFailedRow
-      ? "error"
-      : "success";
-  const content = (
-    <div className="flex flex-col gap-4">
-      {item.kind === "cuaGroup"
-        ? item.events.map((event) =>
-            event.kind === "tool" ? (
-              <ToolCallPresentation
-                key={event.row.rowId}
-                row={event.row}
-                theme={theme}
-                codePreviewSettings={codePreviewSettings}
-                artifactNames={artifactNames}
-                onOpenExternalUrl={onOpenExternalUrl}
-              />
-            ) : event.kind === "assistantMessage" ? (
-              <AssistantTextPresentation
-                key={event.row.rowId}
-                row={event.row}
-                theme={theme}
-                codePreviewSettings={codePreviewSettings}
-                artifactNames={artifactNames}
-                onOpenExternalUrl={onOpenExternalUrl}
-              />
-            ) : (
-              <ReasoningPresentation key={event.row.rowId} row={event.row} />
-            ),
-          )
-        : rows.map((row) =>
-            renderReadonlyRow(
-              row,
-              theme,
-              codePreviewSettings,
-              artifactUrls,
-              artifactNames,
-              labels,
-              onOpenExternalUrl,
-            ),
-          )}
-    </div>
-  );
-  const statusLabel = resolveToolStatusLabel(groupStatus, intl.formatMessage);
+  const snapshots = useContext(ToolSnapshotContext);
+  const { resourceUrl } = useToolPresentationCapabilities();
+  const node = {
+    ...item.node,
+    childToolCalls: item.rows.map((row) =>
+      toolNodeWithSnapshot(row, snapshots.get(row.rowId), resourceUrl ?? (() => undefined)),
+    ),
+  };
   return (
     <div data-conversation-share-work-group={item.kind} data-conversation-selectable="true">
-      <ToolLayout
-        toolId={item.key}
-        icon={groupIcon}
-        kindLabel={groupLabel}
-        primaryText={statusLabel}
-        isRunning={hasRunningRow}
-        canToggle={rows.length > 0}
-        content={content}
-        disableSummaryContentAnimation
+      <ToolPresentation
+        toolCallNode={node}
+        theme={theme}
+        codePreviewSettings={codePreviewSettings}
+        onOpenBrowserUrl={onOpenExternalUrl}
+        cuaGroupEvents={
+          item.kind === "cuaGroup"
+            ? item.events.map((event) =>
+                event.kind === "tool"
+                  ? {
+                      ...event,
+                      node: toolNodeWithSnapshot(
+                        event.row,
+                        snapshots.get(event.row.rowId),
+                        resourceUrl ?? (() => undefined),
+                      ),
+                    }
+                  : event,
+              )
+            : undefined
+        }
+        renderCuaAssistantMessage={(event) => (
+          <AssistantTextPresentation
+            row={event.row}
+            theme={theme}
+            codePreviewSettings={codePreviewSettings}
+            artifactNames={artifactNames}
+            onOpenExternalUrl={onOpenExternalUrl}
+          />
+        )}
+        renderCuaReasoning={(event) => <ReasoningPresentation row={event.row} />}
       />
     </div>
   );
@@ -1068,8 +1022,17 @@ function ReadonlyTurn({
   );
 }
 
-export function ConversationShareReadonlyTimeline({
+export function ConversationShareReadonlyTimeline(props: ConversationShareReadonlyTimelineProps) {
+  return (
+    <ZCodeIntlProvider initialLocale={props.locale ?? "zh-CN"}>
+      <ConversationShareReadonlyTimelineContent {...props} />
+    </ZCodeIntlProvider>
+  );
+}
+
+function ConversationShareReadonlyTimelineContent({
   rows,
+  contentBlocks,
   locale = "zh-CN",
   theme = "system",
   codePreviewSettings = DEFAULT_CODE_PREVIEW_SETTINGS,
@@ -1084,40 +1047,87 @@ export function ConversationShareReadonlyTimeline({
   artifactOpenAction,
   unsupportedRowCount = 0,
 }: ConversationShareReadonlyTimelineProps) {
-  const units = buildConversationTurnRenderUnits(rows);
+  const { intl } = useZCodeIntl();
+  const rowsById = new Map(rows.map((row) => [row.rowId, row] as const));
+  const allBlocks = decodeConversationShareContentBlocks(contentBlocks).filter((block) => {
+    const row = rowsById.get(block.fallback_row_id);
+    return (
+      row?.productTurnId === block.product_turn_id &&
+      row.kind === (block.type === "tool-presentation" ? "toolCall" : "assistantText")
+    );
+  });
+  const toolSnapshots = new Map(
+    allBlocks.flatMap((block) =>
+      block.type === "tool-presentation" &&
+      rows.some(
+        (row) =>
+          row.kind === "toolCall" &&
+          row.rowId === block.fallback_row_id &&
+          row.productTurnId === block.product_turn_id,
+      )
+        ? [[block.fallback_row_id, block.payload] as const]
+        : [],
+    ),
+  );
+  const blocks = allBlocks
+    .filter((block) => block.type === "workflow")
+    .filter((block) =>
+      rows.some(
+        (row) =>
+          row.rowId === block.fallback_row_id &&
+          row.kind === "assistantText" &&
+          row.productTurnId === block.product_turn_id,
+      ),
+    );
+  const envelopes = (contentBlocks ?? []).flatMap((raw) => {
+    const parsed = conversationShareContentEnvelopeSchema.safeParse(raw);
+    return parsed.success &&
+      rows.some(
+        (row) =>
+          row.kind === "assistantText" &&
+          row.rowId === parsed.data.fallback_row_id &&
+          row.productTurnId === parsed.data.product_turn_id,
+      )
+      ? [parsed.data]
+      : [];
+  });
+  const claimed = new Set(envelopes.map((block) => block.fallback_row_id));
+  const claimedResources = new Set(allBlocks.flatMap((block) => block.resource_ids));
+  const fallbacks = new Map(
+    rows.flatMap((row) => (row.kind === "assistantText" ? [[row.rowId, row.text] as const] : [])),
+  );
+  const allUnits = buildConversationTurnRenderUnits(rows);
+  const units = new Map(
+    buildConversationTurnRenderUnits(
+      rows.filter(
+        (row) =>
+          !claimed.has(row.rowId) &&
+          !(row.kind === "artifact" && claimedResources.has(row.artifactVersionId)),
+      ),
+    ).map((unit) => [unit.key, unit]),
+  );
+
   const openShareExternalUrl = useCallback((url: string) => {
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+      if (/^(localhost|127\..*|0\.0\.0\.0|\[::1\])$/iu.test(parsed.hostname)) return;
       window.open(parsed.toString(), "_blank", "noopener,noreferrer");
     } catch {
       // 外链来自不可信 Markdown；解析失败时保持不可操作，不交给浏览器未知协议。
     }
   }, []);
-  const labels: ReadonlyLabels =
-    locale === "zh-CN"
-      ? {
-          history: "思考过程",
-          computerUse: "电脑操作",
-          explore: "探索",
-          execute: "执行",
-          changes: "修改",
-          artifactPreview: "下载文件",
-          markerCompact: "上下文已压缩",
-          markerModelChange: "模型已切换",
-          unsupportedRows: "部分内容需要更新 ZCode 查看",
-        }
-      : {
-          history: "Reasoning",
-          computerUse: "Computer use",
-          explore: "Explore",
-          execute: "Execute",
-          changes: "Changes",
-          artifactPreview: "Download file",
-          markerCompact: "Context compacted",
-          markerModelChange: "Model switched",
-          unsupportedRows: "Some content requires a newer version of ZCode",
-        };
+  const labels: ReadonlyLabels = {
+    history: intl.formatMessage({ id: "conversationShare.readonly.history" }),
+    computerUse: intl.formatMessage({ id: "conversationShare.readonly.computerUse" }),
+    explore: intl.formatMessage({ id: "conversationShare.readonly.explore" }),
+    execute: intl.formatMessage({ id: "conversationShare.readonly.execute" }),
+    changes: intl.formatMessage({ id: "conversationShare.readonly.changes" }),
+    artifactPreview: intl.formatMessage({ id: "conversationShare.readonly.artifactPreview" }),
+    markerCompact: intl.formatMessage({ id: "conversationShare.readonly.markerCompact" }),
+    markerModelChange: intl.formatMessage({ id: "conversationShare.readonly.markerModelChange" }),
+    unsupportedRows: intl.formatMessage({ id: "conversationShare.readonly.unsupportedRows" }),
+  };
   const artifactOpenContext = useMemo<ArtifactOpenContextValue | null>(() => {
     if (
       !workspacePath ||
@@ -1147,38 +1157,111 @@ export function ConversationShareReadonlyTimeline({
     workspaceRemoteSessionId,
   ]);
   return (
-    <TooltipProvider delayDuration={0}>
-      <ZCodeIntlProvider initialLocale={locale}>
-        <PluginReferenceIconProvider value={null}>
-          <ArtifactOpenContext.Provider value={artifactOpenContext}>
-            <div className="@container/conversation flex flex-col" data-conversation-share-timeline>
-              {unsupportedRowCount > 0 ? (
-                // 中性信息语义，不用黄色 warning：分享本身没出错，只是这个 build 认不出其中几行。
-                <div
-                  data-conversation-share-unsupported-notice="true"
-                  className="mx-4 mb-2 flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-ui-xs text-foreground-subtle"
-                >
-                  <InfoIcon aria-hidden="true" className="size-3.5 shrink-0" />
-                  <span className="min-w-0 break-words">{labels.unsupportedRows}</span>
-                </div>
-              ) : null}
-              {units.map((unit) => (
-                <ReadonlyTurn
-                  key={unit.key}
-                  unit={unit}
-                  locale={locale}
-                  theme={theme}
-                  codePreviewSettings={codePreviewSettings}
-                  artifactUrls={artifactUrls}
-                  artifactNames={artifactNames}
-                  labels={labels}
-                  onOpenExternalUrl={openShareExternalUrl}
-                />
-              ))}
-            </div>
-          </ArtifactOpenContext.Provider>
-        </PluginReferenceIconProvider>
-      </ZCodeIntlProvider>
-    </TooltipProvider>
+    <ToolSnapshotContext.Provider value={toolSnapshots}>
+      <ToolPresentationCapabilitiesProvider
+        value={{
+          readonly: true,
+          resourceUrl: (ref) => artifactUrls.get(ref),
+          normalizeOutputText: (text) => normalizeConversationShareMarkdown(text, artifactNames),
+        }}
+      >
+        <TooltipProvider delayDuration={0}>
+          <PluginReferenceIconProvider value={null}>
+            <ArtifactOpenContext.Provider value={artifactOpenContext}>
+              <div
+                className="@container/conversation flex flex-col"
+                data-conversation-share-timeline
+              >
+                {unsupportedRowCount > 0 ? (
+                  // 中性信息语义，不用黄色 warning：分享本身没出错，只是这个 build 认不出其中几行。
+                  <div
+                    data-conversation-share-unsupported-notice="true"
+                    className="mx-4 mb-2 flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-ui-xs text-foreground-subtle"
+                  >
+                    <InfoIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="min-w-0 break-words">{labels.unsupportedRows}</span>
+                  </div>
+                ) : null}
+                {allUnits.map((original) => {
+                  const unit = units.get(original.key);
+                  const turnBlocks = blocks.filter(
+                    (block) =>
+                      block.product_turn_id === original.header?.productTurnId &&
+                      !(
+                        block.payload.unavailable &&
+                        !block.payload.run &&
+                        block.payload.artifacts.length === 0
+                      ),
+                  );
+                  // 已知但隐藏的占位块仍认领摘要，避免删卡后占位文字又作为 fallback 出现。
+                  const fallbackBlocks = envelopes.filter(
+                    (block) =>
+                      block.product_turn_id === original.header?.productTurnId &&
+                      !blocks.some((known) => known.id === block.id),
+                  );
+                  return (
+                    <Fragment key={original.key}>
+                      {unit ? (
+                        <ReadonlyTurn
+                          unit={unit}
+                          locale={locale}
+                          theme={theme}
+                          codePreviewSettings={codePreviewSettings}
+                          artifactUrls={artifactUrls}
+                          artifactNames={artifactNames}
+                          labels={labels}
+                          onOpenExternalUrl={openShareExternalUrl}
+                        />
+                      ) : null}
+                      {turnBlocks.length ? (
+                        <div className="min-w-0 px-4 pb-5 @md/conversation:px-6">
+                          <ConversationShareContent
+                            blocks={turnBlocks}
+                            fallbacks={fallbacks}
+                            artifactUrls={artifactUrls}
+                            locale={locale}
+                            onOpenResource={
+                              artifactOpenContext && onOpenFileLink
+                                ? (id) => {
+                                    const path = workspacePath
+                                      ? resolveImportedArtifactPath(
+                                          workspacePath,
+                                          artifactWorkspaceRelativePaths.get(id),
+                                        )
+                                      : null;
+                                    if (path && workspacePath)
+                                      onOpenFileLink({
+                                        path,
+                                        label: artifactNames.get(id) ?? path,
+                                        workspacePath,
+                                        workspaceIdentity,
+                                        workspaceRemoteSessionId,
+                                      });
+                                  }
+                                : undefined
+                            }
+                          />
+                        </div>
+                      ) : null}
+                      {fallbackBlocks.map((block) => (
+                        <div
+                          key={block.id}
+                          className="px-4 pb-5 @md/conversation:px-6"
+                          data-share-content-fallback={block.id}
+                        >
+                          <MessageResponse>
+                            {fallbacks.get(block.fallback_row_id) ?? ""}
+                          </MessageResponse>
+                        </div>
+                      ))}
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </ArtifactOpenContext.Provider>
+          </PluginReferenceIconProvider>
+        </TooltipProvider>
+      </ToolPresentationCapabilitiesProvider>
+    </ToolSnapshotContext.Provider>
   );
 }

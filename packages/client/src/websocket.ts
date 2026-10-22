@@ -99,7 +99,10 @@ export function connectViaWebSocket(
   });
 }
 
-export function connectViaProtocol(protocol: IMessagePassingProtocol): IServiceAccessor {
+export function connectViaProtocol(
+  protocol: IMessagePassingProtocol,
+  options: { windowProjectDirectory?: boolean } = {},
+): IServiceAccessor {
   const client = new ChannelClient(protocol);
-  return new RemoteServiceAccess(client);
+  return new RemoteServiceAccess(client, options);
 }

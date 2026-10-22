@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared";
+import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -105,7 +105,7 @@ describe("PLM-LC-006/009 Builtin 抑制恢复与 inline smoke E2E", () => {
 
     await openPluginSettings();
     await openManageView();
-    await waitForPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_INLINE_ID });
+    await waitForPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_INLINE_ID });
     await capturePluginManualReview("PLM-LC-009", "inline-manage-smoke");
   });
 });

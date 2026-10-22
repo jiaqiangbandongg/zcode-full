@@ -1,16 +1,18 @@
 import {
-  TID_AUTOMATIONS_OPEN,
   TID_AUTOMATIONS_PAGE_TAB,
-  TID_CHAT_ATTACHMENT_BUTTON,
   TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_ITEM,
   TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER,
+  type DynamicWorkflowMode,
+} from "@zcode/shared";
+import {
+  TID_AUTOMATIONS_OPEN,
+  TID_CHAT_ATTACHMENT_BUTTON,
   TID_SETTINGS_PAGE,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   TID_V4_COMPOSER_INPUT,
   testId,
-  type DynamicWorkflowMode,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clickTestIdByDom,
   clickTestIdByWebDriver,

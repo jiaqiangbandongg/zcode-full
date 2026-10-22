@@ -634,7 +634,9 @@ nothing is parked. Forget the depth bound and two subagents can keep each other 
 **When:** the user asked for cheaper or faster models where they are enough, and one subagent
 can tell which requests need the strong model. A router on the light model answers with a
 typed key; code maps the key to a model the script declared. The router never writes a model
-name, so it can only pick among models the user approved in the window.
+name, so it can only pick among models the user approved in the window. Never on your own,
+and never a model under another provider the user did not name; when you see the fit,
+propose it and ask before the call (SKILL.md §2).
 
 <!-- compile -->
 ```ts

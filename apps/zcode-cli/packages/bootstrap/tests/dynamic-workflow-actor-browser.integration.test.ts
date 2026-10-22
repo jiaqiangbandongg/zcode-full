@@ -53,11 +53,11 @@ function isActorRequest(request: ModelRequest): boolean {
 
 describe("dwf 子代理的 Browser Use（真 app 装配）", () => {
   let root: string;
-  let sessionStore: ReturnType<typeof createSqliteSessionStore>;
+  let sessionStore: Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "zcode-dwf-actor-browser-"));
-    sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+    sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
   });
 
   afterEach(async () => {

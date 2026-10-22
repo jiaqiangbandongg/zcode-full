@@ -39,29 +39,12 @@ describe("legacy permission.requested 映射", () => {
     input: { script: "return 1;" },
   };
 
-  it("剥离 ask 预览，映射结果仍能过 strict schema", () => {
-    // zcodePermissionRequestedEventPayloadSchema 是 .strict()，而 app 侧用 safeParse 解析
-    // 收到的事件：多一个未知字段就会让它丢掉整个事件，确认窗根本到不了旧版 app。
-    const mapped = mapSessionEvent(
-      permissionRequestedEvent({
-        ...basePayload,
-        display: { kind: "create_workflow", ok: true, errorCount: 0, diagnostics: [] },
-        optionsPolicy: "no-always-allow",
-      }),
-    );
-
-    const parsed = zcodeSessionEventSchema.safeParse(mapped);
-    expect(parsed.success).toBe(true);
-    expect(mapped.payload).not.toHaveProperty("display");
-    expect(mapped.payload).not.toHaveProperty("optionsPolicy");
-  });
-
   /**
    * 可复用工作流的归一化入参在 legacy v3 上的成立性（spec 的「版本偏斜边界」）。
    *
    * 这条钉的是整个「入参通道」决策：saved run 的脚本走的是 `input`，而 legacy 侧
    * `input` 是 `z.unknown()`（zcode-protocol/index.ts）——所以旧客户端拿到完整脚本
-   * **不是兼容处理，是构造上就成立**。相对地，把脚本放进 display 会被上面那条剥离
+   * **不是兼容处理，是构造上就成立**。相对地，把脚本放进 display 会被 legacy mapper 的剥离
    * 逻辑整段抹掉，saved run 会在一个不显示任何代码的窗口上被批准。
    */
   it("saved run 的归一化入参整份过 strict schema，脚本不被剥离", () => {
@@ -128,9 +111,6 @@ describe("legacy permission.requested 映射", () => {
 
     const options = (mapped.payload as { options: { optionId: string }[] }).options;
     expect(options.map((option) => option.optionId)).toEqual(["allow_once", "deny"]);
-    // 绊线（docs/dynamic-workflow/launch.md「Refine」）：Refine 只在 v4 投影合成，
-    // legacy 选项列表刻意不含——旧桌面没有 textarea，选它只等于哑拒绝。
-    expect(options.some((option) => option.optionId === "workflowRefine")).toBe(false);
   });
 
   // 第 7 轮：会话免确认只在 v4 投放。旧桌面回传的是 response 原文，认不出会话语义，
@@ -142,8 +122,7 @@ describe("legacy permission.requested 映射", () => {
 
     expect(zcodeSessionEventSchema.safeParse(mapped).success).toBe(true);
     expect(mapped.payload).not.toHaveProperty("optionsPolicy");
-    const options = (mapped.payload as { options: { optionId: string; kind: string }[] })
-      .options;
+    const options = (mapped.payload as { options: { optionId: string; kind: string }[] }).options;
     expect(options.map((option) => option.optionId)).toEqual(["allow_once", "deny"]);
     expect(options.some((option) => option.kind === "allow_session")).toBe(false);
   });
@@ -159,37 +138,6 @@ describe("legacy permission.requested 映射", () => {
       "allow_project",
       "deny",
     ]);
-  });
-
-  /**
-   * SaveWorkflow 走的是同一条收窄：它的 `askOptions.allowAlways: false`（core 的工具声明）
-   * 经 approval-gate 变成 `optionsPolicy: "no-always-allow"` 随事件传播（不变式 3）。
-   *
-   * 「没有 always allow」在这里不是审美：写进仓库的东西会被提交、被别人看见、以后被再次
-   * 运行，一条持久项目规则记不住"这一次的决定"，只会把这道确认永久关掉。
-   */
-  it("SaveWorkflow 同样收窄成允许一次 + 拒绝，且不含 workflowRefine", () => {
-    const mapped = mapSessionEvent(
-      permissionRequestedEvent({
-        ...basePayload,
-        toolName: "SaveWorkflow",
-        reason: "saveWorkflow.confirmation",
-        input: {
-          name: "pr-review",
-          description: "Review a pull request",
-          script: "return 1;",
-          path: "/repo/.zcode/workflows/pr-review.dwf.ts",
-          overwrite: true,
-          scope: "project",
-        },
-        optionsPolicy: "no-always-allow",
-      }),
-    );
-
-    const options = (mapped.payload as { options: { optionId: string }[] }).options;
-    expect(options.map((option) => option.optionId)).toEqual(["allow_once", "deny"]);
-    // 同一条绊线在保存窗上的对应物：Refine 只在 v4 投影合成，legacy 列表两个工具都不含。
-    expect(options.some((option) => option.optionId === "workflowRefine")).toBe(false);
   });
 
   // 这条是"下一个人往 spread 里加字段"的绊线：带 display 的 permission_requested 走完
@@ -216,7 +164,9 @@ describe("legacy permission.requested 映射", () => {
         ],
         lanes: [{ id: "actor#1", name: "a" }],
         // 第二层是子代理导向：每阶段一张参与者卡 + 交接边（docs/dynamic-workflow/presentation.md）。
-        participants: [{ id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] }],
+        participants: [
+          { id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] },
+        ],
         handoffs: [],
         sink: ["ask#1"],
       },

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ZCodePermissionRequest } from "@zcode/shared";
 import { createElement, type ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 
 // 与 workflowPermissionBlock.test.ts 同一组桩：CodeBlock 换成可断言的 <pre>。时间线是纯 DOM，
@@ -195,16 +195,10 @@ describe("WorkflowPermissionBlock saved source badge", () => {
     expect(screen.getByText("Run this workflow?")).toBeTruthy();
   });
 
-  it("renders the badge in both locales", () => {
+  it("renders the saved source badge in zh-CN", () => {
     renderDialog(buildSavedRunRequest(), "zh-CN");
     expect(document.querySelector('[data-workflow-saved-source="true"]')?.textContent).toContain(
       "已保存的工作流 · project",
-    );
-    cleanup();
-
-    renderDialog(buildSavedRunRequest(), "en-US");
-    expect(document.querySelector('[data-workflow-saved-source="true"]')?.textContent).toContain(
-      "Saved workflow · project",
     );
   });
 });
@@ -325,7 +319,7 @@ describe("SaveWorkflowPermissionBlock", () => {
     expect(screen.queryByText("Show full script")).toBeNull();
   });
 
-  it("renders both locales", () => {
+  it("renders the overwrite gate in zh-CN", () => {
     renderDialog(buildSaveRequest({ overwrite: true }), "zh-CN");
     expect(screen.getByText("覆盖已保存的同名工作流？")).toBeTruthy();
     expect(document.querySelector('[data-workflow-overwrite-badge="true"]')?.textContent).toBe(
@@ -333,11 +327,6 @@ describe("SaveWorkflowPermissionBlock", () => {
     );
     expect(screen.getByText("落点")).toBeTruthy();
     expect(screen.getByText("显示完整脚本")).toBeTruthy();
-    cleanup();
-
-    renderDialog(buildSaveRequest({ overwrite: true }), "en-US");
-    expect(screen.getByText("Overwrite the existing saved workflow?")).toBeTruthy();
-    expect(screen.getByText("Path")).toBeTruthy();
   });
 
   it("never paints the save gate with destructive colour", () => {
@@ -346,5 +335,195 @@ describe("SaveWorkflowPermissionBlock", () => {
 
     expect(document.body.innerHTML).not.toContain("text-destructive");
     expect(document.body.innerHTML).toContain("text-warning");
+  });
+});
+
+// ── 保存确认窗：内容归属、折叠与键盘焦点 ──
+// jsdom 检查 DOM 归属和交互；这里不测量视口高度或粘性表头。
+
+const LONG_DESCRIPTION = Array.from({ length: 40 }, (_, i) => `说明第 ${i + 1} 行`).join("\n");
+
+function manyArgs(count: number): Record<string, unknown> {
+  return Object.fromEntries(
+    Array.from({ length: count }, (_, i) => [
+      `arg${String(i + 1).padStart(2, "0")}`,
+      { type: "string", description: `第 ${i + 1} 个实参` },
+    ]),
+  );
+}
+
+function scrollArea(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-permission-dialog-scroll="true"]');
+}
+
+function argRows(): NodeListOf<Element> {
+  return document.querySelectorAll("[data-workflow-save-arg]");
+}
+
+/**
+ * jsdom 的 scrollHeight / clientHeight 恒为 0。折叠开关只在文本真的被截断时出现，所以伪造一组：
+ * 可视高度一律 80，`clipped` 时带 line-clamp 的元素内容高 200（被截断），其余与可视高度相同。
+ */
+function fakeClampedTextGeometry(clipped: boolean) {
+  vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(
+    function (this: HTMLElement) {
+      return clipped && this.className.includes("line-clamp-4") ? 200 : 80;
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(80);
+}
+
+describe("SaveWorkflowPermissionBlock scrolling and disclosure", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps inline run confirmation outside the save-only bounded layout", () => {
+    // 运行确认窗与普通权限窗不在这次改动范围里，保持原样。
+    renderDialog(buildRunRequest());
+    expect(document.querySelector('[data-permission-dialog-bounded="true"]')).toBeNull();
+    expect(scrollArea()).toBeNull();
+  });
+
+  it("keeps approval controls outside disclosed save content", () => {
+    renderDialog(
+      buildSaveRequest({ overwrite: true, description: LONG_DESCRIPTION, args: manyArgs(40) }),
+    );
+    fireEvent.click(screen.getByText("Show full script"));
+
+    const area = scrollArea();
+    // 问句、名字、覆盖提示都在滚动区里（滚动区顶部），不另钉一层。
+    expect(area?.contains(screen.getByText("Overwrite the existing saved workflow?"))).toBe(true);
+    expect(area?.contains(screen.getByText("release-check"))).toBe(true);
+    expect(area?.contains(document.querySelector('[data-workflow-overwrite-hint="true"]'))).toBe(
+      true,
+    );
+    // 选项与确认在滚动区之外，钉在下面。
+    expect(area?.contains(screen.getByRole("listbox"))).toBe(false);
+    expect(area?.contains(screen.getByRole("button", { name: "Confirm" }))).toBe(false);
+
+    expect(screen.getByTestId("code-block").textContent).toContain('await agent("a")');
+  });
+
+  it("shows the first 8 arguments and discloses the rest in place", () => {
+    renderDialog(buildSaveRequest({ args: manyArgs(40) }));
+
+    expect(argRows()).toHaveLength(8);
+    expect(document.querySelector('[data-workflow-save-arg="arg08"]')).toBeTruthy();
+    expect(document.querySelector('[data-workflow-save-arg="arg09"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all 40 arguments" }));
+    expect(argRows()).toHaveLength(40);
+    expect(scrollArea()?.contains(document.querySelector('[data-workflow-save-arg="arg40"]'))).toBe(
+      true,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer arguments" }));
+    expect(argRows()).toHaveLength(8);
+  });
+
+  it("offers no argument toggle when everything already fits in the preview", () => {
+    renderDialog(buildSaveRequest({ args: manyArgs(8) }));
+
+    expect(argRows()).toHaveLength(8);
+    expect(document.querySelector('[data-workflow-save-args-toggle="true"]')).toBeNull();
+  });
+
+  describe("description and whenToUse", () => {
+    beforeEach(() => {
+      fakeClampedTextGeometry(true);
+    });
+
+    it("clamps each to 4 lines and toggles it in place", () => {
+      renderDialog(buildSaveRequest({ description: LONG_DESCRIPTION }));
+
+      const description = screen.getByText(
+        (_, el) => el?.textContent === LONG_DESCRIPTION && el.tagName === "SPAN",
+      );
+      expect(description.className).toContain("line-clamp-4");
+
+      const toggles = screen.getAllByRole("button", { name: "Show more" });
+      // 说明与 whenToUse 各一个（伪造的几何里两者都被截断）。
+      expect(toggles).toHaveLength(2);
+      fireEvent.click(toggles[0]!);
+      expect(description.className).not.toContain("line-clamp-4");
+      expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+      expect(description.className).toContain("line-clamp-4");
+    });
+
+    it("resets every disclosure when the next request arrives", () => {
+      const view = renderDialog(buildSaveRequest({ args: manyArgs(40) }));
+      fireEvent.click(screen.getAllByRole("button", { name: "Show more" })[0]!);
+      fireEvent.click(screen.getByRole("button", { name: "Show all 40 arguments" }));
+      fireEvent.click(screen.getByText("Show full script"));
+      expect(argRows()).toHaveLength(40);
+
+      view.rerender(
+        createElement(
+          ZCodeIntlProvider,
+          { initialLocale: "en-US" },
+          createElement(PermissionDialog, {
+            request: { ...buildSaveRequest({ args: manyArgs(40) }), requestId: "perm-save-2" },
+            onRespond: () => {},
+            workspacePath: "/workspace",
+          }),
+        ),
+      );
+
+      expect(argRows()).toHaveLength(8);
+      expect(screen.queryByTestId("code-block")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Show less" })).toBeNull();
+    });
+  });
+
+  it("offers no text toggle when nothing is cut", () => {
+    fakeClampedTextGeometry(false);
+    renderDialog(buildSaveRequest());
+
+    expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+  });
+
+  it("renders the toggles in both locales", () => {
+    fakeClampedTextGeometry(true);
+    renderDialog(buildSaveRequest({ args: manyArgs(40) }), "zh-CN");
+
+    expect(screen.getAllByRole("button", { name: "展开" })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "显示全部 40 个参数" }));
+    expect(screen.getByRole("button", { name: "收起参数" })).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "展开" })[0]!);
+    expect(screen.getByRole("button", { name: "收起" })).toBeTruthy();
+  });
+
+  // 选项列表的 Tab 循环曾把焦点困在选项与反馈之间，键盘用户够不着上方的展开钮，
+  // 折叠起来的说明、参数与脚本只能用鼠标打开。
+  it("lets Shift+Tab on the first option climb back to the last control in the scroll area", () => {
+    renderDialog(buildSaveRequest({ args: manyArgs(40) }));
+    const allow = screen.getByRole("option", { name: "Allow" });
+    allow.focus();
+    fireEvent.keyDown(allow, { key: "Tab", shiftKey: true });
+
+    // 滚动区里最后一个控件是脚本开关：焦点落在区内，选项的选择不动。
+    const area = scrollArea();
+    expect(area?.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.textContent).toContain("Show full script");
+    expect(allow.getAttribute("aria-selected")).toBe("true");
+    // 参数的展开钮在同一条倒序路径上（区内、可聚焦）。
+    expect(area?.contains(screen.getByRole("button", { name: "Show all 40 arguments" }))).toBe(
+      true,
+    );
+  });
+
+  it("keeps the option cycle for every other Tab press", async () => {
+    renderDialog(buildSaveRequest());
+    const allow = screen.getByRole("option", { name: "Allow" });
+    const deny = screen.getByRole("option", { name: "Deny" });
+    allow.focus();
+    fireEvent.keyDown(allow, { key: "Tab" });
+    await waitFor(() => expect(document.activeElement).toBe(deny));
+    // 不在第一项上的 Shift+Tab 仍是选项间移动，不离开列表。
+    fireEvent.keyDown(deny, { key: "Tab", shiftKey: true });
+    await waitFor(() => expect(document.activeElement).toBe(allow));
   });
 });

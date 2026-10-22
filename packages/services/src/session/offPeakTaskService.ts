@@ -13,6 +13,7 @@ import { ZodError } from "zod";
 import {
   isOffPeakTerminalStatus,
   resolveWorkspaceKey,
+  type ProjectExecutionSnapshot,
   type OffPeakCodingPlanSupport,
   type OffPeakTaskCreateErrorCategory,
   type OffPeakTaskCreateFailureStage,
@@ -25,6 +26,7 @@ import { isOffPeakBoundSessionConflict, type OffPeakTaskRepo } from "./offPeakTa
 import type { IOffPeakTaskService, OffPeakUpdateTaskParams } from "./offPeakTask.js";
 import { OffPeakServerError, type OffPeakServerClient } from "./offPeakServerClient.js";
 import type { ModelSelection, ModelSelectionValidation } from "@zcode/provider";
+import { OffPeakResidentExecutions } from "./offPeakResidentExecutions.js";
 
 /** 轮询下限/上限与失败退避（服务端 next_poll_after 优先，钳制防打爆/防饿死）。 */
 export const OFF_PEAK_SYNC_MIN_INTERVAL_MS = 5_000;
@@ -33,6 +35,7 @@ const SYNC_FAILURE_BASE_MS = 10_000;
 
 export interface OffPeakTaskServiceDeps {
   repo: OffPeakTaskRepo;
+  prepareProjectExecution?: (projectId: string) => Promise<ProjectExecutionSnapshot>;
   client: OffPeakServerClient;
   /** 与 ticket/runtime 共用 resolver 后的脱敏结果，供 renderer 创建门控。 */
   resolveCodingPlanSupport: () => Promise<OffPeakCodingPlanSupport>;
@@ -83,8 +86,8 @@ function isValidCreateParams(params: ZCodeOffPeakTaskCreateParams): boolean {
     params.title.trim().length > 0 &&
     typeof params.prompt === "string" &&
     params.prompt.trim().length > 0 &&
-    typeof params.workspacePath === "string" &&
-    params.workspacePath.trim().length > 0 &&
+    ((typeof params.projectId === "string" && params.projectId.trim().length > 0) ||
+      (typeof params.workspacePath === "string" && params.workspacePath.trim().length > 0)) &&
     typeof params.permissionMode === "string" &&
     VALID_CREATE_PERMISSION_MODES.has(params.permissionMode)
   );
@@ -124,12 +127,46 @@ const OFF_PEAK_SESSION_BOUND_FAILURE = {
 } as const;
 
 export class OffPeakTaskService implements IOffPeakTaskService {
+  readonly residentExecutions: OffPeakResidentExecutions;
+  private readonly retakes = new Map<string, Promise<void>>();
+  private readonly releasedTicketOutbox = new Set<string>();
   private syncTimer: ReturnType<typeof setTimeout> | null = null;
   private syncRunning = false;
   private syncStopped = true;
   private consecutiveSyncFailures = 0;
 
-  constructor(private readonly deps: OffPeakTaskServiceDeps) {}
+  constructor(private readonly deps: OffPeakTaskServiceDeps) {
+    this.residentExecutions = new OffPeakResidentExecutions({
+      renew: (taskId, current) => this.handleTicketExpiredDuringRun(taskId, current),
+      takeover: async (taskId) => {
+        await this.deps.repo.markRunning(taskId, { startedAt: this.now() });
+        await this.deps.repo.updateSchedulingSnapshot(taskId, {
+          schedulable: false,
+          queuePosition: null,
+          now: this.now(),
+        });
+        this.emitChanged();
+      },
+      release: (ticketId) => this.releaseExecutionTicket(ticketId),
+    });
+  }
+
+  /** 释放票据不改变任务终态；失败捎带现有 sync 重试，不增加计时器或持久化凭据。 */
+  private async releaseExecutionTicket(ticketId: string): Promise<void> {
+    this.releasedTicketOutbox.add(ticketId);
+    try {
+      await this.deps.client.settle(ticketId);
+      this.releasedTicketOutbox.delete(ticketId);
+    } catch (error) {
+      if (error instanceof OffPeakServerError && error.httpStatus < 500)
+        this.releasedTicketOutbox.delete(ticketId);
+      else
+        this.deps.logger.warn(
+          `off-peak execution ticket release failed ticket=${ticketId}:`,
+          error,
+        );
+    }
+  }
 
   private now(): number {
     return this.deps.now?.() ?? Date.now();
@@ -196,8 +233,23 @@ export class OffPeakTaskService implements IOffPeakTaskService {
         providerName,
       };
     }
+    let execution: ProjectExecutionSnapshot | undefined;
+    if (params.projectId) {
+      try {
+        if (params.boundSessionId || !this.deps.prepareProjectExecution)
+          throw new Error("project.creation-unavailable");
+        execution = await this.deps.prepareProjectExecution(params.projectId);
+      } catch (error) {
+        return {
+          ok: false,
+          ...classifyOffPeakCreateFailure(error, "client_validation"),
+          providerName,
+        };
+      }
+    }
     const normalizedParams: ZCodeOffPeakTaskCreateParams = {
       ...params,
+      ...execution,
       modelSelection: selection.selection,
     };
     // 绑定会话已有未终态任务即拒，先于取号避免浪费额度；
@@ -284,7 +336,17 @@ export class OffPeakTaskService implements IOffPeakTaskService {
       endedAt: this.now(),
     });
     if (!cancelled) return this.deps.repo.get(offPeakTaskId);
-    if (existing.status === "running" && existing.conversationId && this.deps.stopRunningTask) {
+    if (this.residentExecutions.has(offPeakTaskId)) {
+      try {
+        await this.residentExecutions.cancel(offPeakTaskId);
+      } catch (error) {
+        this.deps.logger.warn(`off-peak lifecycle cancel failed task=${offPeakTaskId}:`, error);
+      }
+    } else if (
+      existing.status === "running" &&
+      existing.conversationId &&
+      this.deps.stopRunningTask
+    ) {
       try {
         await this.deps.stopRunningTask({
           conversationId: existing.conversationId,
@@ -452,10 +514,19 @@ export class OffPeakTaskService implements IOffPeakTaskService {
   // ---- 3102 续跑（host 终态回写识别标记后调用）----
 
   /** 票据过期（active 3h 到期/ready 废票）：回队保 session → 同 task_id 重取号。 */
-  async handleTicketExpiredDuringRun(offPeakTaskId: string): Promise<void> {
+  async handleTicketExpiredDuringRun(
+    offPeakTaskId: string,
+    current = this.residentExecutions.retakeGuard(offPeakTaskId),
+  ): Promise<void> {
+    if (!current()) return;
     const requeued = await this.deps.repo.requeueForContinuation(offPeakTaskId, {
       now: this.now(),
     });
+    if (!current()) {
+      if (this.residentExecutions.isUserOwned(offPeakTaskId))
+        await this.deps.repo.markRunning(offPeakTaskId, { startedAt: this.now() });
+      return;
+    }
     if (!requeued) {
       this.deps.logger.info(
         `off-peak ticket-expired requeue dropped (not running) task=${offPeakTaskId}`,
@@ -469,8 +540,25 @@ export class OffPeakTaskService implements IOffPeakTaskService {
 
   /** 同 task_id 重新取号（已确认允许多次），失败留给轮询周期重试。 */
   private async retakeTicket(offPeakTaskId: string): Promise<void> {
+    const existing = this.retakes.get(offPeakTaskId);
+    if (existing) return existing;
+    const current = this.residentExecutions.retakeGuard(offPeakTaskId);
+    if (!current()) return;
+    const pending = this.runRetakeTicket(offPeakTaskId, current).finally(() => {
+      this.retakes.delete(offPeakTaskId);
+    });
+    this.retakes.set(offPeakTaskId, pending);
+    return pending;
+  }
+
+  private async runRetakeTicket(offPeakTaskId: string, current: () => boolean): Promise<void> {
     try {
       const ticket = await this.deps.client.takeTicket(offPeakTaskId);
+      const task = await this.deps.repo.get(offPeakTaskId);
+      if (!current() || !task || isOffPeakTerminalStatus(task.status)) {
+        await this.releaseExecutionTicket(ticket.ticketId);
+        return;
+      }
       await this.deps.repo.updateSchedulingSnapshot(offPeakTaskId, {
         serverTicketId: ticket.ticketId,
         registeredAt: ticket.registeredAt,
@@ -481,6 +569,18 @@ export class OffPeakTaskService implements IOffPeakTaskService {
           : {}),
         now: this.now(),
       });
+      if (!current()) {
+        await this.releaseExecutionTicket(ticket.ticketId);
+        if (this.residentExecutions.isUserOwned(offPeakTaskId)) {
+          await this.deps.repo.markRunning(offPeakTaskId, { startedAt: this.now() });
+          await this.deps.repo.updateSchedulingSnapshot(offPeakTaskId, {
+            serverTicketId: task.serverTicketId,
+            schedulable: false,
+            now: this.now(),
+          });
+        }
+        return;
+      }
       if (ticket.state === "ready") this.deps.requestSchedulerWake?.();
       this.deps.logger.info(
         `off-peak re-take ticket task=${offPeakTaskId} ticket=${ticket.ticketId} state=${ticket.state}`,
@@ -510,6 +610,7 @@ export class OffPeakTaskService implements IOffPeakTaskService {
 
   /** disposeServiceResources 钩子：host 退出统一回收（停轮询 + 附加清理）。 */
   disposeAll(): void {
+    this.residentExecutions.dispose();
     this.stopSync();
     try {
       this.deps.onDispose?.();
@@ -537,11 +638,20 @@ export class OffPeakTaskService implements IOffPeakTaskService {
     try {
       // 1) 核销 outbox 捎带补报（不新增计时器）。
       await this.flushSettleOutbox();
+      for (const ticketId of this.releasedTicketOutbox) await this.releaseExecutionTicket(ticketId);
+      try {
+        await this.residentExecutions.retryPendingTickets();
+      } catch (error) {
+        // 交接确认失败保留原票，下个同步周期继续；不能阻断其他任务轮询与票据释放。
+        this.deps.logger.warn("off-peak ticket confirmation pending:", error);
+      }
       // 2) 有非终态任务才轮询。
       const nonTerminal = await this.projectModelSelectionIssues(
         await this.deps.repo.listNonTerminal(),
       );
-      const withTickets = nonTerminal.filter((task) => task.serverTicketId);
+      const withTickets = nonTerminal.filter(
+        (task) => task.serverTicketId && !this.residentExecutions.isUserOwned(task.offPeakTaskId),
+      );
       // 无票的 queued 任务（重取号失败残留）：补取号。
       for (const task of nonTerminal) {
         if (!task.serverTicketId && task.status === "queued") {

@@ -8,6 +8,8 @@
 >
 > 关联任务：[`Todo 33`](./todo-33-personal-provider-config-file-cutover.md)
 
+> 2026-09-17 后续裁决：[Todo161](todo-161-cli-legacy-output-token-migration.md) 仅为 Standalone CLI 首次导入增加显式输出上限迁移；本文 context-only 的 CLI 结论由该项取代，Desktop 与历史实施证据保留。
+
 ## 1. 问题
 
 Todo 33 已把正式 Personal Provider/Model Config 切换到 `provider_config.json`，但现有 Legacy Importer

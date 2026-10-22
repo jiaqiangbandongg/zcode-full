@@ -52,7 +52,7 @@
     "message:E2E_STREAM_MESSAGE_2 README 看完了，我再跑测试。",
     "tools:🛠️ 工具摘要 (1):false",
     "message:E2E_STREAM_MESSAGE_3 测试完成。",
-    "message:_✅ 已完成_"
+    "message:✅ 已完成"
   ],
   "forbiddenCardMarkers": [
     "E2E_SECRET_RAW",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ModelRetryBudget } from "@zcode/contracts";
+import { ModelErrorCode, ModelProtocolError, ModelRetryBudget } from "@zcode/contracts";
 import {
+  matchExecutionSelectionCreationFallback,
   matchExecutionSelectionFallback,
   resolveExecutionFallbackCandidates,
 } from "../src/runtime/methods/turn-execution-fallback.js";
@@ -119,6 +120,51 @@ describe("matchExecutionSelectionFallback", () => {
       match(adapterError({ providerCode: CARD_EXPIRED_CODE }), { selectionFallback: catchAllFirst })
         ?.reason,
     ).toBe("highspeed_request_failed");
+  });
+});
+
+describe("matchExecutionSelectionCreationFallback", () => {
+  it.each([ModelErrorCode.ProviderNotFound, ModelErrorCode.ModelNotFound])(
+    "%s 仅在 execution Selection 与声明 provider 相同时退回",
+    (code) => {
+      const error = new ModelProtocolError(code, "selection unavailable");
+      expect(
+        matchExecutionSelectionCreationFallback({
+          error,
+          selection: { providerId: HIGHSPEED_PROVIDER_ID, modelId: "GLM-5.3" },
+          selectionFallback: declaration,
+          selectionScope: "execution",
+        }),
+      ).toEqual({ reason: "highspeed_selection_unavailable" });
+      expect(
+        matchExecutionSelectionCreationFallback({
+          error,
+          selection: { providerId: SESSION_PROVIDER_ID, modelId: "GLM-5.3" },
+          selectionFallback: declaration,
+          selectionScope: "execution",
+        }),
+      ).toBeUndefined();
+    },
+  );
+
+  it("普通 Selection 与其他创建错误不退回", () => {
+    const selection = { providerId: HIGHSPEED_PROVIDER_ID, modelId: "GLM-5.3" };
+    expect(
+      matchExecutionSelectionCreationFallback({
+        error: new ModelProtocolError(ModelErrorCode.ProviderNotFound, "missing"),
+        selection,
+        selectionFallback: declaration,
+        selectionScope: undefined,
+      }),
+    ).toBeUndefined();
+    expect(
+      matchExecutionSelectionCreationFallback({
+        error: new ModelProtocolError(ModelErrorCode.InvalidModelRequest, "invalid"),
+        selection,
+        selectionFallback: declaration,
+        selectionScope: "execution",
+      }),
+    ).toBeUndefined();
   });
 });
 

@@ -18,18 +18,26 @@ import {
   type V4ComposerDraft,
 } from "@/v4/composer/composerDraftStore.js";
 import { getComposerDraftRevision } from "@/v4/composer/composerDraftRevision.js";
+import { pendingCommandRegistry } from "@/v4/pendingCommandRegistry.js";
+import type {
+  CommandAck,
+  CommandEnvelope,
+  ConversationSnapshot,
+} from "@zcode/shared/zcode-protocol-v4";
 import type { ComposerSubmissionConfig } from "@/v4/composer/composerSubmissionConfig.js";
 
-const { attachmentState, chatPromptEditorProps, dialogOpenStates, inputClear } = vi.hoisted(() => ({
-  attachmentState: {
-    adoptSentAttachments: vi.fn(async () => {}),
-    hasUnreadyAttachments: false,
-    prepareForSend: vi.fn(async () => []),
-  },
-  chatPromptEditorProps: [] as Array<Record<string, unknown>>,
-  dialogOpenStates: [] as boolean[],
-  inputClear: vi.fn(),
-}));
+const { attachmentState, chatPromptEditorProps, dialogOpenStates, inputClear, inputSetText } =
+  vi.hoisted(() => ({
+    attachmentState: {
+      adoptSentAttachments: vi.fn(async () => {}),
+      hasUnreadyAttachments: false,
+      prepareForSend: vi.fn(async () => []),
+    },
+    chatPromptEditorProps: [] as Array<Record<string, unknown>>,
+    dialogOpenStates: [] as boolean[],
+    inputClear: vi.fn(),
+    inputSetText: vi.fn(),
+  }));
 
 function expectedTelemetrySendOptions() {
   return expect.objectContaining({
@@ -90,7 +98,7 @@ vi.mock("@/prompt-editor/ChatPromptEditor.js", async () => {
           getEditorState: () => null,
           getMarkdown: () => "",
           setEditorStateJson: vi.fn(),
-          setText: vi.fn(),
+          setText: inputSetText,
         };
       }
       return React.createElement(
@@ -301,8 +309,7 @@ function renderComposerElement(
   submissionReady = true,
 ) {
   const scopeId = sessionId ?? V4_DRAFT_SCOPE_ROOT;
-  let ownedDraft =
-    composerDraft ??
+  let ownedDraft = composerDraft ??
     readV4ComposerDraft("/workspace", undefined, scopeId) ?? {
       text: "",
       updatedAt: 0,
@@ -369,6 +376,7 @@ afterEach(() => {
   attachmentState.prepareForSend.mockClear();
   attachmentState.prepareForSend.mockResolvedValue([]);
   inputClear.mockClear();
+  inputSetText.mockClear();
   dialogOpenStates.length = 0;
   delete (globalThis as { document?: unknown }).document;
   delete (globalThis as { window?: unknown }).window;
@@ -547,7 +555,7 @@ describe("ConversationComposer prompt history", () => {
     await act(async () => root.unmount());
   });
 
-  it("发送成功只清正文，保留当前 scope 的模式和模型选择", async () => {
+  it("发送成功删除持久草稿，内存保留当前模式和模型选择", async () => {
     const container = installMinimalDom();
     const root = createRoot(container);
     const selection = {
@@ -585,7 +593,8 @@ describe("ConversationComposer prompt history", () => {
       (chatPromptEditorProps.at(-1)!.onSubmit as (text: string) => boolean)("会被发送");
       await flushAsyncWork();
     });
-    expect(readV4ComposerDraft("/workspace", undefined, "session-a")).toMatchObject({
+    expect(readV4ComposerDraft("/workspace", undefined, "session-a")).toBeNull();
+    expect(draft).toMatchObject({
       text: "",
       mode: "yolo",
       modelSelection: selection,
@@ -596,7 +605,10 @@ describe("ConversationComposer prompt history", () => {
   it("迟到的发送成功不能清除等待期间产生的新正文", async () => {
     let resolveSend!: () => void;
     const onSendText = vi.fn(
-      () => new Promise<void>((resolve) => { resolveSend = resolve; }),
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSend = resolve;
+        }),
     );
     const { root } = renderComposer(onSendText);
     const submit = chatPromptEditorProps.at(-1)!.onSubmit as (text: string) => boolean;
@@ -822,4 +834,259 @@ describe("ConversationComposer prompt history", () => {
       root.unmount();
     });
   });
+});
+
+// ── R3A-B-07：ACK 丢失 + 断连期间 composer 卸载重挂后的结算 ──
+const REMOUNT_SESSION_ID = "sess_remount";
+const REMOUNT_COMMAND_ID = "cmd_remount_1";
+const REMOUNT_TEXT = "E2E_R3_ACK_LOSS_ACK 请回复";
+
+function authoritativeSnapshot(): ConversationSnapshot {
+  return {
+    sessionId: REMOUNT_SESSION_ID,
+    queue: { items: [] },
+    rows: {
+      window: [
+        {
+          kind: "userInput",
+          rowId: "row-1",
+          sourceCommandId: REMOUNT_COMMAND_ID,
+          text: REMOUNT_TEXT,
+        },
+      ],
+    },
+  } as unknown as ConversationSnapshot;
+}
+
+/** 测试自持的草稿对象，等价于 useDraftConfigControl 持有并跨组件实例存活的 composerDraft。 */
+function createDraftOwner() {
+  const owner = {
+    draft: { text: "", updatedAt: 0 } as V4ComposerDraft,
+    writes: [] as string[],
+    update(content: Pick<V4ComposerDraft, "text" | "editorStateJson" | "mention">) {
+      owner.draft = { ...owner.draft, editorStateJson: undefined, mention: undefined, ...content };
+      owner.writes.push(content.text);
+    },
+  };
+  return owner;
+}
+
+function mountRemountSession(
+  onSendText: (text: string, options?: unknown) => Promise<void>,
+  owner: ReturnType<typeof createDraftOwner>,
+  existingContainer?: Element,
+) {
+  const container = existingContainer ?? installMinimalDom();
+  const root: Root = createRoot(container);
+  act(() => {
+    root.render(
+      renderComposerElement(
+        onSendText,
+        REMOUNT_SESSION_ID,
+        undefined,
+        undefined,
+        undefined,
+        owner.draft,
+        (content) => owner.update(content),
+      ),
+    );
+  });
+  return { root, container };
+}
+
+/** onSendText 先回报 commandId，再挂起等待测试决定传输结果。 */
+function makePendingSend() {
+  let reject: (error: Error) => void = () => {};
+  const pending = new Promise<void>((_resolve, rej) => {
+    reject = rej;
+  });
+  const onSendText = vi.fn(async (_text: string, options?: unknown) => {
+    (options as { onCommandCreated?: (id: string) => void }).onCommandCreated?.(REMOUNT_COMMAND_ID);
+    await pending;
+  });
+  return { onSendText, reject };
+}
+
+async function typeAndSubmitRemountText(text = REMOUNT_TEXT) {
+  const props = chatPromptEditorProps.at(-1)!;
+  await act(async () => {
+    (props.onChange as (value: string) => void)(text);
+  });
+  await act(async () => {
+    (props.onSubmit as (value: string) => boolean)(text);
+    await flushAsyncWork();
+  });
+}
+
+/** 模拟远端 ChannelClient.dispose() 拒绝在途 RPC。 */
+async function closeTransport(reject: (error: Error) => void) {
+  await act(async () => {
+    const error = new Error("ChannelClient disposed");
+    error.name = "ConnectionClosed";
+    reject(error);
+    await flushAsyncWork();
+  });
+}
+
+async function applyAuthoritativeSnapshot() {
+  await act(async () => {
+    pendingCommandRegistry.reconcileSnapshot(authoritativeSnapshot());
+    await flushAsyncWork();
+  });
+}
+
+async function submitAndLoseTransport() {
+  const owner = createDraftOwner();
+  const { onSendText, reject } = makePendingSend();
+  const { root, container } = mountRemountSession(onSendText, owner);
+  await typeAndSubmitRemountText();
+  expect(onSendText).toHaveBeenCalledTimes(1);
+  // claimSubmittedDraft：草稿 store 先被占用清空。
+  expect(owner.writes.at(-1)).toBe("");
+  await closeTransport(reject);
+  // catch → restoreSubmittedDraft：正文写回草稿 store，编辑器未清空。
+  expect(owner.writes.at(-1)).toBe(REMOUNT_TEXT);
+  expect(inputClear).not.toHaveBeenCalled();
+  return { owner, root, container };
+}
+
+describe("ConversationComposer settles submissions across pane remount (R3A-B-07)", () => {
+  it("对照：composer 保持挂载时，传输关闭后权威投影仍能清空正文", async () => {
+    const { owner, root } = await submitAndLoseTransport();
+    await applyAuthoritativeSnapshot();
+    expect(inputClear).toHaveBeenCalledTimes(1);
+    expect(owner.writes.at(-1)).toBe("");
+    await act(async () => root.unmount());
+  });
+
+  it("断连期间卸载重挂后，权威投影到达时清空回填的正文与草稿", async () => {
+    const { owner, root, container } = await submitAndLoseTransport();
+    // 断连：V4PaneConversationProvider rpcReady=false 返回 null → SessionPane/composer 卸载。
+    await act(async () => root.unmount());
+    inputClear.mockClear();
+    inputSetText.mockClear();
+
+    // 重连：重挂载，正文从草稿 store 回填到编辑器。
+    const { root: remounted } = mountRemountSession(
+      vi.fn(async () => {}),
+      owner,
+      container,
+    );
+    await act(async () => {
+      await flushAsyncWork();
+    });
+    expect(inputSetText).toHaveBeenCalledWith(REMOUNT_TEXT);
+
+    await applyAuthoritativeSnapshot();
+    expect(inputClear).toHaveBeenCalledTimes(1);
+    expect(owner.draft.text).toBe("");
+    await act(async () => remounted.unmount());
+  });
+
+  it("权威投影先于重挂到达时，重挂后的 composer 同步清空回填正文", async () => {
+    const { owner, root, container } = await submitAndLoseTransport();
+    await act(async () => root.unmount());
+    await applyAuthoritativeSnapshot();
+    inputClear.mockClear();
+
+    const { root: remounted } = mountRemountSession(
+      vi.fn(async () => {}),
+      owner,
+      container,
+    );
+    await act(async () => {
+      await flushAsyncWork();
+    });
+    expect(inputClear).toHaveBeenCalledTimes(1);
+    expect(owner.draft.text).toBe("");
+    await act(async () => remounted.unmount());
+  });
+
+  it("重挂后用户已修改正文时，迟到的权威投影不得清空新输入", async () => {
+    const { owner, root, container } = await submitAndLoseTransport();
+    await act(async () => root.unmount());
+    inputClear.mockClear();
+
+    const { root: remounted } = mountRemountSession(
+      vi.fn(async () => {}),
+      owner,
+      container,
+    );
+    await act(async () => {
+      await flushAsyncWork();
+    });
+    const props = chatPromptEditorProps.at(-1)!;
+    await act(async () => {
+      (props.onChange as (value: string) => void)(`${REMOUNT_TEXT} 补充`);
+    });
+
+    await applyAuthoritativeSnapshot();
+    expect(inputClear).not.toHaveBeenCalled();
+    expect(owner.draft.text).toBe(`${REMOUNT_TEXT} 补充`);
+    await act(async () => remounted.unmount());
+  });
+
+  it("命令以失败终态收口时，重挂后的 composer 保留正文供用户重试", async () => {
+    const envelope = {
+      commandId: REMOUNT_COMMAND_ID,
+      clientId: "client-1",
+      sessionId: REMOUNT_SESSION_ID,
+      type: "sendText",
+      payload: { text: REMOUNT_TEXT },
+      issuedAt: Date.now(),
+    } as unknown as CommandEnvelope;
+    pendingCommandRegistry.record(envelope);
+    const { owner, root, container } = await submitAndLoseTransport();
+    await act(async () => root.unmount());
+    inputClear.mockClear();
+
+    const { root: remounted } = mountRemountSession(
+      vi.fn(async () => {}),
+      owner,
+      container,
+    );
+    await act(async () => {
+      await flushAsyncWork();
+    });
+    await act(async () => {
+      pendingCommandRegistry.applyAck(envelope, {
+        commandId: REMOUNT_COMMAND_ID,
+        status: "failed",
+        reasonCode: "guard.rejected",
+        revisionAtDecision: 1,
+      } as unknown as CommandAck);
+      await flushAsyncWork();
+    });
+    expect(inputClear).not.toHaveBeenCalled();
+    expect(owner.draft.text).toBe(REMOUNT_TEXT);
+    await act(async () => remounted.unmount());
+  });
+});
+
+// 冲突整合回归：projection 已接管提交后，附件 adoption 尚在等待时的传输失败
+// 不能再恢复旧正文，否则 accepted 输入会重新出现在待发草稿中。
+it("权威投影开始接管附件后，传输失败不能恢复已提交正文", async () => {
+  let completeAdoption = () => {};
+  attachmentState.adoptSentAttachments.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        completeAdoption = resolve;
+      }),
+  );
+  const owner = createDraftOwner();
+  const { onSendText, reject } = makePendingSend();
+  const { root } = mountRemountSession(onSendText, owner);
+  await typeAndSubmitRemountText();
+  await applyAuthoritativeSnapshot();
+  expect(attachmentState.adoptSentAttachments).toHaveBeenCalledOnce();
+  await closeTransport(reject);
+  try {
+    expect(owner.draft.text).toBe("");
+  } finally {
+    await act(async () => {
+      completeAdoption();
+      await flushAsyncWork();
+      root.unmount();
+    });
+  }
 });

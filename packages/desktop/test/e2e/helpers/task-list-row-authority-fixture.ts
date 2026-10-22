@@ -29,10 +29,10 @@ interface SeedTaskIndexRowAuthorityFixtureOptions {
  * Bug 根因：旧列表把 sessions-index snapshot 当成左表，摘要缺失的持久 task 会在冷启动时
  * 消失。这里用真 SQLite 构造 1 个有摘要、24 个无摘要的等价类，验证行集合只由 tasks-index 决定。
  */
-export function seedTaskIndexRowAuthorityFixture(
+export async function seedTaskIndexRowAuthorityFixture(
   options: SeedTaskIndexRowAuthorityFixtureOptions,
-): void {
-  seedProviderReadinessHistoryFixture(options);
+): Promise<void> {
+  await seedProviderReadinessHistoryFixture(options);
 
   // Node 当前内置 SQLite 只提供 DatabaseSync；fixture 在 Electron/Host 启动前执行，
   // 没有与产品进程争用句柄，写完立即关闭。

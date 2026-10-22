@@ -19,6 +19,7 @@ export function createPluginUiSidePaneTab(
   return {
     id: buildPluginUiSidePaneTabId(options),
     type: "plugin-ui",
+    ...(options.instanceId ? { instanceId: options.instanceId } : {}),
     openedAt: Date.now(),
     workspaceKey: options.workspaceKey,
     workspacePath: options.workspacePath,
@@ -27,7 +28,7 @@ export function createPluginUiSidePaneTab(
     parentSessionId: options.parentSessionId,
     ...(scope.kind === "toolCall"
       ? { toolCallId: scope.toolCallId }
-      : { surfaceId: scope.surfaceId }),
+      : { surfaceId: options.surfaceId }),
     ...(options.serverName ? { serverName: options.serverName } : {}),
     pluginId: options.pluginId,
     resourceUri: options.resourceUri,

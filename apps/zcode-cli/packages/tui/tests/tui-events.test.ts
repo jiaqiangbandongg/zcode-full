@@ -75,9 +75,7 @@ test("keeps streamed text and tool parts in assistant message order", () => {
     state.messages[0]?.parts?.map((part) => part.type),
     ["text", "tool"],
   );
-  assert.equal(state.messages[0]?.parts?.[0]?.type, "text");
   assert.equal(state.messages[0]?.parts?.[0]?.text, "先看看 package。");
-  assert.equal(state.messages[0]?.parts?.[1]?.type, "tool");
   assert.equal(state.messages[0]?.parts?.[1]?.toolCallId, "call-1");
 });
 

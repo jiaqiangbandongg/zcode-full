@@ -1,10 +1,8 @@
 import { join, resolve } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
+import { modelSelectionSchema, OFF_PEAK_PROVIDER_IDS, type ModelSelection } from "@zcode/shared";
 import {
-  modelSelectionSchema,
-  OFF_PEAK_PROVIDER_IDS,
-  type ModelSelection,
   TID_OFFPEAK_CARD,
   TID_OFFPEAK_CARD_SESSION,
   TID_OFFPEAK_CREATE_CARD,
@@ -13,7 +11,7 @@ import {
   TID_OFFPEAK_EDIT_VIEW,
   TID_OFFPEAK_FORM_TITLE,
   TID_OFFPEAK_TAB,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,

@@ -22,19 +22,19 @@
       {
         "scope": "modelApiRules",
         "index": 25,
-        "modelMatch": ".*kimi-k3(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k3.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 27,
-        "modelMatch": ".*k3(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*k3.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 29,
-        "modelMatch": ".*k3-256k(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*k3-256k.*",
         "apiMatch": "openai-chat-completions"
       }
     ]
@@ -45,157 +45,157 @@
       {
         "scope": "modelApiRules",
         "index": 5,
-        "modelMatch": ".*glm-5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-5.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 7,
-        "modelMatch": ".*GLM-5-Turbo(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*GLM-5-Turbo.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 10,
-        "modelMatch": ".*glm-5\\.1(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-5\\.1.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 11,
-        "modelMatch": ".*glm-5\\.1-highspeed(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-5\\.1-highspeed.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 12,
-        "modelMatch": ".*glm-5v-turbo(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-5v-turbo.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 13,
-        "modelMatch": ".*glm-4\\.7(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.7.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 14,
-        "modelMatch": ".*glm-4\\.7-flashx(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.7-flashx.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 15,
-        "modelMatch": ".*glm-4\\.7-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.7-flash.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 16,
-        "modelMatch": ".*glm-4\\.6(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.6(?!v).*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 17,
-        "modelMatch": ".*glm-4\\.5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.5.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 18,
-        "modelMatch": ".*glm-4\\.5-air(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-4\\.5-air.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 34,
-        "modelMatch": ".*kimi-k2\\.6(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.6.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 35,
-        "modelMatch": ".*kimi-k2\\.6(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.6.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 36,
-        "modelMatch": ".*kimi-k2\\.5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.5.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 37,
-        "modelMatch": ".*kimi-k2\\.5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.5.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 46,
-        "modelMatch": ".*qwen3\\.5-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.5-plus.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 48,
-        "modelMatch": ".*qwen3\\.5-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.5-flash.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 50,
-        "modelMatch": ".*qwen-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen-plus.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 52,
-        "modelMatch": ".*qwen-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen-flash.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 54,
-        "modelMatch": ".*qwen3-vl-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3-vl-plus.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 56,
-        "modelMatch": ".*mimo-v2\\.5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2\\.5.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 57,
-        "modelMatch": ".*mimo-v2\\.5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2\\.5.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 58,
-        "modelMatch": ".*mimo-v2\\.5-pro(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2\\.5-pro.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 59,
-        "modelMatch": ".*mimo-v2\\.5-pro(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2\\.5-pro.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 60,
-        "modelMatch": ".*mimo-v2-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2-flash.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 61,
-        "modelMatch": ".*mimo-v2-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*mimo-v2-flash.*",
         "apiMatch": "openai-chat-completions"
       }
     ]
@@ -206,7 +206,7 @@
       {
         "scope": "modelApiRules",
         "index": 6,
-        "modelMatch": ".*GLM-5\\.2(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*GLM-5\\.2.*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -217,7 +217,7 @@
       {
         "scope": "modelApiRules",
         "index": 8,
-        "modelMatch": ".*glm-5\\.3(?:-flash)?(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*glm-5\\.3.*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -228,7 +228,7 @@
       {
         "scope": "modelApiRules",
         "index": 19,
-        "modelMatch": ".*gpt-5\\.6(?:-(?:sol|terra|luna))?(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*gpt-5\\.6.*",
         "apiMatch": "openai-responses"
       }
     ]
@@ -239,13 +239,13 @@
       {
         "scope": "modelApiRules",
         "index": 20,
-        "modelMatch": ".*gpt-5\\.3-codex(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*gpt-5\\.3-codex.*",
         "apiMatch": "openai-responses"
       },
       {
         "scope": "modelApiRules",
         "index": 23,
-        "modelMatch": ".*grok-4\\.6(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*grok-4\\.6.*",
         "apiMatch": "openai-responses"
       }
     ]
@@ -256,7 +256,7 @@
       {
         "scope": "modelApiRules",
         "index": 21,
-        "modelMatch": ".*claude-(?:fable|opus|sonnet)-5(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*claude-(?:fable|opus|sonnet)-5.*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -267,19 +267,19 @@
       {
         "scope": "modelApiRules",
         "index": 24,
-        "modelMatch": ".*kimi-k3(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k3.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 26,
-        "modelMatch": ".*k3(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*k3.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 28,
-        "modelMatch": ".*k3-256k(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*k3-256k.*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -290,13 +290,13 @@
       {
         "scope": "modelApiRules",
         "index": 31,
-        "modelMatch": ".*kimi-k2\\.7-code(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.7-code.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 32,
-        "modelMatch": ".*kimi-k2\\.7-code(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.7-code.*",
         "apiMatch": "openai-chat-completions"
       }
     ]
@@ -307,7 +307,7 @@
       {
         "scope": "modelApiRules",
         "index": 33,
-        "modelMatch": ".*kimi-k2\\.7-code(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*kimi-k2\\.7-code.*",
         "apiMatch": "openai-responses"
       }
     ]
@@ -318,13 +318,13 @@
       {
         "scope": "modelApiRules",
         "index": 38,
-        "modelMatch": ".*deepseek-v4-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*deepseek-v4-flash.*",
         "apiMatch": "anthropic-messages"
       },
       {
         "scope": "modelApiRules",
         "index": 40,
-        "modelMatch": ".*deepseek-v4-pro(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*deepseek-v4-pro.*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -335,13 +335,13 @@
       {
         "scope": "modelApiRules",
         "index": 39,
-        "modelMatch": ".*deepseek-v4-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*deepseek-v4-flash.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 41,
-        "modelMatch": ".*deepseek-v4-pro(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*deepseek-v4-pro.*",
         "apiMatch": "openai-chat-completions"
       }
     ]
@@ -352,7 +352,7 @@
       {
         "scope": "modelApiRules",
         "index": 43,
-        "modelMatch": ".*qwen3\\.8-(?:max|flash)(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.8-(?:max|flash).*",
         "apiMatch": "anthropic-messages"
       }
     ]
@@ -363,7 +363,7 @@
       {
         "scope": "modelApiRules",
         "index": 44,
-        "modelMatch": ".*qwen3\\.8-(?:max|flash)(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.8-(?:max|flash).*",
         "apiMatch": "openai-chat-completions"
       }
     ]
@@ -374,7 +374,7 @@
       {
         "scope": "modelApiRules",
         "index": 45,
-        "modelMatch": ".*qwen3\\.8-(?:max|flash)(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.8-(?:max|flash).*",
         "apiMatch": "openai-responses"
       }
     ]
@@ -385,31 +385,31 @@
       {
         "scope": "modelApiRules",
         "index": 47,
-        "modelMatch": ".*qwen3\\.5-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.5-plus.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 49,
-        "modelMatch": ".*qwen3\\.5-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3\\.5-flash.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 51,
-        "modelMatch": ".*qwen-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen-plus.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 53,
-        "modelMatch": ".*qwen-flash(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen-flash.*",
         "apiMatch": "openai-chat-completions"
       },
       {
         "scope": "modelApiRules",
         "index": 55,
-        "modelMatch": ".*qwen3-vl-plus(?:[.\\-:/\\[].*)?",
+        "modelMatch": ".*qwen3-vl-plus.*",
         "apiMatch": "openai-chat-completions"
       }
     ]

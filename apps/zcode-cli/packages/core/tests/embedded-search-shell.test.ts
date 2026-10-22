@@ -1,15 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExecutionShellSelection } from "@zcode/contracts";
-import {
-  shouldInjectEmbeddedSearchBashPrelude,
-  supportsEmbeddedSearchShellSelection,
-} from "../src/embedded-search/shell.js";
-
-describe("shouldInjectEmbeddedSearchBashPrelude", () => {
-  it("enables runtime find/grep alias injection by default", () => {
-    expect(shouldInjectEmbeddedSearchBashPrelude()).toBe(true);
-  });
-});
+import { supportsEmbeddedSearchShellSelection } from "../src/embedded-search/shell.js";
 
 describe("supportsEmbeddedSearchShellSelection", () => {
   it("supports POSIX and Git Bash session shells for runtime prelude injection", () => {

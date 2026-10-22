@@ -53,13 +53,19 @@ describe("session history hydrator", () => {
     });
     const pendingHistory = new MessageHistoryImpl();
     pendingHistory.init("system prompt");
-    await hydrateMessageHistoryFromSession({ history: pendingHistory, messages: [makeMessage("pending")] });
+    await hydrateMessageHistoryFromSession({
+      history: pendingHistory,
+      messages: [makeMessage("pending")],
+    });
     expect(pendingHistory.toRuntimeEntries()).toHaveLength(1);
     expect(JSON.stringify(pendingHistory.toRuntimeEntries())).not.toContain("shared markdown");
 
     const attachedHistory = new MessageHistoryImpl();
     attachedHistory.init("system prompt");
-    await hydrateMessageHistoryFromSession({ history: attachedHistory, messages: [makeMessage("attached")] });
+    await hydrateMessageHistoryFromSession({
+      history: attachedHistory,
+      messages: [makeMessage("attached")],
+    });
     expect(attachedHistory.toRuntimeEntries()).toHaveLength(2);
     expect(JSON.stringify(attachedHistory.toRuntimeEntries())).toContain("shared markdown");
   });
@@ -776,47 +782,6 @@ describe("session history hydrator", () => {
     ]);
   });
 
-  it("hydrates persisted background task notifications as user-role task notifications", async () => {
-    const sessionID = createSessionId("hydrate-background-task-notice");
-    const userID = createMessageId("background-task-notice");
-    const history = new MessageHistoryImpl();
-    history.init("system prompt");
-
-    await hydrateMessageHistoryFromSession({
-      history,
-      messages: [
-        {
-          info: {
-            id: userID,
-            sessionID,
-            role: "user",
-            time: { created: 1 },
-            agent: "zcode-agent",
-            model: { providerID, modelID },
-          },
-          parts: [
-            {
-              id: createPartId("background-task-notice-text"),
-              messageID: userID,
-              metadata: { source: "background_task" },
-              sessionID,
-              synthetic: true,
-              text: "<task-notification>\n<status>completed</status>\n</task-notification>",
-              type: "text",
-            },
-          ],
-        },
-      ],
-    });
-
-    const content = String(providerMessages(history)[1]?.content);
-    expect(providerMessages(history)[1]?.role).toBe("user");
-    expect(content).not.toContain("<system-reminder>");
-    expect(content).toContain("<task-notification>");
-    expect(content).toContain("</task-notification>");
-    expect(content).not.toContain("</system-reminder>");
-  });
-
   it("hydrates persisted synthetic background task notifications as direct user entries", async () => {
     const sessionID = createSessionId("hydrate-background-task-metadata");
     const userID = createMessageId("background-task-metadata");
@@ -858,6 +823,13 @@ describe("session history hydrator", () => {
       },
     });
     expect(hydratedEntry?.metadata?.source).not.toBe("task_status");
+    expect(providerMessages(history)).toEqual([
+      { role: "system", content: "system prompt" },
+      {
+        role: "user",
+        content: "<task-notification>\n<status>completed</status>\n</task-notification>",
+      },
+    ]);
     expect(JSON.stringify(providerMessages(history))).not.toContain("projectionPolicy");
   });
 
@@ -1613,7 +1585,6 @@ describe("session history hydrator", () => {
           'Called the Read tool with the following input: {"file_path":"docs/notes.md"}\nResult of calling the Read tool:\n1\t# Notes\n2\tRemember SR6.',
       },
     ]);
-    expect(JSON.stringify(providerMessages(history))).not.toContain("<system-reminder>");
   });
 
   it("restores an attachment-only text turn with the same live and hydrated provider history", async () => {
@@ -2028,11 +1999,11 @@ describe("session history hydrator", () => {
       {
         role: "user",
         content: [
+          { type: "text", text: "inspect if needed" },
           {
             type: "text",
             text: "[Attached application/octet-stream: /tmp/project/assets/demo.mp4]",
           },
-          { type: "text", text: "inspect if needed" },
         ],
       },
     ]);
@@ -2101,7 +2072,6 @@ describe("session history hydrator", () => {
         ].join("\n"),
       },
     ]);
-    expect(JSON.stringify(messages)).not.toContain("<system-reminder>");
   });
 
   it("keeps a source-less inline image with a data URL on the existing projection path", async () => {

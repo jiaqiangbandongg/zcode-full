@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { WebRemoteControlWindowBootstrapResult } from "@zcode/shared";
-import { createWebRemoteControlVersionGuard } from "../src/webRemoteControlVersion.js";
+import {
+  createWebRemoteControlTaskViewPublisher,
+  createWebRemoteControlVersionGuard,
+} from "#src/web-remote-control/index.js";
 
 const bootstrap = (desktopAppVersion?: string): WebRemoteControlWindowBootstrapResult => ({
   windowControlSessionId: "device-1",
@@ -13,6 +16,7 @@ function harness(options: { url?: string; ready?: boolean; version?: string } = 
   const requestBootstrap = vi.fn(async () => bootstrap(options.version));
   const navigate = vi.fn();
   const onMismatch = vi.fn();
+  const onAccepted = vi.fn();
   const url =
     options.url ?? "https://zcode.z.ai/remote/v4?sid=a&hash=x%2By&t=1&app_version=3.12.1#task";
   const guard = createWebRemoteControlVersionGuard({
@@ -21,8 +25,9 @@ function harness(options: { url?: string; ready?: boolean; version?: string } = 
     isPageReady: () => options.ready ?? false,
     navigate,
     onMismatch,
+    onAccepted,
   });
-  return { guard, requestBootstrap, navigate, onMismatch, url };
+  return { guard, requestBootstrap, navigate, onMismatch, onAccepted, url };
 }
 
 describe("remote v4 desktop version guard", () => {
@@ -31,6 +36,7 @@ describe("remote v4 desktop version guard", () => {
     expect(await h.guard.check()).toBeUndefined();
     expect(h.navigate).toHaveBeenCalledExactlyOnceWith(h.url.replace("3.12.1", "3.12.2"));
     expect(h.onMismatch).not.toHaveBeenCalled();
+    expect(h.onAccepted).not.toHaveBeenCalled();
     expect(h.guard.isBlocked()).toBe(true);
     await h.guard.check();
     h.guard.confirm();
@@ -52,6 +58,7 @@ describe("remote v4 desktop version guard", () => {
       expect(await h.guard.check()).toEqual(bootstrap(version));
       expect(h.navigate).not.toHaveBeenCalled();
       expect(h.guard.isBlocked()).toBe(false);
+      expect(h.onAccepted).toHaveBeenCalledExactlyOnceWith(bootstrap(version));
     },
   );
 
@@ -61,6 +68,7 @@ describe("remote v4 desktop version guard", () => {
       const h = harness({ url: `http://localhost:5173${path}?app_version=old`, version: "3.12.2" });
       expect(await h.guard.check()).toEqual(bootstrap("3.12.2"));
       expect(h.navigate).not.toHaveBeenCalled();
+      expect(h.onAccepted).toHaveBeenCalledExactlyOnceWith(bootstrap("3.12.2"));
     },
   );
 
@@ -69,6 +77,7 @@ describe("remote v4 desktop version guard", () => {
     expect(await h.guard.check()).toBeUndefined();
     expect(h.onMismatch).toHaveBeenCalledExactlyOnceWith("3.12.2");
     expect(h.navigate).not.toHaveBeenCalled();
+    expect(h.onAccepted).not.toHaveBeenCalled();
     await h.guard.check();
     h.guard.confirm();
     h.guard.confirm();
@@ -79,9 +88,11 @@ describe("remote v4 desktop version guard", () => {
     const h = harness({ version: "3.12.1" });
     await Promise.all([h.guard.check(), h.guard.check()]);
     expect(h.requestBootstrap).toHaveBeenCalledTimes(1);
+    expect(h.onAccepted).toHaveBeenCalledTimes(1);
     h.guard.invalidate();
     await h.guard.check();
     expect(h.requestBootstrap).toHaveBeenCalledTimes(2);
+    expect(h.onAccepted).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a late version from an obsolete connection", async () => {
@@ -99,6 +110,62 @@ describe("remote v4 desktop version guard", () => {
     resolveOld(bootstrap("3.12.2"));
     expect(await old).toBeUndefined();
     expect(h.navigate).not.toHaveBeenCalled();
+    expect(h.onAccepted).toHaveBeenCalledExactlyOnceWith(bootstrap("3.12.1"));
+  });
+
+  it.each([false, true])(
+    "MRO03：旧回包先到不能占用新配对的查看 epoch，重申先到=%s",
+    async (reasserted) => {
+      const h = harness({ version: "3.12.1" });
+      const send = vi.fn(() => true);
+      const publisher = createWebRemoteControlTaskViewPublisher(send);
+      const bridge = {
+        kind: "local" as const,
+        bridgeSessionId: "bridge",
+        workspaceKey: "/repo",
+        workspacePath: "/repo",
+      };
+      publisher.setBridge(bridge);
+      publisher.update(bridge, { workspacePath: "/repo", taskId: "task" });
+      h.onAccepted.mockImplementation((result: WebRemoteControlWindowBootstrapResult) =>
+        publisher.seed(result.mobileTaskViewEpoch),
+      );
+      const oldResult = { ...bootstrap("3.12.1"), mobileTaskViewEpoch: "E1" };
+      const newResult = { ...bootstrap("3.12.1"), mobileTaskViewEpoch: "E2" };
+      const oldResponse = Promise.withResolvers<WebRemoteControlWindowBootstrapResult>();
+      h.requestBootstrap.mockReturnValueOnce(oldResponse.promise).mockResolvedValue(newResult);
+      const old = h.guard.check();
+      await Promise.resolve();
+      // 同 socket 的 waiting -> paired 也撤销原请求；不能仅校验物理 socket。
+      publisher.transportStateChanged("waiting", "paired");
+      h.guard.invalidate();
+      publisher.transportStateChanged("paired", "waiting");
+      if (reasserted) publisher.request("E2");
+      oldResponse.resolve(oldResult);
+      expect(await old).toBeUndefined();
+      expect(h.onAccepted).not.toHaveBeenCalled();
+      expect(await h.guard.check()).toEqual(newResult);
+      expect(h.onAccepted).toHaveBeenCalledExactlyOnceWith(newResult);
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          epoch: "E2",
+          seq: 1,
+          view: { workspacePath: "/repo", taskId: "task" },
+        }),
+      );
+    },
+  );
+
+  it("does not accept an in-flight bootstrap after disposal", async () => {
+    const h = harness();
+    const response = Promise.withResolvers<WebRemoteControlWindowBootstrapResult>();
+    h.requestBootstrap.mockReturnValueOnce(response.promise);
+    const pending = h.guard.check();
+    await Promise.resolve();
+    h.guard.dispose();
+    response.resolve(bootstrap());
+    expect(await pending).toBeUndefined();
+    expect(h.onAccepted).not.toHaveBeenCalled();
   });
 
   it("suppresses obsolete errors but propagates current failures", async () => {

@@ -1,11 +1,13 @@
+import { ensureProjectExpanded } from "../../../helpers/project-sidebar.js";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { TID_TASK_ITEM, testId } from "@zcode/shared";
+import { TID_TASK_ITEM, testId } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
-  ensureWorkspaceItemExpanded,
   getE2EAppDataPaths,
+  seedSettings,
+  waitForDefaultWorkspaceReady,
 } from "../../../helpers/desktop-app.js";
 import { restartIntoWorkspace } from "../../../helpers/model-provider-restart.js";
 import {
@@ -18,6 +20,7 @@ import {
   waitForV4ConversationState,
   waitForV4QueueCount,
   waitForV4TimelineContaining,
+  waitForLatestV4CommandAck,
 } from "../../../helpers/v4-conversation.js";
 import {
   waitForUpstreamNetworkCapture,
@@ -37,6 +40,7 @@ describe("turn error 后打开历史任务不刷新侧栏修改时间", () => {
 
   it("冷恢复清理 persisted queue 后，历史 task 不变成刚刚", async function () {
     this.timeout(CASE_TIMEOUT_MS);
+    await waitForDefaultWorkspaceReady(30_000);
     await prepareV4ConversationE2E();
 
     await sendV4Prompt(`${SOURCE_MARKER}: trigger a recoverable provider error.`);
@@ -63,12 +67,19 @@ describe("turn error 后打开历史任务不刷新侧栏修改时间", () => {
 
     // 进程退出后再改时间，避免旧 Host/Agent 的迟到写回覆盖回归样本。
     await restartIntoWorkspace({
-      afterElectronProcessExit: () => agePersistedTask(sessionId),
+      afterElectronProcessExit: async () => {
+        agePersistedTask(sessionId);
+        await seedSettings({ zcodeInteractionBehavior: "guide" });
+      },
     });
-    await ensureWorkspaceItemExpanded(DEFAULT_WORKSPACE);
+    await ensureProjectExpanded(DEFAULT_WORKSPACE);
     await waitForTaskRow(sessionId);
     await movePointerAwayFromTask(sessionId);
     expect(await readTaskRowText(sessionId)).toMatch(/\d+(天|d)/);
+    // 只观察本次点击后的配置 ACK，避免启动草稿的同步让断言提前通过。
+    await browser.execute(() => {
+      (window as Window & { __zcodeV4CommandAcksE2E?: unknown[] }).__zcodeV4CommandAcksE2E = [];
+    });
     await selectV4TaskById(sessionId);
     await waitForV4TimelineContaining(SOURCE_MARKER, 60_000);
     await waitForV4ConversationState(
@@ -76,10 +87,11 @@ describe("turn error 后打开历史任务不刷新侧栏修改时间", () => {
       "冷恢复后 persisted queue 没有被清理",
       60_000,
     );
+    expect((await waitForLatestV4CommandAck("setFollowupMode")).status).toBe("accepted");
 
     await movePointerAwayFromTask(sessionId);
     const rowText = await readTaskRowText(sessionId);
-    // 当前回归：冷恢复后的 WorkspaceHookAdmissionUpdated 未进黑名单，record.updatedAt 被改成 now。
+    // 恢复与追加模式配置事件都不能刷新活动时间；等配置 ACK 后再检查，覆盖自动同步路径。
     expect(rowText).not.toMatch(/刚刚|\bnow\b/);
     expect(rowText).toMatch(/\d+(天|d)/);
   });
@@ -165,8 +177,15 @@ function agePersistedTask(sessionId: string) {
     }
     const meta = JSON.parse(row.meta_json) as Record<string, unknown>;
     taskDatabase
-      .prepare("update tasks set updated_at = ?, meta_json = ? where task_id = ?")
-      .run(historicalAt, JSON.stringify({ ...meta, updatedAt: historicalAt }), sessionId);
+      .prepare(
+        "update tasks set cli_updated_at = ?, updated_at = ?, meta_json = ? where task_id = ?",
+      )
+      .run(
+        historicalAt,
+        historicalAt,
+        JSON.stringify({ ...meta, updatedAt: historicalAt }),
+        sessionId,
+      );
   } finally {
     taskDatabase.close();
   }

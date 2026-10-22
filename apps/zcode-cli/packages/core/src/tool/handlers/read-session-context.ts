@@ -160,6 +160,7 @@ export const readSessionContextHandler: ToolHandler = async (input, context) => 
 export const readSessionContextToolEntry: ToolEntry = {
   capability: "Read bounded session context or materialize an authorized current-topic attachment",
   metadata: {
+    shouldDefer: true,
     name: READ_SESSION_CONTEXT_TOOL_NAME,
     description:
       "Read relevant or handoff context from a persisted ZCode session, or use topic to look up original archived discussion in the current session.",

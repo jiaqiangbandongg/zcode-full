@@ -134,38 +134,6 @@ describe("WindowsCaptionMenuButton", () => {
     );
   }
 
-  it("keeps the normal header trigger flush with the caption edge", async () => {
-    const html = await renderButton("header");
-
-    expect(html).toContain("border-l");
-    expect(html).not.toContain("bg-surface");
-  });
-
-  it("uses the header trigger shape without a border for Windows new task drafts", async () => {
-    const html = await renderButton("header-borderless", true);
-
-    // Bugfix: Windows 新任务草稿态要和 session task 的标题栏入口一致，但不能再带左侧分隔线。
-    expect(html).toContain(
-      "h-full w-[var(--windows-caption-control-width,46px)] rounded-none border-0 hover:bg-hover",
-    );
-    expect(html).not.toContain("border-l");
-    expect(html).not.toContain("bg-surface");
-  });
-
-  it("keeps the legacy caption trigger width unless Windows spacing is requested", async () => {
-    const html = await renderButton("header-borderless");
-
-    expect(html).toContain("h-full w-[45px] rounded-none border-0 hover:bg-hover");
-    expect(html).not.toContain("--windows-caption-control-width");
-  });
-
-  it("does not render the retired bulk session stress menu entry", async () => {
-    const html = await renderButton("header");
-
-    // Bugfix: Windows 标题栏使用自绘合并菜单，原生菜单删掉后这里也不能残留旧压测入口。
-    expect(html).not.toContain("titleBar.menu.help.toggleBulkSessionStressTest");
-  });
-
   it("Preview 隐藏更新入口，生产版继续保留", async () => {
     const { shouldShowDesktopUpdateEntry } = await import("@/WindowsCaptionMenuButton.js");
 

@@ -24,7 +24,7 @@ export function NodeReplImageGrid({
       images.map((image, index) => ({
         alt: `${resultImageLabel} ${index + 1}`,
         filename: `result-image-${index + 1}`,
-        src: `data:${image.mimeType};base64,${image.base64}`,
+        src: image.src ?? `data:${image.mimeType};base64,${image.base64}`,
       })),
     [images, resultImageLabel],
   );

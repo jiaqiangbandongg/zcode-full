@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-new-project-sidebar",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-new-project-sidebar.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-new-project-sidebar.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-new-project-title",
+      "description": "首发标题辅助请求。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不参与状态语义，仅固定新任务名称。"
+    },
+    {
+      "id": "ssh-new-project-write",
+      "description": "首发真实 Write 工具请求，触发权限审批。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定首发工具请求验证真实远端审批和侧栏订阅，未伪造 runtime 状态。"
+    },
+    {
+      "id": "ssh-new-project-complete",
+      "description": "审批后真实工具回灌，切到草稿后才释放完成。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定切走先于后台完成的顺序，断言完成事件自动创建未读，不依赖模型时延。"
+    },
+    {
+      "id": "ssh-new-project-foreground",
+      "description": "同一远程任务前台续发完成，再切新草稿保持已读。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定前台完成先于用户切走，真实 SSH 与持久未读链路不替换；Host 读取在途竞态由集成单测控制。"
+    },
+    {
+      "id": "ssh-new-project-sibling-title",
+      "description": "首发标题辅助请求。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不参与状态语义，仅固定新任务名称。"
+    },
+    {
+      "id": "ssh-new-project-sibling",
+      "description": "创建同一工作区的 T2，作为跨工作区点击目标。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定 T2 内容作为导航可见性断言，不参与后台完成时序。"
+    },
+    {
+      "id": "ssh-new-project-navigation",
+      "description": "T1 后台完成时暂挂未读命令，跨工作区选择 B/T2 后释放。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定后台完成先于跨工作区任务点击；只控制 provider 终态与未读命令发送顺序，使用真实 SSH、Host 和 SQLite。"
+    }
+  ]
+}

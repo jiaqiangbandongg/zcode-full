@@ -1,3 +1,4 @@
+import { remoteHostIdFromWorkspaceIdentity } from "@zcode/shared";
 import { readFile } from "node:fs/promises";
 
 import type { ModelSelectionView } from "@zcode/provider";
@@ -39,7 +40,7 @@ export interface BotsServiceHarnessOptions {
   remoteWorkspaceService?: Record<string, unknown>;
   runStartupBackgroundTasks?: boolean;
   broadcastService?: { send(message: unknown): Promise<void> };
-  lastWorkspaceSession?: Array<
+  projectWorkspaces?: Array<
     Record<string, unknown> & { kind: "local" | "remote"; workspacePath: string }
   >;
 }
@@ -183,6 +184,7 @@ export function createBotsServiceHarness(options: BotsServiceHarnessOptions): Bo
   };
 
   const service = createBotsService({
+    ...createBotProjectFixture(options.projectWorkspaces),
     credentialService: {
       load: async () => "app-secret-e2e",
       save: async () => undefined,
@@ -193,20 +195,28 @@ export function createBotsServiceHarness(options: BotsServiceHarnessOptions): Bo
       get: async () => ({
         locale: "zh-CN",
         recentProjects: [E2E_BOT_WORKSPACE],
-        lastWorkspaceSession: options.lastWorkspaceSession ?? [
-          { kind: "local", workspacePath: E2E_BOT_WORKSPACE },
-        ],
+        lastWorkspaceSession: [],
         enabledBuiltinAgentCliProviders: ["glm"],
       }),
       update: async () => undefined,
       updateDataBaseDir: async () => undefined,
-      ensureDefaultProject: async (path: string) => ({ path, created: false }),
     },
     repo: {
       readConfig: async () => config,
       writeConfig: async (next: BotsConfigFile) => (config = next),
       readState: async () => state,
       writeState: async (next: BotsStateFile) => (state = next),
+      updateContext: async (
+        botId: string,
+        update: (
+          current: BotsStateFile["bots"][string] | undefined,
+        ) => BotsStateFile["bots"][string] | undefined,
+      ) => {
+        const next = update(state.bots[botId]);
+        if (next) state.bots[botId] = next;
+        else delete state.bots[botId];
+        return next;
+      },
     },
     modelSelectionService: options.modelSelectionService ?? {
       getView: async () => createBotModelSelectionView(),
@@ -299,5 +309,65 @@ export function createRecordingFeishuFetch(requests: RecordedRequest[]): typeof 
       return new Response(JSON.stringify({ code: 0, data: { user: { name: "E2E User" } } }));
     }
     return new Response(JSON.stringify({ code: 0 }));
+  };
+}
+
+/** case-local 项目事实；不依赖真实 settings 历史或在线 runtime。 */
+export function createBotProjectFixture(
+  workspaces: Array<{ workspacePath: string; workspaceIdentity?: unknown; projectId?: unknown }> = [
+    { workspacePath: E2E_BOT_WORKSPACE },
+  ],
+) {
+  const projects = workspaces.map((workspace, index) => ({
+    id: typeof workspace.projectId === "string" ? workspace.projectId : `e2e-project-${index}`,
+    hostId:
+      typeof workspace.workspaceIdentity === "string"
+        ? remoteHostIdFromWorkspaceIdentity(workspace.workspaceIdentity)!
+        : "local",
+    name: `E2E project ${index}`,
+    roots: [{ rootPath: workspace.workspacePath, position: 0, isPrimary: true }],
+    nameOverridden: false,
+    position: index,
+    pinned: false,
+    deleted: false,
+    createdAt: 1,
+    updatedAt: 1,
+  }));
+  return {
+    projectService: {
+      readProjects: async (input?: { hostId?: string }) =>
+        projects.filter((project) => project.hostId === (input?.hostId ?? "local")),
+      readTree: async () => ({ projects, tasks: [] }),
+      prepareSession: async (input: { projectId: string }) => {
+        const index = projects.findIndex((project) => project.id === input.projectId);
+        if (index < 0) throw new Error("fixture project missing");
+        return { ...workspaces[index], projectId: input.projectId, additionalDirectories: [] };
+      },
+    },
+    remoteProjectService: {
+      readDirectory: async () => ({
+        hosts: [
+          ...new Set(projects.map((project) => project.hostId).filter((id) => id !== "local")),
+        ].map((id) => ({
+          id,
+          membershipId: id,
+          kind: "server",
+          target: null,
+          position: 0,
+          connectionStatus: "online",
+        })),
+        entries: projects
+          .filter((project) => project.hostId !== "local")
+          .map((project) => ({
+            id: project.id,
+            projectId: project.id,
+            hostId: project.hostId,
+            name: project.name,
+            roots: project.roots,
+            legacyWorkspace: null,
+            lastSyncedAt: 1,
+          })),
+      }),
+    },
   };
 }

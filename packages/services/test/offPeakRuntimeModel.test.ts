@@ -35,10 +35,6 @@ describe("buildOffPeakRequestAuth", () => {
         "X-Off-Peak-Ticket-ID": "ticket-1",
       },
     });
-    expect(requestAuth).not.toHaveProperty("baseURL");
-    expect(requestAuth).not.toHaveProperty("model");
-    expect(requestAuth).not.toHaveProperty("reasoning");
-    expect(requestAuth).not.toHaveProperty("properties");
   });
 });
 

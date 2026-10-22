@@ -82,17 +82,6 @@ function createZCodeError(overrides: Partial<ZCodeError> = {}): ZCodeError {
   };
 }
 
-function createComposerDraft(
-  overrides: Pick<ComposerDraftState, "text"> & Partial<ComposerDraftState>,
-): ComposerDraftState {
-  return {
-    attachments: [],
-    codeCommentAttachments: [],
-    webElementContexts: [],
-    ...overrides,
-  };
-}
-
 function createModelConfigOption(currentValue: string): ZCodeConfigOption {
   return {
     id: "model",
@@ -158,19 +147,6 @@ describe("useZCodeSessionStore provider preference", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-  });
-
-  it("新 workspace 会把旧 provider 偏好归一为 glm", () => {
-    const storage = createStorageMock({
-      [LAST_SELECTED_AGENT_PROVIDER_STORAGE_KEY]: "codex",
-    });
-    vi.stubGlobal("window", { localStorage: storage });
-
-    const workspaceState = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState("/tmp/workspace-codex");
-
-    expect(workspaceState.selectedProvider).toBe("glm");
   });
 
   it("setConfigOptions 会把空 thought_level 归一到第一个合法选项", () => {
@@ -282,24 +258,6 @@ describe("useZCodeSessionStore provider preference", () => {
     expect(storage.getItem(LAST_SELECTED_AGENT_PROVIDER_STORAGE_KEY)).toBe("glm");
     expect(workspaceState.selectedProvider).toBe("glm");
     expect(workspaceState.selectedSupplierKey).toBe(customSupplierKey);
-  });
-
-  it("同路径不同 workspaceIdentity 输入旧 provider 时都应归一为 glm", () => {
-    const workspacePath = "/tmp/workspace-identity-isolation";
-    const workspaceIdentityA = "ssh://user@host-a:/tmp/workspace-identity-isolation";
-    const workspaceIdentityB = "ssh://user@host-b:/tmp/workspace-identity-isolation";
-
-    useZCodeSessionStore.getState().startDraft(workspacePath, "claude", workspaceIdentityA);
-    useZCodeSessionStore.getState().startDraft(workspacePath, "opencode", workspaceIdentityB);
-
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentityA)
-        .selectedProvider,
-    ).toBe("glm");
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentityB)
-        .selectedProvider,
-    ).toBe("glm");
   });
 
   it("composer 文本插入请求按 workspaceIdentity 隔离且只能由对应版本清理", () => {
@@ -485,22 +443,39 @@ describe("useZCodeSessionStore provider preference", () => {
     expect(thirdSnapshot.taskUnreadByTaskId["task-1"]).toBe(true);
   });
 
-  it("workspaceIdentity overlay 应优先使用 identity 桶的 draftSessionId", () => {
-    const workspacePath = "/tmp/workspace-remote-draft-session";
-    const workspaceIdentity = "remote:ssh:localhost:2222:root:/tmp/workspace-remote-draft-session";
+  it("关闭分组草稿只清除当前 identity 的内存分组，不重建草稿或污染同路径", () => {
+    const store = useZCodeSessionStore.getState();
+    const path = "/group-draft";
+    const identity = "remote:server:other:/group-draft";
+    store.startDraft(path, undefined, undefined, { projectId: "local", taskGroupId: "local-g" });
+    store.startDraft(path, undefined, identity, { projectId: "remote", taskGroupId: "remote-g" });
+    const local = useZCodeSessionStore.getState().getWorkspaceState(path);
+    const remote = useZCodeSessionStore.getState().getWorkspaceState(path, identity);
+    store.clearDraftTaskGroup(path, identity);
+    expect(useZCodeSessionStore.getState().getWorkspaceState(path)).toBe(local);
+    expect(useZCodeSessionStore.getState().getWorkspaceState(path, identity)).toEqual({
+      ...remote,
+      draftTaskGroupId: undefined,
+    });
+  });
 
-    useZCodeSessionStore.getState().setDraftSessionId(workspacePath, "sess-path-stale");
-    useZCodeSessionStore
-      .getState()
-      .setDraftSessionId(workspacePath, "sess-identity-current", workspaceIdentity);
-
-    expect(useZCodeSessionStore.getState().getWorkspaceState(workspacePath).draftSessionId).toBe(
-      "sess-path-stale",
-    );
+  it("同 cwd 切换草稿项目只重建预热实例，已提交任务不改变归属", () => {
+    const store = useZCodeSessionStore.getState();
+    const path = "/project-draft";
+    store.startDraft(path, undefined, undefined, { projectId: "a" });
+    const first = useZCodeSessionStore.getState().getWorkspaceState(path);
+    expect(first.draftProjectId).toBe("a");
+    store.startDraft(path, undefined, undefined, { projectId: "a" });
     expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentity)
-        .draftSessionId,
-    ).toBe("sess-identity-current");
+      useZCodeSessionStore.getState().getWorkspaceState(path).draftRuntimeInvalidationVersion,
+    ).toBe(first.draftRuntimeInvalidationVersion);
+    store.startDraft(path, undefined, undefined, { projectId: "b" });
+    expect(useZCodeSessionStore.getState().getWorkspaceState(path)).toMatchObject({
+      draftProjectId: "b",
+      draftRuntimeInvalidationVersion: first.draftRuntimeInvalidationVersion + 1,
+    });
+    store.startDraft(path, undefined, undefined, { projectId: null });
+    expect(useZCodeSessionStore.getState().getWorkspaceState(path).draftProjectId).toBeNull();
   });
 
   it("workspaceIdentity overlay 应优先读取 identity 桶的瞬时状态", () => {
@@ -537,18 +512,6 @@ describe("useZCodeSessionStore provider preference", () => {
     expect(workspaceState.taskUnreadByTaskId[taskId]).toBe(true);
     expect(workspaceState.taskListVersion).toBe(2);
     expect(workspaceState.draftFocusVersion).toBe(2);
-  });
-
-  it("startDraft 选择旧 provider 时也会立即归一最近一次选择", () => {
-    const storage = createStorageMock();
-    vi.stubGlobal("window", { localStorage: storage });
-
-    useZCodeSessionStore.getState().startDraft("/tmp/workspace-draft", "codex");
-
-    expect(storage.getItem(LAST_SELECTED_AGENT_PROVIDER_STORAGE_KEY)).toBe("glm");
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState("/tmp/workspace-draft").selectedProvider,
-    ).toBe("glm");
   });
 
   it("startDraft 传入同 provider 时不应把 custom supplier 重置为 native", () => {
@@ -598,7 +561,6 @@ describe("useZCodeSessionStore provider preference", () => {
     useZCodeSessionStore
       .getState()
       .setConfigOptions(workspacePath, [createModelConfigOption(workspaceModel)]);
-    useZCodeSessionStore.getState().setDraftSessionId(workspacePath, "draft-glm");
     useZCodeSessionStore.getState().setActiveTaskId(workspacePath, taskId);
     useZCodeSessionStore
       .getState()
@@ -612,260 +574,12 @@ describe("useZCodeSessionStore provider preference", () => {
 
     const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
     expect(workspaceState.activeTaskId).toBeNull();
-    expect(workspaceState.draftSessionId).toBeNull();
     expect(readModelConfigValue(workspaceState.configOptions)).toBe(taskModel);
     expect(readModeConfigOption(workspaceState.configOptions)?.currentValue).toBe("yolo");
     expect(
       workspaceState.configOptions?.find((option) => option.category === "thought_level")
         ?.currentValue,
     ).toBe("max");
-  });
-
-  it("startDraft 在 task 级缓存缺失时仍继承当前输入框配置", () => {
-    const workspacePath = "/tmp/workspace-new-task-inherit-current-config";
-    const taskId = "task-projection-only";
-    const taskModel = "output-token-preflight-e2e/otb-preflight-64k";
-
-    useZCodeSessionStore
-      .getState()
-      .setConfigOptions(workspacePath, [
-        createModelConfigOption(taskModel),
-        createModeConfigOption("yolo"),
-        createThoughtConfigOption("max"),
-      ]);
-    useZCodeSessionStore.getState().setActiveTaskId(workspacePath, taskId);
-
-    // 模拟 protocol-v4 投影已经更新当前工具条，但尚未写入 legacy task 级缓存。
-    useZCodeSessionStore.getState().startDraft(workspacePath, "glm");
-
-    const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
-  });
-
-  it("startDraft 在 task 级缓存为空时仍继承当前输入框配置", () => {
-    const workspacePath = "/tmp/workspace-new-task-inherit-empty-task-config";
-    const taskId = "task-projection-with-empty-cache";
-    const taskModel = "custom-provider/custom-vision-model";
-
-    useZCodeSessionStore
-      .getState()
-      .setConfigOptions(workspacePath, [
-        createModelConfigOption(taskModel),
-        createModeConfigOption("yolo"),
-        createThoughtConfigOption("max"),
-      ]);
-    useZCodeSessionStore.getState().setActiveTaskId(workspacePath, taskId);
-    useZCodeSessionStore.setState((state) => ({
-      ...state,
-      workspaces: {
-        ...state.workspaces,
-        [workspacePath]: {
-          ...state.getWorkspaceState(workspacePath),
-          taskConfigOptionsByTaskId: { [taskId]: [] },
-        },
-      },
-    }));
-
-    // 模拟首轮 session 先以空目录建立，随后 protocol-v4 只更新当前工具条投影。
-    useZCodeSessionStore.getState().startDraft(workspacePath, "glm");
-
-    const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
-  });
-
-  it("草稿目录水合不应清掉从 active task 继承的预热配置", () => {
-    const workspacePath = "/tmp/workspace-new-task-hydration-race";
-    const taskId = "task-custom-model";
-    const taskModel = "custom-provider/gpt-5.6-sol";
-
-    useZCodeSessionStore.getState().setActiveTaskId(workspacePath, taskId);
-    useZCodeSessionStore
-      .getState()
-      .setTaskConfigOptions(workspacePath, taskId, [
-        createModelConfigOption(taskModel),
-        createModeConfigOption("yolo"),
-        createThoughtConfigOption("max"),
-      ]);
-    useZCodeSessionStore.getState().startDraft(workspacePath, "glm");
-
-    // 模拟新草稿 mount 后异步完成的 workspace catalog 水合。
-    useZCodeSessionStore
-      .getState()
-      .setConfigOptions(workspacePath, [createModelConfigOption("glm/GLM-5.2")]);
-
-    const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
-  });
-
-  it("grouped 草稿在不同 New task 入口之间切换时会更新创建位置", () => {
-    const workspacePath = "/tmp/workspace-grouped-draft-placement";
-    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1000);
-
-    useZCodeSessionStore
-      .getState()
-      .startDraft(workspacePath, undefined, undefined, { groupedDraftPlacement: { type: "top" } });
-    const topDraft = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-
-    useZCodeSessionStore
-      .getState()
-      .startDraft(workspacePath, undefined, undefined, { groupedDraftPlacement: { type: "top" } });
-    expect(useZCodeSessionStore.getState().getWorkspaceState(workspacePath).groupedDraftTask).toBe(
-      topDraft,
-    );
-
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "group-a" },
-    });
-
-    const groupDraft = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-    expect(groupDraft?.placement).toEqual({ type: "group", groupId: "group-a" });
-    expect(groupDraft?.createdAt).toBe(1000);
-    expect(nowSpy).toHaveBeenCalledTimes(1);
-
-    nowSpy.mockRestore();
-  });
-
-  it("grouped 草稿提升位置落库后可以按 task 消费", () => {
-    const workspacePath = "/tmp/workspace-grouped-draft-consume";
-    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(2000);
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "group-a" },
-    });
-    const groupedDraftTask = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-    expect(groupedDraftTask).not.toBeNull();
-    useZCodeSessionStore
-      .getState()
-      .promoteGroupedDraftTask(workspacePath, "task-promoted", groupedDraftTask!);
-
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath)
-        .promotedGroupedDraftTaskByTaskId["task-promoted"]?.placement,
-    ).toEqual({ type: "group", groupId: "group-a" });
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath).optimisticTaskListByTaskId[
-        "task-promoted"
-      ],
-    ).toMatchObject({
-      taskId: "task-promoted",
-      title: "",
-      workspacePath,
-      createdAt: groupedDraftTask?.createdAt,
-      updatedAt: 0,
-      mode: "default",
-    });
-
-    useZCodeSessionStore.getState().clearPromotedGroupedDraftTask(workspacePath, "task-promoted");
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath)
-        .promotedGroupedDraftTaskByTaskId["task-promoted"],
-    ).toBeUndefined();
-    nowSpy.mockRestore();
-  });
-
-  it("旧创建请求完成时使用原草稿位置且不清除后创建的草稿", () => {
-    const workspacePath = "/tmp/workspace-grouped-draft-interleaved-create";
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "group-a" },
-    });
-    const originalDraft = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-    expect(originalDraft).not.toBeNull();
-
-    useZCodeSessionStore.getState().setActiveTaskId(workspacePath, "existing-task");
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "group-b" },
-    });
-    const newerDraft = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-    expect(newerDraft?.draftId).not.toBe(originalDraft?.draftId);
-
-    useZCodeSessionStore
-      .getState()
-      .promoteGroupedDraftTask(workspacePath, "created-task-a", originalDraft!);
-
-    const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
-    expect(workspaceState.groupedDraftTask).toBe(newerDraft);
-    expect(workspaceState.promotedGroupedDraftTaskByTaskId["created-task-a"]?.placement).toEqual({
-      type: "group",
-      groupId: "group-a",
-    });
-  });
-
-  it("grouped 草稿提升不覆盖先于 ACK 到达的 task 元数据", () => {
-    const workspacePath = "/tmp/workspace-grouped-draft-meta-race";
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "top" },
-    });
-    const groupedDraftTask = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(workspacePath).groupedDraftTask;
-    const task = createTaskMeta({
-      taskId: "task-meta-first",
-      title: "权威标题已到达",
-      workspacePath,
-      createdAt: 10,
-      updatedAt: 20,
-    });
-    useZCodeSessionStore.getState().upsertOptimisticTaskListItem(workspacePath, task);
-
-    useZCodeSessionStore
-      .getState()
-      .promoteGroupedDraftTask(workspacePath, task.taskId, groupedDraftTask!);
-
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath).optimisticTaskListByTaskId[
-        task.taskId
-      ],
-    ).toBe(task);
-  });
-
-  it("grouped 草稿存在时选择已有任务只清除草稿，不生成提升标记", () => {
-    const workspacePath = "/tmp/workspace-grouped-draft-existing-task-navigation";
-    useZCodeSessionStore.getState().startDraft(workspacePath, undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "group-a" },
-    });
-
-    useZCodeSessionStore.getState().setActiveTaskId(workspacePath, "existing-root-task");
-
-    const workspaceState = useZCodeSessionStore.getState().getWorkspaceState(workspacePath);
-    expect(workspaceState.groupedDraftTask).toBeNull();
-    expect(workspaceState.promotedGroupedDraftTaskByTaskId["existing-root-task"]).toBeUndefined();
-  });
-
-  it("切换 workspace 时可以迁移 grouped 草稿位置", () => {
-    const sourceWorkspacePath = "/tmp/workspace-grouped-draft-source";
-    const targetWorkspacePath = "/tmp/workspace-grouped-draft-target";
-    const placement = { type: "group" as const, groupId: "group-a" };
-
-    useZCodeSessionStore.getState().startDraft(sourceWorkspacePath, undefined, undefined, {
-      groupedDraftPlacement: placement,
-    });
-    const sourceDraft = useZCodeSessionStore
-      .getState()
-      .getWorkspaceState(sourceWorkspacePath).groupedDraftTask;
-    expect(sourceDraft).not.toBeNull();
-
-    useZCodeSessionStore.getState().startDraft(targetWorkspacePath, undefined, undefined, {
-      groupedDraftPlacement: sourceDraft!.placement,
-    });
-    // 修复原因：grouped 左侧 New task 行是创建位置，不是 workspace 本身。
-    // 切 workspace 只迁移草稿目标，不能让左侧临时行凭空消失。
-    useZCodeSessionStore.getState().clearGroupedDraftTask(sourceWorkspacePath);
-
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(sourceWorkspacePath).groupedDraftTask,
-    ).toBeNull();
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(targetWorkspacePath).groupedDraftTask,
-    ).toMatchObject({
-      workspacePath: targetWorkspacePath,
-      placement,
-    });
   });
 
   it("草稿态重复点击新建任务时不应清空 slashCommands", () => {

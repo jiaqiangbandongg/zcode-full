@@ -274,6 +274,12 @@ describe("subagent tool event projection", () => {
     }
 
     const parentEvents = await eventStore.getEvents(sessionId);
+    const spawnedAgentId = (
+      parentEvents.find((event) => event.type === SessionEventType.SubagentSpawned)?.payload as
+        | { agentId?: string }
+        | undefined
+    )?.agentId;
+    expect(spawnedAgentId).toMatch(/^agent_/u);
     const childSessionId = parentEvents
       .map((event) => event.payload as Record<string, unknown>)
       .find((payload) => typeof payload.childSessionId === "string")?.childSessionId as
@@ -300,6 +306,7 @@ describe("subagent tool event projection", () => {
     expect(mirroredScheduled?.sessionId).toBe(sessionId);
     expect(mirroredScheduled?.turnId).toBe(parentEvents[0]?.turnId);
     expect(mirroredScheduled?.payload).toMatchObject({
+      agentId: spawnedAgentId,
       childSessionId,
       childToolCallId: "call_child_read",
       description: "Read project readme",
@@ -444,42 +451,6 @@ describe("subagent tool event projection", () => {
         (event) => (event.payload as Record<string, unknown>).background === true,
       ),
     ).toBe(true);
-  });
-
-  it("preserves explicit background provenance on every mirrored child tool event", () => {
-    const childSessionId = createSessionId("runtime-background-child-tool-events");
-    const parentSessionId = createSessionId("runtime-background-parent-tool-events");
-    const parentTurnId = createTurnId("runtime-background-parent-turn");
-    const childEvent = createSessionEvent(SessionEventType.ToolCallScheduled, childSessionId, {
-      toolCallId: "call_child_bash",
-      toolName: "Bash",
-      input: { command: "sleep 60 && date" },
-      schedule: {
-        executionOrder: ["call_child_bash"],
-        parallelGroups: [["call_child_bash"]],
-      },
-    });
-
-    const mirrored = mirrorSubagentToolEvent(childEvent, {
-      agentId: "agent_background",
-      agentType: "general-purpose",
-      background: true,
-      childSessionId,
-      description: "Run a delayed child command",
-      parentSessionId,
-      parentToolCallId: "call_parent_agent",
-      parentTurnId,
-    });
-
-    expect(mirrored?.sessionId).toBe(parentSessionId);
-    expect(mirrored?.turnId).toBe(parentTurnId);
-    expect(mirrored?.payload).toMatchObject({
-      agentId: "agent_background",
-      background: true,
-      childToolCallId: "call_child_bash",
-      source: "subagent",
-      toolName: "Bash",
-    });
   });
 
   it("mirrors a child permission lifecycle with the same parent tool identity", () => {

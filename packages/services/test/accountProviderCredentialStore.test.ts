@@ -26,14 +26,6 @@ describe("AccountProviderCredentialStore", () => {
     await expect(store.loadApiKey(credentialKey)).resolves.toBe("current-key");
   });
 
-  it("新凭据缺失时不再从旧 Provider Store 迁移 Key", async () => {
-    const credentialService = createCredentialService();
-    const store = createAccountProviderCredentialStore({ credentialService });
-
-    await expect(store.loadApiKey(credentialKey)).resolves.toBeNull();
-    expect(credentialService.save).not.toHaveBeenCalled();
-  });
-
   it("空旧值不写入凭据，保存空值等价于删除", async () => {
     const credentialService = createCredentialService();
     const store = createAccountProviderCredentialStore({ credentialService });

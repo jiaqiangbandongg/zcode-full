@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-app-exit-running",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-app-exit-running.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-app-exit-running.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-exit-title",
+      "description": "标题辅助响应",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "独立回放服务在 Desktop 全部退出后释放响应，验证远端运行与历史接续。"
+    },
+    {
+      "id": "ssh-exit-slow",
+      "description": "保持远端任务运行直到更新守卫出现且用户取消；明确释放后才允许普通更新",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "独立回放服务在 Desktop 全部退出后释放响应，验证远端运行与历史接续。"
+    },
+    {
+      "id": "ssh-exit-main-fallback",
+      "description": "其它本 case 请求（续发历史可含 SLOW/Q/PERMISSION，只按最后一条用户消息排除）",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定回复准备真实远端历史并验证退出后的续聊。"
+    }
+  ]
+}

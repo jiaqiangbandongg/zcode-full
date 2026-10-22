@@ -18,8 +18,18 @@ describe("background Bash tabs", () => {
     expect(other.tabs).toHaveLength(2);
     const foreign = openBackgroundBashSidePane(other, { ...target, workspaceIdentity: "ssh:b" });
     expect(foreign.tabs).toHaveLength(3);
-    expect(getVisibleSidePaneTabs(first, "root")).toHaveLength(1);
-    expect(getVisibleSidePaneTabs(first, "other")).toHaveLength(0);
+    expect(
+      getVisibleSidePaneTabs(first.tabs, {
+        workspaceKey: first.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "root",
+      }),
+    ).toHaveLength(1);
+    expect(
+      getVisibleSidePaneTabs(first.tabs, {
+        workspaceKey: first.tabs[0]!.workspaceKey ?? null,
+        ownerTaskId: "other",
+      }),
+    ).toHaveLength(0);
     expect(first.tabs[0]).toMatchObject({
       type: "bash-output",
       workspaceKey: "ssh:a",

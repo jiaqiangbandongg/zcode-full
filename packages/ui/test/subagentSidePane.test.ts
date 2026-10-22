@@ -1,13 +1,12 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TID_V4_SUBAGENT_OPEN_SIDE_PANE, testId } from "@zcode/shared";
 import { SubagentSessionSidePane } from "@/app-shell/SubagentSessionSidePane.js";
 import {
-  closeVisibleSidePaneTabs,
+  closeSidePaneTabs,
   getVisibleSidePaneTabs,
   openSubagentSessionSidePane,
-  selectSidePaneTabsForParent,
+  selectSidePaneTabsForScope,
 } from "@/lib/workspaceSidePane.js";
 import { openSubagentSessionFromSummary } from "@/v4/ConversationAgentToolCallRow.js";
 import type { ConversationRowRenderContext } from "@/v4/conversationRowContext.js";
@@ -35,12 +34,6 @@ vi.mock("@/v4/V4ConversationContext.js", async () => {
 describe("subagent side pane tabs", () => {
   afterEach(() => {
     paneState.props = null;
-  });
-
-  it("uses a stable test id for the child side-pane summary action", () => {
-    expect(testId(TID_V4_SUBAGENT_OPEN_SIDE_PANE, "child-session")).toBe(
-      "v4-subagent-open-side-pane-child-session",
-    );
   });
 
   it("opens foreground, background, mobile and nested child sessions through the same callback", () => {
@@ -88,14 +81,14 @@ describe("subagent side pane tabs", () => {
       { ...context, sessionId: null },
       { ...context, onOpenSubagentSession: undefined },
     ]) {
-    expect(
-      openSubagentSessionFromSummary({
-        childSessionId: "child-session",
-        context: blockedContext,
-        subagentType: "Explore",
-        title: "Explore project structure",
-      }),
-    ).toBe(false);
+      expect(
+        openSubagentSessionFromSummary({
+          childSessionId: "child-session",
+          context: blockedContext,
+          subagentType: "Explore",
+          title: "Explore project structure",
+        }),
+      ).toBe(false);
     }
     expect(
       openSubagentSessionFromSummary({
@@ -169,14 +162,26 @@ describe("subagent side pane tabs", () => {
       title: "Explore parent B",
     });
 
-    expect(getVisibleSidePaneTabs(withB, "parent-a").map((tab) => tab.id)).toEqual([
-      "git",
-      expect.stringContaining("child-a"),
-    ]);
-    const selectedA = selectSidePaneTabsForParent(withB, "parent-a");
+    expect(
+      getVisibleSidePaneTabs(withB.tabs, {
+        workspaceKey: "/workspace",
+        ownerTaskId: "parent-a",
+      }).map((tab) => tab.id),
+    ).toEqual(["git", expect.stringContaining("child-a")]);
+    const selectedA = selectSidePaneTabsForScope(withB, {
+      workspaceKey: "/workspace",
+      ownerTaskId: "parent-a",
+    });
     expect(selectedA?.activeTabId).toContain("child-a");
 
-    const closedVisibleA = closeVisibleSidePaneTabs(selectedA, "parent-a");
+    const closedVisibleA = closeSidePaneTabs(
+      selectedA,
+      getVisibleSidePaneTabs(selectedA?.tabs ?? [], {
+        workspaceKey: "/workspace",
+        ownerTaskId: "parent-a",
+      }).map((tab) => tab.id),
+      { workspaceKey: "/workspace", ownerTaskId: "parent-a" },
+    );
     expect(closedVisibleA?.tabs).toHaveLength(1);
     expect(closedVisibleA?.tabs[0]).toMatchObject({
       type: "subagent-session",

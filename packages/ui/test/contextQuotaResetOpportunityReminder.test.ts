@@ -2,7 +2,6 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ContextQuotaResetOpportunityReminderContent,
@@ -198,7 +197,7 @@ describe("ContextQuotaResetOpportunityReminderContent", () => {
       `${id}:${Object.values(values ?? {}).join(":")}`,
   } as never;
 
-  it("renders the localized initial gift reminder", () => {
+  it("renders the localized initial reminder and dismissal control", () => {
     const html = renderToStaticMarkup(
       createElement(ContextQuotaResetOpportunityReminderContent, {
         count: 2,
@@ -209,19 +208,11 @@ describe("ContextQuotaResetOpportunityReminderContent", () => {
       }),
     );
     expect(html).toContain("codingPlan.quotaReset.contextReminder.available:2");
-    expect(html).toContain("lucide-gift");
-    expect(html).toContain("text-success");
-    expect(html).toContain("text-ui-sm");
+
     expect(html).toContain("data-context-reset-reminder-dismiss");
-    expect(html).toContain('data-slot="button"');
-    expect(html).toContain('data-size="icon-xs"');
-    expect(html).toContain("rounded-full");
-    expect(html).not.toContain("-my-1");
-    expect(html).not.toContain("-mr-1");
-    expect(html).toContain("lucide-x");
   });
 
-  it("renders an animated urgent alarm with reduced-motion protection", () => {
+  it("renders the localized urgent reminder and dismissal action", () => {
     const html = renderToStaticMarkup(
       createElement(ContextQuotaResetOpportunityReminderContent, {
         count: 1,
@@ -232,47 +223,8 @@ describe("ContextQuotaResetOpportunityReminderContent", () => {
       }),
     );
     expect(html).toContain("codingPlan.quotaReset.contextReminder.expiresIn");
-    expect(html).toContain("lucide-alarm-clock");
-    expect(html).toContain("animate-zcode-alarm-ring");
-    expect(html).toContain("motion-reduce:animate-none");
-    expect(html).toContain("text-warning");
-    expect(html).toContain("bg-warning/10");
-    expect(html).toContain("rounded-full");
-    expect(html).toContain("text-ui-xs");
-    expect(html).toContain("px-1.5");
-    expect(html).toContain("h-3.5");
-    expect(html).toContain("leading-none");
-    expect(html).not.toContain("font-mono");
-    expect(html).toContain("tabular-nums");
+
     expect(html).toContain("codingPlan.quotaReset.contextReminder.dismiss");
     expect(html).toContain("data-context-reset-reminder-copy");
-    expect(html).toContain("gap-0");
-  });
-});
-
-describe("context quota reset opportunity reminder integration", () => {
-  it("uses the shared ControlHintTooltip wrapper instead of composing tooltip primitives", () => {
-    const source = readFileSync("packages/ui/src/chat-input-toolbar/contextUsage.tsx", "utf8");
-
-    expect(source).toContain('import { ControlHintTooltip } from "@/ControlHintTooltip.js"');
-    expect(source).toContain("standalone");
-    expect(source).not.toContain("<TooltipProvider>");
-    expect(source).not.toContain("<TooltipContent");
-    expect(source).not.toContain("<TooltipTrigger");
-    expect(source).not.toContain("sideOffset={6}");
-    expect(source).toMatch(
-      /triggerTooltipKind === "reset-status"\s*\? undefined\s*:\s*"bg-background py-0\.5 pr-0\.5"/,
-    );
-    expect(source).toContain('opportunityTriggerTone === "available" && "text-success"');
-    expect(source).not.toContain('opportunityTriggerTone === "available" && "bg-success/10');
-    expect(source).toMatch(
-      /opportunityTriggerTone === "urgent"\s*&&\s*"bg-warning\/10 text-warning"/,
-    );
-    expect(source).toContain("useSyncExternalStore(");
-    expect(source).toContain("contextQuotaResetOpportunityDismissalStore.dismiss(");
-    expect(source).toContain('document.addEventListener("pointerdown"');
-    expect(source).toContain("shouldDismissContextQuotaResetOpportunityReminder(");
-    expect(source).toContain("triggerRef={contextUsageTriggerRef}");
-    expect(source).not.toContain("useState<ContextQuotaResetOpportunityDismissal>");
   });
 });

@@ -5,7 +5,8 @@
 // apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md「Holes」。
 //
 // 从 dynamic-workflow-run-progress.ts 拆出（400 行门），与那里的升级 / 停滞发射器同层、同三条纪律：
-// **每条 `hole-reached` 恰好一条通知**（不重发、不催办，丢失后的兜底是 GetWorkflowRun 的 `holes`）；
+// **每条 `hole-reached` 恰好一条通知**（这条自己不重发；一直没人补时由 dynamic-workflow-blocked-reminder.ts
+// 那条按状态铸的提醒接手，随时可查的兜底是 GetWorkflowRun 的 `holes`）；
 // **`hole-filled` 不发通知**（补全方就是主代理自己，回执已是那次工具调用的结果）；**绝不抛异常**
 // （这是观察面，run 的真相在 journal）。
 //

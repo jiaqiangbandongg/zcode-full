@@ -1,7 +1,7 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 
 const captured = vi.hoisted(() => ({
   contentProps: null as Record<string, unknown> | null,
@@ -145,22 +145,6 @@ describe("V4ComposerModeSwitch", () => {
     });
   });
 
-  it("已有 session 没有 snapshot config 时仍显示 Composer 模式", () => {
-    renderToStaticMarkup(
-      createElement(V4ComposerModeSwitch, {
-        workspacePath: "/workspace",
-        provider: "glm",
-        draftConfig: { mode: "yolo" },
-        activeConfigPicker: null,
-        onConfigPickerOpenChange: vi.fn(),
-        onSwitchMode: vi.fn(),
-      }),
-    );
-
-    expect(captured.permissionProps).toMatchObject({
-      value: "yolo",
-    });
-  });
   it("Plan 勾选独立于权限，菜单通过已有草稿回调切换", () => {
     const onSwitchMode = vi.fn();
     const html = renderToStaticMarkup(

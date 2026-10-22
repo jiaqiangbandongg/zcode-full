@@ -1,5 +1,7 @@
 # Grouped task workspace bootstrap
 
+> 历史文档：2026-09 虚拟项目重构已替代本文的运行模型。当前行为以[虚拟项目设计](superpowers/specs/2026-09-09-virtual-project-design.md)为准。旧 Group 表仅保留迁移/降级证据，运行 API、视图和 workspace bootstrap 已删除；CLI 拥有会话事实，Host 拥有项目与组织态。下文只作历史设计记录。
+
 Grouped task view bootstraps existing visible tasks by workspace.
 
 ## Behavior

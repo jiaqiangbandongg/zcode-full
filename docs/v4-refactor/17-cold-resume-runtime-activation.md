@@ -1,6 +1,6 @@
 # V4 冷恢复：Runtime 激活与 Legacy Snapshot 解耦
 
-> 状态：2026-07-24 accepted；2026-08-13 增补单次物化与单一 READY 水位合同。
+> 状态：2026-07-24 accepted；2026-08-13 增补单次物化；2026-10-09 增补历史就绪与 runtime 就绪。
 > 范围：V4 conversation 首次冷订阅；不删除 legacy `session/resume` 协议，也不迁移 Bot 实时订阅。
 
 ## 1. 问题
@@ -51,7 +51,7 @@ activateSessionForResume ┤
 - record 不存在时完整保留原 `resumeSession` 在 `snapshot(...)` 之前的全部行为；
 - store 无 session、模型不可用、runtime resume 失败等错误与旧路径一致；
 - 不根据 `desktop-continuous` / `web-remote-replayable` 分支。两者只在激活完成后的 V4
-  publisher delivery profile 分流。
+  publisher delivery profile 分流；historyFirst 增量在 §4.1 定义。
 
 legacy `resumeSession` 继续作为兼容包装层：
 
@@ -66,7 +66,7 @@ activation-only primitive。
 
 | 不变量                        | 约束                                                                                                       |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| runtimeReadyBeforeHydration   | `app.resume()` 完成后才读取 V4 config/usage seed 和发布首帧                                                |
+| historyReadyBeforeRuntime     | 支持 historyFirst 的连接先发布持久历史；runtime 完成后才开放执行与读取 runtime config/usage seed           |
 | historicalConfigPreserved     | 历史 model、thought、mode 继续按 session-local durable selection 优先恢复                                  |
 | restoreWarningPreserved       | 历史模型不可用时仍允许读历史，但后续 `sendText` 被同一 restore warning 闸门拒绝                            |
 | workspaceIdentityPreserved    | 远端恢复继续使用持久化 `workspaceID`；identity key 不退化为 `workspacePath`                                |
@@ -76,7 +76,7 @@ activation-only primitive。
 | deliveryBoundaryUnchanged     | desktop 保持 continuous；mobile/Web remote 保持 replayable gap/snapshot 恢复                               |
 | restartDiscardUnchanged       | 上一 runtime 未终态 input 仍按 delivery ledger discarded；不得因去掉 legacy snapshot 自动重放              |
 | legacyResumeResponseUnchanged | `session/resume` 仍返回完整、schema 等价的 legacy snapshot                                                 |
-| v4ColdReadySingleOwner         | V4 gateway 只用一个 cold READY promise 串联 activation 与 hydration                                       |
+| v4ColdReadySingleOwner        | V4 gateway 拥有历史就绪与 runtime 就绪；同一会话同一次初始化单飞                                           |
 | hydrationBoundaryUnchanged     | `hydratePublisher` 仍只负责 projection hydration，不接管各入口既有的 runtime activation 前置条件          |
 | registryIsNotV4Readiness       | `context.sessions` 只登记 record；V4 cold operation 完成前不能据此放行 query/command                      |
 
@@ -106,97 +106,37 @@ runtime projection contextUsed/contextWindow
 - 非正数 used/window 返回 `null`，保持“尚无一次模型往返”语义；
 - 不读取/映射 legacy messages、settings、todos、goal、slash commands 或 model availability。
 
-### 4.1 单次冷恢复物化
-
-大 session 的首次 V4 冷订阅中，settings、runtime resume、durable hydration、subagent manifest
-和 usage seed 使用的是同一批持久 message/part。正常路径只允许在 activation 起点完整读取一次，
-后续消费者通过当前冷恢复调用栈复用该数组：
+### 4.1 历史先显示（2026-10-09）
 
 ```text
-activateSessionForResume
-  messages() ──> M0
-       ├─ derive runtime settings(M0)
-       └─ app.resume({ persistedMessages: M0 })
-              |
-              ├─ 未修改持久 message/part ───────────────> M0
-              └─ 修补中断 compact timeline ─> messages() ─> M1
-                                                        |
-                                                        v
-gateway readyFlights[sessionId](M0 | M1)
-  ├─ durable transcript
-  ├─ parent subagent manifest
-  └─ late usage seed
+subscribe → durable messages M0 → 同一个 V4 publisher → 首帧进入 transport outbox
+                                                          ├─ UI 历史可读、文字草稿可编辑
+                                                          └─ runtime activation(M0)
+                                                               ├─ ready → 对齐投影、开放执行
+                                                               └─ failed → 保留历史、手动重试
 ```
 
-约束如下：
+- 能力名 `historyFirst`，沿 hello/clientHello 和可信 attachment 传递；未声明能力的订阅仍等待完整恢复。
+- 历史阶段 ACK 记录 `historyReadyMs`，旧路径保留 `cliSessionRestoreMs`；完整激活耗时沿现有 resume 生命周期日志记录，不混为首屏时间。
+- snapshot/state patch 新增可选 `runtimeInitialization`：`initializing | ready | failed`，携带 `attemptId`；failed 附结构化 `reasonCode/message`。缺席表示旧协议的完整就绪语义，不增加 run phase。
+- subscribe 可携带 `retryInitialization`（观察到的失败 attemptId）；仅匹配当前 failed 尝试才能启动下一次，重复请求合并。普通重连不重跑失败尝试，不新增 RPC。
+- 首次历史只依赖持久化 materialization，复用 active branch、goal/plan 与既有 reducer，不调用 runtime、不伪造模型可执行状态。详情、附件、工作流目录与 App 交互待 ready。
+- 单次正常恢复完整读取 parent messages 一次，M0 仅在本次恢复调用栈中共享；runtime 修复 interrupted compact 后才允许读取 M1。重试重新读取持久事实。无新数据库 schema、全局缓存或 TTL。
+- 首帧进入现有 post-response outbox 后再调度 activation，不能用固定 sleep 或仅 Promise.all 掩盖同步插件扫描。历史加载失败仍是订阅失败，不能显示虚假空历史。
+- gateway 是两阶段唯一 owner；context.sessions 入册不是 ready。初始化期间新执行命令明确拒绝，不进入 accepted input queue；既有 command query/dedupe 保留语义。
+- 初始化事件和最终 hydration 使用同一个 publisher；对齐 memory tail、source seq、compact 修复及最新配置之后才 ready。UI 不保留第二份 transcript。
+- failure 清理仅本次半初始化 record、event sink 和 app，保留历史 publisher。显式重试重新执行完整 resume（含 SessionStart hook），不承诺回滚 hook 外部副作用。
+- 初始化开始后切走不强制取消既有生命周期；关闭/换代后的迟到结果不能更新新 publisher。初始化中的 record 不得被驻留回收。
+- warm/live/detached child 复用原流程，不创建第二个 runtime，不修改任务时间、taskType 或全局模型默认值。
+- desktop continuous 和 mobile replayable 共享同一恢复 owner，保持各自 gap/snapshot、workspaceIdentity/remoteSessionId 与订阅水位边界。
 
-- materialization 只存在于本次 cold-resume promise 与紧随其后的 hydration 调用栈；不得挂到
-  session record、不得建立 `sessionId -> messages` 长期缓存，也不增加 TTL、失效广播或数据库 schema；
-- runtime 仍先取得持久 session，再消费注入的 messages；只有 V4 cold activation 显式选择
-  复用本次 materialization，普通 core 与 legacy `session/resume` 不注入 messages，继续由 runtime
-  自己读取，保持原入口语义；
-- runtime resume 若把 `started/retrying` compact timeline 收敛并写回 store，activation 必须刷新
-  一次 messages 后再交给 V4。仅该修补路径允许两次完整读取，正常路径必须严格为一次；
-- durable hydration 继续读取最新 session metadata、target、session entries 与 memory events；复用
-  messages 不得冻结 rewind/target/event 水位；
-- usage seed 继续在 hydration 补完 live buffer 后读取最新 session/events/runtime projection，只把
-  已物化 messages 作为输入，保持“新 `ModelComplete` 高于冷种子”的既有顺序；
-- subagent manifest 只复用 parent messages；child session 仍各自读取自己的持久事实，不能误把
-  parent materialization 扩散成跨 session cache；
-- 并发 desktop continuous / web remote replayable 首订阅共享同一个 READY promise 和
-  materialization，但 delivery profile、gap/resync 与首帧终态语义不变。
-- gateway 每个 cold session 只维护一个 `readyFlights` entry，串联
-  `activate runtime -> hydrate projection`。注册 entry 必须早于 activation
-  开始；并发 cold 入口若已看到该 entry，必须等待同一个终态。改动前已有的
-  `ColdSessionResumeCoordinator` 仍只负责 runtime activation 单飞与错误分型，不作为 command/query
-  的 READY 水位。
-- `hydratePublisher` 保持原有 projection-only 职责和独立 hydration singleflight；不得在其中根据
-  `sessionExists`、detached publisher 或调用方 option 决定是否 activation。各入口继续显式保留原有
-  前置条件：普通 conversation 读取按 `hasLiveConversation` 判断，file rewind/attachment read 按
-  `host.sessionExists` 判断。只有确实需要 cold activation 时才进入 `readyFlights`。
-- command/query 只读取调用开始时已经存在的 READY promise；存在就先等待，随后只进入一次既有
-  CommandInbox query/admission 流程。该流程内部原有的锁后复核保持不变；不得在 READY 外再增加
-  “先查一次、等待、再查一次”，也不得由每个 query 包装 `.finally()`。READY 注册早于 activation，
-  因而恢复窗口不会创建旧 command index；READY owner 不再额外失效该索引。
-- 孤立 command/query 不自动激活历史 session。legacy `session/resume` 与 `attachment/begin`
-  保持原有入口，不并入本次 READY 协调，也不新增跨入口 singleflight。
-- `fault.command.queryUnavailable` 只表示 transcript/timeline/child/discarded 持久事实读取失败。
-  activation/hydration 的异常保留原始生命周期错误，禁止伪装成 command query 故障。
-- READY 失败沿用原 activation/hydration 的既有错误与清理语义；gateway 只释放本次 map entry，
-  避免永久复用已 rejected 的 promise，但不改变 `context.sessions` 的既有生命周期。只有 record 入册前
-  失败时，后续请求才会重新进入 cold activation；本次不承诺 record 入册后的自动回滚或重试，也不新增
-  补偿事务或失败缓存。
+### 4.2 UI 与影响面
 
-### 4.2 单一 READY owner
-
-```text
-gateway readyFlights[sessionId]
-  absent
-    -> READYING(activate runtime -> hydrate projection)
-    -> absent + READY publisher
-
-hydratePublisher(sessionId, persistedMessages?)
-  -> 只复用 hydrationInFlight
-  -> 不负责 runtime activation
-
-incoming query / command
-  const ready = readyFlights.get(sessionId)
-  if (ready) await ready
-  enter the existing CommandInbox flow once
-```
-
-状态边界如下：
-
-- `context.sessions` 继续只负责事件接线；V4 query/command 的等待依据只有 gateway READY promise；
-- 只有从未在册持久 session 开始的 cold READY 阻塞 query/command；既有 live session 的首次
-  projection hydration 保持原 command 调度语义，不扩大这次 M0 修复的等待范围；
-- host-dependent 读取继续在自己的入口保证 record 已恢复，不把更强前置条件编码进共享
-  `hydratePublisher`；
-- 改动前已有的 activation singleflight 保持原职责；CommandInbox 不维护或派生 readiness promise；
-- READY owner 在成功或失败后释放 map entry；这只证明失败 promise 不会被永久缓存，不等价于整个
-  activation 在任意失败点都可重试；
-- resident pool 继续独立覆盖 eviction close，显式 `session/close` 保持既有产品删除语义；
-- desktop continuous 与 web remote replayable 仍只在 projection ready 后选择 delivery profile。
+- SessionPane/ConversationComposer：历史 snapshot 控制正文，runtimeInitialization 控制执行；初始化中不显示提示条，仅失败时在输入框上方显示错误和重试。重试后隐藏错误提示，保留草稿与滚动。
+- workflow journal、模型操作、附件与 App 入口：ready 后查询/交互，不能抢在首订阅前启动 runtime。
+- Gateway/bridge/resume：必须修改，负责持久历史、单飞、失败清理与最终状态对齐。Host/transport 只透传新增能力和订阅意图。
+- sessions-index、驻留策略、legacy/Bot、全局插件/Skills 缓存：仅回归验证，不扩大行为。
+- 图谱补充 history-readable 与 runtime-ready 的依赖区别；原图缺少 workflow 查询早于订阅的时序边，应随实现更新。
 
 ## 5. 剪枝后的验证矩阵
 
@@ -212,8 +152,8 @@ incoming query / command
 | mobile replayable                       | 与 desktop 首个完整终态等价；gap/resync 语义不变                                      | PV4-06/25 既有协议证据    |
 | legacy `session/resume`                 | 完整 snapshot 和 context usage 保持                                                   | legacy protocol 单测      |
 | 大会话 PERF03                           | activation 不构建 legacy snapshot；正常冷订阅只完整读取一次 parent messages；记录趋势 | 性能 fixture              |
-| 并发 V4 subscribe/query/command          | 共享一个 READY promise；READY 前零查询、零 admission                                   | bootstrap 单元/集成       |
-| READY 失败                              | command/query 不进入 inbox，保留原 lifecycle error；record 入册前失败会释放 READY entry | gateway 单元               |
+| 并发 V4 subscribe/query/command         | 历史首帧早于初始化完成；初始化期间零执行 admission，分页可读                          | bootstrap 单元/集成       |
+| READY 失败                              | 保留历史及结构化错误；清理半初始化 record；显式重试单飞                               | gateway 单元              |
 
 ## 6. 非目标与后续
 
@@ -222,7 +162,7 @@ incoming query / command
 - V4 `createSession` / fork registration 为取得少量字段构建 legacy snapshot；
 - Bot 的 legacy continuous subscribe、附件发送与状态查询；
 - 删除 legacy `session/resume`、`readSession` 或 snapshot schema；
-- 修改 publisher batch hydration、wire fragment、rows window 或 React 渲染。
+- 优化插件/Skills/MCP 扫描，替换 batch reducer、wire fragment 或 rows window 协议。
 
 这些路径应单独按调用者迁移并留下自己的功能矩阵，不能借本次 cold-resume 优化一并删除。
 
@@ -269,3 +209,52 @@ fixture，不能外推到 10,000-message 以上的工单形状。
 中位数从 3991.9ms 降到 2681.6ms，减少 1310.3ms（32.8%）。两组保持 158038-byte frame、
 29950 rows、60-row window、`toSeq=74164` 与 0 running subagents。完整测量与环境见
 [`v4-conversation-cold-hydration.md`](../performance/v4-conversation-cold-hydration.md#perf03-h-单次冷恢复物化2026-08-12)。
+
+## 8. 历史先显示验收（2026-10-09）
+
+实现使用 gateway 本次恢复 promise 共享 M0，旧 activation coordinator 保持 runtime 单飞。
+持久 metadata/target/entries 和 memory tail 仍读取最新值，usage seed 在补完 live buffer 后对齐；
+parent materialization 不扩散到 child。普通 core 与 legacy resume 不注入 M0，维持原入口语义。
+正常初始化/失败重试通过 state patch 对齐，只有真实历史结构改变（如 compact 修复）才使用 snapshot 边界，
+避免尾窗快照丢弃 UI 已分页读取的行。
+
+### 8.1 运行与回归证据
+
+- 删除初始化提示条后，Composer 回归 **17/17**，pending HF01/HF02 **2/2** 通过；
+  run：`desktop-e2e-20261009124509259-p39833-e0ca33f5fc0a7314`。屏障期间确认无初始化提示条、
+  草稿可编辑且发送禁用；失败仍显示错误和重试，重试中的提示条隐藏，待发送按钮可用才判定就绪。
+- macOS Electron：本分支重新构建 CLI 与 Desktop 后，pending HF01/HF02 **2/2 通过**。
+  最终 run：`desktop-e2e-20261009122057441-p88058-2c6e51fda3f594c9`，产物保留初始化与失败重试截图。
+  HF01 使用真实 SessionStart 文件事件屏障，验证正文可读、草稿可编辑、发送禁用及解除后续发；
+  HF02 在 M0 已展示时损坏隔离 fixture 的分支字段，经真实最终物化失败路径，验证错误条、
+  历史/草稿/滚动保留、修复持久数据后双击重试只再次执行一次 resume hook。
+- Gateway/publisher/cold-resume/cold-event-merge：120 项中 **117 通过**，3 项旧模型/thought 恢复断言失败；
+  从改动前 `23819deddc` 独立提取源码复现相同失败。另一个既有 gateway stale-vs-executionFailed
+  断言也在基线复现，未在本轮扩大修复。
+- UI/Host 能力协商及连接隔离定向回归 **77/77**，状态条定向回归 **17/17**；
+  根目录 related 扫描 14,036 通过、1 项源码断言失败，该断言随 ready 门禁更新后定向重跑通过。
+  `test:unit:affected` 在未提交阶段只比较提交范围而跳过，因此以上 related 运行用于验证工作区改动。
+- 根目录 typecheck/lint、CLI 30 个包 typecheck、architecture check、fixture check 与变更文件开源词检查通过。
+  CLI lint 未全绿：Bootstrap 的 20 个 max-lines 错误在基线同样存在，其他未改包亦有既有超长文件。
+- 新增 E2E 仍处于 pending，未人工晋升或加入 Docker gate。未实跑物理手机/SSH/Windows/Linux；
+  continuous/replayable、workspace identity、compact/rewind、warm/child 的证据来自协议/集成回归，
+  不把它们表述成完整远控网络验收。超大历史的实际 UI 性能本轮未复测。
+
+### 8.2 同条件首帧对照
+
+Apple Silicon / Node 24；同一隔离 SQLite fixture（2 messages），每轮全新 CLI 进程和 HOME，
+交替运行三次；配置有效的 Personal Provider，并断言 ready 帧保留 fixture 的模型选择。基线从 `23819deddc` 的 Bootstrap 与 shared 源码独立构建，其他依赖相同；
+两份 CLI 使用同一资源目录，日志确认每轮均发现 15 个插件、启用 11 个。
+从 `runtime/capabilities` 响应后发出 subscribe 开始计时，真实 SessionStart hook 固定占用 2 秒。
+这是验证等待链路的受控样本，不是自然冷启动百分比，也不是用户会话的 UI 首屏测量。
+
+| 边界 | 修改前（ms） | 修改后（ms） | 中位数前 → 后 |
+| --- | --- | --- | --- |
+| subscribe → CLI 历史首帧 | 3349 / 3094 / 2834 | 12 / 37 / 17 | 3094 → 17 |
+| subscribe → runtime ready 帧 | 3349 / 3094 / 2834 | 3541 / 3305 / 3583 | 3094 → 3541 |
+
+首帧已不再等待 runtime；完整初始化本轮没有改善。日志中插件发现阶段为修改前 607–992 ms、
+修改后 1020–1236 ms，这一 fresh-HOME 样本的主要波动落在原插件流程；本轮没有优化该阶段，
+也不把单机少量样本解释成跨机器 SLA。早期对照因临时基线未发现
+内置插件而不具可比性，已废弃。Desktop 的 hook 使用事件屏障（不是上述 2 秒定时器），
+其耗时包含测试检查和手动释放屏障，不与 CLI 样本混算。

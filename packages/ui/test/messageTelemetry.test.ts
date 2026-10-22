@@ -1243,6 +1243,58 @@ describe("messageTelemetry", () => {
     });
   });
 
+  it.each([
+    ["failed", { skill: "missing-skill" }, "unknown"],
+    ["denied", { name: "legacy-skill" }, "unknown"],
+    ["stopped", { skill: "cancelled-skill" }, "unknown"],
+    ["failed", { skill: "/Users/FAKE_USER/private" }, "unknown"],
+    ["denied", { name: "https://example.com/?token=FAKE" }, "unknown"],
+    ["stopped", { skill: "demo\nFAKE_SECRET" }, "unknown"],
+    ["failed", { skill: "sk-" + "a".repeat(49) }, "unknown"],
+    ["stopped", { skill: "a".repeat(5000) }, "unknown"],
+    ["completed", {}, "unknown"],
+    ["failed", { skill: 123 }, "unknown"],
+  ] as const)("Skill %s 在无解析 metadata 时不保留请求原文", (status, input, expected) => {
+    queuePromptTelemetry({
+      workspacePath: "/tmp/skill",
+      taskId: "skill-name",
+      messageId: "message",
+      sendTime: 100,
+    });
+    activatePromptTelemetry("skill-name", "message");
+    recordAgentStepTelemetryEvent({
+      taskId: "skill-name",
+      now: 110,
+      event: {
+        type: "tool_call",
+        taskId: "skill-name",
+        traceId: "trace",
+        toolId: "tool",
+        kind: "Skill",
+        toolName: "Skill",
+        title: "",
+        input,
+        raw: {},
+      },
+    });
+    const [step] = recordAgentStepTelemetryEvent({
+      taskId: "skill-name",
+      now: 120,
+      event: {
+        type: "tool_call_update",
+        taskId: "skill-name",
+        traceId: "trace",
+        toolId: "tool",
+        kind: "Skill",
+        toolName: "Skill",
+        status,
+        raw: {},
+      },
+    });
+    expect(step?.eventExtraDetail.skill_name).toBe(expected);
+    expect(step?.eventExtraDetail).not.toHaveProperty("skill_plugin_id");
+  });
+
   it("Skill tool step 携带解析后的 skill metadata，普通 tool step 不携带", () => {
     queuePromptTelemetry({
       workspacePath: "/tmp/workspace-skill",
@@ -1265,6 +1317,7 @@ describe("messageTelemetry", () => {
         input: {},
         raw: {},
         skillMetadata: {
+          name: "pptx",
           qualifiedName: "document-skills:pptx",
           pluginId: "document-skills@zcode-plugins-official",
           source: "plugin",
@@ -1285,6 +1338,7 @@ describe("messageTelemetry", () => {
         toolName: "Skill",
         raw: {},
         skillMetadata: {
+          name: "pptx",
           qualifiedName: "document-skills:pptx",
           pluginId: "document-skills@zcode-plugins-official",
           source: "plugin",
@@ -1295,6 +1349,7 @@ describe("messageTelemetry", () => {
 
     expect(step?.eventExtraDetail).toMatchObject({
       tool_name: "Skill",
+      skill_name: "pptx",
       skill_qualified_name: "document-skills:pptx",
       skill_plugin_id: "document-skills@zcode-plugins-official",
       skill_source: "plugin",
@@ -1313,6 +1368,7 @@ describe("messageTelemetry", () => {
         input: {},
         raw: {},
         skillMetadata: {
+          name: "pptx",
           qualifiedName: "document-skills:pptx",
           pluginId: "document-skills@zcode-plugins-official",
           source: "plugin",
@@ -1332,6 +1388,7 @@ describe("messageTelemetry", () => {
         toolName: "Bash",
         raw: {},
         skillMetadata: {
+          name: "pptx",
           qualifiedName: "document-skills:pptx",
           pluginId: "document-skills@zcode-plugins-official",
           source: "plugin",
@@ -1342,6 +1399,7 @@ describe("messageTelemetry", () => {
     expect(bashStep?.eventExtraDetail).not.toHaveProperty("skill_qualified_name");
     expect(bashStep?.eventExtraDetail).not.toHaveProperty("skill_plugin_id");
     expect(bashStep?.eventExtraDetail).not.toHaveProperty("skill_source");
+    expect(bashStep?.eventExtraDetail).not.toHaveProperty("skill_name");
   });
 
   it("uses the latest ordinary message chunk for generation tail finalize time", () => {

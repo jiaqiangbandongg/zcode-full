@@ -1,0 +1,250 @@
+[
+  {
+    "kind": "create_workflow",
+    "ok": true,
+    "errorCount": 0,
+    "diagnostics": [
+      {
+        "line": 0,
+        "column": 0,
+        "code": 1,
+        "message": "诊断"
+      }
+    ],
+    "truncated": false,
+    "causalityGraph": {
+      "steps": [
+        {
+          "id": "s",
+          "kind": "ask",
+          "label": "研究",
+          "labelPattern": {
+            "head": "研究",
+            "tail": "员"
+          },
+          "line": 1,
+          "column": 1,
+          "lane": "l",
+          "lanes": ["l"],
+          "source": "s",
+          "phase": "p",
+          "repeat": "serial"
+        }
+      ],
+      "lanes": [
+        {
+          "id": "l",
+          "name": "研究员",
+          "namePattern": {
+            "head": "研究"
+          },
+          "line": 1,
+          "column": 1
+        }
+      ],
+      "participants": [
+        {
+          "id": "a",
+          "phase": "p",
+          "lane": "l",
+          "steps": ["s"],
+          "member": {
+            "index": 0,
+            "of": 1
+          },
+          "many": true
+        }
+      ],
+      "handoffs": [
+        {
+          "from": "a",
+          "to": "a",
+          "back": true,
+          "types": ["report"]
+        }
+      ],
+      "phases": [
+        {
+          "id": "p",
+          "name": "研究",
+          "line": 1,
+          "column": 1,
+          "alongside": ["p"]
+        }
+      ],
+      "phaseEdges": [
+        {
+          "from": "p",
+          "to": "p",
+          "back": true
+        }
+      ],
+      "exits": ["p"],
+      "sink": ["s"],
+      "truncated": false
+    }
+  },
+  {
+    "kind": "get_workflow_run",
+    "runId": "run-1",
+    "label": "研究",
+    "status": "running",
+    "stopReason": "interrupted",
+    "possiblyInterrupted": true,
+    "summary": "处理中",
+    "generatedAt": 123,
+    "usage": {
+      "spentTokens": 1,
+      "nodesObserved": 1,
+      "nodesRunning": 1,
+      "nodesCompleted": 0,
+      "nodesFailed": 0
+    },
+    "phases": [
+      {
+        "name": "研究",
+        "state": "current",
+        "rounds": 1,
+        "nodesSettled": 0,
+        "nodesRunning": 1,
+        "enteredAt": 1,
+        "exitedAt": 2
+      }
+    ],
+    "subagents": [
+      {
+        "siteId": "s",
+        "ordinal": 0,
+        "name": "研究员",
+        "state": "waiting",
+        "phaseName": "研究",
+        "instructionsHead": "研究需求",
+        "startedAt": 1,
+        "turn": 1,
+        "toolCalls": 2,
+        "lastTool": {
+          "name": "read",
+          "target": "README",
+          "at": 2
+        },
+        "waitCause": "slot",
+        "retryAfterMs": 1,
+        "waitSince": 1,
+        "parkedOn": "s",
+        "stepsSettled": 0,
+        "stepsFailed": 0,
+        "tokens": 1,
+        "lastProgressAt": 2
+      }
+    ],
+    "health": {
+      "lastProgressAt": 2,
+      "stalledSince": 1,
+      "concurrency": {
+        "effective": 1,
+        "cap": 2,
+        "reason": "quota",
+        "since": 1
+      },
+      "consecutiveFailures": 0,
+      "cachedSteps": 0,
+      "leftoverRunning": 1,
+      "pendingQuestionsKnown": false
+    },
+    "actors": [
+      {
+        "siteId": "s",
+        "ordinal": 0,
+        "name": "研究员"
+      }
+    ],
+    "logTail": [
+      {
+        "sequence": 1,
+        "message": "started",
+        "at": 1
+      }
+    ],
+    "result": "结果",
+    "error": {
+      "code": "example",
+      "message": "示例"
+    },
+    "truncated": false
+  },
+  {
+    "kind": "list_workflow_runs",
+    "runs": [
+      {
+        "runId": "run-1",
+        "label": "研究",
+        "labelSource": "name",
+        "status": "stopped",
+        "stopReason": "user",
+        "ownedByThisSession": true,
+        "possiblyInterrupted": false,
+        "createdAt": 1,
+        "updatedAt": 2,
+        "spentTokens": 1
+      }
+    ],
+    "truncated": false
+  },
+  {
+    "kind": "eval_workflow_snippet",
+    "ok": true,
+    "diagnostics": [
+      {
+        "line": 0,
+        "column": 0,
+        "code": 1,
+        "message": "诊断"
+      }
+    ],
+    "logs": ["hello"],
+    "response": "结果",
+    "durationMs": 1,
+    "truncated": false
+  },
+  {
+    "kind": "saved_workflow_list",
+    "workflows": [
+      {
+        "name": "研究",
+        "description": "研究任务",
+        "whenToUse": "研究时",
+        "scope": "project",
+        "path": ".zcode/workflows/research.ts",
+        "argNames": ["topic"]
+      }
+    ],
+    "invalid": [
+      {
+        "path": "broken.ts",
+        "reason": "syntax"
+      }
+    ],
+    "truncated": false
+  },
+  {
+    "kind": "list_models",
+    "current": "model-1",
+    "models": [
+      {
+        "id": "model-1",
+        "providerId": "provider",
+        "modelId": "model",
+        "providerLabel": "提供方",
+        "reasoningLevels": ["high"],
+        "defaultReasoningLevel": "high",
+        "contextWindow": 1000,
+        "disabledReason": "示例"
+      }
+    ],
+    "truncated": false
+  },
+  {
+    "kind": "resume_workflow_run",
+    "runId": "run-1"
+  }
+]

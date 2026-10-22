@@ -6,6 +6,8 @@
 
 ## 当前执行入口
 
+- [Todo161：CLI 旧 config.json 首次迁移保留输出上限](todo-161-cli-legacy-output-token-migration.md)：2026-10-14 基于 staging 独立移植；仅 CLI 首次导入，已有配置和 Desktop 不处理。61 项定向回归通过，三种 API 请求预算及重启边界已验证；根与 CLI 类型/lint、架构和格式检查通过，详细证据见 Todo。
+
 - [Todo159：连接测试输出预算统一调整为 512 Token](todo-159-connectivity-512-token-budget.md)：待执行，目标值已确认。Air 的 OpenCode Go Luna 拒绝 `max_output_tokens=1`，服务端要求至少 16；仅改为 16 的对照请求成功。统一将连接测试预算改为 512，取代 Todo144 的 1 Token 裁决，保留最低推理档位、Prompt、流结束和错误契约；本轮仅记录 Todo，512 与修改后 App 验收待执行。
 
 - [Todo158：权限审批框完全访问与待执行队列权限同步](todo-158-permission-dialog-full-access-and-queued-mode.md)：已实现，验收尚未全部收口。仅审批框同步当前任务、Composer 和固定待执行队列为 yolo，各自 Plan 保留；包含事务、幂等与投影恢复。必要验证的基线失败、跨端未验证项见 Todo 第 9 节。
@@ -20,7 +22,7 @@
 
 - [Todo153：思考档位展示映射与配置顺序对齐](todo-153-thought-level-display-mapping.md)：已实现；关闭文案合并、minimal 独立为“极低 / Minimal”、新增“极致 / Ultra”，保留 extra-high／extra_high，取消模糊别名强制归类并尊重配置顺序。192 项单测、八组浏览器交互及类型／lint／架构检查通过；完整原生／手机远控未重跑，不改原始值或请求映射。
 
-- [Todo147：Builtin Config 简化与默认基线调整](todo-147-builtin-config-simplification-feedback.md)：持续收集反馈，尚未实施；已确认简单前后缀匹配、具体规则后置，删除两条特殊 Model 规则，通用 context/output 上限调整为 1000000 / 128000。本轮仅落盘。
+- [Todo147：Builtin Config 简化与默认基线调整](todo-147-builtin-config-simplification-feedback.md)：已实施简单前后缀匹配、具体规则后置，删除两条特殊 Model 规则，通用 context/output 上限调整为 1000000 / 128000；保留历史关闭档位只读恢复，Builtin revision 32。
 
 - [Todo143：模型配置勾选框颜色对齐系统组件](todo-143-model-checkbox-system-colors.md)：已实现并复审；浏览器 6/6、单测 51/51、类型/lint/架构检查通过。仅修正勾选框颜色，保留外层覆盖高亮、图形和交互，未重跑原生实机。
 

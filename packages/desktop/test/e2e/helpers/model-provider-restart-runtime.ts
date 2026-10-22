@@ -1,11 +1,8 @@
 import { NodePersonalProviderConfigRepository } from "@zcode/provider-node";
-import {
-  getE2EAppDataPaths,
-  waitForDefaultWorkspaceReady,
-  waitForWorkspaceApp,
-} from "./desktop-app.js";
+import { getE2EAppDataPaths, waitForWorkspaceApp } from "./desktop-app.js";
 import { reloadElectronSessionSafely } from "./e2e-electron-reload.js";
 import { flushElectronStorageData } from "./e2e-electron-storage.js";
+import { skipOccupationOnboardingIfPresent } from "./occupation-onboarding.js";
 
 const paths = getE2EAppDataPaths();
 const MODEL_SELECTION_RECENT_KEY_PREFIX = "zcode-model-selection-recent-v1:";
@@ -61,10 +58,12 @@ export async function restartIntoWorkspacePreservingProfile(
   await reloadElectronSessionSafely(browser, {
     afterElectronProcessExit: options.afterElectronProcessExit,
   });
+  // 隔离账号首次登录会出现职业引导，须通过真实 UI 完成后才能等待工作区就绪。
+  await skipOccupationOnboardingIfPresent();
   // Bug 根因：Puppeteer targetId 不保证同时是 ChromeDriver window handle，
   // 长批次直接 switchToWindow(targetId) 会破坏 CDP bridge。复用共享 helper 的
   // BrowserWindow URL + handle/target 交集切换，和 WDIO preflight 保持同一合同。
-  await waitForDefaultWorkspaceReady(60000);
+  // 虚拟项目启动只恢复活动目录，不能先等待无关的默认 workspace。
   await waitForWorkspaceApp(workspacePath, 60000);
 }
 
@@ -91,7 +90,6 @@ export async function restartIntoWorkspaceRestoringPreferences(
   await reloadElectronSessionSafely(browser, {
     afterElectronProcessExit: options.afterElectronProcessExit,
   });
-  await waitForDefaultWorkspaceReady(60000);
   await waitForWorkspaceApp(workspacePath, 60000);
   await browser.execute((preferences) => {
     for (const [key, value] of Object.entries(preferences)) {

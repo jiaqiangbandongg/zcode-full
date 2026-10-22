@@ -1,17 +1,11 @@
-/* oxlint-disable eslint(max-lines) -- WorkbenchLeafPane 集中承载 pane focus、per-pane provider、恢复守卫和 session drop target；拆散会让 DnD/focus/session 绑定链路跨文件跳转，后续稳定后再按职责抽离。 */
-// 分屏叶子 pane：Focus 层外壳 + per-pane 数据面接线 + 恢复守卫。宿主 = V4WorkspaceChatArea。
 import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type DragEvent,
-  type ReactNode,
-} from "react";
-import { TID_V4_PANE_SHELL, testId } from "@zcode/shared";
+  RemoteConversationBanner,
+  RemoteConversationDisconnected,
+} from "@/project-sidebar/RemoteConversationDisconnected.js";
+/* oxlint-disable eslint(max-lines) -- WorkbenchLeafPane 集中承载 pane focus、per-pane provider 与恢复守卫；拆散会让 focus/session 绑定链路跨文件跳转。 */
+// 分屏叶子 pane：Focus 层外壳 + per-pane 数据面接线 + 恢复守卫。宿主 = V4WorkspaceChatArea。
+import { memo, useCallback, useEffect, useMemo, type CSSProperties, type ReactNode } from "react";
+import { TID_V4_PANE_SHELL, testId } from "@zcode/shared/test-ids";
 import type {
   GitChangeSourceId,
   GitRepositorySummary,
@@ -45,17 +39,9 @@ import {
   paneWorkspaceKey,
   V4_PRIMARY_PANE_ID,
   type PaneBinding,
-  type PaneSplitSide,
   type PaneWorkspaceScope,
-  type SplitDirection,
 } from "@/v4/paneLayoutStore.js";
 import type { WorkbenchSessionBinding } from "@/v4/workbenchGroupStore.js";
-import {
-  parseWorkbenchSessionDragPayload,
-  resolveWorkbenchDropSide,
-  type WorkbenchSessionDragPayload,
-} from "@/v4/workbenchDragDrop.js";
-import { registerWorkbenchPointerDropTarget } from "@/v4/workbenchPointerDragDrop.js";
 import {
   acquireSessionsIndex,
   releaseSessionsIndex,
@@ -69,7 +55,6 @@ import type {
 } from "@/v4/legacyChatViewTypes.js";
 
 interface ChatPaneShellProps {
-  containerRef?: (element: HTMLDivElement | null) => void;
   paneId: string;
   focused: boolean;
   /** 单 pane 布局时不画焦点框（无歧义，避免视觉噪音）。 */
@@ -77,52 +62,27 @@ interface ChatPaneShellProps {
   onFocusRequest: (paneId: string) => void;
   /** 绝对定位 rect（布局层计算的 calc 表达式）。 */
   style: CSSProperties;
-  dropSide?: PaneSplitSide | null;
-  onDragOver?: (event: DragEvent<HTMLDivElement>) => void;
-  onDragLeave?: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop?: (event: DragEvent<HTMLDivElement>) => void;
+  hidden?: boolean;
   children: ReactNode;
   restoredUnvalidated?: boolean;
 }
-
-const DROP_PREVIEW_STYLE: CSSProperties = {
-  backgroundColor: "color-mix(in oklab, var(--color-brand) 14%, transparent)",
-  boxShadow: "inset 0 0 0 1px color-mix(in oklab, var(--color-brand) 34%, transparent)",
-};
 
 const INACTIVE_PANE_OVERLAY_STYLE: CSSProperties = {
   backgroundColor: "color-mix(in oklab, var(--color-background) 34%, transparent)",
   backdropFilter: "brightness(0.94) saturate(0.94)",
 };
 
-function dropPreviewClassName(side: PaneSplitSide): string {
-  switch (side) {
-    case "left":
-      return "left-1 top-1 bottom-1 w-1/2";
-    case "right":
-      return "right-1 top-1 bottom-1 w-1/2";
-    case "up":
-      return "left-1 right-1 top-1 h-1/2";
-    case "down":
-      return "left-1 right-1 bottom-1 h-1/2";
-  }
-}
-
 /**
  * Focus 层外壳：点击/聚焦 pane 内任意处 → focus 该 pane（capture，不干扰子树交互）。
  * memo + 稳定回调：焦点切换只翻转 data-focused/边框类名，不牵动 pane 内容子树。
  */
 const ChatPaneShell = memo(function ChatPaneShell({
-  containerRef,
   paneId,
   focused,
   showFocusIndicator,
   onFocusRequest,
   style,
-  dropSide,
-  onDragOver,
-  onDragLeave,
-  onDrop,
+  hidden = false,
   children,
   restoredUnvalidated = false,
 }: ChatPaneShellProps) {
@@ -132,19 +92,16 @@ const ChatPaneShell = memo(function ChatPaneShell({
 
   return (
     <div
-      ref={containerRef}
       data-testid={testId(TID_V4_PANE_SHELL, paneId)}
       data-pane-id={paneId}
       data-focused={focused ? "true" : "false"}
       data-restored-unvalidated={restoredUnvalidated ? "true" : "false"}
       onPointerDownCapture={handleFocusRequest}
       onFocusCapture={handleFocusRequest}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
       style={style}
       className={cn(
         "absolute flex min-h-0 min-w-0 flex-col",
+        hidden && "hidden",
         showFocusIndicator && focused && "ring-1 ring-inset ring-[var(--color-brand)]",
       )}
     >
@@ -155,18 +112,6 @@ const ChatPaneShell = memo(function ChatPaneShell({
           style={INACTIVE_PANE_OVERLAY_STYLE}
           className="pointer-events-none absolute inset-0 z-30 rounded-md transition-[background-color,backdrop-filter]"
         />
-      ) : null}
-      {dropSide ? (
-        <div className="pointer-events-none absolute inset-0 z-50">
-          <div
-            aria-hidden="true"
-            style={DROP_PREVIEW_STYLE}
-            className={cn(
-              "absolute rounded-md transition-[background-color,box-shadow]",
-              dropPreviewClassName(dropSide),
-            )}
-          />
-        </div>
       ) : null}
       {children}
     </div>
@@ -258,6 +203,7 @@ export interface WorkbenchShellBinding {
   /** Prompt 模板埋点当前仅覆盖 Desktop。 */
   isDesktop?: boolean;
   readOnly?: boolean;
+  allowEscapeStopOutsidePane?: boolean;
   compactForRemoteControl?: boolean;
   sessionId: string | null;
   /** Shell 当前真正激活的 task；split pane 接管 active task 时不等于 primary sessionId。 */
@@ -307,9 +253,10 @@ export interface WorkbenchShellBinding {
 export interface WorkbenchLeafPaneProps {
   paneId: string;
   rect: RectExpr;
+  /** 完整视图浮窗只显示焦点 pane；其余 pane 隐藏但不卸载。 */
+  hidden?: boolean;
   focused: boolean;
   showFocusIndicator: boolean;
-  canSplit: boolean;
   shellWorkspaceKey: string;
   /** 非 primary pane 的绑定；primary 传 null（用 shell 绑定）。 */
   binding: PaneBinding | null;
@@ -317,17 +264,10 @@ export interface WorkbenchLeafPaneProps {
   primaryBinding?: WorkbenchSessionBinding | null;
   shell: WorkbenchShellBinding;
   onFocusRequest: (paneId: string) => void;
-  onSplit?: (paneId: string, direction: SplitDirection, scope: PaneWorkspaceScope) => void;
   onClosePane: (paneId: string) => void;
   onConfirmRestoredSession: (paneId: string) => void;
   onBindSession: (paneId: string, sessionId: string) => boolean | void;
   onPaneActiveSessionChange?: (scope: PaneWorkspaceScope, sessionId: string) => void;
-  canDropSession?: (payload: WorkbenchSessionDragPayload) => boolean;
-  onDropSession?: (
-    paneId: string,
-    side: PaneSplitSide,
-    payload: WorkbenchSessionDragPayload,
-  ) => void;
 }
 
 function workspaceBadgeFor(scope: PaneWorkspaceScope): PaneWorkspaceBadge {
@@ -342,23 +282,19 @@ function workspaceBadgeFor(scope: PaneWorkspaceScope): PaneWorkspaceBadge {
 export function WorkbenchLeafPane({
   paneId,
   rect,
+  hidden = false,
   focused,
   showFocusIndicator,
-  canSplit,
   shellWorkspaceKey,
   binding,
   primaryBinding,
   shell,
   onFocusRequest,
-  onSplit,
   onClosePane,
   onConfirmRestoredSession,
   onBindSession,
   onPaneActiveSessionChange,
-  canDropSession,
-  onDropSession,
 }: WorkbenchLeafPaneProps) {
-  const [dropSide, setDropSide] = useState<PaneSplitSide | null>(null);
   const isPrimary = paneId === V4_PRIMARY_PANE_ID;
   const isGroupPrimary = isPrimary && Boolean(primaryBinding);
   const scope = useMemo<PaneWorkspaceScope>(() => {
@@ -384,12 +320,6 @@ export function WorkbenchLeafPane({
 
   const style = useMemo(() => rectStyle(rect), [rect]);
 
-  const handleSplitRight = useCallback(() => {
-    onSplit?.(paneId, "row", scope);
-  }, [onSplit, paneId, scope]);
-  const handleSplitDown = useCallback(() => {
-    onSplit?.(paneId, "column", scope);
-  }, [onSplit, paneId, scope]);
   const handleClosePane = useCallback(() => {
     onClosePane(paneId);
   }, [onClosePane, paneId]);
@@ -431,79 +361,6 @@ export function WorkbenchLeafPane({
     },
     [handleBindSession, isPrimary, onBindSession, paneId, primaryBinding, shell.onSessionCreated],
   );
-  const handleDragOver = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      if (!onDropSession || !canSplit) {
-        return;
-      }
-      const payload = parseWorkbenchSessionDragPayload(event.dataTransfer);
-      if (!payload || (canDropSession && !canDropSession(payload))) {
-        setDropSide(null);
-        return;
-      }
-      const side = resolveWorkbenchDropSide(
-        event.currentTarget.getBoundingClientRect(),
-        event.clientX,
-        event.clientY,
-      );
-      if (!side) {
-        setDropSide(null);
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      event.dataTransfer.dropEffect = "copy";
-      setDropSide(side);
-    },
-    [canDropSession, canSplit, onDropSession],
-  );
-  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
-    const relatedTarget = event.relatedTarget;
-    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
-      return;
-    }
-    setDropSide(null);
-  }, []);
-  const handleDrop = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
-      if (!onDropSession || !canSplit) {
-        setDropSide(null);
-        return;
-      }
-      const payload = parseWorkbenchSessionDragPayload(event.dataTransfer);
-      const side =
-        dropSide ??
-        resolveWorkbenchDropSide(
-          event.currentTarget.getBoundingClientRect(),
-          event.clientX,
-          event.clientY,
-        );
-      setDropSide(null);
-      if (!payload || !side || (canDropSession && !canDropSession(payload))) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      onDropSession(paneId, side, payload);
-    },
-    [canDropSession, canSplit, dropSide, onDropSession, paneId],
-  );
-  const pointerDropTargetRef = useRef<HTMLDivElement | null>(null);
-  const setPointerDropTargetRef = useCallback((element: HTMLDivElement | null) => {
-    pointerDropTargetRef.current = element;
-  }, []);
-  useEffect(() => {
-    const element = pointerDropTargetRef.current;
-    if (!element || !onDropSession || !canSplit) {
-      return undefined;
-    }
-    return registerWorkbenchPointerDropTarget(element, {
-      canDrop: (payload) => !canDropSession || canDropSession(payload),
-      onPreview: setDropSide,
-      onDrop: (side, payload) => onDropSession(paneId, side, payload),
-    });
-  }, [canDropSession, canSplit, onDropSession, paneId]);
-
   if (!isPrimary && !binding) {
     // sanitize/迁移保证非 primary 叶子必有绑定；此处是转移瞬间的防御渲染。
     return null;
@@ -525,19 +382,20 @@ export function WorkbenchLeafPane({
 
   return (
     <ChatPaneShell
-      containerRef={setPointerDropTargetRef}
       paneId={paneId}
       focused={focused}
       showFocusIndicator={showFocusIndicator}
       onFocusRequest={onFocusRequest}
       style={style}
-      dropSide={dropSide}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      hidden={hidden}
       restoredUnvalidated={Boolean((isPrimary ? primaryBinding : binding)?.restoredUnvalidated)}
     >
-      <V4PaneConversationProvider scope={scope}>
+      <V4PaneConversationProvider
+        scope={scope}
+        sessionId={sessionId}
+        unavailableFallback={<RemoteConversationDisconnected {...scope} sessionId={sessionId} />}
+        disconnectedBanner={<RemoteConversationBanner {...scope} sessionId={sessionId} />}
+      >
         {(isPrimary ? primaryBinding : binding)?.restoredUnvalidated && sessionId ? (
           <PaneRestoredGuard
             paneId={paneId}
@@ -566,13 +424,14 @@ export function WorkbenchLeafPane({
           onSessionCreated={handleSessionCreated}
           onSessionDeleted={handleSessionDeleted}
           focused={focused}
-          onSplitRight={canSplit && onSplit ? handleSplitRight : undefined}
-          onSplitDown={canSplit && onSplit ? handleSplitDown : undefined}
+          allowEscapeStopOutsidePane={shell.allowEscapeStopOutsidePane}
           onClosePane={isPrimary ? undefined : handleClosePane}
           workspaceBadge={!isPrimary && !isShellWorkspace ? workspaceBadgeFor(scope) : undefined}
           draftComposerHeader={isPrimary && !primaryBinding ? shell.draftComposerHeader : undefined}
+          // 草稿页头才需要上行拖拽控制器。普通会话上传它会把 Composer 的闭包送回壳层，
+          // 再经壳层回调连回旧 SessionPane，形成跨会话的 snapshot / store 保留链。
           onDropTargetControllerChange={
-            isPrimary && !primaryBinding
+            isPrimary && !primaryBinding && sessionId === null
               ? shell.onPrimaryDraftDropTargetControllerChange
               : undefined
           }

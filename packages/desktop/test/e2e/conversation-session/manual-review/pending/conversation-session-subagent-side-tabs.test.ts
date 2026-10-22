@@ -2,7 +2,7 @@ import {
   TID_CHAT_SUMMARY_PANEL,
   TID_V4_PANE_SHELL,
   TID_V4_SUBAGENT_OPEN_SIDE_PANE,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   prepareConversationE2E,

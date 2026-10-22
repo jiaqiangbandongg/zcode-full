@@ -1,99 +1,70 @@
-import { describe, expect, it } from "vitest";
-import type { WorkspaceTabState } from "@/store/tabStore.js";
+// @vitest-environment jsdom
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { VirtualProject } from "@zcode/services";
 import {
-  isRemoteAutomationWorkspace,
   resolveAutomationProjectOptions,
+  useAutomationProjectOptions,
 } from "@/hooks/useAutomationProjectOptions.js";
-
-function workspaceTab(
-  overrides: Partial<WorkspaceTabState> & Pick<WorkspaceTabState, "id" | "workspacePath">,
-): WorkspaceTabState {
-  return {
-    kind: "workspace",
-    label: "",
-    ...overrides,
-  };
-}
-
-describe("automation project boundaries", () => {
-  it("只保留可用项目并使用路径 basename 作为缺省名称", () => {
-    expect(
-      resolveAutomationProjectOptions([
-        workspaceTab({ id: "local-a", workspacePath: "/repo/local-a", label: "Local A" }),
-        workspaceTab({
-          id: "missing",
-          workspacePath: "/repo/missing",
-          availability: "unavailable-local-directory",
-        }),
-      ]),
-    ).toEqual([{ workspacePath: "/repo/local-a", label: "Local A" }]);
-
-    expect(
-      resolveAutomationProjectOptions([
-        workspaceTab({ id: "windows", workspacePath: "C:\\repo\\local-b" }),
-      ]),
-    ).toEqual([{ workspacePath: "C:\\repo\\local-b", label: "local-b" }]);
+const service = vi.hoisted(() => ({
+  readProjects: vi.fn(),
+  readTree: vi.fn(async () => {
+    throw new Error("task query forbidden");
+  }),
+  onMessage: () => ({ dispose() {} }),
+}));
+vi.mock("@/hooks/useWorkspaceServices.js", () => ({
+  useBaseWorkspaceServices: () => services,
+}));
+const services = { projectService: service, broadcastService: { onMessage: service.onMessage } };
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+const project = (
+  id: string,
+  roots: string[] = [],
+  extra: Partial<VirtualProject> = {},
+): VirtualProject => ({
+  id,
+  hostId: "local",
+  name: id,
+  roots: roots.map((rootPath, position) => ({ rootPath, position, isPrimary: position === 0 })),
+  deleted: false,
+  pinned: false,
+  nameOverridden: true,
+  position: 0,
+  createdAt: 1,
+  updatedAt: 1,
+  ...extra,
+});
+describe("automation virtual project options", () => {
+  it("opening the project selector reads directories without querying tasks or auto-archiving", async () => {
+    service.readProjects.mockResolvedValue([project("p", ["/unopened"])]);
+    const { result } = renderHook(useAutomationProjectOptions);
+    await waitFor(() => expect(result.current.map((option) => option.projectId)).toEqual(["p"]));
+    expect(service.readProjects).toHaveBeenCalledOnce();
+    expect(service.readTree).not.toHaveBeenCalled();
   });
-
-  it("定时任务把多个 conversation backing workspace 合并为一个逻辑无项目选项", () => {
-    const tabs = [
-      workspaceTab({
-        id: "conversation-default",
-        workspacePath: "/Users/test/.zcode/workspace/default",
-        workspacePurpose: "conversation",
-      }),
-      workspaceTab({
-        id: "conversation-test-default",
-        workspacePath: "/private/tmp/test/.zcode/workspace/default",
-        workspacePurpose: "conversation",
-      }),
-      workspaceTab({
-        id: "project",
-        workspacePath: "/repo/project",
-        workspacePurpose: "project",
-      }),
-    ];
-
-    expect(resolveAutomationProjectOptions(tabs)).toEqual([
-      { workspacePath: "/repo/project", label: "project" },
-    ]);
+  it("keeps empty projects and overlapping roots as distinct choices without open tabs", () => {
     expect(
-      resolveAutomationProjectOptions(tabs, {
-        includeConversationWorkspace: true,
-      }),
+      resolveAutomationProjectOptions([
+        project("empty"),
+        project("a", ["/same", "/extra"]),
+        project("b", ["/same"]),
+      ]),
     ).toEqual([
-      {
-        workspacePath: "/Users/test/.zcode/workspace/default",
-        label: "default",
-        workspacePurpose: "conversation",
-      },
-      { workspacePath: "/repo/project", label: "project" },
+      { projectId: "empty", hostId: "local", workspacePath: "", label: "empty" },
+      { projectId: "a", hostId: "local", workspacePath: "/same", label: "a" },
+      { projectId: "b", hostId: "local", workspacePath: "/same", label: "b" },
     ]);
   });
-
-  it("识别所有远端 workspace 身份信号", () => {
+  it("excludes deleted projects and remote entries from local scheduling", () => {
     expect(
-      isRemoteAutomationWorkspace(
-        workspaceTab({
-          id: "ssh",
-          workspacePath: "/repo",
-          remoteSessionId: "remote-session",
-        }),
-      ),
-    ).toBe(true);
-    expect(
-      isRemoteAutomationWorkspace(
-        workspaceTab({
-          id: "identity",
-          workspacePath: "/repo",
-          workspaceIdentity: "ssh://host/repo",
-        }),
-      ),
-    ).toBe(true);
-    expect(
-      isRemoteAutomationWorkspace(
-        workspaceTab({ id: "local", workspacePath: "/repo/local" }),
-      ),
-    ).toBe(false);
+      resolveAutomationProjectOptions([
+        project("deleted", [], { deleted: true }),
+        project("remote", [], { hostId: "remote:server:s" }),
+      ]),
+    ).toEqual([]);
   });
 });

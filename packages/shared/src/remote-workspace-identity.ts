@@ -16,6 +16,8 @@ export type RemoteWorkspaceIdentityKind = "ssh" | "wsl" | "docker" | "server";
 
 export interface ParsedRemoteWorkspaceIdentity {
   kind: RemoteWorkspaceIdentityKind;
+  /** kind=server 时的稳定 Source Server id。 */
+  sourceServerId?: string;
   /** 远端真实路径（posix 归一形态）。 */
   workspacePath: string;
 }
@@ -30,9 +32,7 @@ const AUTHORITY_SEGMENTS: Record<RemoteWorkspaceIdentityKind, number> = {
   server: 1,
 };
 
-function isRemoteWorkspaceIdentityKind(
-  value: string,
-): value is RemoteWorkspaceIdentityKind {
+function isRemoteWorkspaceIdentityKind(value: string): value is RemoteWorkspaceIdentityKind {
   return value === "ssh" || value === "wsl" || value === "docker" || value === "server";
 }
 
@@ -83,10 +83,7 @@ export function buildServerRemoteWorkspaceIdentity(
  * 统一构造远程 workspace identity。Host、Main 和 UI 禁止自行拼接 authority；
  * `workspacePath` 只在这里归一后进入身份键，实际 IO 仍使用调用方原路径。
  */
-export function buildRemoteWorkspaceIdentity(
-  workspacePath: string,
-  target: RemoteTarget,
-): string {
+export function buildRemoteWorkspaceIdentity(workspacePath: string, target: RemoteTarget): string {
   const normalizedPath = normalizeWorkspacePathForIdentity(workspacePath);
   switch (target.kind) {
     case "ssh":
@@ -131,11 +128,13 @@ export function parseRemoteWorkspaceIdentity(
   // 逐段消费 authority；path 段可能含 ":"（理论上 posix 路径允许），
   // 因此不能整体 split——按段推进后取剩余整段为 path。
   let cursor = kindEnd + 1;
+  let sourceServerId: string | undefined;
   for (let i = 0; i < AUTHORITY_SEGMENTS[kind]; i++) {
     const next = rest.indexOf(":", cursor);
     if (next <= cursor) {
       return null;
     }
+    if (kind === "server" && i === 0) sourceServerId = rest.slice(cursor, next);
     cursor = next + 1;
   }
   // WSL identity 为区分默认用户与显式用户增加了可选 user 段，旧解析器
@@ -152,10 +151,24 @@ export function parseRemoteWorkspaceIdentity(
   if (!workspacePath.startsWith("/")) {
     return null;
   }
-  return { kind, workspacePath };
+  return { kind, workspacePath, ...(sourceServerId ? { sourceServerId } : {}) };
 }
 
 /** identity 是否是远程 workspace identity（可被 parseRemoteWorkspaceIdentity 解析）。 */
 export function isRemoteWorkspaceIdentity(identity: string): boolean {
   return parseRemoteWorkspaceIdentity(identity) !== null;
+}
+
+/** 虚拟项目的 host 身份；只在统一 identity 模块裁剪路径，业务层不得自行拆 authority。 */
+export function remoteHostIdFromWorkspaceIdentity(identity: string): string | null {
+  const parsed = parseRemoteWorkspaceIdentity(identity);
+  return parsed ? identity.slice(0, -(parsed.workspacePath.length + 1)) : null;
+}
+
+/** 从已登记的 Host 身份构造目录身份；不让业务模块拼接或解析 authority。 */
+export function buildRemoteHostWorkspaceIdentity(hostId: string, workspacePath: string): string {
+  const identity = `${hostId}:${normalizeWorkspacePathForIdentity(workspacePath)}`;
+  if (remoteHostIdFromWorkspaceIdentity(identity) !== hostId)
+    throw new Error("Invalid remote host identity");
+  return identity;
 }

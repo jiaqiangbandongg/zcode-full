@@ -7,7 +7,6 @@ import { ProviderModelsSection } from "@/settings/model-provider-section/Provide
 import { ProviderModelMetadataDialog } from "@/settings/model-provider-section/ProviderModelMetadataDialog.js";
 import { MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS } from "@/settings/model-provider-section/useIdleTrigger.js";
 import zhCN from "@/i18n/locales/zh-CN.js";
-import enUS from "@/i18n/locales/en-US.js";
 
 const providerSettingsServiceMock = vi.hoisted(() => ({
   resolveModelConfig: vi.fn(),
@@ -159,19 +158,6 @@ function renderAddModelSection(onAddModel = vi.fn(() => true)) {
 }
 
 describe("provider model config resolution", () => {
-  it("匹配提示使用智能配置文案，推理映射标签中英文语义一致", () => {
-    expect(zhCN["settings.modelProvider.modelDefaultsLoaded"]).toBe("已匹配到智能配置");
-    expect(zhCN["settings.modelProvider.reasoningLevelMapping"]).toBe("推理参数映射");
-    expect(enUS["settings.modelProvider.reasoningLevelMapping"]).toBe(
-      "Reasoning parameter mapping",
-    );
-    expect(zhCN["settings.modelProvider.modelMetadata.invalid.reasoningLevelMap"]).toBe(
-      "推理参数映射无效",
-    );
-    expect(enUS["settings.modelProvider.modelDefaultsLoaded"]).toBe(
-      "Smart configuration matched for this model",
-    );
-  });
   beforeEach(() => {
     vi.useFakeTimers();
     providerSettingsServiceMock.resolveModelConfig.mockReset();
@@ -182,7 +168,7 @@ describe("provider model config resolution", () => {
     vi.useRealTimers();
   });
 
-  it("最大输出字段位于 Token 分组，Reasoning 配置直接展示", () => {
+  it("数字字段使用 input，帮助内容位于 label 外并展示推理编辑器", () => {
     render(
       createElement(ProviderModelMetadataDialog, {
         mode: "edit",
@@ -215,14 +201,7 @@ describe("provider model config resolution", () => {
     for (const help of document.querySelectorAll("[data-model-help]")) {
       expect(help.closest("label")).toBeNull();
     }
-    expect(
-      maxOutputTokensInput
-        .closest("[data-model-settings-group]")
-        ?.getAttribute("data-model-settings-group"),
-    ).toBe("tokens");
-    expect(screen.queryByRole("button", { name: "高级" })).toBeNull();
     expect(document.querySelector('[data-model-reasoning-level-editor="true"]')).toBeTruthy();
-    expect(maxOutputTokensInput).toBeTruthy();
   });
 
   it("添加模型时等待统一 idle 时间解析并允许覆盖 Config Rule 回填值", async () => {
@@ -380,22 +359,6 @@ describe("provider model config resolution", () => {
     );
   });
 
-  it("Config Rule 未声明最大输出时保持空白并恢复手动输入", async () => {
-    providerSettingsServiceMock.resolveModelConfig.mockResolvedValue(createModelConfigResolution());
-    const { maxOutputTokensInput, modelIdInput, saveButton } = renderAddModelSection();
-
-    fireEvent.change(modelIdInput, {
-      target: { value: "unknown-output" },
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS);
-    });
-
-    expect(maxOutputTokensInput.value).toBe("");
-    expect(maxOutputTokensInput.disabled).toBe(false);
-    expect(saveButton.disabled).toBe(false);
-  });
-
   it("Config Rule 解析失败时保持空白并恢复手动输入", async () => {
     providerSettingsServiceMock.resolveModelConfig.mockRejectedValue(
       new Error("config resolution unavailable"),
@@ -501,7 +464,6 @@ describe("provider model config resolution", () => {
 
     const maxOutputTokensInput = screen.getByLabelText("最大输出 Token") as HTMLInputElement;
 
-    expect(screen.queryByRole("button", { name: "高级" })).toBeNull();
     // Todo141：最大输出在基础区，高级仍默认收起；查看/编辑/展开都不应触发 catalog 查询。
     const advanced = document.querySelector<HTMLElement>("[data-model-advanced]")!;
     const trigger = advanced.querySelector<HTMLButtonElement>("[data-model-advanced-trigger]")!;

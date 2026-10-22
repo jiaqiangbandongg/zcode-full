@@ -3,7 +3,11 @@
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
-import { TID_CHAT_MODE_SELECT_ITEM, TID_CHAT_MODE_SELECT_TRIGGER, testId } from "@zcode/shared";
+import {
+  TID_CHAT_MODE_SELECT_ITEM,
+  TID_CHAT_MODE_SELECT_TRIGGER,
+  testId,
+} from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths } from "../helpers/desktop-app.js";
 import { resolveE2ERuntimePath } from "../helpers/e2e-runtime-paths.js";
 import { skipOccupationOnboardingIfPresent } from "../helpers/occupation-onboarding.js";

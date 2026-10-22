@@ -4,6 +4,8 @@ import {
   captureComposerRecentSubmission,
   readComposerRecent,
   resolveDraftInitialModelSelection,
+  prepareComposerRecentReceipt,
+  acceptComposerRecentReceipt,
 } from "@/lib/composerRecent.js";
 
 vi.mock("@/logger.js", () => ({ logger: { warn: vi.fn() } }));
@@ -23,6 +25,53 @@ const selection = { providerId: "provider", modelId: "model", options: { reasoni
 const key = "zcode-model-selection-recent-v1:/repo";
 
 describe("composerRecent", () => {
+  it("PD07 持久化的接纳顺序阻止恢复查询中的旧配置回写", () => {
+    const target = storage();
+    const scope = { clientNamespace: "desktop", hostId: "local", projectId: "p" };
+    const old = prepareComposerRecentReceipt(scope, { modelSelection: selection, mode: "build" });
+    const latest = prepareComposerRecentReceipt(scope, {
+      modelSelection: { ...selection, modelId: "next" },
+      mode: "yolo",
+    });
+    expect(acceptComposerRecentReceipt(latest, target)).toBe(true);
+    expect(acceptComposerRecentReceipt(JSON.parse(JSON.stringify(old)), target)).toBe(true);
+    expect(readComposerRecent("/any", undefined, target, scope)).toMatchObject({
+      mode: "yolo",
+      modelSelection: { modelId: "next" },
+    });
+  });
+  it("PD04 Recent 跟随项目而非目录，任务配置跨新目录复用", () => {
+    const target = storage();
+    const p = { clientNamespace: "desktop", hostId: "local", projectId: "p" };
+    const task = { ...p, projectId: null };
+    const accept = captureComposerRecentSubmission(
+      "/repo",
+      { modelSelection: selection, mode: "yolo" },
+      undefined,
+      target,
+      p,
+    );
+    expect(readComposerRecent("/repo", undefined, target, p)).toBeNull();
+    accept();
+    expect(readComposerRecent("/new-root", undefined, target, p)).toEqual({
+      modelSelection: selection,
+      mode: "yolo",
+    });
+    expect(readComposerRecent("/repo", undefined, target, { ...p, projectId: "q" })).toBeNull();
+    expect(readComposerRecent("/repo", undefined, target, task)).toBeNull();
+    captureComposerRecentSubmission(
+      "/task-a",
+      { modelSelection: selection, mode: "build" },
+      undefined,
+      target,
+      task,
+    )();
+    expect(readComposerRecent("/task-b", undefined, target, task)?.mode).toBe("build");
+    expect(
+      readComposerRecent("/task-b", undefined, target, { ...task, clientNamespace: "mobile" }),
+    ).toBeNull();
+  });
+
   it("沿用旧 key 读取纯 ModelSelection，不臆造旧记录的模式", () => {
     const target = storage();
     target.values.set(key, JSON.stringify(selection));

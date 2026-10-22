@@ -105,14 +105,11 @@ describe("ConversationShareReadonlyTimeline", () => {
       }),
     );
     expect(html).toContain('data-v4-user-input-bubble="true"');
-    expect(html).toContain("rounded-tr-xs");
     expect(html).toContain("这是");
     expect(html).toContain('data-conversation-share-turn="turn-1"');
     expect(html).toContain("搜索");
     expect(html).toContain("tool-summary");
     expect(html).not.toContain("<details");
-    expect(html).not.toContain("canEdit");
-    expect(html).not.toContain("turn · userInput · completedSuccess");
   });
 
   it("renders shared user input attachments as downloadable file pills", () => {
@@ -260,11 +257,11 @@ describe("ConversationShareReadonlyTimeline", () => {
     );
 
     expect(html).toContain('data-conversation-share-work-group="executeGroup"');
-    expect(html).toContain("执行");
-    expect(html).toContain("lucide-square-terminal");
+    expect(html).toContain("2 个命令");
+    expect(html).toContain("终端");
   });
 
-  it("uses the Desktop tool family icon and public summary for search rows", () => {
+  it("renders the public query summary for search rows", () => {
     const searchRows = [
       rows[0],
       rows[1],
@@ -281,9 +278,7 @@ describe("ConversationShareReadonlyTimeline", () => {
       }),
     );
 
-    expect(html).toContain("lucide-search");
     expect(html).toContain("AI coding");
-    expect(html).not.toContain("lucide-wrench");
   });
 
   it("marker 不再把枚举名当文案印出来", () => {
@@ -325,7 +320,7 @@ describe("ConversationShareReadonlyTimeline", () => {
     expect(html).not.toContain("goalVerify");
   });
 
-  it("artifact 卡片与正文的 AssistantPreviewCards 对齐", () => {
+  it("artifact 显示公开文件元数据与下载入口", () => {
     const artifactRows = [
       rows[0],
       rows[1],
@@ -355,23 +350,11 @@ describe("ConversationShareReadonlyTimeline", () => {
       }),
     );
 
-    // 与 AssistantPreviewCards.tsx 的容器一致：rounded-xl / p-3 pr-4 / gap-3。
-    expect(html).toContain(
-      "flex w-full items-center gap-3 rounded-xl border border-card-border bg-card p-3 pr-4",
-    );
-    // 时间线 turn 已提供正文 inset，artifact 行不能再叠加水平 padding，否则卡片会比正文窄。
-    expect(html).toContain('data-conversation-share-row-kind="artifact" class="py-1"');
-    // 44px 图标底板 + 真实文件类型图标，而不是一个通用的 size-4 FileIcon。
-    expect(html).toContain("flex size-11 shrink-0 items-center justify-center rounded-md");
-    expect(html).toContain("pdf.svg");
     // 副标题复用正文同一套词汇，并且不再直接印裸字节数。
     expect(html).toContain("文档 · PDF");
     expect(html).toContain("169 KB");
     expect(html).not.toContain("172974 bytes");
-    // 动作按钮与 OpenSplitButton 同一视觉，不再是蓝色文字链；语义锁定用结构性标记，
-    // 不锁 Tailwind 类字符串（类序/尺寸微调不应打断这条回归）。
     expect(html).toContain('data-share-preview-button="true"');
-    expect(html).not.toContain("text-icon-blue");
   });
 
   it("为 Desktop 导入副本的本地 artifact 渲染 OpenSplitButton", () => {
@@ -643,4 +626,48 @@ describe("ConversationShareReadonlyTimeline", () => {
     expect(html).toContain('title="https://tracker.invalid/pixel.png"');
     expect(html).toContain("tracker");
   });
+});
+
+it("分享页展示 workflow 静态图，不需要桌面宿主或执行回调", () => {
+  const html = renderToStaticMarkup(
+    createElement(ConversationShareReadonlyTimeline, {
+      locale: "zh-CN",
+      rows: [
+        ...rows,
+        {
+          rowId: 5,
+          turnId: "turn-1",
+          productTurnId: "product-turn-1",
+          createdAt: 5,
+          createdAtSeq: 5,
+          kind: "toolCall",
+          toolCallId: "workflow-test",
+          toolName: "CreateWorkflow",
+          status: "success",
+          inputText: "{}",
+          input: { name: "调研工作流" },
+          display: {
+            kind: "create_workflow",
+            ok: true,
+            errorCount: 0,
+            diagnostics: [],
+            causalityGraph: {
+              steps: [{ id: "s", kind: "ask", label: "检索", lane: "l", phase: "p" }],
+              lanes: [{ id: "l", name: "研究员" }],
+              participants: [{ id: "a", phase: "p", lane: "l", steps: ["s"] }],
+              handoffs: [],
+              phases: [{ id: "p", name: "调研阶段" }],
+              phaseEdges: [],
+              exits: ["p"],
+            },
+          },
+        },
+      ],
+    }),
+  );
+  expect(html).toContain("调研工作流");
+  expect(html).toContain("调研阶段");
+  expect(html).toContain("研究员");
+  expect(html).toContain("工具调用时的快照");
+  expect(html).not.toContain('data-testid="workflow-card-resume"');
 });

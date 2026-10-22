@@ -1,7 +1,13 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { BUILTIN_MODEL_PROVIDER_IDS, marketingPopupSchema } from "@zcode/shared";
-import { waitForDefaultWorkspaceReady, getE2EAppDataPaths } from "../helpers/desktop-app.js";
+import { TID_TASK_SETTINGS_BUTTON } from "@zcode/shared/test-ids";
+import {
+  waitForTestIdByDom,
+  getE2EAppDataPaths,
+  quitElectronAppGracefully,
+  seedSettings,
+} from "../helpers/desktop-app.js";
 
 const byId = (id: string) => $(`[data-testid="${id}"]`);
 // 原截图写入系统临时目录，违反运行目录隔离；统一归档到本轮报告目录。
@@ -102,7 +108,8 @@ async function deliverHero(hero: unknown) {
 
 describe("Marketing Touch delivery", () => {
   before(async () => {
-    await waitForDefaultWorkspaceReady();
+    // 冷启动可以恢复到未选项目草稿；全局营销界面只依赖应用壳，不能把固定 cwd 当就绪条件。
+    await waitForTestIdByDom(TID_TASK_SETTINGS_BUTTON, { timeout: 30_000 });
     expect(await byId("cloud-content-preview-entry").isExisting()).toBe(false);
   });
   after(async () => {
@@ -123,9 +130,13 @@ describe("Marketing Touch delivery", () => {
         banner: title.startsWith("MTC-11:") || title.startsWith("MTE-06 stale banner"),
       }),
     });
+    // 英文文案和请求头必须由夹具明确声明；先退出，避免旧进程的关闭写回覆盖语言。
+    await quitElectronAppGracefully();
+    await seedSettings({ locale: "en-US", localePreference: "en-US" });
     // 每例从真实新窗口启动；旧失败 modal、导航请求和缓存不能污染下一个 case。
     await browser.reloadSession();
-    await waitForDefaultWorkspaceReady();
+    // 冷启动可以恢复到未选项目草稿；全局营销界面只依赖应用壳，不能把固定 cwd 当就绪条件。
+    await waitForTestIdByDom(TID_TASK_SETTINGS_BUTTON, { timeout: 30_000 });
     const back = $('button[aria-label="Back to workspace"]');
     if (await back.isDisplayed()) await back.click();
   });
@@ -277,6 +288,9 @@ describe("Marketing Touch delivery", () => {
         ),
       ).toBe(false);
       expect((await ledger()).events).toEqual([]);
+      const queriesBefore = (await ledger()).requests.filter(
+        (path) => path === "/api/v1/marketing/touch",
+      ).length;
       await description.$("a").click();
       await browser.waitUntil(async () => {
         await open.update();
@@ -286,6 +300,10 @@ describe("Marketing Touch delivery", () => {
       await byId("cloud-content-dialog").waitForExist({ reverse: true });
       await browser.waitUntil(async () => (await ledger()).events.length === 1);
       expect((await ledger()).events).toEqual([{ campaign_id: campaign, action_type: "confirm" }]);
+      // 外链不改变领取资格，不应与 confirm 并发查询、重新打开旧投放。
+      expect(
+        (await ledger()).requests.filter((path) => path === "/api/v1/marketing/touch").length,
+      ).toBe(queriesBefore);
     } finally {
       await browser.electron.restoreAllMocks();
     }
@@ -790,13 +808,14 @@ describe("Marketing Touch delivery", () => {
         provider_id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
       },
     });
-    await byId("cloud-content-dialog").$("button=Run action").click();
+    // Start Plan 导航会把主按钮文案改为 View plan；按稳定 action 身份点击，不依赖 fixture 原文。
+    await byId("cloud-content-dialog").$('[data-testid="cloud-dialog-action"]').click();
     await byId("cloud-content-dialog").waitForExist({ reverse: true, timeout: 35_000 });
     expect(await $('[data-active-section="modelProvider"]').isDisplayed()).toBe(true);
     expect(await connectionSettings()).toEqual(before);
     expect(
       await $(
-        `[data-testid="model-provider-nav-item-preset:${BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan}"][aria-selected="true"]`,
+        `[data-testid="model-provider-nav-item-coding-plan:${BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan}"][aria-selected="true"]`,
       ).isDisplayed(),
     ).toBe(true);
     const baseline = (await ledger()).events.length;
@@ -857,7 +876,9 @@ describe("Marketing Touch delivery", () => {
       });
       await byId("cloud-content-dialog").$("button=Run action").click();
       await byId("cloud-content-dialog").waitForExist({ reverse: true, timeout: 35_000 });
-      await $('[data-model-provider-detail-scroll="true"] button:has(svg.lucide-trash-2)').click();
+      // 删除入口已收进详情「更多」菜单；旧 toolbar trash 选择器会让已通过的主断言在清理时报错。
+      await byId("model-provider-actions-button").click();
+      await $('[role="menuitem"]:has(svg.lucide-trash-2)').click();
       await byId("confirm-dialog-confirm").click();
       await byId(nodeId).waitForExist({ reverse: true });
     }

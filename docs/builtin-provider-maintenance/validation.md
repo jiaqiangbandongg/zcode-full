@@ -1,0 +1,78 @@
+# 配置验证与人工协作
+
+## 验证分层
+
+| 层                | 能证明什么                           | 不能证明什么                         |
+| ----------------- | ------------------------------------ | ------------------------------------ |
+| 官方资料          | 声明的型号、协议、参数和生命周期     | 指定账号/地区/套餐实际可用           |
+| Decoder/Schema    | 文件结构、字段和值域合法             | 每个模型最终完整、远端支持这些参数   |
+| Resolver/Map 测试 | 覆盖顺序、完整执行配置、参数映射     | 供应商实际接受请求                   |
+| 本地 HTTP/replay  | 请求编码、流消费、工具闭环与配置接线 | 当前公网端点、Key 权限和真实模型行为 |
+| 真实 API          | 本次入口、模型、协议和账号的实测结果 | 其他套餐、地区、协议或未来始终可用   |
+| 产品 E2E/包验证   | UI 配置到目标执行链及实际资源        | 所有供应商和平台全部通过             |
+
+任何层都记录范围和日期。不能把 `GET /models` 成功、SDK 可创建或一次连接测试成功写成完整 Agent 支持。
+
+## 获取 API Key 的人工交接
+
+先完成不依赖凭据的资料、spec、测试和候选 diff，再向协作者给出可执行请求：供应商、具体产品/地区、模型名单、普通 API 或套餐 Key、所需权限、预计请求次数、最高费用及测试数据用途。新购订阅、充值和提高额度由人确认；不得为“全面验证”擅自扩大消费。
+
+协作者在官方控制台开通相应产品、确认模型权限和余额，通过批准的 Secret 管理/受限本地配置交付。需要环境变量时只记录变量名，由进程读取；不把 Key 写入命令参数、聊天、Git、MR、截图或日志。临时 Key 优先最小权限和可撤销，验证结束按协作者约定撤销或归还管理。
+
+测试环境不会自动提供免费 Key：当前测试 JSON 的普通模板仍用正式供应商地址。API Key、Coding Plan/Token Plan Key、网页登录权益不可混用；同品牌也要分别确认。权限不足、余额不足、地区不支持、限流、服务故障和参数错误分别记录，不能统一归因为模型不兼容。
+
+本轮文档整理没有请求或取得这些 Key；每个新观察项仍需这一交接。未来无法取得 Key 时，可以准备带明确阻塞的 MR；不得编造通过记录、扩大已有验证范围或自行动态上线。
+
+## 真实请求最小矩阵
+
+按变更范围裁剪。新增/变更成员逐个确认 ID 可调用；参数和协议差异逐个覆盖，不能用一个旗舰型号代表整个品牌。
+
+| 场景         | 核验内容                                                                         |
+| ------------ | -------------------------------------------------------------------------------- |
+| 连接与基础流 | 实际 URL/协议/Header、模型身份；流正常结束、usage 与结束原因；中途错误不能算成功 |
+| 工具闭环     | 声明工具 → 流式参数组装 → 回传工具结果 → 继续回答；工具 ID/消息顺序正确          |
+| 思考档位     | 每个公开 values 对应 Map 的最终 Body，尤其关闭/最低/最高档及不支持关闭的型号     |
+| 输出限制     | 上限与显式预算分别验证，非法值明确失败；不静默截断或偷偷加预算重试               |
+| 媒体与结构化 | 对本次声明/调整的图片、视频、音频、PDF、JSON Schema 分别验证；未测项标明         |
+| 系统与历史   | 涉及 MCS、推理历史、加密内容或新协议时，检查多轮回放、工具后续轮及系统消息处理   |
+| 相邻变体     | 基础型号/Flash/FlashX/视觉/聚合前后缀；确认规则不串用                            |
+| 用户配置     | 继承值刷新、显式个人覆盖保留、默认启停、已有实例地址/名称和保存选择              |
+
+使用无个人信息的最小提示与测试附件。百万上下文、最大输出压力测试需要单独预算，不能为验证配置数值默认发满容量请求。普通 smoke 不宣称覆盖容量上界。实时延迟和限流波动记录为观察，避免用随意 sleep 掩盖配置问题。
+
+产品连接探测只证明其实际执行过的连接步骤，不能自动等同于上述矩阵。需要调整探测预算时，先从当前代码核对取值、请求路径和成功判据，在本目录记录拟改变的行为并补回归；不能把历史建议值当成当前事实。
+
+## 仓库检查入口
+
+以下命令从仓库根目录执行。根据本项变更选文件，不运行未经授权的全量单测：
+
+```bash
+pnpm provider:config:check-test
+pnpm exec vitest run packages/provider-node/test/zcode-builtin-integrity.test.ts
+pnpm exec vitest run packages/provider/test/model-config-rules.test.ts packages/provider/test/provider-template.test.ts
+pnpm exec vitest run packages/provider-node/test/zcode-builtin-reasoning-map.test.ts
+```
+
+参考测试还有 `packages/provider-node/test/new-model-catalog*.test.ts`、`opencode-go.test.ts`、`openrouter-reasoning-contract.test.ts`、`zhipu-api-templates.test.ts`；按本项新增边界补充，不只修改快照以让失败消失。
+
+最终文件完整性测试支持 `ZCODE_BUILTIN_RELEASE_TEST_FILE` 指定实际文件；分别验证正式和生成的测试配置。POSIX shell 示例：
+
+```bash
+ZCODE_BUILTIN_RELEASE_TEST_FILE="$PWD/config/provider/zcode-builtin.test.json" pnpm exec vitest run packages/provider-node/test/zcode-builtin-integrity.test.ts
+```
+
+其他 shell 使用相应环境变量设置方式，变量值仍为实际绝对路径。此测试包含当前目录业务断言，不是任意旧 Release 的通用兼容测试；不应为了验收历史文件而放松断言。
+
+普通代码变更执行 `pnpm typecheck`、`pnpm lint`、`pnpm architecture:check --changed` 和 `pnpm test:unit:affected --base <起点commit>`。CLI 代码另执行 `pnpm --dir apps/zcode-cli typecheck`、`pnpm --dir apps/zcode-cli lint`，并使用其包脚本/Turbo 选择受影响包及调用方的测试；根 affected 单测不能代替 CLI 测试。CLI 范围无法可靠确定或改动公共测试基础设施时，执行 `pnpm --dir apps/zcode-cli test`。
+
+APP 交互变化先补桌面 E2E 场景，再实现；覆盖新增实例、已有实例继承、显式覆盖保留、模型选择及真实执行链，按影响补手机路径。场景、spec 和测试 case 保持一致；验证使用 `pnpm test:e2e` 并按实际受影响 spec 选择范围，不把一次本地 HTTP fixture 的通过当作供应商公网验证。视觉变化还需桌面/手机、深浅主题及相关语言检查。缺环境时列出未验证组合，不写成全部通过。
+
+双环境构建或生成策略变化还应覆盖 `packages/provider-node/test/builtin-provider-build.test.ts`、`builtin-provider-test-config-sync.test.ts` 及 `scripts/test/` 下对应脚本测试。用不同内容的临时 Release 验证环境优先级、缺失/坏文件、同环境内容更新、已有 JS 时刷新资源、SEA 和最终嵌入内容。两份真实 JSON 分别解码，不要求为构建验证调用计费模型。
+
+纯文档只检查链接、命令、引用和一致性。必要检查失败或环境阻塞时保留改动及证据，不自动提交；通过后自检 diff 并提交本次内容。Push 保留 `pnpm verify:pre-push` 门禁，不绕过 hook；未经明确要求不运行根全量单测。
+
+## 证据留存
+
+记录时间、commit、正式/测试、配置 revision/hash、templateId/modelId/协议、账号产品与地区（不含个人身份）、用例及通过/失败/未执行。请求/响应证据保留脱敏的参数、状态码、结束原因和必要日志；清除 Authorization、Cookie、Key、签名 URL query、私人提示和推理正文。需要 replay 时先检查采集器实际保存的字段，再脱敏、人工复查并验证可回放，禁止直接提交原始网络抓包。
+
+一个入口的验证记录不得复用为另一个套餐或聚合站点的通过结论。失败先保留最小复现和运行日志，区分规则、Adapter、权限和上游问题，再决定是配置修复还是需要设计变更。

@@ -1,14 +1,16 @@
 import { memo, useCallback, useMemo } from "react";
 import { LightbulbIcon, XIcon, ChevronDownIcon } from "lucide-react";
 import {
+  ZCODE_AGENT_PROVIDER,
+  getZCodeAgentAvailableModes,
+  type ZCodeConfigOption,
+} from "@zcode/shared";
+import {
   TID_CHAT_MODE_SELECT_TRIGGER,
   TID_CHAT_MODE_SELECT_ITEM,
   TID_V4_COMPOSER_INPUT,
-  ZCODE_AGENT_PROVIDER,
-  getZCodeAgentAvailableModes,
   testId,
-  type ZCodeConfigOption,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -18,6 +20,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu.js";
+import { RollingToolbarLabel } from "@/chat-input-toolbar/RollingToolbarLabel.js";
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
 import {
@@ -127,7 +130,8 @@ function V4ComposerModeSwitchImpl({
             >
               <Icon className="size-4" />
               <span className="inline group-data-[composer-compact=true]/mode:hidden">
-                {label(selected)}
+                {/* Plan 菜单重写时普通 span 丢失了旧 ConfigSelect 的翻滚；复用同一动画组件恢复。 */}
+                <RollingToolbarLabel label={label(selected)} />
               </span>
               <ChevronDownIcon className="size-3.5 group-data-[composer-compact=true]/mode:hidden" />
             </Button>

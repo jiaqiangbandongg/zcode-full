@@ -1,17 +1,12 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ZCodeProvider, ZCodeTaskMeta } from "@zcode/shared";
-import { useActiveTaskSnapshotMeta } from "@/hooks/useActiveTaskSnapshotMeta.js";
+import { useZCodeTaskService } from "@/hooks/useZCodeTaskService.js";
+import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { useTaskNativeSessionLogFile } from "@/hooks/useTaskNativeSessionLogFile.js";
 import { useTaskSessionFilePath } from "@/hooks/useTaskSessionFilePath.js";
-import { buildTaskEntityKey } from "@/lib/taskQueryCache.js";
-import { mergeTaskMetaCandidates } from "@/lib/zcodeTaskMetaMerge.js";
+import { logger } from "@/logger.js";
 import { resolveWorkspaceHeaderProvider } from "@/lib/workspaceHeaderProvider.js";
-import {
-  getTaskMeta,
-  selectWorkspaceZCodeState,
-  useZCodeSessionStore,
-} from "@/store/zcodeSessionStore.js";
-import { useTaskQueryCacheStore } from "@/store/taskQueryCacheStore.js";
+import { selectWorkspaceZCodeState, useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 
 interface UseWorkspaceActiveTaskStateParams {
   workspaceAbsPath: string;
@@ -28,10 +23,7 @@ function areTaskMetaJsonFieldsEqual(left: unknown, right: unknown) {
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
 
-function areResolvedTaskMetasEqual(
-  left: ZCodeTaskMeta | null,
-  right: ZCodeTaskMeta | null,
-) {
+function areResolvedTaskMetasEqual(left: ZCodeTaskMeta | null, right: ZCodeTaskMeta | null) {
   if (left === right) {
     return true;
   }
@@ -65,9 +57,7 @@ function areResolvedTaskMetasEqual(
   );
 }
 
-export function useStableResolvedActiveTaskMeta(
-  taskMeta: ZCodeTaskMeta | null,
-) {
+export function useStableResolvedActiveTaskMeta(taskMeta: ZCodeTaskMeta | null) {
   const stableTaskMetaRef = useRef<ZCodeTaskMeta | null>(null);
   const stableTaskMeta = stableTaskMetaRef.current;
   // stream chunk 只更新消息流时，active task meta 经列表/乐观层重新合成后可能字段相同但引用变了。
@@ -86,50 +76,75 @@ export function useWorkspaceActiveTaskState({
   selectedProvider,
   intl,
 }: UseWorkspaceActiveTaskStateParams) {
-  const workspaceState = useZCodeSessionStore((state) =>
-    selectWorkspaceZCodeState(state, workspaceAbsPath, workspaceIdentity),
-  );
-  const activeTaskQueryMeta = useTaskQueryCacheStore((state) => {
-    if (!activeTaskId) {
-      return null;
-    }
-    return state.taskMetaByEntityKey[
-      buildTaskEntityKey({
-        taskId: activeTaskId,
-        workspacePath: workspaceAbsPath,
-        workspaceIdentity,
-      })
-    ] ?? null;
-  });
-  const activeTaskMeta = useMemo(() => {
-    if (!activeTaskId) {
-      return null;
-    }
-
-    // App 以前依赖 zcodeTaskMetaMerge 同时拉普通列表和 pinned 列表，只是为了给当前激活 task
-    // 找一份 meta。这样任何列表刷新都会把整棵 App 一起带着重渲。
-    // 这里改成直接从 workspace store 读 taskListCache + optimistic meta 的合并结果；
-    // 普通任务可以同步命中，pinned / archived 再由 snapshot meta 兜底，不再要求 App 常驻订阅旧列表 hook。
-    // 重启恢复后 raw snapshot meta 可能先进入 workspace store，而 sqlite/list
-    // query cache 里保留着 titleOverridden 的手动标题。Header 必须按同一套 title authority
-    // 合并两边，否则当前 task 会看起来被还原成生成标题或首条 query。
-    return mergeTaskMetaCandidates(
-      getTaskMeta(workspaceState, activeTaskId),
-      activeTaskQueryMeta,
-    ) ?? null;
-  }, [activeTaskId, activeTaskQueryMeta, workspaceState]);
-
-  const activeTaskSnapshotMeta = useActiveTaskSnapshotMeta(
+  const service = useZCodeTaskService(
     workspaceAbsPath,
-    activeTaskId,
     workspaceRemoteSessionId,
     workspaceIdentity,
-    activeTaskMeta,
   );
-  const resolvedActiveTaskMeta = useStableResolvedActiveTaskMeta(
-    activeTaskMeta ?? activeTaskSnapshotMeta,
+  const { broadcastService } = useBaseWorkspaceServices();
+  const version = useZCodeSessionStore(
+    (state) =>
+      selectWorkspaceZCodeState(state, workspaceAbsPath, workspaceIdentity).taskListVersion,
   );
-  // store 收尾：taskMessagesByTaskId 已无写入方（旧 ChatView/广播消息回放均退役），
+  const optimisticMeta = useZCodeSessionStore((state) => {
+    const workspace = selectWorkspaceZCodeState(state, workspaceAbsPath, workspaceIdentity);
+    return activeTaskId ? (workspace.optimisticTaskListByTaskId[activeTaskId] ?? null) : null;
+  });
+  const targetKey = JSON.stringify([
+    workspaceIdentity?.trim() || workspaceAbsPath,
+    activeTaskId,
+    workspaceRemoteSessionId ?? null,
+  ]);
+  const [indexed, setIndexed] = useState<{
+    service: typeof service;
+    targetKey: string;
+    meta: ZCodeTaskMeta | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!activeTaskId) return;
+    let disposed = false;
+    let serial = 0;
+    const target = { workspacePath: workspaceAbsPath, workspaceIdentity, taskId: activeTaskId };
+    const refresh = async () => {
+      const request = ++serial;
+      try {
+        // Bugfix: 旧列表退场后，标题 fallback 的 readSession 早于 V4 冷恢复而报
+        // Session is not active。标题只读 Host 索引；正文恢复不再决定标题是否可用。
+        const meta = await service.getTaskMeta(target);
+        if (!disposed && request === serial) setIndexed({ service, targetKey, meta });
+      } catch (error) {
+        if (!disposed && request === serial)
+          logger.warn("[active-task-meta] 读取 Host 任务元数据失败", { ...target, error });
+      }
+    };
+    // 先订阅再查询，避免读取与订阅之间漏掉重命名/归档；同目标的迟到结果也不能覆盖新结果。
+    const events = service.onDynamicWorkspaceEvent(target)((event) => {
+      if (event.type === "workspace_task_list_changed") void refresh();
+    });
+    const projects = broadcastService.onMessage((event) => {
+      if (event.channel === "state:projects") void refresh();
+    });
+    void refresh();
+    return () => {
+      disposed = true;
+      events.dispose();
+      projects.dispose();
+    };
+  }, [
+    service,
+    broadcastService,
+    workspaceAbsPath,
+    workspaceIdentity,
+    activeTaskId,
+    targetKey,
+    version,
+  ]);
+  // 同 ID 可存在于不同远端；渲染时即拒绝旧目标，不能等 effect 才清标题。
+  const indexedMeta =
+    indexed?.service === service && indexed.targetKey === targetKey ? indexed.meta : null;
+  const activeTaskMeta = indexedMeta ?? optimisticMeta;
+  const resolvedActiveTaskMeta = useStableResolvedActiveTaskMeta(activeTaskMeta);
+  // M5② store 收尾：taskMessagesByTaskId 已无写入方（旧 ChatView/bot 消息回放均退役），
   // 由消息流派生的实时改动摘要恒为空；摘要展示回落到 task meta.changeSummary（持久化侧）。
   const activeTaskChangeSummary = null;
   const activeTraceId = resolvedActiveTaskMeta?.traceId ?? null;
@@ -153,11 +168,7 @@ export function useWorkspaceActiveTaskState({
     activeTaskProvider,
     workspaceIdentity,
   );
-  const taskSessionFile = useTaskSessionFilePath(
-    workspaceAbsPath,
-    activeTaskId,
-    workspaceIdentity,
-  );
+  const taskSessionFile = useTaskSessionFilePath(workspaceAbsPath, activeTaskId, workspaceIdentity);
 
   return {
     activeTaskMeta,

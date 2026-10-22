@@ -1,18 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { IFeedbackService } from "@zcode/services";
 import {
-  MAX_SUPPLEMENT_ATTACHMENT_BYTES,
-  MAX_SUPPLEMENT_ATTACHMENTS,
   submitSupplementFeedback,
   type SupplementAttachmentDraft,
 } from "@/feedback/FeedbackSupplementComposer.js";
 
 describe("FeedbackSupplementComposer", () => {
-  it("uses the feedback API attachment limits for supplemental files", () => {
-    expect(MAX_SUPPLEMENT_ATTACHMENTS).toBe(6);
-    expect(MAX_SUPPLEMENT_ATTACHMENT_BYTES).toBe(100 * 1024 * 1024);
-  });
-
   it("creates the supplemental message before uploading attachments to that message", async () => {
     const calls: string[] = [];
     const attachment: SupplementAttachmentDraft = {
@@ -57,10 +50,7 @@ describe("FeedbackSupplementComposer", () => {
     });
 
     expect(calls).toEqual(["comment", "upload"]);
-    expect(feedbackService.comment).toHaveBeenCalledWith(
-      "tkt_1",
-      "补充说明\n\n附件：detail.log",
-    );
+    expect(feedbackService.comment).toHaveBeenCalledWith("tkt_1", "补充说明\n\n附件：detail.log");
     expect(feedbackService.uploadAttachmentData).toHaveBeenCalledWith("tkt_1", "other", {
       dataBase64: "ZGV0YWls",
       filename: "detail.log",

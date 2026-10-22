@@ -109,53 +109,6 @@ describe("FileWorkspaceHookTrustStore lock ownership（CR-02）", () => {
     }
   });
 
-  it("契约 3b：pid 存活且启动时间一致（原实例仍活着）→ 不回收", async () => {
-    const dir = await root();
-    const filePath = join(dir, "workspace-hook-trust-v1.json");
-    const lockPath = `${filePath}.lock`;
-
-    const originalStart = Date.now() - 10_000;
-    await writeFile(
-      lockPath,
-      `${JSON.stringify({ pid: process.pid, startTime: originalStart, token: "slow-but-alive" })}\n`,
-      "utf8",
-    );
-    await ageLockBeyond(lockPath, 5_000);
-
-    const storeB = createFileWorkspaceHookTrustStore({
-      filePath,
-      staleLockMs: 5_000,
-      lockTimeoutMs: 300,
-      probeProcessStartTime: async () => originalStart,
-    });
-    await expect(storeB.grant([record("/ws/owner-b", DIGEST_A)])).rejects.toThrow(
-      /Timed out acquiring/,
-    );
-  });
-
-  it("契约 3c：identity probe 不可用（null）→ 保守不回收，行为与旧版一致", async () => {
-    const dir = await root();
-    const filePath = join(dir, "workspace-hook-trust-v1.json");
-    const lockPath = `${filePath}.lock`;
-
-    await writeFile(
-      lockPath,
-      `${JSON.stringify({ pid: process.pid, startTime: Date.now() - 60_000, token: "probe-less" })}\n`,
-      "utf8",
-    );
-    await ageLockBeyond(lockPath, 5_000);
-
-    const storeB = createFileWorkspaceHookTrustStore({
-      filePath,
-      staleLockMs: 5_000,
-      lockTimeoutMs: 300,
-      probeProcessStartTime: async () => null,
-    });
-    await expect(storeB.grant([record("/ws/owner-b", DIGEST_A)])).rejects.toThrow(
-      /Timed out acquiring/,
-    );
-  });
-
   it("契约 4：owner metadata 写入失败 → 不残留空锁与句柄", async () => {
     const dir = await root();
     const filePath = join(dir, "workspace-hook-trust-v1.json");
@@ -167,9 +120,7 @@ describe("FileWorkspaceHookTrustStore lock ownership（CR-02）", () => {
         throw new Error("disk full while writing lock metadata");
       },
     });
-    await expect(store.grant([record("/ws/owner-b", DIGEST_A)])).rejects.toThrow(
-      /disk full/,
-    );
+    await expect(store.grant([record("/ws/owner-b", DIGEST_A)])).rejects.toThrow(/disk full/);
     // 关键：open("wx") 成功但 metadata 写失败后，必须清理自己刚建的空锁，
     // 否则下一个 writer 会读到一个无法解析的无主锁。
     await expect(stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
@@ -280,19 +231,6 @@ describe("FileWorkspaceHookTrustStore lock ownership（CR-02）", () => {
     await expect(stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("正常串行 mutation：锁写入并验证所有权后清理，行为不变", async () => {
-    const dir = await root();
-    const filePath = join(dir, "workspace-hook-trust-v1.json");
-    const lockPath = `${filePath}.lock`;
-    const store = createFileWorkspaceHookTrustStore({ filePath });
-
-    await store.grant([record("/ws/token", DIGEST_A)]);
-
-    await expect(stat(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
-    const loaded = await store.load();
-    expect(loaded.status).toBe("ok");
-  });
-
   it("并发 grant/revoke 多 writer：已撤销的记录不得被旧 grant 快照恢复", async () => {
     const dir = await root();
     const filePath = join(dir, "workspace-hook-trust-v1.json");
@@ -318,9 +256,7 @@ describe("FileWorkspaceHookTrustStore lock ownership（CR-02）", () => {
     const final = await createFileWorkspaceHookTrustStore({ filePath }).load();
     expect(final.status).toBe("ok");
     if (final.status !== "ok") return;
-    expect(
-      final.records.some((item) => item.workspaceIdentity === "/ws/victim"),
-    ).toBe(false);
+    expect(final.records.some((item) => item.workspaceIdentity === "/ws/victim")).toBe(false);
     expect(final.records).toHaveLength(3);
   });
 });

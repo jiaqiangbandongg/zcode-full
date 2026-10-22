@@ -10,6 +10,7 @@ import { createServiceDescriptor } from "../descriptors.js";
 export interface IHighspeedCardService {
   prepareTurn(params: HighspeedPrepareTurnParams): Promise<HighspeedPrepareTurnResult>;
   getSnapshot(): Promise<HighspeedServiceSnapshot>;
+  invalidateCard(cardId: string): Promise<boolean>;
   healthy(cardId: string): Promise<HighspeedCardUsage>;
 }
 

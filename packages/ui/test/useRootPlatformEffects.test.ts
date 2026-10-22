@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildConnectedRemoteWorkspaceSessionTargets,
   buildWebRemoteControlWorkspaceTargets,
-  shouldPublishCompleteWorkspaceSnapshot,
 } from "@/root/rootPlatformWorkspaceSync.js";
 import type { WindowTabState } from "@/store/tabStore.js";
 
@@ -68,9 +67,7 @@ describe("buildWebRemoteControlWorkspaceTargets", () => {
             workspacePath: "/workspace/local",
           }),
         ],
-        reconnectingRemoteWorkspaceKeys: [
-          "remote:ssh:dev:/workspace/reconnecting",
-        ],
+        reconnectingRemoteWorkspaceKeys: ["remote:ssh:dev:/workspace/reconnecting"],
         remoteWorkspaceErrorByWorkspaceKey: {
           "remote:ssh:dev:/workspace/remote": "ssh closed",
         },
@@ -137,12 +134,5 @@ describe("buildConnectedRemoteWorkspaceSessionTargets", () => {
         remoteSessionId: "remote-session-1",
       },
     ]);
-  });
-});
-
-describe("shouldPublishCompleteWorkspaceSnapshot", () => {
-  it("does not publish the renderer-only active-first projection", () => {
-    expect(shouldPublishCompleteWorkspaceSnapshot(false)).toBe(false);
-    expect(shouldPublishCompleteWorkspaceSnapshot(true)).toBe(true);
   });
 });

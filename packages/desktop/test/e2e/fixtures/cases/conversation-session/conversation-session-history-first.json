@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-history-first",
+  "spec": "./test/e2e/conversation-session/conversation-session-history-first.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-history-first.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "history-first-title",
+      "description": "HF01 固定历史正文，验证 resume hook 阻塞期间的首帧与草稿门禁。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "持久历史由隔离 fixture 播种；provider 验证 ready 后续发，初始化时序由文件事件屏障控制。"
+    },
+    {
+      "id": "history-first-parent",
+      "description": "HF01 固定历史正文，验证 resume hook 阻塞期间的首帧与草稿门禁。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "持久历史由隔离 fixture 播种；provider 验证 ready 后续发，初始化时序由文件事件屏障控制。"
+    }
+  ]
+}

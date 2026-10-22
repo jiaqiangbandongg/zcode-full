@@ -28,6 +28,8 @@ export async function prepareAccountConnectionSwitch(
   const expected = {
     providerFamilyDomain: family,
     providerFamilyConnectionSelections: settings.providerFamilyConnectionSelections,
+    // 原因：相同身份重选不会改变映射，迟到操作仍须按锁内版本拒绝。
+    providerFamilyDomainUpdatedAt: settings.providerFamilyDomainUpdatedAt ?? 0,
   };
   const isOriginal = (view: ProviderSettingsView) => {
     const state = view.providers.find((p) => p.providerId === event.providerId)?.accountState;

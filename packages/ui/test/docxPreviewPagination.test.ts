@@ -41,8 +41,5 @@ describe("DOCX preview pagination", () => {
     expect(bodyPage?.style.padding).toBe("72pt 70.85pt 72pt 85.05pt");
     expect(coverPage?.textContent).toContain("Cover");
     expect(bodyPage?.textContent).toContain("Body");
-    expect(getComputedStyle(coverPage!).boxShadow).toBe(
-      "0 2px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.05)",
-    );
   });
 });

@@ -10,10 +10,7 @@ import {
 } from "@/v4/ConversationUserInputContent.js";
 import { PluginReferenceIconProvider } from "@/v4/pluginReferenceIconContext.js";
 
-function pluginContent(
-  text: string,
-  iconByPluginId: ReadonlyMap<string, string>,
-) {
+function pluginContent(text: string, iconByPluginId: ReadonlyMap<string, string>) {
   return createElement(
     PluginReferenceIconProvider,
     { value: { sessionId: "session-a", iconByPluginId } },
@@ -54,10 +51,6 @@ describe("V4 user input goal query rendering", () => {
     expect(html).toContain('data-v4-user-input-command="goal"');
     expect(html).toContain("lucide-goal");
     expect(html).toContain("text-command-node-foreground");
-    expect(html).toContain("text-ui-base");
-    expect(html).toContain("leading-6");
-    expect(html).not.toContain("text-ui-lg");
-    expect(html).not.toContain("leading-5");
     expect(html).toContain("goal</span> 看一下这是个啥项目");
     expect(html).not.toContain("/goal");
   });
@@ -71,7 +64,6 @@ describe("V4 user input goal query rendering", () => {
     );
 
     expect(html).toBe("/goal 只是普通正文");
-    expect(html).not.toContain("lucide-goal");
   });
 });
 
@@ -100,9 +92,7 @@ describe("V4 user input mention rendering", () => {
     const html = renderToStaticMarkup(
       pluginContent(
         "[@skill-creator](plugin://skill-creator@official)",
-        icon
-          ? new Map([["skill-creator@official", icon]])
-          : new Map<string, string>(),
+        icon ? new Map([["skill-creator@official", icon]]) : new Map<string, string>(),
       ),
     );
 
@@ -114,12 +104,7 @@ describe("V4 user input mention rendering", () => {
     const view = render(
       pluginContent(
         "[@skill-creator](plugin://skill-creator@official)",
-        new Map([
-          [
-            "skill-creator@official",
-            "https://plugins.example.test/missing.png",
-          ],
-        ]),
+        new Map([["skill-creator@official", "https://plugins.example.test/missing.png"]]),
       ),
     );
     const image = view.container.querySelector<HTMLImageElement>(
@@ -129,9 +114,7 @@ describe("V4 user input mention rendering", () => {
 
     fireEvent.error(image as HTMLImageElement);
 
-    expect(
-      view.container.querySelector("img[data-plugin-mention-icon='true']"),
-    ).toBeNull();
+    expect(view.container.querySelector("img[data-plugin-mention-icon='true']")).toBeNull();
     expect(view.container.querySelector(".lucide-cable")).not.toBeNull();
   });
 
@@ -207,7 +190,5 @@ describe("V4 user input mention rendering", () => {
     );
 
     expect(html).toBe("/goal 普通正文里提到 #archived");
-    expect(html).not.toContain("lucide-goal");
-    expect(html).not.toContain("lucide-messages-square");
   });
 });

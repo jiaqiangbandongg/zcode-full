@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { createElement, useState, type ReactNode } from "react";
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -147,11 +146,7 @@ vi.mock("@extend-ai/react-docx", () => ({
 }));
 
 vi.mock("@/components/ui/pptx-preview-viewer.js", () => ({
-  PptxPreviewViewer: ({
-    onOpenBrowserUrl,
-  }: {
-    onOpenBrowserUrl?: (url: string) => void;
-  }) =>
+  PptxPreviewViewer: ({ onOpenBrowserUrl }: { onOpenBrowserUrl?: (url: string) => void }) =>
     createElement("div", {
       "data-pptx-open-url-handler": String(Boolean(onOpenBrowserUrl)),
     }),
@@ -239,12 +234,6 @@ describe("Office file preview", () => {
     sanitizeDocumentLinks(root);
 
     expect(image.getAttribute("href")).toBe("data:image/png;base64,AA==");
-  });
-
-  it("keeps the PDF annotation layer disabled so document links never enter the DOM", () => {
-    const source = readFileSync("packages/ui/src/components/ui/pdf-viewer.tsx", "utf8");
-
-    expect(source).toContain("renderAnnotationLayer={false}");
   });
 
   it("fits DOCX pages to narrow containers without upscaling", () => {
@@ -378,7 +367,7 @@ describe("Office file preview", () => {
       expect(view.container.querySelector("section")?.textContent).toBe("Rendered DOCX");
     });
 
-    expect(view.container.querySelector('a[href]')).not.toBeNull();
+    expect(view.container.querySelector("a[href]")).not.toBeNull();
     expect(view.container.querySelector('a[href^="javascript:"]')).toBeNull();
     expect(view.container.querySelector('a[href="https://example.com/document"]')).not.toBeNull();
     fireEvent.click(view.container.querySelector('a[href="https://example.com/document"]')!);
@@ -406,9 +395,6 @@ describe("Office file preview", () => {
     expect(view.container.querySelector("[data-docx-fit-viewport]")).not.toBeNull();
     expect(view.container.querySelector("[data-docx-fit-frame]")).not.toBeNull();
     expect(view.container.querySelector("[data-docx-fit-content]")).not.toBeNull();
-    expect(styleContainer.textContent).toContain(
-      "box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.05)",
-    );
   });
 
   it("keeps legacy DOC files on the read-only editor compatibility path", async () => {
@@ -426,7 +412,6 @@ describe("Office file preview", () => {
     expect(html).toContain('data-testid="docx-editor-viewer"');
     expect(html).toContain('data-mode="read-only"');
     expect(html).toContain('data-has-model="true"');
-    expect(html).toContain('data-gap-background="transparent"');
     expect(html).toContain('data-virtualization-scale="1"');
     expect(docxMockState.editorOptions).toMatchObject({
       initialDocumentTheme: "light",

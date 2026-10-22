@@ -1,4 +1,5 @@
 import {
+  Archive,
   Monitor,
   Moon,
   Settings,
@@ -16,6 +17,7 @@ import {
   Globe2,
   Cable,
   WandSparkles,
+  HardDrive,
   Keyboard,
   FileSearch,
   HardDriveUpload,
@@ -129,6 +131,14 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     titleId: "settings.browser.title",
     groupId: "basics",
   },
+  // 原型导航顺序：浏览器之后才是远程设备；电脑控制继续紧随其后并受灰度门禁。
+  {
+    id: "remoteDevices",
+    icon: HardDrive,
+    titleId: "settings.remoteDevicesTitle",
+    contentTitleId: "settings.remoteDevicesTitle",
+    groupId: "basics",
+  },
   // 电脑控制紧跟「浏览器」：两者都是给 Agent 用的本机操控入口，
   // 放在基础设置里让用户在同一处理解「控制浏览器 / 控制整台电脑」的关系。
   {
@@ -163,6 +173,18 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     titleId: "settings.usageTitle",
     groupId: "dataAndStats",
   },
+  {
+    id: "archives",
+    icon: Archive,
+    titleId: "archives.nav",
+    groupId: "dataAndStats",
+  },
+  // 暂时隐藏设置页里的 Migration 入口，只保留页面实现，后续可以直接恢复这一项。
+  // {
+  //   id: "migration",
+  //   icon: ArrowLeftRight,
+  //   titleId: "settings.migration.title",
+  // },
 ];
 
 // 兼容既有只读消费者：默认配置代表不带桌面平台能力的 Web 视图；
@@ -207,4 +229,16 @@ export function resolveSettingsSectionForPlatform(
   return visibleSections[0]?.id ?? "general";
 }
 
+export const SETTINGS_SECTION_GROUPS = BASE_SETTINGS_SECTION_GROUPS.map((group) => ({
+  ...group,
+  sections: SETTINGS_SECTIONS.filter((section) => section.groupId === group.id),
+})).filter((group) => group.sections.length > 0);
+
 export type { SettingsSectionId };
+
+export function isSettingsSectionAvailable(
+  section: SettingsSectionId,
+  isDesktop: boolean,
+): boolean {
+  return isDesktop || section !== "remoteDevices";
+}

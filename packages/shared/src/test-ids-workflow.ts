@@ -15,6 +15,8 @@ export const TID_WORKFLOW_CARD_RUN = "workflow-card-run";
 export const TID_WORKFLOW_CARD_MENU = "workflow-card-menu";
 export const TID_WORKFLOW_ACTION_DELETE = "workflow-action-delete";
 export const TID_WORKFLOW_LAUNCH_DIALOG = "workflow-launch-dialog";
+// 实参窗里唯一会滚动的那一段（「运行于」+ 实参字段）；头部与底部（说明、错误区、按钮）在它之外。
+export const TID_WORKFLOW_LAUNCH_FIELDS = "workflow-launch-fields";
 export const TID_WORKFLOW_LAUNCH_ARG = "workflow-launch-arg";
 export const TID_WORKFLOW_LAUNCH_TARGET = "workflow-launch-target";
 export const TID_WORKFLOW_LAUNCH_SUBMIT = "workflow-launch-submit";
@@ -29,6 +31,8 @@ export const TID_WORKFLOW_MOVE_DIALOG_SUBMIT = "workflow-move-dialog-submit";
 export const TID_WORKFLOW_DETAIL = "workflow-detail";
 export const TID_WORKFLOW_DETAIL_RUN = "workflow-detail-run";
 export const TID_WORKFLOW_DETAIL_MENU = "workflow-detail-menu";
+// 详情页标题旁的归属小标：项目名或「全局」。面包屑不带项目一级，归属只在这里说。
+export const TID_WORKFLOW_DETAIL_PROJECT = "workflow-detail-project";
 export const TID_WORKFLOW_DETAIL_TAB = "workflow-detail-tab";
 export const TID_WORKFLOW_DETAIL_DESCRIPTION = "workflow-detail-description";
 export const TID_WORKFLOW_DETAIL_WHEN_TO_USE = "workflow-detail-when-to-use";

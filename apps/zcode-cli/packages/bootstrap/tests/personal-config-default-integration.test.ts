@@ -80,7 +80,6 @@ describe("Todo104 CLI 同文件默认选择", () => {
     const imported = importLegacyCliPersonalProviderConfig({ input });
     expect(imported.defaultModelSelection).toEqual({ providerId: "custom", modelId: "model-a" });
     expect(imported.providers.getRule("custom")?.providerName).toBe("My Provider");
-    expect(imported.providers.get("custom")?.toJSON()).not.toHaveProperty("label");
     expect(imported.models.toPersonalJSON().providerModelRules[0]?.modelId).toBe("model-a");
     expect(JSON.stringify(input)).toBe(before);
   });

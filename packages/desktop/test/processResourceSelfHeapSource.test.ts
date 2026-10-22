@@ -53,13 +53,6 @@ describe("processResourceSelfHeapSource", () => {
     expect(collected.roleSamples).toBe(0);
   });
 
-  it("一次自采读数只贡献一个 heap 样本，下一个 tick 不拿旧值充当当前事实", () => {
-    ingestHostSelfResourceSample(sample(92_160));
-
-    expect(runSample().heapSamples).toEqual([["host", 92_160]]);
-    expect(runSample().heapSamples).toEqual([]);
-  });
-
   it("字段缺失、类型错误或非对象的样本在 main 入口被丢弃且不抛错", () => {
     for (const invalid of [
       undefined,

@@ -55,6 +55,8 @@ describe("v4 M4 门禁：resolveInteraction 收口权限请求", () => {
     // 反向权限请求 → V4InteractionDialogs 渲染 PermissionDialog。
     // Bugfix: v4 权限等待态是 bottom dock 阻塞交互，不应退回 SessionPane 外层全宽底部卡片。
     const dockState = await waitForV4PermissionDialogInComposerDock();
+    // 待处理权限只在底部卡片展示，顶部不再重复提示。
+    await expect($('[data-testid="v4-pending-interaction-top-notice"]')).not.toExist();
     expect(dockState.inDock).toBe(true);
     expect(dockState.composerHidden).toBe(true);
     expect(dockState.interactionBeforeComposer).toBe(true);

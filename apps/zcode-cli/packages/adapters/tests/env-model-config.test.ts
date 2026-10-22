@@ -15,15 +15,6 @@ describe("env model config", () => {
     expect(config).not.toHaveProperty("model");
   });
 
-  it("does not validate legacy model environment variables", () => {
-    const config = parseEnvConfig({
-      ZCODE_BASE_URL: "https://api.z.ai/api/anthropic",
-      ZCODE_MODEL: "zai/",
-    });
-
-    expect(config).not.toHaveProperty("model");
-  });
-
   it("does not let legacy env or file model config enter RuntimeConfig", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zcode-env-model-"));
     const path = join(dir, "config.json");

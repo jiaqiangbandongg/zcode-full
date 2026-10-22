@@ -17,8 +17,9 @@ import {
   TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER,
   TID_CHAT_THOUGHT_LEVEL_SELECT_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
+  DEFAULT_WORKSPACE,
   clearAppData,
   clickTestIdByDom,
   clickTestIdByWebDriver,
@@ -34,7 +35,8 @@ import {
   selectUpstreamModelById,
   UPSTREAM_SECONDARY_MODEL,
 } from "./helpers/upstream-provider.js";
-import { prepareConversationE2E, startNewTask } from "./helpers/conversation-session.js";
+import { prepareV4ConversationE2E } from "./helpers/v4-conversation.js";
+import { openWorkspaceDraftFromSidebar } from "./helpers/workspace-agent-warmup.js";
 import {
   restartIntoWorkspace,
   seedBigModelConnectionSelection,
@@ -69,7 +71,7 @@ describe("闲时任务表单创建与管理 E2E", () => {
     this.timeout(150000);
 
     // 登录 + workspace 就绪即可进入 Automations 主视图；mock 网关免真实 provider。
-    await prepareConversationE2E({ skipProvider: true });
+    await prepareV4ConversationE2E({ skipProvider: true });
     await seedCurrentAccount();
     // 修复原因：Electron 41 不支持 WebDriver window/rect；通过 BrowserWindow 固定宽屏，
     // 才能稳定验证 Tooltip 首选右侧时不会因窄窗碰撞策略翻转。
@@ -225,8 +227,9 @@ describe("闲时任务表单创建与管理 E2E", () => {
 
   it("F-OFFPEAK-004：等待运行期间切换普通聊天计划不会重绑已保存闲时任务", async function () {
     this.timeout(150000);
-    await startNewTask();
-    await prepareConversationE2E();
+    // 后续设置与文件夹具绑定默认项目，不能使用分配新虚拟目录的全局新建。
+    await openWorkspaceDraftFromSidebar(DEFAULT_WORKSPACE);
+    await prepareV4ConversationE2E();
     await ensureUpstreamModelForE2E(UPSTREAM_SECONDARY_MODEL);
 
     await clickTestIdByDom(TID_AUTOMATIONS_OPEN, { timeoutMsg: "侧栏没有 Automations 入口" });
@@ -242,7 +245,8 @@ describe("闲时任务表单创建与管理 E2E", () => {
 
     const before = await waitForOffPeakModelSelection(title);
     expect(before.providerId).toContain("offpeak");
-    await startNewTask();
+    // 后续设置与文件夹具绑定默认项目，不能使用分配新虚拟目录的全局新建。
+    await openWorkspaceDraftFromSidebar(DEFAULT_WORKSPACE);
     await selectUpstreamModelById(UPSTREAM_SECONDARY_MODEL);
     const after = await waitForOffPeakModelSelection(title);
     expect(after).toEqual(before);

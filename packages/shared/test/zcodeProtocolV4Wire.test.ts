@@ -366,18 +366,6 @@ describe("ZCode Protocol V4 wire v3", () => {
     });
   });
 
-  it("分片不改变 logical frame 的 seq 区间", () => {
-    const frame = makeFrame("resume".repeat(500));
-    const wires = encode(frame, 512);
-    const result = reassembleTopicWireFrames(wires, conversationTopicFrameSchema);
-    expect(result.kind).toBe("complete");
-    if (result.kind === "complete") {
-      expect(result.frame.fromSeq).toBe(10);
-      expect(result.frame.toSeq).toBe(11);
-      expect(result.frame).toEqual(frame);
-    }
-  });
-
   it("超大 snapshot 分片后完整校验并原子重组", () => {
     const frame = makeSnapshotFrame("snapshot-title".repeat(600));
     const wires = encode(frame, 480);

@@ -191,24 +191,22 @@ Workspace: [local workspace / remote workspace]
 
 选择 Workspace 后，所有读取和写回都绑定被选择的 Workspace target。
 
-Plugin Marketplace 是独立主视图，不提供 scope selector：
+Plugin Marketplace 是独立主视图，浏览页不提供 scope selector；页内“插件管理”保留 User / Workspace 配置范围。
 
 ```text
-Settings / Plugins / Workspace A
-        | open marketplace; remember returnScopeKey=A
+Settings / Sidebar
+        | open marketplace
         v
 Plugin Marketplace
   | install/update/uninstall package in Host User inventory
   | new install defaults User enabled=true
-        | back
+  | manage -> [User | Workspace] -> browse all
+        | primary navigation back
         v
-Settings / Plugins / Workspace A
-  | row is visible as effective enabled, source=User
+Chat
 ```
 
-从非 Settings 入口打开 Marketplace 时，返回目标固定为 User 已安装列表。Marketplace 的
-source 只来自 User/Host 配置；Workspace 不支持 Marketplace 声明、添加或刷新，当前 Workspace
-只作为窗口/Agent 的执行上下文，不会改变市场的安装或配置 scope。
+主导航返回聊天；市场内管理与详情返回市场浏览。Marketplace 的 source 只来自 User/Host 配置；Workspace 不支持 Marketplace 声明、添加或刷新。包安装写 Host User，项目启停与配置仍由管理页显式选择的范围决定。完整交互见 [市场范围](plugin-market-interactions-scope.md)。
 
 插件详情区分三类状态：
 
@@ -383,7 +381,7 @@ Workspace-level E2E feature 分组如下：
 | User/Workspace scope UI         | `WPL-001` | 两级配置视图共享 Host 候选；User 不受项目覆盖污染；Workspace inheritance/override 与 A/B 隔离                           |
 | enabled 状态优先级              | `WPL-002` | Workspace 显式 true/false 覆盖 User，缺 key 继承                                                                        |
 | options 深合并                  | `WPL-003` | 按 Plugin/key 合并，未覆盖 User option 保留                                                                             |
-| sensitive/secret                | `WPL-004` | Workspace 可保存并运行；UI/log/provider/mobile artifact 不泄露原值                                                   |
+| sensitive/secret                | `WPL-004` | Workspace 可保存并运行；UI/log/provider/mobile artifact 不泄露原值                                                      |
 | Plugin 全组件直达 runtime       | `WPL-005` | Hook/Skill/Command/Agent/MCP 无 trust/approval 即进入新 Session                                                         |
 | 缺包行为                        | `WPL-006` | 只显示 missing，不自动安装；显式安装后才可运行                                                                          |
 | 配置与包生命周期分离            | `WPL-007` | enable/disable、install/uninstall 互不错误回滚                                                                          |
@@ -394,7 +392,7 @@ Workspace-level E2E feature 分组如下：
 | Mobile shared-host              | `WPL-012` | `/remote` 使用现有 Host，不复制 Plugin runtime/store                                                                    |
 | builtin Workspace disable       | `WPL-013` | 只改 enabledPlugins，不删除 builtin asset/user data                                                                     |
 | project Plugin root/MCP         | `WPL-014` | 合法项目 Plugin root 直接激活；非法 manifest/path fail closed                                                           |
-| Marketplace/installed roundtrip | `WPL-015` | 从 User 已安装进入全局市场；市场无 scope/config；安装写 User；返回 User，再切 Workspace 做配置                          |
+| Marketplace/installed roundtrip | `WPL-015` | 从 User 已安装进入全局市场；浏览页无 scope/config；安装写 User；主导航返回聊天，再进入管理切 Workspace 做配置           |
 
 E2E 证据分层：
 
@@ -467,7 +465,7 @@ promotion、Docker admission 和三平台 CI。`WPL-005` 当前只用 Skill+MCP 
 11. 当前 targeted pass 的 WPL case 具备独立 E2E setup/action/assertion/evidence；pending、review、fixture、Docker 和多平台门禁仍是后续晋级条件。
 12. 只有 `WPL-001` 至 `WPL-015` 全部完成对应实现、独立 E2E、人工审核和平台门禁，才能宣称完整 feature complete；本 V1 commit 不做该声明。
 13. 当前提交本身必须通过 `pnpm typecheck`、`pnpm lint`、E2E typecheck 和已实现 WPL 的 targeted E2E。
-14. Marketplace 不显示 scope、enable 或 options 控件；安装固定写 Host User inventory/User enablement，返回动作恢复来源配置视图。
+14. Marketplace 浏览页不显示 scope 或 options 控件；安装固定写 Host User inventory/User enablement；管理页保留项目范围，主导航返回聊天。
 
 ## 11. Out of scope
 
@@ -521,4 +519,3 @@ Workspace Plugin config loads without Workspace trust
   attachment 不复制 Plugin state，尚未完成真实手机 `/remote` E2E。
 
 实现时不能只修改 Settings UI；必须同时修改 config loader、Plugin discovery、Session startup、protocol/service contract 和 E2E fixture/coverage。
-

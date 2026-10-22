@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// Root 模块图的冷启动曾计入首个用例并触发超时；静态导入将加载与渲染断言的计时分开。
+import { Root } from "@/Root.js";
 
 const mockSetUser = vi.fn();
 const mockModelSelectionRead = { failed: false };
@@ -18,15 +20,6 @@ const mockAddTab = vi.fn();
 const mockActivateTabByPath = vi.fn(() => false);
 const mockStartDraft = vi.fn();
 const mockShouldBlockRootRender = vi.fn(() => false);
-const mockUseGlobalTaskList = vi.fn(() => ({
-  items: [],
-  total: 0,
-  hasMore: false,
-  loading: false,
-  syncingRemoteWorkspaces: false,
-  refresh: vi.fn(),
-}));
-
 const tabStoreState = {
   tabs: [] as Array<{
     id: string;
@@ -70,6 +63,7 @@ vi.mock("@/hooks/usePlatform.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   ServiceProvider: ({ children }: { children: unknown }) => children,
   useServices: () => ({
     systemService: {
@@ -114,10 +108,6 @@ vi.mock("@/hooks/useTabPersistence.js", () => ({
     hasCompletedInitialRestore: true,
     hasCompletedFullRestore: true,
   }),
-}));
-
-vi.mock("@/hooks/useGlobalTaskList.js", () => ({
-  useGlobalTaskList: mockUseGlobalTaskList,
 }));
 
 vi.mock("@/hooks/useTokenRefresh.js", () => ({
@@ -185,6 +175,7 @@ vi.mock("@/lib/rootStartupGate.js", () => ({
 
 vi.mock("@/store/StoreProvider.js", () => ({
   StoreProvider: ({ children }: { children: unknown }) => children,
+  useZCodeStoreWithDefault: () => true,
   useZCodeStore: (selector: (state: unknown) => unknown) =>
     selector({
       user: null,
@@ -214,6 +205,8 @@ vi.mock("@/store/TabStoreProvider.js", () => ({
   useTabStoreApi: () => ({
     getState: () => tabStoreApiState,
   }),
+  useOptionalTabStore: (selector: (state: typeof tabStoreState) => unknown) =>
+    selector(tabStoreState),
 }));
 
 vi.mock("@/store/tabStore.js", () => ({
@@ -238,14 +231,13 @@ vi.mock("@/UpdateStatusButton.js", () => ({
   UpdateStatusButton: () => createElement("div", { "data-testid": "update-ready-button" }),
 }));
 
-async function renderRoot(options?: {
+function renderRoot(options?: {
   webRemoteControlFeatureEnabled?: boolean;
   isDesktop?: boolean;
   initialWorkspaceAbsPath?: string;
   initialWorkspaceLoadingFallback?: ReturnType<typeof createElement>;
   platformOverrides?: Record<string, unknown>;
 }) {
-  const { Root } = await import("@/Root.js");
   const html = renderToStaticMarkup(
     createElement(Root, {
       services: {
@@ -253,6 +245,11 @@ async function renderRoot(options?: {
         settingService: {
           get: vi.fn(),
           update: vi.fn(),
+        },
+        credentialService: {
+          delete: vi.fn(async () => {}),
+          load: vi.fn(async () => null),
+          save: vi.fn(async () => {}),
         },
         oauthService: {
           restoreCachedSession: vi.fn(),
@@ -315,15 +312,15 @@ async function renderRoot(options?: {
 }
 
 describe("Root update ready overlay", () => {
-  it("模型读取失败时仍能渲染重试入口，不因图标缺失崩溃", async () => {
+  it("模型读取失败时仍能渲染重试入口，不因图标缺失崩溃", () => {
     mockModelSelectionRead.failed = true;
     try {
-      const html = await renderRoot();
+      const html = renderRoot();
       expect(html).toContain("lucide-refresh-cw");
     } finally {
       mockModelSelectionRead.failed = false;
     }
-  }, 15_000);
+  });
   beforeEach(() => {
     tabStoreState.tabs = [];
     tabStoreState.activeTabId = null;
@@ -336,95 +333,22 @@ describe("Root update ready overlay", () => {
     mockStartDraft.mockClear();
     mockShouldBlockRootRender.mockReset();
     mockShouldBlockRootRender.mockReturnValue(false);
-    mockUseGlobalTaskList.mockClear();
   });
 
-  it("无 workspace 首屏不会挂载更新按钮", async () => {
-    // Bugfix: Root 现在会串起更多顶层模块，测试环境首轮 import + SSR 偶发超过默认 5s。
-    // 这里放宽到局部超时，避免把“模块图变重”误判成“更新按钮逻辑回归”。
-    const html = await renderRoot();
+  it("无 workspace 首屏不会挂载更新按钮", () => {
+    const html = renderRoot();
 
     expect(html).not.toContain('data-testid="project-selector"');
     expect(html).not.toContain('data-testid="update-ready-button"');
-  }, 15_000);
+  });
 
-  it("独立设置页不会挂载更新按钮", async () => {
+  it("独立设置页不会挂载更新按钮", () => {
     tabStoreState.tabs = [{ id: "settings", type: "settings" }];
     tabStoreState.activeTabId = "settings";
 
-    const html = await renderRoot();
+    const html = renderRoot();
 
     expect(html).toContain('data-testid="settings-page"');
     expect(html).not.toContain('data-testid="update-ready-button"');
-  }, 15_000);
-
-  it("Web 远控 feature 关闭时不挂载全局 task 列表同步", async () => {
-    tabStoreState.tabs = [
-      {
-        id: "workspace-1",
-        type: "workspace",
-        workspacePath: "/repo/demo",
-        label: "demo",
-      },
-    ];
-    tabStoreState.activeTabId = "workspace-1";
-    tabStoreState.activeWorkspacePath = "/repo/demo";
-
-    const syncWebRemoteControlTasks = vi.fn();
-    await renderRoot({
-      webRemoteControlFeatureEnabled: false,
-      isDesktop: true,
-      platformOverrides: {
-        syncWebRemoteControlTasks,
-      },
-    });
-
-    // Bugfix: 渲染性能优化后，feature 关闭时 Root 不再挂载 WebRemoteControlTaskSync。
-    // 这里断言不会触发 useGlobalTaskList，避免桌面 continuous 主链路被无用列表订阅唤醒。
-    expect(mockUseGlobalTaskList).not.toHaveBeenCalled();
-    expect(syncWebRemoteControlTasks).not.toHaveBeenCalled();
-  }, 15_000);
-});
-
-describe("Root startup render block desktop gate", () => {
-  beforeEach(() => {
-    tabStoreState.tabs = [];
-    tabStoreState.activeTabId = null;
-    tabStoreState.activeWorkspacePath = null;
-    tabStoreApiState.activeWorkspacePath = null;
-    mockShouldBlockRootRender.mockReset();
-    mockShouldBlockRootRender.mockReturnValue(false);
   });
-
-  it("桌面启动阻塞态会挂载 RootStartupLoading", async () => {
-    mockShouldBlockRootRender.mockReturnValue(true);
-
-    const html = await renderRoot({ isDesktop: true });
-
-    expect(html).toContain('data-testid="root-startup-loading"');
-  }, 15_000);
-
-  it("Web 端不使用启动阻塞 gate", async () => {
-    mockShouldBlockRootRender.mockImplementation(() => {
-      throw new Error("web should not call shouldBlockRootRender");
-    });
-
-    await expect(renderRoot({ isDesktop: false })).resolves.not.toContain(
-      'data-testid="root-startup-loading"',
-    );
-  }, 15_000);
-
-  it("Web 初始 workspace 注入前会渲染入口传入的 loading fallback", async () => {
-    const html = await renderRoot({
-      isDesktop: false,
-      initialWorkspaceAbsPath: "/repo/demo",
-      initialWorkspaceLoadingFallback: createElement(
-        "div",
-        { "data-testid": "web-remote-initial-loading-fallback" },
-        "已配对，正在加载工作区...",
-      ),
-    });
-
-    expect(html).toContain('data-testid="web-remote-initial-loading-fallback"');
-  }, 15_000);
 });

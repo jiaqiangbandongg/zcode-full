@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { decodeCustomModelValue, encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
@@ -13,16 +14,15 @@ import {
   TID_SUBAGENT_BUILT_IN_MODEL_TRIGGER,
   TID_SUBAGENT_ROW,
   TID_TASK_SETTINGS_BUTTON,
-  decodeCustomModelValue,
-  encodeCustomModelValue,
+  TID_V4_MODEL_CONFIG,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
+import { selectCombinedComposerThoughtLevel } from "../helpers/composer-model-picker.js";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
   clickTestIdByDom,
   readAgentsState,
-  readModelProviders,
   waitForTestIdByDom,
   waitForWorkspaceApp,
 } from "../helpers/desktop-app.js";
@@ -71,7 +71,7 @@ const REASONING_BUDGETS: Record<string, number> = {
   low: 4000,
   medium: 8000,
   high: 16000,
-  xhigh: 32000,
+  xhigh: 31999,
 };
 const GENERAL_PARENT_MARKER = "E2E_CLAUDE_CATALOG_GENERAL_PARENT";
 const GENERAL_CHILD_MARKER = "E2E_CLAUDE_CATALOG_GENERAL_CHILD";
@@ -105,11 +105,10 @@ describe("Subagent runtime reasoning catalog E2E", () => {
     await clearAppData();
   });
 
-  it("I68: Claude runtime 档位经 Settings 落盘并在三个 child 请求中生效", async function () {
+  it("I68: Provider Registry 档位经 Settings 落盘并在三个 child 请求中生效", async function () {
     this.timeout(360000);
 
     await prepareV4ConversationE2E({ skipProvider: true });
-    await assertAppMetadataOmitsReasoning();
     await selectUpstreamProviderModelById(MODEL_ID, {
       includePlainModelFallback: false,
       providerId: PROVIDER_ID,
@@ -161,15 +160,6 @@ describe("Subagent runtime reasoning catalog E2E", () => {
     });
   });
 });
-
-async function assertAppMetadataOmitsReasoning() {
-  const provider = (await readModelProviders()).find((item) => item.id === PROVIDER_ID);
-  const model = provider?.models.find((item) =>
-    typeof item === "string" ? item === MODEL_ID : item.id === MODEL_ID,
-  );
-  expect(provider).toBeDefined();
-  expect(typeof model === "string" ? undefined : model?.reasoning).toBeUndefined();
-}
 
 async function configureSubagentReasoningOverrides() {
   expect(await readAgentsState()).toMatchObject({
@@ -408,6 +398,16 @@ async function assertThoughtOptionsAndSelectInScope(
   levels: readonly string[],
   thoughtLevel: string,
 ) {
+  if (scope === "body") {
+    // 主输入框已合并模型和思考入口；Subagent 设置仍使用独立下拉框。
+    await $(sel(TID_CHAT_MODEL_SELECT_TRIGGER)).click();
+    const slider = $('[data-testid="composer-thought-slider"]');
+    await slider.waitForDisplayed({ timeout: 15000 });
+    expect(JSON.parse((await slider.getAttribute("data-levels")) ?? "[]")).toEqual(levels);
+    expect(await selectCombinedComposerThoughtLevel(thoughtLevel)).toBe(true);
+    await expect($(sel(TID_V4_MODEL_CONFIG))).toHaveAttribute("data-thought", thoughtLevel);
+    return;
+  }
   const trigger = $(scope).$(sel(TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER));
   await trigger.waitForClickable({
     timeout: 15000,
@@ -775,9 +775,8 @@ function expectedAnthropicThinkingBudget(effort: string): number {
   if (catalogBudget === undefined) {
     throw new Error(`未知 Claude reasoning effort: ${effort}`);
   }
-  // 回归原因：Anthropic fixed thinking 与可见输出共享请求总预算；即使 catalog 的
-  // xhigh 是 32K，也必须为可见输出保留至少 1 token，provider body 因此使用 31,999。
-  return Math.min(catalogBudget, MODEL_OUTPUT_TOKEN_BUDGET - 1);
+  // Registry 只执行 Option Spec；夹具显式为可见输出保留 1 token，不依赖旧 catalog 补全。
+  return catalogBudget;
 }
 
 async function waitForParentInitialRequestCapture(parentMarker: string) {

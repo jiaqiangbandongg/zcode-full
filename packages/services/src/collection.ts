@@ -1,6 +1,10 @@
 import { ProxyChannel, type IChannelServer } from "@zcode/rpc";
 import type { ServiceDescriptor } from "./descriptors.js";
 
+export interface ServiceExposurePolicy {
+  readonly allowedChannels: ReadonlySet<string>;
+}
+
 /**
  * ServiceCollection — 服务注册中心
  *
@@ -30,8 +34,10 @@ export class ServiceCollection {
   exposeOnChannelServer(
     server: IChannelServer,
     overrides: ReadonlyMap<string, unknown> = new Map(),
+    exposurePolicy?: ServiceExposurePolicy,
   ): void {
     for (const [channelName, instance] of this._services) {
+      if (exposurePolicy && !exposurePolicy.allowedChannels.has(channelName)) continue;
       const exposed = overrides.get(channelName) ?? instance;
       server.registerChannel(
         channelName,

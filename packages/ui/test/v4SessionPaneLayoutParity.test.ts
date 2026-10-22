@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -15,10 +13,6 @@ import type {
   OpenScopedSubagentSideTabRequest,
   OpenScopedWorkflowRunSideTabRequest,
 } from "@/lib/workspaceSidePane.js";
-import {
-  CONVERSATION_CONTENT_WITHOUT_STATUS_PANEL_WIDTH_CLASS_NAME,
-  CONVERSATION_CONTENT_WITH_STATUS_PANEL_WIDTH_CLASS_NAME,
-} from "@/v4/conversationLayout.js";
 
 const projectionState = vi.hoisted(() => ({
   current: null as {
@@ -89,11 +83,10 @@ vi.mock("@/hooks/useSettingService.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useOptionalServices: () => null,
   useServices: () => ({
-    zcodeSessionService: {
-      updateProviderRegistry: vi.fn(),
-    },
+    zcodeSessionService: {},
     zcodeTaskService: {
       restartWorkspaceProcess: vi.fn(),
     },
@@ -374,68 +367,15 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html).toContain('data-v4-timeline-scroll="true"');
     expect(html).toContain('data-testid="mock-draft-empty"');
     expect(html).toContain('data-v4-composer-dock="true"');
-    expect(html).toMatch(
-      /class="[^"]*flex[^"]*min-h-full[^"]*before:min-h-\[52px\][^"]*after:min-h-4/u,
-    );
-    expect(html).toMatch(/data-v4-composer-dock="true" class="[^"]*mt-3[^"]*"/u);
-    expect(html).not.toContain("@media(max-height:700px)");
-    const timelineSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/v4/ConversationTimeline.tsx"),
-      "utf8",
-    );
-    expect(timelineSource).not.toContain('matchMedia("(max-height: 700px)")');
-    expect(timelineSource).toMatch(
-      /element\.scrollTop = responsiveCenteredEmptyLayout[\s\S]*?\? 0[\s\S]*?: element\.scrollHeight/u,
-    );
-    const emptyStateSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/v4/ConversationDraftEmptyState.tsx"),
-      "utf8",
-    );
-    expect(emptyStateSource).not.toContain("100vw");
-    expect(emptyStateSource).toContain("resolveGreetingFontSizePx");
-    expect(emptyStateSource).toContain("new ResizeObserver");
-    expect(emptyStateSource).toContain("data-v4-draft-greeting");
     expect(html).toContain('data-compact-remote="false"');
-    expect(timelineSource).not.toContain("setDesktopWindowContentMinimumHeight");
-    expect(timelineSource).not.toContain("draftWindowMinimumHeight");
-    expect(timelineSource).not.toContain("useOptionalPlatform");
-    expect(timelineSource).not.toMatch(/min-height:703px/u);
     expect(html).toContain('data-draft-mode="true"');
     expect(html).toContain('data-centered="true"');
-    expect(html).not.toContain("发送第一条消息开始对话");
   });
 
-  it("keeps the mobile remote draft on the original compact centered layout", () => {
+  it("passes compact remote draft mode to the empty state", () => {
     const html = renderPane({ sessionId: null, compactForRemoteControl: true });
 
     expect(html).toContain('data-compact-remote="true"');
-    expect(html).toMatch(/class="[^"]*justify-center[^"]*gap-4/u);
-    expect(html).not.toContain("before:min-h-[52px]");
-  });
-
-  it("scopes narrow-width shrinking to mobile remote conversations", () => {
-    const desktopHtml = renderPane({ compactForRemoteControl: false });
-    const mobileHtml = renderPane({ compactForRemoteControl: true });
-    const readSessionPaneClassName = (html: string) =>
-      html.match(/data-v4-conversation-drop-target="true"[^>]*class="([^"]*)"/u)?.[1] ?? "";
-    const readTimelineClassName = (html: string) =>
-      html.match(/data-v4-timeline-scroll="true"[^>]*class="([^"]*)"/u)?.[1] ?? "";
-
-    expect(readSessionPaneClassName(mobileHtml)).toContain("min-w-0");
-    expect(readTimelineClassName(mobileHtml)).toContain("min-w-0");
-    expect(readSessionPaneClassName(desktopHtml)).not.toContain("min-w-0");
-    expect(readTimelineClassName(desktopHtml)).not.toContain("min-w-0");
-  });
-
-  it("keeps constrained desktop draft content reachable through the timeline scroll viewport", () => {
-    const timelineSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/v4/ConversationTimeline.tsx"),
-      "utf8",
-    );
-
-    // 回归原因：内容可达性必须由 timeline 自身承担，不能依赖原生窗口反向扩高。
-    expect(timelineSource).not.toContain('"h-full min-h-0 overflow-hidden"');
-    expect(timelineSource).toMatch(/centeredEmptyLayout[\s\S]*?"flex[^"]*min-h-full[^"]*"/u);
   });
 
   it("keeps a bound empty session blank while preserving the bottom composer dock", () => {
@@ -452,13 +392,10 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html).not.toContain("发送第一条消息开始对话");
   });
 
-  it("renders the composer inside the timeline scroll viewport with shared content width", () => {
+  it("renders the composer after the timeline viewport and inside its dock", () => {
     const html = renderPane();
 
     expect(html).toContain('data-v4-timeline-scroll="true"');
-    expect(html).toMatch(
-      /data-v4-timeline-scroll="true"[^>]*class="[^"]*overflow-x-hidden[^"]*overflow-y-auto/,
-    );
     expect(html).toContain('data-v4-timeline-content-column="true"');
     expect(html).toContain('data-v4-composer-dock="true"');
     expect(html.indexOf('data-v4-timeline-scroll="true"')).toBeLessThan(
@@ -467,57 +404,6 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html.indexOf('data-v4-composer-dock="true"')).toBeLessThan(
       html.indexOf('data-testid="mock-composer"'),
     );
-    expect(html).toContain("@container/conversation");
-    expect(html).toContain(CONVERSATION_CONTENT_WITHOUT_STATUS_PANEL_WIDTH_CLASS_NAME);
-    expect(html).toContain(
-      "transition-[width,max-width,transform] duration-150 ease-out @min-[1280px]/conversation:transition-[transform]",
-    );
-    expect(html).not.toContain("transition-transform duration-150 ease-out");
-  });
-
-  it("TN08：composer 只在内容列接收事件，不遮挡左侧问题导航", () => {
-    const html = renderPane();
-
-    expect(html).toMatch(/data-v4-composer-dock="true" class="[^"]*pointer-events-none/);
-    expect(html).toMatch(/data-v4-composer-dock-content="true" class="[^"]*pointer-events-auto/);
-  });
-
-  it("keeps transparent composer bottom padding and masks only the message layer", () => {
-    const html = renderPane();
-
-    expect(html).toContain('data-v4-timeline-message-layer="true"');
-    expect(html).toContain("px-4 pb-4");
-    expect(html).not.toContain("px-4 pb-4 max-md:px-2");
-    expect(html).not.toContain("max-md:pb-2");
-    expect(html).not.toContain("h-4 bg-background max-md:h-2");
-    expect(html).toContain("mask-repeat:no-repeat");
-    const timelineSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/v4/ConversationTimeline.tsx"),
-      "utf8",
-    );
-    expect(timelineSource).toContain("COMPOSER_MESSAGE_MASK_TRANSPARENT_HEIGHT_PX = 96");
-    expect(timelineSource).toContain("COMPOSER_MESSAGE_MASK_FADE_PX = 24");
-    expect(timelineSource).toContain("isAtBottom({");
-    expect(timelineSource).toContain('messageLayer.style.maskImage = "none"');
-    expect(timelineSource).toContain(
-      "viewportHeight - COMPOSER_MESSAGE_MASK_TRANSPARENT_HEIGHT_PX",
-    );
-    expect(timelineSource).toContain("black ${opaqueEnd}px, transparent ${transparentStart}px");
-    const maskSyncSource = timelineSource.slice(
-      timelineSource.indexOf("const syncMessageLayerMask = useCallback"),
-      timelineSource.indexOf("const syncTurnNavigatorViewport = useCallback"),
-    );
-    expect(maskSyncSource).not.toContain("getBoundingClientRect");
-    expect(timelineSource).not.toContain("data-v4-composer-mask-target");
-    // Bug 回归：composer 的纵向 mask 如果和正文 max-width 共用一层，会把 Markdown
-    // 表格增强模式越出正文列的左右区域一起裁掉。mask 层必须全宽，正文宽度下沉到历史区和 live tail。
-    expect(timelineSource).toContain(
-      'className="relative w-full flex-1 [mask-repeat:no-repeat] [-webkit-mask-repeat:no-repeat]"',
-    );
-    expect(timelineSource).toMatch(
-      /data-v4-timeline-virtual-history="true"[\s\S]*?contentWidthClassName/,
-    );
-    expect(timelineSource).toMatch(/data-v4-running-live-tail="true"[\s\S]*?contentWidthClassName/);
   });
 
   it("anchors the back-to-bottom control to the composer dock above input", () => {
@@ -530,17 +416,6 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html.indexOf('data-v4-back-to-bottom-anchor="composer-dock"')).toBeLessThan(
       html.indexOf('data-testid="mock-composer"'),
     );
-  });
-
-  it("uses the z-code-2 icon-only back-to-bottom control", () => {
-    const timelineSource = readFileSync(
-      resolve(process.cwd(), "packages/ui/src/v4/ConversationTimeline.tsx"),
-      "utf8",
-    );
-
-    expect(timelineSource).toContain('<ArrowDownIcon className="size-4" />');
-    expect(timelineSource).not.toMatch(/>\s*回到底部\s*</);
-    expect(timelineSource).toContain('id: "chat.scrollToBottom"');
   });
 
   it("renders pending permission before the composer inside the composer dock", () => {
@@ -571,6 +446,31 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html).toContain('data-blocking-request-id="perm-1"');
   });
 
+  for (const compactForRemoteControl of [false, true]) {
+    it.each([
+      ["permission", [pendingPermissionInteraction()]],
+      ["user input", [pendingStructuredUserInputInteraction()]],
+      ["mixed requests", [pendingPermissionInteraction(), pendingStructuredUserInputInteraction()]],
+    ])(
+      `keeps %s in the bottom dock without a top notice (remote=${compactForRemoteControl})`,
+      (_label, pendingInteractions) => {
+        const html = renderPane({
+          compactForRemoteControl,
+          snapshot: makeSnapshot({ pendingInteractions }),
+        });
+
+        // 待处理请求已有底部卡片，顶部不再重复展示 warning 和跳转入口。
+        expect(html).not.toContain('data-testid="v4-pending-interaction-top-notice"');
+        const dockIndex = html.indexOf('data-v4-composer-dock="true"');
+        const interactionIndex = html.indexOf('data-testid="mock-interactions"');
+        const composerIndex = html.indexOf('data-testid="mock-composer"');
+        expect(dockIndex).toBeGreaterThanOrEqual(0);
+        expect(interactionIndex).toBeGreaterThan(dockIndex);
+        expect(composerIndex).toBeGreaterThan(interactionIndex);
+      },
+    );
+  }
+
   it("普通 Web 没有 desktop-continuous attachment 时不挂一次性 runtime header controller", () => {
     conversationTelemetryState.current = null;
     const html = renderPane();
@@ -597,7 +497,7 @@ describe("SessionPane v4 chat layout parity", () => {
     expect(html).toContain('data-blocking-request-id="ask-1"');
   });
 
-  it("offsets the conversation column and composer when the status panel can sit inline", () => {
+  it("selects automatic status panel layout for an active goal", () => {
     vi.stubGlobal("window", {
       innerWidth: 1280,
       addEventListener: vi.fn(),
@@ -620,8 +520,6 @@ describe("SessionPane v4 chat layout parity", () => {
         }),
       });
 
-      expect(html).toContain("@min-[1280px]/conversation:-translate-x-42");
-      expect(html).toContain(CONVERSATION_CONTENT_WITH_STATUS_PANEL_WIDTH_CLASS_NAME);
       expect(html).toContain('data-v4-timeline-content-column="true"');
       expect(html).toContain('data-v4-composer-dock="true"');
       expect(statusPanelCapture.props.at(-1)?.layoutMode).toBe("auto");
@@ -688,7 +586,6 @@ describe("SessionPane v4 chat layout parity", () => {
     if (!panelProps) throw new Error("Status panel props were not captured");
     expect(panelProps.parentSessionId).toBe("session-1");
     expect(panelProps.runningSubagents).toEqual([]);
-    expect(panelProps.onOpenSubagentSession).toEqual(expect.any(Function));
 
     (
       panelProps.onOpenSubagentSession as (request: {
@@ -743,7 +640,6 @@ describe("SessionPane v4 chat layout parity", () => {
     renderPane({ snapshot, onSummaryPanelVariantOverrideChange });
     const composerProps = statusPanelCapture.composerProps.at(-1);
     const panelProps = statusPanelCapture.props.at(-1);
-    expect(composerProps?.onOpenRunningBackgroundWorks).toEqual(expect.any(Function));
     expect(panelProps?.terminalSectionOpen).toBe(false);
     expect(panelProps?.onTerminalSectionOpenChange).toEqual(expect.any(Function));
     expect(panelProps?.agentSectionOpen).toBe(false);

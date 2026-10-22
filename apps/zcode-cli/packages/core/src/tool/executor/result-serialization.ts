@@ -1,7 +1,6 @@
 import {
   CoreErrorType,
   createCoreError,
-  modelMessageContentToText,
   traceContextToLogContext,
   type ModelMessageContent,
   type ModelMessageContentBlock,
@@ -14,18 +13,20 @@ import {
 } from "@zcode/zcode-cua/frame-contract";
 import type { ToolEntry, ToolResultSerialization } from "../types.js";
 import { formatHookAdditionalContexts } from "./hook-flow.js";
-import {
-  formatGenericPersistedOutputContent,
-  isPersistedOutputContent,
-} from "../result-persistence-format.js";
+import { formatGenericPersistedOutputContent } from "../result-persistence-format.js";
 import {
   appendHookToPersistedArtifactPreview,
   appendHookToStringContent,
   appendHookWithoutReorderingStructuredContent,
   fitContentWithSuffix,
+  isEmptyModelContent,
+  isPersistedArtifactPreview,
   OfficialCuaFrameContractError,
   projectHookAugmentedModelContent,
   projectOfficialCuaStructuredContent,
+  projectToolReferenceContent,
+  stringifyModelContentForSerialization,
+  stringifyOutputForModel,
 } from "./result-content-projection.js";
 import type { ToolExecutorDeps } from "./types.js";
 import { isRecord } from "./utils.js";
@@ -80,6 +81,19 @@ export async function serializeOutput(
     Math.min(effectiveBudget.maxModelBytes, effectiveBudget.maxInlineBytes),
   );
   const artifactPath = findArtifactPath(output);
+  const referenceProjection = projectToolReferenceContent(
+    modelContent,
+    maxModelBytes,
+    effectiveBudget.preview?.direction ?? "head",
+  );
+  if (referenceProjection) {
+    return {
+      ...referenceProjection,
+      originalBytes,
+      budgetStrategy: effectiveBudget.strategy,
+      artifactPath,
+    };
+  }
   const shouldPersistArtifact =
     (originalBytes > maxModelBytes || exceedsCharacterBudget) &&
     effectiveBudget.artifact?.enabled === true &&
@@ -247,6 +261,21 @@ export function appendHookAdditionalContexts(
     return omittedFrameCredential ? { ...projected, truncated: true } : projected;
   }
   const previewDirection = entry.resultBudget?.preview?.direction ?? "head";
+  const modelContent = serialization.modelContent ?? serialization.content;
+  const referenceProjection = Array.isArray(modelContent)
+    ? projectToolReferenceContent(
+        [...modelContent, { type: "text", text: hookContext }],
+        maxModelBytes,
+        previewDirection,
+      )
+    : undefined;
+  if (referenceProjection) {
+    return {
+      ...serialization,
+      ...referenceProjection,
+      truncated: serialization.truncated || referenceProjection.truncated || omittedFrameCredential,
+    };
+  }
   const artifactPreview = isPersistedArtifactPreview(serialization);
   const contentProjection = artifactPreview
     ? appendHookToPersistedArtifactPreview(serialization.content, suffix, maxModelBytes)
@@ -346,41 +375,6 @@ function formatPersistedOutputContent(input: {
     originalBytes: input.originalBytes,
     persistedPath: input.persistedPath,
   });
-}
-
-function isEmptyModelContent(content: ModelMessageContent): boolean {
-  if (typeof content === "string") return content.trim() === "";
-  if (content.length === 0) return true;
-  return content.every((block) => {
-    if (block.type !== "text") return false;
-    return typeof block.text !== "string" || block.text.trim() === "";
-  });
-}
-
-function stringifyOutputForModel(output: unknown, entry: ToolEntry): ModelMessageContent {
-  if (entry.formatModelContent) return entry.formatModelContent(output);
-  if (typeof output === "string") return output;
-  if (output === undefined) return "";
-
-  try {
-    return JSON.stringify(output) ?? "";
-  } catch {
-    return String(output);
-  }
-}
-
-function stringifyModelContentForSerialization(content: ModelMessageContent): string {
-  return typeof content === "string" ? content : modelMessageContentToText(content);
-}
-
-function isPersistedArtifactPreview(serialization: ToolResultSerialization): boolean {
-  return (
-    serialization.budgetStrategy === "artifact" &&
-    serialization.truncated &&
-    typeof serialization.artifactPath === "string" &&
-    serialization.artifactPath.length > 0 &&
-    isPersistedOutputContent(serialization.content)
-  );
 }
 
 function findArtifactPath(output: unknown): string | undefined {

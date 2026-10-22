@@ -1,4 +1,4 @@
-import { TID_CHAT_STOP_BUTTON } from "@zcode/shared";
+import { TID_CHAT_STOP_BUTTON } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   E2E_REPLY_TOKEN,

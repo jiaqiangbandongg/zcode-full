@@ -6,15 +6,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  CONCURRENCY_DECREASE_FACTOR,
   CONCURRENCY_FLOOR,
   CONCURRENCY_IDLE_RESET_MS,
-  CONCURRENCY_INCREASE_AFTER_SUCCESSES,
   ConcurrencyController,
 } from "../../src/engine/index.js";
 
 const KEY = "anthropic/claude";
-const K = CONCURRENCY_INCREASE_AFTER_SUCCESSES;
+// 成功阈值按规格独立写出，避免测试与实现一同漂移。
+const K = 4;
 const T0 = 1_000_000;
 
 /** 准入 n 个请求，返回它们的 epoch。 */
@@ -35,31 +34,36 @@ function roundTrip(c: ConcurrencyController, n: number, now = T0) {
 }
 
 /** 一个当前 epoch 的 429（先准入再限流）。 */
-function throttleNow(c: ConcurrencyController, reason: "rate_limited" | "provider_overloaded" | "offpeak_queued" = "rate_limited", retryAfterMs?: number, now = T0) {
+function throttleNow(
+  c: ConcurrencyController,
+  reason: "rate_limited" | "provider_overloaded" | "offpeak_queued" = "rate_limited",
+  retryAfterMs?: number,
+  now = T0,
+) {
   const epoch = c.admitted(now);
   return c.throttled(now, epoch, reason, retryAfterMs);
 }
-
-describe("ConcurrencyController — 常量（决策 40）", () => {
-  it("减系数 0.75、每级 4 次成功", () => {
-    expect(CONCURRENCY_DECREASE_FACTOR).toBe(0.75);
-    expect(K).toBe(4);
-  });
-});
 
 describe("ConcurrencyController — 减（决策 4/6/11/35/40）", () => {
   it("当前 epoch 的限流 → cap × 0.75 向下取整并翻 epoch；反复限流一路减到地板 1", () => {
     const c = new ConcurrencyController(KEY, 16);
     expect(c.snapshot().epoch).toBe(0);
     // 减 cap 不设 lastGood（未被证明），只记 lastBad = 撞墙时的 cap。
-    expect(throttleNow(c)).toEqual([{ key: KEY, previous: 16, next: 12, reason: "rate_limited", lastBad: 16 }]);
+    expect(throttleNow(c)).toEqual([
+      { key: KEY, previous: 16, next: 12, reason: "rate_limited", lastBad: 16 },
+    ]);
     expect(c.snapshot()).toMatchObject({ epoch: 1, lastBad: 16 });
     expect(c.snapshot().lastGood).toBeUndefined();
     for (const expected of [9, 6, 4, 3, 2, 1]) {
       const [change] = throttleNow(c, "provider_overloaded");
       expect(change?.next).toBe(expected);
     }
-    expect(c.snapshot()).toMatchObject({ cap: CONCURRENCY_FLOOR, epoch: 7, inFlight: 0, lastBad: 2 });
+    expect(c.snapshot()).toMatchObject({
+      cap: CONCURRENCY_FLOOR,
+      epoch: 7,
+      inFlight: 0,
+      lastBad: 2,
+    });
     // 地板上再限流：cap 不变、无 Retry-After ⇒ 不发事件，但仍翻一页（同一批请求只裁决一次）。
     expect(throttleNow(c)).toEqual([]);
     expect(c.snapshot().epoch).toBe(8);
@@ -72,7 +76,9 @@ describe("ConcurrencyController — 减（决策 4/6/11/35/40）", () => {
     expect(c.snapshot().inFlight).toBe(13);
     const changes = [];
     for (const epoch of epochs) changes.push(...c.throttled(T0, epoch, "rate_limited"));
-    expect(changes).toEqual([{ key: KEY, previous: 13, next: 9, reason: "rate_limited", lastBad: 13 }]);
+    expect(changes).toEqual([
+      { key: KEY, previous: 13, next: 9, reason: "rate_limited", lastBad: 13 },
+    ]);
     expect(c.snapshot()).toMatchObject({ cap: 9, epoch: 1, inFlight: 0, successStreak: 0 });
   });
 
@@ -84,7 +90,13 @@ describe("ConcurrencyController — 减（决策 4/6/11/35/40）", () => {
     roundTrip(c, K - 1); // 当前 epoch 的成功：streak K−1（还差一次兑现）
     expect(c.snapshot()).toMatchObject({ cap: 6, successStreak: K - 1, inFlight: 3 });
     expect(c.throttled(T0, stale[0]!, "rate_limited", 9_000)).toEqual([]);
-    expect(c.snapshot()).toMatchObject({ cap: 6, epoch: 1, successStreak: 0, inFlight: 2, cooldownUntil: T0 + 9_000 });
+    expect(c.snapshot()).toMatchObject({
+      cap: 6,
+      epoch: 1,
+      successStreak: 0,
+      inFlight: 2,
+      cooldownUntil: T0 + 9_000,
+    });
     // 更早的 Retry-After 不会把 cooldown 往前拉。
     expect(c.throttled(T0, stale[1]!, "rate_limited", 1_000)).toEqual([]);
     expect(c.snapshot().cooldownUntil).toBe(T0 + 9_000);
@@ -95,7 +107,9 @@ describe("ConcurrencyController — 减（决策 4/6/11/35/40）", () => {
     const stale = admit(c, 13);
     for (const epoch of stale) c.throttled(T0, epoch, "rate_limited"); // 13→9 一次
     expect(c.snapshot().cap).toBe(9);
-    expect(throttleNow(c)).toEqual([{ key: KEY, previous: 9, next: 6, reason: "rate_limited", lastBad: 9 }]);
+    expect(throttleNow(c)).toEqual([
+      { key: KEY, previous: 9, next: 6, reason: "rate_limited", lastBad: 9 },
+    ]);
   });
 
   it("Retry-After 冻结新准入直到 deadline；地板上带 Retry-After 的限流仍发事件", () => {
@@ -155,7 +169,9 @@ describe("ConcurrencyController — 增（决策 4/15/33/35/40）", () => {
     c.waiters(T0, 1);
     expect(roundTrip(c, K - 1)).toEqual([]);
     expect(c.snapshot().lastGood).toBeUndefined();
-    expect(roundTrip(c, 1)).toEqual([{ key: KEY, previous: 12, next: 13, reason: "recovered", lastGood: 12, lastBad: 16 }]);
+    expect(roundTrip(c, 1)).toEqual([
+      { key: KEY, previous: 12, next: 13, reason: "recovered", lastGood: 12, lastBad: 16 },
+    ]);
     expect(c.snapshot().successStreak).toBe(0);
   });
 
@@ -212,7 +228,9 @@ describe("ConcurrencyController — 记住可用水位（决策 22/40）", () =>
   it("lastGood 及以下被限流 → 墙下移：按系数减、清掉 lastGood（已证伪）、记 lastBad", () => {
     const c = climbTo(14);
     throttleNow(c); // 回 13
-    expect(throttleNow(c)).toEqual([{ key: KEY, previous: 13, next: 9, reason: "rate_limited", lastBad: 13 }]);
+    expect(throttleNow(c)).toEqual([
+      { key: KEY, previous: 13, next: 9, reason: "rate_limited", lastBad: 13 },
+    ]);
     expect(c.snapshot().lastGood).toBeUndefined();
   });
 

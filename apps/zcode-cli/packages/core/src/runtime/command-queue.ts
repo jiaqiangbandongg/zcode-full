@@ -20,6 +20,7 @@ export type RuntimeCommandId = string & {
 };
 
 export interface RuntimeCommandBase {
+  readonly offPeakExecutionId?: string;
   readonly createdAt: Date;
   readonly id: RuntimeCommandId;
   readonly mode: RuntimeCommandMode;
@@ -191,11 +192,18 @@ export function createRuntimeCommandQueue(): RuntimeCommandQueue {
       }
 
       const batch = commands.filter(
-        (command) => command.mode === "task-notification" && command.priority === selected.priority,
+        (command) =>
+          command.mode === "task-notification" &&
+          command.priority === selected.priority &&
+          command.offPeakExecutionId === selected.offPeakExecutionId,
       );
       for (let commandIndex = commands.length - 1; commandIndex >= 0; commandIndex -= 1) {
         const command = commands[commandIndex];
-        if (command?.mode === "task-notification" && command.priority === selected.priority) {
+        if (
+          command?.mode === "task-notification" &&
+          command.priority === selected.priority &&
+          command.offPeakExecutionId === selected.offPeakExecutionId
+        ) {
           commands.splice(commandIndex, 1);
         }
       }

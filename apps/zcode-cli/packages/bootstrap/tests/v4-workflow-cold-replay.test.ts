@@ -29,7 +29,7 @@ import type {
   ZCodeProtocolSessionRecord,
 } from "../src/zcode-protocol/server-types.js";
 
-type TestSessionStore = ReturnType<typeof createSqliteSessionStore>;
+type TestSessionStore = Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
 const WORKSPACE_PATH = "/tmp/zcode-workflow-cold-replay";
 const PARENT_SESSION_ID = "sess_parent_replay" as SessionId;
@@ -165,7 +165,7 @@ describe("v4 冷物化 · dwf run 的冷回放", () => {
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "zcode-workflow-cold-replay-"));
-    store = createSqliteSessionStore({ dbPath: join(tempRoot, "sessions.db") });
+    store = await createSqliteSessionStore({ dbPath: join(tempRoot, "sessions.db") });
     warnings = [];
   });
 

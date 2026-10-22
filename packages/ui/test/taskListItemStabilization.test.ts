@@ -20,6 +20,15 @@ function createTask(overrides: Partial<ZCodeTaskMeta> = {}): ZCodeTaskMeta {
 }
 
 describe("stabilizeTaskListItems", () => {
+  it("连续空快照复用数组，首条任务出现和最后一条移除仍更新", () => {
+    const empty: ZCodeTaskMeta[] = [];
+    expect(stabilizeTaskListItems(empty, [])).toBe(empty);
+    const populated = [createTask()];
+    expect(stabilizeTaskListItems(empty, populated)).toBe(populated);
+    const removed = stabilizeTaskListItems(populated, []);
+    expect(removed).toEqual([]);
+    expect(stabilizeTaskListItems(removed, [])).toBe(removed);
+  });
   it("等价重建时复用整个旧数组和旧元素引用", () => {
     const previous = [createTask(), createTask({ taskId: "task-2" })];
     const next = [createTask(), createTask({ taskId: "task-2" })];
@@ -87,9 +96,7 @@ describe("buildTaskListItemIdentityKey", () => {
 
 describe("areTaskListItemsEquivalent", () => {
   it("字段数量不同即判为不等价", () => {
-    expect(
-      areTaskListItemsEquivalent(createTask(), createTask({ unreadAt: 7 })),
-    ).toBe(false);
+    expect(areTaskListItemsEquivalent(createTask(), createTask({ unreadAt: 7 }))).toBe(false);
   });
 
   // 回归锁：稳定化的全部价值押在这条等价判断上，一旦退化只表现为「整列表闪一下」，

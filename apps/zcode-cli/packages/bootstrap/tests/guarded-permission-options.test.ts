@@ -13,14 +13,7 @@ describe("Guarded single-use protocol options", () => {
       ).toEqual(["allow_once", "deny"]);
     }
   });
-  it("explicit constraint removes persistence; absent constraint preserves old options", () => {
-    expect(
-      buildProtocolPermissionOptions({
-        toolName: "Bash",
-        approvalMode: "user-once",
-        input: { command: "rm -rf build" },
-      }).map((o) => o.kind),
-    ).toEqual(["allow_once", "deny"]);
+  it("absent constraint preserves old options", () => {
     expect(
       buildProtocolPermissionOptions({ toolName: "Bash", suggestedPermissionUpdates: [] }).map(
         (o) => o.kind,

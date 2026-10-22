@@ -1,11 +1,13 @@
+import { isReadonlyAgentSessionKind } from "@zcode/shared";
 import { readBackgroundBashOutputFromOwner } from "./background-work-owner.js";
 // v4 网关 binder。
 // 定位：ConversationV4Gateway 是域无关的通道运行时，本文件把它绑到协议服务器上下文：
 // - 帧出口 = context.notify（stdio NDJSON notification，与旧 session/event 同一条管道并存）；
 // - 命令执行 = V4CommandExecutor（zcode-protocol-v4/commands/，原生直驱 core）；
 //   20 命令全部原生，supports() 未命中（未知命令）→ notImplemented。
-// - 过渡钩子（ensureModelReady / afterLegacyStateMutation / closeSession /
-//   createSessionRecord / child record registration / resumePersistedSession）在此注入旧协议实现，随旧协议一同删除。
+// - 过渡钩子（ensureModelReady / afterLegacyStateMutation / deleteSession /
+//   createSessionRecord / child record registration / resumePersistedSession）在此注入旧实现，
+//   死期 = M5 波次 2（随旧协议一同删除）。
 //
 // 不做桥接：依赖方向只允许 旧目录 → v4 目录。
 // 本文件在旧目录，import v4 executor 合法；v4 目录禁止反向 import 本目录任何模块。
@@ -81,6 +83,7 @@ import type {
   ForkCommitBundle,
   GoalStatus,
   MessageId,
+  MessageWithParts,
   SessionEvent,
   SessionEventStorePort,
   SessionId,
@@ -101,6 +104,7 @@ import {
 import {
   afterStateMutation,
   activateSessionForResume,
+  discardFailedSessionResume,
   createSessionRecordForV4,
   ensureSessionModelAvailableForNextTurn,
   listSessionSubagents,
@@ -1209,9 +1213,12 @@ export function createConversationV4Gateway(
       await afterStateMutation(context, record as ZCodeProtocolSessionRecord, reason);
       await autoDrainV4QueueIfReady(record as ZCodeProtocolSessionRecord);
     },
-    // deleteSession 的执行面：内联旧 closeSession op 的 4 步（不 import 旧 op——
-    // 语义与 server-operations.ts closeSession 对齐，随会话注册表归 v4 后收编）。
-    closeSession: async (sessionId) => {
+    // deleteSession 的执行面：先由 CLI 持久化软删除事实，再内联旧 closeSession op 的
+    // 4 步释放运行实例（不 import 旧 op；随波次 2 会话注册表归 v4 后收编）。
+    deleteSession: async (sessionId) => {
+      if (!context.deps.sessionStore?.softDeleteSession)
+        throw new Error("Session soft deletion is unavailable");
+      await context.deps.sessionStore.softDeleteSession(sessionId as SessionId);
       const record = context.sessions.get(sessionId);
       if (!record) {
         // handler 已校验存在性；此处只兜并发竞态（重复删除幂等成功）。
@@ -1224,7 +1231,7 @@ export function createConversationV4Gateway(
       // gateway 靠 getSessionWorkspaceId（读 context.sessions）定位 workspace 才能把
       // session.removed 推给 sessions-index 订阅者；先 delete 再 dispose 时 workspaceId
       // 恒为 null，删除会话后侧栏列表项永不消失（e2e conversation-session-v4-sidebar 抓出）。
-      context.v4Gateway?.disposeSession(sessionId);
+      context.v4Gateway?.disposeSession(sessionId, { deleted: true });
       queuedTurnExecutions.delete(sessionId);
       context.sessions.delete(sessionId);
     },
@@ -1232,6 +1239,8 @@ export function createConversationV4Gateway(
     // createSession op 内（半初始化 record 的回收顺序修过 bug，不重复实现）。
     // 语义决策（draft persistence / firstInput 走原生 prompt turn）在原生 handler。
     createSessionRecord: async ({
+      sessionId,
+      additionalDirectories,
       workspaceId,
       mcpServers,
       offPeakToolEnabled,
@@ -1251,6 +1260,8 @@ export function createConversationV4Gateway(
       // shared parser 统一兼容 WSL legacy 与显式 user identity；非远程格式继续按
       // 本地 workspacePath 处理。
       const created = await createSessionRecordForV4(context, {
+        sessionId,
+        additionalDirectories,
         workspace: resolveWorkspaceRefFromId(workspaceId),
         // 群任务已经由首条真实需求触发，先落盘隔离授权，再开放任务与配置。
         // 普通 Desktop draft 仍保持 deferred。
@@ -1549,7 +1560,6 @@ export function createConversationV4Gateway(
       }
       const stored = await context.deps.sessionStore.listSessions({
         directory: persistedWorkspacePath,
-        includeArchived: false,
         limit: 200,
         // parentID 只表达会话层级，不能作为左侧任务 membership。
         // 显式 fork 必然带 parentID，但重启后仍应由 taskType 投影进 sessions-index。
@@ -1562,7 +1572,13 @@ export function createConversationV4Gateway(
         ...(session.parentID ? { parentSessionId: String(session.parentID) } : {}),
         title: session.title ?? "",
         titleSource: normalizeStoredTitleSource(session.titleSource),
-        phase: "completedSuccess" as const,
+        phase:
+          session.lastOutcome === "error"
+            ? ("error" as const)
+            : session.lastOutcome === "interrupted"
+              ? ("completedInterrupted" as const)
+              : ("completedSuccess" as const),
+        ...(session.lastOutcome ? { lastOutcome: session.lastOutcome } : {}),
         sessionEnded: true,
         hasBackgroundWork: false,
         lastActivityAt: session.time?.updated ?? 0,
@@ -1580,6 +1596,35 @@ export function createConversationV4Gateway(
   return new ConversationV4Gateway({
     cliVersion: context.deps.version,
     sessionExists: (sessionId) => context.sessions.has(sessionId),
+    reconcileSessions: async ({ workspaceId, sessionIds }) => {
+      const store = context.deps.sessionStore;
+      if (!store) throw new Error("Session store is unavailable");
+      const remote = parseRemoteWorkspaceIdentity(workspaceId);
+      const directory = remote?.workspacePath ?? workspaceId;
+      const sessions = await Promise.all(
+        [...new Set(sessionIds)].map(async (sessionId) => {
+          const session = await store.getSession(sessionId as SessionId);
+          const sameWorkspace =
+            session &&
+            session.directory === directory &&
+            (remote
+              ? session.workspaceID === workspaceId
+              : !session.workspaceID || session.workspaceID === workspaceId);
+          if (!sameWorkspace) return { sessionId, exists: false as const, deleted: false as const };
+          return {
+            sessionId,
+            exists: true as const,
+            deleted: session.time.deleted !== undefined,
+            title: session.title,
+            titleSource: normalizeStoredTitleSource(session.titleSource),
+            createdAt: session.time.created,
+            updatedAt: session.time.updated,
+            ...(session.lastOutcome ? { lastOutcome: session.lastOutcome } : {}),
+          };
+        }),
+      );
+      return { sessions };
+    },
     onDebug: (message) => log?.debug(message),
     onTargetCompleted: (sessionId) => {
       const record = context.sessions.get(sessionId);
@@ -1600,13 +1645,23 @@ export function createConversationV4Gateway(
       persistHighspeedTimingOnTurnTerminal(context, sessionId, event, snapshot);
     },
     // Gateway 的单一 READY promise 负责并发与水位；binder 只恢复 runtime 并返回 M0/M1。
+    retainSessionRuntime: async (sessionId) =>
+      (await context.sessionResidentPool?.acquireOperation(sessionId)) ?? (() => undefined),
+    loadPersistedMessages: async (sessionId) => {
+      const store = context.deps.sessionStore;
+      if (!store || !(await store.getSession(sessionId as SessionId)))
+        throw new Error("fault.subscribe.sessionNotFound");
+      return store.messages({ sessionID: sessionId as SessionId });
+    },
     resumePersistedSession: async (
       sessionId,
       resumeThoughtLevel,
       workspace?: ZCodeWorkspaceRef,
+      additionalDirectories?: string[],
+      persistedMessages?: MessageWithParts[],
     ) => {
       const persisted = await context.deps.sessionStore?.getSession(sessionId as SessionId);
-      if (!persisted) {
+      if (!persisted || persisted.time.deleted !== undefined) {
         context.logger?.warn("ZCode Protocol v4 cold resume has no persisted session", {
           activeSessionCount: context.sessions.size,
           event: "zcode_protocol.v4.resume_persisted_missing",
@@ -1615,6 +1670,7 @@ export function createConversationV4Gateway(
         });
         return { status: "notFound" };
       }
+      const existingRecord = context.sessions.get(sessionId);
       const activated = await activateSessionForResume(
         context,
         {
@@ -1622,13 +1678,20 @@ export function createConversationV4Gateway(
           // session.path 可能是规范化后的执行 cwd，不能覆盖当前 attachment
           // 已知的 workspace 身份。旧 session 没有 attachment 上下文时仍走原有持久化回退。
           ...(workspace ? { workspace } : {}),
+          ...(additionalDirectories !== undefined ? { additionalDirectories } : {}),
           ...(resumeThoughtLevel ? { thoughtLevel: resumeThoughtLevel } : {}),
         },
-        { reusePersistedMessages: true },
+        { reusePersistedMessages: true, persistedMessages },
       );
       return {
         status: "resumed",
         persistedMessages: activated.persistedMessages,
+        ...(!existingRecord
+          ? {
+              disposeOnFailure: () =>
+                discardFailedSessionResume(context, sessionId, activated.record),
+            }
+          : {}),
       };
     },
     emitWireFrame: (wire) =>
@@ -1643,6 +1706,8 @@ export function createConversationV4Gateway(
         method: V4_NOTIFICATIONS.conversationTelemetryFact,
         params: fact,
       }),
+    emitPluginUiToolResult: (result) =>
+      context.notify({ method: V4_NOTIFICATIONS.pluginUiToolResult, params: result }),
     emitCuaPermissionObservation: (observation) =>
       context.notify({
         method: V4_NOTIFICATIONS.cuaPermissionObservation,
@@ -1704,6 +1769,7 @@ export function createConversationV4Gateway(
       return {
         createdAt: record.createdAt,
         lastActivityAt: record.updatedAt,
+        ...(record.lastOutcome ? { lastOutcome: record.lastOutcome } : {}),
         ...(record.parentSessionId ? { parentSessionId: String(record.parentSessionId) } : {}),
       };
     },
@@ -1744,7 +1810,7 @@ export function createConversationV4Gateway(
         const taskType =
           context.sessions.get(envelope.sessionId)?.taskType ??
           (await context.deps.sessionStore?.getSession(envelope.sessionId as SessionId))?.taskType;
-        if (taskType === "subagent_child") {
+        if (isReadonlyAgentSessionKind(taskType)) {
           throw Object.assign(new Error("Subagent sessions are read-only"), {
             reasonCode: "guard.subagentReadOnly",
           });
@@ -1762,7 +1828,7 @@ export function createConversationV4Gateway(
       const record = context.sessions.get(sessionId);
       const controller = record?.activeAbortController;
       if (!controller || controller.signal.aborted) return;
-      // 投影越过 16MiB 后继续生成只会让所有后续 snapshot 都无法编码。
+      // 修复原因：投影越过 16MiB 后继续生成只会让所有后续 snapshot 都无法编码。
       // gateway 先原子拒绝越界事件并登记 protocol fault，再单次调用这里中止模型 turn；
       // abort 的正常终态负责释放 active lock，不能在 gateway 里越层伪造 TurnError。
       controller.abort(createExternalTurnFaultError(reasonCode));
@@ -1923,16 +1989,27 @@ export function createConversationV4Gateway(
       // 代价：contextWindow 分母会按父 record 的当前模型解析而不是 actor 模型，纯展示层偏差。
       const record = await resolveConversationBackingRecord(context, sessionId);
       if (!record) {
-        // 诊断：hydrate 预期在 runtime 已由 cold-resume 激活后执行；连父 record 兜底
-        // 都落空时，返回空事件会把真实的生命周期竞态伪装成“历史为空”，必须留下明确现场。
-        context.logger?.warn("ZCode Protocol v4 hydrate has no active runtime", {
-          activeSessionCount: context.sessions.size,
-          event: "zcode_protocol.v4.hydrate_runtime_missing",
-          module: "bootstrap.zcode_protocol",
-          phase: "loadPersistedEvents",
+        // detached live child 继续使用在线尾部；仅显式携带 M0 的冷打开可以独立物化历史。
+        if (persistedMessages === undefined)
+          return { events: [], synthesized: false, sourceEventSeq: 0 };
+        // 主对话历史只依赖持久化事实；旧路径在这里返回空数组会把冷会话误画成空白。
+        const store = context.deps.sessionStore;
+        if (!store) throw new Error("fault.subscribe.sessionNotFound");
+        const source = await loadPersistedConversationMaterialization({
           sessionId,
+          persistedMessages,
+          memoryEvents: [],
+          store,
         });
-        return { events: [], synthesized: false, sourceEventSeq: 0 };
+        const merged = mergeColdConversationEvents({ ...source, sessionId });
+        return {
+          events: merged.events,
+          synthesized: true,
+          sourceEventSeq: 0,
+          ...(source.sharedContextImport
+            ? { sharedContextImport: source.sharedContextImport }
+            : {}),
+        };
       }
       // message/part 与 session_entry 的异步读取期间 live sink 仍可收到新事件。
       // gateway 必须知道 memory eventStore 取快照时的 raw cursor，才能只补 await 窗口内

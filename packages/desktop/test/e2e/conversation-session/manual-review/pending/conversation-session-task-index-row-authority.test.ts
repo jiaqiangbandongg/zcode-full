@@ -1,8 +1,7 @@
-import { TID_TASK_ITEM, TID_WORKSPACE_ITEM, testId } from "@zcode/shared";
+import { TID_TASK_ITEM, testId } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
-  ensureWorkspaceItemExpanded,
   waitForWorkspaceApp,
 } from "../../../helpers/desktop-app.js";
 import {
@@ -11,6 +10,7 @@ import {
   TASK_INDEX_ROW_AUTHORITY_TASK_IDS,
   TASK_INDEX_ROW_AUTHORITY_TOTAL,
 } from "../../../helpers/task-list-row-authority-fixture.js";
+import { ensureProjectExpanded, projectSectionSelector } from "../../../helpers/project-sidebar.js";
 
 const CASE_TIMEOUT_MS = 120_000;
 const SHOW_MORE_LABELS = ["Show more", "显示更多"];
@@ -25,7 +25,7 @@ describe("TSL23：tasks-index 是 Project 持久任务行权威", () => {
     this.timeout(CASE_TIMEOUT_MS);
 
     await waitForWorkspaceApp(DEFAULT_WORKSPACE, 45_000);
-    await ensureWorkspaceItemExpanded(DEFAULT_WORKSPACE);
+    await ensureProjectExpanded(DEFAULT_WORKSPACE);
     await waitForAuthorityTaskCount(5, "Project 首屏没有显示 5 个 tasks-index 任务");
 
     let visibleCount = await readAuthorityTaskIds().then((ids) => ids.length);
@@ -94,17 +94,15 @@ function readAuthorityTaskIds(): Promise<string[]> {
 function clickWorkspaceShowMore(): Promise<boolean> {
   return browser.execute(
     (workspaceTestId, labels) => {
-      const workspaceRow = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-        (element) => element.dataset.testid === workspaceTestId,
-      );
-      const workspaceListItem = workspaceRow?.closest("li");
+      const workspaceRow = document.querySelector<HTMLElement>(workspaceTestId);
+      const workspaceListItem = workspaceRow;
       const showMore = Array.from(
         workspaceListItem?.querySelectorAll<HTMLElement>("span") ?? [],
       ).find((element) => labels.includes((element.textContent ?? "").trim()));
       showMore?.click();
       return Boolean(showMore);
     },
-    testId(TID_WORKSPACE_ITEM, DEFAULT_WORKSPACE),
+    projectSectionSelector(DEFAULT_WORKSPACE),
     SHOW_MORE_LABELS,
   );
 }

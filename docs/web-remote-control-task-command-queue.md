@@ -107,3 +107,9 @@ discarded，因此不会出现“先 unknown、订阅后才 discarded”的竞�
 `queue/guide` 属于旧 runtime，客户端静默清账；只有未进入 transcript 的 `startNow` 或 `unknown`
 显示“确认重发”入口，绝不自动重放。普通手机断线仍由当前 runtime 的 replayable snapshot 恢复权威
 queue；relay、desktop main 和 host 不能通过私有持久队列绕过该产品边界。
+
+### 2026-09 虚拟项目目录导航
+
+手机 home 复用 ProjectSidebar，经当前 base attachment 读取 Host 项目行集合；手机 shell 仅拥有 home/chat 与浏览器返回状态。`workspace-bridge-open.project` 是严格的 projectId/hostId 意图，由 main 转交窗口 Host 的 ProjectService 准备执行目录。它允许在已在线物理 Source 上创建或复用目录 logical scope，不允许隐式新建物理连接、Host 或 Agent。准备前后检查会员身份、项目入口与物理连接对象；main 只保留当前导航的 RPC promise，同一 bridge identity 的重试不重复分配目录，取消/关窗/后续导航使迟到结果失效。
+
+Host 返回可信 workspaceIdentity、remoteSessionId、cwd 后沿原 shared-host attachment 建立手机 replayable bridge。项目/provider/初始输入只在 Web 的 Root 交接中传递，main 不存草稿或任务业务状态。桌面 direct continuous、手机 snapshot/gap 恢复、owner/lease 和 CLI CommandInbox 的单队列规则保持不变。

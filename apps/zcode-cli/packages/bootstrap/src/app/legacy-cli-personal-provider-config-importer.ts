@@ -9,6 +9,7 @@ import {
   ApiKeyAccessConfig,
   ModelConfig,
   ModelConfigRules,
+  ModelOptionSpecsConfig,
   ModelPropertiesConfig,
   ProviderApiConfig,
   ProviderConfig,
@@ -109,12 +110,21 @@ export function importLegacyCliPersonalProviderConfig(
       }),
     });
     for (const member of members) {
-      if (member.contextWindow === undefined) continue;
+      if (member.contextWindow === undefined && member.maxOutputTokens === undefined) continue;
       models = models.setExact(
         providerId,
         member.modelId,
         new ModelConfig({
-          properties: new ModelPropertiesConfig({ contextWindow: member.contextWindow }),
+          ...(member.contextWindow !== undefined
+            ? { properties: new ModelPropertiesConfig({ contextWindow: member.contextWindow }) }
+            : {}),
+          ...(member.maxOutputTokens !== undefined
+            ? {
+                optionSpecs: new ModelOptionSpecsConfig({
+                  maxOutputTokens: { max: member.maxOutputTokens },
+                }),
+              }
+            : {}),
         }),
       );
     }
@@ -157,6 +167,7 @@ type LegacyCliProvider = NonNullable<LegacyCliModelConfigProjection["provider"]>
 interface LegacyCliModelMember {
   readonly modelId: string;
   readonly contextWindow?: number;
+  readonly maxOutputTokens?: number;
 }
 
 function collectLegacyCliModelMembers(
@@ -170,9 +181,17 @@ function collectLegacyCliModelMembers(
     if (!modelId || seen.has(modelId)) continue;
     seen.add(modelId);
     const contextWindow = model.contextWindow ?? model.limit?.context;
+    // 评测仍使用旧 CLI 文件显式设定预算；仅在首次导入保留数值，map 由正式规则继承。
+    // 沿用 limit > options > 顶层优先级，不能因缺少 context 而丢掉独立输出上限。
+    const maxOutputTokens = [
+      model.limit?.output,
+      model.options?.max_tokens,
+      model.maxOutputTokens,
+    ].find(isPositiveInteger);
     members.push({
       modelId,
       ...(isPositiveInteger(contextWindow) ? { contextWindow } : {}),
+      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
     });
   }
   return members;

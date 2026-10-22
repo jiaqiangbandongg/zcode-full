@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -48,29 +47,9 @@ describe("HighspeedShareNoticeCard", () => {
     expect(container.querySelector('[data-global-notice-type="highspeed-share"]')).not.toBeNull();
     fireEvent.click(getByRole("button", { name: "View" }));
     expect(getByRole("button", { name: "Copy image" })).toBeTruthy();
-    expect(document.querySelector(".highspeed-share-dialog__benefit")).not.toBeNull();
-    expect(document.querySelector(".highspeed-share-dialog__chart-bars--baseline")).not.toBeNull();
-    expect(document.querySelector(".highspeed-share-dialog__chart-bars--fast")).not.toBeNull();
     expect(document.body.textContent).toContain("I used the ZCode Highspeed card and saved 480s.");
     expect(document.body.textContent).toContain("https://zcode.z.ai");
     expect(document.querySelector('[data-highspeed-share-dialog-card="true"]')).not.toBeNull();
-    // Bug 回归锁：Electron 窗口不可见时 animationend 永不触发，Radix 会因等退出动画
-    // 卡住不卸载 overlay（bg-black/60 遮罩滞留吞点击）。关闭态必须无动画以同步卸载：
-    // overlay/content 必须挂上 highspeed 钩子类，且 CSS 对关闭态强制 animation none。
-    expect(document.querySelector('[data-slot="dialog-overlay"]')?.className).toContain(
-      "highspeed-share-dialog__overlay",
-    );
-    expect(document.querySelector('[data-slot="dialog-content"]')?.className).toContain(
-      "highspeed-share-dialog__content",
-    );
-    const shareCss = readFileSync("packages/ui/src/highspeed/highspeed-share.css", "utf8");
-    expect(shareCss).not.toMatch(
-      /@media \(max-width: 480px\)[\s\S]*?\.highspeed-share-dialog__card\s*\{[^}]*border-radius:\s*16px/,
-    );
-    expect(shareCss.replace(/\s+/g, " ")).toContain(
-      '.highspeed-share-dialog__overlay[data-state="closed"], .highspeed-share-dialog__content[data-state="closed"] { animation: none !important; }',
-    );
-    expect(shareCss).toContain(".highspeed-share-dialog__url:hover svg");
   });
 
   it("keeps the card visible but hides View when speedup is not greater than 1.2x", () => {

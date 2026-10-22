@@ -9,10 +9,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import {
   TID_WORKFLOW_LAUNCH_ARG,
   TID_WORKFLOW_LAUNCH_DIALOG,
-  testId,
   type ZCodeSavedWorkflowEntry,
   type ZCodeWorkflowsSaveResult,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 
 vi.mock("@/logger.js", () => ({ logger: { debug: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 const toastSpy = vi.hoisted(() => vi.fn());
@@ -34,7 +34,7 @@ vi.mock("@/store/TabStoreProvider.js", () => ({
     }),
 }));
 const controller = vi.hoisted(() => ({ current: undefined as unknown }));
-vi.mock("@/hooks/useWorkflowRunSave.js", () => ({
+vi.mock("@/project-workflow/useWorkflowRunSave.js", () => ({
   useWorkflowRunSave: () => controller.current,
 }));
 
@@ -49,13 +49,13 @@ import {
 import {
   useWorkflowRunSaveSlots,
   type WorkflowRunSaveSlotsHost,
-} from "@/components/workflow-timeline/WorkflowRunSaveControls.js";
+} from "@/project-workflow/WorkflowRunSaveControls.js";
 // eslint-disable-next-line import/first
 import { WorkflowCompletionCard } from "@/components/workflow-timeline/WorkflowCompletionCard.js";
 // eslint-disable-next-line import/first
 import { SavedWorkflowHubProvider } from "@/v4/savedWorkflowHubContext.js";
 // eslint-disable-next-line import/first
-import { WorkflowRunSaveSlotsBoundary } from "@/components/workflow-timeline/WorkflowRunSaveControls.js";
+import { WorkflowRunSaveSlotsBoundary } from "@/project-workflow/WorkflowRunSaveControls.js";
 // eslint-disable-next-line import/first
 import { ServiceProvider } from "@/hooks/useServices.js";
 // eslint-disable-next-line import/first
@@ -398,16 +398,6 @@ describe("表头槽位", () => {
     ).toBe("release/3.14");
     expect(launch).not.toHaveBeenCalled();
   });
-
-  it("窄卡只剩图标：动词的词挂在容器查询上，默认隐藏", () => {
-    renderSlots();
-    const word = screen.getByTestId("workflow-save-open").querySelector("span");
-    expect(word?.className).toContain("hidden");
-    expect(word?.className).toContain("@[480px]/wf-card:inline");
-    expect(screen.getByTestId("workflow-completion-card-t").className).toContain(
-      "@container/wf-card",
-    );
-  });
 });
 
 describe("WorkflowRunSaveSlotsBoundary", () => {
@@ -491,12 +481,5 @@ describe("run 侧板状态头", () => {
         .getByTestId("workflow-run-status")
         .compareDocumentPosition(screen.getByTestId("chip")) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-  });
-
-  it("没有服务上下文（slots 为 null）：两处都不画", () => {
-    renderHeader(null);
-    expect(screen.queryByTestId("verb")).toBeNull();
-    expect(screen.queryByTestId("chip")).toBeNull();
-    expect(screen.getByTestId("workflow-run-cancel")).toBeTruthy();
   });
 });

@@ -3,7 +3,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRemoteWorkspaceIdentity,
-  isRemoteWorkspaceIdentity,
   parseRemoteWorkspaceIdentity,
 } from "../src/remote-workspace-identity.js";
 
@@ -40,22 +39,26 @@ describe("parseRemoteWorkspaceIdentity", () => {
   });
 
   it("ssh：remote:ssh:<host>:<port>:<username>:<path>", () => {
-    expect(
-      parseRemoteWorkspaceIdentity("remote:ssh:dev.example.com:22:root:/srv/app"),
-    ).toEqual({ kind: "ssh", workspacePath: "/srv/app" });
+    expect(parseRemoteWorkspaceIdentity("remote:ssh:dev.example.com:22:root:/srv/app")).toEqual({
+      kind: "ssh",
+      workspacePath: "/srv/app",
+    });
     // path 含 ":"（posix 合法）不截断
-    expect(
-      parseRemoteWorkspaceIdentity("remote:ssh:host:2222:dev:/data/a:b"),
-    ).toEqual({ kind: "ssh", workspacePath: "/data/a:b" });
+    expect(parseRemoteWorkspaceIdentity("remote:ssh:host:2222:dev:/data/a:b")).toEqual({
+      kind: "ssh",
+      workspacePath: "/data/a:b",
+    });
   });
 
   it("wsl / docker：单段 authority + path", () => {
-    expect(
-      parseRemoteWorkspaceIdentity("remote:wsl:Ubuntu-22.04:/home/dev/ws"),
-    ).toEqual({ kind: "wsl", workspacePath: "/home/dev/ws" });
-    expect(
-      parseRemoteWorkspaceIdentity("remote:docker:my-container:/workspace"),
-    ).toEqual({ kind: "docker", workspacePath: "/workspace" });
+    expect(parseRemoteWorkspaceIdentity("remote:wsl:Ubuntu-22.04:/home/dev/ws")).toEqual({
+      kind: "wsl",
+      workspacePath: "/home/dev/ws",
+    });
+    expect(parseRemoteWorkspaceIdentity("remote:docker:my-container:/workspace")).toEqual({
+      kind: "docker",
+      workspacePath: "/workspace",
+    });
   });
 
   it("wsl：显式 user 属于 authority，解析后只返回真实 workspacePath", () => {
@@ -65,9 +68,7 @@ describe("parseRemoteWorkspaceIdentity", () => {
       kind: "wsl",
       workspacePath: "/home/dev/coding/DEMO-ERP-NEW",
     });
-    expect(
-      parseRemoteWorkspaceIdentity("remote:wsl:Ubuntu-24.04:dev:/data/a:b"),
-    ).toEqual({
+    expect(parseRemoteWorkspaceIdentity("remote:wsl:Ubuntu-24.04:dev:/data/a:b")).toEqual({
       kind: "wsl",
       workspacePath: "/data/a:b",
     });
@@ -96,12 +97,5 @@ describe("parseRemoteWorkspaceIdentity", () => {
     expect(parseRemoteWorkspaceIdentity("remote::host:22:u:/x")).toBeNull();
     expect(parseRemoteWorkspaceIdentity("remote:")).toBeNull();
     expect(parseRemoteWorkspaceIdentity("")).toBeNull();
-  });
-
-  it("isRemoteWorkspaceIdentity 与 parse 判定一致", () => {
-    expect(
-      isRemoteWorkspaceIdentity("remote:ssh:host:22:root:/srv/app"),
-    ).toBe(true);
-    expect(isRemoteWorkspaceIdentity("/Users/dev/ws")).toBe(false);
   });
 });

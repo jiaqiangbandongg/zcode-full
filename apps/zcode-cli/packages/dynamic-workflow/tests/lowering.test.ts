@@ -85,9 +85,10 @@ describe("lowering semantics", () => {
   });
 
   for (const { dir, name } of semanticFixtures) {
-    it(`${name}: every site id appears exactly once in the right __host.* call`, () => {
+    it(`${name}: emits unique host sites, valid JS and deterministic output`, () => {
       const source = readFileSync(join(dir, name), "utf8");
-      const { code, siteIds } = assertLowered(source);
+      const a = assertLowered(source);
+      const { code, siteIds } = a;
       // siteIds 去重后 == 原列表（每个站点唯一）。
       expect(new Set(siteIds).size).toBe(siteIds.length);
       for (const id of siteIds) {
@@ -98,11 +99,8 @@ describe("lowering semantics", () => {
           `${hostCallFor(id)}"${id}"`,
         );
       }
-    });
 
-    it(`${name}: lowers to type-stripped JS (parses as JS, no facade globals)`, () => {
-      const source = readFileSync(join(dir, name), "utf8");
-      const { code } = assertLowered(source);
+      // 复用同一产物检查站点与语法，确定性仍由下方第二次独立降级验证。
       // 把输出当 JS 解析：TS 语法（interface / 类型注解 / <T> 类型实参）会让 AsyncFunction 抛错。
       expect(() => new AsyncFunction(HOST_BINDING, code)).not.toThrow();
       expect(code).not.toContain("interface ");
@@ -115,11 +113,7 @@ describe("lowering semantics", () => {
       expect(code).not.toMatch(/(^|[^.\w])(channel|future)\s*\(/);
       // 留白改写成 __host.hole（docs/dynamic-workflow/authoring.md「Holes」）。
       expect(code).not.toMatch(/(^|[^.\w])hole\s*[(<]/);
-    });
 
-    it(`${name}: is deterministic (lowering twice yields identical bytes)`, () => {
-      const source = readFileSync(join(dir, name), "utf8");
-      const a = assertLowered(source);
       const b = assertLowered(source);
       expect(a.code).toBe(b.code);
       expect(a.siteIds).toEqual(b.siteIds);

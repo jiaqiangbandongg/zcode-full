@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-compact-goal",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-compact-goal.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-cg-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_COMPACT_GOAL"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-cg-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 stale generation\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-cg-compact",
+      "description": "M4 /compact 门禁：手动 compact 的 streaming summary 成功响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "手动 compact 的核心断言是 v4 投影产出 [compact] · completed marker；summary 文案固定即可。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_COMPACT_GOAL", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "delayMs": 300,
+        "text": {
+          "id": "v4-compact-success",
+          "inputTokens": 256,
+          "outputTokens": 64,
+          "text": "<analysis>R3 compact</analysis>\n<summary>R3_COMPACT_SUMMARY: the user sent E2E_R3_COMPACT_GOAL_A_FIRST_PROMPT and got a fixed reply.</summary>"
+        }
+      }
+    },
+    {
+      "id": "r3-cg-goal-continuation",
+      "description": "M4 /goal 设置后的 continuation 慢流，保持 active target 窗口以断言 goal 横幅。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "goal 设置后需要一段 streaming 窗口稳定验证 active 目标横幅，真实模型可能过快完成或触发验证。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "E2E_R3_COMPACT_GOAL_OBJECTIVE",
+          "Continue working toward the active session goal"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"r3-cg-goal-continuation\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_GOAL_STREAMING \"}}\n\n"
+          },
+          {
+            "offsetMs": 45000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 45100,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":120,\"output_tokens\":4,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 45200,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "text": {
+          "id": "r3-cg-goal-continuation",
+          "inputTokens": 120,
+          "outputTokens": 4,
+          "text": "R3_GOAL_STREAMING"
+        }
+      }
+    },
+    {
+      "id": "r3-cg-goal-verifier",
+      "description": "自然完成 goal 的 verifier pass。",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "固定 passed 结果，稳定制造 completed goal。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_COMPACT_GOAL_OBJECTIVE", "Verify whether the active session goal"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "body": "{\"id\":\"r3-cg-goal-verifier\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"passed\\\":true,\\\"reason\\\":\\\"fixture response matched objective\\\",\\\"nextAction\\\":\\\"\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":20,\"output_tokens\":12}}"
+      },
+      "maxMatches": 4
+    },
+    {
+      "id": "r3-cg-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_COMPACT_GOAL_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Continue working toward the active session goal",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-cg-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_COMPACT_GOAL_REPLY"
+        }
+      }
+    }
+  ]
+}

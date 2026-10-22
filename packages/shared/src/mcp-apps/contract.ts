@@ -185,6 +185,8 @@ export interface PluginSandboxPlatformPort {
   supportsRetainedMove?: boolean;
   /** 仅宿主操作可用；Main 校验 owner/代次后复制当前页面内容。 */
   copyImage?(input: PluginSandboxCaptureRequest): Promise<void>;
+  /** 只为指定代际的 MCP guest 保持可逆后台执行；不改变窗口或其他页面的节流。 */
+  setExecutionActive?(sandboxId: string, initId: number, active: boolean): Promise<void>;
   /** 宿主窗口 webContents id；prepareSandbox 用它作为 owner，main 在 will-attach 时校验。 */
   getOwnerWebContentsId(): Promise<number>;
   /**

@@ -595,7 +595,6 @@ describe("TaskRealtimeBus", () => {
       workspaceKeys: ["/repo/demo"],
       deliveryKind: "relay_bridge",
     });
-    expect(bus.getHostDeliveryKindForTest("host-a")).toBe("relay_bridge");
     hostA.emitMessage(makeLeaseRequest());
     hostA.postedMessages.length = 0;
     hostA.emitMessage(makeChunk("hello"));
@@ -782,17 +781,6 @@ describe("TaskRealtimeBus", () => {
         sessionId: "session-source",
         status: "failed",
       },
-    });
-  });
-});
-
-describe("TaskRealtimeBus.collectMemoryDiagnostics", () => {
-  it("返回 streamBatches / leases / sessionRoutes 三张表的只读大小", () => {
-    const bus = new TaskRealtimeBus({ logger: makeLogger() });
-    expect(bus.collectMemoryDiagnostics()).toEqual({
-      streamBatches: 0,
-      leases: 0,
-      sessionRoutes: 0,
     });
   });
 });

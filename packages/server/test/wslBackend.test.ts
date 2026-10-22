@@ -251,7 +251,7 @@ describe("buildWslArgs", () => {
     expect(buildWslArgs(["bash", "-lc", "pwd"], "Ubuntu-24.04", null)).toEqual([
       "-d",
       "Ubuntu-24.04",
-      "--",
+      "--exec",
       "bash",
       "-lc",
       "pwd",
@@ -279,11 +279,34 @@ describe("buildWslArgs", () => {
       "Ubuntu-24.04",
       "-u",
       "root",
-      "--",
+      "--exec",
       "bash",
       "-lc",
       "pwd",
     ]);
+  });
+
+  it("exec 与 execSimple 都以 --exec 直传 argv，命令不经默认 shell 二次解析", async () => {
+    // Bug 场景：Source Server tar preflight 依赖局部变量 `$tar_tool`。wsl.exe 非 --exec 模式会把
+    // `--` 之后的原始命令行交给用户默认 shell `-c`，Node 为参数加的双引号让外层 shell 先把
+    // `"$tar_tool"` 展开成空串，远端输出 `tar=` 且退出码 0，被误判成「远端缺少 tar」。
+    const preflightCommand =
+      "tar_tool=; if command -v tar >/dev/null 2>&1; then tar_tool=tar; fi; printf 'tar=%s\\n' \"$tar_tool\"";
+    const backend = new WSLBackend({ kind: "wsl", distro: "Ubuntu-24.04" });
+
+    await backend.exec(preflightCommand);
+
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      "wsl.exe",
+      ["-d", "Ubuntu-24.04", "-u", "tester", "--exec", "bash", "-lc", preflightCommand],
+      expect.objectContaining({ stdio: "pipe" }),
+    );
+    for (const call of [...mocks.spawn.mock.calls, ...mocks.execFile.mock.calls]) {
+      const args = call[1] as string[];
+      if (!args.includes("bash")) continue;
+      expect(args).not.toContain("--");
+      expect(args.indexOf("--exec")).toBe(args.indexOf("bash") - 1);
+    }
   });
 
   it("WSL NAT 下把不可达的 loopback 代理转换为宿主网关地址", async () => {
@@ -465,7 +488,7 @@ describe("buildWslArgs", () => {
         "Ubuntu-24.04",
         "-u",
         "tester",
-        "--",
+        "--exec",
         "bash",
         "-lc",
         "mkdir -p '/home/tester/.zcode/tmp' && cat > '/home/tester/.zcode/tmp/attachment.bin'",

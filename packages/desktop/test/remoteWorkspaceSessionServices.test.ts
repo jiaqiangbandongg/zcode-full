@@ -3,6 +3,7 @@ import { IHooksService, type IServiceAccessor } from "@zcode/services";
 import { ChannelClient, ChannelServer, ProxyChannel, createQueuePair } from "@zcode/rpc";
 import {
   buildRemoteWorkspaceSessionServices,
+  buildRemoteWorkspaceSessionServicesForRegistration,
   buildServerRemoteWorkspaceSessionServices,
 } from "../src/renderer/src/remoteWorkspaceSessionServices.js";
 
@@ -93,6 +94,38 @@ describe("buildRemoteWorkspaceSessionServices", () => {
     expect(merged.oauthService).toBe(remoteServices.oauthService);
     expect(merged.clientScenesService).toBe(remoteServices.clientScenesService);
     expect(merged.broadcastService).toBe(remoteServices.broadcastService);
+  });
+
+  it("uses server authority for an identified Source connected through SSH", () => {
+    const baseServices = makeServices("base");
+    const remoteServices = makeServices("remote");
+
+    const merged = buildRemoteWorkspaceSessionServicesForRegistration({
+      baseServices,
+      remoteServices,
+      targetKind: "ssh",
+      sourceServerId: "source-a",
+    });
+
+    expect(merged.modelSelectionService).toBe(remoteServices.modelSelectionService);
+    expect(merged.providerSettingsService).toBe(remoteServices.providerSettingsService);
+    expect(merged.settingService).toBe(remoteServices.settingService);
+  });
+
+  it("keeps legacy mixed authority for an unidentified SSH attachment", () => {
+    const baseServices = makeServices("base");
+    const remoteServices = makeServices("remote");
+
+    const merged = buildRemoteWorkspaceSessionServicesForRegistration({
+      baseServices,
+      remoteServices,
+      targetKind: "ssh",
+    });
+
+    expect(merged.settingService).toBe(baseServices.settingService);
+    expect(merged.fileService).toBe(remoteServices.fileService);
+    // Provider/Model 事实始终属于目标 Environment，legacy mixed attachment 也不回落本地。
+    expect(merged.modelSelectionService).toBe(remoteServices.modelSelectionService);
   });
 
   // SG-01：引用级断言只能证明白名单字段存在，证明不了运行时链路。这里走真实 RPC

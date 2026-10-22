@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox.js";
 import { XIcon } from "lucide-react";
-import { TID_CONFIRM_DIALOG_CONFIRM } from "@zcode/shared";
+import { TID_CONFIRM_DIALOG_CONFIRM } from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
   AUTOMATION_CONFIRM_DIALOG_CONTENT_CLASS,
   AUTOMATION_CONFIRM_DIALOG_DESCRIPTION_CLASS,
 } from "@/settings/automationConfirmDialogPresentation.js";
+import { SourceServerBoundaryDialogContent } from "@/remote/SourceServerBoundaryDialogContent.js";
 
 export function ConfirmDialogHost() {
   const { intl } = useZCodeIntl();
@@ -41,20 +42,24 @@ export function ConfirmDialogHost() {
   }>({ request: undefined, checked: false });
   const open = Boolean(pendingRequest);
   const isAutomationConfirmation = displayedRequest?.presentation === "automation-confirmation";
+  const isSourceServerBoundary = displayedRequest?.presentation === "source-server-boundary";
   const confirmLabel =
     displayedRequest?.confirmLabel ?? intl.formatMessage({ id: "common.confirm" });
   const cancelLabel = displayedRequest?.cancelLabel ?? intl.formatMessage({ id: "common.cancel" });
   const compact = displayedRequest?.compact === true;
+  const destructive = displayedRequest?.confirmVariant === "destructive";
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const requiredAcknowledgement = displayedRequest?.requiredAcknowledgement === true;
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      // Radix 在点击遮罩或按 Esc 时只会回调 onOpenChange(false)。
-      // 如果这里不主动把 Promise 结算为 false，调用侧会一直悬挂，后续删除操作也会被卡住。
-      if (!nextOpen) {
+      // Bugfix: Radix 在点击遮罩或按 Esc 时只会回调 onOpenChange(false)。
+      // 选择对话框保留 dismiss 与取消的区别；required acknowledgement 必须保持打开，避免未确认却被记为已读。
+      if (!nextOpen && !requiredAcknowledgement) {
         settleChoice("dismiss");
       }
     },
-    [settleChoice],
+    [requiredAcknowledgement, settleChoice],
   );
 
   const handleConfirm = useCallback(() => {
@@ -62,7 +67,7 @@ export function ConfirmDialogHost() {
   }, [settleConfirmation]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || destructive) {
       return;
     }
 
@@ -89,12 +94,41 @@ export function ConfirmDialogHost() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [open, settleConfirmation, displayedRequest]);
+  }, [open, destructive, settleConfirmation, displayedRequest]);
+
+  if (isSourceServerBoundary) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          data-confirm-intent={displayedRequest?.intent}
+          data-testid="source-server-boundary-dialog"
+          showCloseButton={false}
+          // Bug 原因：continuity dialog 曾用 bg-popover/98 组件级拼接 alpha，主题表面 token 因而无法统一维护。
+          // 直接使用完整的 popover surface，保留对话框层级和专用 continuity panel。
+          className="gap-0 overflow-hidden rounded-2xl border-none bg-popover p-0 ring-border shadow-2xl sm:max-w-xl"
+        >
+          <SourceServerBoundaryDialogContent
+            title={displayedRequest?.title}
+            description={displayedRequest?.description}
+            confirmLabel={confirmLabel}
+            onConfirm={handleConfirm}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        data-confirm-intent={displayedRequest?.intent}
         data-testid={displayedRequest?.testId}
+        onOpenAutoFocus={(event) => {
+          if (destructive) {
+            event.preventDefault();
+            cancelRef.current?.focus();
+          }
+        }}
         showCloseButton={false}
         overlayClassName={
           compact ? "bg-black/20 supports-backdrop-filter:backdrop-blur-[2px]" : undefined
@@ -147,24 +181,27 @@ export function ConfirmDialogHost() {
           <div
             className={displayedRequest?.checkbox ? "ml-auto flex items-center gap-2" : "contents"}
           >
+            {requiredAcknowledgement ? null : (
+              <Button
+                type="button"
+                ref={cancelRef}
+                variant={compact ? "outline" : "secondary"}
+                size={"lg"}
+                onClick={() => settleConfirmation(false)}
+                className={cn(
+                  "h-9 gap-3 px-4",
+                  displayedRequest?.showKeyboardHints !== false && "justify-between sm:min-w-28",
+                )}
+              >
+                <span>{cancelLabel}</span>
+                {displayedRequest?.showKeyboardHints !== false ? (
+                  <span className="font-mono text-ui-base text-foreground-subtle">esc</span>
+                ) : null}
+              </Button>
+            )}
             <Button
               type="button"
-              variant={compact ? "outline" : "secondary"}
-              size={"lg"}
-              onClick={() => settleConfirmation(false)}
-              className={cn(
-                "h-9 gap-3 px-4",
-                displayedRequest?.showKeyboardHints !== false && "justify-between sm:min-w-28",
-              )}
-            >
-              <span>{cancelLabel}</span>
-              {displayedRequest?.showKeyboardHints !== false ? (
-                <span className="font-mono text-ui-base text-foreground-subtle">esc</span>
-              ) : null}
-            </Button>
-            <Button
-              type="button"
-              autoFocus
+              autoFocus={!destructive}
               // 普通确认沿用主按钮；仅显式声明 destructive 的不可恢复动作使用危险色。
               variant={displayedRequest?.confirmVariant ?? "default"}
               size={"lg"}
@@ -176,7 +213,7 @@ export function ConfirmDialogHost() {
               )}
             >
               <span>{confirmLabel}</span>
-              {displayedRequest?.showKeyboardHints !== false ? (
+              {!destructive && displayedRequest?.showKeyboardHints !== false ? (
                 <span
                   className={
                     displayedRequest?.confirmVariant === "destructive"
@@ -190,7 +227,7 @@ export function ConfirmDialogHost() {
             </Button>
           </div>
         </DialogFooter>
-        {displayedRequest?.showCloseButton ? (
+        {displayedRequest?.showCloseButton && !requiredAcknowledgement ? (
           <DialogClose asChild>
             <Button
               type="button"

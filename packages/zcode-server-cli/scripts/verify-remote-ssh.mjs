@@ -11,17 +11,18 @@
  */
 import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { dockerPlatformForTarget, resolveVerificationTarget } from "./verify-remote-ssh-target.mjs";
+import { assert, findFreePort, retry, run } from "./verify-remote-ssh-runtime.mjs";
 
 const HOST_CAPABILITY_HEADER = "x-zcode-rpc-host-capability";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
 const keep = argv.includes("--keep");
+const verifySystemd = !argv.includes("--skip-systemd");
 const target = resolveVerificationTarget(readArg("--target"));
 const dockerPlatform = dockerPlatformForTarget(target);
 const releaseArchive = join(packageRoot, "dist-release", `zcode-server-${target}.tar.gz`);
@@ -34,61 +35,6 @@ const cleanups = [];
 function readArg(flag) {
   const index = argv.indexOf(flag);
   return index >= 0 ? argv[index + 1] : undefined;
-}
-
-function run(command, args, { input, allowFailure = false, quiet = false } = {}) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, { stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
-    if (input) {
-      child.stdin.write(input);
-      child.stdin.end();
-    }
-    child.once("error", rejectPromise);
-    child.once("exit", (code) => {
-      if (code === 0 || allowFailure) {
-        resolvePromise({ code: code ?? 1, stdout, stderr });
-      } else {
-        if (!quiet) console.error(stderr || stdout);
-        rejectPromise(new Error(`${command} ${args.join(" ")} exited with code ${code ?? "null"}`));
-      }
-    });
-  });
-}
-
-async function findFreePort() {
-  return await new Promise((resolvePromise, rejectPromise) => {
-    const server = createServer();
-    server.once("error", rejectPromise);
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
-      server.close(() => resolvePromise(port));
-    });
-  });
-}
-
-async function retry(description, attempts, delayMs, action) {
-  let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await action();
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, delayMs));
-    }
-  }
-  throw new Error(`${description} failed after ${attempts} attempts: ${lastError}`);
-}
-
-function assert(condition, message) {
-  if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
 async function main() {
@@ -109,12 +55,21 @@ async function main() {
   const { stdout: publicKey } = await run("cat", [`${keyPath}.pub`]);
 
   log(`build sshd image (${imageTag})`);
-  const dockerfile = [
-    "FROM ubuntu:22.04",
-    "RUN apt-get update && apt-get install -y --no-install-recommends openssh-server ca-certificates && rm -rf /var/lib/apt/lists/*",
-    "RUN mkdir -p /run/sshd /root/.ssh && chmod 700 /root/.ssh",
-    'CMD ["/usr/sbin/sshd", "-D", "-e"]',
-  ].join("\n");
+  const dockerfile = verifySystemd
+    ? [
+        "FROM ubuntu:22.04",
+        "ENV container=docker",
+        "RUN apt-get update && apt-get install -y --no-install-recommends openssh-server ca-certificates systemd systemd-sysv dbus-user-session && rm -rf /var/lib/apt/lists/*",
+        "RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && systemctl enable ssh.service",
+        "STOPSIGNAL SIGRTMIN+3",
+        'CMD ["/sbin/init"]',
+      ].join("\n")
+    : [
+        "FROM ubuntu:22.04",
+        "RUN apt-get update && apt-get install -y --no-install-recommends openssh-server ca-certificates && rm -rf /var/lib/apt/lists/*",
+        "RUN mkdir -p /run/sshd /root/.ssh && chmod 700 /root/.ssh",
+        'CMD ["/usr/sbin/sshd", "-D", "-e"]',
+      ].join("\n");
   // build context 用空的临时目录：Dockerfile 走 stdin，不需要任何文件，
   // 用包根会把 dist-release/node_modules 几百 MB 传给 docker daemon。
   await run("docker", ["build", "--platform", dockerPlatform, "-t", imageTag, "-f", "-", workDir], {
@@ -126,6 +81,9 @@ async function main() {
     "run",
     "--platform",
     dockerPlatform,
+    ...(verifySystemd
+      ? ["--privileged", "--cgroupns=host", "-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw"]
+      : []),
     "-d",
     "--name",
     containerName,
@@ -135,7 +93,10 @@ async function main() {
   ]);
   cleanups.push(async () => {
     if (!keep)
-      await run("docker", ["rm", "-f", containerName], { allowFailure: true, quiet: true });
+      await run("docker", ["rm", "-f", containerName], {
+        allowFailure: true,
+        quiet: true,
+      });
   });
   await run(
     "docker",
@@ -171,25 +132,60 @@ async function main() {
   await retry("ssh connectivity", 30, 1000, () => ssh("true"));
   log(`sshd ready on 127.0.0.1:${sshPort}`);
 
-  log("scp release archive and extract");
+  log("upload release archive and extract bootstrap CLI");
   await run("scp", [
     ...sshBaseArgs.map((arg) => (arg === "-p" ? "-P" : arg)),
     releaseArchive,
     `${sshTargetHost}:/root/`,
   ]);
   await ssh(
-    `mkdir -p /root/zcode-server && tar -xzf /root/zcode-server-${target}.tar.gz -C /root/zcode-server --strip-components=1`,
+    `mkdir -p /root/zcode-bootstrap && tar -xzf /root/zcode-server-${target}.tar.gz -C /root/zcode-bootstrap --strip-components=1`,
+  );
+
+  log("install archive through bootstrap bin/zcode");
+  const serverRoot = "/root/.zcode/server";
+  const remoteArchive = `/root/zcode-server-${target}.tar.gz`;
+  const { stdout: installOutput } = await ssh(
+    `/root/zcode-bootstrap/bin/zcode update --from-archive ${remoteArchive} --server-root ${serverRoot} --json`,
+  );
+  const installResult = JSON.parse(installOutput.trim().split("\n").pop());
+  assert(installResult.applied === true, `archive install applied, got: ${installOutput}`);
+  assert(
+    installResult.installed === true,
+    `archive install reports first install, got: ${installOutput}`,
   );
 
   log("start daemon on remote");
-  const { stdout: daemonOutput } = await ssh("/root/zcode-server/bin/zcode serve --daemon --json");
+  const stableZcode = `${serverRoot}/bin/zcode`;
+  const serviceEnvironment = verifySystemd
+    ? "XDG_RUNTIME_DIR=/run/user/0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus"
+    : "";
+  if (verifySystemd) {
+    await ssh("loginctl enable-linger root && systemctl start user@0.service");
+  }
+  const { stdout: daemonOutput } = await ssh(
+    `${serviceEnvironment} ${stableZcode} serve --daemon --server-root ${serverRoot} --json`,
+  );
   const daemonStatus = JSON.parse(daemonOutput.trim().split("\n").pop());
   assert(daemonStatus.state === "ready", `daemon ready, got: ${daemonOutput}`);
   assert(
     daemonStatus.host === "127.0.0.1",
     `daemon binds loopback only, got: ${daemonStatus.host}`,
   );
+  assert(
+    daemonStatus.serviceRegistered === verifySystemd,
+    `service registration matches verification mode (${verifySystemd})`,
+  );
+  if (verifySystemd) {
+    const { stdout: unitFiles } = await ssh(
+      `${serviceEnvironment} systemctl --user list-unit-files 'com.zhipu.zcode.server.*.service' --no-legend`,
+    );
+    assert(unitFiles.includes("enabled"), `systemd user unit enabled: ${unitFiles}`);
+  }
   const remotePort = daemonStatus.port;
+  const { stdout: ingressTokenOutput } = await ssh(`cat ${serverRoot}/run/ingress-token`);
+  const ingressToken = ingressTokenOutput.trim();
+  assert(ingressToken.length >= 32, "daemon writes a non-empty ingress token");
   log(`remote core ready at 127.0.0.1:${remotePort} (pid ${daemonStatus.pid})`);
 
   // Core 只监听远端回环地址；ssh -L 隧道是到达它的唯一路径。
@@ -206,7 +202,9 @@ async function main() {
   const baseUrl = `http://127.0.0.1:${localPort}`;
 
   const serverInfo = await retry("server-info via tunnel", 20, 500, async () => {
-    const response = await fetch(`${baseUrl}/api/server-info`);
+    const response = await fetch(`${baseUrl}/api/server-info`, {
+      headers: { authorization: `Bearer ${ingressToken}` },
+    });
     assert(response.ok, `server-info status ${response.status}`);
     return await response.json();
   });
@@ -214,11 +212,12 @@ async function main() {
     serverInfo.capabilities?.websocketRpc === true,
     "server-info reports websocketRpc capability",
   );
+  assert(serverInfo.authRequired === true, "server-info reports ingress authentication");
   log(`server-info ok: serverId=${serverInfo.serverId} version=${serverInfo.version}`);
 
   log("verify web replayable /ws upgrade");
   await new Promise((resolvePromise, rejectPromise) => {
-    const socket = new WebSocket(`ws://127.0.0.1:${localPort}/ws`);
+    const socket = new WebSocket(`ws://127.0.0.1:${localPort}/ws?token=${ingressToken}`);
     const timer = setTimeout(() => rejectPromise(new Error("/ws upgrade timed out")), 10_000);
     socket.once("open", () => {
       clearTimeout(timer);
@@ -239,14 +238,17 @@ async function main() {
     unauthorized.status === 401,
     `/ws/host without ticket must be 401, got ${unauthorized.status}`,
   );
-  const ticketResponse = await fetch(`${baseUrl}/api/rpc-host-capability`, { method: "POST" });
+  const ticketResponse = await fetch(`${baseUrl}/api/rpc-host-capability`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${ingressToken}` },
+  });
   const ticket = await ticketResponse.json();
   assert(
     typeof ticket.capability === "string" && ticket.capability.length > 0,
     "capability ticket issued",
   );
   await new Promise((resolvePromise, rejectPromise) => {
-    const socket = new WebSocket(`ws://127.0.0.1:${localPort}/ws/host`, {
+    const socket = new WebSocket(`ws://127.0.0.1:${localPort}/ws/host?token=${ingressToken}`, {
       headers: { [HOST_CAPABILITY_HEADER]: ticket.capability },
     });
     const timer = setTimeout(() => rejectPromise(new Error("/ws/host upgrade timed out")), 10_000);
@@ -261,7 +263,10 @@ async function main() {
     });
   });
   const replayed = await fetch(`${baseUrl}/ws/host`, {
-    headers: { [HOST_CAPABILITY_HEADER]: ticket.capability },
+    headers: {
+      authorization: `Bearer ${ingressToken}`,
+      [HOST_CAPABILITY_HEADER]: ticket.capability,
+    },
   });
   assert(replayed.status === 401, `replayed ticket must be 401, got ${replayed.status}`);
   log("ws contracts ok (replayable upgrade, host gate, one-time ticket)");
@@ -269,18 +274,22 @@ async function main() {
   // linux 的 pty.node 走 @lydell 补齐路径（打包时特殊处理），必须在真实目标平台验证可加载。
   log("verify node-pty spawns a real pty on remote");
   await ssh(
-    "cd /root/zcode-server/runtime && ./node -e \"const pty=require('node-pty');const p=pty.spawn('/bin/echo',['pty-ok'],{cols:80,rows:24});let o='';p.onData(d=>o+=d);p.onExit(()=>{process.exit(o.includes('pty-ok')?0:1)})\"",
+    `RELEASE_DIR=$(/root/zcode-bootstrap/runtime/node -e "console.log(JSON.parse(require('node:fs').readFileSync('${serverRoot}/current.json','utf8')).releaseDir)") && cd "$RELEASE_DIR/runtime" && ./node -e "const pty=require('node-pty');const p=pty.spawn('/bin/echo',['pty-ok'],{cols:80,rows:24});let o='';p.onData(d=>o+=d);p.onExit(()=>{process.exit(o.includes('pty-ok')?0:1)})"`,
   );
   log("node-pty ok");
 
   log("verify remote lifecycle status/stop");
-  const { stdout: statusOutput } = await ssh("/root/zcode-server/bin/zcode status --json");
+  const { stdout: statusOutput } = await ssh(
+    `${stableZcode} status --server-root ${serverRoot} --json`,
+  );
   assert(
     JSON.parse(statusOutput.trim().split("\n").pop()).state === "ready",
     "remote status ready",
   );
-  await ssh("/root/zcode-server/bin/zcode stop --json");
-  const { stdout: stoppedOutput } = await ssh("/root/zcode-server/bin/zcode status --json");
+  await ssh(`${stableZcode} stop --server-root ${serverRoot} --json`);
+  const { stdout: stoppedOutput } = await ssh(
+    `${stableZcode} status --server-root ${serverRoot} --json`,
+  );
   const stopped = JSON.parse(stoppedOutput.trim().split("\n").pop());
   assert(stopped.state === "stopped", `remote stopped, got ${stopped.state}`);
   log("lifecycle ok (ready -> stop -> stopped)");

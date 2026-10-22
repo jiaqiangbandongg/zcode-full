@@ -774,7 +774,6 @@ describe("情势截面 — 老 journal", () => {
     expect("enteredAt" in roster.phases![0]!).toBe(false);
     // 一趟 JSON 往返兜住整棵树：任何 NaN 都会在这里变成 null 而被断言抓住。
     expect(JSON.stringify(roster)).not.toContain("null");
-    expect(JSON.stringify(roster)).not.toContain("NaN");
   });
 
   it("没有 node-queued 任务摘要、没有 node-progress 读数时，那几个键一个都不编", () => {

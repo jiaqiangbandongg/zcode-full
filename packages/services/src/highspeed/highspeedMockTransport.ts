@@ -32,8 +32,7 @@ export function createHighspeedMockTransport(options?: {
       }
       const taskId =
         scenario === "existing-foreign-task-card" ? "mock-foreign-task" : request.task_id;
-      const expiresAt =
-        scenario === "expired-card" ? current - 1 : current + MOCK_CARD_LIFETIME_MS;
+      const expiresAt = scenario === "expired-card" ? current - 1 : current + MOCK_CARD_LIFETIME_MS;
       return {
         code: 0,
         msg: "success",
@@ -42,7 +41,10 @@ export function createHighspeedMockTransport(options?: {
             card_id: `hsc_mock_${current}`,
             task_id: taskId,
             provider: request.provider,
-            model: request.model,
+            model:
+              scenario === "hit-invalid-model"
+                ? "E2E-HIGHSPEED-MODEL-NOT-IN-REGISTRY"
+                : request.model,
             issued_at: current,
             expires_at: expiresAt,
           },

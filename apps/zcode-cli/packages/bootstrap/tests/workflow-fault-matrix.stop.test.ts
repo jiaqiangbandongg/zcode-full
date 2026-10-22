@@ -82,7 +82,10 @@ const STOP_ROWS: StopRow[] = [
   },
 ];
 
-async function runCell(server: FakeProviderServer, cell: CellCoordinate): Promise<FaultCellObservation> {
+async function runCell(
+  server: FakeProviderServer,
+  cell: CellCoordinate,
+): Promise<FaultCellObservation> {
   const observation = await runFaultCell({
     server,
     shape: cell.shape,
@@ -107,7 +110,6 @@ for (const row of STOP_ROWS) {
           if (obs.settlement.status !== "stopped") return;
           expect(obs.settlement.error?.code).toBe("ProviderStop");
           const details = obs.settlement.error?.providerStop;
-          expect(details).toBeDefined();
           expect(details?.kind).toBe(row.kind);
           expect(details?.providerId).toBe(FAULT_PROVIDER_ID);
           expect(details?.modelId).toBe(FAULT_MODEL_ID);
@@ -118,7 +120,6 @@ for (const row of STOP_ROWS) {
           if (row.kind === "quota") {
             // Retry-After: 120 → resetAt ≈ 第一条 429 的到达时刻 + 120 s。
             const firstAt = server.requests[0]?.at ?? 0;
-            expect(details?.resetAt).toBeDefined();
             expect(details!.resetAt! - firstAt).toBeGreaterThanOrEqual(110_000);
             expect(details!.resetAt! - firstAt).toBeLessThanOrEqual(130_000);
           } else {
@@ -156,13 +157,21 @@ for (const row of STOP_ROWS) {
           expect(providerFailed.length).toBeGreaterThan(0);
           expect(providerFailed.length).toBeLessThanOrEqual(stopResponses.length);
           expect(failed.every((event) => event.retryable === false)).toBe(true);
-          expect(providerFailed.every((event) => event.providerErrorCode === row.verdict.code)).toBe(
-            true,
-          );
+          expect(
+            providerFailed.every((event) => event.providerErrorCode === row.verdict.code),
+          ).toBe(true);
           expect(obs.statusEvents.some((event) => event.type === "model_retry_scheduled")).toBe(
             false,
           );
           expect(obs.governor.snapshot(obs.key)?.inFlight ?? 0).toBe(0);
+          // Stop 集不是并发信号：桶既不降 cap 也不冷却，resume（额度恢复后）同一模型立即准入，
+          // 而不是在闸门上静默等到 Retry-After 指的额度窗口结束。
+          const snapshot = obs.governor.snapshot(obs.key);
+          expect(snapshot?.cooldownUntil).toBeUndefined();
+          expect(snapshot?.cap).toBe(snapshot?.initial);
+          const resumed = obs.governor.tryAdmit("resumed-run", obs.key);
+          expect(resumed).toBeDefined();
+          resumed?.release();
         } finally {
           await server.close();
         }

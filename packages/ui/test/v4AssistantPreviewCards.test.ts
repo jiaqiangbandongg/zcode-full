@@ -155,6 +155,7 @@ vi.mock("@/hooks/useSettingService.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   // Bug 根因：Highspeed 历史消息改用可选服务以支持无 Provider 的只读渲染；
   // Vitest 的整模块 mock 未同步新导出，导致组件进入业务断言前就直接失败。
   useOptionalServices: () => null,

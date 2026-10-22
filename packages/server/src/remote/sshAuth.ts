@@ -1,4 +1,5 @@
 import type { ConnectConfig } from "ssh2";
+import type { PublicZCodeErrorCode } from "@zcode/shared";
 
 export const SSH_READY_TIMEOUT_MS = 60_000;
 export const SSH_KEEPALIVE_INTERVAL_MS = 15_000;
@@ -75,7 +76,7 @@ export function normalizeSSHConnectError(error: unknown): Error {
     "level" in error &&
     (error as { level?: string }).level === "client-authentication"
   ) {
-    return new Error("SSH 认证失败：请检查用户名、密码或私钥配置");
+    return authenticationError("SSH 认证失败：请检查用户名、密码或私钥配置", error);
   }
 
   if (
@@ -94,10 +95,10 @@ export function normalizeSSHConnectError(error: unknown): Error {
     // 之前仅匹配单一字符串，导致部分“缺少口令/口令错误”场景泄露底层错误文本，用户难以判断应输入哪种凭据。
     // 这里改为模式化归一化，把同类错误稳定映射成产品语义提示，便于用户直接修正输入。
     if (isMissingPrivateKeyPassphraseMessage(error.message)) {
-      return new Error("SSH 私钥需要口令：检测到加密私钥，但当前未提供私钥口令");
+      return authenticationError("SSH 私钥需要口令：检测到加密私钥，但当前未提供私钥口令", error);
     }
     if (isInvalidPrivateKeyPassphraseMessage(error.message)) {
-      return new Error("SSH 私钥口令错误：无法解密私钥，请检查私钥口令是否正确");
+      return authenticationError("SSH 私钥口令错误：无法解密私钥，请检查私钥口令是否正确", error);
     }
     return error;
   }
@@ -107,4 +108,11 @@ export function normalizeSSHConnectError(error: unknown): Error {
   }
 
   return new Error("SSH 连接失败");
+}
+
+function authenticationError(message: string, cause: unknown): Error {
+  // 认证发生在懒连接的 probe 内；在仍有 ssh2 结构化原因的边界定码，避免被归成预检失败。
+  return Object.assign(new Error(message, { cause }), {
+    code: "remote-authentication-failed" satisfies PublicZCodeErrorCode,
+  });
 }

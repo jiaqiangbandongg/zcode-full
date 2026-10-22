@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ZCodeTaskChangeSummary } from "@zcode/shared";
-import { formatGroupedTaskHoverChangeParts } from "@/workspace-grouped-tasks/task-row-tooltip.js";
+import { formatGroupedTaskHoverChangeParts } from "@/project-sidebar/grouped/task-row-tooltip.js";
 
-function createChangeSummary(
-  added: number,
-  removed: number,
-): ZCodeTaskChangeSummary {
+function createChangeSummary(added: number, removed: number): ZCodeTaskChangeSummary {
   return {
     fileCount: 1,
     added,
@@ -24,18 +21,11 @@ function createChangeSummary(
 
 describe("grouped task row tooltip", () => {
   it("formats non-zero change stats for the hover tooltip", () => {
-    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(5, 2))).toEqual([
-      "+5",
-      "-2",
-    ]);
+    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(5, 2))).toEqual(["+5", "-2"]);
   });
 
   it("omits zero change stats", () => {
-    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(0, 3))).toEqual([
-      "-3",
-    ]);
-    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(0, 0))).toEqual(
-      [],
-    );
+    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(0, 3))).toEqual(["-3"]);
+    expect(formatGroupedTaskHoverChangeParts(createChangeSummary(0, 0))).toEqual([]);
   });
 });

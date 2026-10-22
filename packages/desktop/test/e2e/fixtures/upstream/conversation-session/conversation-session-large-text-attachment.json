@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-large-text-attachment",
+  "spec": "./test/e2e/conversation-session/conversation-session-large-text-attachment.test.ts",
+  "fixtures": [
+    {
+      "id": "large-text-only",
+      "description": "T18 only：4096 字节跨中文字符的大文本附件首发。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复隔离模型随机性；真实文件选择、Agent 读取和 provider 请求正文由 E2E 断言，不模拟附件读取。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["e2e-large-text-only.txt", "E2E_LARGE_TEXT_ONLY_CONTENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "large-text-only",
+          "inputTokens": 10000,
+          "outputTokens": 8,
+          "text": "LARGE_TEXT_ATTACHMENT_OK"
+        }
+      }
+    },
+    {
+      "id": "large-text-with-query",
+      "description": "T18 with-query：4096 字节跨中文字符的大文本附件首发。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复隔离模型随机性；真实文件选择、Agent 读取和 provider 请求正文由 E2E 断言，不模拟附件读取。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["e2e-large-text-with-query.txt", "E2E_LARGE_TEXT_QUERY_CONTENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "large-text-with-query",
+          "inputTokens": 10000,
+          "outputTokens": 8,
+          "text": "LARGE_TEXT_ATTACHMENT_OK"
+        }
+      }
+    },
+    {
+      "id": "large-text-gbk",
+      "description": "T18 gbk：ASCII 前缀后的 GBK 字符跨 4096 字节采样边界，补读后排除 UTF-8。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复隔离模型随机性；真实文件选择、Agent 读取和 provider 请求正文由 E2E 断言，不模拟附件读取。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["e2e-large-text-gbk.txt", "E2E_LARGE_TEXT_GBK_CONTENT"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "large-text-gbk",
+          "inputTokens": 10000,
+          "outputTokens": 8,
+          "text": "LARGE_TEXT_ATTACHMENT_OK"
+        }
+      }
+    }
+  ]
+}

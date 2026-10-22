@@ -2,14 +2,14 @@
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type EmbeddedBrowserPermissionPromptEvent } from "@zcode/shared";
 import {
   TID_BROWSER_PERMISSION_ALLOW_ALWAYS,
   TID_BROWSER_PERMISSION_ALLOW_ONCE,
   TID_BROWSER_PERMISSION_DENY,
   TID_BROWSER_PERMISSION_DISMISS,
   TID_BROWSER_PERMISSION_PROMPTS,
-  type EmbeddedBrowserPermissionPromptEvent,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 // 与组件相同的 "@/..." 说明符：vitest alias 下相对路径与别名会解析成两个模块实例，
 // 导致 setState 与组件订阅落在不同 store 上。

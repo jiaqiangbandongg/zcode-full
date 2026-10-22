@@ -146,6 +146,13 @@
 
 DF-01 verification (2026-09-07): macOS Desktop WDIO passed (`desktop-e2e-20260907040958265-p60496-c535b8967f7e59a1`). HTTP 200/400 business failures, body/header log ID, update rejection, streaming circuit status, and localized error rendering are covered by 124 passing unit tests. Typecheck, Desktop E2E typecheck, and lint passed (43 warnings, 0 errors). Pending case is not promoted. Live Feishu, Windows/Linux, mobile devices, and delivery-failure DOM interaction remain unverified; existing connection-error DOM regression CF-01 passed in macOS Desktop WDIO.
 
+## BOT-E2E-RW-02：R3 stable / legacy Bot 身份
+
+- accepted：已握手 Source 与当前窗口远程 session 在线，回退快照仍是 legacy；以 stable 和 legacy Bot context 分别请求模型/任务入口。
+- 断言：两个入口归一到同一 stable scope；不误报断线、不调用本机 task、不额外建 Host/Agent；只授权的旧身份升级后仍限制为同一 Source。
+- 对照：同 path 不同 Source、重绑旧线路、preferred Profile 与在线线路不同、断线/重连换代、并发 task/model lookup、迟到 port 和 dispose。
+- 主证据为真实模块串联探针及 Bot service synthetic E2E；不声称真实飞书/Telegram 投递已验证。
+
 ## Feishu group collaboration (accepted, pending automation)
 
 - BOT-E2E-GR-01: two enabled groups and private chat retain separate task/configuration; member commands cannot switch tasks or approve. Group prompts carry trusted source to canonical admission; no legacy sendPrompt.
@@ -200,16 +207,16 @@ BOT-UI-MN：真实正式气泡、准备气泡与队列组件在 390/1200px、深
 用户已确认实施整个分支的覆盖补齐；重复成功回执保持现状，不增加去重断言。
 状态 owner：CLI CommandInbox 管 admission/执行，Bot Host 管绑定、材料及 delivery，UI 只投影；不另建队列。
 
-| Case | Setup → Action → Assert | 证据与状态 |
-| --- | --- | --- |
-| BOT-E2E-TP-04 | 真实 CLI 话题运行中 → Bot 接收新消息 → 自动停止旧 run，权威终态后续接，零排队，旧输出不冒充新轮 | Host/CLI/模型 HTTP，pending |
-| BOT-E2E-TP-05 | 已接收历史文件索引 → 真实 ReadSessionContext → Host 验证并下载，CLI 收到正确文件；其他任务/失效授权不下载 | Host/CLI/模拟平台 HTTP，pending |
-| BOT-E2E-FN-01 | 工具输出后终态含完整正文 → adapter 对账 → 完整结果仅回传一次；普通对话仍正常 | adapter/真实 stream/平台出站，pending |
-| BOT-E2E-MN-02 | 真实 CLI 触发 ReplyToChannel → 原生提及成功 → 客户端续聊按名字查询新目标，无 botGroupSource，不弹默认审批 | Host/CLI/模拟平台 HTTP，pending |
-| BOT-E2E-GR-02 | 运行中接收群输入 → 取消及正常晋升分别执行 → FIFO、原始来源、同卡终态与不重复输入 | 调整已有 runtime case |
-| BOT-E2E-GR-UI-01 | 两机器人/两群 → 设置开关、失败及恢复 → 隔离、持久化、不补发 | 新增 UI 候选 |
-| BOT-E2E-PS-01 | 私聊绑定 task → IM/desktop/mobile 连续轮次与重启 → 一轮一回传，失败显式重试 | 扩展已有候选，模拟 origin 不计手机 UI |
-| BOT-E2E-MN-01/TP-03 | 群/话题与多个身份 → 回复和管理员操作 → quote、条件 @、管理员提醒及幂等 | 扩展现有服务候选 |
+| Case                | Setup → Action → Assert                                                                                   | 证据与状态                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| BOT-E2E-TP-04       | 真实 CLI 话题运行中 → Bot 接收新消息 → 自动停止旧 run，权威终态后续接，零排队，旧输出不冒充新轮           | Host/CLI/模型 HTTP，pending           |
+| BOT-E2E-TP-05       | 已接收历史文件索引 → 真实 ReadSessionContext → Host 验证并下载，CLI 收到正确文件；其他任务/失效授权不下载 | Host/CLI/模拟平台 HTTP，pending       |
+| BOT-E2E-FN-01       | 工具输出后终态含完整正文 → adapter 对账 → 完整结果仅回传一次；普通对话仍正常                              | adapter/真实 stream/平台出站，pending |
+| BOT-E2E-MN-02       | 真实 CLI 触发 ReplyToChannel → 原生提及成功 → 客户端续聊按名字查询新目标，无 botGroupSource，不弹默认审批 | Host/CLI/模拟平台 HTTP，pending       |
+| BOT-E2E-GR-02       | 运行中接收群输入 → 取消及正常晋升分别执行 → FIFO、原始来源、同卡终态与不重复输入                          | 调整已有 runtime case                 |
+| BOT-E2E-GR-UI-01    | 两机器人/两群 → 设置开关、失败及恢复 → 隔离、持久化、不补发                                               | 新增 UI 候选                          |
+| BOT-E2E-PS-01       | 私聊绑定 task → IM/desktop/mobile 连续轮次与重启 → 一轮一回传，失败显式重试                               | 扩展已有候选，模拟 origin 不计手机 UI |
+| BOT-E2E-MN-01/TP-03 | 群/话题与多个身份 → 回复和管理员操作 → quote、条件 @、管理员提醒及幂等                                    | 扩展现有服务候选                      |
 
 剪枝：Feishu/Lark 平台差异由服务候选双平台覆盖，真实 CLI 主链路优先 Feishu；不机械交叉所有平台与主题。
 主题/宽度由组件浏览器验证；真实手机 replayable、SSH 身份、平台租户通知分别记录，不能以窄屏或 stub 代替。

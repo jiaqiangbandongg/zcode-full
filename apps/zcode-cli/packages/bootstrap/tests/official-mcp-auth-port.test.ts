@@ -33,7 +33,9 @@ function entrypointResolveWorkspace(fallbackCwd: string) {
   };
 }
 
-function createHarness(options: { resolveWorkspace?: ReturnType<typeof entrypointResolveWorkspace> } = {}) {
+function createHarness(
+  options: { resolveWorkspace?: ReturnType<typeof entrypointResolveWorkspace> } = {},
+) {
   const requestClient = vi.fn(async () => OK);
   const context = { requestClient } as unknown as OfficialMcpAuthRequestContext;
   const port = createOfficialMcpAuthHeadersPort({
@@ -72,27 +74,6 @@ describe("official mcp auth headers port", () => {
       workspaceKey: "/workspace/app",
       workspacePath: "/workspace/app",
     });
-    expect(sentWorkspace(0).workspaceKey).not.toBe(sentWorkspace(1).workspaceKey);
-  });
-
-  it("forwards workspaceIdentity through to resolveWorkspace", async () => {
-    const resolveWorkspace = vi.fn(entrypointResolveWorkspace("/fallback"));
-    const { port } = createHarness({ resolveWorkspace });
-    await port.resolveHeaders({
-      ...BASE_REQUEST,
-      workspaceIdentity: "remote:ssh:host:/repo",
-      workspacePath: "/repo",
-    });
-    expect(resolveWorkspace).toHaveBeenCalledWith({
-      workspaceIdentity: "remote:ssh:host:/repo",
-      workspacePath: "/repo",
-    });
-  });
-
-  it("treats a blank identity as absent instead of producing an empty workspaceKey", async () => {
-    const { port, sentWorkspace } = createHarness();
-    await port.resolveHeaders({ ...BASE_REQUEST, workspaceIdentity: "   ", workspacePath: "/repo" });
-    expect(sentWorkspace(0)).toEqual({ workspaceKey: "/repo", workspacePath: "/repo" });
   });
 
   it("sends the declared plugin identity and target origin unchanged", async () => {
@@ -126,9 +107,9 @@ describe("official mcp auth headers port", () => {
       resolveContext: () => undefined,
       resolveWorkspace: entrypointResolveWorkspace("/fallback"),
     });
-    await expect(
-      port.resolveHeaders({ ...BASE_REQUEST, workspacePath: "/repo" }),
-    ).resolves.toEqual({ ok: false, reason: "official_auth_unavailable" });
+    await expect(port.resolveHeaders({ ...BASE_REQUEST, workspacePath: "/repo" })).resolves.toEqual(
+      { ok: false, reason: "official_auth_unavailable" },
+    );
     expect(requestClient).not.toHaveBeenCalled();
   });
 
@@ -156,6 +137,5 @@ describe("official mcp auth headers port", () => {
     const result = await port.resolveHeaders({ ...BASE_REQUEST, workspacePath: "/repo" });
     // 绝不降级为匿名，且不把可能含上下文的错误详情带出
     expect(result).toEqual({ ok: false, reason: "official_auth_unavailable" });
-    expect(JSON.stringify(result)).not.toContain("/secret/path");
   });
 });

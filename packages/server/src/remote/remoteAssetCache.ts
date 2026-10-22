@@ -1645,7 +1645,11 @@ async function writeResponseBodyToFile(
     },
   });
 
-  await pipeline(Readable.fromWeb(response.body as globalThis.ReadableStream), byteMeter, output);
+  await pipeline(
+    Readable.fromWeb(response.body as unknown as import("node:stream/web").ReadableStream),
+    byteMeter,
+    output,
+  );
   reportProgress(transferredBytes, true);
 }
 

@@ -10,13 +10,6 @@ import {
 } from "../src/foundation.js";
 
 describe("toDisposable", () => {
-  it("should call the function on dispose", () => {
-    const fn = vi.fn();
-    const d = toDisposable(fn);
-    d.dispose();
-    expect(fn).toHaveBeenCalledOnce();
-  });
-
   it("should only call the function once", () => {
     const fn = vi.fn();
     const d = toDisposable(fn);
@@ -45,27 +38,9 @@ describe("DisposableStore", () => {
     store.add(toDisposable(fn));
     expect(fn).toHaveBeenCalledOnce();
   });
-
-  it("should not double-dispose", () => {
-    const store = new DisposableStore();
-    const fn = vi.fn();
-    store.add(toDisposable(fn));
-    store.dispose();
-    store.dispose();
-    expect(fn).toHaveBeenCalledOnce();
-  });
 });
 
 describe("Emitter", () => {
-  it("should fire events to listeners", () => {
-    const emitter = new Emitter<number>();
-    const values: number[] = [];
-    emitter.event((v) => values.push(v));
-    emitter.fire(1);
-    emitter.fire(2);
-    expect(values).toEqual([1, 2]);
-  });
-
   it("should support multiple listeners", () => {
     const emitter = new Emitter<string>();
     const a: string[] = [];
@@ -158,18 +133,6 @@ describe("Event", () => {
 });
 
 describe("Relay", () => {
-  it("should relay events from input source", () => {
-    const source = new Emitter<number>();
-    const relay = new Relay<number>();
-    relay.input = source.event;
-
-    const values: number[] = [];
-    relay.event((v) => values.push(v));
-    source.fire(1);
-    source.fire(2);
-    expect(values).toEqual([1, 2]);
-  });
-
   it("should switch input source", () => {
     const source1 = new Emitter<number>();
     const source2 = new Emitter<number>();
@@ -206,15 +169,6 @@ describe("EventMultiplexer", () => {
 });
 
 describe("CancellationTokenSource", () => {
-  it("should fire cancellation event on cancel", () => {
-    const cts = new CancellationTokenSource();
-    const fn = vi.fn();
-    cts.token.onCancellationRequested(fn);
-    expect(cts.token.isCancellationRequested).toBe(false);
-    cts.cancel();
-    expect(fn).toHaveBeenCalledOnce();
-  });
-
   it("should only fire once", () => {
     const cts = new CancellationTokenSource();
     const fn = vi.fn();

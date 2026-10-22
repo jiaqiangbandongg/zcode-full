@@ -91,9 +91,6 @@ describe("row identity materialization", () => {
       productTurnId: "user-message-1",
       visibility: "visible",
     });
-    expect(projection.getEntityIdForRow(user!.rowId)).toBe(
-      (user as unknown as { entityId: string }).entityId,
-    );
     expect(projection.getMessageIdForRow(user!.rowId)).toBe(
       (user as unknown as { entityId: string }).entityId,
     );

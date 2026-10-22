@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { TID_WORKSPACE_ITEM } from "@zcode/shared";
 import {
   TID_COMPOSER_WORKSPACE_TRIGGER,
   TID_V4_SESSION_PANE,
-  TID_WORKSPACE_ITEM,
   TID_WORKSPACE_PATH,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { probeWorkspaceAppState } from "./e2e/helpers/desktop-app.js";
 
 const PROJECT_PATH = "/Users/dev/Code/z-code/.e2e-home/ZCodeProject";
@@ -31,6 +31,7 @@ function appendTestId(testIdValue: string, attributes: Record<string, string> = 
 
 afterEach(() => {
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
 });
 
 describe("desktop e2e workspace readiness probe", () => {
@@ -41,23 +42,34 @@ describe("desktop e2e workspace readiness probe", () => {
   });
 
   it("is ready when the workspace path badge matches", () => {
+    appendTestId(TID_WORKSPACE_PATH, { "data-workspace-abs-path": PROJECT_PATH });
+
+    expect(probe()).toBe("ready");
+  });
+
+  it("does not treat a native title as the workspace path anchor", () => {
+    // 路径徽标的上下文信息改由 tooltip 承载，DOM 不再有 title；只认数据属性锚点。
     appendTestId(TID_WORKSPACE_PATH, { title: PROJECT_PATH });
 
-    expect(probe()).toBe("ready");
+    expect(probe()).toBe("pending");
   });
 
-  it("is ready when the sidebar workspace item and a v4 session pane both exist", () => {
+  it("is ready when the active workspace and a v4 session pane both exist", () => {
     appendTestId(testId(TID_WORKSPACE_ITEM, PROJECT_PATH));
     appendTestId(`${TID_V4_SESSION_PANE}-pane-1`);
+    vi.stubGlobal("__zcodeTabStoreE2E", {
+      getState: () => ({ activeWorkspacePath: PROJECT_PATH }),
+    });
 
     expect(probe()).toBe("ready");
   });
 
-  it("matches a Windows workspace item without CSS escaping the path", () => {
+  it("matches a Windows active workspace path", () => {
     const windowsPath = String.raw`C:\gitlab-runner\builds\project\packages\desktop\.e2e-home\ZCodeProject`;
     appendTestId(testId(TID_WORKSPACE_ITEM, windowsPath));
     appendTestId(`${TID_V4_SESSION_PANE}-pane-1`);
 
+    vi.stubGlobal("__zcodeTabStoreE2E", { getState: () => ({ activeWorkspacePath: windowsPath }) });
     expect(probe(windowsPath)).toBe("ready");
   });
 

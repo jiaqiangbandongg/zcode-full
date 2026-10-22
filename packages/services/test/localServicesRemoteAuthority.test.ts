@@ -314,12 +314,20 @@ describe("createLocalServices remote authority", () => {
       expect(registerChannel).toHaveBeenCalled();
       expect(exposeService).not.toHaveBeenCalledWith(accountRequestAuthService);
       const credentialService = services.get(ICredentialService);
-      await services.get(ISettingService).update({
-        providerFamilyDomain: "zai",
-        providerFamilyConnectionSelections: {
-          zai: { kind: "individual-coding-plan" },
+      const before = await services.get(ISettingService).get();
+      await services.get(ISettingService).update(
+        {
+          providerFamilyDomain: "zai",
+          providerFamilyConnectionSelections: {
+            zai: { kind: "individual-coding-plan" },
+          },
         },
-      });
+        {
+          providerFamilyDomain: before.providerFamilyDomain,
+          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+          providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
+        },
+      );
       await credentialService.save(
         "oauth:zai:user_info",
         JSON.stringify({ id: "account-a", username: "a", displayName: "Account A" }),

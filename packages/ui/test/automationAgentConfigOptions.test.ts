@@ -132,34 +132,6 @@ describe("automation model/thought linkage", () => {
     ).toBe("Demo Provider/model-a");
   });
 
-  it("Registry View 已发布时使用其中的 Provider label", () => {
-    expect(
-      resolveAutomationModelTriggerLabel({
-        modelGroups: groups,
-        modelSelectionView: {
-          revision: 1,
-          providers: [
-            {
-              providerId: "demo",
-              providerName: "Registry Provider",
-              config: {
-                api: {
-                  type: "openai-chat-completions",
-                  baseUrl: "https://registry.example.com/v1",
-                },
-                access: { type: "api-key", apiKey: "test-key" },
-                models: ["model-a"],
-              },
-              models: [{ modelId: "model-a", config: {} }],
-            },
-          ],
-        },
-        modelValue: "demo/model-a",
-        fallbackLabel: "选择模型",
-      }),
-    ).toBe("Registry Provider/model-a");
-  });
-
   it("模型触发器继续遵循会话侧内置 family 的裁剪规则", () => {
     const providerId = BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan;
     const modelGroups: ModelSelectGroup[] = [
@@ -244,12 +216,20 @@ describe("automation model/thought linkage", () => {
     expect(option?.currentValue).toBe("");
   });
 
-  it.each(["edit", "guarded", "yolo"])("编辑态权限 %s 原样回显，菜单用 guarded 替代 edit", (mode) => {
-    const option = buildAutomationModeOption(mode);
+  it.each(["edit", "guarded", "yolo"])(
+    "编辑态权限 %s 原样回显，菜单用 guarded 替代 edit",
+    (mode) => {
+      const option = buildAutomationModeOption(mode);
 
-    expect(option.currentValue).toBe(mode);
-    expect(option.options?.map((item) => item.value)).toEqual(["build", "guarded", "plan", "yolo"]);
-  });
+      expect(option.currentValue).toBe(mode);
+      expect(option.options?.map((item) => item.value)).toEqual([
+        "build",
+        "guarded",
+        "plan",
+        "yolo",
+      ]);
+    },
+  );
 
   it("ModelSelection 只保存模型身份与 reasoning，不继承旧输出预算", () => {
     const previous = {

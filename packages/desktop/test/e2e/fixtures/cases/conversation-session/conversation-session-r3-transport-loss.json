@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-transport-loss",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-transport-loss.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-transport-loss.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-tloss-title",
+      "description": "标题辅助响应",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-tloss-slow-turn",
+      "description": "远端 running 窗口：controlled stream 45s",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "queue/stop 只在 running 期间存在"
+    },
+    {
+      "id": "r3-tloss-queued",
+      "description": "排队项被消费后的普通回复",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "队列消费按 FIFO"
+    },
+    {
+      "id": "r3-tloss-permission-write",
+      "description": "Write 工具触发远端权限请求",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "权限阻塞必须由真实 blocking request 承载"
+    },
+    {
+      "id": "r3-tloss-permission-final",
+      "description": "工具结果后的终态文本",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "终态"
+    },
+    {
+      "id": "r3-tloss-main-fallback",
+      "description": "其它本 case 请求",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/续发普通回复"
+    }
+  ]
+}

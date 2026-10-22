@@ -1,14 +1,14 @@
 import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import {
   DYNAMIC_WORKFLOW_MODES,
-  isDynamicWorkflowOffered,
   normalizeDynamicWorkflowMode,
+  readDynamicWorkflowOfferedMode,
   TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_ITEM,
   TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER,
-  testId,
   type AppSettings,
   type DynamicWorkflowMode,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import {
   DynamicWorkflowAlwaysOnIcon,
   DynamicWorkflowOffIcon,
@@ -36,16 +36,18 @@ const MODE_ICONS: Record<DynamicWorkflowMode, ComponentType<SVGProps<SVGSVGEleme
 };
 
 /**
- * 设置行要显示什么（docs/dynamic-workflow/launch.md「The user's choice」）。快照加载中、读取失败、
- * 服务端未提供功能时都返回 null：行不渲染，灰度对用户不可见。值与「默认」都取 Host 算好的结果，
- * renderer 不自己套用户选择。
+ * 设置行要显示什么（docs/dynamic-workflow/launch.md「The user's choice」）。快照就绪后总是出现：
+ * 服务端只决定默认值，提供的是 disabled 时「默认」落在「关闭」上，用户照样可以打开。
+ * 只有快照加载中、读取失败、或来自不认用户选择的旧 Host（没有 offeredMode）时返回 null。
+ * 值与「默认」都取 Host 算好的结果，renderer 不自己套用户选择。
  */
 export function resolveDynamicWorkflowModeSettingView(
   snapshot: DynamicWorkflowAvailabilitySnapshot,
 ): { value: DynamicWorkflowMode; offeredMode: DynamicWorkflowMode } | null {
   const config = snapshot.config;
-  if (snapshot.status !== "ready" || !config || !isDynamicWorkflowOffered(config)) return null;
-  return { value: config.mode, offeredMode: config.offeredMode };
+  if (snapshot.status !== "ready" || !config) return null;
+  const offeredMode = readDynamicWorkflowOfferedMode(config);
+  return offeredMode ? { value: config.mode, offeredMode } : null;
 }
 
 /** 选回服务端提供的模式等于删除选择（空串哨兵，服务层归一成删除），安装继续跟随服务端翻转。 */

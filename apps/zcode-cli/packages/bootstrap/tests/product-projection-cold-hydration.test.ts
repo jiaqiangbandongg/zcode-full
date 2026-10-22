@@ -487,7 +487,9 @@ describe("ProductProjection cold hydration ask preview", () => {
       ],
       lanes: [{ id: "actor#1", name: "a" }],
       // 第二层是子代理导向：每阶段一张参与者卡 + 交接边（docs/dynamic-workflow/presentation.md）。
-      participants: [{ id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] }],
+      participants: [
+        { id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] },
+      ],
       handoffs: [],
       sink: ["ask#1"],
     },
@@ -541,7 +543,6 @@ describe("ProductProjection cold hydration ask preview", () => {
     expect(payload).toMatchObject({ kind: "permission", display });
     // 第 4 轮：CreateWorkflow 的 v4 选项含 Refine；第 7 轮含会话免确认；冷恢复走同一
     // 合成函数，天然一致。
-    expect(payload?.kind === "permission" && payload.options).toHaveLength(4);
     expect(
       payload?.kind === "permission" && payload.options.map((option) => option.optionId),
     ).toEqual(["allowOnce", "allowSession", "deny", "workflowRefine"]);

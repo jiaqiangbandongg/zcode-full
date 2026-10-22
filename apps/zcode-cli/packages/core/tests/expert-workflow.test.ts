@@ -129,7 +129,6 @@ describe("ExpertWorkflowRuntime", () => {
     expect(result.snapshot?.definitionVersion).toBe("2");
     expect(result.snapshot?.strategy).toEqual(DEFAULT_EXPERT_WORKFLOW_STRATEGY);
     expect(result.snapshot?.phases.every((phase) => phase.status === "completed")).toBe(true);
-    expect(result.snapshot?.activities).toHaveLength(7);
     expect(result.snapshot?.activities.map((activity) => activity.sessionId)).toEqual([
       "sess-clarify",
       "sess-task_analysis",
@@ -146,7 +145,6 @@ describe("ExpertWorkflowRuntime", () => {
     expect(store.events.map((event) => event.type)).toContain("node_started");
     expect(store.events.map((event) => event.type)).toContain("executor_completed");
     expect(store.events.map((event) => event.type)).toContain("critic_passed");
-    expect(store.graphRecords.some((record) => record.recordType === "meta")).toBe(true);
     expect(
       store.graphRecords.some(
         (record) =>
@@ -418,7 +416,9 @@ describe("ExpertWorkflowRuntime", () => {
     expect(execPrompts).toHaveLength(1);
     expect(execPrompts[0]).toContain("Node: Implement public API boundary");
     expect(execPrompts[0]).toContain("Implement only the public API boundary.");
-    expect(execPrompts[0]).toContain("Preserve existing validation behavior and add focused tests.");
+    expect(execPrompts[0]).toContain(
+      "Preserve existing validation behavior and add focused tests.",
+    );
     expect(result.snapshot?.graph.nodes.find((node) => node.id === "implement_api")).toMatchObject({
       description: "Implement only the public API boundary.",
       prompt: "Preserve existing validation behavior and add focused tests.",

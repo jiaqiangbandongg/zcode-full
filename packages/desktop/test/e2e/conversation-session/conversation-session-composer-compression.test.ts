@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { NodePersonalProviderConfigRepository } from "@zcode/provider-node";
+import { ZCODE_CUA_OFFICIAL_PLUGIN_ID } from "@zcode/shared";
 import {
-  ZCODE_CUA_OFFICIAL_PLUGIN_ID,
   TID_LOGIN_USE_API_KEY_BUTTON,
   TID_TASK_SETTINGS_BUTTON,
   TID_CHAT_MODEL_SELECT_TRIGGER,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   DEFAULT_WORKSPACE,
@@ -15,10 +15,7 @@ import {
   setCurrentElectronRendererContentSize,
   restoreElectronRendererContentSize,
 } from "../helpers/desktop-app.js";
-import {
-  UPSTREAM_PROVIDER_ID,
-  UPSTREAM_SECONDARY_MODEL,
-} from "../helpers/upstream-provider.js";
+import { UPSTREAM_PROVIDER_ID, UPSTREAM_SECONDARY_MODEL } from "../helpers/upstream-provider.js";
 import {
   prepareV4ConversationE2E,
   loginWithApiKey,
@@ -52,7 +49,8 @@ async function snapshot() {
     const controls = ["0", "1", "2", "3"].map((priority) =>
       root.querySelector<HTMLElement>(`[data-composer-collapse-priority="${priority}"]`),
     );
-    const thought = controls[3];
+    // Think 已合并到模型按钮；绿条在该按钮内，不再有独立 Think 控件。
+    const thought = model;
     const prefix = model.querySelector(".composer-provider-prefix");
     const bar = thought?.querySelector(".bg-success") ?? null;
     const rect = (el: Element) => {
@@ -63,20 +61,16 @@ async function snapshot() {
     const providerHidden = root.dataset.composerProviderCompact === "true";
     const compact = controls.map((el) => el?.dataset.composerCompact ?? "full");
     const stage = modelIcon
-      ? 7
-      : compact[3] === "icon"
-        ? 6
-        : providerHidden
-          ? 5
-          : compact[3] === "true"
-            ? 4
-            : compact[2] === "true"
-              ? 3
-              : compact[1] === "true"
-                ? 2
-                : compact[0] === "true"
-                  ? 1
-                  : 0;
+      ? 5
+      : compact[3] === "true"
+        ? 4
+        : compact[2] === "true"
+          ? 3
+          : compact[1] === "true"
+            ? 2
+            : compact[0] === "true"
+              ? 1
+              : 0;
     return {
       stage,
       compact,
@@ -87,10 +81,10 @@ async function snapshot() {
       barVisible: visible(bar),
       bar: bar ? rect(bar) : null,
       track: bar?.parentElement ? rect(bar.parentElement) : null,
-      label: model.querySelector(".overflow-hidden[title]")
-        ? rect(model.querySelector(".overflow-hidden[title]")!)
+      label: model.querySelector("span[title]") ? rect(model.querySelector("span[title]")!) : null,
+      modelText: model.querySelector("span[title] > span > span:last-child")
+        ? rect(model.querySelector("span[title] > span > span:last-child")!)
         : null,
-      modelText: prefix?.nextElementSibling ? rect(prefix.nextElementSibling) : null,
       providerText: prefix ? rect(prefix) : null,
       title: model.querySelector("[title]")?.getAttribute("title") ?? null,
       controls: controls.map((el) => (el ? rect(el) : null)),
@@ -108,23 +102,24 @@ function assertLayout(s: Snapshot) {
   const expected: string[] = [s.stage >= 1, s.stage >= 2, s.stage >= 3].map((compact) =>
     compact ? "true" : "full",
   );
-  expected.push(s.stage >= 6 ? "icon" : s.stage >= 4 ? "true" : "full");
+  expected.push(s.stage >= 4 ? "true" : "full");
   assert.deepEqual(s.compact, expected, JSON.stringify(s));
-  assert.equal(s.prefixVisible, s.stage < 5, JSON.stringify(s));
-  assert.equal(s.barVisible, s.stage === 4 || s.stage === 5, JSON.stringify(s));
+  assert.equal(s.prefixVisible, false, JSON.stringify(s));
+  assert.equal(s.barVisible, s.stage >= 4, JSON.stringify(s));
   for (const [i, control] of s.controls.entries()) {
     assert.ok(control, "桌面各入口必须真实存在");
-    if ((i < 3 && s.compact[i] === "true") || (i === 3 && s.stage >= 6)) {
+    if (i < 3 && s.compact[i] === "true") {
       assert.ok(
         Math.abs(control.width - 28) < 1 && Math.abs(control.height - 28) < 1,
         JSON.stringify(s),
       );
     }
   }
-  if (s.modelIcon) assert.ok(Math.abs(s.model.width - 28) < 1 && Math.abs(s.model.height - 28) < 1);
+  if (s.modelIcon)
+    assert.equal(s.text.includes(UPSTREAM_SECONDARY_MODEL), false, "最后一档显示模型图标");
   else assert.ok(s.text.includes(UPSTREAM_SECONDARY_MODEL), "模型文字必须保留到最后一档");
   if (!s.modelIcon) {
-    assert.ok(s.label && s.modelText, "有名称 provider 必须生成独立模型文字片段");
+    assert.ok(s.label && s.modelText, "展开态必须保留完整模型文字");
     assert.ok(
       s.modelText.x >= s.label.x - 1 && s.modelText.right <= s.label.right + 1,
       "模型文字不能横向截断",
@@ -156,7 +151,7 @@ async function settledSnapshot() {
   return snapshot();
 }
 
-describe("Composer 七档压缩", () => {
+describe("Composer 五档压缩", () => {
   before(async () => {
     await browser.waitUntil(
       async () =>
@@ -180,7 +175,7 @@ describe("Composer 七档压缩", () => {
     await clearAppData();
   });
 
-  it("CMP01: 真实窗口逐档缩窄与放宽，think 两次变化独立于 provider 和 model", async function () {
+  it("CMP01: 真实窗口逐档缩窄与放宽，合并模型入口按五档顺序压缩且绿条保留", async function () {
     this.timeout(240000);
     await prepareV4ConversationE2E();
     await restartIntoWorkspacePreservingProfile(DEFAULT_WORKSPACE, {
@@ -263,11 +258,11 @@ describe("Composer 七档压缩", () => {
           stages.set(state.stage, width);
           await browser.saveScreenshot(join(evidence, `stage-${state.stage}.png`));
         }
-        if (state.stage === 7) break;
+        if (state.stage === 5) break;
       }
       assert.deepEqual(
         [...stages.keys()],
-        [0, 1, 2, 3, 4, 5, 6, 7],
+        [0, 1, 2, 3, 4, 5],
         "必须观察到所有独立档位，不能只经过首尾状态",
       );
       for (const [stage, width] of [...stages.entries()].reverse()) {

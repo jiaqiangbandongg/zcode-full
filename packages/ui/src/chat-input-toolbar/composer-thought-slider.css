@@ -1,0 +1,149 @@
+.composer-thought-slider {
+  /* 参考图中的白色滑块在两套主题下保持一致，轨道与档位圆点继续使用语义主题色。 */
+  --composer-thought-slider-thumb: var(--color-white);
+  --composer-thought-max-accent: var(--color-blue-500);
+}
+
+.composer-thought-slider[data-disabled="true"] {
+  opacity: 0.5;
+}
+
+.composer-thought-slider:has(input:focus-visible) {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* 拖拽也是离散档位切换，禁用过渡会造成跳动；保留与点击一致的短过渡。 */
+.composer-thought-slider-thumb {
+  background: var(--composer-thought-slider-thumb);
+  transition: left 120ms ease-out;
+}
+
+.composer-thought-slider-fill {
+  background: var(--color-success);
+  transition: width 120ms ease-out;
+}
+
+/* 普通档和入口竖条共用 Highspeed 蓝色，避免渐变退场后回到普通模型的绿色。 */
+.composer-thought-slider-fill[data-highspeed="true"],
+[data-highspeed="true"] > .composer-thought-meter-fill {
+  background: var(--color-blue-500);
+}
+
+.composer-thought-slider-fill::before {
+  /* 纯色与渐变背景无法直接插值；常驻渐变层用透明度过渡，反向调档也不会瞬切。 */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+  /* 沿较短色相路径经过青色，保留高饱和度，避免中段发灰。 */
+  background: linear-gradient(
+    270deg in oklch shorter hue,
+    var(--composer-thought-max-accent) 0%,
+    var(--color-success) 100%
+  );
+}
+
+/* 仅 GLM Highspeed 使用蓝→紫；OKLab 直接插值，避免原绿色起点带来青色过渡。 */
+.composer-thought-slider-fill[data-highspeed="true"]::before {
+  background: linear-gradient(
+    90deg in oklab,
+    var(--color-blue-500) 0%,
+    var(--color-purple-500) 100%
+  );
+}
+
+.composer-thought-slider-fill[data-max="true"]::before {
+  opacity: 1;
+}
+
+.composer-thought-bubble {
+  opacity: 0;
+  animation: composer-thought-bubble-flow linear infinite;
+}
+
+@keyframes composer-thought-bubble-flow {
+  0% {
+    transform: translateX(104%);
+    opacity: 0;
+  }
+  15%,
+  80% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(-4%);
+    opacity: 0;
+  }
+}
+
+.composer-thought-slider-stop {
+  /* 中性灰在绿底上不清楚；已填充档位沿用滑块白色，不随深色主题变黑。 */
+  background: var(--color-foreground-subtlest);
+  scale: 1;
+  transition:
+    scale 120ms ease-out,
+    opacity 120ms ease-out;
+}
+
+.composer-thought-slider-stop[data-filled="true"] {
+  background: var(--color-white);
+  opacity: 0.3;
+}
+
+.composer-thought-slider-stop[data-hovered="true"] {
+  scale: 1.75;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-thought-bubbles {
+    display: none;
+  }
+
+  .composer-thought-bubble {
+    animation: none;
+  }
+
+  .composer-thought-slider-stop,
+  .composer-thought-slider-thumb,
+  .composer-thought-slider-fill,
+  .composer-thought-slider-fill::before {
+    transition: none;
+  }
+}
+
+/* 原生滑块尺寸与可视滑块一致，确保首尾档位及点击/拖动坐标对齐。 */
+.composer-thought-range::-webkit-slider-runnable-track {
+  height: 32px;
+  background: transparent;
+}
+
+.composer-thought-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.composer-thought-range::-moz-range-track {
+  height: 32px;
+  background: transparent;
+}
+
+.composer-thought-range::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.composer-thought-range::-moz-range-progress {
+  background: transparent;
+}

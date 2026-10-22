@@ -1,8 +1,39 @@
+// @vitest-environment jsdom
+import { render, cleanup, act } from "@testing-library/react";
+import { useRemoteWorkspaceSessionStore } from "@/store/remoteWorkspaceSessionStore.js";
+import { RemoteProjectPresentationProvider } from "@/hooks/RemoteProjectPresentationContext.js";
+import { getSourceServerStatusRegistry } from "@/store/sourceServerStatusRegistry.js";
+import { getSourceServerDisplayNameRegistry } from "@/store/sourceServerDisplayNameRegistry.js";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { TID_WORKSPACE_MORE_BUTTON, TID_WORKSPACE_PATH, TID_WORKSPACE_TITLE } from "@zcode/shared";
+import {
+  TID_WORKSPACE_MORE_BUTTON,
+  TID_WORKSPACE_PATH,
+  TID_WORKSPACE_TITLE,
+} from "@zcode/shared/test-ids";
 
+const headerManagement = vi.hoisted(() => ({
+  getSnapshot: vi.fn(async () => ({
+    servers: [
+      {
+        sourceServerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        displayName: "Dev",
+        installState: "installed",
+      },
+    ],
+    profiles: [
+      {
+        profileId: "p",
+        sourceServerId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        target: { kind: "ssh", host: "dev", username: "user" },
+      },
+    ],
+    states: [{ profileId: "p", state: "online", updatedAt: 1 }],
+  })),
+  onDidChangeState: () => ({ dispose() {} }),
+  onDidChangeDirectory: () => ({ dispose() {} }),
+}));
 const capturedGitBranchSwitcherProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 
 vi.mock("lucide-react", async (importOriginal) => {
@@ -10,7 +41,9 @@ vi.mock("lucide-react", async (importOriginal) => {
   const createIcon = (name: string) => (props: Record<string, unknown>) =>
     createElement("svg", { "data-icon": name, ...props });
 
-  return {
+  // 共享组件（RemoteSyncActions 等）的图标随迭代增减，枚举 mock 会反复缺导出；
+  // 保留既有命名映射，其余图标名用 Proxy 兜底为占位 svg。
+  const icons: Record<string, unknown> = {
     ...actual,
     Cloud: createIcon("cloud"),
     Ellipsis: createIcon("ellipsis"),
@@ -19,6 +52,25 @@ vi.mock("lucide-react", async (importOriginal) => {
     LoaderIcon: createIcon("loader"),
     UploadCloud: createIcon("upload-cloud"),
   };
+  return new Proxy(icons, {
+    // vitest 对具名导出做 `in` 检查，动态图标必须声明存在。
+    has: (target, name) => typeof name === "string" || Reflect.has(target, name),
+    get: (target, name) => {
+      if (typeof name !== "string") return Reflect.get(target, name);
+      if (name === "default" || name === "then" || name === "__esModule") {
+        return Reflect.get(target, name);
+      }
+      return (
+        target[name] ??
+        createIcon(
+          name
+            .replace(/Icon$/u, "")
+            .replace(/([a-z0-9])([A-Z])/gu, "$1-$2")
+            .toLowerCase(),
+        )
+      );
+    },
+  });
 });
 
 vi.mock("@/ControlHintTooltip.js", () => ({
@@ -100,6 +152,7 @@ vi.mock("@/hooks/useWorkspaceServices.js", () => ({
   // Bugfix: Header 现在同时读取 workspace services 和 base services；
   // 测试 mock 需要覆盖同模块全部被用到的 hook，避免新增导出后静态渲染直接崩溃。
   useBaseWorkspaceServices: () => ({
+    sourceServerManagementService: headerManagement,
     skillSyncService: {},
     mcpSyncService: {},
     pluginSyncService: {},
@@ -156,24 +209,6 @@ vi.mock("@/store/zcodeSessionStore.js", () => ({
     }),
 }));
 
-vi.mock("@/store/remotePinnedTaskStore.js", () => ({
-  useRemotePinnedTaskStore: {
-    getState: () => ({
-      removeTask: vi.fn(),
-      upsertTask: vi.fn(),
-    }),
-  },
-}));
-
-vi.mock("@/store/remoteTimelineTaskStore.js", () => ({
-  useRemoteTimelineTaskStore: {
-    getState: () => ({
-      removeTask: vi.fn(),
-      upsertTask: vi.fn(),
-    }),
-  },
-}));
-
 vi.mock("@/store/modelTrajectoryStore.js", () => ({
   useModelTrajectoryStore: {
     getState: () => ({
@@ -183,7 +218,7 @@ vi.mock("@/store/modelTrajectoryStore.js", () => ({
 }));
 
 describe("WorkspaceHeaderTitleSection", () => {
-  it("keeps the title but hides task-only context and menus in the draft variant", async () => {
+  it("hides task-only title, context and menus in the local draft variant", async () => {
     capturedGitBranchSwitcherProps.length = 0;
     const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
 
@@ -213,7 +248,7 @@ describe("WorkspaceHeaderTitleSection", () => {
       }),
     );
 
-    expect(html).toContain(`data-testid="${TID_WORKSPACE_TITLE}"`);
+    expect(html).not.toContain(`data-testid="${TID_WORKSPACE_TITLE}"`);
     expect(html).not.toContain(`data-testid="${TID_WORKSPACE_PATH}"`);
     expect(html).not.toContain(`data-testid="${TID_WORKSPACE_MORE_BUTTON}"`);
     expect(capturedGitBranchSwitcherProps).toHaveLength(0);
@@ -257,53 +292,62 @@ describe("WorkspaceHeaderTitleSection", () => {
     expect(capturedGitBranchSwitcherProps).toHaveLength(0);
     expect(html).toContain('data-icon="folder"');
     expect(html).toContain('aria-label="zcode-cli · main"');
+    // 回归保护：aria-label 只有显示名，e2e 判定“header 属于哪个工作区”依赖这个绝对路径
+    // 数据属性。上一次它以 DOM title 形式存在，被 tooltip 重构顺手删掉后无人发现。
+    expect(html).toContain('data-workspace-abs-path="/workspace/zcode-cli"');
     expect(html.indexOf(`data-testid="${TID_WORKSPACE_PATH}"`)).toBeLessThan(
       html.indexOf(`data-testid="${TID_WORKSPACE_TITLE}"`),
     );
   });
 
-  it("uses the SSH alias suffix format for remote workspace context", async () => {
-    const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
+  it.each(["task", "draft"] as const)(
+    "keeps device context visible in the remote %s header",
+    async (variant) => {
+      const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
 
-    const html = renderToStaticMarkup(
-      createElement(WorkspaceHeaderTitleSection, {
-        workspaceAbsPath: "/root",
-        remoteSessionId: "remote-session-1",
-        workspaceIdentity: "remote:ssh:localhost:2223:root:/root",
-        remoteTarget: {
-          kind: "ssh",
-          host: "localhost",
-          port: 2223,
-          username: "root",
-          sshConfigAlias: "linux-arm64",
-        },
-        projectName: "root",
-        activeTaskTitle: "hello",
-        activeTaskId: "task-1",
-        activeTraceId: "trace-1",
-        activeSessionId: "session-1",
-        activeTaskProvider: "glm",
-        gitSummary: { isRepository: false },
-        gitDirtyFileCount: 0,
-        sessionLogPath: null,
-        nativeSessionLogProvider: null,
-        nativeSessionLogPath: null,
-        nativeSessionLogExists: false,
-        nativeSessionLogLoading: false,
-        providerWorkspaceConfigPath: null,
-        providerWorkspaceConfigExists: false,
-        providerWorkspaceConfigLoading: false,
-        workspaceHeaderState: { selectedProvider: "glm" },
-        selectedEditor: null,
-        onRefreshGit: vi.fn(),
-      }),
-    );
+      const html = renderToStaticMarkup(
+        createElement(WorkspaceHeaderTitleSection, {
+          variant,
+          workspaceAbsPath: "/root",
+          remoteSessionId: "remote-session-1",
+          workspaceIdentity: "remote:ssh:localhost:2223:root:/root",
+          remoteTarget: {
+            kind: "ssh",
+            host: "localhost",
+            port: 2223,
+            username: "root",
+            sshConfigAlias: "linux-arm64",
+          },
+          projectName: "root",
+          activeTaskTitle: "hello",
+          activeTaskId: "task-1",
+          activeTraceId: "trace-1",
+          activeSessionId: "session-1",
+          activeTaskProvider: "glm",
+          gitSummary: { isRepository: false },
+          gitDirtyFileCount: 0,
+          sessionLogPath: null,
+          nativeSessionLogProvider: null,
+          nativeSessionLogPath: null,
+          nativeSessionLogExists: false,
+          nativeSessionLogLoading: false,
+          providerWorkspaceConfigPath: null,
+          providerWorkspaceConfigExists: false,
+          providerWorkspaceConfigLoading: false,
+          workspaceHeaderState: { selectedProvider: "glm" },
+          selectedEditor: null,
+          onRefreshGit: vi.fn(),
+        }),
+      );
 
-    expect(html).toContain("root [SSH: linux-arm64]");
-    expect(html).toContain('data-icon="cloud"');
-    expect(html).not.toContain(">root</span><span");
-    expect(html).not.toContain(">localhost:2223</span>");
-  });
+      expect(html).toContain('data-workspace-device-name=""');
+      expect(html).toContain(">linux-arm64</span>");
+      expect(html).toContain('aria-label="root"');
+      expect(html).toContain('data-remote-state-icon="cloud-off"');
+      expect(html).not.toContain("[SSH: linux-arm64]");
+      expect(html).not.toContain(">root</span><span");
+    },
+  );
 
   it("shows Skills and MCP sync actions for connected SSH workspace header menu", async () => {
     const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
@@ -342,7 +386,126 @@ describe("WorkspaceHeaderTitleSection", () => {
       }),
     );
 
-    expect(html).toContain("settings.skills.remoteSync.open");
-    expect(html).toContain("settings.mcp.remoteSync.open");
+    // 同步菜单已按原型 L1197-1203 收敛为 remote.sync* key 与分化图标（wand/cable）。
+    expect(html).toContain("remote.syncSkills");
+    expect(html).toContain("remote.syncMcp");
   });
+});
+
+it.each([false, true])("头部读取项目错误/恢复事实（恢复=%s）", async (recovering) => {
+  getSourceServerStatusRegistry(headerManagement as never);
+  getSourceServerDisplayNameRegistry(headerManagement as never);
+  await Promise.resolve();
+  const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
+  const identity = "remote:server:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:/srv";
+  const child = createElement(WorkspaceHeaderTitleSection, {
+    workspaceAbsPath: "/srv",
+    workspaceIdentity: identity,
+    remoteTarget: { kind: "ssh", host: "dev", username: "user" },
+    projectName: "Project",
+    activeTaskTitle: "task",
+    activeTaskId: "task",
+    activeTaskProvider: "glm",
+    gitSummary: { isRepository: false },
+    gitDirtyFileCount: 0,
+    sessionLogPath: null,
+    nativeSessionLogProvider: null,
+    nativeSessionLogPath: null,
+    nativeSessionLogExists: false,
+    nativeSessionLogLoading: false,
+    providerWorkspaceConfigPath: null,
+    providerWorkspaceConfigExists: false,
+    providerWorkspaceConfigLoading: false,
+    workspaceHeaderState: { selectedProvider: "glm" },
+    selectedEditor: null,
+    onRefreshGit: vi.fn(),
+  });
+  const html = renderToStaticMarkup(
+    createElement(RemoteProjectPresentationProvider, {
+      reconnectingKeys: recovering ? [identity] : [],
+      errors: { [identity]: "attachment failed" },
+      recovery: recovering ? { [identity]: { mode: "automatic", attempt: 2, limit: 3 } } : {},
+      children: child,
+    }),
+  );
+  expect(html).toContain(
+    recovering ? "workspaceSidebar.recoveringAutomaticAttempt" : "remote.status.failed",
+  );
+  expect(html).toContain(
+    recovering ? "text-progress-surface-foreground" : "text-destructive-surface-foreground",
+  );
+});
+
+const headerDirectory = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock("@/project-sidebar/index.js", () => ({
+  useOptionalProjectDirectory: () => headerDirectory.current,
+}));
+
+it("远控 Header 从身份索引读取连接并从同一 Host 读取名称，连接换代和删除会更新", async () => {
+  const identity = "remote:server:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:/srv";
+  const store = useRemoteWorkspaceSessionStore;
+  headerDirectory.current = {
+    directory: {
+      hosts: [
+        {
+          id: "remote:server:other",
+          target: { kind: "ssh", host: "wrong.example", username: "dev" },
+        },
+        {
+          id: "remote:server:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          target: {
+            kind: "ssh",
+            host: "right.example",
+            username: "dev",
+            sshConfigAlias: "Remote Dev",
+          },
+        },
+      ],
+    },
+  };
+  store.getState().registerSession({ sessionId: "bridge", services: {} as never });
+  store.getState().bindWorkspaceIdentity(identity, "bridge");
+  const { WorkspaceHeaderTitleSection } = await import("@/WorkspaceHeaderSections.js");
+  const props = {
+    workspaceAbsPath: "/srv",
+    workspaceIdentity: identity,
+    projectName: "Project",
+    activeTaskTitle: "task",
+    activeTaskId: "task",
+    activeTraceId: null,
+    activeSessionId: null,
+    activeTaskProvider: null,
+    gitSummary: { isRepository: false },
+    gitDirtyFileCount: 0,
+    sessionLogPath: null,
+    nativeSessionLogProvider: null,
+    nativeSessionLogPath: null,
+    nativeSessionLogExists: false,
+    nativeSessionLogLoading: false,
+    providerWorkspaceConfigPath: null,
+    providerWorkspaceConfigExists: false,
+    providerWorkspaceConfigLoading: false,
+    workspaceHeaderState: { selectedProvider: "glm" },
+    selectedEditor: null,
+    onRefreshGit: vi.fn(),
+    isWebRemoteControl: true,
+  } satisfies import("@/WorkspaceHeaderSections.js").WorkspaceHeaderTitleSectionProps;
+  const view = render(createElement(WorkspaceHeaderTitleSection, props));
+  try {
+    const header = () => view.container.querySelector('[data-testid="workspace-path"]')!;
+    expect(header().getAttribute("aria-description")).toBe("remote.status.online");
+    expect(header().textContent).toBe("Remote Dev");
+    act(() => store.getState().unregisterSession("bridge"));
+    expect(header().getAttribute("aria-description")).toBe("remote.status.offline");
+    act(() => {
+      store.getState().registerSession({ sessionId: "replacement", services: {} as never });
+      store.getState().bindWorkspaceIdentity(identity, "replacement");
+    });
+    expect(header().getAttribute("aria-description")).toBe("remote.status.online");
+  } finally {
+    cleanup();
+    store.getState().unregisterSession("bridge");
+    store.getState().unregisterSession("replacement");
+    headerDirectory.current = null;
+  }
 });

@@ -210,3 +210,32 @@ describe("turn 载荷的 wf 维度", () => {
     ).toMatchObject({ kind: "turn.terminal", workflowResultConsumed: true });
   });
 });
+
+describe("MCP plugin attribution", () => {
+  it.each([SessionEventType.ToolCallResult, SessionEventType.ToolCallError])(
+    "keeps resolved attribution on %s",
+    (type) => {
+      const normalizer = new ConversationTelemetryFactNormalizer();
+      const fact = normalizer.normalize(
+        "s",
+        event(
+          type,
+          {
+            toolCallId: "mcp-call",
+            pluginId: "demo@market",
+            duration: 12,
+            result: { success: true, content: "do not report" },
+            error: { type: "tool_error", message: "do not report" },
+          },
+          1,
+          "s",
+        ),
+      );
+      expect(fact).toMatchObject({
+        kind: "tool.lifecycle",
+        pluginId: "demo@market",
+        pluginComponent: "mcp",
+      });
+    },
+  );
+});

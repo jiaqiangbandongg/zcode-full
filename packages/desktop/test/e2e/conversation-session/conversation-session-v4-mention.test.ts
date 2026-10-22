@@ -1,3 +1,4 @@
+import { openWorkspaceDraftFromSidebar } from "../helpers/workspace-agent-warmup.js";
 // S01 / S05 / S08 门禁：composer 聚合入口、兼容触发器与 Session Skill catalog 生命周期。
 // 证据层 L3：
 // 1) 首轮固定回复建立一个 session（写入 sessions-index）；
@@ -13,7 +14,7 @@ import {
   getE2EAppDataPaths,
   setInputValueByTestIdDom,
 } from "../helpers/desktop-app.js";
-import { TID_CHAT_ATTACHMENT_BUTTON, TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_CHAT_ATTACHMENT_BUTTON, TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import {
   clickV4SlashOption,
   getV4ComposerText,
@@ -22,7 +23,6 @@ import {
   prepareV4ConversationE2E,
   selectV4TaskById,
   sendV4Prompt,
-  startNewV4Draft,
   waitForV4MentionOptionPrefix,
   waitForV4Pane,
   waitForV4TimelineContaining,
@@ -128,7 +128,8 @@ describe("S01 / S05 / S08：composer 候选入口与 Session Skill catalog", () 
     }
 
     // 2) 新建 draft → 干净输入框
-    await startNewV4Draft();
+    // 全局新建会分配虚拟目录；Hook、Skill 与会话候选必须继续使用夹具所属项目。
+    await openWorkspaceDraftFromSidebar(getE2EAppDataPaths().workspace);
 
     // 3) `@` 聚合入口加载 sessions-index，并仍写入 # canonical mention。
     await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, "@E2E_V4_MENTION_SEED", {
@@ -275,7 +276,8 @@ describe("S01 / S05 / S08：composer 候选入口与 Session Skill catalog", () 
     }
 
     // 9) 新建任务创建新的 prewarm/runtime；同一个真实 SKILL.md 必须同时进入 / 与 $ 候选。
-    await startNewV4Draft();
+    // 全局新建会分配虚拟目录；Hook、Skill 与会话候选必须继续使用夹具所属项目。
+    await openWorkspaceDraftFromSidebar(getE2EAppDataPaths().workspace);
     let slashSkillOptionId: string | undefined;
     for (const trigger of ["/", "$"] as const) {
       await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, `${trigger}${SESSION_SKILL_NAME}`, {

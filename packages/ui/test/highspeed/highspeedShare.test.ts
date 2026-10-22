@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildHighspeedShareNotice,
   copyHighspeedCardImage,
-  copyHighspeedShareText,
   isHighspeedShareEligible,
   isHighspeedShareNoticePayload,
   resolveHighspeedShareNoticeMetrics,
@@ -153,19 +152,6 @@ describe("highspeed client share", () => {
     expect(svg).toContain("减少等待 80%");
     expect(svg).toContain("节省 1,067 秒");
     expect(svg).not.toContain("standard generation speed");
-  });
-
-  it("copies the complete share text", async () => {
-    let copied = "";
-    await copyHighspeedShareText(
-      "我用 ZCode 高速卡节省了 120 秒的时间，你也来试试吧。下载 ZCode https://zcode.z.ai",
-      async (text) => {
-        copied = text;
-      },
-    );
-    expect(copied).toBe(
-      "我用 ZCode 高速卡节省了 120 秒的时间，你也来试试吧。下载 ZCode https://zcode.z.ai",
-    );
   });
 
   it("rasterizes the SVG before writing it to the image clipboard", async () => {

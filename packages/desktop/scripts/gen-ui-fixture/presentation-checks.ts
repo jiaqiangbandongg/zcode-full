@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import type { PluginSandboxHandle } from "@zcode/shared/mcp-apps";
+import { checkPreviewCorners } from "./preview-corner-checks.js";
+import { checkUnifiedStyles } from "./style-checks.js";
 
 export async function checkCopyButton(win: BrowserWindow, preview = false) {
+  if (preview) await checkPreviewCorners(win);
   const selector = `${preview ? '[role="dialog"] ' : ""}[data-testid="gen-ui-actions"] button`;
   const buttonState = () =>
     win.webContents.executeJavaScript(`(() => {
@@ -146,6 +149,7 @@ export async function checkInlineLayout(
   await win.webContents.executeJavaScript("document.querySelector('#root').style.width=''");
   await checkNativeScroll(win);
   await checkContentSizing(win, read, artifacts);
+  await checkUnifiedStyles(win, read);
 }
 
 async function checkParentWidth(win: BrowserWindow, read: (code: string) => Promise<any>) {

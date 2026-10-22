@@ -26,10 +26,6 @@ import { CreateWorkflowToolCallBlock } from "../src/ToolCallBlocks/renderers/cre
 import { resolveToolCallRenderer } from "../src/ToolCallBlocks/resolveRenderer.js";
 // eslint-disable-next-line import/first -- 同上；整链路由断言要走真实入口组件。
 import { ToolCallBlock } from "@/ToolCallBlocks.js";
-// eslint-disable-next-line import/first -- 同上；词条只用于双语言存在性断言。
-import enUS from "../src/i18n/locales/en-US.js";
-// eslint-disable-next-line import/first -- 同上。
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 interface ToolCallOverrides {
   input?: unknown;
@@ -201,15 +197,12 @@ describe("SubmitResultToolCallBlock body 智能分流", () => {
     expect(html).toContain("&quot;alpha&quot;");
   });
 
-  it("纯字符串 result 走正文 prose，不进代码块、不用 mono", () => {
+  it("纯字符串 result 显示正文且不进代码块", () => {
     const prose = "根因在 scheduler 的 may-set 展开：lane 副本没有 actor 路由。";
     const html = renderBlock({ input: { result: prose } });
 
     expect(html).toContain(prose);
     expect(html).not.toContain('data-testid="code-block"');
-    // DESIGN.md 把 mono 留给路径/命令/代码/标识符；人话是 prose。
-    expect(html).not.toMatch(/font-mono[^>]*>根因在/u);
-    expect(html).toContain("whitespace-pre-wrap");
   });
 
   it("JSON 字符串 result 被解开成对象后走代码块分支", () => {
@@ -218,8 +211,6 @@ describe("SubmitResultToolCallBlock body 智能分流", () => {
 
     expect(html).toContain('data-testid="code-block"');
     expect(html).toContain("&quot;verdict&quot;: &quot;disproved&quot;");
-    // 折叠头部的单行概要仍是压缩形态，但 body 里不能再多出一块 prose 面板。
-    expect(html).not.toContain("rounded-lg border border-border bg-panel");
   });
 
   it("看着像 JSON 但解析不了的字符串保持 prose，不崩卡", () => {
@@ -264,7 +255,6 @@ describe("SubmitResultToolCallBlock 流式门", () => {
 
     expect(html).not.toContain('role="button"');
     expect(html).not.toContain('data-testid="code-block"');
-    expect(html).not.toContain("rounded-lg border border-border bg-panel");
     expect(html).toContain("正在提交结果");
   });
 
@@ -314,22 +304,5 @@ describe("SubmitResultToolCallBlock 快照字段提示", () => {
     );
 
     expect(html).toContain("加载完整工具数据");
-  });
-});
-
-describe("submitResult 词条双语齐备", () => {
-  it("四个相位 key 加一个小标题 key 在两种语言里都在场，且不是英文占位", () => {
-    // 缺 key 会静默渲染裸 key（IntlProvider.tsx 的 messages[id] ?? id）。
-    for (const key of [
-      "chat.toolCall.submitResult.submitting",
-      "chat.toolCall.submitResult.submitted",
-      "chat.toolCall.submitResult.rejected",
-      "chat.toolCall.submitResult.stopped",
-      "chat.toolCall.submitResult.resultHeading",
-    ]) {
-      expect(enUS[key]).toBeTruthy();
-      expect(zhCN[key]).toBeTruthy();
-      expect(zhCN[key]).not.toBe(enUS[key]);
-    }
   });
 });

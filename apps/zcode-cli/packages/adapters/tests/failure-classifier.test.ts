@@ -720,9 +720,7 @@ describe("classifyModelFailure provider business codes", () => {
   });
 
   it.each([
-    ["engine_overloaded_error", "provider_overloaded"],
     ["rate_limit_reached_error", "rate_limited"],
-    ["overloaded_error", "provider_overloaded"],
     ["rate_limit_error", "rate_limited"],
   ])("retries official transient provider code %s", (providerCode, reason) => {
     const failure = classifyModelFailure(

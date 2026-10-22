@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { ApplicationIconRequest } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
-import { useOptionalPlatform } from "@/hooks/usePlatform.js";
+import { useToolPresentationCapabilities } from "@/ToolCallBlocks/presentationCapabilities.js";
 import { CUA_TOOL_ICON } from "@/ToolCallBlocks/renderers/cuaIcon.js";
 
 export function CuaAppSummaryIcon({
@@ -22,7 +22,7 @@ export function CuaAppSummaryIcon({
   name: string;
   className?: "size-4" | "size-5";
 }) {
-  const platform = useOptionalPlatform();
+  const platform = useToolPresentationCapabilities();
   const [iconDataUrl, setIconDataUrl] = useState<string | null>(null);
 
   useEffect(() => {

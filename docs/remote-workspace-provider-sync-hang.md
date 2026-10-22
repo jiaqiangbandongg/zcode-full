@@ -4,6 +4,11 @@
 > 事故版本：3.8.1（commit `99f955e2`）；取证材料：用户日志包 `zcode-logs-full-20260821-100852-ssh-hang`（2026-08-21，本地时区 UTC+8）。
 > Provider Refactor 已整体删除涉案的 Registry 同步功能，因此本文只描述 3.8.1 事故和通用 RPC
 > dispose 不变量，不再适用于当前 Provider 架构。历史符号和日志原样保留用于取证。
+> 2026-09-07 注记：文中的 `packages/ui/src/lib/remoteWorkspaceProviderSync.ts`（含 in-flight 缓存与
+> `remoteWorkspaceProviderSync.test.ts`）以及 E2E 候选 `SSH-P0-LIFE-03` 已随 Provider 重构合并
+> （provider 重构路线 A）一并撤销，`ssh-remote-p0-e2e-plan.md` 不再登记该编号；
+> 本文仅作历史事故记录。仍然有效的只有 `ChannelClient.dispose()` reject in-flight 请求与
+> renderer 侧 `RemoteWorkspaceSession.dispose` 这两条通用 RPC 不变量。
 
 ## 0. 修复分析结论（速览）
 
@@ -75,7 +80,7 @@
 
 | 层级                 | 定性                                                                                                                                             | 位置                                                                                                                                                                                                           |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 触发器               | 远端 zcode-server 启动后即退（环境/服务端，本修复不处理）                                                                                        | 203.0.113.10                                                                                                                                                                                                  |
+| 触发器               | 远端 zcode-server 启动后即退（环境/服务端，本修复不处理）                                                                                        | 203.0.113.10                                                                                                                                                                                                   |
 | **根因（设计缺陷）** | RPC 挂起请求在传输终结时永不 settle：`dispose()` 不 reject pending，`send` 失败静默吞掉，全链路无超时                                            | `packages/rpc/src/channelClient.ts:233-242`                                                                                                                                                                    |
 | 放大器               | 模块级 in-flight 缓存把"一次永久 pending"放大为"该 workspaceKey 的所有后续打开全部挂死"（跨连接、跨向导/重连入口）                               | `packages/ui/src/lib/remoteWorkspaceProviderSync.ts:68-76,245-248`                                                                                                                                             |
 | 清理盲区             | `unregisterRemoteWorkspaceSession` 只清理已 bind 的 workspaceKey；sync 先于 bind（选目录与重连两条流程皆然），死于 sync 中的 session 无 key 可清 | `packages/ui/src/store/remoteWorkspaceSessionStore.ts:133-148`；流程顺序见 `packages/ui/src/root/useRemoteWorkspaceHistory.ts:582-597`、`packages/ui/src/root/reconnectRemoteWorkspaceHistoryEntry.ts:161-182` |

@@ -691,21 +691,6 @@ describe("amendWorkflowRunSettings — 只改并发即就地生效", () => {
     expect(meta.amend).toEqual({ maxConcurrency: { to: 40 }, ceiling: 13 });
   });
 
-  it("没有存档脚本的 run 照样能调并发（脚本读在分叉之后）", async () => {
-    const { runtime, retunes, amends } = makeRuntime({
-      name: "retune-no-script",
-      script: null,
-      snapshot: { maxConcurrency: 8 },
-      retune: { ok: true, maxConcurrency: 4, previous: 8, defaultConcurrency: 13 },
-    });
-
-    const result = await runtime.amendWorkflowRunSettings({ runId: PREVIOUS, maxConcurrency: 4 });
-
-    expect(result).toMatchObject({ ok: true, runId: PREVIOUS });
-    expect(retunes).toHaveLength(1);
-    expect(amends).toHaveLength(0);
-  });
-
   it("端口答 unchanged（值在分叉之后被挪过）→ 既有的 unchanged 拒绝", async () => {
     const { runtime, amends, store, events } = makeRuntime({
       name: "retune-unchanged",

@@ -3,7 +3,7 @@
 // dispatchCommand("compact", baseRevision) → v4-bridge compactSession → CompactStarted/Completed
 // 事件 → reducer onCompactLifecycle → timelineMarker compact/manual/success。
 // 证明 slash 命令入口 + compact 全链路（命令面已桥接，仅补 UI 触发）。
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   setInputValueByTestIdDom,

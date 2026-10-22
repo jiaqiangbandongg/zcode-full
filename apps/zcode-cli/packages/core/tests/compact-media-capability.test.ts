@@ -157,9 +157,6 @@ describe("compact media policy projection", () => {
       expect(compactRequest?.imageCount).toBe(expectedImageCount);
       expect(compactRequest?.videoCount).toBe(expectedVideoCount);
       expect(compactRequest?.text).toContain(omittedText);
-      if (capabilities.supportsImages === true) {
-        expect(compactRequest?.text).toContain("Media omitted from provider request");
-      }
     },
   );
 });

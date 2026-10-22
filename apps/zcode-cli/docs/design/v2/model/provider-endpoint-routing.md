@@ -31,10 +31,10 @@ bootstrap process registry（endpoint origin + network policy）
 
 静态实现保持既有开源网关行为：
 
-| 精确匹配的 HTTPS 端点 | 当前 runtime ZCode origin 下的目标路径 |
-| --- | --- |
-| `open.bigmodel.cn/api/anthropic/v1/messages` | `/api/v1/ultra/anthropic/v1/messages` |
-| `api.z.ai/api/anthropic/v1/messages` | `/api/v1/ultra-zai/anthropic/v1/messages` |
+| 精确匹配的 HTTPS 端点                        | 当前 runtime ZCode origin 下的目标路径    |
+| -------------------------------------------- | ----------------------------------------- |
+| `open.bigmodel.cn/api/anthropic/v1/messages` | `/api/v1/ultra/anthropic/v1/messages`     |
+| `api.z.ai/api/anthropic/v1/messages`         | `/api/v1/ultra-zai/anthropic/v1/messages` |
 
 默认端口、主机大小写、末尾 `/` 与 query 的处理遵循下文匹配规则；其它协议、端口、路径、子域和
 第三方 Provider 不改写。origin 复用 `resolveRuntimeZCodeEndpointOrigin`，不增加用户配置或环境变量。
@@ -67,17 +67,48 @@ GET https://zcode.z.ai/api/v1/agent/configs
       "mapping": [
         {
           "from": "https://open.bigmodel.cn/api/anthropic/v1/messages",
-          "to": "https://zcode.z.ai/api/v1/proxy/anthropic/v1/messages"
+          "to": "https://zcode.z.ai/api/v1/ultra/anthropic/v1/messages",
+          "zcodeAuthorizationHeader": "X-Zcode-Authorization"
         },
         {
           "from": "https://api.z.ai/api/anthropic/v1/messages",
-          "to": "https://zcode.z.ai/api/v1/proxy/anthropic/v1/messages"
+          "to": "https://zcode.z.ai/api/v1/ultra-zai/anthropic/v1/messages",
+          "zcodeAuthorizationHeader": "X-Zcode-Authorization"
         }
       ]
     }
   }
 }
 ```
+
+### ZCode 网关身份头
+
+mapping 条目的可选字段 `zcodeAuthorizationHeader` 表示命中该条目时向最终 ZCode 网关请求附加
+登录身份。字段值大小写不敏感地必须等于 `X-ZCode-Authorization`；客户端始终使用规范名称：
+
+```http
+X-ZCode-Authorization: Bearer <zcodejwt>
+```
+
+身份头仅允许发送到当前 runtime ZCode origin 下的两个路径族：
+
+- `/api/v1/ultra` 本身及其子路径；
+- `/api/v1/ultra-zai` 本身及其子路径。
+
+路径按 URL segment 判断；`/api/v1/ultra-other` 不属于 `/api/v1/ultra`。携带身份字段的条目如果
+目标 origin 或路径不满足限制，整份新快照拒绝并保持上一份可用快照。没有该字段的既有 mapping
+继续遵循原路由规则。
+
+JWT 唯一来源是当前 Environment 凭据存储中的 `zcodejwttoken`。路由命中后按请求读取，不缓存 JWT：
+
+- 有非空 JWT 时附加身份头；已带 `Bearer` 前缀时不重复添加；
+- 未登录、JWT 缺失/空白或凭据读取失败时仍完成既有 URL 路由，但不附加身份头；
+- JWT 表示当前 Environment 的 ZCode 登录身份，与模型 Provider Token/API Key 相互独立，不要求账号代次一致；
+- 直连请求、未声明身份字段的 mapping 和其它 ZCode API 不读取或发送 JWT。
+
+SSH、WSL 与 Docker 的目标 Environment 已通过 Provider Provisioning 的凭据 allowlist 同步
+`zcodejwttoken`，因此远程 Source Server 与本地 CLI 使用相同的目标端读取逻辑；不新增
+Host 到 CLI 的协议字段，也不修改 OAuth 凭据格式、登录回滚或 Provider 请求鉴权材料。
 
 ## 边界
 
@@ -88,7 +119,7 @@ GET https://zcode.z.ai/api/v1/agent/configs
 | 不生效请求   | WebFetch、MCP、OAuth、插件、Bash/tool、Desktop/Web renderer、`custom` provider transport |
 | 配置 owner   | ZCode CLI 进程内共享 routing registry                                                    |
 | 持久化       | 无；进程重启后重新读取                                                                   |
-| 协议/配置    | 私有 requestAuth 增加可选 apiKeyId，不新增用户配置或环境变量                             |
+| 协议/配置    | 私有 requestAuth 仅保留既有可选 apiKeyId，不新增协议字段、用户配置或环境变量             |
 
 桌面 `desktop-continuous` 与手机 `web-remote-replayable` 仍只描述 session/task 消息交付。
 本能力只修改 Agent 到模型 provider 的最终 HTTP 目的地，不改变 stream、snapshot、queue、owner、
@@ -134,6 +165,7 @@ ProviderEndpointRoutingPort.resolve
 - 配置请求最长 3 秒、响应体最长 256 KiB。
 - 刷新失败后 30 秒内不再发起配置请求；已有快照可继续使用到下一次成功刷新，冷启动无快照则直连。
 - 单个模型请求取消时必须立刻停止等待，但不能取消其他请求共享的配置刷新。
+- 身份 mapping 命中后的 JWT 读取属于同一请求取消边界；取消必须立即拒绝，迟到的读取结果不得继续发送请求。
 
 ## 配置请求与校验
 
@@ -185,6 +217,8 @@ requestAuth.apiKeyId --explicit ID only-----------------+--> agent/configs GET
 3. `data` 是对象；`proxyEndpoint` 缺失或 `mapping` 为空表示合法空快照。
 4. mapping 最多 256 条，且整份通过校验；坏项、重复 `from` 或超限时整份拒绝。
 5. `from` 与 `to` 都是 HTTPS URL，不含 username、password、query 或 fragment。
+6. `zcodeAuthorizationHeader` 缺失/空白时不附加身份；非空时必须是固定名称，且 `to` 必须命中当前
+   runtime ZCode origin 的 `/api/v1/ultra` 或 `/api/v1/ultra-zai` 路径族。
 
 `data` 中与本功能无关的字段允许存在。`to` 是受信控制面的任意 HTTPS 目标；这意味着命中时原模型
 鉴权头与请求内容会发送到该目标，服务端配置发布权限必须按敏感控制面管理。
@@ -195,7 +229,9 @@ requestAuth.apiKeyId --explicit ID only-----------------+--> agent/configs GET
 - URL parser 负责 scheme/hostname 大小写和默认端口归一化；除根路径外，末尾 `/` 视为等价。
 - 匹配忽略模型请求 query；命中后用完整 `to` 替换目标，并把原 query 原样附加到 `to`。
 - 不做 hostname-only、前缀或通配匹配，避免一个映射意外接管同域其它 API。
-- method、headers、body、AbortSignal 和响应 stream 必须保持不变；最终 `Host` 由 fetch 按目标 URL 生成。
+- method、既有 headers、body、AbortSignal 和响应 stream 必须保持不变；最终 `Host` 由 fetch 按目标 URL 生成。
+- 路由决策声明的身份 header 必须覆盖 Request、URL、string 三种 fetch 输入形态，包括没有
+  `init.headers` 的调用；不得依赖 SDK 恰好提供 headers。
 - URL 重写必须早于 HTTP proxy/No Proxy 解析，使出口策略按最终目标判断。
 - 后续 Model 创建使用的新 provider/model 配置不能丢失注入的 routing port；已创建 Model 的执行事实保持冻结。
 
@@ -204,18 +240,18 @@ requestAuth.apiKeyId --explicit ID only-----------------+--> agent/configs GET
 - 新快照与上一快照内容变化时记录一次 `info`，只包含 mapping 数量。
 - 刷新失败按 30 秒冷却窗口记录 `warn`，只包含错误类别和配置 endpoint host。
 - 单次命中只允许记录 `debug`，只包含源/目标 host 和规范化 path。
-- 禁止记录配置响应原文、query、headers、API Key、OAuth token、模型 body 或模型输出。
+- 禁止记录配置响应原文、query、headers、API Key、OAuth token、JWT、模型 body 或模型输出。
 
 ## Impact Brief
 
-| Field            | Value                                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| Developer intent | 通过同一个 port 装配动态路由或静态网关，保持公共模型请求链一致                                           |
-| Capability       | provider endpoint routing                                                                               |
-| Change layer     | commit-effect / persistence / recovery                                                                  |
-| Operating mode   | implementation-handoff                                                                                  |
+| Field            | Value                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- |
+| Developer intent | 通过同一个 port 装配动态路由或静态网关，保持公共模型请求链一致                                             |
+| Capability       | provider endpoint routing                                                                                  |
+| Change layer     | commit-effect / persistence / recovery                                                                     |
+| Operating mode   | implementation-handoff                                                                                     |
 | Primary seeds    | `createProviderEndpointRoutingPort`, `createProviderEndpointRoutingFetch`, `AiSdkModelExecution.bindModel` |
-| Out of scope     | UI、provider 配置持久化、非 provider 网络出口                                                           |
+| Out of scope     | UI、provider 配置持久化、非 provider 网络出口                                                              |
 
 本能力没有 UI surface、草稿状态或用户提交动作。权威 owner 是进程内 routing registry；
 Model execution、workflow child 与 script workflow child 只持有同一个 port 引用。必须检查的下游是
@@ -230,13 +266,13 @@ provider fetch 组合顺序和所有默认 model adapter 创建路径；WebFetch
 
 新增实现替换验收：
 
-| Case | Setup / Action | Assertions |
-| --- | --- | --- |
-| PER-019 | 两个官方端点、默认端口、末尾斜线、query | 静态目标路径正确，query 不变，远端配置调用数为零 |
-| PER-020 | 不同 scheme/host/port/path 和第三方 URL | 静态实现原样返回，不扩大匹配范围 |
-| PER-021 | 静态 port 经公共 wrapper 发送 Request/URL/string | method/body/auth/signal/response 不变，旧 Host 删除 |
-| PER-022 | 同 endpoint/network 重复创建，或改变 network | 工厂共享或隔离符合现有进程 registry 契约 |
-| PER-023 | 替换 edition 后构建并实际发送模型请求 | 默认装配走静态网关，动态源码缺席，公共调用链与测试保留 |
+| Case    | Setup / Action                                   | Assertions                                             |
+| ------- | ------------------------------------------------ | ------------------------------------------------------ |
+| PER-019 | 两个官方端点、默认端口、末尾斜线、query          | 静态目标路径正确，query 不变，远端配置调用数为零       |
+| PER-020 | 不同 scheme/host/port/path 和第三方 URL          | 静态实现原样返回，不扩大匹配范围                       |
+| PER-021 | 静态 port 经公共 wrapper 发送 Request/URL/string | method/body/auth/signal/response 不变，旧 Host 删除    |
+| PER-022 | 同 endpoint/network 重复创建，或改变 network     | 工厂共享或隔离符合现有进程 registry 契约               |
+| PER-023 | 替换 edition 后构建并实际发送模型请求            | 默认装配走静态网关，动态源码缺席，公共调用链与测试保留 |
 
 PER-019—023 与以下动态用例先于实现更新。动态测试继续覆盖缓存、失败、取消和 ID 隔离；
 本次没有 UI 交互变更，以真实 HTTP/模型执行集成与导出树运行验证入口，不新增 conversation 产品状态。
@@ -262,6 +298,18 @@ PER-019—023 与以下动态用例先于实现更新。动态测试继续覆盖
 | PER-017 | 来源 header builder 被错误注入敏感或未声明 header              | 冷启动刷新            | 只发送来源 allowlist；`x-api-key-id` 仍只能来自触发请求 |
 | PER-018 | 携带 ID 的首个 waiter 取消，另一个 waiter 仍等待 single-flight | 刷新进行中取消        | 取消不终止共享 GET；配置 GET 使用启动刷新时的 ID        |
 
+身份头用例：
+
+| Case    | Setup / Action                            | Assertions                     |
+| ------- | ----------------------------------------- | ------------------------------ |
+| PER-024 | ultra mapping 声明身份字段，目标端有 JWT  | 最终请求携带固定 Bearer header |
+| PER-025 | ultra-zai mapping 声明大小写变体字段      | 规范化为固定 header 名         |
+| PER-026 | 未登录、JWT 空白或读取失败                | 仍路由，但不附加身份 header    |
+| PER-027 | mapping 未声明身份字段                    | 不读取 JWT，不附加 header      |
+| PER-028 | 身份字段指向其它 origin 或其它 ZCode path | 整份快照拒绝，旧快照保持       |
+| PER-029 | JWT 在两次请求之间变化                    | 下一次请求读取新值，不缓存身份 |
+| PER-030 | Request、URL、string 且无 init.headers    | 身份 header 均到达最终请求     |
+
 ### 测试维度与剪枝
 
 | 维度       | 等价类                                                  | 代表用例                           |
@@ -270,9 +318,14 @@ PER-019—023 与以下动态用例先于实现更新。动态测试继续覆盖
 | ID 来源    | 有效 requestAuth.apiKeyId / 手工 Key / 来源 header 注入 | PER-011、PER-012、PER-017          |
 | ID 形态    | 显式参数 / 空白 / 控制字符或非 ASCII                    | PER-013、PER-014                   |
 | 并发与取消 | 单请求 / single-flight 多 waiter / 单 waiter 取消       | PER-011、PER-003、PER-018          |
-| fetch 输入 | URL/string / Request / Request + RequestInit override   | PER-012、PER-011、PER-013          |
+| fetch 输入 | URL/string / Request / Request + RequestInit override   | PER-012、PER-011、PER-013、PER-030 |
+| 身份状态   | 已登录 / 未登录 / 空白 / 读取失败 / 登录态变化          | PER-024、PER-026、PER-029          |
+| 身份目标   | ultra / ultra-zai / 其它 origin / 其它 path             | PER-024、PER-025、PER-028          |
 
-个人、团队账号和手工 Provider 使用实际 HTTP 回归：账号配置 GET 携带真实 ID，模型请求只携带 PAT；手工配置 GET 不携带凭据，模型请求仍用手工 Key。缓存过期后切换 ID，不能复用前一请求的 ID。Desktop/TUI/workflow 共享同一 adapter 与进程级 port，并由 bootstrap 协议测试覆盖 ID 透传。
+个人、团队账号和手工 Provider 使用实际 HTTP 回归：账号配置 GET 携带真实 ID；命中声明身份字段的
+ultra/ultra-zai mapping 时，目标 Environment 已登录则额外携带当前 ZCode JWT，未登录则保持原模型
+鉴权。手工配置 GET 仍不携带凭据，模型请求仍用手工 Key。缓存过期后切换 ID，不能复用前一请求的
+ID。Desktop/TUI/workflow 与 SSH/WSL/Docker Source Server 共享同一 adapter、目标端凭据和进程级 port。
 
 本功能不改变 conversation 产品状态，不进入 conversation case catalog、coverage matrix 或 formal-proof。
 

@@ -23,7 +23,9 @@ app
         '<!doctype html><script>throw new Error("fixture startup failure")</script>',
       );
       const scope = await env.agent.session(join(root, "interaction-workspace"), "managed");
-      const creation = env.createWindow(scope).then(() => "unexpected success", String);
+      const creation = env
+        .createWindow(scope, "background-interaction")
+        .then(() => "unexpected success", String);
       await env.events.wait((event) => event.type === "phase" && event.phase === "mounted");
       const win = env.windows[0]!;
       const ui = (code: string) => win.webContents.executeJavaScript(code);
@@ -58,6 +60,99 @@ app
       await ui("window.setAnchors(true, false)");
       await checkPagePointerInput(win, guest);
       assert.equal(env.guests.get(win.webContents.id)!.id, guest.id);
+      await ui("window.setAnchors(false, true)");
+      const stateBeforeHide = await env.evalPage(
+        win,
+        `({
+        counter: document.querySelector('#counter').textContent,
+        input: document.querySelector('#input').value
+      })`,
+      );
+      const registrations = env.events.history.filter(
+        (event) => event.type === "registered",
+      ).length;
+      const clickControl = async (selector: string) => {
+        const point = await ui(`(() => {
+          const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+          return {x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2)};
+        })()`);
+        await clickHostPoint(win, point);
+      };
+      // 保留真实 React 卡片与 guest，用宿主鼠标关闭、重开及切换标签，防止只测卸载的假阳性。
+      for (const theme of ["light", "dark"] as const) {
+        await ui(`window.setShowcasePresentation(${JSON.stringify(theme)}, 'en', 400)`);
+        await ui("window.setAnchors(false, true)");
+        for (const selector of [
+          "#toggle-sidebar",
+          "#switch-sidebar-tab",
+          "#switch-main-page",
+          "#switch-workspace",
+        ]) {
+          await clickControl(selector);
+          const hidden = await ui(`(() => {
+          const view = document.querySelector('webview');
+          const root = view.closest('[data-sandbox-page-root]');
+          return {
+            visible: window.managedState().visible,
+            display: getComputedStyle(root).display,
+            opacity: getComputedStyle(root).opacity,
+            inert: root.inert,
+            width: view.getBoundingClientRect().width,
+            anchorConnected: document.querySelector('#sidebar-anchor [data-testid="plugin-ui-card"]').isConnected,
+            hit: document.elementFromPoint(600, 200)?.tagName
+          };
+        })()`);
+          await writeFile(
+            join(root, `visibility-${theme}-${selector.slice(1)}.json`),
+            JSON.stringify(hidden, null, 2),
+          );
+          await writeFile(
+            join(root, `visibility-${theme}-${selector.slice(1)}.png`),
+            (await win.webContents.capturePage()).toPNG(),
+          );
+          assert.equal(hidden.visible, false, JSON.stringify(hidden));
+          assert.equal(hidden.display, "block", JSON.stringify(hidden));
+          assert.ok(Number(hidden.opacity) <= 0.001, JSON.stringify(hidden));
+          assert.equal(hidden.inert, true);
+          assert.ok(hidden.width > 0);
+          assert.equal(hidden.anchorConnected, true);
+          assert.notEqual(hidden.hit, "WEBVIEW");
+          assert.equal(guest.isDestroyed(), false);
+          // 隐藏不能停帧；用真实后台双帧完成工作，不能只检查 guest 还存在。
+          assert.equal(
+            await env.evalPage(
+              win,
+              `Promise.race([
+          new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve('running')))),
+          new Promise(resolve => setTimeout(() => resolve('stalled'), 5000))
+        ])`,
+            ),
+            "running",
+          );
+          await clickControl(selector);
+          assert.equal((await ui("window.managedState()")).visible, true);
+          assert.equal(env.guests.get(win.webContents.id)!.id, guest.id);
+          assert.deepEqual(
+            await env.evalPage(
+              win,
+              `({
+          counter: document.querySelector('#counter').textContent,
+          input: document.querySelector('#input').value
+        })`,
+            ),
+            stateBeforeHide,
+          );
+        }
+        await writeFile(
+          join(root, `visibility-${theme}-restored.png`),
+          (await win.webContents.capturePage()).toPNG(),
+        );
+      }
+      assert.equal(
+        env.events.history.filter((event) => event.type === "registered").length,
+        registrations,
+      );
+      await checkPagePointerInput(win, guest);
       await writeFile(
         join(root, "interaction-results.json"),
         JSON.stringify(
@@ -67,6 +162,12 @@ app
             views: (await ui("window.managedState()")).views,
             sidebarInput: true,
             inlineInput: true,
+            sidebarHideAndRestore: true,
+            inactiveTabHideAndRestore: true,
+            mainPageHideAndRestore: true,
+            workspaceHideAndRestore: true,
+            hiddenBackgroundFrames: true,
+            themes: ["light", "dark"],
           },
           null,
           2,

@@ -30,6 +30,7 @@ import type {
   SessionInputPromotedPayload,
   StreamRecoveryRetryStartedPayload,
   StreamRecoveryStartedPayload,
+  StreamingToolLedgerPayload,
   TargetChangedPayload,
   TargetCompletionVerificationPayload,
   ToolCallErrorPayload,
@@ -53,6 +54,7 @@ import type {
   WorkspaceHookReviewSupersededPayload,
 } from "@zcode/contracts";
 import {
+  DEFERRED_TOOL_CALL_NAME,
   AMEND_WORKFLOW_TOOL_NAME,
   CREATE_WORKFLOW_TOOL_NAME,
   CoreErrorType,
@@ -522,6 +524,20 @@ export class ProductProjection {
 
   getSnapshot(): ConversationSnapshot {
     return this.snapshot;
+  }
+
+  /** 生命周期状态独立于 run phase；更新必须推进水位，避免旧 base 漏掉门禁。 */
+  setRuntimeInitialization(
+    state: NonNullable<ConversationSnapshot["runtimeInitialization"]>,
+    minimumSeq = this.snapshot.seq + 1,
+    minimumRevision = this.snapshot.revision + 1,
+  ): void {
+    this.snapshot = {
+      ...this.snapshot,
+      runtimeInitialization: state,
+      seq: Math.max(this.snapshot.seq, minimumSeq),
+      revision: Math.max(this.snapshot.revision, minimumRevision),
+    };
   }
 
   /** assistant 守恒：被拒收的正文流事件数（>0 = 投影可能缺段，需重 hydration）。 */
@@ -1409,6 +1425,8 @@ export class ProductProjection {
         return this.onModelComplete(event);
       case SessionEventType.ToolCallScheduled:
         return this.onToolCallScheduled(event);
+      case SessionEventType.StreamingToolLedgerUpdated:
+        return this.onStreamingToolIdentity(event);
       case SessionEventType.ToolCallStarted:
         return this.onToolCallActivity(event);
       case SessionEventType.ToolCallProgress:
@@ -2994,7 +3012,7 @@ export class ProductProjection {
   ): ConversationDelta[] {
     const toolCallId = String(payload.toolCallId ?? "");
     const rowId = this.toolRowIdByCallId.get(toolCallId);
-    if (rowId === undefined) return [];
+    if (rowId === undefined || this.findToolRow(toolCallId)?.input !== undefined) return [];
     const state = this.fileToolInputPreviewByCallId.get(toolCallId);
     if (!state) {
       return [{ op: "row.delta", rowId, path: "inputText", append: payload.delta }];
@@ -3038,6 +3056,8 @@ export class ProductProjection {
     if (shouldHideInvalidToolCallFromProduct(payload.toolName)) return [];
     const inputText = stringifyToolInput(payload.input);
     const existing = this.findToolRow(toolCallId);
+    // scheduled 或完整 tool_call 已定稿输入；迟到原始流不能覆盖执行身份。
+    if (existing?.input !== undefined) return [];
     if (existing) {
       return [
         {
@@ -3069,6 +3089,33 @@ export class ProductProjection {
     return [{ op: "row.appended", row }];
   }
 
+  private onStreamingToolIdentity(event: SessionEvent): ConversationDelta[] {
+    if (this.isMirroredSubagentToolEvent(event) || !this.acceptsActiveModelEvent(event)) return [];
+    const payload = event.payload as StreamingToolLedgerPayload;
+    if (
+      payload.status !== "tool_call_closed" ||
+      payload.input === undefined ||
+      payload.toolName === DEFERRED_TOOL_CALL_NAME ||
+      shouldHideInvalidToolCallFromProduct(payload.toolName)
+    )
+      return [];
+    const row = this.findToolRow(String(payload.toolCallId));
+    if (row?.toolName !== DEFERRED_TOOL_CALL_NAME) return [];
+    // 断流恢复可能直接提交工具错误而不经过 scheduled；目标身份取 Core 已闭合的调用，
+    // 只补齐包装行，不触发 scheduled 的 Todo 等业务更新，也不重置已有状态和错误。
+    return [
+      {
+        op: "row.upserted",
+        row: {
+          ...row,
+          toolName: payload.toolName,
+          input: payload.input,
+          inputText: stringifyToolInput(payload.input),
+        },
+      },
+    ];
+  }
+
   private onToolCallScheduled(event: SessionEvent): ConversationDelta[] {
     if (this.isMirroredSubagentToolEvent(event) || !this.isRunning()) return [];
     const payload = event.payload as ToolCallScheduledPayload;
@@ -3098,6 +3145,7 @@ export class ProductProjection {
           op: "row.upserted",
           row: {
             ...existing,
+            toolName: payload.toolName,
             ...(payload.assistantMessageId
               ? { assistantResponseId: String(payload.assistantMessageId) }
               : {}),

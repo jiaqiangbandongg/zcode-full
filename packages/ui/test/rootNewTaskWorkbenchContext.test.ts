@@ -1,9 +1,17 @@
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  readV4ComposerDraft,
+  readComposerWorkspaceScope,
+  rememberComposerWorkspaceScope,
+  resolveComposerScope,
+} from "@/v4/composer/composerDraftStore.js";
+import { selectRemoteWorkspaceProjectFromDialog } from "@/root/useRemoteWorkspaceHistory.js";
+import type { CreateTaskOptions } from "@/app-shell/types.js";
 import { useRootWorkspaceActions } from "@/root/useRootWorkspaceActions.js";
-import type { CreateTaskRequest } from "@/app-shell/types.js";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
+import { onTaskNavigationCommitted } from "@/store/zcodeSessionStoreNavigation.js";
 import {
   INITIAL_PANE_LAYOUT,
   V4_PRIMARY_PANE_ID,
@@ -12,325 +20,455 @@ import {
 } from "@/v4/paneLayoutStore.js";
 import { useWorkbenchGroupStore } from "@/v4/workbenchGroupStore.js";
 
-const mountedRoots: Root[] = [];
-
-function createMinimalElement(ownerDocument: Document, tagName = "div") {
-  const element = {
-    addEventListener: () => {},
-    appendChild: (child: { parentNode?: unknown }) => {
-      child.parentNode = element;
-      return child;
+function fixture(
+  clientMode: "desktop-continuous" | "web-remote-replayable" = "desktop-continuous",
+  openRemoteProjectWorkspace?: (target: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    hostId: string;
+  }) => Promise<void>,
+  openMobileProjectDraft?: (request: CreateTaskOptions) => Promise<void>,
+) {
+  let next = 0;
+  const prepared = new Map<string, string>();
+  const prepareSession = vi.fn(
+    async (input?: {
+      projectId?: string;
+      draftId?: string;
+      reuseDraft?: boolean;
+      hostId?: string;
+    }) => {
+      const path = input?.projectId
+        ? "/project-primary"
+        : (input?.draftId && prepared.get(input.draftId)) || `/managed/${++next}`;
+      if (input?.draftId) prepared.set(input.draftId, path);
+      return {
+        workspacePath: path,
+        projectId: input?.projectId ?? null,
+        additionalDirectories: [],
+      };
     },
-    childNodes: [] as unknown[],
-    getAttribute: () => null,
-    insertBefore: (child: { parentNode?: unknown }) => {
-      child.parentNode = element;
-      return child;
-    },
-    nodeName: tagName.toUpperCase(),
-    nodeType: 1,
-    ownerDocument,
-    parentNode: null as unknown,
-    removeAttribute: () => {},
-    removeChild: (child: { parentNode?: unknown }) => {
-      child.parentNode = null;
-      return child;
-    },
-    removeEventListener: () => {},
-    setAttribute: () => {},
-    style: {
-      removeProperty: () => {},
-      setProperty: () => {},
-    },
-    tagName: tagName.toUpperCase(),
-  };
-  return element as unknown as Element;
-}
-
-function installMinimalDom() {
-  const documentMock = {
-    addEventListener: () => {},
-    createElement: (tagName: string) =>
-      createMinimalElement(documentMock as unknown as Document, tagName),
-    createTextNode: (nodeValue: string) => ({
-      nodeType: 3,
-      nodeValue,
-      ownerDocument: documentMock,
-      parentNode: null,
-    }),
-    nodeType: 9,
-    removeEventListener: () => {},
-  } as unknown as Document;
-  const windowMock = {
-    addEventListener: () => {},
-    document: documentMock,
-    HTMLIFrameElement: function HTMLIFrameElement() {},
-    HTMLElement: function HTMLElement() {},
-    Node: function Node() {},
-    removeEventListener: () => {},
-  };
-  Object.defineProperty(globalThis, "document", {
-    configurable: true,
-    value: documentMock,
-  });
-  Object.defineProperty(globalThis, "window", {
-    configurable: true,
-    value: windowMock,
-  });
-  Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-    configurable: true,
-    value: true,
-  });
-  return createMinimalElement(documentMock, "div");
-}
-
-function resetState(): void {
-  for (const root of mountedRoots.splice(0)) {
-    act(() => {
-      root.unmount();
-    });
-  }
-  useZCodeSessionStore.setState((state) => ({
-    ...state,
-    workspaces: {},
+  );
+  const readTree = vi.fn(async (_input?: unknown) => ({
+    tasks: [] as {
+      taskId: string;
+      workspacePath: string;
+      workspaceIdentity?: string;
+      projectId: string | null;
+    }[],
   }));
-  usePaneLayoutStore.setState({
-    root: INITIAL_PANE_LAYOUT.root,
-    panes: INITIAL_PANE_LAYOUT.panes,
-    focusedPaneId: INITIAL_PANE_LAYOUT.focusedPaneId,
-  });
-  useWorkbenchGroupStore.getState().resetWorkbenchGroups();
-  delete (globalThis as { document?: unknown }).document;
-  delete (globalThis as { window?: unknown }).window;
-  delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: unknown }).IS_REACT_ACT_ENVIRONMENT;
-}
-
-function renderRootActions({
-  activeWorkspacePath = "/workspace-a",
-  activeWorkspaceIdentity = null,
-  workbenchGroupClientMode = "desktop-continuous",
-}: {
-  activeWorkspacePath?: string;
-  activeWorkspaceIdentity?: string | null;
-  workbenchGroupClientMode?: "desktop-continuous" | "web-remote-replayable";
-} = {}) {
-  let handleCreateTask: ((request?: CreateTaskRequest) => void) | null = null;
-  let handleSelectConversationWorkspace: ((path: string) => void) | null = null;
-  const tabState = {
-    // 修复原因：新任务动作会在真实 tab store 上检查失效 workspace；测试 mock 也必须
-    // 提供完整的只读判定输入，不能用缺失 tabs 的对象绕过生产契约。
+  const addTab = vi.fn();
+  const state = {
     tabs: [],
-    activeWorkspacePath,
-    activeWorkspaceIdentity,
-    activateTabByPath: vi.fn(
-      (workspacePath: string, options?: { workspaceIdentity?: string }) => {
-        tabState.activeWorkspacePath = workspacePath;
-        tabState.activeWorkspaceIdentity = options?.workspaceIdentity ?? null;
-        return true;
-      },
-    ),
+    activeWorkspacePath: "/old",
+    activeWorkspaceIdentity: null,
+    activateTabByPath: vi.fn(() => true),
   };
-  const addTab = vi.fn((workspacePath: string, options?: { workspaceIdentity?: string }) => {
-    tabState.activeWorkspacePath = workspacePath;
-    tabState.activeWorkspaceIdentity = options?.workspaceIdentity ?? null;
-  });
-
-  function Probe() {
-    const actions = useRootWorkspaceActions({
-      intl: { formatMessage: ({ id }: { id: string }) => id },
-      platform: {} as never,
-      services: {} as never,
-      tabStoreApi: { getState: () => tabState } as never,
-      addTab,
-      activeWorkspacePath: tabState.activeWorkspacePath,
-      activeWorkspaceIdentity: tabState.activeWorkspaceIdentity,
-      supportsSettings: true,
-      allowOpenWorkspace: true,
-      preferDirectoryBrowser: false,
-      refreshProviderState: vi.fn(),
-      updateAppSettings: vi.fn(),
-      setOAuthError: vi.fn(),
-      setUser: vi.fn(),
-      workbenchGroupClientMode,
-    });
-    handleCreateTask = actions.handleCreateTask;
-    handleSelectConversationWorkspace = actions.handleSelectConversationWorkspace;
-    return createElement("span", null, "probe");
-  }
-
-  const root = createRoot(installMinimalDom());
-  mountedRoots.push(root);
-  act(() => {
-    root.render(createElement(Probe));
-  });
-  return {
+  const options = {
+    intl: { formatMessage: ({ id }: { id: string }) => id } as never,
+    platform: {} as never,
+    services: { projectService: { prepareSession, readTree } } as never,
+    tabStoreApi: { getState: () => state } as never,
     addTab,
-    getHandleCreateTask: () => {
-      if (!handleCreateTask) {
-        throw new Error("handleCreateTask was not captured");
-      }
-      return handleCreateTask;
-    },
-    getHandleSelectConversationWorkspace: () => {
-      if (!handleSelectConversationWorkspace) {
-        throw new Error("handleSelectConversationWorkspace was not captured");
-      }
-      return handleSelectConversationWorkspace;
-    },
-    tabState,
+    activeWorkspacePath: "/old",
+    activeWorkspaceIdentity: null,
+    supportsSettings: true,
+    allowOpenWorkspace: true,
+    preferDirectoryBrowser: false,
+    refreshProviderState: vi.fn(),
+    updateAppSettings: vi.fn(),
+    setOAuthError: vi.fn(),
+    setUser: vi.fn(),
+    workbenchGroupClientMode: clientMode,
+    openMobileProjectDraft,
   };
+  const { result, rerender } = renderHook(
+    ({ opener }) => useRootWorkspaceActions({ ...options, openRemoteProjectWorkspace: opener }),
+    { initialProps: { opener: openRemoteProjectWorkspace } },
+  );
+  return { result, rerender, prepareSession, readTree, addTab, state };
 }
-
-function workspaceState(workspacePath: string, workspaceIdentity?: string) {
-  return useZCodeSessionStore
-    .getState()
-    .getWorkspaceState(workspacePath, workspaceIdentity);
-}
-
-describe("root new task workbench context", () => {
-  beforeEach(resetState);
-  afterEach(resetState);
-
-  it("creates the draft in the focused read-only subagent pane workspace and exits split view", () => {
-    useZCodeSessionStore.getState().setActiveTaskId("/workspace-a", "main-session");
-    useWorkbenchGroupStore.getState().splitSessionIntoGroup(
-      V4_PRIMARY_PANE_ID,
-      "right",
-      {
-        workspaceScope: {
-          workspacePath: "/workspace-b",
-          workspaceIdentity: "remote:ssh:dev:/workspace-b",
-        },
-        sessionId: "child-session",
-        readOnly: true,
-      },
-      {
-        workspaceScope: { workspacePath: "/workspace-a" },
-        sessionId: "main-session",
-      },
+beforeEach(() => {
+  localStorage.clear();
+  useZCodeSessionStore.setState({ workspaces: {} });
+  usePaneLayoutStore.setState(INITIAL_PANE_LAYOUT);
+  useWorkbenchGroupStore.getState().resetWorkbenchGroups();
+});
+it.each([null, "other-project", "retained-project"])(
+  "恢复原项目时显式初始化草稿归属，不沿用缓存 %s",
+  async (cachedProjectId) => {
+    const path = "/srv/project";
+    const identity = "remote:server:source-1:/srv/project";
+    const projectId = "retained-project";
+    if (cachedProjectId)
+      rememberComposerWorkspaceScope(
+        path,
+        identity,
+        resolveComposerScope(cachedProjectId, identity),
+      );
+    const { result } = fixture();
+    const activation = vi.fn(
+      (target: { workspacePath: string; workspaceIdentity: string; projectId?: string | null }) =>
+        result.current.startDraftInWorkspace(target.workspacePath, target.workspaceIdentity, {
+          projectId: target.projectId,
+        }),
     );
-    const { getHandleCreateTask, tabState } = renderRootActions();
-
-    act(() => {
-      getHandleCreateTask()();
+    await act(async () => {
+      await selectRemoteWorkspaceProjectFromDialog({
+        canUseRemoteWorkspace: true,
+        sessionId: "session-1",
+        path,
+        preparedWorkspaceIdentity: identity,
+        draftProjectId: projectId,
+        restoringWorkspaceTabId: "tab",
+        loadingMessage: "loading",
+        getRemoteWorkspaceSession: () =>
+          ({
+            sessionId: "session-1",
+            target: { kind: "ssh", host: "dev.example.com", username: "dev" },
+          }) as never,
+        getWorkspaceTabs: () => [
+          {
+            id: "tab",
+            kind: "workspace",
+            label: "project",
+            workspacePath: path,
+            workspaceIdentity: identity,
+            remoteSessionId: "session-1",
+          },
+        ],
+        resolveRemoteWorkspaceCanonicalPath: async () => path,
+        activateTabByPath: () => true,
+        handleCancelRemoteProject: vi.fn(),
+        bindRemoteWorkspaceScope: async () => ({
+          workspacePath: path,
+          workspaceIdentity: identity,
+        }),
+        commitRemoteWorkspaceSessionMutation: async (mutation) => mutation.entry,
+        getRemoteSessions: () => [],
+        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspaceIdentity: vi.fn(),
+        addTab: vi.fn(),
+        onWorkspaceActivated: activation,
+      });
     });
-
-    expect(tabState.activeWorkspacePath).toBe("/workspace-b");
-    expect(tabState.activeWorkspaceIdentity).toBe("remote:ssh:dev:/workspace-b");
-    expect(workspaceState("/workspace-a").activeTaskId).toBe("main-session");
-    expect(
-      workspaceState("/workspace-b", "remote:ssh:dev:/workspace-b").activeTaskId,
-    ).toBeNull();
-    expect(
-      workspaceState("/workspace-b", "remote:ssh:dev:/workspace-b").draftFocusVersion,
-    ).toBe(1);
-    expect(useWorkbenchGroupStore.getState().activeGroupId).toBeNull();
-    expect(countPanes(usePaneLayoutStore.getState())).toBe(1);
-  });
-
-  it("creates the draft in a focused ordinary split pane workspace and resets to one panel", () => {
-    useZCodeSessionStore.getState().setActiveTaskId("/workspace-a", "main-session");
-    usePaneLayoutStore.getState().splitPaneWithBinding(V4_PRIMARY_PANE_ID, "right", {
-      workspaceScope: { workspacePath: "/workspace-b" },
-      sessionId: "session-b",
+    expect(activation).toHaveBeenCalledOnce();
+    expect(activation).toHaveBeenCalledWith({
+      workspacePath: path,
+      workspaceIdentity: identity,
+      projectId,
     });
-    const { getHandleCreateTask, tabState } = renderRootActions();
-
-    act(() => {
-      getHandleCreateTask()();
-    });
-
-    expect(tabState.activeWorkspacePath).toBe("/workspace-b");
-    expect(workspaceState("/workspace-a").activeTaskId).toBe("main-session");
-    expect(workspaceState("/workspace-b").activeTaskId).toBeNull();
-    expect(workspaceState("/workspace-b").draftFocusVersion).toBe(1);
-    expect(countPanes(usePaneLayoutStore.getState())).toBe(1);
-  });
-
-  it("ignores a hidden workbench group when remote control creates a new task", () => {
-    useWorkbenchGroupStore.getState().splitSessionIntoGroup(
-      V4_PRIMARY_PANE_ID,
-      "right",
-      {
-        workspaceScope: {
-          workspacePath: "/workspace-b",
-          workspaceIdentity: "remote:ssh:dev:/workspace-b",
-        },
-        sessionId: "secondary-session",
-      },
-      {
-        workspaceScope: {
-          workspacePath: "/workspace-a",
-          workspaceIdentity: "remote:ssh:dev:/workspace-a",
-        },
-        sessionId: "main-session",
-      },
+    expect(useZCodeSessionStore.getState().getWorkspaceState(path, identity).draftProjectId).toBe(
+      projectId,
     );
-    usePaneLayoutStore.getState().splitPaneWithBinding(V4_PRIMARY_PANE_ID, "right", {
-      workspaceScope: {
-        workspacePath: "/workspace-b",
-        workspaceIdentity: "remote:ssh:dev:/workspace-b",
-      },
-      sessionId: "hidden-secondary-session",
-    });
-    const { getHandleCreateTask, tabState } = renderRootActions({
-      activeWorkspaceIdentity: "remote:ssh:dev:/workspace-a",
-      workbenchGroupClientMode: "web-remote-replayable",
-    });
-
-    act(() => {
-      getHandleCreateTask()();
-    });
-
-    expect(tabState.activeWorkspacePath).toBe("/workspace-a");
-    expect(tabState.activeWorkspaceIdentity).toBe("remote:ssh:dev:/workspace-a");
-    expect(
-      workspaceState("/workspace-a", "remote:ssh:dev:/workspace-a").activeTaskId,
-    ).toBeNull();
+    expect(readComposerWorkspaceScope(path, identity)?.projectId).toBe(projectId);
+  },
+);
+describe("project-aware new task creation", () => {
+  it("keeps new-task callbacks stable while using the latest committed remote opener", async () => {
+    const previous = vi.fn(async () => {});
+    const latest = vi.fn(async () => {});
+    const { result, rerender, prepareSession } = fixture("desktop-continuous", previous);
+    const create = result.current.handleCreateTask;
+    const createConversation = result.current.handleCreateConversationTask;
+    rerender({ opener: latest });
+    expect(result.current.handleCreateTask).toBe(create);
+    expect(result.current.handleCreateConversationTask).toBe(createConversation);
+    prepareSession.mockResolvedValueOnce({
+      workspacePath: "/remote",
+      workspaceIdentity: "remote:server:s:/remote",
+      projectId: "p",
+      additionalDirectories: [],
+    } as never);
+    await act(async () => create({ projectId: "p", hostId: "remote:server:s" }));
+    expect(previous).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceIdentity: "remote:server:s:/remote", projectId: "p" }),
+    );
   });
-
-  it("preserves initial prompt trailing space in the targeted remote identity bucket", () => {
-    const workspacePath = "/workspace-a";
-    const workspaceIdentity = "remote:ssh:dev:/workspace-a";
-    const otherWorkspaceIdentity = "remote:ssh:other:/workspace-a";
+  it.each([true, false])(
+    "publishes a settings return only after tab activation succeeds (%s)",
+    (activated) => {
+      useZCodeSessionStore.getState().setActiveTaskId("/old", "old-session");
+      const { result, state } = fixture();
+      state.activateTabByPath.mockReturnValue(activated);
+      const history = useZCodeSessionStore.getState().taskNavHistory;
+      const viewed = vi.fn();
+      const subscription = onTaskNavigationCommitted(viewed);
+      try {
+        act(() => result.current.handleBackFromSettings());
+        expect(viewed).toHaveBeenCalledTimes(activated ? 1 : 0);
+        if (activated)
+          expect(viewed).toHaveBeenCalledWith({
+            kind: "task",
+            workspacePath: "/old",
+            taskId: "old-session",
+            workspaceIdentity: undefined,
+          });
+        expect(useZCodeSessionStore.getState().taskNavHistory).toBe(history);
+      } finally {
+        subscription.dispose();
+      }
+    },
+  );
+  it("routes the selected Host and binds its attachment before creating a draft under the returned identity", async () => {
+    const open = vi.fn(async () => {});
+    const { result, prepareSession, addTab } = fixture("desktop-continuous", open);
+    prepareSession.mockResolvedValueOnce({
+      workspacePath: "/remote",
+      workspaceIdentity: "remote:server:s:/remote",
+      projectId: "p",
+      additionalDirectories: [],
+    } as never);
+    await act(async () => {
+      await result.current.handleCreateTask({ projectId: "p", hostId: "remote:server:s" });
+    });
+    expect(prepareSession).toHaveBeenCalledWith({ projectId: "p", hostId: "remote:server:s" });
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostId: "remote:server:s",
+        workspacePath: "/remote",
+        workspaceIdentity: "remote:server:s:/remote",
+      }),
+    );
+    expect(addTab).not.toHaveBeenCalled();
+    expect(
+      useZCodeSessionStore.getState().getWorkspaceState("/remote", "remote:server:s:/remote")
+        .draftProjectId,
+    ).toBe("p");
+    expect(useZCodeSessionStore.getState().workspaces["/remote"]).toBeUndefined();
+  });
+  it.each(["desktop-continuous"] as const)(
+    "PD01 连续新建复用未发送目录，显式 local Host 也保持同一身份（%s）",
+    async (mode) => {
+      useZCodeSessionStore.getState().setActiveTaskId("/old", "old-session");
+      const { result, prepareSession, addTab } = fixture(mode);
+      await act(async () => {
+        await result.current.handleCreateTask({ projectId: null, hostId: "local" });
+        await result.current.handleCreateTask({ projectId: null, hostId: "local" });
+      });
+      expect(prepareSession).toHaveBeenCalledTimes(2);
+      expect(addTab).toHaveBeenNthCalledWith(1, "/managed/1", { workspacePurpose: "conversation" });
+      expect(addTab).toHaveBeenNthCalledWith(2, "/managed/1", { workspacePurpose: "conversation" });
+      expect(
+        useZCodeSessionStore.getState().getWorkspaceState("/managed/1").draftProjectId,
+      ).toBeNull();
+      expect(useZCodeSessionStore.getState().getWorkspaceState("/old").activeTaskId).toBe(
+        "old-session",
+      );
+    },
+  );
+  it("uses the selected project primary directory, exits split view and preserves mention spacing", async () => {
+    const { result, prepareSession } = fixture();
+    usePaneLayoutStore.getState().splitPaneWithBinding(V4_PRIMARY_PANE_ID, "right", {
+      workspaceScope: { workspacePath: "/unrelated" },
+      sessionId: "another",
+    });
     const mention = {
-      id: "skill:skill-creator",
+      id: "skill:creator",
       category: "skills" as const,
-      label: "skill-creator",
-      value: "skill-creator",
-      markdown: "$skill-creator",
+      label: "creator",
+      value: "creator",
+      markdown: "$creator",
     };
-    const { getHandleCreateTask } = renderRootActions({
-      activeWorkspacePath: workspacePath,
-      activeWorkspaceIdentity: workspaceIdentity,
-    });
-
-    act(() => {
-      getHandleCreateTask()({
-        initialPrompt: "$skill-creator ",
+    await act(async () => {
+      await result.current.handleCreateTask({
+        projectId: "project-a",
+        initialPrompt: "$creator ",
         initialPromptMention: mention,
       });
     });
-
-    expect(workspaceState(workspacePath, workspaceIdentity).composerTextInsertRequest).toEqual({
-      requestId: 1,
-      text: "$skill-creator ",
-      mention,
+    expect(prepareSession).toHaveBeenCalledWith({ projectId: "project-a" });
+    const draft = useZCodeSessionStore.getState().getWorkspaceState("/project-primary");
+    expect(draft.draftProjectId).toBe("project-a");
+    expect(draft.composerTextInsertRequest).toMatchObject({ text: "$creator ", mention });
+    expect(countPanes(usePaneLayoutStore.getState())).toBe(1);
+    expect(useWorkbenchGroupStore.getState().activeGroupId).toBeNull();
+  });
+  it("leaves the current session intact when directory preparation fails", async () => {
+    useZCodeSessionStore.getState().setActiveTaskId("/old", "old-session");
+    const { result, prepareSession, addTab } = fixture();
+    prepareSession.mockRejectedValueOnce(new Error("directory unavailable"));
+    await act(async () => {
+      await result.current.handleCreateTask();
     });
+    expect(addTab).not.toHaveBeenCalled();
+    expect(useZCodeSessionStore.getState().getWorkspaceState("/old").activeTaskId).toBe(
+      "old-session",
+    );
+    expect(result.current.workspaceActionError).toContain("directory unavailable");
+  });
+});
+
+it("hands mobile project intent to the bridge owner without preparing or mutating the old Root", async () => {
+  let finish!: () => void;
+  const openMobileProjectDraft = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { result, prepareSession, addTab } = fixture(
+    "web-remote-replayable",
+    undefined,
+    openMobileProjectDraft,
+  );
+  useZCodeSessionStore.getState().setActiveTaskId("/old", "old-session");
+  const request = { projectId: "p", hostId: "remote:server:s", initialPrompt: "$creator " };
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = result.current.handleCreateTask(request);
+  });
+  expect(openMobileProjectDraft).toHaveBeenCalledWith(request);
+  expect(prepareSession).not.toHaveBeenCalled();
+  useZCodeSessionStore
+    .getState()
+    .startDraft("/new", undefined, "remote:server:s:/new", { projectId: "p" });
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(addTab).not.toHaveBeenCalled();
+  expect(useZCodeSessionStore.getState().getWorkspaceState("/old").activeTaskId).toBe(
+    "old-session",
+  );
+  expect(
+    useZCodeSessionStore.getState().getWorkspaceState("/new", "remote:server:s:/new")
+      .draftProjectId,
+  ).toBe("p");
+});
+it("initializes a handed off draft with its project and exact input under the new identity", () => {
+  const { result } = fixture("web-remote-replayable");
+  const mention = {
+    id: "skill:creator",
+    category: "skills" as const,
+    label: "creator",
+    value: "creator",
+    markdown: "$creator",
+  };
+  act(() =>
+    result.current.startDraftInWorkspace("/new", "remote:server:s:/new", {
+      projectId: "p",
+      provider: "zcode",
+      initialPrompt: "$creator ",
+      initialPromptMention: mention,
+    }),
+  );
+  const draft = useZCodeSessionStore.getState().getWorkspaceState("/new", "remote:server:s:/new");
+  expect(draft.draftProjectId).toBe("p");
+  expect(draft.composerTextInsertRequest).toMatchObject({ text: "$creator ", mention });
+  expect(useZCodeSessionStore.getState().workspaces["/new"]).toBeUndefined();
+});
+
+it("does not allocate a directory when the mobile peer lacks project admission", async () => {
+  const { result, prepareSession, addTab } = fixture("web-remote-replayable");
+  await act(async () => {
+    await result.current.handleCreateTask();
+  });
+  expect(prepareSession).not.toHaveBeenCalled();
+  expect(addTab).not.toHaveBeenCalled();
+  expect(result.current.workspaceActionError).toBe("project.remote-navigation-unavailable");
+});
+
+it.each(["desktop-continuous", "web-remote-replayable"] as const)(
+  "TD07 %s 空白创建意图只留在内存，文字出现时才保存项目和分组",
+  (mode) => {
+    const { result } = fixture(mode);
+    act(() =>
+      result.current.startDraftInWorkspace("/metadata", "remote:server:s:/metadata", {
+        projectId: "p",
+        taskGroupId: "g",
+      }),
+    );
     expect(
-      workspaceState(workspacePath, otherWorkspaceIdentity).composerTextInsertRequest,
+      useZCodeSessionStore.getState().getWorkspaceState("/metadata", "remote:server:s:/metadata"),
+    ).toMatchObject({ draftProjectId: "p", draftTaskGroupId: "g" });
+    expect(
+      readV4ComposerDraft("/metadata", "remote:server:s:/metadata", "__draft__", {
+        clientNamespace: "desktop",
+        hostId: "remote:server:s",
+        projectId: "p",
+      }),
     ).toBeNull();
-  });
+    act(() =>
+      result.current.startDraftInWorkspace("/metadata", "remote:server:s:/metadata", {
+        projectId: "p",
+        taskGroupId: "g",
+        initialPrompt: "draft",
+      }),
+    );
+    expect(
+      readV4ComposerDraft("/metadata", "remote:server:s:/metadata", "__draft__", {
+        clientNamespace: "desktop",
+        hostId: "remote:server:s",
+        projectId: "p",
+      }),
+    ).toMatchObject({ text: "draft", projectId: "p", taskGroupId: "g" });
+  },
+);
 
-  it("selects a conversation backing workspace without treating it as a project", () => {
-    const { addTab, getHandleSelectConversationWorkspace } = renderRootActions();
-
-    act(() => {
-      getHandleSelectConversationWorkspace()("/Users/demo/.zcode/workspace/default");
+it.each(["desktop-continuous", "web-remote-replayable"] as const)(
+  "D3 %s inherits the current session project by exact task identity",
+  async (mode) => {
+    useZCodeSessionStore.getState().setActiveTaskId("/old", "session");
+    const open = vi.fn(async () => {});
+    const { result, prepareSession, readTree } = fixture(mode, undefined, open);
+    readTree.mockResolvedValueOnce({
+      tasks: [
+        { taskId: "session", workspacePath: "/other", projectId: "wrong" },
+        { taskId: "session", workspacePath: "/old", projectId: "current" },
+      ],
     });
-
-    expect(addTab).toHaveBeenCalledWith("/Users/demo/.zcode/workspace/default", {
-      workspacePurpose: "conversation",
+    await act(async () => {
+      await result.current.handleCreateTask();
     });
+    if (mode === "desktop-continuous") {
+      expect(prepareSession).toHaveBeenCalledWith({ projectId: "current" });
+    } else {
+      expect(open).toHaveBeenCalledWith({ projectId: "current" });
+      expect(prepareSession).not.toHaveBeenCalled();
+    }
+  },
+);
+
+it("D3 inherits draft project without reading task history; explicit null opts out", async () => {
+  useZCodeSessionStore
+    .getState()
+    .startDraft("/old", undefined, undefined, { projectId: "draft-project" });
+  const { result, prepareSession, readTree } = fixture();
+  await act(async () => {
+    await result.current.handleCreateTask();
   });
+  expect(prepareSession).toHaveBeenLastCalledWith({ projectId: "draft-project" });
+  expect(readTree).not.toHaveBeenCalled();
+  await act(async () => {
+    await result.current.handleCreateTask({ projectId: null });
+  });
+  expect(prepareSession).toHaveBeenLastCalledWith({
+    draftId: expect.any(String),
+    reuseDraft: false,
+  });
+});
+
+it("D3 discards project lookup after the user selects another session", async () => {
+  useZCodeSessionStore.getState().setActiveTaskId("/old", "session");
+  const { result, prepareSession, readTree, addTab } = fixture();
+  let finish!: (tree: Awaited<ReturnType<typeof readTree>>) => void;
+  readTree.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = result.current.handleCreateTask();
+  });
+  act(() => useZCodeSessionStore.getState().setActiveTaskId("/old", "other"));
+  await act(async () => {
+    finish({ tasks: [{ taskId: "session", workspacePath: "/old", projectId: "current" }] });
+    await pending;
+  });
+  expect(prepareSession).not.toHaveBeenCalled();
+  expect(addTab).not.toHaveBeenCalled();
 });

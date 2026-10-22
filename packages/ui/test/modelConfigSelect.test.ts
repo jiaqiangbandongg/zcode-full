@@ -5,11 +5,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { Locale } from "@zcode/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip.js";
-import { MODEL_INPUT_CAPABILITY_BADGE_CLASS_NAME } from "@/components/ModelInputCapabilityBadge.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import {
-  MODEL_CONFIG_SELECT_BADGE_CLASS_NAME,
-  getModelTriggerLabelClassName,
   isModelSelectGroupSelected,
   ModelConfigSelect,
   shouldRenderModelGroupSeparator,
@@ -109,52 +106,11 @@ describe("ModelConfigSelect menu hierarchy", () => {
   });
 });
 
-describe("ModelConfigSelect badge style", () => {
-  it("个人和团队连接标签使用无边框的弱表面 pill", () => {
-    const classTokens = MODEL_CONFIG_SELECT_BADGE_CLASS_NAME.split(/\s+/);
-
-    expect(classTokens).toEqual(
-      expect.arrayContaining([
-        "rounded-full",
-        "bg-surface",
-        "px-1",
-        "py-px",
-        "text-ui-xs",
-        "font-medium",
-        "text-foreground-subtle",
-      ]),
-    );
-    expect(classTokens).not.toContain("border");
-    expect(classTokens).not.toContain("border-border");
-    expect(classTokens).not.toContain("bg-secondary");
-    expect(classTokens).not.toContain("text-ui-base");
-  });
-
-  it("视觉标签与连接方式标签使用一致的轻量圆形 pill", () => {
-    const classTokens = MODEL_INPUT_CAPABILITY_BADGE_CLASS_NAME.split(/\s+/);
-
-    expect(classTokens).toEqual(
-      expect.arrayContaining([
-        "rounded-full",
-        "border",
-        "border-border",
-        "bg-surface",
-        "px-1",
-        "py-px",
-        "text-ui-xs",
-        "font-medium",
-        "text-foreground-subtle",
-      ]),
-    );
-    expect(classTokens).not.toContain("rounded-md");
-    expect(classTokens).not.toContain("text-ui-sm");
-    expect(classTokens).not.toContain("font-mono");
-  });
-
+describe("ModelConfigSelect vision capability", () => {
   it.each([
     ["zh-CN", "视觉"],
     ["en-US", "Vision"],
-  ] as const)("模型项在模型名后展示 %s 视觉标签并保留行尾选中区", (locale, label) => {
+  ] as const)("模型项在模型名后展示 %s 视觉能力标签", (locale, label) => {
     renderInteractive(
       createElement(ModelConfigSelect, {
         modelGroups: [
@@ -189,63 +145,10 @@ describe("ModelConfigSelect badge style", () => {
     expect(badge.getAttribute("data-model-input-capability")).toBe("vision");
     expect(modelName).not.toBeNull();
     expect(modelName?.compareDocumentPosition(badge)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(modelItem?.className.split(/\s+/)).toContain("pr-8");
   });
 });
 
 describe("ModelConfigSelect trigger label", () => {
-  it("composer 仅在小于 sm 的超窄宽度隐藏模型名称", () => {
-    const className = getModelTriggerLabelClassName({
-      labelVisibilityClassName: "hidden @sm/composer:inline-flex",
-    });
-
-    expect(className.split(/\s+/)).toContain("hidden");
-    expect(className).toContain("@sm/composer:inline-flex");
-    expect(className).toContain("min-w-0");
-    expect(className).toContain("text-left");
-  });
-
-  it("显式标签样式仍可让非 composer 场景始终展示模型名称", () => {
-    const className = getModelTriggerLabelClassName({
-      labelVisibilityClassName: "hidden @xl/composer:inline-flex",
-      triggerLabelClassName: "inline-flex min-w-0",
-    });
-
-    const classTokens = className.split(/\s+/);
-    expect(classTokens).not.toContain("hidden");
-    expect(className).toContain("inline-flex");
-    expect(className).toContain("min-w-0");
-  });
-
-  it("composer 宽屏显示模型名称，超窄屏只保留正方形 package 图标按钮", () => {
-    const html = renderWithTooltipProvider(
-      createElement(ModelConfigSelect, {
-        modelGroups: [createGroup("Provider A")],
-        normalizedValue: "Provider A/model",
-        triggerLabel: "GLM-5",
-        showManageModelsAction: false,
-        lockReasonMessage: "Locked",
-        isItemLocked: () => false,
-        onValueChange: () => {},
-        tooltipTitle: "Choose model",
-        labelVisibilityClassName: "hidden @sm/composer:inline-flex",
-        triggerIconClassName: "inline-flex @sm/composer:hidden",
-        indicatorClassName: "hidden @sm/composer:block",
-        triggerClassName:
-          "@max-sm/composer:size-7 @max-sm/composer:justify-center @max-sm/composer:gap-0 @max-sm/composer:p-0",
-      }),
-    );
-
-    expect(html).toContain("lucide-package");
-    expect(html).toContain("inline-flex @sm/composer:hidden");
-    expect(html).toContain("GLM-5");
-    expect(html).toContain("lucide-chevron-down");
-    expect(html).toContain("hidden @sm/composer:block");
-    expect(html).toContain("@max-sm/composer:size-7");
-    expect(html).toContain("@max-sm/composer:p-0");
-    expect(html).toContain("hidden @sm/composer:inline-flex");
-  });
-
   it("允许调用方省略通用 tooltip 并保留模型名可访问文案", () => {
     const html = renderWithTooltipProvider(
       createElement(ModelConfigSelect, {

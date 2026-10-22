@@ -318,6 +318,25 @@ export class OAuthCredentialRepo {
     }
   }
 
+  async loadCachedSessionTokens(
+    provider: OAuthProviderId,
+  ): Promise<{ key: string; value: string }[] | null> {
+    try {
+      return await Promise.all(
+        [ZCODE_JWT_TOKEN_KEY, accessTokenKey(provider)].map(async (key) => ({
+          key,
+          value: (await this.credentialService.load(key))?.trim() ?? "",
+        })),
+      );
+    } catch (error) {
+      if (!isCredentialDecryptError(error)) throw error;
+      // 启动轻量检查曾绕过仓储的解密异常分类，导致业务 token 损坏时恢复直接失败。
+      // 复用既有 OAuth 清理边界，不读取 refresh token，也不触发远端资料迁移。
+      await this.clearCorruptOAuthSession();
+      return null;
+    }
+  }
+
   async saveTokenSet(provider: OAuthProviderId, tokenSet: OAuthTokenSet): Promise<void> {
     await this.credentialService.save(accessTokenKey(provider), tokenSet.accessToken);
 

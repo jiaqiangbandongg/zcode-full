@@ -41,26 +41,40 @@ V4 composer 不再等到点击发送才 materialize。选择 host-local 附件�
 发布连接级进度，并支持 cancel/cleanup。
 
 ```text
-renderer composer
-  -> workspace service resolver
-     ├─ local workspace
-     │  -> window Local Host IPromptAttachmentTransferService
-     │  -> stat + localPath zero-copy
-     │  -> AttachmentRef(local path, staged=false)
-     ├─ SSH/WSL/Docker remote workspace
-     │  -> target Remote Host IPromptAttachmentTransferService
-     │  -> IRemoteBackend.upload(progress, signal)
-     │  -> ~/.zcode/tmp/prompt-attachments/<operation>/...
-     │  -> AttachmentRef(remote path, staged=true)
-     └─ Server remote workspace
-        -> server-authoritative IPromptAttachmentTransferService
-        -> AttachmentRef(server runtime path)
+renderer composer（Desktop continuous / Mobile shared-host replayable）
+  -> 当前窗口已有 Host attachment
+     ├─ local：本地 transfer，localPath 零拷贝，staged=false
+     ├─ SSH/WSL/Docker：attachment-scoped transfer
+     │    -> SourceServerConnectionManager 当前 generation 的文件传输能力
+     │    -> 同一 Transport Adapter / backend 的 exec + upload(progress, signal)
+     │    -> Source 用户私有 ~/.zcode/tmp/prompt-attachments/...，staged=true
+     └─ Server dev 直连：保持原 Source service；不开放 desktop localPath 暂存
+
+attachment 关闭 / Source 换代 -> abort 未完成 operation + cleanup 未 adopt 文件
+已 adopt -> CLI 已接受的 ref 生命周期，不由 attachment close 删除
 ```
 
-service resolver 以当前 workspace session accessor 为边界：本地 workspace 使用窗口 Local Host 的
-`createLocalPromptAttachmentTransferService()`；SSH/WSL/Docker workspace 必须使用 Remote Host 注入的
-`createRemotePromptAttachmentTransferService()`；Server remote 则完整使用 server-authoritative service
-collection。workspace service scope 只决定选用哪一个 service 实例，不创建新的 Host 进程。
+### R3 接线与生命周期（2026-09-16）
+
+根因：R3 移除旧 mixed service factory 时，也删掉了跨机 staging；全转发指向 Source 的
+`createLocalPromptAttachmentTransferService`，它只会返回原 `localPath` 与 `staged:false`。
+这是缺少文件系统边界转换，不能靠恢复本机 JWT、删除 composer 保护或伪造 staged 修复。
+
+跨机 staging 由当前 Window Host 的 owning attachment 管理，不是 Source Core 可以直接执行的
+普通业务 RPC。Host 暴露 attachment 时覆盖 `IPromptAttachmentTransferService`；RPC 合同中的
+Source service 保留供 Source 本地路径语义使用。仅 SSH/WSL/Docker attachment 提供跨机能力。
+Transport Adapter 只暴露窄 `exec/upload` 能力，复用已建立的 backend；Manager 将能力绑定当前
+online connection，旧 generation 的新操作 fail-closed，不新建 SSH/WSL/Docker 连接或 Agent。
+Source 的 Provider、JWT、文件/会话状态继续远端自持，不改为旧版混合权威。
+
+- operation 记录只有 attachment 内一份，Host 可信 scope 校验 workspaceIdentity、workspacePath、
+  remoteSessionId，拒绝跨 scope stage。Main/relay 不保存进度、任务、queue 或副本。
+- 相同 operationId 的重试先使旧 record 失效并 abort；迟到结果只能清理自己，不能删除新 record。
+- cancel/cleanup/dispose 先同步摘除 record 并 abort，上传即使晚成功也不得发布 ready，必须回收文件。
+- attachment close 对所有未 adopt 操作执行上述收口；adopt 移除暂存 record，保持 CLI 已接受引用。
+  断网时 cleanup best-effort，继续由 24 小时 janitor 清理遗留文件；不因清理重连或切换线路。
+- Desktop 使用 continuous，手机仍只 attachment 已有 Host，粘贴临时文件沿同一 staging 合同；
+  内联字节继续走既有 V4 attachment transaction。staging 不改变 stream/queue/replay 语义。
 
 - 身份隔离使用 `workspaceKey = workspaceIdentity?.trim() || workspacePath`；远程连接路由继续传递 `remoteSessionId`。
 - composer 判断附件是否必须远端物化时，对任意非空 `workspaceIdentity` 都按远端目标

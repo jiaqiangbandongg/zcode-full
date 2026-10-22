@@ -293,17 +293,6 @@ describe("Provider Facades", () => {
     expect(savePersonalModelDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("Settings Facade 可显式等待 Source 刷新后返回最新 View", async () => {
-    const service = await createService();
-    const refresh = vi.spyOn(service, "refresh");
-    const facade = new ProviderSettingsFacade(service);
-
-    const view = await facade.refresh("purchase-complete");
-
-    expect(refresh).toHaveBeenCalledWith("purchase-complete");
-    expect(view).toEqual(facade.getView());
-  });
-
   it("Selection View 只投影 Registry 中实际可选的 Provider 和模型", async () => {
     const service = await createService();
     const facade = new ModelSelectionFacade(service);

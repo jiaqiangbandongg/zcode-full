@@ -203,6 +203,16 @@ engine records the name in the persona. The host maps it through the table the l
 resolved. A name missing from that table, which only a cast can produce, fails that
 subagent's first ask with `DriverError`.
 
+Whose choice the name is matters as much as its syntax. A persona names a model only when
+the user asked for one, and the authoring agent never moves a subagent to a model under
+another provider on its own, however light the work looks: another provider is another bill
+(`docs/dynamic-workflow/launch.md`, `subagent_model`, states the rule for the run-level
+field; it is the same rule). Seeing the fit is a reason to ask, not to act: the agent
+proposes the model and asks the user before the call, and their yes is the request. A bare
+name resolves only within the session's provider; when
+the user asked for a model that lives elsewhere, the script writes it as
+`providerId/modelId`, which is what the resolver demands for crossing the boundary.
+
 A subagent's own model outranks everything else; the run's `subagent_model` becomes the
 default for the subagents that name none (`execution-engine.md`, "Subagent sessions").
 The model is not part of a subagent's cache identity: an amend that changes only the model a
@@ -596,8 +606,17 @@ How the pack reaches each runtime:
 - Development and the Electron desktop resolve `packages/bundled-skills` on disk next to the
   CLI entry, through the same candidate-directory walk official plugins use, and read it in
   place; nothing is copied. `packages/desktop/scripts/prepare-agent-node-bundle.mjs` stages
-  it beside `resources/glm/zcode.cjs`; `scripts/prepare-prebuilds.mjs` stages it for remote
-  hosts.
+  it beside `resources/glm/zcode.cjs`.
+- ZCode Server releases (headless Server and SSH / WSL / Docker Source Server) use
+  `stageRelease` to stage the pack's `README.md` and `skills/` from `bundledSkillsDir` at
+  `runtime/packages/bundled-skills`, beside `runtime/zcode.cjs`. Other top-level files are
+  excluded. The pack belongs only to the `agent-runtime` component, including its content
+  hash and archive, and is not listed in the manifest's `plugins`. Official plugin staging
+  neither supplies nor overwrites the pack. Development remote
+  deployment stages the same directory beside its agent bundle, includes every pack file
+  in the deployment hash and checks the required files before reusing a remote installation.
+  Both paths reject a missing or incomplete pack before publishing or uploading. They do
+  not depend on an old plugin cache or on the server's working directory.
 - SEA binaries embed `skills/**` under the `zcode-bundled-skills/` asset prefix
   (`cli/scripts/sea-bundled-skill-assets.mjs`) with a manifest whose hash covers every file.
   On start the CLI extracts the pack once into `~/.zcode/cli/bundled-skills/<hash>/`; the
@@ -706,7 +725,7 @@ What the skill teaches, section by section:
 | The bar | A workflow exists to produce the deliverable a senior practitioner would hand over. When a shortcut and the expert's way disagree, take the expert's way. Depth is measured by what is at stake: trim the work when the task is small, trim the checking when a wrong claim costs little or a command has already decided. |
 | Is this the right tool | Routing is by request, not by task shape. When the user names workflow as the means, `CreateWorkflow` is mandatory and size decides only how many subagents; without that request the task goes to `Agent` (one delegation, or independent lookups in parallel) or is done inline, however multi-step it is. Only once a workflow has been requested does shape matter: results feeding results, a loop with a stopping condition, control flow on a typed result are what the script is good at. |
 | Subagent topology | Fresh subagent per item gives independent, parallel verdicts; one shared subagent gives consistent verdicts and serializes. Names are unique identities and the amend cache key. Personas stack on the harness contract, so write the role, not the rules. At every hand-off, an item moves on to the next stage as soon as it is done; the stage waits for all its items only where the next step needs every one. Reuse the same two subagents across loop rounds. No nesting. |
-| Choosing models | Only when the user asks for models, or the work has an obvious light tier (one-turn judges, classifiers, routers) and the user asked for cost or speed. A fixed choice is the name inline; routing declares a `model()` table at the top and maps a typed key from the router to it. Names come from `ListModels`; every one is checked at launch. |
+| Choosing models | Only when the user asks for a model, with the name they used; never a model under another provider unless the user asked for that model, however light the work — when a lighter model would clearly fit, ask the user before the call and take their yes as the request. A fixed choice is the name inline; routing declares a `model()` table at the top and maps a typed key from the router to it. Names come from `ListModels`; every one is checked at launch. |
 | Fresh eyes | A separate context sees the gaps the author filled. Ask for failures, not approval. Give reviewers the same evidence. One deliverable, one mechanism: a plan gets a reviewer who reads the code, findings get a confirmer, prose gets a reader; two is the ceiling and needs a reason. The independent read is for prose nothing else checked; a report whose findings were each confirmed has had its eyes. Not a gate on submitting the script. |
 | Typed results | Type the ask when control flow branches on it. JSDoc becomes the field description. Keep results narrow; pass paths, not file contents. |
 | Getting the world in | `files.glob` and `git.changedFiles` are fan-out sources. Caps reject. `world.run` is the deterministic gate. Choose the gate from the repository's own checks, build it in two tiers, and let the strongest tier the request implies decide the exit, run at least once before the final return with the timeout it needs. |

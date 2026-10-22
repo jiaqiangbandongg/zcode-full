@@ -1,6 +1,11 @@
 import { Hourglass, MessageCircleQuestion, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { WorkflowNotificationMeta, WorkflowRunHole } from "@zcode/shared/zcode-protocol-v4";
+import type {
+  BackgroundResultOriginMeta,
+  WorkflowBlockedMeta,
+  WorkflowNotificationMeta,
+  WorkflowRunHole,
+} from "@zcode/shared/zcode-protocol-v4";
 import { CodeBlock, CodeBlockHeader } from "@/components/ai-elements/code-block.js";
 import { WorkflowNotificationHoleRow } from "@/v4/WorkflowNotificationHoleRow.js";
 import { ToolLayout } from "@/ToolCallBlocks/ToolLayout.js";
@@ -57,6 +62,14 @@ const TERMINAL_KIND_LABEL_ID: Record<"completed" | "errored" | "stopped", string
 const STALL_KIND_LABEL_ID = "chat.backgroundResult.workflow.stall";
 const STALL_ICON = <Hourglass className="size-4 shrink-0 text-foreground-subtle" />;
 
+/**
+ * blocked 行的 kindLabel：主代理闲着、run 还欠着决定时的那条提醒（docs/dynamic-workflow/
+ * transcript-and-notifications.md「Reminding an idle main agent」）。与 stall 同一枚沙漏——两条都是
+ * 「在等」，等的是谁由 kindLabel 说；也同样只描述发出那一刻，不随后续状态翻转（每个决定答没答，
+ * 在它自己那条 escalation / hole 行上）。
+ */
+const BLOCKED_KIND_LABEL_ID = "chat.backgroundResult.workflow.blocked";
+
 /** 展开体里的一个 `label: value` 事实行（stall 的等待时长 / 原因 / 并发数）。 */
 function factLine(label: string, value: string, key: string) {
   return (
@@ -81,8 +94,28 @@ function escalationState(
   return pendingQids.has(qid) ? "waiting" : "answered";
 }
 
+/**
+ * 一条通知行画的东西：线上的 `workflowNotification`，或空闲提醒。提醒在线上不是那个 union 的成员
+ * （闭集多一个 kind 会让老客户端拒掉整帧，见 shared 的 workflowBlockedMetaSchema），它在 originMeta
+ * 自己的键上；到了这里才并成同一个按 `kind` 分支的视图，行组件不必知道它从哪个键来。
+ */
+export type WorkflowRowNotification =
+  | WorkflowNotificationMeta
+  | ({ kind: "blocked" } & WorkflowBlockedMeta);
+
+/** 后台结果轮的 originMeta → 这一行要画的通知；两个载荷都缺席（批量轮、旧 transcript）即裸标题行。 */
+export function workflowRowNotification(
+  originMeta: BackgroundResultOriginMeta | undefined,
+): WorkflowRowNotification | undefined {
+  if (originMeta?.backgroundSource !== "workflow") return undefined;
+  if (originMeta.workflowNotification) return originMeta.workflowNotification;
+  return originMeta.workflowBlocked
+    ? { kind: "blocked", ...originMeta.workflowBlocked }
+    : undefined;
+}
+
 export interface WorkflowNotificationToolRowProps {
-  notification: WorkflowNotificationMeta;
+  notification: WorkflowRowNotification;
   /** run 名 = originMeta.title（CLI 权威给出，不本地化）。 */
   runName: string;
   /** testid 后缀 + ToolLayout persist key，取 unit.key。 */
@@ -135,7 +168,7 @@ function WorkflowNotificationBaseRow({
   pendingQids,
   forceOpen = false,
 }: WorkflowNotificationToolRowProps & {
-  notification: Exclude<WorkflowNotificationMeta, { kind: "hole" }>;
+  notification: Exclude<WorkflowRowNotification, { kind: "hole" }>;
 }) {
   const { intl } = useZCodeIntl();
 
@@ -158,6 +191,7 @@ function WorkflowNotificationBaseRow({
 
   const isEscalation = notification.kind === "escalation";
   const isStall = notification.kind === "stall";
+  const isBlocked = notification.kind === "blocked";
 
   // kindLabel + primaryText + 展开体，按三类通知分别铸造。
   const escalationView = isEscalation ? escalationState(pendingQids, notification.qid) : undefined;
@@ -171,12 +205,14 @@ function WorkflowNotificationBaseRow({
     ? intl.formatMessage({ id: `chat.backgroundResult.workflow.${escalationView!}` })
     : isStall
       ? intl.formatMessage({ id: STALL_KIND_LABEL_ID })
-      : stopReason !== undefined
-        ? `${intl.formatMessage({ id: TERMINAL_KIND_LABEL_ID[notification.status] })} · ${intl.formatMessage({ id: `chat.toolCall.workflow.run.stopReason.${stopReason}` })}`
-        : intl.formatMessage({ id: TERMINAL_KIND_LABEL_ID[notification.status] });
+      : notification.kind === "blocked"
+        ? intl.formatMessage({ id: BLOCKED_KIND_LABEL_ID })
+        : stopReason !== undefined
+          ? `${intl.formatMessage({ id: TERMINAL_KIND_LABEL_ID[notification.status] })} · ${intl.formatMessage({ id: `chat.toolCall.workflow.run.stopReason.${stopReason}` })}`
+          : intl.formatMessage({ id: TERMINAL_KIND_LABEL_ID[notification.status] });
 
   const primaryText = useMemo(() => {
-    if (notification.kind === "terminal" || notification.kind === "stall") {
+    if (notification.kind !== "escalation") {
       return (
         <span className="inline-flex min-w-0 items-center gap-2">
           <span aria-hidden>·</span>
@@ -208,9 +244,9 @@ function WorkflowNotificationBaseRow({
     ) : undefined;
 
   // 展开门：终态看 artifact（errored / provider 停下的 error，否则 result），升级恒有问题正文，
-  // stall 恒有等待事实。
+  // stall 与 blocked 恒有等待事实。
   const hasDetails =
-    notification.kind === "escalation" || notification.kind === "stall"
+    notification.kind !== "terminal"
       ? true
       : notification.error !== undefined
         ? true
@@ -268,6 +304,46 @@ function WorkflowNotificationBaseRow({
       );
     }
 
+    if (notification.kind === "blocked") {
+      // 一行：开着什么（零的那一种不出现）与其中最久的等待。计数词与 run 卡上的摘要 chip 同一组。
+      const minutes = Math.max(1, Math.round(notification.sinceMs / 60_000));
+      const facts = [
+        ...(notification.questions > 0
+          ? [
+              intl.formatMessage(
+                {
+                  id:
+                    notification.questions === 1
+                      ? "chat.toolCall.workflow.digest.question"
+                      : "chat.toolCall.workflow.digest.questions",
+                },
+                { count: notification.questions },
+              ),
+            ]
+          : []),
+        ...(notification.holes > 0
+          ? [
+              intl.formatMessage(
+                {
+                  id:
+                    notification.holes === 1
+                      ? "chat.toolCall.workflow.card.hole"
+                      : "chat.toolCall.workflow.card.holes",
+                },
+                { count: notification.holes },
+              ),
+            ]
+          : []),
+        intl.formatMessage({ id: "chat.backgroundResult.workflow.blocked.openFor" }, { minutes }),
+      ];
+      return (
+        <div className="space-y-1" data-testid="workflow-notification-blocked">
+          <p className="text-ui-sm text-foreground-subtle">{facts.join(" · ")}</p>
+          {openRunLink}
+        </div>
+      );
+    }
+
     // errored，或 stopped 而带错误明细（provider / interrupted）：错误面板。
     if (notification.error !== undefined) {
       return (
@@ -318,7 +394,7 @@ function WorkflowNotificationBaseRow({
       <ToolLayout
         toolId={toolId}
         persistOpenKey={toolId}
-        icon={isEscalation ? ESCALATION_ICON : isStall ? STALL_ICON : TERMINAL_ICON}
+        icon={isEscalation ? ESCALATION_ICON : isStall || isBlocked ? STALL_ICON : TERMINAL_ICON}
         // 图标已由 kind 区分；showIcon 缺省即显示。
         canToggle={hasDetails}
         forceOpen={forceOpen && hasDetails}

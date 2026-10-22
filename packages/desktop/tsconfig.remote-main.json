@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["es2025"],
+    "noEmit": true,
+    "types": ["node", "electron"]
+  },
+  "include": ["src/main/desktopRemoteSessions.ts", "src/main/webRemoteControlManager.ts"],
+  "references": [
+    { "path": "../rpc" },
+    { "path": "../shared" },
+    { "path": "../services" },
+    { "path": "../client" }
+  ]
+}

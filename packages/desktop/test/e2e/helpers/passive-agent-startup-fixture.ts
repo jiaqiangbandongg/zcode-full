@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 export const PASSIVE_AGENT_STARTUP_WORKSPACE_COUNT = 9;
 
+// 虚拟项目重构（spec 3.6 F13 / D42）后启动只预热上次活动的目录，不再从 recentProjects
+// 额外挑选预热目标；期望集合因此只剩 active workspace。
 export const PASSIVE_AGENT_STARTUP_SCENARIO = {
   workspaceCount: PASSIVE_AGENT_STARTUP_WORKSPACE_COUNT,
   activeWorkspaceIndex: 4,

@@ -88,6 +88,9 @@ export function buildConversationShareConfirmRequest(
   return conversationShareConfirmRequestSchema.parse({
     ...confirmRequest,
     integrity: {
+      ...(input.projection.content_blocks === undefined
+        ? {}
+        : { content_blocks_sha256: sha256ConversationShareJson(input.projection.content_blocks) }),
       projection_sha256: projectionSha256,
       artifact_set_sha256: artifactSetSha256,
     },
@@ -133,8 +136,13 @@ function stripArtifactUrls(value: unknown): unknown {
  */
 export function verifyConversationShareIntegrity(input: {
   rawRows: unknown;
+  rawContentBlocks?: unknown;
   rawArtifacts: unknown;
-  integrity: { projection_sha256: string; artifact_set_sha256: string };
+  integrity: {
+    projection_sha256: string;
+    artifact_set_sha256: string;
+    content_blocks_sha256?: string;
+  };
 }): boolean {
   const artifacts = Array.isArray(input.rawArtifacts)
     ? [...(input.rawArtifacts as unknown[])]
@@ -142,6 +150,10 @@ export function verifyConversationShareIntegrity(input: {
         .map(stripArtifactUrls)
     : input.rawArtifacts;
   return (
+    (input.rawContentBlocks === undefined
+      ? input.integrity.content_blocks_sha256 === undefined
+      : sha256ConversationShareJson(input.rawContentBlocks) ===
+        input.integrity.content_blocks_sha256) &&
     sha256ConversationShareJson(input.rawRows) === input.integrity.projection_sha256 &&
     sha256ConversationShareJson(artifacts) === input.integrity.artifact_set_sha256
   );

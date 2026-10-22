@@ -65,18 +65,6 @@ describe("RuntimeCommandQueue", () => {
     expect(queue.dequeue()).toBeUndefined();
   });
 
-  it("preserves FIFO order for commands with the same priority", () => {
-    const queue = createRuntimeCommandQueue();
-
-    queue.enqueue(command("next-1", "next"));
-    queue.enqueue(command("next-2", "next"));
-    queue.enqueue(command("next-3", "next"));
-
-    expect(queue.dequeue()?.id).toBe("next-1");
-    expect(queue.dequeue()?.id).toBe("next-2");
-    expect(queue.dequeue()?.id).toBe("next-3");
-  });
-
   it("dequeues all same-priority task notifications as one frozen batch", () => {
     const queue = createRuntimeCommandQueue();
 

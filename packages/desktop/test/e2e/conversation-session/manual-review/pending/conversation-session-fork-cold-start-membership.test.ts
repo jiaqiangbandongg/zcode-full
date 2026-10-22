@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { TID_TASK_ITEM, TID_V4_COMPOSER_INPUT, testId } from "@zcode/shared";
+import { TID_TASK_ITEM, TID_V4_COMPOSER_INPUT, testId } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,

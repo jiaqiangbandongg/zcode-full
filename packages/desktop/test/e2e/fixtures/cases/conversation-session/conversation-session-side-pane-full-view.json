@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-pane-full-view",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-pane-full-view.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-side-pane-full-view.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "upstream-conversation-side-pane-full-view-first",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只需要一个已完成的会话作为完整视图 owner，回复内容不参与断言。"
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-floating-send",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "证明浮窗输入框与主对话是同一实例，回复内容只用于确认消息被 agent 处理。"
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-ask",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "稳定制造问答等待态并延迟 4s 返回，保证请求在浮窗最小化之后到达，验证自动恢复并显示卡片。"
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-ask-final",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只证明问答回答已被 agent 消费，核心断言在浮窗卡片的显示与消失。"
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_SPFV_FIRST 首发会触发 title sidecar；固定 case-local 标题，避免 sidecar 500 重试干扰会话。"
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-compact",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "manual-review 的小上下文窗口会在每轮之间自动 compact（compact 后历史不再含首条 marker）；compact 失败会退避重试并阻塞后续输入，这里统一给出稳定摘要。"
+    }
+  ]
+}

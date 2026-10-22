@@ -37,7 +37,7 @@ export interface DividerLayout {
   crossLength: string;
 }
 
-const ROOT_RECT: RectExpr = {
+export const FULL_WORKBENCH_RECT: RectExpr = {
   left: "0%",
   top: "0%",
   width: "100%",
@@ -122,7 +122,7 @@ export interface WorkbenchLayout {
 export function collectWorkbenchLayout(root: PaneLayoutNode): WorkbenchLayout {
   const leaves: LeafLayout[] = [];
   const dividers: DividerLayout[] = [];
-  collectNode(root, ROOT_RECT, 1, 1, leaves, dividers);
+  collectNode(root, FULL_WORKBENCH_RECT, 1, 1, leaves, dividers);
   return { leaves, dividers };
 }
 

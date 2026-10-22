@@ -5,7 +5,15 @@ import { Events } from "./agent.js";
 // 确定性本地模型只返回预置工具调用；授权、认领、执行、取消仍走真实 Agent。
 export async function startModel(root: string, cli: string) {
   const requests = new Events<any>();
-  const plans: { key: string; delayed: boolean; status?: number; finishReason?: string }[] = [];
+  const plans: {
+    key: string;
+    delayed: boolean;
+    holdStream?: boolean;
+    toolName?: string;
+    arguments?: Record<string, unknown>;
+    status?: number;
+    finishReason?: string;
+  }[] = [];
   const aborted = new Events<string>();
   const releases = new Map<string, () => void>();
   const server = createServer(async (req, res) => {
@@ -13,7 +21,9 @@ export async function startModel(root: string, cli: string) {
     for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString());
     const plan = plans.shift();
-    const tool = body.tools?.find((t: any) => t.function?.name.endsWith("__page_edit"));
+    const tool = body.tools?.find((t: any) =>
+      t.function?.name.endsWith(`__${plan?.toolName ?? "page_edit"}`),
+    );
     if (!body.stream) {
       const reply = () => {
         releases.delete(plan?.key ?? "");
@@ -59,6 +69,13 @@ export async function startModel(root: string, cli: string) {
       return;
     }
     requests.emit({ body, plan, tool, url: req.url });
+    if (plan?.holdStream) {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(": fixture running\n\n");
+      releases.set(plan.key, () => res.end("data: [DONE]\n\n"));
+      res.on("close", () => releases.delete(plan.key));
+      return;
+    }
     const delta =
       plan && tool
         ? {
@@ -68,7 +85,10 @@ export async function startModel(root: string, cli: string) {
                 index: 0,
                 id: `call_${plan.key}`,
                 type: "function",
-                function: { name: tool.function.name, arguments: JSON.stringify(plan) },
+                function: {
+                  name: tool.function.name,
+                  arguments: JSON.stringify(plan.arguments ?? plan),
+                },
               },
             ],
           }

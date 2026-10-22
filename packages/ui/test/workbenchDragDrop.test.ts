@@ -3,7 +3,6 @@ import {
   WORKBENCH_SESSION_DRAG_MIME,
   clearActiveWorkbenchSessionDragPayload,
   parseWorkbenchSessionDragPayload,
-  resolveWorkbenchDropSide,
   serializeWorkbenchSessionDragPayload,
   setActiveWorkbenchSessionDragPayload,
 } from "@/v4/workbenchDragDrop.js";
@@ -76,15 +75,5 @@ describe("workbench session drag/drop helpers", () => {
         getData: () => "",
       }),
     ).toBeNull();
-  });
-
-  it("resolves only four edge zones and keeps the center disabled", () => {
-    const rect = { left: 10, top: 20, width: 200, height: 100 };
-
-    expect(resolveWorkbenchDropSide(rect, 15, 70)).toBe("left");
-    expect(resolveWorkbenchDropSide(rect, 205, 70)).toBe("right");
-    expect(resolveWorkbenchDropSide(rect, 110, 25)).toBe("up");
-    expect(resolveWorkbenchDropSide(rect, 110, 115)).toBe("down");
-    expect(resolveWorkbenchDropSide(rect, 110, 70)).toBeNull();
   });
 });

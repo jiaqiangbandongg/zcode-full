@@ -4,20 +4,61 @@
   "spec": "./test/e2e/conversation-session/conversation-session-share-ssh-artifact.test.ts",
   "fixtures": [
     {
+      "id": "conversation-share-ssh-write",
+      "description": "Create a real remote HTML artifact before publishing.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "回放只固定模型决策；Write、远端产物读取和分享发布均走真实链路。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_CONVERSATION_SHARE_SSH_ARTIFACT_V1"
+        ],
+        "bodyIncludes": [
+          "E2E_SSH_SHARE_ARTIFACT_CONTENT"
+        ],
+        "bodyExcludes": [
+          "toolu_share_ssh_write",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_share_ssh_write",
+            "name": "Write",
+            "input": {
+              "file_path": "report.html",
+              "content": "<!doctype html><html><body>E2E_SSH_SHARE_ARTIFACT_CONTENT</body></html>\n"
+            }
+          }
+        ]
+      }
+    },
+    {
       "id": "conversation-share-ssh-main",
       "description": "SSH share case has a deterministic completed response after remote artifact creation.",
       "metadata": {
         "kind": "main",
         "timingPolicy": "fast-text",
         "source": "synthetic",
-        "syntheticReason": "The case validates remote file authority and publication wiring, not model content."
+        "syntheticReason": "回放只固定模型决策；Write、远端产物读取和分享发布均走真实链路。"
       },
       "maxMatches": 1,
       "match": {
         "method": "POST",
         "pathIncludes": "/messages",
-        "lastUserMessageIncludes": ["E2E_CONVERSATION_SHARE_SSH_ARTIFACT_V1"],
-        "bodyIncludes": ["share-ssh-ready"]
+        "bodyIncludes": [
+          "E2E_CONVERSATION_SHARE_SSH_ARTIFACT_V1",
+          "toolu_share_ssh_write"
+        ]
       },
       "response": {
         "statusCode": 200,
@@ -26,7 +67,7 @@
           "id": "conversation-share-ssh-main",
           "inputTokens": 64,
           "outputTokens": 8,
-          "text": "share-ssh-ready"
+          "text": "share-ssh-ready [report.html](report.html)"
         }
       }
     }

@@ -108,7 +108,7 @@ test("renders Read errors under the path title with error styling", () => {
   assert.equal(lines[1]?.style.fg, "#fca5a5");
 });
 
-test("renders tool rows without a global left gutter", () => {
+test("renders the tool title and indented detail rows", () => {
   const part: ToolTranscriptPart = {
     detailLines: ["command: npm test", "cwd: packages/tui"],
     status: "running",
@@ -120,7 +120,6 @@ test("renders tool rows without a global left gutter", () => {
   const view = ToolTranscriptPartView({ part });
   const lines = collectTextNodes(view);
 
-  assert.equal((view.props.style as Record<string, unknown>).paddingLeft, undefined);
   assert.equal(lines[0]?.text, "Tool Bash running");
   assert.equal(lines[1]?.text, "  command: npm test");
   assert.equal(lines[2]?.text, "  cwd: packages/tui");

@@ -895,7 +895,7 @@ describe("BrowserGuestManager", () => {
     expect(snap.snapshot?.elements[0]?.ref).toBe("e1");
   });
 
-  it("缩放只在 guest CDP 边界换算鼠标坐标，重置后不得残留倍率", async () => {
+  it("任意 Desktop zoom 下 metrics 不带 scale，鼠标坐标按 CSS px 原样下发", async () => {
     const { guest, spy } = registerGuest(601);
     const other = registerGuest(602);
     const mgr = new BrowserGuestManager();
@@ -903,8 +903,19 @@ describe("BrowserGuestManager", () => {
     mgr.attachGuest("other-tab", 602);
     for (const zoom of [1, 1.1, 1.61, 1, 0.826446]) {
       spy.zoomFactor = zoom;
-      await mgr.updateViewportFromRenderer("zoom-tab", { width: 1280, height: 720 }, 0, zoom);
+      spy.cdpCalls.length = 0;
+      await mgr.updateViewportFromRenderer("zoom-tab", { width: 1280, height: 720 }, 0);
       expect(guest.getZoomFactor()).toBe(1);
+      // 布局补偿已由 renderer 完成；metrics 带 scale 会在 idle detach 后与自然布局分叉。
+      expect(
+        spy.cdpCalls.find(({ method }) => method === "Emulation.setDeviceMetricsOverride")?.params,
+      ).toEqual({
+        width: 1280,
+        height: 720,
+        deviceScaleFactor: 1,
+        mobile: false,
+        dontSetVisibleSize: true,
+      });
       spy.cdpCalls.length = 0;
       const result = await mgr.execute("zoom-tab", {
         method: "click",
@@ -913,7 +924,7 @@ describe("BrowserGuestManager", () => {
         y: 400,
       });
       expect(result.ok).toBe(true);
-      const scale = Math.max(1, zoom);
+      const scale = 1;
       expect(spy.cdpCalls.filter(({ method }) => method === "Input.dispatchMouseEvent")).toEqual([
         {
           method: "Input.dispatchMouseEvent",
@@ -1002,7 +1013,7 @@ describe("BrowserGuestManager", () => {
       coordinator,
     );
     mgr.attachGuest("zoom-shot", 603);
-    await mgr.updateViewportFromRenderer("zoom-shot", { width: 1280, height: 720 }, 0, 0.9);
+    await mgr.updateViewportFromRenderer("zoom-shot", { width: 1280, height: 720 }, 0);
     // Chromium detach 会清空 per-session metrics；Electron page zoom 也可能晚于 renderer 回调到达。
     guest.debugger.detach();
     spy.viewport = { width: 1408, height: 792 };
@@ -1050,8 +1061,9 @@ describe("BrowserGuestManager", () => {
         () => "FIT_PNG",
         coordinator,
       );
+      Object.defineProperty(guest, "hostWebContents", { value: { getZoomFactor: () => 1.1 } });
       mgr.attachGuest("fit-shot", 604);
-      await mgr.updateViewportFromRenderer("fit-shot", { width: 1280, height: 720 }, 0, 1.1);
+      await mgr.updateViewportFromRenderer("fit-shot", { width: 1280, height: 720 }, 0);
       guest.debugger.detach();
       spy.viewport = { width: 1408, height: 792 };
       spy.zoomFactor = 1.1;
@@ -1093,7 +1105,7 @@ describe("BrowserGuestManager", () => {
     expect(spy.cdpCalls.some(({ method }) => method === "Emulation.setDeviceMetricsOverride")).toBe(
       false,
     );
-    await mgr.updateViewportFromRenderer("natural-shot", { width: 1280, height: 720 }, 0, 1 / 1.21);
+    await mgr.updateViewportFromRenderer("natural-shot", { width: 1280, height: 720 }, 0);
     await expect(mgr.execute("natural-shot", { method: "screenshot" })).resolves.toMatchObject({
       ok: true,
     });
@@ -1126,10 +1138,11 @@ describe("BrowserGuestManager", () => {
         await expect(
           mgr.execute("replacement-scale", { method: "screenshot" }),
         ).resolves.toMatchObject({ ok: true });
-        expect(old.spy.cdpCalls).toContainEqual({
-          method: "Emulation.setDeviceMetricsOverride",
-          params: expect.objectContaining({ scale: 1.1 }),
-        });
+        const fallbackMetrics = old.spy.cdpCalls.find(
+          ({ method }) => method === "Emulation.setDeviceMetricsOverride",
+        );
+        expect(fallbackMetrics).toBeDefined();
+        expect(fallbackMetrics?.params).not.toHaveProperty("scale");
         if (mode === "destroyed") old.guest.__emitDestroyed();
         expect(mgr.attachGuest("replacement-scale", next.guest.id, { active: true }).ok).toBe(true);
         // 自然模式的新 guest 没有 metrics；再次 idle 重连也不能继承旧倍率。
@@ -1149,7 +1162,7 @@ describe("BrowserGuestManager", () => {
     },
   );
 
-  it("普通 fallback 在应用放大、热截图和 idle 重连后共用 raster 与输入补偿", async () => {
+  it("普通 fallback 在应用放大、热截图和 idle 重连后 metrics 不带 scale，输入不乘倍率", async () => {
     const { guest, spy } = registerGuest(605);
     let desktopZoom = 1.1;
     Object.defineProperty(guest, "hostWebContents", {
@@ -1178,36 +1191,35 @@ describe("BrowserGuestManager", () => {
       if (phase === "reattach") guest.debugger.detach();
       if (phase === "reset") desktopZoom = 1;
       if (phase === "shrink") desktopZoom = 1 / 1.21;
-      const metricsScale = Math.max(1, desktopZoom);
+      const nativeCapture = desktopZoom > 1;
       spy.zoomFactor = desktopZoom;
       spy.cdpCalls.length = 0;
       const result = await mgr.execute("fallback-zoom", { method: "screenshot" });
       expect(result).toMatchObject({
         ok: true,
-        image: { base64: metricsScale > 1 ? "FALLBACK_PNG" : "PNGDATA" },
+        image: { base64: nativeCapture ? "FALLBACK_PNG" : "PNGDATA" },
       });
       expect(prepare).toHaveBeenLastCalledWith(
         expect.objectContaining({ viewportMode: "emulated" }),
       );
-      if (phase !== "shrink") {
-        const metrics = spy.cdpCalls
-          .filter(({ method }) => method === "Emulation.setDeviceMetricsOverride")
-          .at(-1);
-        expect(metrics?.params).toMatchObject({ width: 1280, height: 720 });
-        expect((metrics?.params as { scale?: number } | undefined)?.scale).toBe(
-          metricsScale > 1 ? metricsScale : undefined,
-        );
+      const metricsCalls = spy.cdpCalls.filter(
+        ({ method }) => method === "Emulation.setDeviceMetricsOverride",
+      );
+      // metrics 与 Desktop zoom 无关：只在首次安装和 idle 重连时下发，热态 zoom 变化不重发。
+      if (phase === "initial" || phase === "reattach") {
+        expect(metricsCalls.at(-1)?.params).toMatchObject({ width: 1280, height: 720 });
       }
+      for (const { params } of metricsCalls) expect(params).not.toHaveProperty("scale");
       expect(spy.zoomFactor).toBe(1);
       expect(spy.cdpCalls.some(({ method }) => method === "Page.captureScreenshot")).toBe(
-        metricsScale === 1,
+        !nativeCapture,
       );
       await expect(
         mgr.execute("fallback-zoom", { method: "click", x: 1000, y: 600 }),
       ).resolves.toMatchObject({ ok: true });
       expect(spy.cdpCalls).toContainEqual({
         method: "Input.dispatchMouseEvent",
-        params: { type: "mouseMoved", x: 1000 * metricsScale, y: 600 * metricsScale },
+        params: { type: "mouseMoved", x: 1000, y: 600 },
       });
     }
     mgr.closeWindow(0);
@@ -1313,12 +1325,7 @@ describe("BrowserGuestManager", () => {
       coordinator,
     );
     mgr.attachGuest("tab-218", 218);
-    await mgr.updateViewportFromRenderer(
-      "tab-218",
-      { width: 1280, height: 720 },
-      0,
-      Math.pow(1.1, -2),
-    );
+    await mgr.updateViewportFromRenderer("tab-218", { width: 1280, height: 720 }, 0);
     spy.cdpCalls.length = 0;
 
     await expect(mgr.execute("tab-218", { method: "screenshot" })).resolves.toMatchObject({
@@ -1359,12 +1366,7 @@ describe("BrowserGuestManager", () => {
       coordinator,
     );
     mgr.attachGuest("tab-219", 219);
-    await mgr.updateViewportFromRenderer(
-      "tab-219",
-      { width: 1280, height: 720 },
-      0,
-      Math.pow(1.1, -2),
-    );
+    await mgr.updateViewportFromRenderer("tab-219", { width: 1280, height: 720 }, 0);
 
     guest.capturePage = async () => {
       throw new Error("capturePage failed");
@@ -1378,35 +1380,6 @@ describe("BrowserGuestManager", () => {
       },
     });
     expect(release).toHaveBeenCalledOnce();
-  });
-
-  it("第七位 resize 兼容保留，coordinator 从第八位开始门禁 screenshot", async () => {
-    registerGuest(212);
-    const resizeScreenshotToCssPixels = vi.fn();
-    const coordinator = {
-      prepare: vi.fn(async (input: ScreenshotSurfacePrepareInput) => ({
-        surfaceScale: 1,
-        webContentsId: input.webContentsId,
-        viewport: input.viewport,
-        release: vi.fn(),
-      })),
-    } satisfies BrowserScreenshotSurfaceCoordinator;
-    const mgr = new BrowserGuestManager(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      resizeScreenshotToCssPixels,
-      coordinator,
-    );
-    mgr.attachGuest("tab-212", 212);
-
-    await expect(mgr.execute("tab-212", { method: "screenshot" })).resolves.toMatchObject({
-      ok: true,
-    });
-    expect(coordinator.prepare).toHaveBeenCalledOnce();
   });
 
   it("CSS 像素修正完成前保留 lease，完成后才 release", async () => {
@@ -3259,19 +3232,7 @@ describe("BrowserGuestManager", () => {
       params: undefined,
     });
     expect(viewportChanges.at(-1)).toEqual({ tabId, viewport: null });
-    await mgr.updateViewportFromRenderer(tabId, { width: 400, height: 700 }, 1, 1.21);
-    expect(guest.spy.cdpCalls.at(-1)).toEqual({
-      method: "Emulation.setDeviceMetricsOverride",
-      params: {
-        width: 400,
-        height: 700,
-        deviceScaleFactor: 1,
-        mobile: false,
-        dontSetVisibleSize: true,
-        scale: 1.21,
-      },
-    });
-    await mgr.updateViewportFromRenderer(tabId, { width: 400, height: 700 }, 1, 0.826446);
+    await mgr.updateViewportFromRenderer(tabId, { width: 400, height: 700 }, 1);
     expect(guest.spy.cdpCalls.at(-1)).toEqual({
       method: "Emulation.setDeviceMetricsOverride",
       params: {
@@ -6007,13 +5968,5 @@ describe("BrowserGuestManager", () => {
       }),
     ).resolves.toBeUndefined();
     expect(mgr.hasGuest("browser:remote-drift")).toBe(false);
-  });
-
-});
-
-describe("BrowserGuestManager.collectMemoryDiagnostics", () => {
-  it("返回 tabs / closedTabIds 的只读大小", () => {
-    const mgr = new BrowserGuestManager();
-    expect(mgr.collectMemoryDiagnostics()).toEqual({ tabs: 0, closedTabIds: 0 });
   });
 });

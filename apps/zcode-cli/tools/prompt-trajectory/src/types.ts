@@ -1,5 +1,9 @@
 export type JsonObject = Record<string, unknown>;
 
+export interface TrajectoryDerivationOptions {
+  ignoreToolSearchChanges?: boolean;
+}
+
 export interface OpenAiMessage extends JsonObject {
   role: string;
 }
@@ -33,6 +37,7 @@ export interface DerivedTrajectory {
 export interface DerivedTrajectoryManifest {
   schemaVersion: 1;
   generatedAt: string;
+  ignoreToolSearchChanges?: true;
   trajectories: Array<{
     id: string;
     lastRequestIndex: number;

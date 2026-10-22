@@ -2,7 +2,7 @@ import {
   TID_CHAT_ASSISTANT_MESSAGE,
   TID_CHAT_MESSAGE_FORK_BUTTON,
   TID_CHAT_USER_MESSAGE,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clickTestIdByDom } from "./desktop-app.js";
 
 export interface ForkButtonSnapshot {

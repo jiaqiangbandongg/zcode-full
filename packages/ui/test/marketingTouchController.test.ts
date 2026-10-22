@@ -137,6 +137,37 @@ describe("marketing touch controller", () => {
     expect(f.report).not.toHaveBeenCalled();
     f.controller.dispose();
   });
+  it("closes safe links without querying stale delivery while confirmation is pending", async () => {
+    let confirm!: () => void;
+    const confirmation = new Promise<void>((resolve) => {
+      confirm = resolve;
+    });
+    const refresh = vi.fn();
+    const f = fixture({ refresh });
+    f.report.mockReturnValue(confirmation);
+    await f.controller.refresh();
+    await f.controller.showPending();
+    await f.controller.dialogAction({
+      type: "open_url",
+      args: { url: "https://example.com/help" },
+    });
+    expect(f.controller.store.getState().dialog).toBeNull();
+    expect(f.report).toHaveBeenCalledTimes(1);
+    expect(f.report.mock.calls[0]?.[0]).toMatchObject({
+      campaignId: "popup",
+      actionType: "confirm",
+    });
+    expect(refresh).not.toHaveBeenCalled();
+    confirm();
+    await confirmation;
+    expect(f.controller.store.getState().dialog).toBeNull();
+    // 后续服务端主动投放仍然有效，不能靠客户端记住活动来掩盖竞态。
+    await f.controller.refresh();
+    await f.controller.showPending();
+    expect(f.controller.store.getState().dialog?.delivery.campaign_id).toBe("popup");
+    f.controller.dispose();
+  });
+
   it.each(["navigate", "copy_text"] as const)(
     "does not open success_popup for banner %s",
     async (type) => {

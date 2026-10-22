@@ -7,7 +7,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { SettingsFormTextarea } from "@/settings/SettingsFormTextarea.js";
 import { SettingsFormActions } from "@/settings/SettingsFormActions.js";
 import { PluginScopeMenu } from "@/settings/PluginScopeMenu.js";
-import type { WorkspaceTabState } from "@/store/tabStore.js";
+import type { ConfigWorkspaceTarget } from "@/workspace-config-catalog/index.js";
 
 const NAME_REGEX = /^[a-zA-Z0-9_-]+$/;
 const MIN_NAME_LENGTH = 1;
@@ -27,7 +27,7 @@ function CommandScopeMenu({
 }: {
   disabled: boolean;
   scopeKey: string;
-  workspaceTabs: WorkspaceTabState[];
+  workspaceTabs: ConfigWorkspaceTarget[];
   onChange: (scopeKey: string) => void;
 }) {
   const { intl } = useZCodeIntl();
@@ -51,7 +51,7 @@ interface CommandFormProps {
   initial?: UserCommand;
   agentSource?: CommandAgentSource;
   scopeKey: string;
-  workspaceTabs: WorkspaceTabState[];
+  workspaceTabs: ConfigWorkspaceTarget[];
   onScopeKeyChange: (scopeKey: string) => void;
   onSave: (config: CommandConfig, scopeKey: string) => Promise<void>;
   onCancel: () => void;

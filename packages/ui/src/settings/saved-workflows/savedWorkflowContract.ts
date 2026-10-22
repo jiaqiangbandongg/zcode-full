@@ -3,6 +3,8 @@
 
 /** 工作流所属项目的坐标：发往对话（运行 / 修订 / 创建）与打开实例都用它，绝不取活动项目。 */
 export type SavedWorkflowProjectTarget = {
+  projectId?: string | null;
+  hostId?: string;
   workspacePath: string;
   workspaceIdentity?: string;
 };

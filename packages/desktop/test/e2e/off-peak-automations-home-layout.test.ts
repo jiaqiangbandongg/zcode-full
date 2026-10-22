@@ -1,10 +1,15 @@
+import {
+  restartIntoWorkspace,
+  seedBigModelConnectionSelection,
+  seedBigModelOAuthCredential,
+} from "./helpers/model-provider-restart.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   TID_AUTOMATION_CREATE_MANUALLY,
   TID_AUTOMATIONS_OPEN,
   TID_OFFPEAK_CREATE_BUTTON,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -13,7 +18,7 @@ import {
   type ElectronRendererContentSizeSnapshot,
   waitForTestIdByDom,
 } from "./helpers/desktop-app.js";
-import { prepareConversationE2E } from "./helpers/conversation-session.js";
+import { prepareV4ConversationE2E } from "./helpers/v4-conversation.js";
 
 /**
  * Figma 4798:2443 空首页布局回归。
@@ -36,7 +41,14 @@ describe("Automations 空首页 Figma 布局 E2E", () => {
   it("按空状态、保持唤醒、两组双列模板的顺序渲染", async function () {
     this.timeout(150000);
 
-    await prepareConversationE2E({ skipProvider: true });
+    await prepareV4ConversationE2E({ skipProvider: true });
+    // 网关只替代曝光和取票；Registry 模型需要真实的隔离账号与连接前置。
+    await restartIntoWorkspace({
+      afterElectronProcessExit: async () => {
+        await seedBigModelConnectionSelection({ kind: "individual-coding-plan" });
+        await seedBigModelOAuthCredential();
+      },
+    });
     // 修复原因：Electron 41 不实现 WebDriver window/rect 依赖的
     // Browser.getWindowForTarget，必须通过 BrowserWindow 调整 renderer viewport。
     // macOS work area 可能小于 960px；本用例只需要宽屏双列断点，不能把不可达高度
@@ -85,62 +97,66 @@ describe("Automations 空首页 Figma 布局 E2E", () => {
       },
     );
 
-    const layout = await browser.execute((offPeakCreateTestId, manualCreateTestId) => {
-      const requireElement = (selector: string): HTMLElement => {
-        const element = document.querySelector<HTMLElement>(selector);
-        if (!element) throw new Error(`Missing element: ${selector}`);
-        return element;
-      };
-      const rect = (element: HTMLElement) => {
-        const value = element.getBoundingClientRect();
-        return {
-          top: value.top,
-          right: value.right,
-          bottom: value.bottom,
-          left: value.left,
-          width: value.width,
-          height: value.height,
+    const layout = await browser.execute(
+      (offPeakCreateTestId, manualCreateTestId) => {
+        const requireElement = (selector: string): HTMLElement => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) throw new Error(`Missing element: ${selector}`);
+          return element;
         };
-      };
-      const gridMetrics = (section: HTMLElement) => {
-        const grid = section.querySelector<HTMLElement>(".grid");
-        if (!grid) throw new Error("Missing template grid");
-        return {
-          columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
-          cards: grid.children.length,
-          firstCardRadius:
-            grid.querySelector("button") instanceof HTMLElement
-              ? getComputedStyle(grid.querySelector("button") as HTMLElement).borderRadius
-              : "",
+        const rect = (element: HTMLElement) => {
+          const value = element.getBoundingClientRect();
+          return {
+            top: value.top,
+            right: value.right,
+            bottom: value.bottom,
+            left: value.left,
+            width: value.width,
+            height: value.height,
+          };
         };
-      };
+        const gridMetrics = (section: HTMLElement) => {
+          const grid = section.querySelector<HTMLElement>(".grid");
+          if (!grid) throw new Error("Missing template grid");
+          return {
+            columns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
+            cards: grid.children.length,
+            firstCardRadius:
+              grid.querySelector("button") instanceof HTMLElement
+                ? getComputedStyle(grid.querySelector("button") as HTMLElement).borderRadius
+                : "",
+          };
+        };
 
-      const content = requireElement("[data-automations-content]");
-      const empty = requireElement("[data-automations-empty-state]");
-      const keepAwake = requireElement("[data-automations-keep-awake]");
-      const idle = requireElement("[data-automations-idle-templates]");
-      const scheduled = requireElement("[data-automations-scheduled-templates]");
-      const manualCreate = requireElement(`[data-testid="${manualCreateTestId}"]`);
-      const idleCreate = requireElement(`[data-testid="${offPeakCreateTestId}"]`);
-      const contentStyle = getComputedStyle(content);
+        const content = requireElement("[data-automations-content]");
+        const empty = requireElement("[data-automations-empty-state]");
+        const keepAwake = requireElement("[data-automations-keep-awake]");
+        const idle = requireElement("[data-automations-idle-templates]");
+        const scheduled = requireElement("[data-automations-scheduled-templates]");
+        const manualCreate = requireElement(`[data-testid="${manualCreateTestId}"]`);
+        const idleCreate = requireElement(`[data-testid="${offPeakCreateTestId}"]`);
+        const contentStyle = getComputedStyle(content);
 
-      return {
-        contentWidth:
-          content.getBoundingClientRect().width -
-          Number.parseFloat(contentStyle.paddingLeft) -
-          Number.parseFloat(contentStyle.paddingRight),
-        empty: rect(empty),
-        keepAwake: rect(keepAwake),
-        idle: rect(idle),
-        scheduled: rect(scheduled),
-        manualCreate: rect(manualCreate),
-        idleCreate: rect(idleCreate),
-        emptyRadius: getComputedStyle(empty).borderRadius,
-        keepAwakeRadius: getComputedStyle(keepAwake).borderRadius,
-        idleGrid: gridMetrics(idle),
-        scheduledGrid: gridMetrics(scheduled),
-      };
-    }, TID_OFFPEAK_CREATE_BUTTON, TID_AUTOMATION_CREATE_MANUALLY);
+        return {
+          contentWidth:
+            content.getBoundingClientRect().width -
+            Number.parseFloat(contentStyle.paddingLeft) -
+            Number.parseFloat(contentStyle.paddingRight),
+          empty: rect(empty),
+          keepAwake: rect(keepAwake),
+          idle: rect(idle),
+          scheduled: rect(scheduled),
+          manualCreate: rect(manualCreate),
+          idleCreate: rect(idleCreate),
+          emptyRadius: getComputedStyle(empty).borderRadius,
+          keepAwakeRadius: getComputedStyle(keepAwake).borderRadius,
+          idleGrid: gridMetrics(idle),
+          scheduledGrid: gridMetrics(scheduled),
+        };
+      },
+      TID_OFFPEAK_CREATE_BUTTON,
+      TID_AUTOMATION_CREATE_MANUALLY,
+    );
 
     // Settings 统一内容框当前为 max-w-4xl（896px）+ 左右 32px padding，内列应为 832px；
     // 旧 802px 是收敛 Settings 框架前的历史值，不能继续当作当前布局的回归基线。

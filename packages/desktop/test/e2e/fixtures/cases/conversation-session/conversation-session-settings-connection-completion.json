@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-settings-connection-completion",
+  "spec": "./test/e2e/conversation-session/conversation-session-settings-connection-completion.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-settings-connection-completion.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "RDUX15 设置连接只验证真实 SSH/Docker 设备管理与导航，不发模型请求。",
+  "requests": []
+}

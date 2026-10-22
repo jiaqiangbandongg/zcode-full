@@ -87,6 +87,10 @@ best-effort observability.
 
 - Runtime writes `model_usage` after every successful `ModelComplete` and after model request
   failures when a request reached the runtime boundary.
+- 明确超窗且无有效输出的 finish 在 Adapter 归一为失败；若 provider 已报告 usage，将其保留在
+  `model_request_failed.usage`。既有失败记账消费该事实，不添加额外 usage 数组。
+  Turn 和 Subagent 汇总计入失败事件的 usage；成功响应仍只从 `ModelComplete` 计入，避免双计。
+  记账在 Reactive Compact 前完成，压缩成功、失败、禁用和取消均不得遗漏原请求。
 - Runtime writes `turn_usage` at turn completion or turn error.
 - Runtime writes `tool_usage` from tool lifecycle events:
   `tool_call_scheduled`, `permission_requested`, `permission_resolved`,

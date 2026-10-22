@@ -1,4 +1,5 @@
 import type { AgentRuntimeInternal } from "../internal.js";
+import { getOffPeakExecution } from "../off-peak/runtime.js";
 
 /**
  * 登记会越过当前同步调用栈的 runtime-owned work。
@@ -20,6 +21,7 @@ export function trackResidencyBlockingWork<T>(
 /** Session 常驻池只消费这一项，新增 sidecar 时不再修改 bootstrap 的猜测列表。 */
 export function hasResidencyBlockingWork(this: AgentRuntimeInternal): boolean {
   return (
+    getOffPeakExecution(this)?.lifecycle.terminal === false ||
     this.hasActiveOrQueuedTurnWork() ||
     this.hasRunningBackgroundTasks() ||
     this.residencyBlockingWorkCount > 0 ||

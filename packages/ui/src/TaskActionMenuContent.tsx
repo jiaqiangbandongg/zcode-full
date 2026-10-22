@@ -1,5 +1,3 @@
-import { TID_V4_TASK_OPEN_IN_SPLIT } from "@zcode/shared";
-
 interface TaskActionMenuItemProps {
   children: React.ReactNode;
   "data-testid"?: string;
@@ -15,6 +13,7 @@ interface TaskActionMenuSeparatorProps {
 export function TaskActionMenuContent({
   intl,
   isPinned,
+  isArchived = false,
   fileManagerLabel,
   taskSessionFile,
   activeSessionId,
@@ -31,8 +30,6 @@ export function TaskActionMenuContent({
   onStartRenameTask,
   onArchiveTask,
   onMarkTaskAsUnread,
-  onOpenInSplitPane,
-  openInSplitPaneDisabled = false,
   onOpenTaskFeedback,
   onOpenTaskPathInFileManager,
   onCopyWorkspacePath,
@@ -43,12 +40,10 @@ export function TaskActionMenuContent({
   onOpenProviderConfig,
 }: {
   intl: {
-    formatMessage: (
-      desc: { id: string },
-      values?: Record<string, string>,
-    ) => string;
+    formatMessage: (desc: { id: string }, values?: Record<string, string>) => string;
   };
   isPinned: boolean;
+  isArchived?: boolean;
   fileManagerLabel: string;
   taskSessionFile: { loading: boolean; path: string | null; exists: boolean };
   activeSessionId?: string | null;
@@ -69,10 +64,6 @@ export function TaskActionMenuContent({
   onStartRenameTask: () => void;
   onArchiveTask: () => void;
   onMarkTaskAsUnread: () => void;
-  /** 「在分屏打开」（仅桌面 shell 传入；手机远控不显示该入口）。 */
-  onOpenInSplitPane?: () => void;
-  /** 当前 session 或 pane 数达上限且目标无已有归属时禁用（保留布局与层级）。 */
-  openInSplitPaneDisabled?: boolean;
   onOpenTaskFeedback?: () => void;
   onOpenTaskPathInFileManager: () => void;
   onCopyWorkspacePath: () => void;
@@ -82,8 +73,7 @@ export function TaskActionMenuContent({
   onViewModelTrajectory?: () => void;
   onOpenProviderConfig: () => void;
 }) {
-  const taskTargetActionsDisabled =
-    disableTaskActions || disableTaskTargetActions;
+  const taskTargetActionsDisabled = disableTaskActions || disableTaskTargetActions;
 
   return (
     <>
@@ -118,7 +108,7 @@ export function TaskActionMenuContent({
           }
         }}
       >
-        {intl.formatMessage({ id: "taskList.archive" })}
+        {intl.formatMessage({ id: isArchived ? "taskList.unarchive" : "taskList.archive" })}
       </Item>
       <Item
         disabled={taskTargetActionsDisabled}
@@ -131,15 +121,6 @@ export function TaskActionMenuContent({
       >
         {intl.formatMessage({ id: "taskList.markAsUnread" })}
       </Item>
-      {onOpenInSplitPane ? (
-        <Item
-          data-testid={TID_V4_TASK_OPEN_IN_SPLIT}
-          disabled={taskTargetActionsDisabled || openInSplitPaneDisabled}
-          onSelect={onOpenInSplitPane}
-        >
-          {intl.formatMessage({ id: "taskList.openInSplitPane" })}
-        </Item>
-      ) : null}
       <Separator />
       {!hideMobileUnsupportedActions ? (
         <Item
@@ -162,11 +143,7 @@ export function TaskActionMenuContent({
         {intl.formatMessage({ id: "appHeader.copyPath" })}
       </Item>
       <Item
-        disabled={
-          taskTargetActionsDisabled ||
-          taskSessionFile.loading ||
-          !taskSessionFile.path
-        }
+        disabled={taskTargetActionsDisabled || taskSessionFile.loading || !taskSessionFile.path}
         title={taskTargetActionsDisabled ? disabledReason : undefined}
         onSelect={onCopyTaskPath}
       >
@@ -198,11 +175,7 @@ export function TaskActionMenuContent({
         /* Bugfix: 手机远控运行在浏览器里，无法可靠打开桌面端 provider 配置文件。
            这里只在远控移动端隐藏入口，桌面端仍沿用“路径已知即可前往配置”的能力。 */
         <Item
-          disabled={
-            disableTaskActions ||
-            providerConfigFile.loading ||
-            !providerConfigFile.path
-          }
+          disabled={disableTaskActions || providerConfigFile.loading || !providerConfigFile.path}
           title={disableTaskActions ? disabledReason : undefined}
           onSelect={() => {
             if (!disableTaskActions) {

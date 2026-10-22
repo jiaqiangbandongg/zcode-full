@@ -1,0 +1,15 @@
+export type RemoteConnectionAction =
+  | "connect"
+  | "disconnect"
+  | "cancel"
+  | "update-server"
+  | "update-desktop"
+  | "install"
+  | "confirm-identity"
+  | "credentials"
+  | "edit-auth"
+  | "edit-host"
+  | "security"
+  | "details"
+  | "retry"
+  | "none";

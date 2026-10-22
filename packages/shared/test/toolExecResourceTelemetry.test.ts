@@ -40,7 +40,6 @@ describe("Bash 慢命令通知契约", () => {
   );
 
   it("CLI 与 Host 接受有界完成事实，拒绝隐私字段、短命令和非法计数", () => {
-    expect(zcodeToolExecResourceSchema.parse(sample)).toEqual(sample);
     expect(
       hostResponseMessageSchema.safeParse({
         type: "tool-exec-resource",

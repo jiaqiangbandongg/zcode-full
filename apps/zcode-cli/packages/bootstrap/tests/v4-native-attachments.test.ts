@@ -841,7 +841,6 @@ describe("gateway v4 chunked attachment transaction", () => {
     // 修复原因：video 全局 preview 上限已从 100MiB 收敛到 30MiB；样本只需越过
     // V4 upload 20MiB 边界来证明已发送预览读取不复用上传上限。
     const bytes = Buffer.alloc(PROTOCOL_V4_LIMITS.attachmentMaxBytes + 1, 9);
-    expect(bytes.byteLength).toBeLessThanOrEqual(PROTOCOL_V4_LIMITS.attachmentPreviewMaxBytes);
     const read = vi.fn().mockResolvedValue({
       bytes,
       mediaType: "video/quicktime",
@@ -1180,7 +1179,14 @@ describe("gateway v4 chunked attachment transaction", () => {
       mediaType: "image/png",
       nextOffset: null,
     });
-    expect(resumePersistedSession).toHaveBeenCalledWith("s1", undefined);
+    // 冷恢复统一以 (sessionId, thoughtLevel, workspace, additionalDirectories, persistedMessages) 五参调用宿主钩子。
+    expect(resumePersistedSession).toHaveBeenCalledWith(
+      "s1",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
     expect(read).toHaveBeenCalledWith("s1", {
       ref: attachment.previewRef,
       mime: "image/png",
@@ -1236,7 +1242,14 @@ describe("gateway v4 chunked attachment transaction", () => {
 
     try {
       await Promise.resolve();
-      expect(resumePersistedSession).toHaveBeenCalledWith("s1", undefined);
+      // 冷恢复统一以 (sessionId, thoughtLevel, workspace, additionalDirectories, persistedMessages) 五参调用宿主钩子。
+      expect(resumePersistedSession).toHaveBeenCalledWith(
+        "s1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
       releaseHydration();
       await expect(reading).resolves.toMatchObject({
         dataBase64: Buffer.from("detached-image").toString("base64"),

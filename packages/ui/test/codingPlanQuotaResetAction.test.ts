@@ -40,25 +40,6 @@ describe("CodingPlanQuotaResetAction", () => {
     cleanup();
   });
 
-  it("重置按钮复用等待请求的确认色", () => {
-    render(
-      createElement(CodingPlanQuotaResetAction, {
-        ariaLabel: "重置 5 小时额度",
-        completedAt: null,
-        completedLabel: "已重置",
-        processing: false,
-        processingLabel: "正在重置",
-        resetLabel: "重置",
-        successLabel: "重置成功",
-        onReset: vi.fn(async () => {}),
-      }),
-    );
-
-    const button = screen.getByRole("button", { name: "重置 5 小时额度" });
-    expect(button.className).toContain("bg-interaction-confirmation-surface");
-    expect(button.className).toContain("text-interaction-confirmation-foreground");
-  });
-
   it("页面重置入口只打开统一弹窗，不直接核销", () => {
     const onOpenDialog = vi.fn();
     render(
@@ -183,10 +164,6 @@ describe("CodingPlanQuotaResetAction", () => {
 
     expect(screen.queryByRole("button", { name: "重置 5 小时额度" })).toBeNull();
     expect(screen.getByText("已重置")).toBeTruthy();
-    // 回归:已重置文案必须与「重置」按钮的 xs 尺寸(h-5)等高。曾经的 min-h-6 会把
-    // 所在额度条的标签行撑高,导致同排没有动作的额度条数值与进度条错位。
-    expect(screen.getByText("已重置").className).toContain("min-h-5");
-    expect(screen.getByText("已重置").className).not.toContain("min-h-6");
   });
 
   it("自动/运营完成收到补播信号时，等浮层锚点挂载一帧后补播一次撒花且不重播", () => {

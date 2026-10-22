@@ -42,8 +42,8 @@ describe("Bot remote workspace delivery E2E", () => {
         "webhook-e2e": {
           botId: "webhook-e2e",
           workspacePath: "/workspace",
-          workspaceIdentity: "ssh://e2e-host/workspace",
-          workspaceId: "ssh://e2e-host/workspace",
+          workspaceIdentity: "remote:server:e2e-host:/workspace",
+          workspaceId: "remote:server:e2e-host:/workspace",
           mode: "task",
           activeTaskId: "task-remote-e2e",
           updatedAt: Date.now(),
@@ -56,11 +56,11 @@ describe("Bot remote workspace delivery E2E", () => {
     const harness = createBotsServiceHarness({
       config,
       state,
-      lastWorkspaceSession: [
+      projectWorkspaces: [
         {
           kind: "remote",
           workspacePath: "/workspace",
-          workspaceIdentity: "ssh://e2e-host/workspace",
+          workspaceIdentity: "remote:server:e2e-host:/workspace",
           remoteSessionId: "remote-session-e2e",
         },
       ],
@@ -68,8 +68,9 @@ describe("Bot remote workspace delivery E2E", () => {
         isConnected: async (target: unknown) => {
           isConnectedCalls += 1;
           expect(target).toEqual({
+            hostId: "remote:server:e2e-host",
             workspacePath: "/workspace",
-            workspaceIdentity: "ssh://e2e-host/workspace",
+            workspaceIdentity: "remote:server:e2e-host:/workspace",
           });
           return false;
         },

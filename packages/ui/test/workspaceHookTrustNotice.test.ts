@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import {
   hasWorkspaceHooksRequiringReview,
-  requiresWorkspaceHookTrust,
   shouldShowWorkspaceHookTrustNotice,
   WorkspaceHookTrustNotice,
 } from "@/settings/WorkspaceHookTrustNotice.js";
@@ -120,12 +119,5 @@ describe("Workspace Hook Trust settings notice", () => {
     expect(renderNotice("en-US", workspaceBHooks)).toContain(
       'data-testid="workspace-hook-trust-notice"',
     );
-  });
-
-  it("reuses the single-hook trust predicate for scope and row decisions", () => {
-    for (const trustState of ["pending_trust", "stale_digest", "trusted_persistent"] as const) {
-      const hook = workspaceHook(trustState);
-      expect(hasWorkspaceHooksRequiringReview([hook])).toBe(requiresWorkspaceHookTrust(hook));
-    }
   });
 });

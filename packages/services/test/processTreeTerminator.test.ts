@@ -82,46 +82,46 @@ async function waitForProcessTreeSnapshotIdentity(
   return snapshot && identity ? { snapshot, identity } : undefined;
 }
 
-function readFirstStdoutLine(
-  child: ChildProcessWithoutNullStreams,
-): Promise<string> {
+function readFirstStdoutLine(child: ChildProcessWithoutNullStreams): Promise<string> {
   return new Promise((resolve, reject) => {
     let buffer = "";
     let stderrBuffer = "";
-    const timer = setTimeout(() => {
-      reject(
-        new Error(
-          `child did not report grandchild pid stdout=${JSON.stringify(buffer)} stderr=${JSON.stringify(stderrBuffer)}`,
-        ),
-      );
-    }, 2_000);
-
-    child.stdout.on("data", (chunk: Buffer) => {
+    // 修复原因：嵌套 Node 启动可能超过 2 秒，但此时尚未开始验证回收。
+    // 就绪由完整输出行确认，挂起由测试整体超时约束，不另设启动竞速窗口。
+    const cleanup = () => {
+      child.stdout.off("data", onStdout);
+      child.stderr.off("data", onStderr);
+      child.off("error", onError);
+      child.off("close", onClose);
+    };
+    const onStdout = (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
       const newlineIndex = buffer.indexOf("\n");
       if (newlineIndex < 0) {
         return;
       }
-      clearTimeout(timer);
+      cleanup();
       resolve(buffer.slice(0, newlineIndex).trim());
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
+    };
+    const onStderr = (chunk: Buffer) => {
       stderrBuffer += chunk.toString("utf8");
-    });
-    child.once("error", (error) => {
-      clearTimeout(timer);
+    };
+    const onError = (error: Error) => {
+      cleanup();
       reject(error);
-    });
-    child.once("exit", (code, signal) => {
-      if (!buffer.trim()) {
-        clearTimeout(timer);
-        reject(
-          new Error(
-            `child exited before reporting pid code=${code} signal=${signal} stderr=${JSON.stringify(stderrBuffer)}`,
-          ),
-        );
-      }
-    });
+    };
+    const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      reject(
+        new Error(
+          `child exited before reporting pid code=${code} signal=${signal} stdout=${JSON.stringify(buffer)} stderr=${JSON.stringify(stderrBuffer)}`,
+        ),
+      );
+    };
+    child.stdout.on("data", onStdout);
+    child.stderr.on("data", onStderr);
+    child.once("error", onError);
+    child.once("close", onClose);
   });
 }
 
@@ -541,14 +541,12 @@ process.stdout.write(String(descendant.pid) + "\\n");
     },
   );
 
-  it.runIf(process.platform !== "win32")(
-    "根进程已退出时仍按原进程组回收同组后代",
-    async () => {
-      const child = spawn(
-        process.execPath,
-        [
-          "-e",
-          `
+  it.runIf(process.platform !== "win32")("根进程已退出时仍按原进程组回收同组后代", async () => {
+    const child = spawn(
+      process.execPath,
+      [
+        "-e",
+        `
 const { spawn } = require("node:child_process");
 const descendant = spawn(
   process.execPath,
@@ -556,42 +554,45 @@ const descendant = spawn(
   { stdio: ["ignore", "ignore", "ignore", "ipc"] },
 );
 descendant.once("message", () => {
-  process.stdout.write(String(descendant.pid) + "\\n", () => setTimeout(() => process.exit(0), 100));
+  process.stdout.write(String(descendant.pid) + "\\n");
+});
+process.on("message", (message) => {
+  if (message === "exit") process.exit(0);
 });
 `,
-        ],
-        {
-          detached: shouldSpawnInDetachedProcessGroup(),
-          stdio: ["ignore", "pipe", "pipe"],
-          windowsHide: true,
-        },
-      );
-      activeChildren.add(child);
-      const descendantPid = await readReportedPid(child);
-      const snapshot = captureProcessTreeSnapshot(child);
-      expect(
-        snapshot?.identities.some((identity) => identity.pid === descendantPid),
-      ).toBe(true);
-      expect(await waitForPidExit(child.pid!)).toBe(true);
-      expect(isPidRunning(descendantPid)).toBe(true);
+      ],
+      {
+        detached: shouldSpawnInDetachedProcessGroup(),
+        stdio: ["ignore", "pipe", "pipe", "ipc"],
+        windowsHide: true,
+      },
+    );
+    activeChildren.add(child);
+    const descendantPid = await readReportedPid(child);
+    // 修复原因：固定 100ms 后退出会与父测试取快照竞争；确认身份后再允许根进程退出。
+    const captured = await waitForProcessTreeSnapshotIdentity(child, descendantPid);
+    expect(captured).toBeDefined();
+    const { snapshot } = captured!;
+    child.send("exit");
+    expect(await waitForPidExit(child.pid!)).toBe(true);
+    expect(isPidRunning(descendantPid)).toBe(true);
 
-      try {
-        // 修复原因：CLI 根进程异常退出后，同组 MCP 仍可能存活；必须用根进程
-        // 生前快照证明该 PGID 内仍有原成员，不能只凭已退出的裸 root PID 发信号。
-        await terminateProcessTreeAndWait(child, {
-          forceAfterMs: 30,
-          waitAfterForceMs: 30,
-          snapshot,
-        });
-        expect(isPidRunning(descendantPid)).toBe(false);
-      } finally {
-        if (isPidRunning(descendantPid)) {
-          process.kill(-child.pid!, "SIGKILL");
-        }
+    try {
+      // 修复原因：CLI 根进程异常退出后，同组 MCP 仍可能存活；必须用根进程
+      // 生前快照证明该 PGID 内仍有原成员，不能只凭已退出的裸 root PID 发信号。
+      await terminateProcessTreeAndWait(child, {
+        forceAfterMs: 30,
+        waitAfterForceMs: 30,
+        snapshot,
+      });
+      expect(isPidRunning(descendantPid)).toBe(false);
+    } finally {
+      if (isPidRunning(descendantPid)) {
+        process.kill(-child.pid!, "SIGKILL");
       }
-      activeChildren.delete(child);
-    },
-  );
+    }
+    activeChildren.delete(child);
+  });
 
   it.runIf(process.platform !== "win32")(
     "健康 runtime 提前退出时不会固定等待兜底窗口",

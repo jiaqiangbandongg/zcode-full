@@ -12,6 +12,83 @@ import { cloneModelSelection } from "../model-selection.js";
 import { createRefreshRuntimeHeadersBeforeModelAttempt } from "./model-runtime-headers.js";
 import { createRuntimeModel, withModelInvocationContext } from "./runtime-model.js";
 import { applyRuntimeExecutionState } from "../execution-state.js";
+import { acceptOffPeakUserTakeover, selectionForPersistence } from "../off-peak/runtime.js";
+
+const selectionAdmissions = new WeakMap<
+  AgentRuntimeInternal,
+  {
+    sequence: number;
+    commandId: string;
+    persisted: Promise<void>;
+  }
+>();
+// 只用于 ModelSelected 的前后展示边界，不参与选模、续跑或持久化。
+const publishedSelections = new WeakMap<AgentRuntimeInternal, ModelSelection | undefined>();
+
+/** 先固定旧会话候选，再接纳用户选择；声明目标失效时仍能退回原会话模型。 */
+export function captureHighspeedFallbackSelection(
+  runtime: AgentRuntimeInternal,
+  execution: import("../types.js").ModelExecutionContext | undefined,
+): import("../types.js").ModelExecutionContext | undefined {
+  if (!execution?.selectionFallback) return execution;
+  return {
+    ...execution,
+    highspeedFallbackSelection: structuredClone(runtime.getSessionModelSelection()),
+  };
+}
+
+export function recordPublishedModelSelection(
+  runtime: AgentRuntimeInternal,
+  selection: ModelSelection,
+): void {
+  publishedSelections.set(runtime, cloneModelSelection(selection));
+}
+
+/** 串行接纳序号决定续跑选择；队列消费只能执行自己的快照，不能倒写较新的选择。 */
+export function acceptSubmissionModelSelection(
+  runtime: AgentRuntimeInternal,
+  intent: TurnInputIntentMetadata | undefined,
+  _traceContext: TraceContext,
+  modelExecution?: Pick<
+    import("../types.js").ModelExecutionContext,
+    "selectionScope" | "selectionFallback"
+  > & {
+    highspeedFallbackSelection?: ModelSelection;
+  },
+): Promise<void> {
+  const selection =
+    modelExecution?.selectionScope === "execution"
+      ? (modelExecution.selectionFallback?.target ?? modelExecution.highspeedFallbackSelection)
+      : intent?.modelSelection;
+  if (!selection || !intent) return Promise.resolve();
+  const previous = selectionAdmissions.get(runtime);
+  if (
+    previous &&
+    (previous.commandId === intent.sourceCommandId ||
+      (Number.isFinite(intent.admissionSeq) && intent.admissionSeq <= previous.sequence))
+  ) {
+    return previous.persisted;
+  }
+  const previousSelection = runtime.getSessionModelSelection();
+  if (!publishedSelections.has(runtime)) publishedSelections.set(runtime, previousSelection);
+  const appliedSelection = cloneModelSelection(selection);
+  runtime.setSessionModelSelection(appliedSelection);
+  acceptOffPeakUserTakeover(runtime);
+  // 保存串行化，防止旧异步写入在新选择之后落库；不引入另一份输入队列。
+  const persisted = (previous?.persisted ?? Promise.resolve()).then(async () => {
+    // 新 Session 的 entry 由 ensureSessionPersisted 创建时统一写入，避免先写外键失败。
+    if (runtime.sessionPersisted !== false)
+      await persistRuntimeModelSelection(runtime, appliedSelection);
+  });
+  selectionAdmissions.set(runtime, {
+    sequence: Number.isFinite(intent.admissionSeq)
+      ? intent.admissionSeq
+      : (previous?.sequence ?? 0),
+    commandId: intent.sourceCommandId,
+    persisted,
+  });
+  return persisted;
+}
 
 /**
  * 带退回声明且 Selection 指向声明 provider 的执行句柄只允许一次物理请求：失败后由 core 退回会话模型
@@ -63,7 +140,6 @@ export async function applySubmissionExecutionState(
   preparedModel?: Model,
 ): Promise<Model | undefined> {
   const selection = intent?.modelSelection;
-  const previousSelection = runtime.getSessionModelSelection();
   let model = preparedModel;
 
   if (selection) {
@@ -75,14 +151,15 @@ export async function applySubmissionExecutionState(
         selectionFallback: modelExecution?.selectionFallback,
       }),
     });
+    await acceptSubmissionModelSelection(runtime, intent, traceContext, modelExecution);
     if (modelExecution?.selectionScope !== "execution") {
-      const appliedSelection = cloneModelSelection(selection);
-      runtime.setSessionModelSelection(appliedSelection);
-      await persistRuntimeModelSelection(runtime, appliedSelection);
-      if (!sameModelSelection(previousSelection, appliedSelection)) {
+      // ModelSelected 展示实际 Loop 的切换；接纳只保存意图，不提前创建可调用 Model。
+      const previousSelection = publishedSelections.get(runtime);
+      publishedSelections.set(runtime, cloneModelSelection(selection));
+      if (!sameModelSelection(previousSelection, selection)) {
         await runtime.emitModelSelected({
           model,
-          modelSelection: appliedSelection,
+          modelSelection: selection,
           effectiveReasoningLevel: model.options.reasoningLevel,
           previousModelSelection: previousSelection,
           supportedThoughtLevels: model.optionSpecs.reasoningLevel.values,
@@ -115,6 +192,8 @@ export async function persistRuntimeModelSelection(
   selection: ModelSelection,
 ): Promise<void> {
   if (!runtime.sessionStore?.saveSessionEntry) return;
+  const persistentSelection = selectionForPersistence(runtime, selection);
+  if (!persistentSelection) return;
   const timestamp = Date.now();
   try {
     await runtime.sessionStore.saveSessionEntry({
@@ -123,7 +202,7 @@ export async function persistRuntimeModelSelection(
       type: SESSION_ENTRY_MODEL_SELECTION,
       touchSession: false,
       time: { created: timestamp, updated: timestamp },
-      data: selection,
+      data: persistentSelection,
     });
   } catch (error) {
     runtime.logger?.warn("Session model selection persistence failed", {

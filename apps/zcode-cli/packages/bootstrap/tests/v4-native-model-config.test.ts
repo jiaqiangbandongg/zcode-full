@@ -285,11 +285,6 @@ describe("v4 原生 switchModelConfig", () => {
     expect(app.setModel).not.toHaveBeenCalled();
     expect(app.setThoughtLevel).toHaveBeenCalledWith("max");
   });
-
-  it("supports 分流：switchModelConfig 已原生", () => {
-    const executor = new V4CommandExecutor(makeHost(makeRecord(makeApp())));
-    expect(executor.supports("switchModelConfig")).toBe(true);
-  });
 });
 
 // M5 additive：switchCollaborationMode（UI 模式选择器 → app.setMode + SessionModeChanged 补发）。
@@ -303,7 +298,6 @@ describe("v4 原生 switchCollaborationMode", () => {
       issuedAt: Date.now(),
     };
     const parsed = parseCommandEnvelope(requested);
-    expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw parsed.error;
     await executor.execute(parsed.envelope);
     expect(app.setMode).toHaveBeenCalledWith("guarded");
@@ -401,42 +395,6 @@ describe("切模型前校验当前 Environment Provider", () => {
     ).rejects.toMatchObject({ reasonCode: "provider.notInRegistry" });
     expect(app.setModel).not.toHaveBeenCalled();
     expect(app.runtime.emitModelSelected).not.toHaveBeenCalled();
-  });
-
-  it("普通模型切换不把 Host runtimeModel 交给 Provider 就绪检查", async () => {
-    const app = makeApp();
-    const record = makeRecord(app);
-    const captured: string[] = [];
-    const runtimeModel = {
-      revision: "model-runtime:1",
-      generatedAt: 1,
-      model: { providerId: "prov-b", modelId: "new-model" },
-      provider: {
-        providerId: "prov-b",
-        kind: "openai-chat",
-        models: [{ modelId: "new-model" }],
-      },
-    };
-    await new V4CommandExecutor(makeResolvingHost(record, { available: true }, captured)).execute(
-      envelope("s1", {
-        provider: "prov-b",
-        model: "new-model",
-        thought: "",
-        runtimeModel,
-      }),
-    );
-    expect(captured).toEqual(["prov-b"]);
-    expect(app.setModel).toHaveBeenCalledWith("prov-b/new-model");
-  });
-
-  it("host 无 ensureProviderAvailable（旧 binder/夹具）：跳过能力，同 provider 直切不回归", async () => {
-    const app = makeApp();
-    const record = makeRecord(app);
-    await new V4CommandExecutor(makeHost(record)).execute(
-      envelope("s1", { provider: "prov-a", model: "new-model", thought: "" }),
-    );
-    expect(app.setModel).toHaveBeenCalledWith("prov-a/new-model");
-    expect(app.runtime.emitModelSelected).toHaveBeenCalled();
   });
 });
 

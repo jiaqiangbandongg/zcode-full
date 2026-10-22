@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-upgrade-history",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-upgrade-history.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-upgrade-history.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-history-reconnect-title",
+      "description": "SSH directory resilience task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "ssh-history-reconnect-main",
+      "description": "SSH directory resilience 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "用固定回复准备和续聊真实远端历史，旧程序自然造数后切换当前程序与回退程序验证。"
+    }
+  ]
+}

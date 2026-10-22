@@ -1,10 +1,7 @@
 import { PassThrough } from "node:stream";
 
 import type { IDisposable, Event } from "@zcode/rpc";
-import type {
-  IRemoteBackend,
-  StdioStream,
-} from "@zcode/server/remote/backend.js";
+import type { IRemoteBackend, StdioStream } from "@zcode/server/remote/backend.js";
 import { detectRemoteAssetTools } from "@zcode/server/remote/remoteAssetPreflight.js";
 import { describe, expect, it } from "vitest";
 
@@ -98,47 +95,48 @@ function createClosedStream(
 describe("detectRemoteAssetTools", () => {
   it("selects one tool from each required capability", async () => {
     const tools = await detectRemoteAssetTools(
-      new PreflightBackend("download=wget\ntar=tar\nsha256=shasum\n"),
+      new PreflightBackend("download=wget\ntar=tar\nsha256=shasum\nprogress=full\n"),
       { log: () => undefined },
     );
 
-    expect(tools).toEqual({ download: "wget", tar: "tar", sha256: "shasum" });
+    expect(tools).toEqual({
+      download: "wget",
+      tar: "tar",
+      sha256: "shasum",
+      supportsProgress: true,
+    });
   });
 
   it("fails clearly when no download tool exists", async () => {
     await expect(
-      detectRemoteAssetTools(
-        new PreflightBackend("download=\ntar=tar\nsha256=sha256sum\n"),
-        { log: () => undefined },
-      ),
+      detectRemoteAssetTools(new PreflightBackend("download=\ntar=tar\nsha256=sha256sum\n"), {
+        log: () => undefined,
+      }),
     ).rejects.toThrow("远端服务器缺少 curl 或 wget");
   });
 
   it("fails clearly when tar is missing", async () => {
     await expect(
-      detectRemoteAssetTools(
-        new PreflightBackend("download=curl\ntar=\nsha256=sha256sum\n"),
-        { log: () => undefined },
-      ),
+      detectRemoteAssetTools(new PreflightBackend("download=curl\ntar=\nsha256=sha256sum\n"), {
+        log: () => undefined,
+      }),
     ).rejects.toThrow("远端服务器缺少 tar");
   });
 
   it("fails clearly when no checksum tool exists", async () => {
     await expect(
-      detectRemoteAssetTools(
-        new PreflightBackend("download=curl\ntar=tar\nsha256=\n"),
-        { log: () => undefined },
-      ),
+      detectRemoteAssetTools(new PreflightBackend("download=curl\ntar=tar\nsha256=\n"), {
+        log: () => undefined,
+      }),
     ).rejects.toThrow("远端服务器缺少 sha256sum、shasum 或 openssl");
   });
 
   it("does not hang when close fires before stdout end", async () => {
     const tools = await Promise.race([
       detectRemoteAssetTools(
-        new PreflightBackend(
-          "download=curl\ntar=tar\nsha256=openssl\n",
-          { closeBeforeStdoutEnd: true },
-        ),
+        new PreflightBackend("download=curl\ntar=tar\nsha256=openssl\n", {
+          closeBeforeStdoutEnd: true,
+        }),
         { log: () => undefined },
       ),
       new Promise<never>((_, reject) => {
@@ -146,15 +144,19 @@ describe("detectRemoteAssetTools", () => {
       }),
     ]);
 
-    expect(tools).toEqual({ download: "curl", tar: "tar", sha256: "openssl" });
+    expect(tools).toEqual({
+      download: "curl",
+      tar: "tar",
+      sha256: "openssl",
+      supportsProgress: false,
+    });
   });
 
   it("keeps collecting stdout when close fires before data", async () => {
     const tools = await detectRemoteAssetTools(
-      new PreflightBackend(
-        "download=curl\ntar=tar\nsha256=sha256sum\n",
-        { stdoutAfterClose: true },
-      ),
+      new PreflightBackend("download=curl\ntar=tar\nsha256=sha256sum\n", {
+        stdoutAfterClose: true,
+      }),
       { log: () => undefined },
     );
 
@@ -162,6 +164,7 @@ describe("detectRemoteAssetTools", () => {
       download: "curl",
       tar: "tar",
       sha256: "sha256sum",
+      supportsProgress: false,
     });
   });
 });

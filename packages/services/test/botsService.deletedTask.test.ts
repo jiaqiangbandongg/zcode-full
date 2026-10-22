@@ -16,7 +16,7 @@ afterEach(() => {
 function setup(locale: "zh-CN" | "en-US" = "zh-CN", remote = true) {
   const workspace = {
     workspacePath: "/tmp/workspace",
-    ...(remote ? { workspaceIdentity: "ssh://host/tmp/workspace" } : {}),
+    ...(remote ? { workspaceIdentity: "remote:server:test-owner:/tmp/workspace" } : {}),
   };
   const state: BotsStateFile = {
     version: 3,
@@ -68,6 +68,7 @@ function setup(locale: "zh-CN" | "en-US" = "zh-CN", remote = true) {
   });
   vi.stubGlobal("fetch", fetch);
   const service = f.createBotsService({
+    ...f.createBotProjectServices([workspace]),
     repo: repo as never,
     zcodeTaskService: taskService,
     broadcastService,

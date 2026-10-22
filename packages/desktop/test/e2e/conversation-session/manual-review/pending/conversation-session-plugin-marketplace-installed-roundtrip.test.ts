@@ -1,16 +1,16 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared";
+import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
   getE2EAppDataPaths,
+  waitForDefaultWorkspaceReady,
 } from "../../../helpers/desktop-app.js";
 import {
   addMarketplaceSourceThroughAgent,
   clickPluginControl,
-  clickPluginSettingsListBreadcrumb,
   createPluginLifecycleFixture,
   getPluginList,
   hasPluginControl,
@@ -18,6 +18,7 @@ import {
   openInstalledPluginSettingsDetail,
   openPluginCard,
   openPluginSettings,
+  openPluginManagementSettings,
   PLUGIN_LIFECYCLE_CONFIG_KEY,
   PLUGIN_LIFECYCLE_INHERITED_CONFIG_KEY,
   PLUGIN_LIFECYCLE_CONFIG_VALUE,
@@ -35,7 +36,7 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     await clearAppData();
   });
 
-  it("returns to User after global install, then configures the Workspace view", async function () {
+  it("returns to chat after global install, then manages User and Workspace configuration", async function () {
     this.timeout(240000);
 
     const fixture = await createPluginLifecycleFixture("1.0.0");
@@ -43,6 +44,7 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     const userConfigPath = join(storageRoot, "cli", "config.json");
     const workspaceConfigPath = join(workspace, ".zcode", "config.json");
 
+    await waitForDefaultWorkspaceReady();
     await addMarketplaceSourceThroughAgent(fixture.marketplaceRoot);
     await waitUntilPluginOverview(
       (overview) => overview.availablePlugins.some((plugin) => plugin.id === PLUGIN_LIFECYCLE_ID),
@@ -60,7 +62,7 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     await openPluginCard(PLUGIN_LIFECYCLE_ID);
     await installPluginThroughUi(PLUGIN_LIFECYCLE_ID);
     await clickTestIdByDom("desktop-top-nav-back");
-
+    await openPluginManagementSettings();
     await waitForPluginSettingsScope("user");
     await waitForPluginControl("plugin-settings-plugin-row", {
       pluginId: PLUGIN_LIFECYCLE_ID,
@@ -93,7 +95,7 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
       },
     );
 
-    await clickPluginSettingsListBreadcrumb();
+    await clickPluginControl("plugin-settings-detail-back");
     await selectPluginSettingsScope("workspace");
     expect(await hasPluginControl("plugin-store-browse")).toBe(false);
     await waitForPluginControl("plugin-settings-plugin-row", {
@@ -148,8 +150,8 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     );
     await waitForPluginOptionSource(PLUGIN_LIFECYCLE_CONFIG_KEY, "user");
 
-    // 已安装详情是设置页内联详情，必须点击真实的 Plugins 面包屑回到配置列表。
-    await clickPluginSettingsListBreadcrumb();
+    // 已安装详情通过页内返回按钮回到配置列表。
+    await clickPluginControl("plugin-settings-detail-back");
     await waitForPluginControl("plugin-settings-plugin-row", {
       pluginId: PLUGIN_LIFECYCLE_ID,
     });
@@ -173,12 +175,7 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     );
 
     await openInstalledPluginSettingsDetail(PLUGIN_LIFECYCLE_ID);
-    await clickPluginControl("plugin-store-item-menu", {
-      pluginId: PLUGIN_LIFECYCLE_ID,
-    });
-    await clickPluginControl("plugin-store-menu-reset-config", {
-      pluginId: PLUGIN_LIFECYCLE_ID,
-    });
+    await clickPluginControl("plugin-store-reset-config");
     await browser.waitUntil(
       async () => {
         const plugin = (await getPluginList(workspace, undefined, "workspace")).plugins.find(
@@ -199,7 +196,8 @@ describe("WPL-015 Marketplace installed roundtrip E2E", () => {
     await clickTestIdByDom("plugin-store-sidebar-open");
     await waitForPluginControl("plugin-store-root", {}, 30000);
     await clickTestIdByDom("desktop-top-nav-back");
-    await waitForPluginSettingsScope("user");
+    await browser.waitUntil(async () => !(await hasPluginControl("plugin-store-root")));
+    expect(await hasPluginControl("plugin-settings-scope-trigger")).toBe(false);
   });
 });
 
@@ -244,36 +242,41 @@ function readPluginOptions(config: Record<string, unknown>): Record<string, unkn
       ? (config.plugins as Record<string, unknown>)
       : {};
   return typeof plugins.options === "object" && plugins.options !== null
-    ? ((plugins.options as Record<string, unknown>)[PLUGIN_LIFECYCLE_ID] as Record<
+    ? (((plugins.options as Record<string, unknown>)[PLUGIN_LIFECYCLE_ID] as Record<
         string,
         unknown
-      >) ?? {}
+      >) ?? {})
     : {};
 }
 
 async function setPluginControlValueForRoundtrip(key: string, value: string): Promise<void> {
   await waitForPluginControl("plugin-store-config-input", { configKey: key });
-  const state = await browser.execute((configKey, nextValue) => {
-    const input = document.querySelector<HTMLInputElement>(
-      `[data-testid="plugin-store-config-input"][data-config-key="${configKey}"]`,
-    );
-    if (!input) return { updated: false, reason: "missing" };
-    if (input.disabled || input.readOnly) {
-      return {
-        updated: false,
-        reason: "not-editable",
-        disabled: input.disabled,
-        readOnly: input.readOnly,
-        outerHTML: input.outerHTML,
-      };
-    }
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    setter?.call(input, nextValue);
-    input.dispatchEvent(new InputEvent("input", { bubbles: true, data: nextValue }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    return { updated: true };
-  }, key, value);
-  if (!state.updated) throw new Error(`Could not set Plugin option input: ${JSON.stringify(state)}`);
+  const state = await browser.execute(
+    (configKey, nextValue) => {
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-testid="plugin-store-config-input"][data-config-key="${configKey}"]`,
+      );
+      if (!input) return { updated: false, reason: "missing" };
+      if (input.disabled || input.readOnly) {
+        return {
+          updated: false,
+          reason: "not-editable",
+          disabled: input.disabled,
+          readOnly: input.readOnly,
+          outerHTML: input.outerHTML,
+        };
+      }
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, nextValue);
+      input.dispatchEvent(new InputEvent("input", { bubbles: true, data: nextValue }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return { updated: true };
+    },
+    key,
+    value,
+  );
+  if (!state.updated)
+    throw new Error(`Could not set Plugin option input: ${JSON.stringify(state)}`);
 }
 
 async function readPluginOptionSource(key: string): Promise<string | null> {
@@ -281,8 +284,10 @@ async function readPluginOptionSource(key: string): Promise<string | null> {
     const input = document.querySelector<HTMLElement>(
       `[data-testid="plugin-store-config-input"][data-config-key="${configKey}"]`,
     );
-    return input?.closest("label")?.querySelector<HTMLElement>("[data-settings-scope]")?.dataset
-      .settingsScope ?? null;
+    return (
+      input?.closest("label")?.querySelector<HTMLElement>("[data-settings-scope]")?.dataset
+        .settingsScope ?? null
+    );
   }, key);
 }
 

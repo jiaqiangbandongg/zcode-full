@@ -1,5 +1,8 @@
-import { clearAppData, clickTestIdByDom } from "../../../helpers/desktop-app.js";
-import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared";
+import {
+  clearAppData,
+  clickTestIdByDom,
+  waitForDefaultWorkspaceReady,
+} from "../../../helpers/desktop-app.js";
 import {
   PLUGIN_CDN_ZIP_ID,
   PLUGIN_CDN_ZIP_MARKETPLACE_ID,
@@ -13,7 +16,6 @@ import {
   requirePluginManualReview,
   waitForPluginCard,
   waitForPluginControl,
-  waitForPluginSettingsScope,
 } from "../../../helpers/plugin-management-lifecycle.js";
 
 const THROTTLED_TIMEOUT_MS = 120000;
@@ -37,6 +39,7 @@ describe("PLM-LC-018 Desktop plugin store auto refresh throttled", () => {
   it("官方市场 1 分钟前刷新过，进入与重进商店页都不再刷新", async function () {
     this.timeout(THROTTLED_TIMEOUT_MS);
     requirePluginManualReview();
+    await waitForDefaultWorkspaceReady();
 
     // wdio seed 把官方市场 lastUpdated 写成启动前 1 分钟（命中 10 分钟节流窗口）。
     const seeded = await getPluginOverview();
@@ -51,11 +54,8 @@ describe("PLM-LC-018 Desktop plugin store auto refresh throttled", () => {
     expect(await hasPluginControl("plugin-store-error")).toBe(false);
 
     // 离开商店页再重进（重新挂载），仍在窗口内，同样不刷新。
-    // 重进路径与 conversation-session-plugin-marketplace-installed-roundtrip 一致：商店顶栏返回
-    // 到设置页 → 退出设置 → 侧栏「插件市场」重新进入，保证 PluginStorePage 真正重新挂载。
+    // 商店顶栏返回聊天，再从侧栏进入，保证 PluginStorePage 真正重新挂载。
     await clickTestIdByDom("desktop-top-nav-back");
-    await waitForPluginSettingsScope("user");
-    await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON);
     await clickTestIdByDom("plugin-store-sidebar-open");
     await waitForPluginControl("plugin-store-root", {}, 30000);
     await waitForPluginCard(PLUGIN_CDN_ZIP_ID, 60000);

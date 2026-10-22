@@ -175,8 +175,6 @@ describe("Bash result mapping", () => {
       "Output too large (29.3KB). Full output saved to: /artifacts/artifact-1.json",
     );
     expect(result.content).toContain(`Preview (first 2KB):\n${"x".repeat(2_000)}`);
-    expect(result.content).not.toContain("29 KB");
-    expect(result.content).not.toContain("2 KB");
     expect(result.modelContent).toBe(result.content);
   });
 
@@ -238,8 +236,6 @@ describe("Bash result mapping", () => {
       "Output too large (29.3KB). Full output saved to: /artifacts/artifact-1.json",
     );
     expect(result.content).toContain(`Preview (first 2KB):\nExit code 2\n${"O".repeat(1_988)}`);
-    expect(result.content).not.toContain("30 KB");
-    expect(result.content).not.toContain("2 KB");
     expect(result.modelContent).toBe(result.content);
   });
 

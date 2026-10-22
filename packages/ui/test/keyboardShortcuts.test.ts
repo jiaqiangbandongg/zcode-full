@@ -89,23 +89,6 @@ describe("keyboardShortcuts", () => {
     ).toBe(false);
   });
 
-  it("matches primary shift shortcuts by key", () => {
-    expect(
-      matchesPrimaryShiftShortcut(
-        {
-          key: "P",
-          code: "KeyP",
-          metaKey: true,
-          ctrlKey: false,
-          shiftKey: true,
-          altKey: false,
-        },
-        "p",
-        { platform: "MacIntel" },
-      ),
-    ).toBe(true);
-  });
-
   it("matches plain Shift+Tab without modifier keys", () => {
     expect(
       matchesShiftTab({

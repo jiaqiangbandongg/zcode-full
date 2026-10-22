@@ -54,5 +54,5 @@ describe("telemetry service registration", () => {
       reportAppDailyActive: unknown;
     }>("telemetry");
     expect(() => services.get(telemetryDescriptor)).toThrow("Service not registered: telemetry");
-  }, 15_000);
+  });
 });

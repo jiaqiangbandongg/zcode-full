@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-pane-full-view",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-pane-full-view.test.ts",
+  "fixtures": [
+    {
+      "id": "upstream-conversation-side-pane-full-view-first",
+      "description": "完整视图用例的首条消息：建立真实会话 A。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只需要一个已完成的会话作为完整视图 owner，回复内容不参与断言。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPFV_FIRST"],
+        "bodyIncludes": ["E2E_SPFV_FIRST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "spfv-first-ok"
+      }
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-floating-send",
+      "description": "从完整视图浮窗输入框发送的消息。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明浮窗输入框与主对话是同一实例，回复内容只用于确认消息被 agent 处理。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPFV_FLOATING_SEND"],
+        "bodyIncludes": ["E2E_SPFV_FLOATING_SEND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "spfv-floating-ok"
+      }
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-ask",
+      "description": "最小化浮窗期间触发 AskUserQuestion 等待态。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定制造问答等待态并延迟 4s 返回，保证请求在浮窗最小化之后到达，验证自动恢复并显示卡片。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SPFV_ASK"],
+        "bodyIncludes": ["E2E_SPFV_ASK"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_e2e_spfv_ask_user_question",
+          "name": "AskUserQuestion",
+          "input": {
+            "questions": [
+              {
+                "question": "E2E_SPFV_ASK_QUESTION: choose an answer?",
+                "header": "E2E",
+                "options": [
+                  {
+                    "label": "Use default",
+                    "description": "Continue with the default answer."
+                  },
+                  {
+                    "label": "Use fallback",
+                    "description": "Continue with the fallback answer."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "delayMs": 4000
+      }
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-ask-final",
+      "description": "问答回答进入下一次请求后的最终回复。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只证明问答回答已被 agent 消费，核心断言在浮窗卡片的显示与消失。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SPFV_ASK_QUESTION", "toolu_e2e_spfv_ask_user_question"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "spfv-ask-done"
+      }
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-title",
+      "description": "完整视图用例首发的 case-local 标题生成响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "E2E_SPFV_FIRST 首发会触发 title sidecar；固定 case-local 标题，避免 sidecar 500 重试干扰会话。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SPFV_FIRST"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "upstream-conversation-side-pane-full-view-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"SPFV E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "upstream-conversation-side-pane-full-view-compact",
+      "description": "manual-review 小上下文窗口触发的自动 compact 摘要。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "manual-review 的小上下文窗口会在每轮之间自动 compact（compact 后历史不再含首条 marker）；compact 失败会退避重试并阻塞后续输入，这里统一给出稳定摘要。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["CRITICAL: Respond with TEXT ONLY", "E2E_SPFV_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "text": {
+          "id": "upstream-conversation-side-pane-full-view-compact",
+          "inputTokens": 128,
+          "outputTokens": 32,
+          "text": "<summary>The user asked for brief replies in a side pane full view test. No files or tools were used.</summary>"
+        }
+      }
+    }
+  ]
+}

@@ -1,9 +1,15 @@
 import * as React from "react";
+import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "./button.js";
 import { XIcon } from "lucide-react";
+
+function DialogCloseText() {
+  const { intl } = useZCodeIntl();
+  return intl.formatMessage({ id: "common.close" });
+}
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -75,7 +81,9 @@ function DialogContent({
               size="icon-sm"
             >
               <XIcon />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">
+                <DialogCloseText />
+              </span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -107,7 +115,9 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">
+            <DialogCloseText />
+          </Button>
         </DialogPrimitive.Close>
       )}
     </div>

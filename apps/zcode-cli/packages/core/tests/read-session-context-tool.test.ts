@@ -392,15 +392,12 @@ describe("ReadSessionContext tool", () => {
       providerId: createModelProviderId("test"),
       modelId: createModelId("main"),
     };
-    let capturedRequest:
-      | { model: ModelSelection; messages: ModelInputMessage[]; options?: ModelOptions }
-      | undefined;
+    let capturedRequest: { messages: ModelInputMessage[]; options?: ModelOptions } | undefined;
     const context = createToolContext(targetSessionId, {
       messages: createTranscript(targetSessionId),
       modelSelection,
       generateText: async (request) => {
         capturedRequest = {
-          model: modelSelection,
           messages: request.messages,
           options: request.options,
         };
@@ -423,7 +420,6 @@ describe("ReadSessionContext tool", () => {
       source: "lite",
       content: "Use packages/services/src/auth-refresh.ts; rerun auth tests.",
     });
-    expect(capturedRequest?.model).toEqual(modelSelection);
     expect(capturedRequest?.options).toEqual({
       maxOutputTokens: 2_000,
       reasoningLevel: "low",

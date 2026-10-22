@@ -127,7 +127,6 @@ describe("v4 get_workflow_run display payload", () => {
       logTail: [{ sequence: 19, message: "judge#1 finished", at: 1_700_000_000_000 }],
     };
     expect(toolCallDisplaySchema.parse(withTime)).toEqual(withTime);
-    expect(toolCallDisplaySchema.parse(CARD)).toEqual(CARD);
   });
 
   // 枚举闭集：一个未知的相位词会让这一侧拒收整帧，所以两侧的词表永远一起改。

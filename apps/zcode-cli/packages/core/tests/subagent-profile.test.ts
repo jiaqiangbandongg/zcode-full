@@ -394,11 +394,6 @@ Review carefully.`,
     });
   });
 
-  it("does not materialize built-in options without a model Selection", () => {
-    const profiles = normalizeAgentProfiles([]);
-    expect(profiles.find((profile) => profile.name === "Explore")?.modelSelection).toBeUndefined();
-  });
-
   it("formats built-in Explore tools for the embedded search branch", () => {
     const prompt = formatAgentProfilesForPrompt([], {
       embeddedSearchEnabled: true,

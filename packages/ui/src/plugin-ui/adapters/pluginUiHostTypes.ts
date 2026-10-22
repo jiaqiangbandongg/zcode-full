@@ -59,7 +59,11 @@ export interface Page {
   visible: boolean;
   snapshot(): UsePluginUiHostResult;
   subscribe(listener: () => void): () => void;
+  start(): void;
   update(input: UsePluginUiHostInput): void;
+  updateToolFeed(
+    input: Pick<UsePluginUiHostInput, "toolCallId" | "toolInput" | "toolResult" | "toolCancelled">,
+  ): void;
   bind(node: HTMLElement, sidebar: boolean): () => void;
   busy(): boolean;
   running(): boolean;

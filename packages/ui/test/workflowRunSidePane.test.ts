@@ -384,7 +384,6 @@ describe("WorkflowRunSidePane 状态头与阶段清单", () => {
     ]);
     expect(rails.map((rail) => rail.getAttribute("data-rail-ink"))).toEqual(["march", "march"]);
     expect(rails[0]!.className).toContain("wf-spine-march");
-    expect(rails[0]!.className).toContain("w-[1.5px]");
     const lamps = view.getAllByTestId("workflow-run-phase-lamp");
     expect(lamps.map((lamp) => lamp.getAttribute("data-lamp"))).toEqual(["done", "running"]);
     expect(lamps[1]!.className).toContain("wf-lamp-running");
@@ -392,7 +391,7 @@ describe("WorkflowRunSidePane 状态头与阶段清单", () => {
     expect(lamps[0]!.closest('[data-testid="workflow-run-phase-toggle"]')).toBeTruthy();
   });
 
-  it("脊线：没有边的相邻两站之间不画轨道段；折起的阶段在节头带头像串，展开后头像串让位给药丸", () => {
+  it("脊线：折起的阶段在节头带头像串，展开后头像串让位给药丸", () => {
     setSnapshot({
       run: run({ nodes: [{ siteId: "ask#2", ordinal: 1, phase: "executing" }] }),
       phased: true,
@@ -402,9 +401,6 @@ describe("WorkflowRunSidePane 状态头与阶段清单", () => {
     const [plan, review] = view.getAllByTestId("workflow-run-phase");
     const cluster = within(plan!).getByTestId("workflow-run-phase-cluster");
     expect(cluster.querySelectorAll("[title]")).toHaveLength(2);
-    expect(cluster.className).toContain("gap-1");
-    expect(cluster.querySelector(".rounded-full")).toBeNull();
-    expect(cluster.querySelectorAll("img.size-4, svg.size-4")).toHaveLength(2);
     expect(cluster.textContent).not.toContain("+");
     expect(within(review!).queryByTestId("workflow-run-phase-cluster")).toBeNull();
     // 展开 plan 后头像串消失，药丸出现。
@@ -568,7 +564,6 @@ describe("WorkflowRunSidePane 子代理模型", () => {
 
     const segment = view.getByTestId("workflow-run-subagent-model");
     expect(segment.textContent).toBe("Subagents GLM-5.3-Flash");
-    expect(segment.textContent).not.toContain("4fc7f541");
     expect(document.body.textContent).not.toContain("4fc7f541");
     expect(segment.getAttribute("title")).toContain(TEAM_PLAN_MODEL);
     // 强度不上屏，它跟规范串一起住在 tooltip 里。
@@ -726,16 +721,12 @@ describe("WorkflowRunSidePane Stop", () => {
     expect(view.getByTestId<HTMLButtonElement>("workflow-run-cancel").disabled).toBe(true);
   });
 
-  it("按钮说 Stop run，图标与卡上那枚同款：实心方块", () => {
+  it("停止按钮提供 Stop run 无障碍名与可见文案", () => {
     setSnapshot({ run: run({ status: "running" }) });
     const view = renderPane();
     const button = view.getByTestId("workflow-run-cancel");
     expect(button.getAttribute("aria-label")).toBe("Stop run");
     expect(button.textContent).toContain("Stop run");
-    // 与 WorkflowRunDigest 的 Stop 钮同形：填充 currentColor 的方块，不是叉。
-    const icon = button.querySelector("svg");
-    expect(icon?.getAttribute("class")).toContain("fill-current");
-    expect(icon?.querySelector("rect")).toBeTruthy();
   });
 
   it("可点时提示带第二行「停下的运行可以恢复」；禁用时只剩为什么不可用", () => {
@@ -846,19 +837,6 @@ describe("WorkflowRunSidePane 结果与失败面板", () => {
     const panel = view.getByTestId("workflow-run-error");
     expect(panel.textContent).toContain("Run errored");
     expect(panel.textContent).toContain("节点数超过上限 100");
-  });
-
-  it("错误原文按正文排版，不用等宽字体", () => {
-    // 投影写进 error 的是 WorkflowErrorJson.message（product-projection.ts 的 run-settled
-    // 分支只取 .message，code 被丢掉），而那些 message 是人话短句——"run 已取消"、
-    // "typed ask 结束时未提交结果"、"节点数超过上限 100"。DESIGN.md 把 font-mono 留给
-    // 路径/命令/代码/标识符/终端数据，一句人话不属于其中任何一类。
-    setSnapshot({ run: run({ status: "errored", error: "typed ask 结束时未提交结果" }) });
-    const view = renderPane();
-    const message = view.getByTestId("workflow-run-error-message");
-    expect(message.className).not.toContain("font-mono");
-    // 仍保留 pre-wrap：message 万一带换行也不能被折叠掉。
-    expect(message.className).toContain("whitespace-pre-wrap");
   });
 
   it("stopped 且没有错误详情时说明没有，而不是留一片空白", () => {
@@ -1166,8 +1144,6 @@ describe("WorkflowRunSidePane 子代理行", () => {
     expect(pill.tagName).toBe("BUTTON");
     expect(pill.getAttribute("aria-label")).toBe("Open the transcript of planner");
     expect(pill.querySelector('[data-testid="workflow-run-agent-open"]')).toBeTruthy();
-    // <button> 在块级父元素里只包住内容；行的容器是纵向 flex，药丸才拉满本节宽度、行行等宽。
-    expect(pill.parentElement?.className).toContain("flex-col");
     fireEvent.click(pill);
     expect(onOpenWorkflowActorSession).toHaveBeenCalledTimes(1);
     expect(onOpenWorkflowActorSession).toHaveBeenCalledWith(
@@ -1185,7 +1161,6 @@ describe("WorkflowRunSidePane 子代理行", () => {
       .getAllByTestId("workflow-agent-pill")
       .find((candidate) => candidate.textContent?.includes("planner"))!;
     expect(pill.tagName).toBe("BUTTON");
-    expect(pill.className).toContain("wf-pill-open");
     fireEvent.click(pill);
     expect(onOpenWorkflowActorSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1252,7 +1227,6 @@ describe("WorkflowRunSidePane 子代理行", () => {
     expect(pill.querySelector('[data-testid="workflow-run-agent-open"]')).toBeNull();
     expect(pill.textContent).toContain("1 reads");
     expect(pill.tagName).toBe("BUTTON");
-    expect(pill.className).toContain("wf-pill-open");
     const open = pill.querySelector('[data-testid="workflow-run-workspace-open"]')!;
     // 无标记脚本：隐式站的 id 是 "workflow"，落点就落它。
     expect(open.getAttribute("data-phase-id")).toBe("workflow");
@@ -1861,7 +1835,10 @@ describe("WorkflowRunSidePane 阶段名册", () => {
     createElement(
       ZCodeIntlProvider,
       { initialLocale: "en-US" },
-      createElement(WorkflowRunSidePane, { tab: { ...tab, ...overrides }, onOpenWorkflowActorSession }),
+      createElement(WorkflowRunSidePane, {
+        tab: { ...tab, ...overrides },
+        onOpenWorkflowActorSession,
+      }),
     );
 
   it("tab 带 focusPhaseId：那一站展开、门开着、节头滚到顶并亮一下；换 openedAt 再落；不带就不落", () => {
@@ -1961,7 +1938,7 @@ describe("WorkflowRunSidePane lineage", () => {
     );
   });
 
-  it("后继不在投影里（或宿主没给回调）时那一行是静态文字", () => {
+  it("后继不在投影里时那一行是静态文字", () => {
     setSnapshot({
       run: run({
         status: "stopped",

@@ -1,5 +1,7 @@
+import type { WorkspaceTabState } from "@/store/tabStore.js";
+import { useSettingsMachineLabel, useSettingsUserScope } from "@/settings/SettingsMachine.js";
 import { ChevronDown, Cloud, Folder, Monitor } from "lucide-react";
-import { testId } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,
@@ -12,15 +14,16 @@ import {
 } from "@/components/ui/dropdown-menu.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { getWorkspaceKey } from "@/lib/workspaceKey.js";
-import type { WorkspaceTabState } from "@/store/tabStore.js";
+import type { ConfigWorkspaceTarget } from "@/workspace-config-catalog/index.js";
 
-export function getPluginWorkspaceKey(tab: WorkspaceTabState): string {
+export function getPluginWorkspaceKey(tab: ConfigWorkspaceTarget): string {
   return getWorkspaceKey(tab.workspacePath, tab.workspaceIdentity);
 }
 
-export function isPluginScopeWorkspaceConnected(tab: WorkspaceTabState): boolean {
-  // 持久化 tab 会保留已经断开的远端项目和已失效的本地目录；Scope 若继续展示，
+export function isPluginScopeWorkspaceConnected(tab: ConfigWorkspaceTarget): boolean {
+  // Bug 根因：持久化 tab 会保留已经断开的远端项目和已失效的本地目录；Scope 若继续展示，
   // 用户会选中一个没有可用 service target 的项目。远端必须有当前 session，本地必须仍可用。
+  if (tab.configOnline !== undefined) return tab.configOnline;
   if (tab.availability === "unavailable-local-directory") {
     return false;
   }
@@ -43,6 +46,8 @@ export function PluginScopeMenu({
   userOptionTestId,
   workspaceOptionTestIdPrefix,
   workspaceOptions,
+  userTarget,
+  userSourceServerId,
   workspaceTabs = [],
   onScopeKeyChange,
 }: {
@@ -55,21 +60,36 @@ export function PluginScopeMenu({
   userOptionTestId?: string;
   workspaceOptionTestIdPrefix?: string;
   workspaceOptions?: Array<{ key: string; label: string; remote?: boolean }>;
-  workspaceTabs?: WorkspaceTabState[];
+  workspaceTabs?: ConfigWorkspaceTarget[];
+  userTarget?: Partial<WorkspaceTabState> | null;
+  userSourceServerId?: string | null;
   onScopeKeyChange: (scopeKey: string) => void;
 }) {
   const { intl } = useZCodeIntl();
+  const machineLabel = useSettingsMachineLabel();
+  const inheritedUserScope = useSettingsUserScope();
+  const userMachine = machineLabel(
+    userTarget ?? inheritedUserScope.target,
+    userSourceServerId ?? inheritedUserScope.sourceServerId,
+  );
+  const UserIcon = userMachine.remote ? Cloud : Monitor;
   const scopeWorkspaces =
     workspaceOptions ??
     workspaceTabs.filter(isPluginScopeWorkspaceConnected).map((tab) => ({
       key: getPluginWorkspaceKey(tab),
-      label: tab.label,
-      remote: Boolean(tab.remoteTarget || tab.remoteSessionId),
+      label: intl.formatMessage(
+        { id: "settings.machine.scope" },
+        { scope: tab.label, machine: machineLabel(tab).label },
+      ),
+      remote: machineLabel(tab).remote,
     }));
   const selectedWorkspace = scopeWorkspaces.find((workspace) => workspace.key === selectedScopeKey);
   const SelectedWorkspaceIcon = selectedWorkspace?.remote ? Cloud : Folder;
   // 用户作用域是本机配置范围，不能使用登录账号或设备用户名代替其语义。
-  const userLabel = intl.formatMessage({ id: "settings.plugin.scope.user" });
+  const userLabel = intl.formatMessage(
+    { id: "settings.machine.scope" },
+    { scope: intl.formatMessage({ id: "settings.plugin.scope.user" }), machine: userMachine.label },
+  );
 
   return (
     <DropdownMenu>
@@ -90,7 +110,7 @@ export function PluginScopeMenu({
               data-testid={triggerIconTestId}
             />
           ) : (
-            <Monitor className="size-4" aria-hidden="true" data-testid={triggerIconTestId} />
+            <UserIcon className="size-4" aria-hidden="true" data-testid={triggerIconTestId} />
           )}
           <span className="max-w-48 truncate">{selectedWorkspace?.label ?? userLabel}</span>
           <ChevronDown className="size-4 text-foreground-subtlest" aria-hidden="true" />
@@ -99,8 +119,12 @@ export function PluginScopeMenu({
       <DropdownMenuContent align={align} className="w-64 max-w-[calc(100vw-2rem)]">
         <DropdownMenuRadioGroup value={selectedScopeKey} onValueChange={onScopeKeyChange}>
           {includeUser ? (
-            <DropdownMenuRadioItem value="user" data-testid={userOptionTestId}>
-              <Monitor className="size-4" aria-hidden="true" />
+            <DropdownMenuRadioItem
+              value="user"
+              data-testid={userOptionTestId}
+              data-plugin-scope-key="user"
+            >
+              <UserIcon className="size-4" aria-hidden="true" />
               <span className="truncate text-ui-base font-medium text-foreground">{userLabel}</span>
             </DropdownMenuRadioItem>
           ) : null}
@@ -118,6 +142,7 @@ export function PluginScopeMenu({
                   <DropdownMenuRadioItem
                     key={workspace.key}
                     value={workspace.key}
+                    data-plugin-scope-key={workspace.key}
                     data-testid={
                       workspaceOptionTestIdPrefix
                         ? testId(workspaceOptionTestIdPrefix, workspace.key)

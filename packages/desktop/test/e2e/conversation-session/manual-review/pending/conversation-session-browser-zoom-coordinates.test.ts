@@ -2,14 +2,14 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { PlatformChannels } from "@zcode/shared";
 import {
-  PlatformChannels,
   TID_BROWSER_RESPONSIVE_BUTTON,
   TID_SIDE_PANE_TOGGLE,
   TID_BROWSER_RESPONSIVE_VIEWPORT,
   TID_BROWSER_RESPONSIVE_ZOOM_OPTION,
   TID_BROWSER_RESPONSIVE_ZOOM_SELECT,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByWebDriver } from "../../../helpers/desktop-app.js";
 import {
   prepareV4ConversationE2E,
@@ -194,6 +194,20 @@ describe("ZCT-2096856609784438784：缩放后的截图坐标与真实点击一�
             }, fixtureUrl) as unknown as Promise<boolean>,
           { timeout: 15_000, timeoutMsg: "guest CDP 未进入 idle detach" },
         );
+        // detach 会清掉 per-session metrics；放大档曾因只靠 metrics scale 补偿，空闲时退回
+        // 1280 × zoom，Browser Use 每次操作页面都会变大又变回。空闲态必须已等于目标 viewport。
+        const idleViewport = (await browser.electron.execute(async (electron, url) => {
+          const guest = electron.webContents
+            .getAllWebContents()
+            .find((wc: Electron.WebContents) => wc.getURL() === url)!;
+          return guest.executeJavaScript("({ width: innerWidth, height: innerHeight })");
+        }, fixtureUrl)) as unknown as { width: number; height: number };
+        expect({ round, zoomLevel, ...idleViewport }).toEqual({
+          round,
+          zoomLevel,
+          width: 1280,
+          height: 720,
+        });
       }
       await sendV4Prompt(
         `E2E_BROWSER_ZOOM_COORDINATES E2E_ZOOM_ROUND_${round} E2E_BROWSER_FIXTURE_URL:${fixtureUrl} 截图并按固定坐标点击。`,
@@ -418,8 +432,6 @@ describe("ZCT-2096856609784438784：缩放后的截图坐标与真实点击一�
             deviceScaleFactor: 1,
             mobile: false,
             dontSetVisibleSize: true,
-            // 与 main 的 buildViewportMetricsOverride 一致，放大时补偿 native compositor。
-            scale: Math.max(1, owner.webContents.getZoomFactor()),
           });
           // 对齐 main 安装 fallback metrics 后的 guest zoom；后续 release 不应把它改成应用缩放。
           guest.setZoomFactor(1);
@@ -475,19 +487,17 @@ describe("ZCT-2096856609784438784：缩放后的截图坐标与真实点击一�
             [600, 400],
             [1000, 600],
           ]) {
-            // 直接 CDP 探针复用产品输入边界的 metrics scale；manager 换算另有单测覆盖。
-            const inputScale = Math.max(1, owner.webContents.getZoomFactor());
             await guest.debugger.sendCommand("Input.dispatchMouseEvent", {
               type: "mousePressed",
-              x: x! * inputScale,
-              y: y! * inputScale,
+              x: x!,
+              y: y!,
               button: "left",
               clickCount: 1,
             });
             await guest.debugger.sendCommand("Input.dispatchMouseEvent", {
               type: "mouseReleased",
-              x: x! * inputScale,
-              y: y! * inputScale,
+              x: x!,
+              y: y!,
               button: "left",
               clickCount: 1,
             });
@@ -566,9 +576,15 @@ describe("ZCT-2096856609784438784：缩放后的截图坐标与真实点击一�
     expect(result.error).toBeUndefined();
     expect(result.png).toBeDefined();
     await writeFile(join(artifactDir, "normal-background.png"), Buffer.from(result.png, "base64"));
-    expect(result.ready.viewport).toEqual({ width: 1280, height: 720 });
-    expect(result.layout.width).toBe(1280);
-    expect(result.layout.height).toBe(720);
+    // 放大档也按 1 / zoom 布局 webview；offset 是整数，还原后允许 1px 取整误差。
+    expect(Math.abs(result.ready.viewport.width - 1280)).toBeLessThanOrEqual(1);
+    expect(Math.abs(result.ready.viewport.height - 720)).toBeLessThanOrEqual(1);
+    expect(Math.abs(result.layout.width - 1280 / result.released.desktopZoom)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(Math.abs(result.layout.height - 720 / result.released.desktopZoom)).toBeLessThanOrEqual(
+      1,
+    );
     expect(result.layout.innerWidth).toBeLessThan(1280);
     expect(result.layout.innerHeight).toBeLessThan(720);
     expect(result.ready.surfaceScale).toBeLessThan(1);

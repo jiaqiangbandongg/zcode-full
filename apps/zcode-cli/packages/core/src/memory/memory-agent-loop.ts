@@ -47,14 +47,17 @@ export async function runMemoryAgentLoop(input: {
     options: { abortSignal?: AbortSignal },
   ) => Promise<ToolExecutionResult>;
   maxTurns: number;
-  messages: readonly ModelInputMessage[];
+  request: {
+    messages: readonly ModelInputMessage[];
+    tools: readonly ModelToolContract[];
+    toolSearchEnabled: boolean;
+  };
   model: Model;
   rootDir: string;
-  tools: readonly ModelToolContract[];
   workingDirectory: string;
   workspaceRoot: string;
 }): Promise<MemoryAgentLoopResult> {
-  const messages = input.messages.map(cloneModelMessage);
+  const messages = input.request.messages.map(cloneModelMessage);
   let turns = 0;
 
   for (; turns < input.maxTurns; turns += 1) {
@@ -70,7 +73,8 @@ export async function runMemoryAgentLoop(input: {
       messages: mediaProjection.messages,
       options: auxiliaryModelOptions(input.model),
       // Memory agent 的 provider request 必须保留 Main 的真实工具目录；执行权限只在 tool-use 边界收窄。
-      tools: input.tools as ModelToolContract[],
+      tools: input.request.tools as ModelToolContract[],
+      toolSearchEnabled: input.request.toolSearchEnabled,
     };
     const response = await input.model.generateText(request);
     input.abortSignal?.throwIfAborted();
@@ -87,7 +91,7 @@ export async function runMemoryAgentLoop(input: {
         const decision = evaluateMemoryAgentToolPolicy({
           rootDir: input.rootDir,
           toolCall,
-          tools: input.tools,
+          tools: input.request.tools,
           workingDirectory: input.workingDirectory,
           workspaceRoot: input.workspaceRoot,
         });

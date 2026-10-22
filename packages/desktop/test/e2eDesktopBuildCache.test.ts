@@ -255,6 +255,27 @@ describe("desktop E2E build cache", () => {
     expect(entered).toBe(true);
     expect(existsSync(lockPath)).toBe(false);
   });
+
+  it.each([false, true])(
+    "holds the build lock through asynchronous staging (failure=%s)",
+    async (fail) => {
+      const lockPath = resolve(ROOT, "cache/desktop-build.lock");
+      let finish!: () => void;
+      const staged = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const result = withE2EDesktopBuildLock({ lockPath }, async () => {
+        await staged;
+        if (fail) throw new Error("staging failed");
+        return "staged";
+      });
+      expect(existsSync(lockPath)).toBe(true);
+      finish();
+      if (fail) await expect(result).rejects.toThrow("staging failed");
+      else await expect(result).resolves.toBe("staged");
+      expect(existsSync(lockPath)).toBe(false);
+    },
+  );
 });
 
 function runBuildCacheWorker() {

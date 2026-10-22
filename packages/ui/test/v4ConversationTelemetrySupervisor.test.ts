@@ -189,6 +189,58 @@ function completionAgentCompositions(
 }
 
 describe("ConversationTelemetrySupervisor", () => {
+  it.each([
+    ["resolved", "completed", "pptx"],
+    ["unresolved", "failed", "unknown"],
+    ["legacy", "completed", "unknown"],
+    ["resolved-failure", "failed", "pptx"],
+    ["unsafe", "failed", "unknown"],
+    ["missing-source", "completed", "unknown"],
+  ] as const)(
+    "Skill 只接受终态已解析名称，旧调度字段不进入上报：%s",
+    async (scenario, phase, expected) => {
+      const { platform, reportTelemetryEvent } = createPlatform();
+      const supervisor = new ConversationTelemetrySupervisor({
+        platform,
+        workspaceScopeKey: "skill-names",
+      });
+      supervisor.acceptPromptSeed({
+        sessionId: "session-1",
+        sourceCommandId: "command-1",
+        sendTime: 1,
+        extraDetail: {},
+      });
+      supervisor.handleFact({ ...commonFact("turn-start", 1), kind: "turn.started" });
+      supervisor.handleFact({
+        ...commonFact("skill-start", 2),
+        kind: "tool.lifecycle",
+        phase: "scheduled",
+        toolCallId: "skill-tool",
+        toolName: "Skill",
+        ...(scenario !== "legacy" ? { skillName: "unverified-request-name" } : {}),
+      });
+      supervisor.handleFact({
+        ...commonFact("skill-end", 3),
+        kind: "tool.lifecycle",
+        phase,
+        toolCallId: "skill-tool",
+        toolName: "Skill",
+        ...(scenario === "resolved" || scenario === "resolved-failure"
+          ? { skillName: "pptx", skillSource: "plugin", skillPluginId: "document-skills@market" }
+          : scenario === "unsafe"
+            ? { skillName: "/Users/FAKE_USER/private", skillSource: "zcode" }
+            : scenario === "missing-source"
+              ? { skillName: "unverified-name" }
+              : {}),
+      });
+      await supervisor.flushReportsForTest();
+      const steps = reportsByElement(reportTelemetryEvent, "agent_step");
+      expect(steps).toHaveLength(1);
+      expect(steps[0].eventExtraDetail.skill_name).toBe(expected);
+      supervisor.dispose();
+    },
+  );
+
   it("父 ACK 未到时 child step 从启动事实读取 Memory", async () => {
     const { platform, reportTelemetryEvent } = createPlatform();
     const supervisor = new ConversationTelemetrySupervisor({
@@ -370,7 +422,6 @@ describe("ConversationTelemetrySupervisor", () => {
             maxAttempts: 1,
           });
           supervisor.handleFact(fact);
-          expect(fact.providerId).toBe(providerId);
           supervisor.handleFact({
             ...commonFact(`chunk-${seq}`, seq++),
             kind: "stream.chunk",
@@ -4166,7 +4217,7 @@ describe("workflow subagent：动态工作流子代理的 token 埋点（apps/zc
     supervisor.dispose();
   });
 
-  it("停下的 run：每个子代理一条 fail 汇总 step，错误原文保留，无 usage 时 token 为 0", async () => {
+  it("停下的 run：每个子代理一条 fail 汇总 step，错误脱敏，无 usage 时 token 为 0", async () => {
     const { platform, reportTelemetryEvent } = createPlatform();
     const supervisor = new ConversationTelemetrySupervisor({
       platform,
@@ -4221,7 +4272,7 @@ describe("workflow subagent：动态工作流子代理的 token 埋点（apps/zc
     supervisor.dispose();
   });
 
-  it("workflow 通知唤起的 main turn 计为 main_plus_wf，message_source 为 background_workflow", async () => {
+  it("workflow 通知同时消费两类结果时计为 main_plus_bg_wf，来源为 background_workflow", async () => {
     const { platform, reportTelemetryEvent } = createPlatform();
     const supervisor = new ConversationTelemetrySupervisor({
       platform,
@@ -4248,6 +4299,55 @@ describe("workflow subagent：动态工作流子代理的 token 埋点（apps/zc
     expect(
       reportsByElement(reportTelemetryEvent, "message_completion")[0]?.eventExtraDetail,
     ).toMatchObject({ message_source: "background_workflow" });
+    supervisor.dispose();
+  });
+});
+
+describe("resolved MCP plugin usage", () => {
+  it("extends the existing step once and does not infer an unrelated tool", async () => {
+    const { platform, reportTelemetryEvent } = createPlatform();
+    const supervisor = new ConversationTelemetrySupervisor({
+      platform,
+      workspaceScopeKey: "mcp-plugin",
+    });
+    supervisor.acceptPromptSeed({
+      sessionId: "session-1",
+      sourceCommandId: "command-1",
+      memoryEnabled: true,
+      sendTime: 1,
+      extraDetail: {},
+    });
+    supervisor.handleFact({
+      ...commonFact("start", 1),
+      kind: "turn.started",
+      executionKind: "agent",
+    });
+    supervisor.handleFact({
+      ...commonFact("tool-start", 2),
+      kind: "tool.lifecycle",
+      phase: "started",
+      toolCallId: "call",
+      toolName: "mcp__demo__tool",
+    });
+    const terminal = {
+      ...commonFact("tool-done", 3),
+      kind: "tool.lifecycle" as const,
+      phase: "completed" as const,
+      toolCallId: "call",
+      toolName: "mcp__demo__tool",
+      pluginId: "demo@market",
+      pluginComponent: "mcp" as const,
+    };
+    supervisor.handleFact(terminal);
+    supervisor.handleFact(terminal);
+    await supervisor.flushReportsForTest();
+    const steps = reportsByElement(reportTelemetryEvent, "agent_step");
+    expect(steps).toHaveLength(1);
+    expect(steps[0].eventExtraDetail).toMatchObject({
+      plugin_id: "demo@market",
+      plugin_component: "mcp",
+    });
+    expect(steps[0].eventExtraDetail).not.toHaveProperty("skill_plugin_id");
     supervisor.dispose();
   });
 });

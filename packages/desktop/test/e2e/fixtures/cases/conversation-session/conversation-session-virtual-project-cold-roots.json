@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project-cold-roots",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project-cold-roots.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-virtual-project-cold-roots.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "vp16-create",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+    },
+    {
+      "id": "vp16-live",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+    },
+    {
+      "id": "vp16-cold",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+    }
+  ]
+}

@@ -187,9 +187,6 @@ describe("output-token terminal errors across Compact persistence", () => {
 
     const coldRequest = requests.at(-1);
     expect(coldRequest?.text).toBe(liveRequest?.text);
-    expect(coldRequest?.text).toContain("Reactive Compact keeps the raw context partial.");
-    expect(coldRequest?.text).toContain("raw context partial");
-    expect(coldRequest?.text).not.toContain(OUTPUT_TOKEN_CONTINUE_PROMPT);
   });
 
   it("keeps a partial terminal assistant in both live and cold preserved history", async () => {

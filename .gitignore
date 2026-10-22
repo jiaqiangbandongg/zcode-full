@@ -69,6 +69,8 @@ binding.Makefile
 packages/desktop/resources/macos-window-bounds/
 # CUA Helper SEA 基座下载缓存（scripts/cua-helper-sea-base.mjs 落盘的官方 Node 22 运行时，纯下载产物）
 /.tmp/
+# R3 服务器部署时写入的实际 commit 标记（harness/remote/deploy-server.sh 产出，随环境变化）
+.deployed-commit
 # Python 字节码（docker/plugin-eval/summarize.py 在主机上跑会生成）。
 __pycache__/
 *.pyc

@@ -16,7 +16,18 @@ import { describe, expect, it } from "vitest";
 // 解析统一归一化后再比对，并覆盖副作用 / 动态 / re-export 三种额外形态。
 const UI_SRC_ROOT = fileURLToPath(new URL("../src", import.meta.url));
 
-const SHARE_BOUNDARY_SOURCES = ["v4/ConversationShareReadonlyTimeline.tsx"] as const;
+const SHARE_BOUNDARY_SOURCES = [
+  "v4/ConversationShareReadonlyTimeline.tsx",
+  "ToolCallBlocks/ToolPresentation.tsx",
+  "ToolCallBlocks/resolveRenderer.ts",
+  "ToolCallBlocks/ToolCallBody.tsx",
+  "ToolCallBlocks/renderers/cuaAppSummaryIcon.tsx",
+  "ToolCallBlocks/renderers/cuaListDetails.tsx",
+  "ToolCallBlocks/renderers/list-models.tsx",
+  "v4/ConversationShareWorkflow.tsx",
+  "ToolCallBlocks/renderers/list-saved-workflows-presentation.tsx",
+  "chat-input-toolbar/thoughtLevelLabels.ts",
+] as const;
 
 // denylist：会把 Desktop 专属子树拖进公开页 bundle 的模块根。@/OpenSplitButton.js 是
 // open-with 子树的入口；其余条目是其 Desktop 专属依赖，防止绕过入口直接静态引入。
@@ -25,6 +36,10 @@ const SHARE_BOUNDARY_SOURCES = ["v4/ConversationShareReadonlyTimeline.tsx"] as c
 const VALUE_IMPORT_DENYLIST: ReadonlySet<string> = new Set([
   "@/OpenSplitButton.js",
   "@/hooks/usePlatform.js",
+  "@/hooks/useServices.js",
+  "@/ToolCallBlocks.js",
+  "@/plugin-ui/index.js",
+  "@/chat-input-toolbar/display.js",
   "@/hooks/useFileContextActions.js",
   "@/hooks/useWorkspaceOpenInEditorTarget.js",
   "@/lib/editorPreference.js",
@@ -128,10 +143,7 @@ describe("conversation share public-page bundle boundary", () => {
     });
 
     it("副作用导入（无 from 子句）命中 denylist", () => {
-      const violations = findDeniedValueImports(
-        'import "@/OpenSplitButton.js";\n',
-        sourceDir,
-      );
+      const violations = findDeniedValueImports('import "@/OpenSplitButton.js";\n', sourceDir);
       expect(violations).toEqual([{ specifier: "@/OpenSplitButton.js", kind: "side-effect" }]);
     });
 

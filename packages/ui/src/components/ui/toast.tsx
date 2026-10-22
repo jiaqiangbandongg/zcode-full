@@ -10,7 +10,7 @@ import { Info, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 
 export type ToastPosition = "top-center" | "top-right" | "bottom-left" | "bottom-center";
-type ToastVariant = "default" | "update" | "info" | "warning";
+type ToastVariant = "default" | "update" | "source-server-update" | "info" | "warning";
 
 export interface ToastOptions {
   durationMs?: number;
@@ -302,6 +302,7 @@ export function ToastMessageView({
   onDismiss?: () => void;
 }) {
   const isUpdate = item.variant === "update";
+  const isSourceServerUpdate = item.variant === "source-server-update";
   const isNotice = item.variant === "info" || item.variant === "warning";
   const isTopRight = item.position === "top-right";
   const [fallbackTitle, ...fallbackBodyLines] = item.message.split("\n");
@@ -312,12 +313,14 @@ export function ToastMessageView({
     <div
       className={cn(
         "rounded-2xl border bg-toast/60 text-ui-base shadow-lg backdrop-blur-xl transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.77,0,0.175,1)] motion-reduce:transform-none motion-reduce:transition-opacity",
-        isUpdate
-          ? "origin-bottom-left w-[min(300px,calc(100vw-1rem))] max-w-[min(300px,calc(100vw-1rem))] border-popover-border text-foreground shadow-lg"
-          : isNotice
-            ? "w-[min(536px,calc(100vw-2rem))] border-border text-foreground"
-            : "border-border px-4 py-3 text-foreground whitespace-pre-line",
-        // 右上角 Toast 曾复用顶部居中的纵向缩放动画，无法表达其从右侧进入的空间关系。
+        isSourceServerUpdate
+          ? "w-[min(480px,calc(100vw-2rem))] border-popover-border text-foreground"
+          : isUpdate
+            ? "origin-bottom-left w-[min(300px,calc(100vw-1rem))] max-w-[min(300px,calc(100vw-1rem))] border-popover-border text-foreground shadow-lg"
+            : isNotice
+              ? "w-[min(536px,calc(100vw-2rem))] border-border text-foreground"
+              : "border-border px-4 py-3 text-foreground whitespace-pre-line",
+        // Bug 原因：右上角 Toast 曾复用顶部居中的纵向缩放动画，无法表达其从右侧进入的空间关系。
         isTopRight
           ? visible
             ? "translate-x-0 opacity-100"
@@ -331,7 +334,43 @@ export function ToastMessageView({
               : "-translate-y-1 scale-[0.98] opacity-0",
       )}
     >
-      {isUpdate ? (
+      {isSourceServerUpdate ? (
+        <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+          <span
+            className="mt-1.5 size-2 shrink-0 rounded-full bg-primary ring-4 ring-accent"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="break-words text-ui-base font-medium leading-5 text-foreground">
+              {displayTitle}
+            </div>
+            {displayBody ? (
+              <div className="mt-1 whitespace-pre-line break-words text-ui-sm leading-5 text-foreground-subtle">
+                {displayBody}
+              </div>
+            ) : null}
+          </div>
+          {item.actionLabel ? (
+            <button
+              type="button"
+              onClick={onAction ?? item.onAction}
+              className="h-8 shrink-0 whitespace-nowrap rounded-md bg-primary px-3 text-ui-base font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {item.actionLabel}
+            </button>
+          ) : null}
+          {item.dismissible ? (
+            <button
+              type="button"
+              onClick={onDismiss}
+              aria-label={item.dismissLabel ?? "Close"}
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-foreground-subtle hover:bg-hover hover:text-foreground"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+      ) : isUpdate ? (
         <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2">
           <span
             className="size-2 shrink-0 rounded-full bg-primary/80 ring-4 ring-accent"

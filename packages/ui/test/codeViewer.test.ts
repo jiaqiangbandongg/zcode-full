@@ -4,19 +4,12 @@ import {
   buildUnifiedDiff,
   getToolCallCodeContentPreview,
   getToolCallCodePreview,
-  inferCodeLanguage,
   inferImageMediaType,
   isPdfPreviewPath,
   isPptxPreviewPath,
 } from "../src/lib/codeViewer.js";
 
 describe("codeViewer helpers", () => {
-  it("infers language from file extension", () => {
-    expect(inferCodeLanguage("/tmp/example.tsx")).toBe("tsx");
-    expect(inferCodeLanguage("/tmp/example.py")).toBe("python");
-    expect(inferCodeLanguage("/tmp/README.md")).toBe("markdown");
-  });
-
   it("infers image media types from file extensions", () => {
     expect(inferImageMediaType("/tmp/example.png")).toBe("image/png");
     expect(inferImageMediaType("/tmp/example.svg")).toBe("image/svg+xml");

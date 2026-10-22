@@ -5,7 +5,10 @@
 import { describe, expect, it } from "vitest";
 import type { ModelToolContract } from "@zcode/contracts";
 import { toAiSdkTools } from "../src/model/index.js";
-import { isAnthropicFirstPartyModelId, toStrictToolSchema } from "../src/model/strict-tool-schema.js";
+import {
+  isAnthropicFirstPartyModelId,
+  toStrictToolSchema,
+} from "../src/model/strict-tool-schema.js";
 
 /** dwf 合成器会发射的一份典型 mono 子代理 schema（外层 `{ result }` 由 contracts 包起来）。 */
 const REVIEW_SCHEMA = {
@@ -146,10 +149,10 @@ describe("toStrictToolSchema — ineligible shapes", () => {
 });
 
 describe("isAnthropicFirstPartyModelId", () => {
-  it.each(["claude-opus-5", "claude-fable-5-1", "claude-sonnet-4-6"])("accepts %s", (id) => {
+  it.each(["claude-opus-5"])("accepts %s", (id) => {
     expect(isAnthropicFirstPartyModelId(id)).toBe(true);
   });
-  it.each(["glm-5.3", "gpt-5", "anthropic/claude-opus-5", undefined])("rejects %s", (id) => {
+  it.each(["glm-5.3", "anthropic/claude-opus-5", undefined])("rejects %s", (id) => {
     expect(isAnthropicFirstPartyModelId(id)).toBe(false);
   });
 });

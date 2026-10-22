@@ -23,7 +23,7 @@ describe("session event retention policy", () => {
     expect(policy.onAppend(ev(SessionEventType.TurnStarted, "t3"), 0)).toEqual(["t2"]);
   });
 
-  it("RET-001 多个已结束 turn 一起淘汰；rewind 不触发淘汰；无 turnId 的事件不参与", () => {
+  it("RET-001 rewind 不触发淘汰；无 turnId 的事件不参与", () => {
     const policy = createSessionEventRetentionPolicy("turn-window");
     policy.onAppend(ev(SessionEventType.TurnStarted, "t1"), 0);
     policy.onAppend(ev(SessionEventType.TurnComplete, "t1"), 0);

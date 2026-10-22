@@ -1,7 +1,7 @@
-import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { build } from "esbuild";
-import { TID_FEEDBACK_LOGS_OPT_IN } from "@zcode/shared";
+import { TID_FEEDBACK_LOGS_OPT_IN } from "@zcode/shared/test-ids";
 import {
   readSettings,
   seedSettings,
@@ -35,6 +35,7 @@ async function dismissInitialOnboarding() {
 }
 
 describe("反馈上传授权（manual review）", () => {
+  const screenshotDirectory = join(process.cwd(), ".e2e-artifacts", "feedback-upload-privacy");
   let settings: Awaited<ReturnType<typeof readSettings>>;
   let server: Awaited<ReturnType<typeof startHelpConfigFixture>>;
   let windowSize:
@@ -42,6 +43,7 @@ describe("反馈上传授权（manual review）", () => {
     | undefined;
 
   before(async () => {
+    await mkdir(screenshotDirectory, { recursive: true });
     await dismissInitialOnboarding();
     await waitForDefaultWorkspaceReady(30000);
     settings = await readSettings();
@@ -70,7 +72,7 @@ describe("反馈上传授权（manual review）", () => {
     ["en-US", 1280, 900, "Help", "Report", "On by default"],
     ["zh-CN", 430, 900, "帮助", "问题上报", "默认开启"],
   ] as const) {
-    it(`FB-PRIV-01/08: ${locale} ${width}px 新反馈默认开启日志且允许取消`, async () => {
+    it(`FB-PRIV-01/08 / FB-DESC-01 / FB-REQ-A11Y-01: ${locale} ${width}px 反馈必填标识与日志选择`, async () => {
       await seedSettings({ locale, localePreference: locale, zcodeEndpointOrigin: server.origin });
       await browser.electron.execute(
         (electron, size) => {
@@ -87,6 +89,19 @@ describe("反馈上传授权（manual review）", () => {
       await $(`//*[@role="menuitem" and contains(.,"${reportLabel}")]`).click();
       const dialog = $('[role="dialog"]');
       await dialog.waitForDisplayed({ timeout: 10000 });
+      const description = dialog.$("textarea");
+      const submitButton = dialog.$(
+        `button=${locale === "zh-CN" ? "提交反馈" : "Submit feedback"}`,
+      );
+      await expect(description).toHaveAttribute("required");
+      await expect(description).toHaveAttribute("aria-required", "true");
+      await expect(description).toHaveAttribute(
+        "aria-label",
+        locale === "zh-CN" ? "问题描述" : "Issue description",
+      );
+      const bugMarker = dialog.$("section h3 span[aria-hidden='true']");
+      await expect(bugMarker).toHaveText("*");
+      await expect(submitButton).toBeDisabled();
       const logs = $(`[data-testid="${TID_FEEDBACK_LOGS_OPT_IN}"]`);
       await expect(logs).toHaveAttribute("aria-checked", "true");
       await expect(dialog).toHaveText(expect.stringContaining(hint));
@@ -103,10 +118,50 @@ describe("反馈上传授权（manual review）", () => {
           if (!actions?.setTheme) throw new Error("缺少主题测试入口");
           actions.setTheme(value);
         }, theme);
+        await expect(bugMarker).toBeDisplayed();
         await logs.scrollIntoView();
         await expect(logs).toBeDisplayed();
-        // E2E runtime path guard 禁止源码出现裸系统临时目录字面量，须走 tmpdir() 拼接。
-        await browser.saveScreenshot(join(tmpdir(), `zcode-feedback-${locale}-${theme}.png`));
+        await browser.saveScreenshot(
+          join(screenshotDirectory, `zcode-feedback-${locale}-${theme}.png`),
+        );
+      }
+      await browser.keys("Escape");
+      await help.click();
+      const requestLabel = locale === "zh-CN" ? "给产品提需求" : "Request a feature";
+      await $(`//*[@role="menuitem" and contains(.,"${requestLabel}")]`).click();
+      await dialog.waitForDisplayed({ timeout: 10000 });
+      const requiredMarkers = await dialog.$$("section h3 span");
+      expect(requiredMarkers.length).toBe(2);
+      for (const marker of requiredMarkers) {
+        await expect(marker).toHaveText("*");
+        await expect(marker).toHaveAttribute("aria-hidden", "true");
+      }
+      const requestFields = await dialog.$$("textarea");
+      expect(requestFields.length).toBe(2);
+      const fieldLabels =
+        locale === "zh-CN"
+          ? ["需求描述", "期望的解决方案"]
+          : ["Request description", "Expected solution"];
+      for await (const [index, field] of requestFields.entries()) {
+        await expect(field).toHaveAttribute("required");
+        await expect(field).toHaveAttribute("aria-required", "true");
+        await expect(field).toHaveAttribute("aria-label", fieldLabels[index]);
+      }
+      await expect(
+        dialog.$(`button=${locale === "zh-CN" ? "提交需求" : "Submit request"}`),
+      ).toBeDisabled();
+      for (const theme of ["light", "dark"] as const) {
+        await browser.execute((value) => {
+          const actions = (
+            window as typeof window & { __testActions?: { setTheme?: (theme: string) => void } }
+          ).__testActions;
+          if (!actions?.setTheme) throw new Error("缺少主题测试入口");
+          actions.setTheme(value);
+        }, theme);
+        for (const marker of requiredMarkers) await expect(marker).toBeDisplayed();
+        await browser.saveScreenshot(
+          join(screenshotDirectory, `zcode-feature-request-${locale}-${theme}.png`),
+        );
       }
       await browser.keys("Escape");
     });
@@ -196,6 +251,34 @@ describe("FB-PRIV-02: 反馈表单到日志服务边界", () => {
       { timeout: 10000 },
     );
   };
+
+  it("FB-DESC-02: 空描述不调用服务，有效描述可提交", async () => {
+    await browser.refresh();
+    const description = $("textarea");
+    await description.waitForDisplayed({ timeout: 10000 });
+    const submitButton = $("button=Submit feedback");
+    await expect(description).toHaveAttribute("required");
+    await expect(submitButton).toBeDisabled();
+    await description.setValue("   ");
+    await expect(submitButton).toBeDisabled();
+    expect((await snapshot()).calls).toEqual({ create: 0, prepare: 0, upload: [], cleanup: 0 });
+    await description.setValue("E2E_FEEDBACK_REQUIRED_DESCRIPTION");
+    await expect(submitButton).toBeEnabled();
+    // WebDriver clearValue 不保证触发 React 的 input；通过实际退格事件验证清空。
+    await description.setValue(" ");
+    await browser.keys("Backspace");
+    await expect(description).toHaveValue("");
+    await expect(submitButton).toBeDisabled();
+    expect((await snapshot()).calls).toEqual({ create: 0, prepare: 0, upload: [], cleanup: 0 });
+    await description.setValue("E2E_FEEDBACK_REQUIRED_DESCRIPTION");
+    await submit();
+    const result = await snapshot();
+    expect(result.createInputs).toHaveLength(1);
+    expect(result.createInputs[0]).toMatchObject({
+      title: "E2E_FEEDBACK_REQUIRED_DESCRIPTION",
+      description: expect.stringContaining("E2E_FEEDBACK_REQUIRED_DESCRIPTION"),
+    });
+  });
 
   for (const [name, includeLogs, restore] of [
     ["默认提交", true, false],

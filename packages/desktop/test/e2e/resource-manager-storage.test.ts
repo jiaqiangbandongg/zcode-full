@@ -2,7 +2,7 @@
  * 资源管理器「存储」tab E2E。
  * 用例目录：docs/settings-storage-management.md §7（SM-01 扫描、SM-02 下钻、SM-03 safe 清理、
  * SM-04 confirm 清理、SM-05 日志保留当天）。fixture 直接写进隔离 HOME 的 .zcode，
- * 类别选用 backup/ 与 cli/debug：应用自身不会往这两处写，断言可以精确到字节。
+ * 类别选用 backup/ 与 cli/debug：启动迁移备份先隔离清理，再按夹具精确断言字节。
  */
 import { mkdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -23,7 +23,7 @@ import {
   TID_RESOURCE_MANAGER_STORAGE_STATUS,
   TID_RESOURCE_MANAGER_STORAGE_TOTAL,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -59,6 +59,8 @@ const OLD_LOG_FILE = join(storageRoot, "v2", "logs", "2020-01-01.log");
 const TODAY_LOG_FILE = join(storageRoot, "v2", "logs", todayLogFileName());
 
 async function seedStorageFixture(): Promise<void> {
+  // 启动迁移会生成 tasks_index 备份；先清理隔离 HOME 的既有备份，再建立精确字节夹具。
+  await rm(join(storageRoot, "backup"), { recursive: true, force: true });
   await mkdir(join(TRAJECTORY_FILE, ".."), { recursive: true });
   await writeFile(TRAJECTORY_FILE, "x".repeat(TRAJECTORY_BYTES));
   await mkdir(join(BACKUP_FILE, ".."), { recursive: true });

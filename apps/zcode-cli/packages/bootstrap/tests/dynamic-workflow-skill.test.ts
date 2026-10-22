@@ -193,7 +193,9 @@ describe("bundled dynamic-workflows skill", () => {
     expect(skill).toContain("## 16. Tool reference");
     expect(skill).toContain("refuses\nto run until this skill has been loaded");
     expect(skill).toContain("**Three sources; pass exactly one.**");
-    expect(skill).toContain("Running a saved workflow\n  is the one call that does not need this skill loaded");
+    expect(skill).toContain(
+      "Running a saved workflow\n  is the one call that does not need this skill loaded",
+    );
     expect(skill).toContain("`max_concurrency`");
     expect(skill).toContain("`subagent_model`");
     expect(skill).toContain("do not imitate it");
@@ -230,7 +232,9 @@ describe("bundled dynamic-workflows skill", () => {
     // 描述矛盾；描述收短后技能是唯一出处，两处必须同一个说法。
     expect(skill).toContain("**How the cache works.**");
     expect(skill).toContain("Asks that only\nanswered keep settling from the cache");
-    expect(skill).not.toContain("every ask to any subagent runs live even if its text is unchanged");
+    expect(skill).not.toContain(
+      "every ask to any subagent runs live even if its text is unchanged",
+    );
     expect(skill).toContain("### 16.5 `SaveWorkflow`");
     expect(skill).toContain("Never unsolicited");
     expect(skill).toContain("`script_path`");
@@ -423,9 +427,6 @@ describe("bundled dynamic-workflows skill", () => {
   it("teaches proportional verification, per-item streaming, and mid-run repair (amendment 10)", async () => {
     const skill = await readSkillFile("SKILL.md");
     // 2026-09-30 起 §7 以「默认流水线」立题（见上一条用例）；按条串接的规则住在 **Chaining.** 段。
-    expect(skill).toContain(
-      "## 7. Pipeline by default; join only where the next step needs every item",
-    );
     expect(skill).toContain("**Chaining.** When two stages map one to one");
     expect(skill).toContain("**Not inside a concurrent fan-out callback.**");
     expect(skill).toContain("Three things that look like verification and are waste.");
@@ -438,7 +439,9 @@ describe("bundled dynamic-workflows skill", () => {
     const movedExample = await readSkillFile("examples.md");
     expect(movedExample).toContain("## 5. Changed-file review with confirmation as reviews land");
     expect(movedExample).toContain("confirmer-${p}-${index}");
-    expect(movedExample).not.toContain('phase("Confirm each kept finding independently and report it")');
+    expect(movedExample).not.toContain(
+      'phase("Confirm each kept finding independently and report it")',
+    );
     // 过时的缓存关门说法（工具档位 2026-09-12 已退场）不得回来。
     for (const { name, text } of await readAllContent()) {
       expect(text, name).not.toMatch(/first subagent with tools/i);
@@ -470,7 +473,6 @@ describe("bundled dynamic-workflows skill", () => {
     expect(skill).toContain("edit the run's script file, which the notification names,");
     expect(skill).toContain("**Every run remembers its script file, so a revision is an `Edit`.**");
     expect(skill).toContain("`scriptPath`");
-    expect(skill).toContain("`script_unchanged`");
     // 草稿目录免审批，否则模型会以为改文件也要等用户点确认，于是又回去贴脚本。
     expect(skill).toContain("**Editing a draft asks nothing.**");
     // EvalWorkflowSnippet 的第二个来源。

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ConversationSharePreviewClient,
-  ConversationSharePreviewClientError,
   buildShareImportDeepLink,
   parseConversationShareRoute,
 } from "../src/share/conversationSharePreviewClient.js";
@@ -23,6 +22,28 @@ const preview = {
 const decodedPreview = { ...preview, unsupportedRowCount: 0 };
 
 describe("conversation share preview client", () => {
+  it.each([
+    [429, "<html>limit</html>", "rate_limited"],
+    [403, "", "not_found"],
+    [403, "<html>forbidden</html>", "not_found"],
+    [400, "<html>bad request</html>", "unknown"],
+    [400, JSON.stringify({ message: "bad request" }), "unknown"],
+    [502, "<html>gateway</html>", "service_unavailable"],
+    [503, "", "service_unavailable"],
+    [
+      500,
+      JSON.stringify({ code: 2001, msg: "database error", logid: "web-log-id" }),
+      "service_unavailable",
+    ],
+    [404, JSON.stringify({ code: 3200, msg: "disabled" }), "feature_disabled"],
+  ])("classifies HTTP %s without blaming the content", async (status, body, kind) => {
+    const client = new ConversationSharePreviewClient({
+      baseUrl: "https://api.example.com",
+      fetchImpl: vi.fn(async () => new Response(body, { status })),
+    });
+    await expect(client.getPreview("share-1")).rejects.toMatchObject({ kind, status });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -137,9 +158,6 @@ describe("conversation share preview client", () => {
     expect(fetchImpl.mock.calls[1]?.[1]).toMatchObject({
       headers: { Authorization: "Bearer jwt-1" },
     });
-    expect(
-      new ConversationSharePreviewClientError({ kind: "expired", message: "expired" }).kind,
-    ).toBe("expired");
   });
 
   it("maps an empty 401 response to authentication_required", async () => {
@@ -150,6 +168,24 @@ describe("conversation share preview client", () => {
     await expect(client.getPreview("share-1")).rejects.toMatchObject({
       kind: "authentication_required",
       status: 401,
+    });
+  });
+
+  it("retains unknown server codes and logid for support", async () => {
+    const client = new ConversationSharePreviewClient({
+      baseUrl: "https://api.example.com",
+      fetchImpl: vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ code: 9999, msg: "server text", logid: "web-request-id" }),
+            { status: 500 },
+          ),
+      ),
+    });
+    await expect(client.getPreview("share-1")).rejects.toMatchObject({
+      kind: "service_unavailable",
+      code: 9999,
+      requestId: "web-request-id",
     });
   });
 

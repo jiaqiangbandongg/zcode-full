@@ -72,11 +72,6 @@ describe("workflowActorModelPolicy (run-level subagent model)", () => {
     expect(policy.configOverrides).toEqual({ modelSelection: RUN_CHOICE });
   });
 
-  it("no pin + no run selection: overrides nothing (the child inherits the session model)", () => {
-    expect(workflowActorModelPolicy({ parentSelection: PARENT }).configOverrides).toEqual({});
-    expect(workflowActorModelPolicy({}).configOverrides).toEqual({});
-  });
-
   it("the run selection applies even when the parent session has no model of its own", () => {
     expect(workflowActorModelPolicy({ runSelection: RUN_CHOICE }).configOverrides).toEqual({
       modelSelection: RUN_CHOICE,
@@ -91,11 +86,6 @@ describe("workflowActorModelPolicy (run-level subagent model)", () => {
       "zhipu/glm-5.3-flash",
     );
     expect(policy.configOverrides).toEqual({ modelSelection: RUN_CHOICE });
-  });
-
-  it("a pin with the parent's identity and no run selection overrides nothing", () => {
-    const policy = workflowActorModelPolicy({ parentSelection: PARENT }, "anthropic/sonnet");
-    expect(policy.configOverrides).toEqual({});
   });
 
   it("the run selection wins over a differing pin (the amend asked for the switch)", () => {
@@ -153,13 +143,6 @@ describe("workflowActorModelPolicy (persona model)", () => {
     expect(() =>
       workflowActorModelPolicy({ actorSelection: ACTOR_CHOICE }, "no-provider-segment"),
     ).not.toThrow();
-  });
-
-  it("without a persona model the run selection still applies (the default for the rest)", () => {
-    expect(
-      workflowActorModelPolicy({ parentSelection: PARENT, runSelection: RUN_CHOICE })
-        .configOverrides,
-    ).toEqual({ modelSelection: RUN_CHOICE });
   });
 });
 

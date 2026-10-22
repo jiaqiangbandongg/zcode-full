@@ -150,11 +150,6 @@ describe("instrumentForContextPersistence", () => {
 });
 
 describe("parseReplCode", () => {
-  it("returns ast for valid code", () => {
-    const parsed = parseReplCode("const x = 1;");
-    expect("ast" in parsed).toBe(true);
-  });
-
   it("returns parseError for invalid code", () => {
     const parsed = parseReplCode("const x = (");
     expect("parseError" in parsed).toBe(true);

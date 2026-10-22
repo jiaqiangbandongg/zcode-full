@@ -40,7 +40,7 @@ function makeActions(overrides: Partial<PluginStoreActions> = {}): PluginStoreAc
     onInstall: () => {},
     onUninstall: () => {},
     onUpdate: () => {},
-    operationId: null,
+    activeOperations: [],
     togglingPluginId: null,
     ...overrides,
   };
@@ -60,7 +60,7 @@ describe("PluginStoreItemMenu separator", () => {
     expect(html).not.toContain('data-slot="dropdown-menu-separator"');
   });
 
-  it("卸载前只有「更新」一项时同样保留分隔线", async () => {
+  it("更新移到行内后，只有卸载的菜单不留分隔线", async () => {
     const html = await renderMenu(
       storeItem({
         installedMeta: {
@@ -75,8 +75,8 @@ describe("PluginStoreItemMenu separator", () => {
       makeActions(),
     );
 
-    expect(html).toContain('data-testid="plugin-store-menu-update"');
-    expect(html).toContain('data-slot="dropdown-menu-separator"');
+    expect(html).not.toContain('data-testid="plugin-store-menu-update"');
+    expect(html).not.toContain('data-slot="dropdown-menu-separator"');
   });
 
   it("卸载前有其他操作项时保留分隔线", async () => {

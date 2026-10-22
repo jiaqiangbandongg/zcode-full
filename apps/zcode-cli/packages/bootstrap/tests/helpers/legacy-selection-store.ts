@@ -9,13 +9,13 @@ import { SESSION_ENTRY_MODEL_SELECTION, type SessionId } from "@zcode/contracts"
 export async function createLegacySelectionStoreFixture() {
   const root = await mkdtemp(join(tmpdir(), "app-legacy-selection-"));
   const dbPath = join(root, "sessions.sqlite");
-  let store = createSqliteSessionStore({ dbPath });
+  let store = await createSqliteSessionStore({ dbPath });
   const db = new DatabaseSync(dbPath);
   return {
     get store() {
       return store;
     },
-    seedLegacy(sessionID: SessionId, data: unknown) {
+    async seedLegacy(sessionID: SessionId, data: unknown) {
       db.prepare(
         "insert into session_entry(id, session_id, type, time_created, time_updated, data) values(?,?,?,?,?,?)",
       ).run(
@@ -29,7 +29,7 @@ export async function createLegacySelectionStoreFixture() {
       // Todo109：播种旧格式后关闭并重开，迁移必须由启动门禁触发，不再由 resume 补迁。
       store.close();
       db.exec("DELETE FROM schema_migration WHERE id='0020_provider_model_selection'");
-      store = createSqliteSessionStore({ dbPath });
+      store = await createSqliteSessionStore({ dbPath });
     },
     async dispose() {
       db.close();

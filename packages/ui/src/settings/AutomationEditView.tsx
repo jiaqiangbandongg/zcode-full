@@ -16,7 +16,12 @@ import {
   X,
 } from "lucide-react";
 import {
-  resolveWorkspaceKey,
+  ZCODE_AGENT_PROVIDER,
+  type ZCodeAutomation,
+  type ZCodeAutomationRun,
+  type ZCodeAutomationScheduleRule,
+} from "@zcode/shared";
+import {
   testId,
   TID_AUTOMATION_CUSTOM_CONFIRM,
   TID_AUTOMATION_CUSTOM_INTERVAL_DECREMENT,
@@ -37,11 +42,7 @@ import {
   TID_AUTOMATION_YEAR_DAY_OPTION,
   TID_AUTOMATION_YEAR_MONTH_OPTION,
   TID_AUTOMATION_YEAR_MONTHDAY,
-  ZCODE_AGENT_PROVIDER,
-  type ZCodeAutomation,
-  type ZCodeAutomationRun,
-  type ZCodeAutomationScheduleRule,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   AutomationAddScheduleIcon,
   AutomationChevronDownIcon,
@@ -104,7 +105,6 @@ import { resolveLocalizedAutomationCreateTitle } from "@/settings/automationEdit
 import { ModelConfigSelect } from "@/ModelConfigSelect.js";
 import { ThoughtLevelCycleControl } from "@/chat-input-toolbar/ThoughtLevelCycleControl.js";
 import { ConfigSelect } from "@/chat-input-toolbar/display.js";
-import { ChatEmptyWorkspacePreviewMenu, type ChatEmptyWorkspaceMenuTab } from "@/ChatEmptyState.js";
 import {
   AUTOMATION_DEFAULT_MODE,
   buildAutomationModelSelectGroups,
@@ -127,7 +127,8 @@ import {
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
 import { useAutomationProjectOptions } from "@/hooks/useAutomationProjectOptions.js";
-import { useModelSelectionView } from "@/hooks/useModelSelectionView.js";
+import { useWorkspaceServicesResolution } from "@/hooks/useWorkspaceServices.js";
+import { useModelSelectionServiceView } from "@/hooks/useModelSelectionView.js";
 import { resolveModelThoughtOption } from "@/lib/modelThoughtOption.js";
 import { decodeCustomModelValue, encodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
 import { parseModelPickerValue } from "@/lib/zcodeSessionProjection.js";
@@ -1255,11 +1256,12 @@ export function AutomationEditView({
   // 目标项目 key(仅新建时可改;编辑锁定为 automation 所属项目)。
   const [workspaceKey, setWorkspaceKey] = useState<string | null>(null);
 
-  const localWorkspaceOptions = useAutomationProjectOptions({
-    includeConversationWorkspace: true,
-  });
+  const localWorkspaceOptions = useAutomationProjectOptions();
   const editingWorkspaceOption = editing
-    ? findAutomationWorkspaceOptionByKey(localWorkspaceOptions, editing.workspaceKey)
+    ? findAutomationWorkspaceOptionByKey(
+        localWorkspaceOptions,
+        resolveAutomationWorkspaceSelectionKey(editing),
+      )
     : undefined;
   const workspaceOptions = useMemo<AutomationWorkspaceOption[]>(
     () =>
@@ -1268,16 +1270,9 @@ export function AutomationEditView({
             {
               workspacePath: editing.workspacePath,
               workspaceIdentity: editing.workspaceIdentity,
-              label: workspaceLabelFromPath(editing.workspacePath),
-              ...(editingWorkspaceOption?.remoteSessionId
-                ? { remoteSessionId: editingWorkspaceOption.remoteSessionId }
-                : {}),
-              ...(editingWorkspaceOption?.remoteTarget
-                ? { remoteTarget: editingWorkspaceOption.remoteTarget }
-                : {}),
-              ...(editingWorkspaceOption?.workspacePurpose
-                ? { workspacePurpose: editingWorkspaceOption.workspacePurpose }
-                : {}),
+              projectId: editing.projectId,
+              hostId: editing.hostId,
+              label: editingWorkspaceOption?.label ?? workspaceLabelFromPath(editing.workspacePath),
             },
           ]
         : localWorkspaceOptions,
@@ -1313,12 +1308,7 @@ export function AutomationEditView({
       setThoughtLevel(editingThoughtLevel);
       setBuilder(initialBuilder(editing, initialDraft));
       setEndAt(editing.endAt);
-      setWorkspaceKey(
-        resolveWorkspaceKey({
-          workspacePath: editing.workspacePath,
-          workspaceIdentity: editing.workspaceIdentity,
-        }),
-      );
+      setWorkspaceKey(resolveAutomationWorkspaceSelectionKey(editing));
     } else {
       setScheduleRemoved(!initialDraft);
       // 新建页的默认标题可随 locale 更新；模板标题仍属于用户明确选择的内容。
@@ -1436,26 +1426,17 @@ export function AutomationEditView({
     () => (cronExpr ? describeCronBuilder(builder, intl) : ""),
     [builder, cronExpr, intl],
   );
-  const selectedWorkspace =
+  const selectedWorkspace: AutomationWorkspaceOption | null =
     findAutomationWorkspaceOptionByKey(workspaceOptions, workspaceKey) ??
     (editing
       ? {
           workspacePath: editing.workspacePath,
           workspaceIdentity: editing.workspaceIdentity,
-          label: workspaceLabelFromPath(editing.workspacePath),
+          projectId: editing.projectId,
+          hostId: editing.hostId,
+          label: editingWorkspaceOption?.label ?? workspaceLabelFromPath(editing.workspacePath),
         }
       : null);
-  // 复用输入框空态的项目选择菜单：把表单的项目候选映射成它的 tab 结构。
-  const workspaceMenuTabs = useMemo<ChatEmptyWorkspaceMenuTab[]>(
-    () =>
-      workspaceOptions.map((option) => ({
-        workspacePath: option.workspacePath,
-        label: option.label,
-        ...(option.workspaceIdentity ? { workspaceIdentity: option.workspaceIdentity } : {}),
-        ...(option.workspacePurpose ? { workspacePurpose: option.workspacePurpose } : {}),
-      })),
-    [workspaceOptions],
-  );
   // 新建态无有效项目时保留空目标，避免模型配置读取悄悄回退到 conversation/default workspace。
   const selectedWorkspacePath = selectedWorkspace?.workspacePath ?? "";
   const selectedWorkspaceIdentity = selectedWorkspace?.workspaceIdentity;
@@ -1467,12 +1448,17 @@ export function AutomationEditView({
       : null;
   }, [model, thoughtLevel]);
   // 模型候选属于当前表单目标 Host。项目切换时立即切换订阅；远程目标未连接时
-  // useModelSelectionView 会保持 unavailable，绝不能退回当前设置页的 Local Host。
-  const modelSelectionRead = useModelSelectionView(
+  // 等待远端时保持 unavailable；本地空项目直接读取同 Host 模型目录，不创建假 cwd。
+  const selectionOwner = useWorkspaceServicesResolution(
     selectedWorkspacePath || null,
     selectedWorkspace?.remoteSessionId,
     selectedWorkspaceIdentity,
     selectedWorkspace?.remoteTarget,
+  );
+  const modelSelectionRead = useModelSelectionServiceView(
+    selectionOwner.services.modelSelectionService,
+    Boolean(selectedWorkspace) && selectionOwner.connectionKind !== "remote-waiting",
+    selectedWorkspace ? "remote-waiting" : "missing-target",
     { selection: originalSelection },
   );
   const modelSelectionView =
@@ -1513,35 +1499,21 @@ export function AutomationEditView({
       registrySelectionView: modelSelectionView,
     });
   }, [intl, modelSelectionView]);
-  const isSelectedConversationWorkspace = selectedWorkspace?.workspacePurpose === "conversation";
-  // automation 数据只持久化 workspaceKey/path，编辑态曾直接把 conversation
+  const isSelectedConversationWorkspace =
+    selectedWorkspace?.projectId === null || selectedWorkspace?.workspacePurpose === "conversation";
+  // Bug 原因：automation 数据只持久化 workspaceKey/path，编辑态曾直接把 conversation
   // backing path 当项目展示成 default。匹配当前 canonical 候选恢复 purpose 后，
   // 继续复用会话侧文案；无法匹配的历史目标仍回退到路径名称。
   const selectedWorkspaceDisplayLabel = isSelectedConversationWorkspace
     ? intl.formatMessage({ id: "chat.empty.workOutsideProject" })
     : (selectedWorkspace?.label ?? workspaceLabelFromPath(defaultWorkspacePath));
-  const conversationWorkspace = workspaceOptions.find(
-    (option) => option.workspacePurpose === "conversation",
-  );
-  const handleSelectWorkspace = (workspace: ChatEmptyWorkspaceMenuTab) => {
+  const handleSelectProject = (key: string) => {
+    if (!findAutomationWorkspaceOptionByKey(workspaceOptions, key)) return;
     modelManuallyChangedRef.current = false;
     thoughtManuallyChangedRef.current = false;
     modelSelection.current = "";
     setModel("");
-    // 远程工作区可以共享同一实际路径；旧回调只传 path 再 find，永远命中第一个
-    // 候选。选择事件必须携带 identity，确保模型预览、保存和派发使用用户点击的 workspaceKey。
-    setWorkspaceKey(resolveAutomationWorkspaceSelectionKey(workspace));
-  };
-  const handleSelectConversationWorkspace = () => {
-    if (!conversationWorkspace) return;
-    modelManuallyChangedRef.current = false;
-    thoughtManuallyChangedRef.current = false;
-    modelSelection.current = "";
-    setModel("");
-    // conversation backing workspace 曾被降格成名为 default 的普通项目，
-    // 导致菜单泄露内部目录名和 Folder 图标。这里按 purpose 选择 canonical backing，
-    // 展示则交给会话侧固定的「不在项目中工作」菜单项。
-    setWorkspaceKey(resolveAutomationWorkspaceSelectionKey(conversationWorkspace));
+    setWorkspaceKey(key);
   };
   const modelTriggerLabel = resolveAutomationModelTriggerLabel({
     modelGroups: modelSelectGroups,
@@ -1779,7 +1751,10 @@ export function AutomationEditView({
       if (modelSelection.current !== model || thoughtLevelRef.current !== thoughtLevel)
         return false;
       const input: CreateAutomationInput | UpdateAutomationInput = {
-        // 权限下拉和保存按钮是两个独立控件，快速选择 Plan 后立即保存时，
+        ...(!editing && selectedWorkspace?.projectId
+          ? { projectId: selectedWorkspace.projectId }
+          : {}),
+        // Bugfix: 权限下拉和保存按钮是两个独立控件，快速选择 Plan 后立即保存时，
         // React state 可能还没刷新到 submit 闭包；用 ref 保留最后一次选择，避免落库成默认 build。
         ...buildSubmitInput({
           modeValue: modeRef.current,
@@ -1839,6 +1814,7 @@ export function AutomationEditView({
       thoughtLevel,
       selectedWorkspace?.workspaceIdentity,
       selectedWorkspace?.workspacePath,
+      selectedWorkspace?.projectId,
     ],
   );
 
@@ -2600,29 +2576,29 @@ export function AutomationEditView({
                         )}
                         <span className="max-w-40 truncate">{selectedWorkspaceDisplayLabel}</span>
                       </Button>
-                    ) : workspaceMenuTabs.length > 0 ? (
-                      // Automations 工具条与会话 composer 控件统一使用 rounded-lg，普通会话 chip 不变。
-                      <ChatEmptyWorkspacePreviewMenu
-                        workspacePath={selectedWorkspacePath}
-                        workspaceTabs={workspaceMenuTabs}
-                        // 定时任务允许选择 canonical conversation backing，但不提供 chip 上的快捷 X；
-                        // 菜单展示统一复用会话侧「不在项目中工作」文案和 MessageCircle 图标。
-                        allowConversationWorkspaceSelection={Boolean(conversationWorkspace)}
-                        allowConversationWorkspaceDetach={false}
-                        onSelectWorkspace={handleSelectWorkspace}
-                        onSelectConversationWorkspace={handleSelectConversationWorkspace}
-                        allowOpenWorkspace={false}
-                        allowRemoteWorkspace={false}
-                        onOpenFolder={() => {}}
-                        onConnectRemote={async () => ""}
-                        onSelectRemoteProject={async () => {}}
-                        onCancelRemoteProject={async (_sessionId) => {}}
-                        containerClassName="contents"
-                        triggerClassName={cn(
-                          AUTOMATION_INSTRUCTIONS_TOOLBAR_TRIGGER_CLASSNAME,
-                          "min-w-0 gap-1 px-2",
-                        )}
-                      />
+                    ) : workspaceOptions.length > 0 ? (
+                      <Select value={workspaceKey ?? ""} onValueChange={handleSelectProject}>
+                        <SelectTrigger
+                          data-testid="automation-project-select"
+                          variant="ghost"
+                          className={AUTOMATION_INSTRUCTIONS_TOOLBAR_TRIGGER_CLASSNAME}
+                        >
+                          <FolderOpen className="size-4" aria-hidden="true" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workspaceOptions.map((option) => (
+                            <SelectItem
+                              key={resolveAutomationWorkspaceSelectionKey(option)}
+                              value={resolveAutomationWorkspaceSelectionKey(option)}
+                              data-project-id={option.projectId}
+                              data-project-name={option.label}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <Button
                         type="button"

@@ -14,8 +14,6 @@ import {
   workflowRunOpenTarget,
 } from "@/v4/conversationStatusPanelModel.js";
 import {
-  CONVERSATION_STATUS_PANEL_INLINE_OFFSET_CLASS_NAME,
-  CONVERSATION_STATUS_PANEL_INLINE_OFFSET_PX,
   CONVERSATION_STATUS_PANEL_WIDE_OFFSET_CLASS_NAME,
   getConversationStatusPanelOffsetClassName,
   resolveConversationStatusPanelVariant,
@@ -595,12 +593,7 @@ describe("buildConversationStatusPanelModel", () => {
 });
 
 describe("conversation status panel layout", () => {
-  it("uses the z-code-2 inline offset for the conversation column", () => {
-    expect(CONVERSATION_STATUS_PANEL_INLINE_OFFSET_PX).toBe(168);
-    expect(CONVERSATION_STATUS_PANEL_INLINE_OFFSET_CLASS_NAME).toBe("-translate-x-42");
-    expect(CONVERSATION_STATUS_PANEL_WIDE_OFFSET_CLASS_NAME).toBe(
-      "@min-[1280px]/conversation:-translate-x-42",
-    );
+  it("maps the status panel layout to its offset class", () => {
     expect(getConversationStatusPanelOffsetClassName("auto")).toBe(
       CONVERSATION_STATUS_PANEL_WIDE_OFFSET_CLASS_NAME,
     );

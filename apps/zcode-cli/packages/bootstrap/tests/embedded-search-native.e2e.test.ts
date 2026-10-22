@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -244,10 +244,7 @@ describe.skipIf(!nativeE2eEnabled)("native embedded search E2E", () => {
 
     expect(
       outputLines(normalizeNativeSearchResultPaths(outputSection(result.stdout, "RG_FILES"))),
-    ).toEqual([
-      "src/alpha.ts:2:needle alpha",
-      "src/deep/beta.ts:1:needle beta",
-    ]);
+    ).toEqual(["src/alpha.ts:2:needle alpha", "src/deep/beta.ts:1:needle beta"]);
     expect(outputSection(result.stdout, "RG_HIDDEN")).toBe(".hidden.ts:1:needle hidden");
     expect(outputSection(result.stdout, "RG_STDIN")).toBe("needle from rg stdin");
     expect(outputLines(outputSection(result.stdout, "RG_MATCHERS"))).toEqual([
@@ -292,6 +289,73 @@ describe.skipIf(!nativeE2eEnabled)("native embedded search E2E", () => {
     expect(result.stdout).toBe("src/alpha.ts\nsrc/deep/beta.ts\n---\nneedle fallback\n");
     expect(result.stderr).toBe("");
   });
+
+  it.each(["ugrep-direct", "ugrep-pipe", "system-grep-pipe"])(
+    "isolates live output from recursive search (%s)",
+    async (mode) => {
+      const searchRoot = join(fixtureRoot, `self-search-${mode}`);
+      const tempParent = join(fixtureRoot, `temporary-${mode}`);
+      await mkdir(searchRoot);
+      await mkdir(tempParent);
+      await writeFile(join(searchRoot, "00-seed.txt"), "self_search_needle\n".repeat(200_000));
+      const shellPath = (path: string) =>
+        process.platform === "win32" ? windowsPathToGitBashPath(path) : path;
+      // 只允许读回种子输出及一条嵌套匹配；另设大小和时长保护，不能把测试变成磁盘耗尽事故。
+      const grep =
+        mode === "system-grep-pipe"
+          ? "command grep -rn -m200001 self_search_needle ."
+          : "grep -J1 --sort=name -rn -m200001 self_search_needle .";
+      const command = `cd ${quoteShellValue(shellPath(searchRoot))} && ${grep}${mode.endsWith("pipe") ? " | cut -c 1-4096" : ""}`;
+      for (const useTmp of [false, true]) {
+        const outputRoot = join(searchRoot, "zz-output");
+        const execution = new NodeExecutionAdapter({
+          outputRootDir: outputRoot,
+          ...(useTmp ? { bashOutputTempDir: tempParent } : {}),
+          processEnv: { ...process.env, PATH: nativeShellPathEntries().join(delimiter) },
+        });
+        const deadline = setTimeout(() => void execution.close(), 10_000);
+        const controlPath = join(
+          outputRoot,
+          "native-search-e2e",
+          "tool_native_search_e2e-stdout.log",
+        );
+        const sizeGuard = setInterval(() => {
+          void stat(controlPath).then(
+            (file) => {
+              if (file.size >= 64 * 1024 * 1024) return execution.close();
+            },
+            () => undefined,
+          );
+        }, 25);
+        try {
+          const result = await runBashToolCall(command, backend, execution);
+          expectToolCallExit(result, 0);
+          const outputPath = result.persistedOutputPath!;
+          expect(outputPath).toBeTruthy();
+          expect((await stat(outputPath)).size).toBeLessThan(64 * 1024 * 1024);
+          const text = await readFile(outputPath, "utf8");
+          const nested = /stdout\.log:\d+:/u.test(text);
+          if (useTmp) {
+            expect(outputPath.startsWith(tempParent)).toBe(true);
+            expect(nested).toBe(false);
+            expect(text.match(/self_search_needle/g)).toHaveLength(200_000);
+          } else if (
+            mode === "ugrep-pipe" ||
+            process.platform === "win32" ||
+            (mode === "system-grep-pipe" && process.platform === "linux")
+          ) {
+            expect(nested).toBe(true);
+          }
+        } finally {
+          clearTimeout(deadline);
+          clearInterval(sizeGuard);
+          await execution.close();
+          await rm(outputRoot, { recursive: true, force: true });
+        }
+      }
+    },
+    30_000,
+  );
 
   async function runBashToolCall(
     command: string,

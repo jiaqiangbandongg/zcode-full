@@ -19,7 +19,7 @@
 // getReadOnlyClient(params) 默认 start-if-needed，重订阅本身会把 agent 拉起来——这与侧栏
 // subscribeSessionsIndexV4 显式用 existing-only + dormant 的策略差异是故意设计的。
 import { Emitter } from "@zcode/rpc";
-import type { ConversationTopicWireFrame } from "@zcode/shared/zcode-protocol-v4";
+import type { CommandEnvelope, ConversationTopicWireFrame } from "@zcode/shared/zcode-protocol-v4";
 import {
   createZCodeAgentConnectionScope,
   readTrustedZCodeAgentV4Connection,
@@ -28,6 +28,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { createAgentConversationTransport } from "@/v4/agentConversationTransport.js";
 import { ConversationProjectionStore } from "@/v4/conversationProjectionStore.js";
+import type { ConversationTransport } from "@/v4/transport.js";
 import { ReplaceableConversationTransport } from "@/v4/replaceableConversationTransport.js";
 
 const TOPIC = "conversation/s1";
@@ -368,4 +369,53 @@ describe("conversation projection 在 CUA Helper 回收 agent runtime 后自愈"
       vi.useRealTimers();
     }
   });
+});
+
+it("forwards project creation context before and after a remote proxy replacement", async () => {
+  const first = { sendCommand: vi.fn(async () => ({ status: "accepted" })) };
+  const next = { sendCommand: vi.fn(async () => ({ status: "accepted" })) };
+  const transport = new ReplaceableConversationTransport(first as unknown as ConversationTransport);
+  const envelope = { type: "createSession", commandId: "create-project" } as CommandEnvelope;
+  const context = { projectId: "project-a" };
+  await transport.sendCommand(envelope, context);
+  expect(first.sendCommand).toHaveBeenCalledWith(envelope, context);
+  transport.replace(next as unknown as ConversationTransport);
+  await transport.sendCommand(envelope, context);
+  expect(next.sendCommand).toHaveBeenCalledWith(envelope, context);
+  expect(first.sendCommand).toHaveBeenCalledOnce();
+});
+
+it("recovers when a new runtime appears while the first subscription ACK is pending", async () => {
+  vi.useFakeTimers();
+  try {
+    const { base, mocks, runtimeLifecycle, runtimeRestarts } = setupBase({ withLifecycle: true });
+    let resolveAck!: (value: {
+      ack: { subscriptionId: string; mode: "snapshot"; logEpoch: string };
+    }) => void;
+    mocks.subscribeConversationV4.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveAck = resolve;
+        }),
+    );
+    const { store } = createStore(base, "cold-runtime");
+    const connecting = store.connect();
+    await vi.waitFor(() => expect(mocks.subscribeConversationV4).toHaveBeenCalledOnce());
+    runtimeLifecycle.fire(lifecycleEvent("available", 2));
+    runtimeRestarts.fire({ workspaceKey: WORKSPACE_PATH });
+    expect(mocks.subscribeConversationV4).toHaveBeenCalledOnce();
+    resolveAck({
+      ack: { subscriptionId: "old-runtime-ack", mode: "snapshot", logEpoch: "old-epoch" },
+    });
+    await connecting;
+    expect(store.getState().status).toBe("connecting");
+    await vi.advanceTimersByTimeAsync(250);
+    expect(mocks.subscribeConversationV4).toHaveBeenCalledTimes(2);
+    expect(store.getState().status).toBe("live");
+    expect(store.getState().subscriptionId).not.toBe("old-runtime-ack");
+    expect(mocks.sendConversationCommandV4).not.toHaveBeenCalled();
+    await store.close();
+  } finally {
+    vi.useRealTimers();
+  }
 });

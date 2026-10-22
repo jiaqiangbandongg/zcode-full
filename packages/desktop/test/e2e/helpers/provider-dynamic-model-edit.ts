@@ -1,4 +1,5 @@
-import { BUILTIN_MODEL_PROVIDER_IDS, TID_MODEL_PROVIDER_ADD_MODEL_BUTTON } from "@zcode/shared";
+import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
+import { TID_MODEL_PROVIDER_ADD_MODEL_BUTTON } from "@zcode/shared/test-ids";
 import { ModelConfig } from "@zcode/provider";
 import { NodePersonalProviderConfigRepository } from "@zcode/provider-node";
 import { clickTestIdByDom, getE2EAppDataPaths } from "./desktop-app.js";

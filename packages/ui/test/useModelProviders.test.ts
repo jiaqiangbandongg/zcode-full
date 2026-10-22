@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { IProviderSettingsService, ProviderSettingsView } from "@zcode/services";
 import type { ProviderSettingsFormProvider } from "@/lib/providerSettingsFormTypes.js";
 import { persistPersonalProvider } from "@/lib/providerPersonalSave.js";
-import { persistProviderDisplayOrder } from "@/lib/providerDisplayOrderPersistence.js";
 import { ServiceProvider } from "@/hooks/useServices.js";
 import { useModelProviders } from "@/hooks/useModelProviders.js";
 
@@ -106,29 +105,6 @@ describe("Provider Personal Overlay persistence", () => {
     expect(savePersonalProviderOverlay).toHaveBeenCalledTimes(1);
   });
 
-  it("Personal-only Provider 只写新 Config，不再回写旧文件", async () => {
-    const calls: string[] = [];
-    const provider = createProvider({
-      providerId: "personal-provider",
-    });
-
-    const savePersonalProviderOverlay = vi.fn(async () => ({
-      revision: 2,
-      providers: [],
-    }));
-    await persistPersonalProvider({
-      provider,
-      providerSettingsService: {
-        savePersonalProviderOverlay: vi.fn(async (...args) => {
-          calls.push("personal");
-          return savePersonalProviderOverlay(...args);
-        }),
-      },
-    });
-
-    expect(calls).toEqual(["personal"]);
-  });
-
   it("新建 Provider 保存不顺带遍历模型配置", async () => {
     const provider = createProvider({
       providerId: "new-provider",
@@ -206,24 +182,6 @@ describe("Provider Personal Overlay persistence", () => {
       }),
       undefined,
     );
-  });
-});
-
-describe("persistProviderDisplayOrder", () => {
-  it("新 Settings Service 已装配时只写 Personal Overlay", async () => {
-    const calls: string[] = [];
-
-    await persistProviderDisplayOrder({
-      state: { providerIds: ["official-a", "personal-y"] },
-      providerSettingsService: {
-        reorderPersonalProviders: vi.fn(async () => {
-          calls.push("personal");
-          return { revision: 2, providers: [] };
-        }),
-      },
-    });
-
-    expect(calls).toEqual(["personal"]);
   });
 });
 

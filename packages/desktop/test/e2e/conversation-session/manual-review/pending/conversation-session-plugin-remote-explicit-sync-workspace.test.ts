@@ -1,7 +1,16 @@
+import { startDraftFromProject } from "#e2e/helpers/project-sidebar";
+import {
+  selectUpstreamProviderModelById,
+  selectUpstreamThoughtLevelValue,
+} from "#e2e/helpers/upstream-provider";
 import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { TID_WORKSPACE_HEADER, TID_WORKSPACE_MORE_BUTTON, TID_WORKSPACE_PATH } from "@zcode/shared";
+import {
+  TID_WORKSPACE_HEADER,
+  TID_WORKSPACE_MORE_BUTTON,
+  TID_WORKSPACE_PATH,
+} from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths } from "../../../helpers/desktop-app.js";
 import {
   addMarketplaceSourceThroughAgent,
@@ -19,16 +28,14 @@ import {
 import {
   getUpstreamRequestRecordCount,
   getUpstreamRequestToolNames,
+  getLatestUpstreamToolResultByToolCallId,
   waitForUpstreamRequest,
 } from "../../../helpers/conversation-session-network.js";
 import { waitForToolCallBlockByToolName } from "../../../helpers/conversation-session-tool.js";
 import {
-  ensureToolCrossProductFullAccessMode,
-  respondToToolCrossProductBlockers,
-} from "../../../helpers/conversation-session-tool-cross-product.js";
-import {
   connectSSHWorkspaceAndSendFirstTurn,
   createSSHLifecycleProvider,
+  SSH_LIFECYCLE_MODEL_ID,
   type SSHLifecycleProvider,
 } from "../../../helpers/ssh-remote-lifecycle.js";
 import {
@@ -38,8 +45,11 @@ import {
 } from "../../../helpers/ssh-remote-p0.js";
 import {
   prepareV4ConversationE2E,
+  approveV4Permission,
+  hasV4PermissionDialog,
+  getV4ConfigProjection,
+  switchV4Mode,
   sendV4PromptAndWaitAccepted,
-  startNewV4Draft,
   waitForV4AssistantMessageContaining,
 } from "../../../helpers/v4-conversation.js";
 
@@ -47,6 +57,15 @@ const CASE_MARKER = "E2E_WPL_011_REMOTE_EXPLICIT_SYNC";
 const RUNTIME_MARKER = `${PLUGIN_LIFECYCLE_RUNTIME_MARKER}_1.0.0`;
 const RUNTIME_PROMPT = `${CASE_MARKER}_RUNTIME_PROMPT`;
 const RUNTIME_REPLY = "WPL_011_REMOTE_EXPLICIT_SYNC_REPLY";
+
+async function selectFullAccessMode(): Promise<void> {
+  // V4 菜单不使用旧 select-item/option；实际选择后等待当前 workspace 的配置投影。
+  await switchV4Mode("yolo");
+  await browser.waitUntil(async () => (await getV4ConfigProjection()).mode === "yolo", {
+    timeout: 15_000,
+    timeoutMsg: `${CASE_MARKER}: 完全访问模式没有写入当前草稿配置`,
+  });
+}
 
 describe("WPL-011 remote Workspace Plugin explicit sync E2E", () => {
   let provider: SSHLifecycleProvider | null = null;
@@ -71,7 +90,7 @@ describe("WPL-011 remote Workspace Plugin explicit sync E2E", () => {
     await seedRemoteWorkspace(target, workspacePath);
 
     await prepareV4ConversationE2E({ skipProvider: true });
-    await ensureToolCrossProductFullAccessMode();
+    await selectFullAccessMode();
 
     const fixture = await createPluginLifecycleFixture("1.0.0");
     await addMarketplaceSourceThroughAgent(fixture.marketplaceRoot);
@@ -171,7 +190,18 @@ describe("WPL-011 remote Workspace Plugin explicit sync E2E", () => {
       },
     );
 
-    await startNewV4Draft();
+    // 显式同步后的验证必须在同一远程项目创建新会话；全局新建会错误执行本机已安装的插件。
+    // 同步完成保留结果弹窗；未关闭它时真实侧栏点击被遮罩拦截。
+    const syncDialog = $('[role="dialog"]');
+    await syncDialog.$('[data-slot="dialog-close"]').click();
+    await syncDialog.waitForExist({ reverse: true });
+    await startDraftFromProject(workspacePath, { workspaceIdentity: task.identity });
+    await selectUpstreamProviderModelById(SSH_LIFECYCLE_MODEL_ID, {
+      providerId: provider.id,
+      providerName: provider.name,
+      includePlainModelFallback: false,
+    });
+    await selectUpstreamThoughtLevelValue("disabled");
     const requestStart = await getUpstreamRequestRecordCount();
     await sendV4PromptAndWaitAccepted(
       `${RUNTIME_PROMPT}: Call ${PLUGIN_LIFECYCLE_MCP_TOOL_NAME} exactly once, then reply with exactly ${RUNTIME_REPLY}.`,
@@ -192,29 +222,38 @@ describe("WPL-011 remote Workspace Plugin explicit sync E2E", () => {
         lastUserMessageIncludes: [RUNTIME_PROMPT],
       }),
     ).toContain(PLUGIN_LIFECYCLE_MCP_TOOL_NAME);
+    await waitForToolCallBlockByToolName(PLUGIN_LIFECYCLE_MCP_TOOL_NAME, 120_000);
+    // tool-call 已出现不代表工具已执行；远端默认模式可能随后才显示权限请求。
+    // 持续观察到真实 tool_result，期间只响应一次当前请求，不把工具块当作完成屏障。
+    let permissionApproved = false;
     await browser.waitUntil(
       async () => {
-        await respondToToolCrossProductBlockers();
-        return Boolean(
-          await waitForToolCallBlockByToolName(PLUGIN_LIFECYCLE_MCP_TOOL_NAME, 2_000).catch(
-            () => null,
-          ),
-        );
+        if (!permissionApproved && (await hasV4PermissionDialog())) {
+          expect(await approveV4Permission()).toBe(true);
+          permissionApproved = true;
+        }
+        return (await getLatestUpstreamToolResultByToolCallId("call_wpl_011_plugin")) !== null;
       },
-      {
-        timeout: 120_000,
-        timeoutMsg: `${CASE_MARKER}: Plugin MCP tool-call block 没有出现`,
-      },
+      { timeout: 120_000, timeoutMsg: `${CASE_MARKER}: Plugin MCP 没有返回真实 tool_result` },
     );
     await waitForV4AssistantMessageContaining(RUNTIME_REPLY, 120_000);
+    const toolResult = await getLatestUpstreamToolResultByToolCallId("call_wpl_011_plugin");
+    expect(toolResult?.isError).toBe(false);
+    expect(toolResult?.content.trim()).toBe(RUNTIME_MARKER);
   });
 });
+
+// 本 case 会 rm -rf 远端 workspace，所以只允许重置一个约定路径，不接受任意路径。默认值
+// /root/workspace 是历史上唯一跑过的 root 目标；Linux e2e 服务器用 dev 用户，通过
+// ZCODE_E2E_WPL011_WORKSPACE 指定该机的专用目录（不能指向共享 workspace 根）。
+const ALLOWED_REMOTE_WORKSPACE =
+  process.env.ZCODE_E2E_WPL011_WORKSPACE?.trim() || "/root/workspace";
 
 async function seedRemoteWorkspace(
   target: SSHConnectionConfig,
   workspacePath: string,
 ): Promise<void> {
-  if (workspacePath !== "/root/workspace") {
+  if (workspacePath !== ALLOWED_REMOTE_WORKSPACE) {
     throw new Error(`${CASE_MARKER}: refusing to reset unexpected remote path ${workspacePath}`);
   }
   const config = {
@@ -226,7 +265,8 @@ async function seedRemoteWorkspace(
   };
   const command = [
     "set -eu",
-    `rm -rf -- /root/.zcode ${quoteShell(workspacePath)}`,
+    // 远端用户不一定是 root（服务器上是 dev），配置目录一律走 $HOME 展开。
+    `rm -rf -- "$HOME/.zcode" ${quoteShell(workspacePath)}`,
     `mkdir -p -- ${quoteShell(posix.join(workspacePath, ".zcode"))}`,
     writeBase64Command(
       posix.join(workspacePath, ".zcode", "config.json"),
@@ -242,7 +282,7 @@ async function cleanupRemoteWorkspace(
   target: SSHConnectionConfig,
   workspacePath: string,
 ): Promise<void> {
-  if (workspacePath !== "/root/workspace") {
+  if (workspacePath !== ALLOWED_REMOTE_WORKSPACE) {
     throw new Error(`${CASE_MARKER}: refusing to clean unexpected remote path ${workspacePath}`);
   }
   await runSSHCommand(target, `rm -rf -- ${quoteShell(workspacePath)}`);
@@ -279,73 +319,116 @@ async function readRemoteFile(target: SSHConnectionConfig, path: string): Promis
 }
 
 async function openRemotePluginSyncDialog(workspacePath: string): Promise<void> {
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        (headerTestId, moreTestId, pathTestId, expectedPath) => {
-          const headers = Array.from(
-            document.querySelectorAll<HTMLElement>(`[data-testid="${headerTestId}"]`),
-          );
-          const header = headers.find((candidate) => {
-            if (candidate.getClientRects().length === 0) return false;
-            const path = candidate.querySelector<HTMLElement>(`[data-testid="${pathTestId}"]`);
-            return path?.title.startsWith(expectedPath);
-          });
-          const button = header?.querySelector<HTMLButtonElement>(`[data-testid="${moreTestId}"]`);
-          if (!button || button.disabled) return false;
-          button.dispatchEvent(
-            new PointerEvent("pointerdown", {
-              bubbles: true,
-              cancelable: true,
-              button: 0,
-              pointerId: 1,
-              pointerType: "mouse",
-            }),
-          );
-          button.click();
-          return true;
-        },
-        TID_WORKSPACE_HEADER,
-        TID_WORKSPACE_MORE_BUTTON,
-        TID_WORKSPACE_PATH,
-        workspacePath,
-      ),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${CASE_MARKER}: remote task header 没有更多菜单`,
-    },
-  );
-  let visibleMenuItems: string[] = [];
-  await browser.waitUntil(
-    async () => {
-      const result = await browser.execute(() => {
-        const visibleItems = Array.from(
-          document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
-        ).filter((candidate) => candidate.getClientRects().length > 0);
-        const item = Array.from(visibleItems).find((candidate) => {
-          const text = candidate.innerText.trim();
-          return text === "同步 Plugin" || text === "Sync Plugin";
-        });
-        if (!item) {
-          return {
-            clicked: false,
-            visibleItems: visibleItems.map((candidate) => candidate.innerText.trim()),
-          };
-        }
-        item.click();
-        return {
-          clicked: true,
-          visibleItems: visibleItems.map((candidate) => candidate.innerText.trim()),
-        };
-      });
-      visibleMenuItems = result.visibleItems;
-      return result.clicked;
-    },
-    {
-      timeout: 30_000,
-      timeoutMsg: `${CASE_MARKER}: remote task menu 没有“同步 Plugin”入口，visible=${JSON.stringify(visibleMenuItems)}`,
-    },
-  );
+  // 这一步串联「找到目标 workspace 的 header」→「打开更多菜单」→「点同步 Plugin」，
+  // 三个环节任一不成立以前都只报一句超时。两条经验教训写进实现：
+  // 1. timeoutMsg 是模板字符串，在 waitUntil 调用时就求值，之前打印的 visible=[] 是
+  //    探测前的初始值，不是现场事实——诊断必须在超时之后收集。
+  // 2. 菜单只在第一轮点一次的话，一旦那次点击没生效（Radix trigger 是 toggle 语义）
+  //    后面 30 秒都在等一个不会出现的菜单。每轮按需重点，让它能自愈。
+  type MenuProbe = {
+    stage:
+      | "header-missing"
+      | "more-missing"
+      | "more-disabled"
+      | "menu-closed"
+      | "item-missing"
+      | "clicked";
+    headers: Array<{ visible: boolean; pathAbs: string | null; hasMoreButton: boolean }>;
+    moreState: string | null;
+    menuCount: number;
+    visibleItems: string[];
+  };
+  let probe: MenuProbe = {
+    stage: "header-missing",
+    headers: [],
+    moreState: null,
+    menuCount: 0,
+    visibleItems: [],
+  };
+  await browser
+    .waitUntil(
+      async () => {
+        probe = await browser.execute(
+          (headerTestId, moreTestId, pathTestId, expectedPath) => {
+            const headers = Array.from(
+              document.querySelectorAll<HTMLElement>(`[data-testid="${headerTestId}"]`),
+            );
+            const facts = headers.map((candidate) => {
+              const path = candidate.querySelector<HTMLElement>(`[data-testid="${pathTestId}"]`);
+              return {
+                visible: candidate.getClientRects().length > 0,
+                pathAbs: path?.dataset.workspaceAbsPath ?? null,
+                hasMoreButton: Boolean(
+                  candidate.querySelector<HTMLButtonElement>(`[data-testid="${moreTestId}"]`),
+                ),
+              };
+            });
+            const menus = Array.from(
+              document.querySelectorAll<HTMLElement>('[role="menu"]'),
+            ).filter((menu) => menu.getClientRects().length > 0);
+            const visibleItems = Array.from(
+              document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+            )
+              .filter((candidate) => candidate.getClientRects().length > 0)
+              .map((candidate) => candidate.innerText.trim());
+            const header = headers.find((candidate) => {
+              if (candidate.getClientRects().length === 0) return false;
+              const path = candidate.querySelector<HTMLElement>(`[data-testid="${pathTestId}"]`);
+              // 修复原因：header 上下文改到 tooltip 承载后按钮没有 DOM title，
+              // 只有 data-workspace-abs-path 还稳定携带工作区绝对路径。
+              return path?.dataset.workspaceAbsPath?.startsWith(expectedPath) ?? false;
+            });
+            const base = { headers: facts, menuCount: menus.length, visibleItems };
+            if (!header) return { ...base, stage: "header-missing" as const, moreState: null };
+            const button = header.querySelector<HTMLButtonElement>(`[data-testid="${moreTestId}"]`);
+            if (!button) return { ...base, stage: "more-missing" as const, moreState: null };
+            const moreState = button.dataset.state ?? button.getAttribute("aria-expanded") ?? null;
+            if (button.disabled) return { ...base, stage: "more-disabled" as const, moreState };
+            if (menus.length === 0) {
+              // Radix DropdownMenuTrigger 靠 pointerdown 打开；click 单独派发不够。
+              button.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                  bubbles: true,
+                  cancelable: true,
+                  button: 0,
+                  pointerId: 1,
+                  pointerType: "mouse",
+                }),
+              );
+              button.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }),
+              );
+              button.click();
+              return { ...base, stage: "menu-closed" as const, moreState };
+            }
+            const item = Array.from(
+              document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+            ).find((candidate) => {
+              if (candidate.getClientRects().length === 0) return false;
+              const text = candidate.innerText.trim();
+              // 修复原因：菜单项文案是 remote.syncPlugins（"同步插件" / "Sync plugins"），
+              // 旧断言找的是"同步 Plugin"。现场事实里这一项确实叫"同步插件"。
+              return ["同步插件", "Sync plugins", "同步 Plugin", "Sync Plugin"].includes(text);
+            });
+            if (!item) return { ...base, stage: "item-missing" as const, moreState };
+            item.click();
+            return { ...base, stage: "clicked" as const, moreState };
+          },
+          TID_WORKSPACE_HEADER,
+          TID_WORKSPACE_MORE_BUTTON,
+          TID_WORKSPACE_PATH,
+          workspacePath,
+        );
+        return probe.stage === "clicked";
+      },
+      { timeout: 60_000, interval: 500 },
+    )
+    .catch((error: unknown) => {
+      throw new Error(
+        `${CASE_MARKER}: 没能从 remote task header 打开“同步 Plugin”（expected=${workspacePath}）；现场: ${JSON.stringify(probe)}`,
+        { cause: error },
+      );
+    });
 }
 
 async function waitForRemotePluginCandidate(candidateId: string): Promise<void> {

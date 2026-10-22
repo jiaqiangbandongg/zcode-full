@@ -4,10 +4,10 @@
 
 本节是整合验收范围，不覆盖或改写下文历史运行记录。
 
-| Case | 来源与操作 | 验收与限制 |
-| --- | --- | --- |
-| AUTH-05 | d17cb6a800；正式 oauth-login-failure-cancel.test.ts，通过 preload 回调投递无效 state | 真实 Host 拒绝回调后 UI 仅展示失败块；取消后回到渠道列表，登录入口不关闭。保留上游正式用例身份，不是本轮擅自晋级 |
-| AUTH-06 | a172e9c398 / 71a195b6be / f26d4e75fb；pending access-token-401-auto-logout.test.ts | case-local HTTP 暂停真实 Host userinfo，再返回 401；清理当前 OAuth、保留 Bot 凭据、只展示一次过期提示；确认发出既有 RelaunchApp。IPC 截断实际重启，不冒充真实重启已验证 |
+| Case    | 来源与操作                                                                           | 验收与限制                                                                                                                                                              |
+| ------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-05 | d17cb6a800；正式 oauth-login-failure-cancel.test.ts，通过 preload 回调投递无效 state | 真实 Host 拒绝回调后 UI 仅展示失败块；取消后回到渠道列表，登录入口不关闭。保留上游正式用例身份，不是本轮擅自晋级                                                        |
+| AUTH-06 | a172e9c398 / 71a195b6be / f26d4e75fb；pending access-token-401-auto-logout.test.ts   | case-local HTTP 暂停真实 Host userinfo，再返回 401；清理当前 OAuth、保留 Bot 凭据、只展示一次过期提示；确认发出既有 RelaunchApp。IPC 截断实际重启，不冒充真实重启已验证 |
 
 两条用例都不产生模型请求，manifest 明确 providerRequestPolicy=none。AUTH-06 的
 业务 token/JWT 是值不同的合成凭据，其它控制面 HTTP 200，避免原 JWT 失效路径掩盖
@@ -27,6 +27,29 @@ Electron 用例不声称覆盖这些微观竞态。AUTH-06 保持 pending，Pro 
 - 如果不触发模型请求，manifest 必须显式声明 `providerRequestPolicy: "none"`。
 - 如果通过 WDIO seed 写入本地配置，文档必须写明 seed 文件和需要验证的清理边界。
 
+## 默认启动凭据合同
+
+普通、本地 Personal Provider、远程回放以及未知 spec 默认向隔离 HOME 的
+`~/.zcode/v2/credentials.json` 写入空对象。未提供 spec、空列表或套件 glob 也不能
+隐式恢复假 OAuth / JWT；新增普通用例不需要再登记“无账号例外”。
+
+```text
+worker 的具体 spec -> 现有账号 mock 选择 -> 冷启动 seed -> Electron / Host
+                           |
+                           +-- 未选择账号 mock：空凭据
+                           +-- Coding Plan 专项：仅对应账号族的合成 OAuth
+                           +-- JWT 专项：保留该专项声明的合成 JWT
+```
+
+账号 mock 是否启用由现有 WDIO fixture 选择结果传入凭据生成器，不再维护一份
+普通用例排除名单。BigModel 专项只播种 BigModel OAuth，不夹带 Z.AI 假身份。
+JWT 仍按现有明确专项保留，不因为存在账号 mock 就默认注入。远程回放始终无账号启动，
+真实账号导入、损坏密文和过期 JWT 专项继续使用各自的显式 setup。
+
+回归要求：单测覆盖默认空凭据、Windows / POSIX 路径、显式账号 fixture、JWT 专项、
+远程优先级及输入不变性；Browser E2E 检查普通启动没有账号键，Coding Plan E2E 检查
+只有对应账号族，再执行原有真实 UI 操作。不得用屏蔽登录失效弹窗或放宽断言替代隔离。
+
 ## AUTH-01: 损坏 OAuth 凭据冷启动恢复
 
 ### Case 定义
@@ -43,6 +66,8 @@ Electron 用例不声称覆盖这些微观竞态。AUTH-06 保持 pending，Pro 
 用户本地 `credentials.json` 中残留 OAuth 登录态，但其中 `oauth:active_provider` 是当前机器无法解密的密文。桌面端冷启动时，OAuth session restore 不能让登录入口进入“加载失败 / 没有登录渠道”的死态；系统应清理损坏登录态，并重新展示可登录渠道。
 
 这条 case 只验证“损坏 OAuth 凭据 -> 冷启动恢复 -> 登录渠道可见 -> 损坏登录态清理”。它不覆盖真实网页登录、OAuth callback、token refresh、购买链路、remote workspace 或模型发送。
+
+业务 token 损坏回归（2026-10-12）：通过 `ZCODE_E2E_CORRUPT_OAUTH_TOKEN_PROVIDER=bigmodel` 或 `zai` 运行同一 AUTH-01，seed 保持 active provider、用户资料和共享 JWT 正常，仅业务 access token 为无法解密的密文。验证登录渠道可见、全部 OAuth 凭据清理、独立 Bot 凭据保留。默认运行仍覆盖 active provider 损坏；恢复与新登录交错、普通 IO 异常及请求取消由服务层受控测试覆盖。
 
 限制：AUTH-01 当前只覆盖 desktop local host；remote workspace 与手机 `/remote` 的 OAuth 损坏恢复已由 service 级回归测试保护，正式 remote E2E case 待后续补充。
 
@@ -86,6 +111,13 @@ Electron 用例不声称覆盖这些微观竞态。AUTH-06 保持 pending，Pro 
 
 Docker 准入暂不执行：该 case 不依赖 provider replay，也不属于 conversation Docker preset。
 
+### 业务 token 损坏修复验证（2026-10-12）
+
+- BigModel/ZAI 单个业务 token 损坏和默认 active provider 损坏均通过隔离 macOS Electron AUTH-01，OAuth 清理后登录渠道可用，独立 Bot 凭据保留。ZAI 初次运行停在启动页；运行时 RPC 日志与刷新链路定位到后台仓储清理回调等待 Account Source 自己的下一轮刷新，修正该循环等待后重新构建通过。
+- 260 项 services 定向单测、18 项登录恢复/onboarding 单测通过；覆盖两平台业务/共享 token 损坏、普通 IO 错误、旧恢复与新登录交错、核验 fetch/正文取消、原请求超时、观察预算和共享订阅取消。
+- AUTH-06 使用同一最终构建验证失效清理、单次提示、确认后进入登录入口且无重启命令，通过。类型检查、E2E 类型检查、lint 和 architecture 检查通过；lint 保留基线 warnings。
+- 没有运行手机 shared-host、远程 workspace、Windows/Linux 或真实后端撤销回归；认证 owner 与 desktop-continuous / web-remote-replayable 协议未改变。
+
 ## AUTH-02: Provider readiness 门禁与恢复
 
 ### Case 定义
@@ -99,30 +131,36 @@ Docker 准入暂不执行：该 case 不依赖 provider replay，也不属于 co
 
 ### 测试场景
 
-desktop local 使用隔离 HOME 冷启动；CLI session DB 预置一条 interactive 历史，但用户没有 OAuth 登录态、API Key 或其它结构可用 provider。登录入口完成渲染后，用户暂时跳过并进入默认 workspace；sessions-index 必须按需启动唯一只读会话 Agent，把这条真实历史展示在侧栏，点击后能读取已持久化正文，同时首页继续展示 `modelConfigMissing` banner。用户新建草稿并尝试首发时不得创建 session/model command。随后重新打开登录/provider 配置入口，保存一个已启用、具有 runtime Base URL、未禁用模型和所需 credential 的 provider；同一 workspace 必须复用该 Agent、保持数量为 1，完成草稿模型水合，并清除该 banner。
+desktop local 使用隔离 HOME 冷启动；CLI session DB 与 App tasks-index 预置同一条 interactive 历史，但用户没有 OAuth 登录态、API Key 或其它结构可用 provider。登录入口完成渲染后，用户暂时跳过并进入默认 workspace；侧栏必须展示 tasks-index 中的历史；只读订阅按需启动唯一会话 Agent，点击后能读取 CLI 中已持久化正文，同时首页继续展示 `modelConfigMissing` banner。用户通过同一项目入口返回草稿并输入文本；缺模型时发送按钮禁用，原文保留且 pending command 为空。随后从缺模型横幅进入设置，通过 BigModel Template 创建具有独立 ID 的 Personal Provider，并在 API Key 输入框失焦后确认保存；同一 workspace 必须复用该 Agent、保持数量为 1，完成草稿模型水合、清除 banner，并在保留原文的同时恢复发送按钮可用。测试不点击已恢复的发送按钮。
 
 本 case 只验证本地结构 readiness、进程启动边界和草稿水合，不发送 prompt、不联网验证 provider 连通性，也不覆盖插件/MCP management Agent。remote workspace 使用 service/integration case 验证 desktop registry 下发前后边界。
 
 ### 验证条目
 
-| 编号      | 验证项                                          | 有效性说明                                                                                                                                                          |
-| --------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AUTH-02-A | 未配置时登录/provider 入口可用                  | `waitForTestIdByDom(TID_LOGIN_USE_API_KEY_BUTTON)`                                                                                                                  |
-| AUTH-02-B | 跳过后草稿首页展示缺模型 banner                 | `TID_CHAT_ERROR_BANNER` 回显“当前没有可用模型”                                                                                                                      |
-| AUTH-02-C | 未配置时点击发送被 UI admission 拒绝            | composer 原文保留；没有 `createSession` pending 记录或 unknown/discarded 恢复横幅                                                                                   |
-| AUTH-02-D | 未配置时历史可见且可读                          | 预置 interactive CLI session 的侧栏 row、用户正文与助手正文均可见，证明真实 sessions-index/conversation topic 已工作                                                |
-| AUTH-02-E | 未配置时没有 deferred draft/retry               | service/UI focused tests 断言 `provider_not_ready` 保持 idle 且投影 banner                                                                                          |
+| 编号      | 验证项                                          | 有效性说明                                                                                                                                                        |
+| --------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTH-02-A | 未配置时登录/provider 入口可用                  | `waitForTestIdByDom(TID_LOGIN_USE_API_KEY_BUTTON)`                                                                                                                |
+| AUTH-02-B | 跳过后草稿首页展示缺模型 banner                 | `TID_CHAT_ERROR_BANNER` 回显“当前没有可用模型”                                                                                                                    |
+| AUTH-02-C | 未配置时发送按钮被 UI admission 禁用            | 输入文本后按钮仍禁用，composer 原文保留，pending command ledger 为空                                                                                 |
+| AUTH-02-D | 未配置时历史可见且可读                          | 预置 interactive CLI session 的侧栏 row、用户正文与助手正文均可见，证明真实 sessions-index/conversation topic 已工作                                              |
+| AUTH-02-E | 未配置时没有 deferred draft/retry               | service/UI focused tests 断言 `provider_not_ready` 保持 idle 且投影 banner                                                                                        |
 | AUTH-02-F | 未配置时目标 workspace 只读 Agent 数为 1        | 资源管理器快照按 `ZCodeProject` workspace tag 断言为 1；系统 conversation sibling 不计入，只允许 sessions-index/history 读取，不产生 session create/model command |
-| AUTH-02-G | 保存 provider 后仍复用目标 workspace 唯一 Agent | 资源管理器对同一 workspace 的 Agent 行数保持 1，稳定窗口后二次断言仍为 1，read→write 不重复启动                                                                      |
-| AUTH-02-H | 草稿模型水合且缺模型 banner 清除                | 模型 trigger 回显首个未禁用模型，`TID_CHAT_ERROR_BANNER` 不再存在                                                                                                   |
+| AUTH-02-G | 保存 provider 后仍复用目标 workspace 唯一 Agent | 资源管理器对同一 workspace 的 Agent 行数保持 1，稳定窗口后二次断言仍为 1，read→write 不重复启动                                                                   |
+| AUTH-02-H | 配置后模型水合、草稿保留且恢复可发送                | 模型 trigger 指向新 Personal Provider 实例及非空模型；banner 消失，原文保留，发送按钮启用                                                                                                 |
 
 ### Fixture 合同
 
 - manifest 使用 `providerRequestPolicy: "none"` 和空 `requests`；整个 case 不产生模型请求。
-- 输入 fixture 只向 Agent CLI SQLite 写入 interactive session/message/part；不写 App `tasks-index`，侧栏 membership 必须由真实冷启动 sessions-index baseline 创建。其余输入是隔离 HOME 的空 auth/provider 状态，以及测试过程中通过真实 API Key 登录入口保存的本地 provider 配置。
+- 输入 fixture 同时预置 Agent CLI SQLite 的 interactive session/message/part 与 App `tasks-index` membership；侧栏 row 由 tasks-index 提供，正文必须通过真实只读 conversation 订阅读取。其余输入是隔离 HOME 的空 auth/provider 状态，以及测试过程中通过 Template 创建并保存的本地 Personal Provider 配置。
 - 进程断言读取资源管理器与主进程 lifecycle registry 同源的进程快照，不使用只适配单一操作系统的 `pgrep`/`ps` 断言。
 
 ### 实际验证结论
+
+2026-10-16 修复后复跑：1 个 spec / 1 个 case passed。Artifact：
+`packages/desktop/.e2e-artifacts/desktop-e2e-20261016040830885-p3810818-9b9ec2468aec7c23/summary.md`。
+新增断言确认首个 Provider 就绪后保留原文、发送按钮启用、pending command 仍为空，
+同一 workspace Agent 保持 1 个；模型控件通过共享解码函数校验 Personal 实例身份。
+共享 Hook 单测覆盖本地/远端 identity；未执行真实手机配对 E2E。
 
 2026-07-20 已执行：
 
@@ -135,6 +173,8 @@ desktop local 使用隔离 HOME 冷启动；CLI session DB 预置一条 interact
 Docker 准入不执行：该 auth/config case 不依赖 provider replay，也不属于 conversation Docker preset。
 
 ## AUTH-03: ZCode JWT 过期后重新认证
+
+2026-10-12 隔离 Electron 自动复测：1 case passed；artifact：`packages/desktop/.e2e-artifacts/desktop-e2e-20261012-113824-131/summary.md`。确认本轮运行时恢复入口变更没有破坏冷启动过期清理和登录入口；仍保留 pending。
 
 ### Case 定义
 
@@ -205,7 +245,14 @@ Welcome 展示 Z.ai + BigModel 登录入口
 当前只完成自动运行，尚未记录人工视觉验收，因此继续保留在 `manual-review/pending`，不执行转正或 Docker 准入。
 
 <!-- 固定 staging 的 JWT 场景原编号 AUTH-05，与上方登录取消编号冲突；此处命名为 AUTH-JWT-401，历史证据不算本轮通过。 -->
+
 ## AUTH-JWT-401: 运行中 ZCode JWT 401 退出并重启
+
+### 2026-10-12 当前行为
+
+共享 JWT 与业务 access_token 使用同一个过期提示入口，确认后直接进入 Welcome 登录页。用例已改为本地 HTTP fixture 暂停真实 Host 余额请求，返回 HTTP 401；不再用 main net.fetch mock 代替 Host transport。确认前清理 OAuth/JWT、保留独立 Bot 凭据，确认后断言登录入口可见、app.relaunch/quit 均未调用。
+
+隔离 Electron 自动复测：1 case passed；artifact：`packages/desktop/.e2e-artifacts/desktop-e2e-20261012-113752-866/summary.md`。用例保留 pending；以下重启断言及运行记录是历史背景。
 
 ### Case 定义
 
@@ -251,8 +298,8 @@ Renderer 显示“登录已过期”
 
 ### 验证条目
 
-| 编号      | 验证项                         | 有效性说明                                            |
-| --------- | ------------------------------ | ----------------------------------------------------- |
+| 编号           | 验证项                         | 有效性说明                                            |
+| -------------- | ------------------------------ | ----------------------------------------------------- |
 | AUTH-JWT-401-A | 运行中 401 能显示登录过期提示  | 证明请求出口观察和 Host 广播链路实际工作              |
 | AUTH-JWT-401-B | 确认前 OAuth/JWT 凭据已清理    | 证明提示框不会阻塞认证事实清理                        |
 | AUTH-JWT-401-C | 确认后调用 `RelaunchApp`       | 证明提示动作复用现有重启流程                          |
@@ -278,56 +325,42 @@ Renderer 显示“登录已过期”
 
 ### 测试场景
 
-desktop local 使用隔离 HOME 冷启动：OAuth 凭据为空，当前 Environment 预置一个带 reasoning 档位的自定义 DeepSeek 模型。用户从 Welcome 完成 BigModel OAuth；回调后，Account Overlay 与当前 Environment 的 Provider Runtime 刷新，使 `builtin:bigmodel-coding-plan/GLM-5.2` 进入 Model Selection View。用户不重启、不手动保存 Provider，直接打开 Subagent 设置，在同一个 `general-purpose` 行依次选择自定义模型和内置 Coding Plan 模型。
+desktop local 使用隔离 HOME 冷启动，OAuth 凭据为空。若职业引导覆盖应用，先通过真实 Escape 关闭，再观察 Welcome 或未登录工作区。当前 Local Host 预置带 reasoning 档位的自定义 DeepSeek 模型。用户完成 BigModel OAuth 后，不重启、不手动保存 Provider，直接打开 Subagent 设置，在同一个 `general-purpose` 行依次选择自定义模型和 Coding Plan GLM-5.3。
 
-该 case 同时读取 renderer 暴露的 workspace `configOptions`，避免仅凭文案猜测能力状态。`configOptions` 是当前 Environment Model Selection View 的会话投影，不是 Desktop 持有并向 Worker 推送的第二份 Provider Registry。该 case 只观察 desktop `desktop-continuous` 本地链路，不修改业务实现，不触发手机 `/remote` 的 replayable 恢复边界。
+Settings 的模型成员和能力唯一来源是 Local Host 的 Model Selection View。E2E 只读 Subagent 行实际消费的 View props，验证登录前后模型目录和 reasoning 控件；不再读取已退出模型目录职责的 workspace `configOptions`，也不人为写入 ready。该 case 只覆盖 desktop local，手机 `/remote` 单独验证。
 
 ### 状态与操作时序
 
 ```text
-隔离 HOME 冷启动
-  OAuth 未登录；当前 Environment 只有 custom DeepSeek
-                 |
-                 v
-用户点击 BigModel 登录 ----> OAuth callback
-                 |                |
-                 |                +--> setUser，App/workspace 开始挂载
-                 |                +--> Account Overlay 刷新
-                 |                +--> 当前 Environment Registry 重建
-                 |                                  |
-                 v                                  v
-直接打开 Subagent 设置                    Model Selection View 出现 GLM-5.2
-                 |                                               |
-                 +----------------+-----------------+
-                                  |
-                                  v
-                    workspace configOptions 投影就绪
-                 |
-                                  +--> custom DeepSeek：effort 可选
-                                  `--> Coding Plan GLM-5.2：无需重启即可展示 effort
+隔离 HOME → 关闭职业引导 → 未登录工作区
+                                  ↓
+                   Subagent Local Host View 含自定义模型
+                                  ↓
+                       BigModel OAuth callback
+                                  ↓
+                 Account Overlay / Local Host View 刷新
+                                  ↓
+                    Subagent 选择自定义模型：effort 可用
+                                  ↓
+                    选择 Coding Plan GLM-5.3：effort 可用
+                                  ↓
+                 页面消费的 View 包含 GLM-5.3 high / max
 ```
-
-缺陷链路中，OAuth 回调已经完成，但 workspace `configOptions` 的状态仍未收敛，Subagent 把 readiness 当成 UI 门禁而无限 loading。当前边界是：Provider 与 Model 的事实均由当前 Environment 的 Effective Config 和 Registry 产生；renderer 只消费 Model Selection View 及其会话投影，不维护可反向覆盖 Registry 的 App 快照。E2E 分别验证登录完成后的控件可用性，以及 workspace `configOptions` 最终进入 `ready` 并包含 Coding Plan reasoning 档位。
 
 ### 验证条目
 
-| 编号      | 验证项                                       | 有效性说明                                                           |
-| --------- | -------------------------------------------- | -------------------------------------------------------------------- |
-| AUTH-04-A | OAuth token、用户信息和 Coding Plan 配置完成 | 排除“登录回调尚未结束”造成的瞬态 loading                             |
-| AUTH-04-B | Model Selection View 出现 GLM-5.2 reasoning  | 证明当前 Environment 的账号约束与模型配置已经生效                    |
-| AUTH-04-C | workspace 投影从未就绪状态收敛               | 证明 UI 不会因为 `configOptionsStatus` 的过渡状态永久阻塞            |
-| AUTH-04-D | 自定义 DeepSeek effort 可选                  | 证明已有 Runtime 明确能力仍正常驱动 Subagent 控件                    |
-| AUTH-04-E | Coding Plan effort 无需重启即可用            | 证明登录后的 Account Overlay 与 Model Selection 刷新能被当前页面观察 |
-| AUTH-04-F | `configOptions` 最终出现 GLM-5.2 high/max    | 独立证明当前 Environment 的 Host/Worker Registry 与会话投影最终一致  |
+- 登录前自定义模型存在，Coding Plan 模型不存在。
+- 真实 OAuth URL、state 与 deep link 完成登录。
+- 登录后已有自定义模型保持可用，reasoning 包含 high / max。
+- Coding Plan 模型和 reasoning 无需重启即可选择；页面的 Model Selection View 最终 ready 并包含同一能力。
 
 ### Fixture 合同与边界
 
-- manifest 使用 `providerRequestPolicy: "none"`、`noProviderRequests: true`，不会向模型 provider 发送请求。
-- 共享 Coding Plan HTTP mock 在每次 `beforeSession` 中按当前 worker spec 重置 case mode；只有本 spec 启用 OAuth token、`/api/v2/releases/latest`、`/api/v1/client/configs` 和 Start Plan balance 响应。随后运行的其它 Coding Plan E2E 会先恢复默认模式，不继承该目录行为或 OAuth 状态。
-- Desktop OAuth polling 路径下，case-local mock 固定返回 `/api/v1/oauth/cli/init` flow，`/api/v1/oauth/cli/poll/:flowId` 保持 pending；case 继续通过 deep link 完成登录，避免把 polling 完成语义与本用例的 catalog 断言耦合。
-- `release/latest` 登录前后返回不同的 `config_version`；带版本的 `client/configs` 按请求版本返回不可变目录，避免客户端旧版本缓存被当前 OAuth 状态静默替换为新目录。
-- `client/configs` 固定下发 `builtin:bigmodel-coding-plan/GLM-5.2` 以及 `high`、`max`、`nothink` 三档 reasoning metadata。
-- 当前 case 分别断言登录后 UI 可用与当前 Environment 的 Model Selection 会话投影最终一致；正式 spec 由默认 desktop E2E 根目录收集，矩阵标记为 covered。
+- manifest 为 `providerRequestPolicy: "none"`，不发送模型请求；OAuth、release/latest、client/configs、套餐与凭据接口由 case-local HTTP mock 固定。
+- 每次 beforeSession 按当前 worker spec 重置 mock 模式，其它 Coding Plan 用例不继承登录目录状态。
+- OAuth polling 保持 pending，由 deep link 完成登录，避免混入 polling 完成语义。
+- release/latest 登录前后使用不同 config_version；client/configs 按版本提供不可变目录。
+- 登录后的当前内置 GLM-5.3 必须提供 high、max 档位；release payload 不再作为模型成员来源。真实 UI 与只读 View 共同证明刷新，不注入 renderer catalog。
 
 ### 自动运行记录
 
@@ -354,7 +387,36 @@ desktop local 使用隔离 HOME 冷启动：OAuth 凭据为空，当前 Environm
 该 case 已从 `manual-review/pending` 移入正式路径。它不发送模型请求，不依赖 provider replay，也不属于 conversation Docker preset；正式准入以 case manifest 的 `providerRequestPolicy: "none"`、本地正式路径运行和默认 desktop E2E 收集为边界。
 
 <!-- 以下 AUTH-06 场景与运行记录来自固定 staging，运行编号不是 Todo103 本轮结果。 -->
+
 ## AUTH-06: 用户资料 access token HTTP/业务 401 复用退出提示
+
+### 2026-10-12 当前行为
+
+- 两平台通过 `ZCODE_E2E_AUTH_EXPIRY_PROVIDER=bigmodel|zai` 选择合成登录身份；HTTP `401` 或 `200` 数值业务 `401` 均复用条件退出。
+- BigModel 另覆盖 `ZCODE_E2E_AUTH_EXPIRY_HTTP_STATUS=200 ZCODE_E2E_AUTH_EXPIRY_RESPONSE_KIND=empty`：真实 Host 收到 customerInfo 零字节200后识别远端注销。
+- 确认前清理当前 OAuth/JWT/profile、保留独立 Bot 凭据；过期提示只出现一次；确认按钮为“重新登录”，直接出现 Welcome 登录入口，不执行 RelaunchApp。保留原 IPC 记录以断言没有重启命令。
+- 业务空响应经身份核验、正常身份不登出、ZAI 空身份响应证据不足、并发去重和旧核验不清新会话由服务层受控测试覆盖；Electron 不声称覆盖精确网络竞态。
+- 以下较早记录的确认重启行为属于历史验收，不是本次行为。
+
+CR-01 裸 token 核验回归：`ZCODE_E2E_AUTH_VALIDATION_HEADER=1` 使用有效合成 ZAI 身份，PAT 资料读取取得组织/项目，后续业务接口按 `ZCODE_E2E_AUTH_EXPIRY_HTTP_STATUS=200|403` 返回空200或普通403。全部 customerInfo 请求（包括 PAT 资料读取及异常后的身份核验）只接受裸 token，Bearer 返回401。要求真实 Host 已发出异常业务请求及正确身份核验，启动进入工作区后 OAuth/JWT 与 Bot 凭据仍存在，UI 不显示过期提示；该场景不调用网站接口，也不产生模型请求。既有真正失效后的登录入口用例继续回归，均保持 pending。
+
+CR-01 本地隔离 Electron 回归（2026-10-12），以下三组各 1 case passed。前两组收尾记录均为业务异常请求 5 次、异常后裸 token 身份读取 8 次、认证头拒绝 0 次；真实后端是否拒绝 Bearer 不属于此夹具验证结论。
+
+| 场景                      | 运行产物                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| ZAI 有效身份、业务普通403 | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-130134-910/summary.md` |
+| ZAI 有效身份、业务空200   | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-130212-817/summary.md` |
+| ZAI 真正401后进入重新登录 | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-130238-083/summary.md` |
+
+本轮隔离 Electron 自动复测（2026-10-12），三组各 1 case passed：
+
+| 场景                             | 运行产物                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| BigModel 身份接口空正文 HTTP 200 | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-113906-886/summary.md` |
+| ZAI HTTP 200 + 数值业务 401      | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-112942-876/summary.md` |
+| BigModel HTTP 401                | `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-113245-109/summary.md` |
+
+采用本地 HTTP fixture 和合成凭据；用例继续保留 pending。未验证真实后端、手机或 Windows/Linux 设备，不声称正式 CI 准入。
 
 - 候选 spec：`packages/desktop/test/e2e/manual-review/pending/access-token-401-auto-logout.test.ts`。
 - manifest：`packages/desktop/test/e2e/fixtures/cases/auth-config/access-token-401-auto-logout.json`。
@@ -466,10 +528,81 @@ Todo103 本轮运行证据记录在 staging-integration ledger。
 - 全仓 `pnpm typecheck`、lint（0 errors / 54 warnings）、架构门禁及 151 项相关单测通过。
 - 重新构建 App 后 AUTH-07 通过，run id `desktop-e2e-20260917075008349-p32477-57ae7b5093a2bbd0`。
 
+## AUTH-08: 桌面远控登录门禁（pending）
+
+- 设备身份保存失败回归（CR-02）：`manual-review/pending/web-remote-control-session-events.test.ts` 在已有首次注册完成后，通过真实弹窗停止远控，在 loopback relay 删除旧 SID，再将隔离 HOME 的 setting.json 与父目录设为只读，保留文件读取与 endpoint，仅阻止原子写入。重新打开弹窗触发 `AUTH_FAILED` 恢复注册，断言启动立即进入 `error`、没有二维码，新设备已被补偿删除，超过首个退避窗口后设备数不再增长；恢复原权限后，用户再次打开弹窗可正常启动。复用 loopback V2 relay，不产生模型请求；不冒充真实磁盘满、线上 relay 或 Windows/Linux 验证。用例保留 pending，待人工审阅。
+
+- 凭据完成事件回归：`manual-review/pending/web-remote-control-session-events.test.ts` 使用单窗口、真实 Host OAuth 与 loopback V2 relay。已配对后持有隔离 HOME 的 setting.json 写锁，保留有效设置读取与独立凭据写入，再从真实用户菜单登出；断言凭据清空、Main 为 `auth-required`、旧 terminal WS 关闭且未靠重启关闭。额外断言凭据清除之后出现 `setting.update FAIL`，清理阶段释放写锁。该候选不覆盖多窗口，也不代表真实 OAuth 或线上 relay 验收。
+
+- Spec：`packages/desktop/test/e2e/manual-review/pending/web-remote-control-auth-gate.test.ts`。
+- 前置：隔离 HOME 的 OAuth/JWT 凭据为空；保留上次启用目标；case-local HTTP/WS 计数服务在 Electron 启动前接入 main 的 endpoint 和 relay URL。
+- 操作：打开移动端远控弹窗，依次检查 Zai Light/Dark × zh-CN/en-US，点击登录入口。
+- 断言：main 保持 `auth-required`；标题、说明、登录按钮可见；没有二维码、复制链接或生成中占位；真实登录渠道可达；远控 HTTP 和 WS Upgrade 次数均为零。
+- 重新认证回归：恢复缓存用户与合成 JWT，使远控 HTTP 返回401；全局用户仍保留，点击远控登录按钮应按当前OAuth渠道创建新登录尝试，发起一次授权并停留等待页，不能因缓存用户立即完成。渠道加载时按钮禁用；已有用户但渠道读取失败时保留弹窗、提示失败并重新读取，读取恢复后可重试。
+- 证据：E2E 产物内四张弹窗截图及网络计数 JSON。`providerRequestPolicy: none`，不产生模型请求；不替代真实 OAuth、手机登录或 Windows/Linux 验证。
+- 状态：accepted 语义，pending 实现验证及人工截图审阅；人工确认后转正。此 auth-config 路径不属于 conversation/provider replay 和 Docker conversation 准入。
+
+### AUTH-08 本次验证（2026-09-19，macOS arm64）
+
+- 完整构建 App/Agent 后，pending Electron E2E 1/1 通过；最终 run id：`desktop-e2e-20260919054022407-p76850-149c65ccfe5737d4`。
+- `auth-required-network.json` 为 `{remoteHttp: 0, wsUpgrades: 0}`；四张截图为产物目录下 `auth-required-{zh-CN,en-US}-{zai-light,zai-dark}.png`，拼图为 `auth-required-review.png`。
+- manager、workspace 完整快照、IPC、UI hook/渲染相关回归通过；Standards/Spec 评审发现的混合 workspace 覆盖问题已修复并复核。
+- fixture checker 仅支持 conversation-session/plugins，拒绝 auth-config 路径；本 case manifest 已声明无模型请求及 canonical formal path，按 auth-config 契约直接核验。
+- 保持 pending，等待人工确认截图后转正；未执行手机、Windows/Linux 或 Docker 准入。
+
+### AUTH-08 远控401重新登录回归（2026-09-19，macOS arm64）
+
+- 最终源码完整构建 App/Agent 后，Electron E2E 两项通过；run id：`desktop-e2e-20260919094618238-p38547-51d7c0efafe28411`。构建前后源码指纹一致，原四种主题语言门禁验证保持通过。
+- `remote-401-relogin.json` 记录一次远控HTTP、零WS Upgrade及一次`zai` OAuth初始化；点击前缓存用户仍可见，点击后进入真实统一登录等待页。截图为 `remote-401-relogin.png`，授权链接由 Electron shell mock 截获，没有访问真实 OAuth 提供方。
+- UI与登录定向回归四文件27项通过，覆盖 ZAI/BigModel、渠道加载、读取失败后重试和未登录入口；`typecheck:e2e` 通过。用例继续保留 pending，不替代真实 OAuth授权完成或手机验收。
+
+### AUTH-08 凭据事件与设置失败回归（2026-09-22，macOS arm64）
+
+- `web-remote-control-session-events.test.ts` 1/1 通过，run id：`desktop-e2e-20260922033841444-p82542-b070f1a88919befa`。复用此前同一产品源码的完整 App/Agent 构建，仅修正测试入口和事件等待。
+- `remote-logout-settings-failure.json` 记录凭据已清空、Main 为 `auth-required`、已配对 terminal WS 已关闭、重启调用为零。真实 setting.json 目录故障使 UI 设置写入失败且用户投影仍保留，证明关闭不依赖 UI 更新或重启。
+- OAuth owner、RPC、Root hook、Main/loopback relay 及相邻登录/退出回归共 9 文件158项通过。用例保留 pending；不代表多窗口、真实手机、线上 OAuth/relay 或 Windows/Linux 验收。
+- 原有登录门禁及401重新登录两项通过，run id：`desktop-e2e-20260922034047265-p83703-d5d6a95570facec2`。用例等待 workspace 恢复后的远控按钮可见，并独立初始化重新登录场景的语言，避免启动中间态或前一个用例失败导致误报。
+
+### AUTH-08 CR-02 本次验证（2026-10-09，macOS arm64）
+
+- `web-remote-control-session-events.test.ts` 两项通过，run id：`desktop-e2e-20261008210518141-p70374-763dbf6ff9c57299`。先完整构建当前 App/Agent，后续只修改测试与 fixture 并复用产物；pending replay 显式使用 `fixtures/upstream/common.json`，fixture 的账号业务 API 与 relay 均走 loopback。
+- `remote-device-save-failure.json` 记录 Main 为 `error`、`relay-unavailable`、无二维码链接，补偿前后的设备列表均为空；真实日志确认新身份保存因设置锁目录 `mkdir` 返回 `EACCES` 而失败。恢复权限后手动启动成功，原有凭据完成事件/登出回归继续通过。截图：`remote-device-save-failure.png`。
+- manager、transport、HTTP 与构建入口四文件共77项聚焦单测通过；全仓 typecheck、lint（0 errors / 68 warnings）、E2E typecheck 与架构门禁通过。用例仍为 pending，未进行人工转正；未验证真实磁盘满、线上 relay、手机真机或 Windows/Linux。
+
+### AUTH-08 模块迁移复验（2026-10-11，macOS arm64）
+
+- 登录门禁与 401 重新认证两项通过，run id `desktop-e2e-20261011124104790-p96630-dfdfff8d46f12a96`。
+  夹具增加独立业务 API 的 loopback 配置，避免合成凭据访问外部业务接口导致提前登出。
+- 注册补偿与凭据事件两项通过，run id `desktop-e2e-20261011124451683-p19041-9baf640b4fc4d95e`。
+  复用前一次产品源码构建，测试保留有效 setting.json 并独占其写锁；真实日志确认凭据清除后
+  `setting.update FAIL`，Main 为 `auth-required`、terminal 已关闭、未调用重启。
+- pending 状态不变；不替代真实 OAuth/relay、手机或 Windows/Linux 验收。
+
+## PAT-LOCATION-RECOVERY：项目定位密文异常局部恢复（pending）
+
+- Spec：`packages/desktop/test/e2e/manual-review/pending/project-location-decrypt-recovery.test.ts`。
+- 有效 BigModel OAuth 与同账号坏位置共存；真实 Host 原子删除坏位置，自动重新查询并换证。
+- 断言 OAuth 原始密文、Bot 凭据保持；头像恢复；无登录失效提示、无 OAuth polling、无重启。
+- 同一用例经本地 HTTP 控制再次制造缓存故障及元数据 503，断言恢复失败仍保留当前登录；
+  恢复服务端后经真实 ProviderSettingsFacade 刷新成功，不额外创建登录状态源。
+- 两个独立凭据服务、已修复记录、普通 IO、锁等待期间失效、客户端 clear 与 pending 合并
+  由服务层单测覆盖；确认业务登录失效仍由现有 401 核验用例覆盖。
+- 本地 HTTP 为合成账号；保持 pending，不宣称真实 OAuth、Windows/Linux 或手机真机验证。
+- 2026-10-15 macOS Electron：1 case passed，runId `desktop-e2e-20261015-074508-840`；
+  自动恢复、503 保留登录、手动刷新换证与已连接套餐/解绑入口均已断言。HTTP：定位查询 7 次、
+  签发 2 次、OAuth polling 登录 0 次。截图：同 runId 制品目录的 `project-location-recovered.png`。
+- 定向 UT 135 项通过；最终 affected 1,384 个规格全部通过，15,435 项通过、6 项跳过。
+  根类型、E2E 类型、Lint 与架构检查通过；Lint 有 210 项既有警告。
+- 日志补充复验：runId `desktop-e2e-20261015-081458-266`，同一 Electron 用例通过；
+  真实 Host 日志按序出现 `project_token_location_unreadable` 与 `project_token_location_recovery`，
+  覆盖首次恢复及重建 503，两事件仅含 family、stage、固定 code。恢复内 IO 失败由客户端单测覆盖。
+- fixture checker 尚不支持 auth-config pending 路径；本地 JSON/路径静态核对通过，
+  用例继续 pending，不做人工转正或 CI admission。旧“立即登出后重登”证据不适用于本方案。
+
 ## PAT-KEY-UPGRADE：有效登录态与坏旧 Key 共存
 
 候选用例：`packages/desktop/test/e2e/manual-review/pending/account-key-usage-scene.test.ts`。
-复用该文件 Z.AI 恢复用例：在隔离 HOME 的 credentials.json 中保存有效合成 OAuth 与账号资料，同时将同账号 account-provider:*:api-key 写为损坏密文；重启 Electron，要求直接恢复工作区，Host 创建 usageScene=1 的专用 Key 并签发 Token，不调用 Copy，原坏旧记录保持不变。BigModel 用例覆盖无旧 Key 的创建/换证路径。
+复用该文件 Z.AI 恢复用例：在隔离 HOME 的 credentials.json 中保存有效合成 OAuth 与账号资料，同时将同账号 account-provider:\*:api-key 写为损坏密文；重启 Electron，要求直接恢复工作区，Host 创建 usageScene=1 的专用 Key 并签发 Token，不调用 Copy，原坏旧记录保持不变。BigModel 用例覆盖无旧 Key 的创建/换证路径。
 此用例不触发模型推理；HTTP 为既有本地 Coding Plan mock，不代表真实后端联调。手机/远程链路由 Provisioning 与鉴权服务测试覆盖，本轮不宣称设备级远程 E2E。保持 pending，不自动转正。
 
 本轮自动复测：2026-09-23，2 cases passed；artifact：`packages/desktop/.e2e-artifacts/desktop-e2e-20260923070315610-p85476-12717808333f5136/summary.md`。未进行人工确认或转正；手机、真实后端及混版本远端不在本 case 范围。

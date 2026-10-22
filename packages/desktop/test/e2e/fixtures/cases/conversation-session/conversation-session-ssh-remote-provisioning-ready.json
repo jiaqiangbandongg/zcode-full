@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-provisioning-ready",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-provisioning-ready.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-provisioning-ready.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-ssh-ready-title",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题内容不属于本 case 语义，只需保持 task row 稳定。"
+    },
+    {
+      "id": "r3-ssh-ready-first",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+    }
+  ]
+}

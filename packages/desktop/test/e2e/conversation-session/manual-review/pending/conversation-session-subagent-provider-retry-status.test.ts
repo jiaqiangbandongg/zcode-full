@@ -3,7 +3,7 @@ import {
   TID_V4_SESSION_PANE,
   TID_V4_SUBAGENT_OPEN_SIDE_PANE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import { waitForUpstreamRequest } from "../../../helpers/conversation-session-network.js";
 import { waitForToolCallBlockByToolCallId } from "../../../helpers/conversation-session-tool.js";

@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-remote-hooks",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-remote-hooks.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-hooks-local-title",
+      "description": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_REMOTE_HOOKS_LOCAL_CONTROL"],
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-hooks-local-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 hook local control\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-hooks-local-reply",
+      "description": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_REMOTE_HOOKS_LOCAL_CONTROL"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-hooks-local-reply",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_HOOKS_LOCAL_REPLY"
+        }
+      }
+    },
+    {
+      "id": "r3-hooks-reconnect-title",
+      "description": "R3 remote hooks task 标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_REMOTE_HOOKS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-hooks-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"R3 remote hooks\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-hooks-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "r3-hooks-reconnect-main",
+      "description": "R3 remote hooks 首发和续发的通用响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_R3_REMOTE_HOOKS_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-hooks-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"R3_REMOTE_HOOKS_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-hooks-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import {
 } from "../../../helpers/subagent-refresh-conversation.js";
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_PROJECT_ADD } from "@zcode/shared";
+import { TID_VIRTUAL_PROJECT_ADD } from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths } from "../../../helpers/desktop-app.js";
 import {
   saveRefreshProfile,
@@ -73,7 +73,7 @@ describe("Subagent 多实际 workspace CLI", () => {
     await mkdir(join(workspaceB, ".zcode", "agents"), { recursive: true });
     const dialog = await browser.electron.mock("dialog", "showOpenDialog");
     await dialog.mockResolvedValueOnce({ canceled: false, filePaths: [workspaceB] });
-    await $(`[data-testid="${TID_PROJECT_ADD}"]`).click();
+    await $(`[data-testid="${TID_VIRTUAL_PROJECT_ADD}"]`).click();
     const openFolder = $('[role="menuitem"]=Open folder');
     await openFolder.waitForClickable({ timeout: 15000 });
     await openFolder.click();

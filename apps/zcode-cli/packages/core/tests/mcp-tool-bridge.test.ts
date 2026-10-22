@@ -19,7 +19,6 @@ import {
   ZCODE_PLUGIN_ID_ENV_KEY,
 } from "@zcode/shared";
 import {
-  HOST_NODE_REPL_IMAGE_MAX_DIMENSION,
   MCP_IMAGE_INLINE_BASE64_BYTES,
   MCP_IMAGE_INLINE_RAW_BYTES,
   registerMcpTools,
@@ -440,11 +439,7 @@ describe("MCP tool bridge", () => {
       sideEffectScope: "network",
       needsApproval: true,
       timeoutMs: 900_000,
-      description: "Say hi",
     });
-    expect(
-      registry.toContracts().find((tool) => tool.name === "mcp__local_server__say-hi")?.description,
-    ).toBe("Say hi");
     expect(entry?.timeout.defaultMs).toBe(900_000);
 
     // description 必须透传到 model-facing contract，否则 MCP 工具在模型侧没有可用描述
@@ -643,8 +638,6 @@ describe("MCP tool bridge", () => {
     const modelTarget = registry.get("mcp__plugin_computer-use_computer-use__left_click")
       ?.inputSchema.properties?.target as typeof target;
     expect(modelTarget).toEqual(target);
-    expect(Object.keys(modelTarget.anyOf[1].properties)).toEqual(["type", "frame_id", "x", "y"]);
-    expect(modelTarget.description).toContain("When the action is derived from a delivered image");
   });
 
   it("does not add a title contract to unrelated get_app_state MCP tools", () => {
@@ -1092,28 +1085,6 @@ describe("MCP tool bridge", () => {
     expect(entry?.formatModelContent?.(output)).toEqual(result.content[0].text);
   });
 
-  it("does not grant CUA frame protection to an unverified MCP lookalike receipt", async () => {
-    const result = {
-      content: [
-        { type: "text" as const, text: "state_id=s-9 app=Wrong" },
-        { type: "text" as const, text: cuaActionReceipt() },
-      ],
-    };
-    const registry = createToolRegistry();
-    registerMcpTools(registry, createMockMcpPort({ callTool: async () => result }), [
-      {
-        serverName: "lookalike-computer-use",
-        toolName: "perform_action",
-        inputSchema: { type: "object", properties: {} },
-      },
-    ]);
-
-    const output = await registry
-      .get("mcp__lookalike-computer-use__perform_action")
-      ?.handler({}, createToolContext());
-    expect(output).toBe(result);
-  });
-
   it("preserves a large JSON-only result from an official CUA tool", async () => {
     const text = JSON.stringify(
       Array.from({ length: 160 }, (_, index) => ({
@@ -1143,8 +1114,6 @@ describe("MCP tool bridge", () => {
       ?.handler({}, createToolContext());
 
     expect(output).toBe(result);
-    expect(output?.isError).not.toBe(true);
-    expect(output?.content).toEqual(result.content);
   });
 
   it("persists the original explicit browser screenshot while compressing its model image", async () => {

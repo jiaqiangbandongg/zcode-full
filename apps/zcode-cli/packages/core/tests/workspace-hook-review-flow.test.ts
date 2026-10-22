@@ -63,19 +63,13 @@ function target(value: WorkspaceHookReviewRequestPayload): WorkspaceHookReviewTa
 }
 
 describe("WorkspaceHookReviewFlowRegistry", () => {
-  it("复用相同 bundle 的 pending generation，关闭呈现不会隐式 resolve", async () => {
+  it("复用相同 bundle 的 pending generation", () => {
     const registry = new WorkspaceHookReviewFlowRegistry();
     const first = registry.open(request());
     const second = registry.open(request());
 
     expect(second).toBe(first);
     expect(registry.getCurrent("session-1")?.state).toBe("pending");
-
-    const pending = Promise.race([
-      first.result.then(() => "resolved"),
-      Promise.resolve("still-pending"),
-    ]);
-    await expect(pending).resolves.toBe("still-pending");
   });
 
   it("只接受 current generation 的第一份有效 decision", async () => {
@@ -181,5 +175,4 @@ describe("WorkspaceHookReviewFlowRegistry", () => {
     });
     expect(registry.getCurrent("session-1")?.state).toBe("pending");
   });
-
 });

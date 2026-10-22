@@ -6,7 +6,7 @@
  *   - 模型侧错误的收容（apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md）：确定性错误 → stopRun(ProviderStop)；
  *     context_exceeded → ContextLimit；瞬态 → 退避后续跑；非模型错误 → DriverError；
  *   - run 级 stall 时钟（决策 4）：20 分钟无一次成功 → runStalled 恰好一次；
- *   - 端口缺席即 runtimeFactory 不收 admission、driver 无 acquireSlot。
+ *   - 端口缺席即 runtimeFactory 不收 admission。
  * 用最小 stub runtime（可控 executeTurn + 可注入会话事件），不跑真模型。
  */
 
@@ -156,7 +156,12 @@ function fakePort() {
   const state = {
     fast: true,
     tryAdmits: [] as Array<{ runId: string; key: string }>,
-    admits: [] as Array<{ runId: string; key: string; signal: AbortSignal; resolve: (t: ModelRequestAdmissionTicket) => void }>,
+    admits: [] as Array<{
+      runId: string;
+      key: string;
+      signal: AbortSignal;
+      resolve: (t: ModelRequestAdmissionTicket) => void;
+    }>,
     subscribes: [] as Array<{ runId: string; listener: (change: ConcurrencyChange) => void }>,
     unsubscribe: vi.fn(),
   };
@@ -169,7 +174,10 @@ function fakePort() {
       new Promise((resolve, reject) => {
         state.admits.push({ runId, key, signal, resolve });
         if (signal.aborted) reject(signal.reason ?? new Error("aborted"));
-        else signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), { once: true });
+        else
+          signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), {
+            once: true,
+          });
       }),
     subscribe: (runId, listener) => {
       state.subscribes.push({ runId, listener });
@@ -189,7 +197,12 @@ function makeDriver(input: {
 }) {
   const { sink, calls } = recordingSink();
   const journal = new InMemoryJournalStore();
-  journal.createRun({ runId: RUN, caps: { maxConcurrency: 16 }, spentTokens: 0, status: "running" });
+  journal.createRun({
+    runId: RUN,
+    caps: { maxConcurrency: 16 },
+    spentTokens: 0,
+    status: "running",
+  });
   const factoryInputs: Array<{ modelRequestAdmission?: ModelRequestAdmission }> = [];
   const driver = createAgentRuntimeWorkflowDriver({
     journal,
@@ -239,16 +252,43 @@ describe("workflow driver — waiting / executing 观察（§6，决策 38）", 
     driver.startAsk(session, INSTANCE, { instructions: "go", typed: false });
     runtime.emitStatus({ type: "model_request_started", attempt: 1 });
 
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "rate_limited", delayMs: 20_000, nextAttempt: 2, retryAfterMs: 20_000, message: "429" });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "rate_limited",
+      delayMs: 20_000,
+      nextAttempt: 2,
+      retryAfterMs: 20_000,
+      message: "429",
+    });
     expect(calls.waiting).toEqual([
-      { instance: INSTANCE, info: { cause: "backoff", reason: "rate_limited", attempt: 2, delayMs: 20_000, retryAfterMs: 20_000 } },
+      {
+        instance: INSTANCE,
+        info: {
+          cause: "backoff",
+          reason: "rate_limited",
+          attempt: 2,
+          delayMs: 20_000,
+          retryAfterMs: 20_000,
+        },
+      },
     ]);
     runtime.emitStatus({ type: "model_request_started", attempt: 2 });
     expect(calls.executing).toEqual([INSTANCE, INSTANCE]);
     // 再一次限流 + 重试：每一段等待都恰好一对 waiting / executing。
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "server_error", delayMs: 3000, nextAttempt: 3, message: "500" });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "server_error",
+      delayMs: 3000,
+      nextAttempt: 3,
+      message: "500",
+    });
     expect(calls.waiting).toHaveLength(2);
-    expect(calls.waiting[1]!.info).toEqual({ cause: "backoff", reason: "server_error", attempt: 3, delayMs: 3000 });
+    expect(calls.waiting[1]!.info).toEqual({
+      cause: "backoff",
+      reason: "server_error",
+      attempt: 3,
+      delayMs: 3000,
+    });
     runtime.emitStatus({ type: "model_request_started", attempt: 3 });
     expect(calls.executing).toHaveLength(3);
   });
@@ -259,9 +299,30 @@ describe("workflow driver — waiting / executing 观察（§6，决策 38）", 
     const session = await driver.createActorSession(ACTOR, {});
     driver.startAsk(session, INSTANCE, { instructions: "go", typed: false });
 
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "reasoning_signature_repair", delayMs: 0, nextAttempt: 2, message: "repair" });
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "auth_refresh", delayMs: 0, nextAttempt: 2, message: "refresh" });
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "server_error", delayMs: 4000, nextAttempt: 3, message: "500" }, "some-other-session");
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "reasoning_signature_repair",
+      delayMs: 0,
+      nextAttempt: 2,
+      message: "repair",
+    });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "auth_refresh",
+      delayMs: 0,
+      nextAttempt: 2,
+      message: "refresh",
+    });
+    runtime.emitStatus(
+      {
+        type: "model_retry_scheduled",
+        reason: "server_error",
+        delayMs: 4000,
+        nextAttempt: 3,
+        message: "500",
+      },
+      "some-other-session",
+    );
     runtime.emitStatus({ type: "model_request_started" }, "some-other-session");
     expect(calls.waiting).toEqual([]);
     expect(calls.executing).toEqual([]);
@@ -284,7 +345,13 @@ describe("workflow driver — waiting / executing 观察（§6，决策 38）", 
     const { driver, calls } = makeDriver({ runtime });
     await driver.createActorSession(ACTOR, {});
     runtime.emitStatus({ type: "model_request_started" });
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "rate_limited", delayMs: 2000, nextAttempt: 2, message: "429" });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "rate_limited",
+      delayMs: 2000,
+      nextAttempt: 2,
+      message: "429",
+    });
     expect(calls.executing).toEqual([]);
     expect(calls.waiting).toEqual([]);
     driver.dispose?.();
@@ -309,7 +376,13 @@ describe("workflow driver — per-actor 准入（§4，决策 34/36）", () => {
     expect(state.admits).toEqual([]);
     expect(calls.waiting).toEqual([]);
 
-    const change: ConcurrencyChange = { key: "prov/alpha", previous: 8, next: 4, reason: "rate_limited", cooldownMs: 5000 };
+    const change: ConcurrencyChange = {
+      key: "prov/alpha",
+      previous: 8,
+      next: 4,
+      reason: "rate_limited",
+      cooldownMs: 5000,
+    };
     state.subscribes[0]!.listener(change);
     expect(calls.concurrency).toEqual([change]);
 
@@ -356,24 +429,35 @@ describe("workflow driver — per-actor 准入（§4，决策 34/36）", () => {
     const { driver, factoryInputs } = makeDriver({ runtime, concurrency: port });
     await driver.createActorSession(ACTOR, {});
     const controller = new AbortController();
-    const pending = factoryInputs[0]!.modelRequestAdmission!.acquire({ model: MODEL, signal: controller.signal });
+    const pending = factoryInputs[0]!.modelRequestAdmission!.acquire({
+      model: MODEL,
+      signal: controller.signal,
+    });
     await flush();
     controller.abort(new Error("cancelled"));
     await expect(pending).rejects.toThrow("cancelled");
   });
 
-  it("端口缺席：runtimeFactory 不收 admission，driver 无 acquireSlot，不订阅", async () => {
+  it("端口缺席：runtimeFactory 不收 admission", async () => {
     const runtime = stubRuntime(() => new Promise(() => {}));
     const { driver, factoryInputs } = makeDriver({ runtime });
     await driver.createActorSession(ACTOR, {});
     expect(factoryInputs).toEqual([{}]);
-    expect((driver as { acquireSlot?: unknown }).acquireSlot).toBeUndefined();
   });
 });
 
 describe("workflow driver — 按请求链聚合的子代理相位（v3 决策 46）", () => {
-  const turn = (extra: Record<string, unknown> = {}) => ({ queryId: "q-1", querySource: "workflow_child", ...extra });
-  const tool = (id: string, extra: Record<string, unknown> = {}) => ({ queryId: "q-1", querySource: "web_search_tool", toolCallId: id, ...extra });
+  const turn = (extra: Record<string, unknown> = {}) => ({
+    queryId: "q-1",
+    querySource: "workflow_child",
+    ...extra,
+  });
+  const tool = (id: string, extra: Record<string, unknown> = {}) => ({
+    queryId: "q-1",
+    querySource: "web_search_tool",
+    toolCallId: id,
+    ...extra,
+  });
 
   it("一条链在执行时另一条链排队不报 waiting；执行链结束、只剩等待者 → 报最新的等待", async () => {
     const runtime = stubRuntime(() => new Promise(() => {}));
@@ -400,12 +484,33 @@ describe("workflow driver — 按请求链聚合的子代理相位（v3 决策 4
     driver.startAsk(session, INSTANCE, { instructions: "go", typed: false });
 
     runtime.emitStatus({ type: "model_request_started", requestId: "r-1", ...turn() });
-    runtime.emitStatus({ type: "model_request_failed", requestId: "r-1", reason: "rate_limited", retryable: true, message: "429", ...turn() });
-    runtime.emitStatus({ type: "model_retry_scheduled", requestId: "r-1", reason: "rate_limited", delayMs: 2000, nextAttempt: 2, message: "429", ...turn() });
+    runtime.emitStatus({
+      type: "model_request_failed",
+      requestId: "r-1",
+      reason: "rate_limited",
+      retryable: true,
+      message: "429",
+      ...turn(),
+    });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      requestId: "r-1",
+      reason: "rate_limited",
+      delayMs: 2000,
+      nextAttempt: 2,
+      message: "429",
+      ...turn(),
+    });
     expect(calls.waiting).toHaveLength(1);
     runtime.emitStatus({ type: "model_request_started", requestId: "r-2", attempt: 2, ...turn() });
     expect(calls.executing).toEqual([INSTANCE, INSTANCE]);
-    runtime.emitStatus({ type: "model_request_completed", requestId: "r-2", attempt: 2, durationMs: 5, ...turn() });
+    runtime.emitStatus({
+      type: "model_request_completed",
+      requestId: "r-2",
+      attempt: 2,
+      durationMs: 5,
+      ...turn(),
+    });
     // 集合为空：保持上一相位，不发任何事件。之后一条工具链排队 → 真正在等。
     expect(calls.waiting).toHaveLength(1);
     runtime.emitStatus({ type: "model_request_queued", ...tool("tc-b") });
@@ -422,16 +527,39 @@ describe("workflow driver — 按请求链聚合的子代理相位（v3 决策 4
     runtime.emitStatus({ type: "model_request_started", ...tool("tc-1") });
     runtime.emitStatus({ type: "model_request_started", ...tool("tc-2") });
     expect(calls.executing).toEqual([INSTANCE]);
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "rate_limited", delayMs: 1500, nextAttempt: 2, message: "429", ...tool("tc-2") });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "rate_limited",
+      delayMs: 1500,
+      nextAttempt: 2,
+      message: "429",
+      ...tool("tc-2"),
+    });
     expect(calls.waiting).toEqual([]);
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "rate_limited", delayMs: 3000, nextAttempt: 2, message: "429", ...tool("tc-1") });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "rate_limited",
+      delayMs: 3000,
+      nextAttempt: 2,
+      message: "429",
+      ...tool("tc-1"),
+    });
     expect(calls.waiting).toEqual([
-      { instance: INSTANCE, info: { cause: "backoff", reason: "rate_limited", attempt: 2, delayMs: 3000 } },
+      {
+        instance: INSTANCE,
+        info: { cause: "backoff", reason: "rate_limited", attempt: 2, delayMs: 3000 },
+      },
     ]);
     runtime.emitStatus({ type: "model_request_started", attempt: 2, ...tool("tc-2") });
     expect(calls.executing).toEqual([INSTANCE, INSTANCE]);
     // 不可重试的失败结束一条链；另一条仍在执行，不报。
-    runtime.emitStatus({ type: "model_request_failed", reason: "auth_failed", retryable: false, message: "401", ...tool("tc-1") });
+    runtime.emitStatus({
+      type: "model_request_failed",
+      reason: "auth_failed",
+      retryable: false,
+      message: "401",
+      ...tool("tc-1"),
+    });
     expect(calls.waiting).toHaveLength(1);
   });
 
@@ -446,7 +574,14 @@ describe("workflow driver — 按请求链聚合的子代理相位（v3 决策 4
     }
     expect(calls.waiting).toEqual([{ instance: INSTANCE, info: { cause: "slot" } }]);
     // 内容不同的等待（退避）仍照报：相位信息变了。
-    runtime.emitStatus({ type: "model_retry_scheduled", reason: "rate_limited", delayMs: 1500, nextAttempt: 2, message: "429", ...tool("tc-1") });
+    runtime.emitStatus({
+      type: "model_retry_scheduled",
+      reason: "rate_limited",
+      delayMs: 1500,
+      nextAttempt: 2,
+      message: "429",
+      ...tool("tc-1"),
+    });
     expect(calls.waiting).toHaveLength(2);
     // 一条链拿到票 → executing；它完成后只剩等待者 → 同样的 slot 等待再报一次（新的一段等待）。
     runtime.emitStatus({ type: "model_request_admitted", queuedMs: 30, ...tool("tc-2") });
@@ -474,7 +609,13 @@ describe("workflow driver — 模型侧错误的收容（apps/zcode-cli/packages
     const runtime = stubRuntime(() =>
       Promise.reject(
         adapterError(
-          { reason: "auth_failed", providerId: "prov", modelId: "alpha", providerCode: "1006", retryable: false },
+          {
+            reason: "auth_failed",
+            providerId: "prov",
+            modelId: "alpha",
+            providerCode: "1006",
+            retryable: false,
+          },
           "[1006] token expired",
         ),
       ),
@@ -568,7 +709,10 @@ describe("workflow driver — 模型侧错误的收容（apps/zcode-cli/packages
     expect(calls.failed).toEqual([]);
     expect(calls.stopped).toEqual([]);
     expect(calls.waiting).toEqual([
-      { instance: INSTANCE, info: { cause: "backoff", reason: "network_error", attempt: 1, delayMs: 2000 } },
+      {
+        instance: INSTANCE,
+        info: { cause: "backoff", reason: "network_error", attempt: 1, delayMs: 2000 },
+      },
     ]);
     expect(pending()).toHaveLength(1);
     expect(turns).toBe(1);

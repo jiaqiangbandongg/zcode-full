@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildAssistantPreviewCardFileSource,
@@ -13,21 +12,6 @@ import {
   resolveAssistantPreviewCardsWithoutFileStat,
   resolveValidatedAssistantPreviewCards,
 } from "@/lib/assistantPreviewCardValidation.js";
-
-const assistantPreviewCardsSource = readFileSync(
-  new URL("../src/AssistantPreviewCards.tsx", import.meta.url),
-  "utf8",
-);
-
-describe("AssistantPreviewCards presentation", () => {
-  it("统一使用 24px 的网址、文件和兜底图标", () => {
-    expect(assistantPreviewCardsSource).toContain('<GlobeIcon className="size-6" />');
-    expect(assistantPreviewCardsSource).toContain(
-      "<FileDisplayIcon src={descriptor.fileIconSrc} size={24} />",
-    );
-    expect(assistantPreviewCardsSource).toContain('<FileTextIcon className="size-6" />');
-  });
-});
 
 describe("assistant PPTX auto-open projection", () => {
   it("只投影最终可见卡片中的 PPTX，并把卡片签名并入一次性 key", () => {

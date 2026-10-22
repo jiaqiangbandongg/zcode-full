@@ -79,7 +79,7 @@ function resolve(resume: boolean, modelSelection?: ModelSelection, registry = cr
 }
 
 describe("Runtime 创建与未绑定恢复的边界", () => {
-  it("新建空白会话没有 configured default 时保持未绑定，等待显式提交选择", () => {
+  it("新建会话没有 configured default 时使用正式初始推荐，历史恢复仍保持未绑定", () => {
     const config = resolveAppRuntimeConfig({
       cliStorageRoot: "/test/cli",
       configResult: createConfig({ env: {}, skipUserConfig: true, workingDirectory: "/test" }),
@@ -87,7 +87,8 @@ describe("Runtime 创建与未绑定恢复的边界", () => {
       subagentOutputRootDir: "/test/agents",
       workingDirectory: "/test",
     });
-    expect(config.runtimeConfig.modelSelection).toBeUndefined();
+    // Todo 58/88 的初始选择规则允许 Registry 推荐；下面的 resume 场景仍禁止默认值覆盖历史。
+    expect(config.runtimeConfig.modelSelection).toEqual(complete);
   });
   it.each([
     undefined,

@@ -20,9 +20,24 @@ function toolbarEvent(patch: Partial<Parameters<typeof resolveToolbarShortcutAct
 }
 
 /** model 类选项（category=model → 归 Ctrl+M 动作）。 */
-const modelOption = { type: "select", category: "model", currentValue: "m1", options: [] } as unknown as ZCodeConfigOption;
-const modeOption = { type: "select", category: "mode", currentValue: "a", options: [] } as unknown as ZCodeConfigOption;
-const thoughtOption = { type: "select", category: "thought_level", currentValue: "low", options: [] } as unknown as ZCodeConfigOption;
+const modelOption = {
+  type: "select",
+  category: "model",
+  currentValue: "m1",
+  options: [],
+} as unknown as ZCodeConfigOption;
+const modeOption = {
+  type: "select",
+  category: "mode",
+  currentValue: "a",
+  options: [],
+} as unknown as ZCodeConfigOption;
+const thoughtOption = {
+  type: "select",
+  category: "thought_level",
+  currentValue: "low",
+  options: [],
+} as unknown as ZCodeConfigOption;
 
 const enabledState = {
   hasAnyOption: true,
@@ -36,22 +51,23 @@ const enabledState = {
 describe("composer 工具条热键按生效表解析（spec §12.6）", () => {
   it("默认表：Ctrl+M / Ctrl+Shift+M / Ctrl+T 分别命中三个动作", () => {
     const effective = resolveEffectiveShortcutBindings(undefined);
-    expect(resolveToolbarShortcutAction(toolbarEvent({ ctrlKey: true }), effective, enabledState)).toBe(
-      "openModelMenu",
-    );
     expect(
-      resolveToolbarShortcutAction(toolbarEvent({ key: "m", code: "KeyM", ctrlKey: true, shiftKey: true }), effective, enabledState),
+      resolveToolbarShortcutAction(toolbarEvent({ ctrlKey: true }), effective, enabledState),
+    ).toBe("openModelMenu");
+    expect(
+      resolveToolbarShortcutAction(
+        toolbarEvent({ key: "m", code: "KeyM", ctrlKey: true, shiftKey: true }),
+        effective,
+        enabledState,
+      ),
     ).toBe("cycleSessionMode");
     expect(
-      resolveToolbarShortcutAction(toolbarEvent({ key: "t", code: "KeyT", ctrlKey: true }), effective, enabledState),
+      resolveToolbarShortcutAction(
+        toolbarEvent({ key: "t", code: "KeyT", ctrlKey: true }),
+        effective,
+        enabledState,
+      ),
     ).toBe("cycleThoughtLevel");
-  });
-
-  it("修饰精确匹配：Ctrl+Shift+M 不误命中 Ctrl+M（与旧 matchesCtrlShortcut 语义一致）", () => {
-    const effective = resolveEffectiveShortcutBindings(undefined);
-    expect(
-      resolveToolbarShortcutAction(toolbarEvent({ ctrlKey: true, shiftKey: true }), effective, enabledState),
-    ).toBe("cycleSessionMode");
   });
 
   it("改绑后按新键位命中：openModelMenu 改绑 Ctrl+Y", () => {
@@ -60,7 +76,11 @@ describe("composer 工具条热键按生效表解析（spec §12.6）", () => {
       resolveToolbarShortcutAction(toolbarEvent({ ctrlKey: true }), effective, enabledState),
     ).toBeNull();
     expect(
-      resolveToolbarShortcutAction(toolbarEvent({ key: "y", code: "KeyY", ctrlKey: true }), effective, enabledState),
+      resolveToolbarShortcutAction(
+        toolbarEvent({ key: "y", code: "KeyY", ctrlKey: true }),
+        effective,
+        enabledState,
+      ),
     ).toBe("openModelMenu");
   });
 
@@ -82,14 +102,20 @@ describe("composer 工具条热键按生效表解析（spec §12.6）", () => {
     expect(
       resolveToolbarShortcutAction({ ...ctrlM, defaultPrevented: true }, effective, enabledState),
     ).toBeNull();
-    expect(resolveToolbarShortcutAction({ ...ctrlM, repeat: true }, effective, enabledState)).toBeNull();
+    expect(
+      resolveToolbarShortcutAction({ ...ctrlM, repeat: true }, effective, enabledState),
+    ).toBeNull();
   });
 
   it("mac 语义：显式 Ctrl 命中，Cmd+M 不命中（与旧固定热键一致）", () => {
     const effective = resolveEffectiveShortcutBindings(undefined);
     const macState = { ...enabledState };
     expect(
-      resolveToolbarShortcutAction(toolbarEvent({ key: "m", code: "KeyM", ctrlKey: true, metaKey: false }), effective, macState),
+      resolveToolbarShortcutAction(
+        toolbarEvent({ key: "m", code: "KeyM", ctrlKey: true, metaKey: false }),
+        effective,
+        macState,
+      ),
     ).toBe("openModelMenu");
     expect(
       resolveToolbarShortcutAction(toolbarEvent({ metaKey: true }), effective, macState),

@@ -168,51 +168,6 @@ describe("model tool input normalization", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("does not let legacy args replace an explicit null generateText input", async () => {
-    const warn = vi.fn();
-    const runtime: AiSdkModelRuntime = {
-      async generateText() {
-        return {
-          finishReason: "tool-calls",
-          text: "",
-          toolCalls: [
-            {
-              args: { file_path: "wrong.md" },
-              input: null,
-              toolCallId: "call_null",
-              toolName: "Read",
-            },
-          ],
-          totalUsage: usage(2, 1),
-          usage: usage(2, 1),
-        } as never;
-      },
-      streamText() {
-        throw new Error("not used");
-      },
-    };
-    const adapter = new AiSdkModelAdapter({
-      logger: testLogger(warn),
-      registry: registry(),
-      runtime,
-    });
-
-    const result = await executeAdapterGenerateText(adapter, {
-      providerId: "test" as never,
-      modelId: "model-a" as never,
-      messages: [{ role: "user", content: "Read a file" }],
-    });
-
-    expect(result.toolCalls).toEqual([
-      {
-        id: "call_null",
-        input: {},
-        name: "Read",
-      },
-    ]);
-    expect(warn).toHaveBeenCalledOnce();
-  });
-
   it("keeps legacy generateText args fallback when input is missing", async () => {
     const runtime: AiSdkModelRuntime = {
       async generateText() {

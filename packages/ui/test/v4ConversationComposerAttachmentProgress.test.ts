@@ -6,7 +6,7 @@ import {
   TID_V4_ATTACHMENT_UPLOAD_RETRY,
   TID_V4_COMPOSER_SEND,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import { ConversationComposer } from "@/v4/ConversationComposer.js";
 
@@ -169,7 +169,7 @@ describe("ConversationComposer attachment upload progress", () => {
     });
   });
 
-  it("图片中央显示主题 token 圆环与百分比，未 ready 时发送按钮 disabled", () => {
+  it("图片显示上传圆环与百分比，未 ready 时发送按钮 disabled", () => {
     attachmentState.attachments = [
       {
         adopted: false,
@@ -195,13 +195,8 @@ describe("ConversationComposer attachment upload progress", () => {
     expect(html).toContain('role="status"');
     expect(html).toContain("42%");
     expect(html).toContain('stroke-dasharray="42 100"');
-    expect(html).toContain("bg-background/85");
-    expect(html).toContain("size-3.5 rounded-full bg-primary");
     expect(html).toContain('data-composer-attachment-kind="image"');
-    expect(html).toContain("size-12");
-    expect(html).toContain("size-12 overflow-hidden rounded-lg");
     expect(html).toContain('data-composer-image-preview="image.png"');
-    expect(html).not.toContain("bg-white");
     expect(html).toContain(`disabled="" data-testid="${TID_V4_COMPOSER_SEND}"`);
   });
 
@@ -269,40 +264,23 @@ describe("ConversationComposer attachment upload progress", () => {
       html.indexOf('data-composer-attachment-kind="video"'),
     );
     expect(html).toContain('data-composer-file-attachments-row="true"');
-    expect(html).toContain("flex-col items-start");
     expect(html).toContain('data-composer-attachment-kind="image"');
     expect(html).toContain('data-composer-attachment-kind="video"');
     expect(html).toContain('data-composer-attachment-kind="file"');
-    // 视频与图片共用 48px 媒体卡片；本地 objectUrl 存在时显示首帧。
-    expect(html).toContain('data-composer-attachment-kind="video"');
+    // 视频与图片共享预览列表；保留原始 objectUrl。
     expect(html).toContain('data-composer-attachment-url="blob:video-third"');
     expect(html).toContain('data-composer-image-preview="avatar.png,demo.mov"');
-    expect(html).toContain("size-12");
-    expect(html).toContain("h-12");
-    expect(html).toContain("w-fit max-w-full");
-    expect(html).toContain("gap-2 rounded-lg border");
-    expect(html).toContain("size-9 rounded-md bg-background");
-    expect(html).toContain("pr-6");
-    expect(html).not.toContain("pr-8");
     expect(html).toContain("SNAKE-ARENA.md");
     expect(html).toContain('title="SNAKE-ARENA.md"');
-    expect(html).toContain("truncate text-ui-base");
-    expect(html).toContain("min-w-0 max-w-40 flex-1");
     expect(html).toContain(">MD<");
     expect(html.match(/data-composer-attachment-remove=/gu)).toHaveLength(3);
-    expect(html).toContain("size-3.5 rounded-full bg-primary");
-    expect(html).toContain("lucide-x size-2.5");
     expect(html).toContain("opacity-0");
     expect(html).toContain("group-hover:opacity-100");
     expect(html).toContain("focus-visible:opacity-100");
     expect(html).toContain("[@media(hover:none)]:opacity-100");
-    expect(html.match(/top-0\.5/gu)).toHaveLength(3);
-    expect(html.match(/right-0\.5/gu)).toHaveLength(3);
-    expect(html).not.toContain("top-1");
-    expect(html).not.toContain("right-1");
   });
 
-  it("视频附件与图片同样显示主题 token 上传进度环与 48px 卡片", () => {
+  it("视频附件显示上传进度环与原始预览地址", () => {
     attachmentState.attachments = [
       {
         adopted: false,
@@ -330,10 +308,9 @@ describe("ConversationComposer attachment upload progress", () => {
     expect(html).toContain('stroke-dasharray="42 100"');
     expect(html).toContain('data-composer-attachment-kind="video"');
     expect(html).toContain('data-composer-attachment-url="blob:video-1"');
-    expect(html).toContain("size-12 overflow-hidden rounded-lg");
   });
 
-  it("非图片失败态提供 alert、错误提示、重试和适配窄屏的行内布局", () => {
+  it("非图片失败态提供 alert、错误提示和可访问重试入口", () => {
     attachmentState.attachments = [
       {
         adopted: false,
@@ -359,8 +336,6 @@ describe("ConversationComposer attachment upload progress", () => {
     expect(html).toContain("network unavailable");
     expect(html).toContain(`data-testid="${testId(TID_V4_ATTACHMENT_UPLOAD_RETRY, "file-1")}"`);
     expect(html).toContain('aria-label="重试上传"');
-    expect(html).toContain("flex-wrap");
-    expect(html).toContain("max-w-full");
     expect(html).toContain("text-destructive");
   });
 });

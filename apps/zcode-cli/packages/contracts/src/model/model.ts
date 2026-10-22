@@ -9,6 +9,7 @@ import type {
 } from "./index.js";
 import { modelSelectionSchema, type ModelSelection } from "@zcode/shared/model-selection";
 import type { ModelPropertiesData, ModelOptionSpecsData } from "@zcode/shared/model-config";
+import type { ToolSearchCapability } from "../tools/tool-search.js";
 
 export type { ModelSelection } from "@zcode/shared/model-selection";
 
@@ -29,6 +30,7 @@ export interface ModelOptions {
 }
 
 export interface ModelRequest {
+  toolSearchEnabled?: boolean;
   messages: ModelInputMessage[];
   tools?: ModelToolContract[];
   responseJsonSchema?: JsonSchema;
@@ -42,6 +44,7 @@ export type ModelResult = ModelTextResult;
 export type ModelEvent = ModelStreamEvent;
 
 export interface Model {
+  readonly requestCapabilities?: { readonly toolSearch?: ToolSearchCapability };
   readonly providerId: ModelProviderId;
   readonly modelId: ModelId;
   readonly displayName?: string;

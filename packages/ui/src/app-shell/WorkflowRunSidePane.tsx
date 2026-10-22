@@ -18,7 +18,7 @@ import {
   workflowRunTabScope,
 } from "@/app-shell/useWorkflowRunPaneSettings.js";
 import { WorkflowRunSettingsPopover } from "@/components/workflow-timeline/WorkflowRunSettingsPopover.js";
-import { WorkflowRunPaneSaveSlots } from "@/app-shell/WorkflowRunPaneSaveSlots.js";
+import { WorkflowRunPaneSaveSlots } from "@/project-workflow/WorkflowRunPaneSaveSlots.js";
 import { resolveWorkflowLaunchProvenance } from "@/app-shell/workflowRunLaunchProvenance.js";
 import {
   describeWorkflowRunActionRejection,

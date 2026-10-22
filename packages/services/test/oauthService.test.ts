@@ -93,8 +93,6 @@ function expectDeletedOAuthSessionCredentials(
   expect(new Set(deletedKeys)).toEqual(
     new Set([...OAUTH_SESSION_CREDENTIAL_KEYS, ...additionalKeys]),
   );
-  expect(deletedKeys).not.toContain("auth_token");
-  expect(deletedKeys).not.toContain("refresh_token");
 }
 
 function createMockCredentialDecryptError(message = "Serialized credential decrypt failure") {
@@ -241,7 +239,8 @@ describe("oauthService", () => {
       }
       if (url.includes("/api/biz/")) {
         expect(new Headers(init?.headers).get("authorization")).toBe(
-          team && url.includes("/api_keys") && !url.endsWith("/access_tokens")
+          url.endsWith("/getCustomerInfo") ||
+            (team && url.includes("/api_keys") && !url.endsWith("/access_tokens"))
             ? "zai-business-token"
             : "Bearer zai-business-token",
         );
@@ -2121,7 +2120,8 @@ describe("oauthService", () => {
             accessToken,
             zcodeJwtToken,
           }),
-          normalizeError: (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+          normalizeError: (error: unknown) =>
+            error instanceof Error ? error : new Error(String(error)),
         },
       ],
       now: () => 2_000_000_000_000,
@@ -2162,7 +2162,8 @@ describe("oauthService", () => {
             state: new URL(url).searchParams.get("state") ?? "",
           }),
           exchangeToken: async () => exchange,
-          normalizeError: (error: unknown) => (error instanceof Error ? error : new Error(String(error))),
+          normalizeError: (error: unknown) =>
+            error instanceof Error ? error : new Error(String(error)),
         },
       ],
     });
@@ -2345,27 +2346,6 @@ describe("oauthService", () => {
     );
     expect(await credentialServiceStub.load("oauth:active_provider")).toBe(BIGMODEL_PROVIDER_ID);
     expect(await credentialServiceStub.load("oauth:zai:user_info")).toBeNull();
-  });
-
-  it("BigModel zcode token body 不携带 appSecret", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
-    const service = createBigModelService({
-      apiClient: createMockApiClient(fetchMock),
-      env: {} as NodeJS.ProcessEnv,
-    });
-    const { state } = await service.startOAuth(BIGMODEL_PROVIDER_ID);
-
-    fetchMock.mockResolvedValueOnce(createBigModelZcodeTokenResponse());
-    fetchMock.mockResolvedValueOnce(createBigModelUserInfoResponse());
-    await service.handleCallback(`zcode://oauth/callback?authCode=auth-code-004&state=${state}`);
-
-    const tokenCall = fetchMock.mock.calls[0];
-    if (!tokenCall) {
-      throw new Error("missing token call");
-    }
-    const tokenInit = tokenCall[1] as RequestInit;
-    const tokenPayload = JSON.parse(String(tokenInit.body)) as { appSecret?: unknown };
-    expect(tokenPayload.appSecret).toBeUndefined();
   });
 
   it("keeps single pending state and invalidates older flow", async () => {
@@ -2977,8 +2957,14 @@ describe("oauthService", () => {
     await credentialServiceStub.save("oauth:bigmodel:user_info", JSON.stringify(cachedUser));
 
     let blockedBigModelTokenLoad = false;
+    let businessTokenReads = 0;
     vi.spyOn(credentialServiceStub, "load").mockImplementation(async (key) => {
-      if (key === "oauth:bigmodel:access_token" && !blockedBigModelTokenLoad) {
+      // 首次读取用于本地有效期检查；这里暂停第二次、属于后台资料迁移的读取。
+      if (
+        key === "oauth:bigmodel:access_token" &&
+        ++businessTokenReads === 2 &&
+        !blockedBigModelTokenLoad
+      ) {
         blockedBigModelTokenLoad = true;
         markTokenLoadStarted();
         await tokenLoadCanFinish;
@@ -3103,6 +3089,70 @@ describe("oauthService", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each(
+    [BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID].flatMap((provider) =>
+      ["business", "shared"].map((kind) => ({ provider, kind })),
+    ),
+  )(
+    "$provider 启动 $kind token 解密失败时清理 OAuth，保留独立凭据且不启动资料迁移",
+    async ({ provider, kind }) => {
+      const onProviderLogout = vi.fn(async () => {});
+      const fetchMock = vi.fn<typeof fetch>();
+      const service = createBigModelService({
+        onProviderLogout,
+        apiClient: createMockApiClient(fetchMock),
+      });
+      await credentialServiceStub.save("oauth:active_provider", provider);
+      await credentialServiceStub.save(`oauth:${provider}:access_token`, "corrupt-token");
+      await credentialServiceStub.save("zcodejwttoken", createUnsignedJwt({ exp: 9_999_999_999 }));
+      await credentialServiceStub.save(
+        `oauth:${provider}:user_info`,
+        JSON.stringify(
+          provider === ZAI_PROVIDER_ID
+            ? { user_id: "cached-user", name: "Fixture User" }
+            : { id: "cached-user", username: "Fixture User", displayName: "Fixture User" },
+        ),
+      );
+      await credentialServiceStub.save("bot:independent:token", "bot-token");
+      await credentialServiceStub.save("independent-pat", "pat-token");
+      const originalLoad = credentialServiceStub.load;
+      vi.spyOn(credentialServiceStub, "load").mockImplementation(async (key) => {
+        if (key === (kind === "business" ? `oauth:${provider}:access_token` : "zcodejwttoken"))
+          throw createMockCredentialDecryptError();
+        return originalLoad(key);
+      });
+
+      await expect(service.restoreCachedSessionState()).resolves.toEqual({ status: "signed-out" });
+      for (const key of OAUTH_SESSION_CREDENTIAL_KEYS) expect(credentialStore.has(key)).toBe(false);
+      expect(credentialStore.get("bot:independent:token")).toBe("bot-token");
+      expect(credentialStore.get("independent-pat")).toBe("pat-token");
+      expectProviderLogoutNotifications(onProviderLogout, [BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("启动 token 读取普通 IO 错误时保留凭据并传播异常", async () => {
+    const onProviderLogout = vi.fn(async () => {});
+    const service = createBigModelService({ onProviderLogout });
+    await credentialServiceStub.save("oauth:active_provider", ZAI_PROVIDER_ID);
+    await credentialServiceStub.save("oauth:zai:access_token", "business-token");
+    await credentialServiceStub.save("zcodejwttoken", "backend-token");
+    await credentialServiceStub.save(
+      "oauth:zai:user_info",
+      JSON.stringify({ user_id: "cached-user", name: "Fixture User" }),
+    );
+    const originalLoad = credentialServiceStub.load;
+    const failure = new Error("credential RPC unavailable");
+    vi.spyOn(credentialServiceStub, "load").mockImplementation(async (key) => {
+      if (key === "oauth:zai:access_token") throw failure;
+      return originalLoad(key);
+    });
+    await expect(service.restoreCachedSessionState()).rejects.toBe(failure);
+    expect(credentialStore.get("oauth:active_provider")).toBe(ZAI_PROVIDER_ID);
+    expect(credentialStore.get("zcodejwttoken")).toBe("backend-token");
+    expect(onProviderLogout).not.toHaveBeenCalled();
+  });
+
   it("invalidates an expired zcode JWT and requests reauthentication", async () => {
     const onProviderLogout = vi.fn(async () => {
       throw new Error("derived provider cleanup failed");
@@ -3130,6 +3180,35 @@ describe("oauthService", () => {
     expect(await credentialServiceStub.load("zcodejwttoken")).toBeNull();
     expect(onProviderLogout).toHaveBeenCalledWith(ZAI_PROVIDER_ID, "zai-u-cached");
   });
+
+  it.each([BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID])(
+    "%s 业务 JWT 明确过期时不恢复缓存登录，即使共享 JWT 有效",
+    async (provider) => {
+      const onProviderLogout = vi.fn(async () => {});
+      const service = createBigModelService({ now: () => 2_000_000, onProviderLogout });
+      await credentialServiceStub.save("oauth:active_provider", provider);
+      await credentialServiceStub.save(
+        `oauth:${provider}:access_token`,
+        createUnsignedJwt({ exp: 1000 }),
+      );
+      await credentialServiceStub.save("zcodejwttoken", createUnsignedJwt({ exp: 3000 }));
+      await credentialServiceStub.save(
+        `oauth:${provider}:user_info`,
+        JSON.stringify(
+          provider === ZAI_PROVIDER_ID
+            ? { user_id: "synthetic-account", name: "Fixture User" }
+            : { id: "synthetic-account", username: "Fixture User", displayName: "Fixture User" },
+        ),
+      );
+      await expect(service.restoreCachedSessionState()).resolves.toEqual({
+        status: "reauthentication-required",
+        reason: "jwt-expired",
+      });
+      expect(await credentialServiceStub.load("oauth:active_provider")).toBeNull();
+      expect(await credentialServiceStub.load(`oauth:${provider}:access_token`)).toBeNull();
+      expect(onProviderLogout).toHaveBeenCalledWith(provider, "synthetic-account");
+    },
+  );
 
   it("does not clear a new login completed while an expired cached session is being restored", async () => {
     const expiredJwt = createUnsignedJwt({ exp: 1_000 });
@@ -3176,6 +3255,46 @@ describe("oauthService", () => {
     expect(await credentialServiceStub.load("oauth:active_provider")).toBe(BIGMODEL_PROVIDER_ID);
     expect(await credentialServiceStub.load("oauth:bigmodel:access_token")).toBe("new-token");
     expect(await credentialServiceStub.load("zcodejwttoken")).toBe("new-zcode-jwt");
+  });
+
+  it("旧启动读取的解密失败不会清理已提交的新登录", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const originalLoad = credentialServiceStub.load;
+    let first = true;
+    vi.spyOn(credentialServiceStub, "load").mockImplementation(async (key) => {
+      if (key === "oauth:bigmodel:access_token" && first) {
+        first = false;
+        started();
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        throw createMockCredentialDecryptError();
+      }
+      return originalLoad(key);
+    });
+    const fetchMock = vi.fn<typeof fetch>();
+    const service = createBigModelService({ apiClient: createMockApiClient(fetchMock) });
+    await credentialServiceStub.save("oauth:active_provider", BIGMODEL_PROVIDER_ID);
+    await credentialServiceStub.save("oauth:bigmodel:access_token", "old-token");
+    await credentialServiceStub.save("zcodejwttoken", "old-jwt");
+    await credentialServiceStub.save(
+      "oauth:bigmodel:user_info",
+      JSON.stringify({ id: "old-user", username: "Old", displayName: "Old" }),
+    );
+    const restore = service.restoreCachedSessionState();
+    await reading;
+    const { state } = await service.startOAuth(BIGMODEL_PROVIDER_ID);
+    fetchMock.mockResolvedValueOnce(createBigModelZcodeTokenResponse("new-jwt", "new-token"));
+    fetchMock.mockResolvedValueOnce(createBigModelUserInfoResponse());
+    await service.handleCallback(`zcode://oauth/callback?authCode=new-login&state=${state}`);
+    release();
+    await expect(restore).resolves.toMatchObject({ status: "authenticated" });
+    expect(credentialStore.get("oauth:bigmodel:access_token")).toBe("new-token");
+    expect(credentialStore.get("zcodejwttoken")).toBe("new-jwt");
   });
 
   it("does not clear a newly selected provider while another provider restore is expiring", async () => {

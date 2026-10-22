@@ -1,4 +1,4 @@
-import { TID_SIDE_PANE_TOGGLE, TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_SIDE_PANE_TOGGLE, TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { clearAppData, switchToNewestWindow } from "../../../helpers/desktop-app.js";
 import {
   prepareV4ConversationE2E,
@@ -48,7 +48,9 @@ describe("DBG01 开发者工具请求诊断", () => {
     } else {
       await add.waitForClickable({ timeout: 15_000 });
       await add.click();
-      const item = await $('[data-side-pane-add-item="developer-tools"]');
+      const item = await $(
+        '[data-state="active"] [data-side-pane-open-tab-item="developer-tools"]',
+      );
       await item.waitForClickable({ timeout: 10_000 });
       await item.click();
     }

@@ -1,5 +1,5 @@
 import { dirname } from "node:path";
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -40,7 +40,7 @@ import { getPassiveAgentStartupWorkspacePaths } from "../../../helpers/passive-a
 import {
   openWorkspaceDraftFromSidebar,
   waitForActiveWorkspacePath,
-  waitForRestoredWorkspaceItems,
+  waitForRestoredProjects,
 } from "../../../helpers/workspace-agent-warmup.js";
 import { restartIntoWorkspacePreservingProfile } from "../../../helpers/model-provider-restart.js";
 
@@ -72,7 +72,7 @@ describe("Model Provider 回归目录缺口 E2E", () => {
     await ensureUpstreamModelForE2E(UPSTREAM_SECONDARY_MODEL);
 
     const workspacePaths = getPassiveAgentStartupWorkspacePaths(dirname(DEFAULT_WORKSPACE), 2);
-    await waitForRestoredWorkspaceItems(workspacePaths, 60000);
+    await waitForRestoredProjects(workspacePaths, 60000);
     const workspaceA = DEFAULT_WORKSPACE;
     const workspaceB = workspacePaths[0];
     if (!workspaceB) throw new Error("workspace fixture 不完整");

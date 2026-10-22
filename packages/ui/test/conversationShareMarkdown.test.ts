@@ -11,8 +11,6 @@ describe("normalizeConversationShareMarkdown", () => {
     );
 
     expect(result).toBe("结论见 report.pdf。");
-    expect(result).not.toContain("zcode-file-citation");
-    expect(result).not.toContain("/Users/demo");
   });
 
   it("does not rewrite citation-looking text inside a fenced code block", () => {

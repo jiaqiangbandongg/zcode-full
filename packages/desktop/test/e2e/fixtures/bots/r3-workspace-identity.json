@@ -1,0 +1,7 @@
+{
+  "caseId": "BOT-E2E-RW-02",
+  "classification": "synthetic",
+  "syntheticReason": "Uses an in-memory Source directory and Window registry with real Bot services and MessagePort RPC; legacy contexts migrate to the current project authorization key while task/model endpoints are isolated synthetic services and no third-party messages or model requests are sent.",
+  "promptMarker": "E2E_BOT_R3_IDENTITY",
+  "timing": "fast-process"
+}

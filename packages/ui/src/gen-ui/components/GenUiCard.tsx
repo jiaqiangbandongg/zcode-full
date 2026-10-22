@@ -6,7 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { Copy, Maximize2, SlidersHorizontal, X } from "lucide-react";
+import { Copy, Loader2, Maximize2, SlidersHorizontal, X } from "lucide-react";
 import type { GenUiReference } from "@zcode/shared/gen-ui";
 import { Button } from "@/components/ui/button.js";
 import {
@@ -35,14 +35,33 @@ function PageAnchor({ page, height }: { page: GenUiPage; height: number }) {
     />
   );
 }
-function PreviewAnchor({ page, suspended }: { page: GenUiPage; suspended: boolean }) {
+function PreviewAnchor({
+  page,
+  suspended,
+  hasPanel,
+}: {
+  page: GenUiPage;
+  suspended: boolean;
+  hasPanel: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (suspended || !ref.current) return;
     page.preview(ref.current);
     return () => page.preview(null);
   }, [page, suspended]);
-  return <div ref={ref} className="min-h-0 flex-1" data-testid="gen-ui-preview-anchor" />;
+  // 预览位于 top layer，外层 Dialog 无法裁切；锚点向承载层传递实际底部圆角。
+  return (
+    <div
+      ref={ref}
+      className="min-h-0 flex-1"
+      style={{
+        borderBottomLeftRadius: hasPanel ? 0 : "inherit",
+        borderBottomRightRadius: hasPanel ? 0 : "inherit",
+      }}
+      data-testid="gen-ui-preview-anchor"
+    />
+  );
 }
 export function GenUiCard({
   target,
@@ -91,6 +110,7 @@ export function GenUiCard({
     if (snapshot.escapeSequence) setExpanded(false);
   }, [snapshot.escapeSequence]);
   const title = reference.title || label("title");
+  const loading = supported && online && snapshot.phase !== "error" && !acquisitionError;
   const status = !supported
     ? label("desktopOnly")
     : !online
@@ -110,6 +130,14 @@ export function GenUiCard({
       data-visible={snapshot.hovered || tweaks}
       data-testid="gen-ui-actions"
     >
+      {preview && (
+        <DialogTitle
+          className={reference.title ? "min-w-0 flex-1 truncate" : "sr-only"}
+          title={title}
+        >
+          {title}
+        </DialogTitle>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"
@@ -165,8 +193,11 @@ export function GenUiCard({
     <section className="my-3 w-full" data-testid="gen-ui-card" data-gen-ui-phase={snapshot.phase}>
       <div className="group relative flow-root">
         {(snapshot.phase !== "ready" || !page) && (
-          <div className="space-y-2 py-3 text-ui-sm text-foreground-subtle" role="status">
-            <p>{status}</p>
+          <div className="space-y-2 py-3 text-ui-base text-foreground-subtle" role="status">
+            <p className="flex items-center gap-2">
+              {loading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+              {status}
+            </p>
             {(snapshot.error || acquisitionError) && (
               <p className="break-words text-ui-xs">{snapshot.error || acquisitionError}</p>
             )}
@@ -207,9 +238,10 @@ export function GenUiCard({
             expandButton.current?.focus();
           }}
         >
-          <DialogTitle className="sr-only">{title}</DialogTitle>
           {controls(true)}
-          {page && <PreviewAnchor page={page} suspended={draft !== null} />}
+          {page && (
+            <PreviewAnchor page={page} suspended={draft !== null} hasPanel={panel !== null} />
+          )}
           {panel}
         </DialogContent>
       </Dialog>

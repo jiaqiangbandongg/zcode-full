@@ -339,7 +339,6 @@ test("/dwf rejects an unknown subcommand with usage", async () => {
 
 test("the slash command registry knows /dwf and /workflow and has dropped /workflows", () => {
   const dwf = parseSlashCommand("/dwf list");
-  assert.equal(dwf?.type, "known");
   assert.equal(dwf?.type === "known" ? dwf.name : undefined, "dwf");
 
   // legacy `/workflows` 命名空间整体移除（面板机器随之删除）。`/workflow` 不是它的残留：

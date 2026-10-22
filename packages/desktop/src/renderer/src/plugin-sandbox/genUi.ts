@@ -4,6 +4,8 @@ import {
   GEN_UI_GLOBALS_EVENT,
   GEN_UI_STATE_CONTEXT_KEY,
   GEN_UI_TWEAK_CONTEXT_KEY,
+  GEN_UI_STYLE_CONTEXT_KEY,
+  genUiStyleVariablesSchema,
   GEN_UI_STATE_METHOD,
   GEN_UI_FOLLOW_UP_METHOD,
   GEN_UI_TWEAK_METHOD,
@@ -118,7 +120,8 @@ const update = (context: Record<string, unknown>) => {
   }
   const variables = (context.styles as { variables?: Record<string, string> } | undefined)
     ?.variables;
-  for (const [name, value] of Object.entries(variables ?? {}))
+  const controls = genUiStyleVariablesSchema.parse(context[GEN_UI_STYLE_CONTEXT_KEY] ?? {});
+  for (const [name, value] of Object.entries({ ...variables, ...controls }))
     if (name.startsWith("--")) document.documentElement.style.setProperty(name, value);
   window.dispatchEvent(
     new CustomEvent(GEN_UI_GLOBALS_EVENT, {

@@ -12,6 +12,7 @@ import {
   type SVGProps,
 } from "react";
 import { CircleCheck, Loader2, TriangleAlert } from "lucide-react";
+import { type ZCodeOffPeakTask } from "@zcode/shared";
 import {
   TID_OFFPEAK_ACTION_CONTINUE,
   TID_OFFPEAK_ACTION_DELETE,
@@ -19,8 +20,7 @@ import {
   TID_OFFPEAK_CARD,
   TID_OFFPEAK_CARD_SESSION,
   TID_OFFPEAK_CARD_MENU,
-  type ZCodeOffPeakTask,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DropdownMenu,
   DropdownMenuContent,

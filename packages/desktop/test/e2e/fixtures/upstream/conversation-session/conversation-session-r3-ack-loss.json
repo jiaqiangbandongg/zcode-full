@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-ack-loss",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-ack-loss.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-ack-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_ACK_LOSS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-ack-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 ack loss\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-ack-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_ACK_LOSS_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-ack-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_ACK_LOSS_REPLY"
+        },
+        "delayMs": 3000
+      }
+    }
+  ]
+}

@@ -1,3 +1,7 @@
+import { TOOL_SEARCH_NAME, type ModelToolContract } from "@zcode/contracts";
+import { buildToolSearchAnnouncement, buildToolExposure } from "../../tool/search/exposure.js";
+import { prepareRuntimeProviderRequest } from "../helpers/runtime-provider-request-messages.js";
+import { collectDiscoveredTools, compactDiscoveryMetadata } from "../../tool/search/history.js";
 import { collectRuntimeAgentListing } from "../helpers/agent-listing.js";
 import {
   CompactPhase,
@@ -95,6 +99,7 @@ export async function compactActiveConversation(
     model?: Model;
     agentListingTools?: readonly { name: string }[];
     activeEntries?: readonly RuntimeMessageEntry[];
+    getContinuationTools?: () => readonly ModelToolContract[];
   } = {},
 ): Promise<{
   displayText: string;
@@ -163,6 +168,7 @@ async function compactActiveConversationImpl(
     model?: Model;
     agentListingTools?: readonly { name: string }[];
     activeEntries?: readonly RuntimeMessageEntry[];
+    getContinuationTools?: () => readonly ModelToolContract[];
   } = {},
 ): Promise<{
   displayText: string;
@@ -251,13 +257,33 @@ async function compactActiveConversationImpl(
     turnTraceContext,
     events,
   );
-  // 止血原因：massive MCP 工具会把 compact summary request 的 provider context 撑爆。
-  // ToolSearch/deferred tools 完成前，仅在工具数超过阈值时让 compact summary 保持无工具。
   await this.initializeMcp(turnTraceContext);
   throwIfTurnAborted(options.abortSignal);
   const runtimeCompactTools = this.getTools(compactModel);
-  const compactTools =
-    runtimeCompactTools.length > COMPACT_TOOL_KEEP_MAX_COUNT ? [] : runtimeCompactTools;
+  const registry = this.getToolRegistry();
+  let compactCandidates = runtimeCompactTools.filter(
+    (tool) =>
+      tool.name === "Read" ||
+      tool.name === TOOL_SEARCH_NAME ||
+      tool.name === "DeferredToolCall" ||
+      registry.get(tool.name)?.metadata.mcpPresentation,
+  );
+  // Bug 根因：只看 provider 能力会在 ToolSearch 被禁用或全部常驻时绕过数量保护，
+  // 让大量 MCP schema 再次撑大压缩请求；实际不可启用时恢复原普通工具策略。
+  if (
+    !buildToolExposure({
+      model: compactModel,
+      mode: this.config.toolSearch?.mode,
+      tools: compactCandidates,
+      registry,
+      entries: [],
+    }).enabled
+  ) {
+    compactCandidates = runtimeCompactTools.filter(
+      (tool) => tool.name !== TOOL_SEARCH_NAME && tool.name !== "DeferredToolCall",
+    );
+    if (compactCandidates.length > COMPACT_TOOL_KEEP_MAX_COUNT) compactCandidates = [];
+  }
 
   while (true) {
     try {
@@ -309,17 +335,23 @@ async function compactActiveConversationImpl(
       };
 
       while (true) {
-        const requestMessages = buildCompactSummaryRequestMessages(
-          entriesForSummary,
-          compactPrompt,
-          { useMidConversationSystem },
-        );
-        const recordableEntries = filterOutputTokenContinuationEntries(entriesForSummary);
+        const prepared = prepareRuntimeProviderRequest(this, {
+          model: compactModel,
+          tools: compactCandidates,
+          registry,
+          entries: entriesForSummary,
+          prompt: compactPrompt,
+          applyCacheControl: true,
+          skipCacheWrite: true,
+        });
+        const requestMessages = prepared.request.messages;
+        const recordableEntries = filterOutputTokenContinuationEntries(prepared.entries);
         const recordableRequestMessages =
-          recordableEntries === entriesForSummary
+          recordableEntries === prepared.entries
             ? requestMessages
             : buildCompactSummaryRequestMessages(recordableEntries, compactPrompt, {
                 useMidConversationSystem,
+                loadedToolCallIds: prepared.loadedToolCallIds,
               });
         // Compact 曾只执行 capability projection，漏掉普通 turn 共用的聚合
         // 媒体预算；统一走模型媒体策略，避免 summary 请求绕过全局请求上限。
@@ -374,7 +406,7 @@ async function compactActiveConversationImpl(
             providerId: String(compactModel.providerId),
             modelId: String(compactModel.modelId),
             querySource: "compact",
-            toolCount: compactTools.length,
+            toolCount: prepared.request.tools.length,
             compactPromptTooLongRetry: compactPromptTooLongAttempts,
           },
           modelTraceContext,
@@ -402,7 +434,8 @@ async function compactActiveConversationImpl(
           // content block 提交前仍可丢弃并 HTTP fallback，block end 后则禁止任何重放。
           preserveProviderStreamBoundaries: true,
           traceContext: modelTraceContext,
-          tools: compactTools,
+          tools: prepared.request.tools,
+          toolSearchEnabled: prepared.request.toolSearchEnabled,
           refreshRuntimeHeadersBeforeAttempt: createRefreshRuntimeHeadersBeforeModelAttempt(this, {
             abortSignal: options.abortSignal,
             model: compactModel,
@@ -494,6 +527,25 @@ async function compactActiveConversationImpl(
             workspaceRoot: this.workspaceRoot,
           })
         : undefined;
+      // Bug 根因：compact 丢弃旧公告后曾依赖下一次请求补齐，纯 Continue 无正常收集机会。
+      // 在取消检查后按保留历史重建，使用继续执行的作用域，不使用摘要候选工具。
+      throwIfTurnAborted(options.abortSignal);
+      const preCompactDiscoveredTools = collectDiscoveredTools(activeEntries);
+      const discovery = compactDiscoveryMetadata({
+        boundaryId: createCompactBoundaryId(),
+        preCompactDiscoveredTools: [...preCompactDiscoveredTools],
+      });
+      // 新检查点尚未提交；公告使用同一候选分类，避免把即将提升的工具重新公告为待加载。
+      const toolAnnouncement = buildToolSearchAnnouncement(
+        {
+          model: compactModel,
+          mode: this.config.toolSearch?.mode,
+          tools: options.getContinuationTools?.() ?? this.getTools(compactModel),
+          registry,
+          entries: preservedEntries,
+        },
+        preCompactDiscoveredTools,
+      );
       const agentListingEntry = collectRuntimeAgentListing(
         this,
         preservedEntries,
@@ -506,6 +558,7 @@ async function compactActiveConversationImpl(
           preservedEntries,
           readFileState: this.readFileState,
         }),
+        ...(toolAnnouncement ? [toolAnnouncement] : []),
       ];
 
       const modelCompleteEvent = this.createEvent(
@@ -536,26 +589,20 @@ async function compactActiveConversationImpl(
             summaryMessageId,
           })
         : { keptMessageCount: countCompactPreservedRuntimeMessages(recordablePreservedEntries) };
-      const postCompactEntries = buildPostCompactRuntimeEntries(
-        activeEntries,
-        {
-          message: {
-            role: "user",
-            content: summaryMessageContent,
-          },
-          metadata: legacySyntheticRuntimeMetadata(),
-        },
-        {
-          postCompactReminderEntries,
-          preservedEntries,
-        },
-      );
+      const summaryEntry = {
+        message: { role: "user" as const, content: summaryMessageContent },
+        metadata: { ...legacySyntheticRuntimeMetadata(), compactBoundary: discovery },
+      };
+      const postCompactEntries = buildPostCompactRuntimeEntries(activeEntries, summaryEntry, {
+        postCompactReminderEntries,
+        preservedEntries,
+      });
       const truePostCompactTokenCount = estimateRuntimeEntryTokens(postCompactEntries, {
         useMidConversationSystem,
       });
       const providerPostCompactTokenCount = getUsageTotalTokens(result.usage);
       const compactBoundary = buildManualCompactBoundary({
-        boundaryId: createCompactBoundaryId(),
+        ...discovery,
         autoCompactThreshold: options.autoCompactThreshold,
         compactReason,
         customInstructions,
@@ -580,6 +627,7 @@ async function compactActiveConversationImpl(
             : undefined,
       });
 
+      // 发现检查点跟随 summary 原子保存；持久化成功后才替换 Runtime 历史。
       await this.persistCompactSummary(
         summaryMessageId,
         summaryMessageContent,

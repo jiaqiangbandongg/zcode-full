@@ -1,15 +1,23 @@
 import { create } from "zustand";
-import type { RemoteTarget } from "@zcode/shared";
+import type { RemoteTarget, WorkspacePurpose } from "@zcode/shared";
 import type { IServiceAccessor } from "@zcode/services";
 import { remoteAgentServiceGeneration } from "@/lib/remoteAgentServiceGeneration.js";
 import { createRemoteWorkspaceDisconnectedError } from "@/lib/remoteWorkspaceServiceError.js";
 
 export interface RemoteWorkspaceSession {
   sessionId: string;
+  sourceServerId?: string;
+  workspacePath?: string;
+  workspaceIdentity?: string;
+  workspacePurpose?: WorkspacePurpose;
+  /** Desktop bind 返回的旧 route tab rekey 提示；不参与 remote session 路由。 */
+  previousWorkspaceIdentity?: string;
   target?: RemoteTarget;
   services: IServiceAccessor;
   dispose?: (reason?: Error) => void;
 }
+
+export type RemoteWorkspaceConnectionOverlay = "disconnected" | "reconnecting";
 
 interface RemoteWorkspaceSessionState {
   baseServices: IServiceAccessor | null;
@@ -18,6 +26,7 @@ interface RemoteWorkspaceSessionState {
   // 之前只按 workspacePath 建索引，同路径不同远端会互相覆盖。
   // 这里补充 workspaceIdentity -> session 的映射，保证远程会话按“主机+路径”唯一绑定。
   sessionIdByWorkspaceIdentity: Record<string, string>;
+  connectionOverlayByWorkspaceKey: Record<string, RemoteWorkspaceConnectionOverlay>;
   registerBaseServices: (services: IServiceAccessor) => void;
   registerSession: (session: RemoteWorkspaceSession) => void;
   unregisterSession: (sessionId: string) => void;
@@ -25,6 +34,8 @@ interface RemoteWorkspaceSessionState {
   unbindWorkspacePath: (workspacePath: string) => void;
   bindWorkspaceIdentity: (workspaceIdentity: string, sessionId: string) => void;
   unbindWorkspaceIdentity: (workspaceIdentity: string) => void;
+  setConnectionOverlay: (workspaceKey: string, state: RemoteWorkspaceConnectionOverlay) => void;
+  clearConnectionOverlay: (workspaceKey: string) => void;
 }
 
 export const useRemoteWorkspaceSessionStore = create<RemoteWorkspaceSessionState>()((set) => ({
@@ -32,6 +43,7 @@ export const useRemoteWorkspaceSessionStore = create<RemoteWorkspaceSessionState
   sessionsById: {},
   sessionIdByWorkspacePath: {},
   sessionIdByWorkspaceIdentity: {},
+  connectionOverlayByWorkspaceKey: {},
   registerBaseServices: (services) =>
     set({
       baseServices: services,
@@ -112,6 +124,22 @@ export const useRemoteWorkspaceSessionStore = create<RemoteWorkspaceSessionState
         sessionIdByWorkspaceIdentity: nextSessionIdByWorkspaceIdentity,
       };
     }),
+  setConnectionOverlay: (workspaceKey, overlay) =>
+    set((state) => ({
+      connectionOverlayByWorkspaceKey: {
+        ...state.connectionOverlayByWorkspaceKey,
+        [workspaceKey]: overlay,
+      },
+    })),
+  clearConnectionOverlay: (workspaceKey) =>
+    set((state) => {
+      if (!(workspaceKey in state.connectionOverlayByWorkspaceKey)) {
+        return state;
+      }
+      const next = { ...state.connectionOverlayByWorkspaceKey };
+      delete next[workspaceKey];
+      return { connectionOverlayByWorkspaceKey: next };
+    }),
 }));
 
 export function registerRemoteWorkspaceSession(session: RemoteWorkspaceSession): void {
@@ -158,6 +186,23 @@ export function bindRemoteWorkspaceIdentity(workspaceIdentity: string, sessionId
 
 export function unbindRemoteWorkspaceIdentity(workspaceIdentity: string): void {
   useRemoteWorkspaceSessionStore.getState().unbindWorkspaceIdentity(workspaceIdentity);
+}
+
+export function setRemoteWorkspaceConnectionState(
+  workspaceKey: string,
+  state: RemoteWorkspaceConnectionOverlay,
+): void {
+  useRemoteWorkspaceSessionStore.getState().setConnectionOverlay(workspaceKey, state);
+}
+
+export function clearRemoteWorkspaceConnectionState(workspaceKey: string): void {
+  useRemoteWorkspaceSessionStore.getState().clearConnectionOverlay(workspaceKey);
+}
+
+export function getRemoteWorkspaceConnectionState(
+  workspaceKey: string,
+): RemoteWorkspaceConnectionOverlay | undefined {
+  return useRemoteWorkspaceSessionStore.getState().connectionOverlayByWorkspaceKey[workspaceKey];
 }
 
 export function getRemoteWorkspaceSession(sessionId: string): RemoteWorkspaceSession | null {

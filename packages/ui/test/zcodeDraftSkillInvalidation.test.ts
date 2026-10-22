@@ -1,90 +1,45 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { IZCodeSessionService } from "@zcode/services";
-import { invalidateDeferredDraftSessionForSkillChange } from "../src/lib/zcodeDraftSkillInvalidation.js";
-import { useZCodeSessionStore } from "../src/store/zcodeSessionStore.js";
-
-function createSessionService(
-  closeSession: IZCodeSessionService["closeSession"] = vi.fn(async () => {}),
-): Pick<IZCodeSessionService, "closeSession"> {
-  return { closeSession };
-}
-
+import { beforeEach, describe, expect, it } from "vitest";
+import { invalidateDeferredDraftSessionForSkillChange } from "@/lib/zcodeDraftSkillInvalidation.js";
+import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 beforeEach(() => {
-  useZCodeSessionStore.setState((state) => ({
-    ...state,
-    workspaces: {},
-  }));
+  useZCodeSessionStore.setState({ workspaces: {} });
 });
-
-describe("invalidateDeferredDraftSessionForSkillChange", () => {
-  it("closes and clears the current workspace draft session", async () => {
-    const closeSession = vi.fn(async () => {});
+describe("draft capability invalidation", () => {
+  it("invalidates only the requested identity without changing its active task", async () => {
     const workspacePath = "/workspace/app";
-    const workspaceIdentity = "ssh:dev";
-    useZCodeSessionStore.getState().setDraftSessionId(workspacePath, "draft-1", workspaceIdentity);
-
+    const workspaceIdentity = "remote:server:dev:/workspace/app";
+    const store = useZCodeSessionStore.getState();
+    store.setActiveTaskId(workspacePath, "active", workspaceIdentity);
     await invalidateDeferredDraftSessionForSkillChange({
       reason: "test",
       workspacePath,
-      workspaceIdentity,
-      zcodeSessionService: createSessionService(closeSession),
-    });
-
-    expect(closeSession).toHaveBeenCalledWith({
-      workspacePath,
-      workspaceIdentity,
-      sessionId: "draft-1",
+      workspaceIdentity: ` ${workspaceIdentity} `,
     });
     expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentity)
-        .draftSessionId,
-    ).toBeNull();
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentity)
-        .draftRuntimeInvalidationVersion,
-    ).toBe(1);
-  });
-
-  it("invalidates a protocol-v4 prewarm even when there is no legacy draft session", async () => {
-    const closeSession = vi.fn(async () => {});
-    const workspacePath = "/workspace/app";
-
-    await invalidateDeferredDraftSessionForSkillChange({
-      reason: "test",
-      workspacePath,
-      zcodeSessionService: createSessionService(closeSession),
+      useZCodeSessionStore.getState().getWorkspaceState(workspacePath, workspaceIdentity),
+    ).toMatchObject({
+      activeTaskId: "active",
+      draftRuntimeInvalidationVersion: 1,
     });
-
-    expect(closeSession).not.toHaveBeenCalled();
     expect(
       useZCodeSessionStore.getState().getWorkspaceState(workspacePath)
         .draftRuntimeInvalidationVersion,
-    ).toBe(1);
+    ).toBe(0);
   });
-
-  it("still clears the draft when closing the stale session fails", async () => {
-    const closeSession = vi.fn(async () => {
-      throw new Error("stale draft");
-    });
-    const workspacePath = "/workspace/app";
-    useZCodeSessionStore.getState().setDraftSessionId(workspacePath, "draft-1");
-
-    await invalidateDeferredDraftSessionForSkillChange({
-      reason: "test",
-      workspacePath,
-      zcodeSessionService: createSessionService(closeSession),
-    });
-
-    expect(closeSession).toHaveBeenCalledWith({
-      workspacePath,
-      sessionId: "draft-1",
-    });
+  it("invalidates a prewarm on each capability change without a copied session id", async () => {
+    for (const reason of ["skill-enabled", "plugin-updated"]) {
+      await invalidateDeferredDraftSessionForSkillChange({
+        reason,
+        workspacePath: "/workspace/app",
+      });
+    }
     expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath).draftSessionId,
-    ).toBeNull();
-    expect(
-      useZCodeSessionStore.getState().getWorkspaceState(workspacePath)
+      useZCodeSessionStore.getState().getWorkspaceState("/workspace/app")
         .draftRuntimeInvalidationVersion,
-    ).toBe(1);
+    ).toBe(2);
+  });
+  it("does not create a workspace for a settings view without an execution target", async () => {
+    await invalidateDeferredDraftSessionForSkillChange({ reason: "test" });
+    expect(useZCodeSessionStore.getState().workspaces).toEqual({});
   });
 });

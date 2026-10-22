@@ -10,6 +10,7 @@ Electron Main 适配层，拥有沙箱内容、guest、端口和浏览器分区�
 - 原生 camera/microphone/geolocation/clipboardWrite 仍按资源声明和既有确认策略授权；绑定实际 guest/frame、owner、运行凭证，异步确认和系统授权返回后再验证。失效页面的确认不能授权替换页面。
 - guest 输入产生 5 秒一次性手势 token。关闭实例同时释放 ports 和实际 guest，partition 持久保留。
 - 上限 64；Main 不抢占其他窗口或刚准备的实例，只清过期且未被 guest pin 的登记。Renderer owner 决定业务回收；容量不足明确报错。
+- `setExecutionActive` 仅接受宿主 sender 对当前 sandboxId/initId 的 MCP 请求，Gen UI 不接入。复用目标 guest 的可逆 capturer 活动，不改变全窗口后台节流；登记撤销、guest/owner 销毁释放活动。Renderer page owner 按保留页面的可见性请求活动，不根据 session 执行状态停止页面；Main 不保存第二份业务状态。
 - 撤销登记先关端口，再由 Main 单次导航 guest 到 about:blank，等待旧插件 frame 移除后 close；IPC dispose 等待同一个停止 Promise。Electron 附着 webview 的 destroyed 可能仅释放包装对象，不是停止页面写入的屏障；插件 beforeunload 不能阻止宿主释放。
 - 清除所有数据先阻止新登记、撤销登记并等待所有 guest 停止（含已在 dispose 的实例），再 clearStorageData/clearCache，覆盖所有新旧 MCP App 分区。停止失败不能继续报告清理成功；flushStorageData 不是完成屏障。平时保留旧 v1 分区，不迁移或自动合并；本模块不访问插件 SQLite 或业务文件。
 

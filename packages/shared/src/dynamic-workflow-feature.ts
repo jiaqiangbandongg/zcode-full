@@ -44,19 +44,19 @@ export type DynamicWorkflowClientConfigSource = "remote" | "override" | "default
 
 /**
  * 灰度快照（launch.md「Gray release」「The user's choice」）。两层：
- *   - 提供（offer）：服务端 key 或本地覆盖决定功能是否可用、默认是哪个模式，记在 `offeredMode`；
- *   - 生效（effective）：可用时用户在设置里的选择取代提供的模式，记在 `mode` / `enabled`。
- * 旧消费者读 `mode` / `enabled` 即得生效值；设置页读 `offeredMode` 决定是否出现与「默认」标签。
+ *   - 提供（offer）：服务端 key 或本地覆盖决定默认是哪个模式，记在 `offeredMode`（disabled 也只是默认值）；
+ *   - 生效（effective）：用户在设置里的明确选择永远取代提供的模式，记在 `mode` / `enabled`。
+ * 旧消费者读 `mode` / `enabled` 即得生效值；设置页读 `offeredMode` 决定「默认」标签。
  */
 export interface DynamicWorkflowClientConfig {
-  /** 生效模式：可用且用户有选择时是用户选择，否则等于 offeredMode。 */
+  /** 生效模式：用户有选择时是用户选择，否则等于 offeredMode。 */
   readonly mode: DynamicWorkflowMode;
   /** 等于 isDynamicWorkflowModeEnabled(mode)；单独落字段免得每个消费者各写一遍折叠规则。 */
   readonly enabled: boolean;
   readonly source: DynamicWorkflowClientConfigSource;
-  /** 服务端（或本地覆盖）提供的模式：不是 disabled 即功能可用，也是设置页的「默认」选项。 */
+  /** 服务端（或本地覆盖）提供的模式：用户没选时的生效模式，也是设置页的「默认」选项。 */
   readonly offeredMode: DynamicWorkflowMode;
-  /** 实际生效的用户选择；缺席表示跟随提供的模式（未选择、非法值，或功能未提供）。 */
+  /** 实际生效的用户选择；缺席表示跟随提供的模式（未选择或非法值）。 */
   readonly userMode?: DynamicWorkflowMode;
 }
 
@@ -73,21 +73,23 @@ export function createDynamicWorkflowClientConfig(
 }
 
 /**
- * 功能是否提供（与用户选择无关）：设置行只在提供时出现。
+ * 读快照里服务端提供的默认模式（与用户选择无关）；设置行与中枢的「工作流设置」只在读得到时出现。
+ * disabled 也是合法的默认值：此时行照样出现，「默认」标签落在「关闭」上。
  *
- * 修复原因：快照可能来自没有 offeredMode 的旧 Host（新 UI——例如手机远控 bundle——连旧桌面）。
- * 过去直接比 `!== "disabled"`，缺席的字段读作「已提供」，设置行照出、选择写进一个旧 Host 不认的
- * 设置。缺席或读不懂的 offeredMode 一律按未提供：只有认用户选择的 Host 才会写这个字段。
+ * 快照可能来自没有 offeredMode 的旧 Host（新 UI——例如手机远控 bundle——连旧桌面）。旧 Host 不认
+ * 用户选择，摆出设置行只会把选择写进一个不生效的设置，所以缺席或读不懂的 offeredMode 返回 undefined：
+ * 只有认用户选择的 Host 才会写这个字段。
  */
-export function isDynamicWorkflowOffered(config: DynamicWorkflowClientConfig): boolean {
-  const offeredMode = normalizeDynamicWorkflowMode(config.offeredMode);
-  return offeredMode !== undefined && isDynamicWorkflowModeEnabled(offeredMode);
+export function readDynamicWorkflowOfferedMode(
+  config: DynamicWorkflowClientConfig,
+): DynamicWorkflowMode | undefined {
+  return normalizeDynamicWorkflowMode(config.offeredMode);
 }
 
 /**
- * 「服务端提供、用户挑选」规则的唯一实现（launch.md「The user's choice」）：
- *   - 功能未提供（offeredMode 为 disabled）时用户选择不生效——选择永远不能把服务端关掉的功能打开；
- *   - 可用时合法的用户选择取代提供的模式；缺席或非法值（旧文件、未来版本写入的新值）按跟随处理。
+ * 「服务端给默认、用户选择永远生效」规则的唯一实现（launch.md「The user's choice」）：
+ *   - 合法的用户选择取代提供的模式，提供的是 disabled 也一样——功能已全量，服务端只决定默认值；
+ *   - 缺席或非法值（旧文件、未来版本写入的新值）按跟随提供的模式处理。
  * 只从 `offeredMode` 推导，所以对已应用过选择的快照再次应用是覆盖而不是叠加：Host 闩住的是提供，
  * 每次使用都用最新选择重新应用。
  */
@@ -97,7 +99,7 @@ export function applyDynamicWorkflowUserMode(
 ): DynamicWorkflowClientConfig {
   const offer = createDynamicWorkflowClientConfig(config.offeredMode, config.source);
   const choice = normalizeDynamicWorkflowMode(userMode);
-  if (!choice || !isDynamicWorkflowOffered(offer)) return offer;
+  if (!choice) return offer;
   return {
     ...offer,
     mode: choice,

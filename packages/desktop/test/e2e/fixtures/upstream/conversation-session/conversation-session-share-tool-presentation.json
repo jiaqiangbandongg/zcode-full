@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-tool-presentation",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-tool-presentation.test.ts",
+  "fixtures": [
+    {
+      "id": "share-tool-fetch-call",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "tool-use",
+        "syntheticReason": "固定触发 Fetch 与 Bash；Fetch 的私网目标在 IO 前失败，整个用例不访问真实网站。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SHARE_TOOL_PRESENTATION"],
+        "bodyExcludes": [
+          "toolu_share_fetch",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUses": [
+          {
+            "id": "toolu_share_fetch",
+            "name": "WebFetch",
+            "input": {
+              "url": "http://example.localhost/paper",
+              "prompt": "EXTRACTION_MUST_NOT_BE_VISIBLE"
+            }
+          },
+          {
+            "id": "toolu_share_bash",
+            "name": "Bash",
+            "input": {
+              "command": "echo SHARE_TOOL_BASH"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "share-tool-final",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "工具结果回填后固定结束本轮，避免依赖真实模型。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_SHARE_TOOL_PRESENTATION", "toolu_share_fetch"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "SHARE_TOOLS_READY"
+      }
+    },
+    {
+      "id": "share-tool-title",
+      "metadata": {
+        "kind": "title",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "为独立 replay 用例提供固定标题。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": "Tool presentation"
+      }
+    }
+  ]
+}

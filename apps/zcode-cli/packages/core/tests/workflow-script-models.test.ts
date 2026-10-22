@@ -48,7 +48,11 @@ const CATALOG: ModelCatalogPort = {
     }),
     entry("zhipu", "GLM-5.3-Flash"),
     entry("team", "GLM-5.3-Flash"),
+    // `gpt-5` 在会话的 provider 下也有：裸名落到 zhipu，acme 那条只能靠全称点到。
+    entry("zhipu", "gpt-5"),
     entry("acme", "gpt-5"),
+    // 只在别的 provider 下有：裸名撞 provider 边界。
+    entry("acme", "atlas"),
   ],
 };
 
@@ -157,7 +161,7 @@ describe("resolving the names a script uses", () => {
     const analysis = analyzeScript(ROUTING_SCRIPT);
     expect(distinctModelNames(analysis.modelReferences)).toEqual(["gpt-5", "GLM-5.3"]);
     expect(resolveScriptModelBindings(["gpt-5", "GLM-5.3"], CATALOG)).toEqual({
-      "gpt-5": "acme/gpt-5",
+      "gpt-5": "zhipu/gpt-5",
       // 默认档位写进规范串：窗与 journal 读到的是将要生效的整条选择。
       "GLM-5.3": "zhipu/GLM-5.3$high",
     });
@@ -178,12 +182,23 @@ describe("resolving the names a script uses", () => {
     expect(diagnostics[0]!.message).toContain("zhipu/GLM-5.3 [current]");
   });
 
-  it("names the ambiguity when a bare id is configured under several providers and the session's is not among them", () => {
-    const analysis = analyzeScript(`agent("a", { model: "GLM-5.3-Flash" });\nreturn 1;`);
+  it("a bare id the session's provider has resolves there, whatever other providers also have it", () => {
+    expect(resolveScriptModelBindings(["GLM-5.3-Flash"], CATALOG)).toEqual({
+      "GLM-5.3-Flash": "zhipu/GLM-5.3-Flash",
+    });
+  });
+
+  it("a bare id only other providers have is 9011 naming the boundary, not a silent switch of bill", () => {
+    const analysis = analyzeScript(`agent("a", { model: "atlas" });\nreturn 1;`);
     const [diagnostic] = unresolvedScriptModelDiagnostics(analysis, {}, CATALOG);
-    expect(diagnostic!.message).toContain("more than one provider");
-    expect(diagnostic!.message).toContain("zhipu/GLM-5.3-Flash");
-    expect(diagnostic!.message).toContain("team/GLM-5.3-Flash");
+    expect(diagnostic).toMatchObject({ code: MODEL_UNRESOLVED_CODE, line: 1 });
+    expect(diagnostic!.message).toContain("session's provider (zhipu)");
+    expect(diagnostic!.message).toContain("acme/atlas");
+    expect(diagnostic!.message).toContain("never moves the subagents to another provider");
+    // 全称仍然过：那是用户点名了别处模型时的写法。
+    expect(resolveScriptModelBindings(["acme/atlas"], CATALOG)).toEqual({
+      "acme/atlas": "acme/atlas",
+    });
   });
 
   it("says the inherited model is gone rather than blaming the name", () => {
@@ -203,8 +218,8 @@ describe("resolving the names a script uses", () => {
 
   it("describes the table in the canonical spelling the model can paste back", () => {
     expect(describeScriptModelBindings({})).toBe("");
-    expect(describeScriptModelBindings({ "gpt-5": "acme/gpt-5", x: "zhipu/GLM-5.3$high" })).toBe(
-      ' Models named in the script: "gpt-5" = acme/gpt-5; "x" = zhipu/GLM-5.3$high.',
+    expect(describeScriptModelBindings({ "gpt-5": "zhipu/gpt-5", x: "zhipu/GLM-5.3$high" })).toBe(
+      ' Models named in the script: "gpt-5" = zhipu/gpt-5; "x" = zhipu/GLM-5.3$high.',
     );
   });
 });
@@ -217,7 +232,7 @@ describe("CreateWorkflow — models the script names", () => {
       resolutionContext(port),
     );
     expect(input.model_bindings).toEqual({
-      "gpt-5": "acme/gpt-5",
+      "gpt-5": "zhipu/gpt-5",
       "GLM-5.3": "zhipu/GLM-5.3$high",
     });
     expect(CreateWorkflowInputSchema.safeParse(input).success).toBe(true);
@@ -267,11 +282,11 @@ describe("CreateWorkflow — models the script names", () => {
     expect(output.ok).toBe(true);
     expect(submits).toHaveLength(1);
     expect(submits[0]!.modelBindings).toEqual({
-      "gpt-5": { providerId: "acme", modelId: "gpt-5" },
+      "gpt-5": { providerId: "zhipu", modelId: "gpt-5" },
       "GLM-5.3": { providerId: "zhipu", modelId: "GLM-5.3", options: { reasoningLevel: "high" } },
     });
     expect(output.response).toContain(
-      'Models named in the script: "gpt-5" = acme/gpt-5; "GLM-5.3" = zhipu/GLM-5.3$high.',
+      'Models named in the script: "gpt-5" = zhipu/gpt-5; "GLM-5.3" = zhipu/GLM-5.3$high.',
     );
   });
 
@@ -289,7 +304,7 @@ describe("the window's settings adjustment", () => {
   const context = resolutionContext(undefined);
   const input = {
     script: ROUTING_SCRIPT,
-    model_bindings: { "gpt-5": "acme/gpt-5", "GLM-5.3": "zhipu/GLM-5.3$high" },
+    model_bindings: { "gpt-5": "zhipu/gpt-5", "GLM-5.3": "zhipu/GLM-5.3$high" },
   };
 
   // 确认窗不逐名列出脚本点名的模型（docs/dynamic-workflow/launch.md「The window」）：应答里没有改它们的

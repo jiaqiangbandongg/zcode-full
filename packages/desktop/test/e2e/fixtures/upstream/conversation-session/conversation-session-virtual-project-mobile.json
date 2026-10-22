@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project-mobile",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project-mobile.test.ts",
+  "fixtures": [
+    {
+      "id": "vp13-existing-task",
+      "description": "Persisted project and unclassified tasks after draft reload and directory reuse",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "A fixed reply creates one real persisted task for mobile navigation; model generation quality is outside this case."
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP13_HISTORY"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp13-history",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP13_HISTORY_READY"
+        }
+      }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RemoteTarget } from "@zcode/shared";
+import type { RemoteTarget, RemoteWorkspaceSessionEntry } from "@zcode/shared";
 import {
   buildRemoteWorkspaceIdentity,
   buildRemoteWorkspaceSessionMutation,
@@ -8,7 +8,6 @@ import {
   createRemoteTargetFromSnapshot,
   createRemoteTargetSnapshot,
   findMatchingRemoteWorkspaceSessionEntry,
-  formatRemoteWorkspaceDisplayLabel,
   formatRemoteWorkspaceHeaderHostLabel,
   formatRemoteWorkspaceTargetSubtitle,
   hasRemoteWorkspaceIdentity,
@@ -39,6 +38,103 @@ describe("remoteWorkspaceHistory helpers", () => {
         ],
       }),
     ).toHaveLength(2);
+  });
+
+  it("restores a rollback conversation identity from its bound Source profile", () => {
+    const workspacePath = "/home/dev/.zcode/workspace/default";
+    const legacyIdentity = `remote:ssh:localhost:2222:dev:${workspacePath}`;
+    const stableIdentity = `remote:server:source-1:${workspacePath}`;
+
+    expect(
+      readPersistedWorkspaceSessionEntries({
+        lastWorkspaceSession: [
+          {
+            kind: "remote",
+            workspacePath,
+            workspaceIdentity: legacyIdentity,
+            workspacePurpose: "conversation",
+            target: {
+              kind: "ssh",
+              host: "localhost",
+              port: 2222,
+              username: "dev",
+            },
+            lastOpenedAt: 1,
+            lastConnectionStatus: "connected",
+          },
+        ],
+        sourceServerWorkspaceHistory: [],
+        connectionProfiles: [
+          {
+            profileId: "profile-1",
+            sourceServerId: "source-1",
+            transport: "ssh",
+            target: {
+              kind: "ssh",
+              host: "localhost",
+              port: 2222,
+              username: "dev",
+            },
+            createdAt: 1,
+          },
+        ],
+        remoteConversationWorkspaceBySourceServerId: {
+          "source-1": { workspacePath, lastResolvedAt: 1 },
+        },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        workspaceIdentity: stableIdentity,
+        workspacePurpose: "conversation",
+      }),
+    ]);
+  });
+
+  it("keeps an ambiguous rollback conversation identity fail-closed", () => {
+    const workspacePath = "/home/dev/.zcode/workspace/default";
+    const legacyIdentity = `remote:ssh:localhost:2222:dev:${workspacePath}`;
+    const target = {
+      kind: "ssh" as const,
+      host: "localhost",
+      port: 2222,
+      username: "dev",
+    };
+
+    expect(
+      readPersistedWorkspaceSessionEntries({
+        lastWorkspaceSession: [
+          {
+            kind: "remote",
+            workspacePath,
+            workspaceIdentity: legacyIdentity,
+            workspacePurpose: "conversation",
+            target,
+            lastOpenedAt: 1,
+            lastConnectionStatus: "connected",
+          },
+        ],
+        connectionProfiles: [
+          {
+            profileId: "profile-1",
+            sourceServerId: "source-1",
+            transport: "ssh",
+            target,
+            createdAt: 1,
+          },
+          {
+            profileId: "profile-2",
+            sourceServerId: "source-2",
+            transport: "ssh",
+            target,
+            createdAt: 2,
+          },
+        ],
+        remoteConversationWorkspaceBySourceServerId: {
+          "source-1": { workspacePath, lastResolvedAt: 1 },
+          "source-2": { workspacePath, lastResolvedAt: 2 },
+        },
+      }),
+    ).toEqual([expect.objectContaining({ workspaceIdentity: legacyIdentity })]);
   });
 
   it("serializes local and remote tabs into a combined session snapshot", () => {
@@ -193,17 +289,14 @@ describe("remoteWorkspaceHistory helpers", () => {
   });
 
   it("persists and hydrates SSH config alias metadata", () => {
-    const snapshot = createRemoteTargetSnapshot(
-      "remote:ssh:localhost:2223:root:/root",
-      {
-        kind: "ssh",
-        host: "localhost",
-        port: 2223,
-        username: "root",
-        password: "secret",
-        sshConfigAlias: "linux-arm64",
-      },
-    );
+    const snapshot = createRemoteTargetSnapshot("remote:ssh:localhost:2223:root:/root", {
+      kind: "ssh",
+      host: "localhost",
+      port: 2223,
+      username: "root",
+      password: "secret",
+      sshConfigAlias: "linux-arm64",
+    });
 
     expect(snapshot).toMatchObject({
       kind: "ssh",
@@ -267,11 +360,7 @@ describe("remoteWorkspaceHistory helpers", () => {
     ];
 
     expect(
-      findMatchingRemoteWorkspaceSessionEntry(
-        sessions,
-        "/workspace/demo",
-        target,
-      )?.workspacePath,
+      findMatchingRemoteWorkspaceSessionEntry(sessions, "/workspace/demo", target)?.workspacePath,
     ).toBe("/workspace/demo");
   });
 
@@ -354,9 +443,7 @@ describe("remoteWorkspaceHistory helpers", () => {
       distro: "Ubuntu-24.04",
       user: "root",
     });
-    expect(formatRemoteWorkspaceHeaderHostLabel(snapshot)).toBe(
-      "wsl:Ubuntu-24.04:root",
-    );
+    expect(formatRemoteWorkspaceHeaderHostLabel(snapshot)).toBe("wsl:Ubuntu-24.04:root");
   });
 
   it("persists and hydrates server remote target credentials", () => {
@@ -388,12 +475,8 @@ describe("remoteWorkspaceHistory helpers", () => {
         token: "server-secret",
       }),
     ).toEqual(target);
-    expect(formatRemoteWorkspaceTargetSubtitle(snapshot)).toBe(
-      "Server · Studio Server",
-    );
-    expect(formatRemoteWorkspaceHeaderHostLabel(snapshot)).toBe(
-      "studio.example.com",
-    );
+    expect(formatRemoteWorkspaceTargetSubtitle(snapshot)).toBe("Server · Studio Server");
+    expect(formatRemoteWorkspaceHeaderHostLabel(snapshot)).toBe("studio.example.com");
   });
 
   it("keeps the legacy WSL identity when no user is specified", () => {
@@ -455,27 +538,6 @@ describe("remoteWorkspaceHistory helpers", () => {
     ).toBe("dev.internal:2222");
   });
 
-  it("formats SSH alias as a workspace display suffix", () => {
-    expect(
-      formatRemoteWorkspaceDisplayLabel("root", {
-        kind: "ssh",
-        host: "localhost",
-        port: 2223,
-        username: "root",
-        sshConfigAlias: " linux-arm64 ",
-      }),
-    ).toBe("root [SSH: linux-arm64]");
-
-    expect(
-      formatRemoteWorkspaceDisplayLabel("root", {
-        kind: "ssh",
-        host: "localhost",
-        port: 2223,
-        username: "root",
-      }),
-    ).toBe("root");
-  });
-
   it("treats disconnected remote tabs as remote identities", () => {
     expect(
       hasRemoteWorkspaceIdentity({
@@ -525,6 +587,156 @@ describe("remoteWorkspaceHistory helpers", () => {
     expect(mutation.credentialKeysToDelete).toEqual([]);
   });
 
+  it("does not create workspace-scoped SSH credentials for a Source Server identity", () => {
+    const mutation = buildRemoteWorkspaceSessionMutation({
+      remoteSessions: [],
+      workspacePath: "/srv/project",
+      workspaceIdentity: "remote:server:3cd4f9da-cd79-426c-9d70-75f36e9f6a87:/srv/project",
+      target: {
+        kind: "ssh",
+        host: "dev.example.com",
+        username: "alice",
+        password: "profile-owned-password",
+      },
+      lastConnectionStatus: "connected",
+      touchOpenedAt: true,
+    });
+
+    expect(mutation.entry.target).toEqual({
+      kind: "ssh",
+      host: "dev.example.com",
+      port: undefined,
+      username: "alice",
+      assetInstallMode: undefined,
+      privateKeyPath: undefined,
+      passwordCredentialKey: undefined,
+      privateKeyPassphraseCredentialKey: undefined,
+    });
+    expect(mutation.credentialsToSave).toEqual([]);
+  });
+
+  it("rekeys a legacy route entry to the Host stable identity without duplicating history or deleting rollback credentials", () => {
+    const legacyIdentity = "remote:ssh:dev.example.com:22:alice:/srv/project";
+    const stableIdentity = "remote:server:3cd4f9da-cd79-426c-9d70-75f36e9f6a87:/srv/project";
+    const mutation = buildRemoteWorkspaceSessionMutation({
+      remoteSessions: [
+        {
+          kind: "remote",
+          workspacePath: "/srv/project",
+          localWorkspacePath: "/Users/alice/project",
+          workspaceIdentity: legacyIdentity,
+          target: {
+            kind: "ssh",
+            host: "dev.example.com",
+            port: 22,
+            username: "alice",
+            passwordCredentialKey: `remote-workspace:${legacyIdentity}:password`,
+          },
+          lastOpenedAt: 123,
+          lastConnectionStatus: "connected",
+        },
+      ],
+      workspacePath: "/srv/project",
+      workspaceIdentity: stableIdentity,
+      target: {
+        kind: "ssh",
+        host: "dev.example.com",
+        port: 22,
+        username: "alice",
+      },
+      lastConnectionStatus: "failed",
+      lastConnectionError: "offline",
+      touchOpenedAt: false,
+    });
+
+    expect(mutation.nextRemoteSessions).toHaveLength(1);
+    expect(mutation.entry).toMatchObject({
+      workspaceIdentity: stableIdentity,
+      localWorkspacePath: "/Users/alice/project",
+      lastOpenedAt: 123,
+    });
+    expect(mutation.credentialKeysToDelete).toEqual([]);
+  });
+
+  describe("credential ownership during history cleanup", () => {
+    const profileEntry: RemoteWorkspaceSessionEntry = {
+      kind: "remote",
+      workspacePath: "/srv/project",
+      workspaceIdentity: "remote:ssh:dev.example.com:22:dev:/srv/project",
+      target: {
+        kind: "ssh",
+        host: "dev.example.com",
+        username: "dev",
+        passwordCredentialKey: "connection-profile:profile-1:password",
+        privateKeyPassphraseCredentialKey: "connection-profile:profile-1:private-key-passphrase",
+      },
+      lastOpenedAt: 1,
+      lastConnectionStatus: "connected",
+    };
+
+    it.each(["connected", "failed"] as const)(
+      "preserves Profile secrets when rekeying a %s workspace",
+      (lastConnectionStatus) => {
+        const mutation = buildRemoteWorkspaceSessionMutation({
+          remoteSessions: [profileEntry],
+          workspacePath: profileEntry.workspacePath,
+          workspaceIdentity: "remote:server:source-1:/srv/project",
+          target: { kind: "ssh", host: "dev.example.com", username: "dev" },
+          lastConnectionStatus,
+          touchOpenedAt: false,
+        });
+        expect(mutation.nextRemoteSessions).toHaveLength(1);
+        expect(mutation.entry.workspaceIdentity).toBe("remote:server:source-1:/srv/project");
+        expect(mutation.credentialKeysToDelete).toEqual([]);
+        expect(mutation.credentialsToSave).toEqual([]);
+        if (lastConnectionStatus === "connected") {
+          expect(mutation.entry.target).not.toHaveProperty(
+            "passwordCredentialKey",
+            "connection-profile:profile-1:password",
+          );
+          expect(mutation.entry.target).not.toHaveProperty(
+            "privateKeyPassphraseCredentialKey",
+            "connection-profile:profile-1:private-key-passphrase",
+          );
+        }
+      },
+    );
+
+    it("does not delete Profile secrets when their history entry is evicted", () => {
+      const mutation = buildRemoteWorkspaceSessionMutation({
+        remoteSessions: [
+          profileEntry,
+          ...Array.from(
+            { length: 19 },
+            (_, index): RemoteWorkspaceSessionEntry => ({
+              kind: "remote",
+              workspacePath: `/srv/other-${index}`,
+              target: { kind: "docker", container: "fixture" },
+              lastOpenedAt: index + 2,
+              lastConnectionStatus: "connected",
+            }),
+          ),
+        ],
+        workspacePath: "/srv/new",
+        target: { kind: "docker", container: "fixture" },
+        lastConnectionStatus: "connected",
+        touchOpenedAt: true,
+      });
+      expect(mutation.nextRemoteSessions).toHaveLength(20);
+      expect(mutation.nextRemoteSessions).not.toContain(profileEntry);
+      expect(mutation.credentialKeysToDelete).toEqual([]);
+    });
+
+    it("removes history without deleting secrets owned by its connection Profile", () => {
+      const result = removeRemoteWorkspaceSessionEntries(
+        [profileEntry],
+        [profileEntry.workspaceIdentity!],
+      );
+      expect(result.nextRemoteSessions).toEqual([]);
+      expect(result.credentialKeysToDelete).toEqual([]);
+    });
+  });
+
   it("stores the local workspace path used for remote MCP path rewriting", () => {
     const mutation = buildRemoteWorkspaceSessionMutation({
       remoteSessions: [],
@@ -542,9 +754,9 @@ describe("remoteWorkspaceHistory helpers", () => {
       localWorkspacePath: string;
     });
 
-    expect(
-      (mutation.entry as { localWorkspacePath?: string }).localWorkspacePath,
-    ).toBe("/Users/alice/project");
+    expect((mutation.entry as { localWorkspacePath?: string }).localWorkspacePath).toBe(
+      "/Users/alice/project",
+    );
   });
 
   it("removes remote workspace history entries and returns their SSH credential keys", () => {

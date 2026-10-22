@@ -1,4 +1,4 @@
-import { TID_TASK_ITEM, testId } from "@zcode/shared";
+import { TID_TASK_ITEM, testId } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   getActiveWorkspacePath,

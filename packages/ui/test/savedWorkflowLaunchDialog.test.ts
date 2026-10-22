@@ -7,11 +7,13 @@ import {
   TID_WORKFLOW_LAUNCH_ARG,
   TID_WORKFLOW_LAUNCH_DIALOG,
   TID_WORKFLOW_LAUNCH_ERROR,
+  TID_WORKFLOW_LAUNCH_FIELDS,
   TID_WORKFLOW_LAUNCH_SUBMIT,
   TID_WORKFLOW_LAUNCH_TARGET,
-  testId,
+  type ZCodeSavedWorkflowArgsDeclaration,
   type ZCodeSavedWorkflowEntry,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import {
   resolveAutomationWorkspaceSelectionKey,
@@ -40,9 +42,34 @@ const GLOBAL_ENTRY: ZCodeSavedWorkflowEntry = {
   path: "/home/.zcode/workflows/deep-research.dwf.ts",
 };
 
+// 实参很多的声明（40 个）：第 13 个是无默认值的必填项，第 31 个是 json，其余都有默认值。
+// 真实窗口里这份表单远高于视口；jsdom 不排版，这里只能断言结构与焦点，高度由桌面 e2e 断言。
+const MANY_ARGS_REQUIRED = "arg12";
+const MANY_ARGS_JSON = "arg30";
+const MANY_ARGS: ZCodeSavedWorkflowArgsDeclaration = {};
+for (let index = 0; index < 40; index += 1) {
+  const name = `arg${String(index).padStart(2, "0")}`;
+  MANY_ARGS[name] =
+    name === MANY_ARGS_REQUIRED
+      ? { type: "string", required: true }
+      : name === MANY_ARGS_JSON
+        ? { type: "json" }
+        : { type: "string", default: `v${index}` };
+}
+const MANY_ARGS_ENTRY: ZCodeSavedWorkflowEntry = {
+  name: "arg-overflow",
+  description: "实参很多",
+  scope: "global",
+  path: "/home/.zcode/workflows/arg-overflow.dwf.ts",
+  args: MANY_ARGS,
+};
+
 const ALPHA: AutomationWorkspaceOption = { workspacePath: "/repo/alpha", label: "Alpha" };
 const BETA: AutomationWorkspaceOption = { workspacePath: "/repo/beta", label: "Beta" };
 const TARGETS: readonly AutomationWorkspaceOption[] = [ALPHA, BETA];
+
+// jsdom 没有实现 scrollIntoView；校验失败时实参窗会调它，这里记下是谁被滚进了视野。
+const scrollIntoView = vi.fn();
 
 // Radix Dialog 在 jsdom 下需要 ResizeObserver；这里给个空实现。
 beforeAll(() => {
@@ -51,10 +78,12 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
+  Element.prototype.scrollIntoView = scrollIntoView;
 });
 
 afterEach(() => {
   cleanup();
+  scrollIntoView.mockClear();
 });
 
 function mount(
@@ -250,5 +279,74 @@ describe("SavedWorkflowLaunchDialog", () => {
     const region = screen.getByTestId(TID_WORKFLOW_LAUNCH_ERROR);
     expect(region.textContent).toContain("当前 agent 不支持直接启动工作流");
     expect(region.querySelector("pre")).toBeNull();
+  });
+
+  it("只有「运行于」与实参字段在滚动区内；说明、错误区、按钮钉在滚动区外", () => {
+    const error: SavedWorkflowLaunchError = {
+      reason: "compile_failed",
+      code: "fault.command.savedWorkflowStartRejected.compile_failed",
+      message: "line 3: boom",
+    };
+    mount(MANY_ARGS_ENTRY, { targets: TARGETS, scope: "global", projectLabel: "Alpha", error });
+    const dialog = screen.getByTestId(TID_WORKFLOW_LAUNCH_DIALOG);
+    const fields = screen.getByTestId(TID_WORKFLOW_LAUNCH_FIELDS);
+    expect(dialog.contains(fields)).toBe(true);
+    // 滚动区内：「运行于」与全部 40 个实参字段。
+    expect(fields.contains(screen.getByTestId(TID_WORKFLOW_LAUNCH_TARGET))).toBe(true);
+    for (const name of Object.keys(MANY_ARGS)) {
+      expect(fields.contains(screen.getByTestId(testId(TID_WORKFLOW_LAUNCH_ARG, name)))).toBe(true);
+    }
+    // 滚动区外、窗口内：名字、说明文案、错误区、取消与提交——实参再多它们也不会被顶出视口。
+    const pinned = [
+      screen.getByText("arg-overflow"),
+      screen.getByText("将立即在 Alpha 的新会话中运行"),
+      screen.getByTestId(TID_WORKFLOW_LAUNCH_ERROR),
+      screen.getByText("取消"),
+      screen.getByTestId(TID_WORKFLOW_LAUNCH_SUBMIT),
+    ];
+    for (const element of pinned) {
+      expect(dialog.contains(element)).toBe(true);
+      expect(fields.contains(element)).toBe(false);
+    }
+  });
+
+  it("没有「运行于」也没有实参时不渲染滚动区", () => {
+    mount({ ...GLOBAL_ENTRY, scope: "project" });
+    expect(screen.getByTestId(TID_WORKFLOW_LAUNCH_DIALOG)).toBeTruthy();
+    expect(screen.queryByTestId(TID_WORKFLOW_LAUNCH_FIELDS)).toBeNull();
+  });
+
+  it("校验失败：第一个出错字段被滚进视野并拿到焦点", () => {
+    const { onSubmit } = mount(MANY_ARGS_ENTRY, { targets: TARGETS, scope: "global" });
+    const required = screen.getByTestId(testId(TID_WORKFLOW_LAUNCH_ARG, MANY_ARGS_REQUIRED));
+    const json = screen.getByTestId(testId(TID_WORKFLOW_LAUNCH_ARG, MANY_ARGS_JSON));
+    fireEvent.change(json, { target: { value: "{oops" } });
+    fireEvent.click(screen.getByTestId(TID_WORKFLOW_LAUNCH_SUBMIT));
+    expect(onSubmit).not.toHaveBeenCalled();
+    // 两个字段都出错：按声明顺序取第一个（必填项），而不是后面的 json。
+    expect(document.activeElement).toBe(required);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    const revealed = scrollIntoView.mock.contexts[0] as HTMLElement;
+    // 滚进视野的是整行（标签 + 控件 + 错误文案），不只是输入框本身。
+    expect(revealed.contains(required)).toBe(true);
+    expect(revealed.textContent).toContain("必填");
+    expect(revealed.contains(json)).toBe(false);
+
+    // 修掉第一个后再提交：轮到下一个出错字段。
+    fireEvent.change(required, { target: { value: "prod" } });
+    fireEvent.click(screen.getByTestId(TID_WORKFLOW_LAUNCH_SUBMIT));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(json);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it("校验通过时不滚动", () => {
+    const { onSubmit } = mount(ENTRY);
+    fireEvent.change(screen.getByTestId(testId(TID_WORKFLOW_LAUNCH_ARG, "branch")), {
+      target: { value: "main" },
+    });
+    fireEvent.click(screen.getByTestId(TID_WORKFLOW_LAUNCH_SUBMIT));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });

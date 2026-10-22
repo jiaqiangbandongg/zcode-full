@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLoginApiKeyDefaultModelPreferenceFromSelection,
   buildLoginApiKeySkipSettings,
-  resolveLoginApiKeyProviderFamilyDomain,
   resolveLoginApiKeyDefaultProvider,
-  resolveLoginApiKeyProviderLabel,
   resolveHydratedLoginApiKeyValue,
   resolveLoginApiKeyTemplateId,
   shouldShowLoginApiKeyLink,
@@ -22,14 +20,7 @@ describe("LoginApiKeyForm provider update helpers", () => {
     expect(resolveLoginApiKeyTemplateId("bigmodel")).toBe("bigmodel-api");
   });
 
-  it("API key 表单展示 BigModel 品牌固定大小写", () => {
-    expect(resolveLoginApiKeyProviderLabel("zai")).toBe("Z.ai");
-    expect(resolveLoginApiKeyProviderLabel("bigmodel")).toBe("BigModel");
-  });
-
   it("跳过 API key 时只写入当前 provider family domain", () => {
-    expect(resolveLoginApiKeyProviderFamilyDomain("zai")).toBe("zai");
-    expect(resolveLoginApiKeyProviderFamilyDomain("bigmodel")).toBe("bigmodel");
     expect(buildLoginApiKeySkipSettings("bigmodel", 300)).toEqual({
       providerFamilyDomain: "bigmodel",
       providerFamilyDomainUpdatedAt: 300,

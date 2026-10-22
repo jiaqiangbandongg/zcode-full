@@ -207,7 +207,8 @@ assert:
 | runningGoalQueues | running 时发送 `/goal xxx` 必须进入该 session 的 queue，消费时设置或更新 goal |
 | acceptedInputHasSingleAuthority | 桌面与手机已提交的 busy/running 输入统一按 CLI 串行 admission 顺序进入一个 CommandInbox/FIFO；host 和 UI 不保留第二份权威队列 |
 | acceptedInputAlwaysAccountedFor | 已提交输入必须且只能处于 queue、guided row、transcript、explicit rejected/failed/discarded 之一 |
-| acceptedInputProjectionSilenceRecovers | `sendText` 收到 `accepted` 或 `duplicate` ACK 后，发起端必须等待同一 `sourceCommandId` 的 queue item 或 real-user `userInput` row。若短暂宽限期内仍无任一权威可见事实，客户端只触发当前 owned subscription 的 single-flight same-sub resync；不得补造 user row、建立 renderer queue 或自动重放 command。恢复继续沿可信 attachment 保持 desktop continuous / mobile replayable 边界；`sendGoalCommand` 的 direct goal state 不以 user row 作为确认条件 |
+| acceptedInputProjectionSilenceRecovers | `sendText` 或 `editUserQuery` 收到 `accepted` 或 `duplicate` ACK 后，发起端必须等待同一 `sourceCommandId` 的 queue item 或 real-user `userInput` row。`editUserQuery` 已发布 branch cut 时，replacement row 仍是恢复后的唯一权威输入事实，客户端不得只保留截断结果。若短暂宽限期内仍无任一权威可见事实，客户端只触发当前 owned subscription 的 single-flight same-sub resync；不得补造 user row、恢复旧分支、建立 renderer queue 或自动重放 command。恢复继续沿可信 attachment 保持 desktop continuous / mobile replayable 边界；`sendGoalCommand` 的 direct goal state 不以 user row 作为确认条件 |
+| destructiveReplayPreservesReplacement | `editUserQuery` / `retryTurn` 在 branch cut 前完成外部模型目录预检；提交 branch cut 后不得因再次读取变化中的目录而拒绝 replacement。若 Core 创建模型时目录已变化，必须先发布 `TurnStarted` 并持久化 replacement user input，再发布 `TurnError(model_creation)`。replacement 走普通轮的同一条生命周期，终态只写一次：落库本身失败时仍以原始模型创建错误收口，Stop 收口为 `completed(cancelled)`；该轮不接受 guide，guide 改投普通 queue。允许工作区保持已确认的 rewind，但不得出现“旧分支已截断且 replacement 不存在”的状态；唯一例外是 `UserPromptSubmit` hook 显式拦截，按普通轮的策略拒绝结束且不落库。`/compact` 不产生 user row，创建失败直接发布 `TurnError(model_creation)` |
 | promptRequiresTextOrAttachment | `sendText`、`createSession.firstInput`、`createSelectionSideSession.firstInput` 与 `editUserQuery` 的正文和有效附件至少存在一个；普通附件输入可以使用空正文，本功能的 child 首发只允许非空正文，二者同时为空必须明确 reject |
 | sourceCommandIdEndToEnd | queue item、drain/guided event、user row、message anchor、marker 与 fork child metadata 保留原始 sourceCommandId |
 | guideDrainsAfterCompletedToolBatch | eligible guide 可以在 tool 出现前等待；只有一次 model step 的全部 sibling tool results 已提交后，才最多内联消费一条 guide，并在同一 product turn 继续 |
@@ -641,3 +642,7 @@ review 的输出不是“树好不好看”，而是这些产物：
 - rule 列表按 `decision` 和 `invariant` 分类。
 - case 导出时带上完整协议字段，而不是只导出标题文本。
 - 如果出现 `undefined`，能直接看出缺的是哪一层协议：状态、输入、规则、effect 还是不变量。
+
+## 历史先显示的执行边界（2026-10-09）
+
+支持 historyFirst 的 V4 会话先发布持久历史，runtimeInitialization 未 ready 时只允许阅读与编辑本地文字草稿；新执行命令拒绝且不入 accepted queue。初始化失败保留历史，显式重试通过原订阅入口触发；普通重连不重跑失败尝试。该状态独立于 running/completed，不改变 desktop continuous 与 mobile replayable、模型默认值及任务活动时间。详见 `v4-refactor/17-cold-resume-runtime-activation.md`。

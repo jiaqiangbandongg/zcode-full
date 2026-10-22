@@ -1,0 +1,605 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-local-feedback",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-local-feedback.test.ts",
+  "fixtures": [
+    {
+      "id": "conversation-session-toolsearch-local-feedback-first-json",
+      "stage": "first-json",
+      "description": "first-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"first\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:mcp__catalog__lookup\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-first-stream",
+      "stage": "first-stream",
+      "description": "first-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"first\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:mcp__catalog__lookup\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-mixed-json",
+      "stage": "mixed-json",
+      "description": "mixed-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"mixed\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:lookup,TodoWrite\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-mixed-stream",
+      "stage": "mixed-stream",
+      "description": "mixed-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"mixed\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:lookup,TodoWrite\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-repeat-json",
+      "stage": "repeat-json",
+      "description": "repeat-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"repeat\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:mcp__catalog__lookup,TodoWrite\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-repeat-stream",
+      "stage": "repeat-stream",
+      "description": "repeat-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"repeat\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:mcp__catalog__lookup,TodoWrite\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-resident-json",
+      "stage": "resident-json",
+      "description": "resident-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"resident\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:Read,TodoWrite\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-resident-stream",
+      "stage": "resident-stream",
+      "description": "resident-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"resident\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:Read,TodoWrite\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-parallel-json",
+      "stage": "parallel-json",
+      "description": "parallel-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"parallel_one\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:WebFetch\"}}, {\"type\": \"tool_use\", \"id\": \"parallel_two\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:WebFetch\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-parallel-stream",
+      "stage": "parallel-stream",
+      "description": "parallel-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"parallel_one\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:WebFetch\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 1, \"content_block\": {\"type\": \"tool_use\", \"id\": \"parallel_two\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 1, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:WebFetch\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 1}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-cold-repeat-json",
+      "stage": "cold-repeat-json",
+      "description": "cold-repeat-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"cold_repeat\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:lookup\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-cold-repeat-stream",
+      "stage": "cold-repeat-stream",
+      "description": "cold-repeat-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"cold_repeat\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:lookup\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-wrapper-json",
+      "stage": "promoted-wrapper-json",
+      "description": "promoted-wrapper-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"promoted_wrapper\", \"name\": \"DeferredToolCall\", \"input\": {\"name\": \"mcp__catalog__lookup\", \"input\": {\"value\": \"must-not-run\"}}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-wrapper-stream",
+      "stage": "promoted-wrapper-stream",
+      "description": "promoted-wrapper-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"promoted_wrapper\", \"name\": \"DeferredToolCall\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"name\\\": \\\"mcp__catalog__lookup\\\", \\\"input\\\": {\\\"value\\\": \\\"must-not-run\\\"}}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-direct-json",
+      "stage": "promoted-direct-json",
+      "description": "promoted-direct-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"promoted_direct\", \"name\": \"mcp__catalog__lookup\", \"input\": {\"value\": \"ordinary\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-direct-stream",
+      "stage": "promoted-direct-stream",
+      "description": "promoted-direct-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"promoted_direct\", \"name\": \"mcp__catalog__lookup\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"value\\\": \\\"ordinary\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-select-json",
+      "stage": "promoted-select-json",
+      "description": "promoted-select-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"promoted_select\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:lookup\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-select-stream",
+      "stage": "promoted-select-stream",
+      "description": "promoted-select-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"promoted_select\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:lookup\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-search-json",
+      "stage": "new-search-json",
+      "description": "new-search-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"new_search\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:TodoWrite\"}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-search-stream",
+      "stage": "new-search-stream",
+      "description": "new-search-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"new_search\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:TodoWrite\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-wrapper-json",
+      "stage": "new-wrapper-json",
+      "description": "new-wrapper-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"new_wrapper\", \"name\": \"DeferredToolCall\", \"input\": {\"name\": \"TodoWrite\", \"input\": {\"todos\": []}}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-wrapper-stream",
+      "stage": "new-wrapper-stream",
+      "description": "new-wrapper-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"new_wrapper\", \"name\": \"DeferredToolCall\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"name\\\": \\\"TodoWrite\\\", \\\"input\\\": {\\\"todos\\\": []}}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-done-json",
+      "stage": "done-json",
+      "description": "done-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"text\", \"text\": \"E2E_TOOLSEARCH_LOCAL_FEEDBACK_DONE\"}], \"stop_reason\": \"end_turn\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-done-stream",
+      "stage": "done-stream",
+      "description": "done-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_LOCAL_FEEDBACK_DONE\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-summary-json",
+      "stage": "summary-json",
+      "description": "summary-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"text\", \"text\": \"<summary>Continue E2E_TOOLSEARCH_LOCAL_FEEDBACK.</summary>\"}], \"stop_reason\": \"end_turn\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-summary-stream",
+      "stage": "summary-stream",
+      "description": "summary-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_local_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"<summary>Continue E2E_TOOLSEARCH_LOCAL_FEEDBACK.</summary>\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

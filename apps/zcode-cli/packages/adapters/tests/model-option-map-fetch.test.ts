@@ -50,6 +50,31 @@ describe("createModelOptionMapFetch", () => {
     expect(capture.body).toEqual(sentBody);
   });
 
+  it.each([256, 20_000, 64_000])(
+    "preserves the final request budget %s without subtracting thinking",
+    async (budget) => {
+      const send = vi.fn(
+        async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}"),
+      );
+      const fetch = createModelOptionMapFetch({
+        fetch: send,
+        maps: compileModelOptionMaps({
+          reasoningLevel: { map: "{}" },
+          maxOutputTokens: { map: "{'max_tokens': maxOutputTokens}" },
+        }),
+        values: { reasoningLevel: "high", maxOutputTokens: budget },
+      });
+      await fetch("https://example.com", {
+        method: "POST",
+        body: JSON.stringify({ max_tokens: 1, thinking: { type: "enabled", budget_tokens: 8000 } }),
+      });
+      expect(JSON.parse(String(send.mock.calls[0]?.[1]?.body))).toEqual({
+        max_tokens: budget,
+        thinking: { type: "enabled", budget_tokens: 8000 },
+      });
+    },
+  );
+
   it("does not mutate or reuse a previous request body", async () => {
     const bodies: unknown[] = [];
     const fetch = createModelOptionMapFetch({

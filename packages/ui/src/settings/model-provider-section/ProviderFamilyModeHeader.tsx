@@ -1,11 +1,13 @@
 import {
-  TID_MODEL_PROVIDER_CONNECTION_MODE_ITEM,
-  TID_MODEL_PROVIDER_CONNECTION_MODE_TRIGGER,
   resolveModelProviderFamilySpecByProviderId,
   isStartPlanModelProviderId,
-  testId,
   type ProviderFamilyConnectionSelectionSettings,
 } from "@zcode/shared";
+import {
+  TID_MODEL_PROVIDER_CONNECTION_MODE_ITEM,
+  TID_MODEL_PROVIDER_CONNECTION_MODE_TRIGGER,
+  testId,
+} from "@zcode/shared/test-ids";
 import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {

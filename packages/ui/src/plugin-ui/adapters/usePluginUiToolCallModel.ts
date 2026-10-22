@@ -194,6 +194,7 @@ export function usePluginUiToolCallModel(
     displayMode,
     toolInput,
     toolResult,
+    toolCallId: toolCall.toolId,
     toolCancelled: isPluginUiToolCancelled(toolCall),
     hostVersion: "zcode",
     // 没有侧栏入口（如只读 / 非桌面壳）或页面不支持 fullscreen 时只声明 inline。

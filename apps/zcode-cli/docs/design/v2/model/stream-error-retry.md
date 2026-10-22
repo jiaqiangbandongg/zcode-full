@@ -14,6 +14,31 @@ app-server 模式默认开启模型流式输出。Vercel AI SDK 的 `streamText(
   completion，并自动重试 **最多 1 次**。该重试复用统一退避和状态事件，但不占用
   core stream recovery budget；如果 adapter 的 `maxAttempts` 已禁止下一次物理请求，
   则不重试。
+- 新增例外只覆盖上下文超限、拒绝和内容过滤：`finishReason` 或 `rawFinishReason` 命中
+  `context_exceeded`、`context_length_exceeded`、`context_window_exceeded`、
+  `model_context_exceeded`、`model_context_window_exceeded`、`prompt_too_long`，
+  或 `refusal`、`content-filter`、`content_filter` 时，
+  即使 text/reasoning/tool/usage 全为零，也不得叠加 generic empty completion retry。
+  判据只做 trim 和大小写归一化，不靠任意错误文本的模糊匹配扩展范围。
+  非流式请求读取 SDK 顶层 `rawFinishReason`，兼容已有 `providerMetadata.rawFinishReason`；
+  流式 finish 同样支持这两种来源；用于空响应判定，不修改原有 metadata 透传及业务错误识别。
+  原有 `stop`、`tool-calls`、`tool_calls` 的空响应处理保持不变。
+  普通 `length`、`max_tokens`、`max_output_tokens` 及 `other`/`unknown`
+  保持此前判定。缺少 finish 的 EOF 检测与恢复不变。
+- 明确上下文超限且没有正文、有效 reasoning（包括 opaque metadata）或完整工具调用时，
+  Adapter 在成功 finish/completed 前转换成已有 `ModelContextExceeded`，发布一次
+  `model_request_failed`，由 Core 原有 catch 决定 Reactive Compact 和重试，不追加 Continue。
+  判定与 usage 是否为零无关。其余响应保持原样，包括任何带有效输出的上下文限制响应；
+  Adapter 不判断 Continue，不迁移或删除 Core 原有成功响应兼容分支。
+  错误保留 provider 已报告 usage，由既有失败事件记账；不伪造 `ModelComplete`。
+  compact 自身复用现有错误/fallback 边界，不改变恢复次数及取消语义。
+
+```text
+provider completion -> adapter 检查终止原因
+                       | 明确上下文超限 + 无有效输出 -> failed -> core 既有 catch / Reactive Compact
+                       | 其余响应 -> 原有空响应重试判定及调用方处理
+```
+
 - generic empty completion 的第一次 attempt 在重试前不得向 core 释放 `start`、
   `finish` 或其他仅属于该 attempt 的事件；第二次仍为空时保持现有行为，由 core
   生成 `empty_model_response` 可见错误。非流式 `generateText` 与流式 SSE 使用同一
@@ -131,6 +156,15 @@ core recovery 的可观测性要求：
   成功时最终只看到第二次的有效输出，第二次仍为空时仍生成 `empty_model_response`。
 - 非流式 `generateText` 返回同样的 zero-output empty completion 时，应只重试一次；
   第二次成功返回有效结果，或第二次仍为空并把既有空响应错误交给 core。
+- 流式和非流式的零输出 `rawFinishReason=model_context_window_exceeded` 不产生
+  adapter retry，转为一次超窗失败，保留已报告 usage；normalized finish 为 `length`
+  或 `other` 时均成立。上下文超限同义标记同样处理；有有效输出时无论 finish 是否可续写均原样返回。
+  拒绝、内容过滤、普通输出限制与未知标记保持原行为。
+- 桌面 I73 从无账号态通过 Personal Provider UI 建立回放前置，不播种无关的假 OAuth 凭据，
+  避免登录过期弹窗遮挡被测交互。Provider 只初始化一次，每个场景通过 UI 新建任务并选择模型，
+  不要求与重试语义无关的思考档位。同时验证明确上下文限制的空 SSE：先准备可压缩历史，
+  再严格执行超窗失败 → compact → 恢复三次请求，不追加 Continue；最终正常回复并回到 idle，
+  失败请求、compact 和恢复请求的 usage 独立记录、汇总不重不漏。
 - compact `preserveProviderStreamBoundaries=true` 的空 completion 不得因普通主请求
   规则增加额外重试。
 - 重试后的第二次 stream 成功时，最终只向 core 产出成功事件。

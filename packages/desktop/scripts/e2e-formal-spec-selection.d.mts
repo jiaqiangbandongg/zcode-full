@@ -1,8 +1,7 @@
 export const SSH_FORMAL_SPEC_GLOB: string;
+export const MANUAL_REVIEW_SPEC_GLOB: string;
 
-export function hasRequiredSshE2EEnvironment(
-  env: Record<string, string | undefined>,
-): boolean;
+export function hasRequiredSshE2EEnvironment(env: Record<string, string | undefined>): boolean;
 
 export function isSshFormalSpec(spec: string): boolean;
 

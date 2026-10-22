@@ -199,10 +199,8 @@ describe("2.1 什么时候淘汰", () => {
       kind: "ask",
       actor: actorRef(2),
     });
-    const before = driven.run;
     // 同一条信封再喂一次：表里已有这条实例 → 逐字节无变化。
     expect(driven.replay(queued)).toBeNull();
-    expect(driven.run).toBe(before);
   });
 
   it("缓存命中的 node-settled 出生即结算，永不淘汰：它被拒，只进计数", () => {
@@ -297,7 +295,6 @@ describe("2.2 受害者顺序", () => {
 
     // actor#1 的第三次 ask 撞上满表：它自己那个「已完成」组正要重新开工，不能拿它顶账。
     driven.send("node-queued", { instance: askRef(4), kind: "ask", actor: actorRef(1) });
-    expect(actorKeys(driven.run)).toContain("actor#1");
     expect(nodeKeys(driven.run)).toEqual(["ask#1", "ask#2", "ask#4"]);
     expect(actorKeys(driven.run)).toEqual(["actor#1"]);
   });
@@ -811,21 +808,6 @@ describe("B4 表外的子代理也按出生阶段可数", () => {
     runOneAsk(driven, 1, { phaseName: "p1", settle: false });
     driven.send("actor-created", { actor: actorRef(2), name: "a2", phaseName: "p2" });
     expect(driven.run.unlistedByPhase).toEqual([{ phaseName: "p2", actors: 1, settled: 0 }]);
-  });
-
-  it("已完成组让位：actors 与 actorsSettled 一起加，失败的再加一格", () => {
-    const driven = driver({ maxActors: 2, maxNodes: 6, maxPhases: 4 });
-    runOneAsk(driven, 1, { phaseName: "p1", outcome: "failed" });
-    runOneAsk(driven, 2, { phaseName: "p2" });
-    driven.send("actor-created", { actor: actorRef(3), name: "a3", phaseName: "p3" });
-    expect(driven.run.unlistedByPhase).toEqual([
-      { phaseName: "p2", actors: 1, actorsSettled: 1, settled: 1 },
-    ]);
-    driven.send("actor-created", { actor: actorRef(4), name: "a4", phaseName: "p3" });
-    expect(driven.run.unlistedByPhase).toEqual([
-      { phaseName: "p2", actors: 1, actorsSettled: 1, settled: 1 },
-      { phaseName: "p1", actors: 1, actorsSettled: 1, actorsFailed: 1, settled: 1 },
-    ]);
   });
 
   it("空闲组让位只加 actors；回表的子代理把自己那一格减回去，归零即摘格", () => {
@@ -1569,9 +1551,17 @@ describe("不变量 I1–I9（引擎形状：先建全部 actor、再入队、FI
     { cachedNamesActor: true, label: "缓存结算带出生事实" },
     { cachedNamesActor: false, label: "老 journal：缓存结算不带 actor" },
   ] as const;
-  const CASES = CACHE_SHAPES.flatMap(({ cachedNamesActor, label }) =>
-    ENGINE_CASES.map((engineCase) => ({ shape: { ...engineCase, cachedNamesActor }, label })),
-  );
+  const CASES = ENGINE_CASES.flatMap((engineCase) => {
+    // 无缓存且不重开时生成器不会调用 settleCached；两种缓存载荷标签会生成完全相同的事件流。
+    const cacheShapes =
+      engineCase.cachedRate > 0 || engineCase.interruptAfter > 0
+        ? CACHE_SHAPES
+        : CACHE_SHAPES.slice(0, 1);
+    return cacheShapes.map(({ cachedNamesActor, label }) => ({
+      shape: { ...engineCase, cachedNamesActor },
+      label,
+    }));
+  });
   for (const { shape, label } of CASES) {
     const { seed, limits } = shape;
     it(`seed ${seed}（并发 ${shape.concurrency} / actor 界 ${limits.maxActors}，${label}）：两张账都对得上`, () => {

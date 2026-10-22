@@ -9,7 +9,7 @@ import {
 import { assertIncomingMessage } from "../helpers/incoming-message-evidence.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_CHAT_BACKGROUND_RESULT_TITLE, TID_V4_TIMELINE } from "@zcode/shared";
+import { TID_CHAT_BACKGROUND_RESULT_TITLE, TID_V4_TIMELINE } from "@zcode/shared/test-ids";
 import { clearAppData } from "../helpers/desktop-app.js";
 import {
   countUpstreamRequests,

@@ -6,7 +6,6 @@ import {
   ModelPropertiesConfig,
   ProviderConfigMap,
   ProviderRegistryService,
-  MutableAccountProviderConfigSource,
   type AccountProviderConfigSnapshot,
   type ProviderConfigSnapshot,
   type ProviderSource,
@@ -124,36 +123,6 @@ describe("ProviderRegistryService", () => {
     } finally {
       service.dispose();
     }
-  });
-  it("Mutable Account Config Source 替换第三层 Overlay 后驱动 Registry 刷新", async () => {
-    const configSource = new MutableSource(configSnapshot("config-1", "model-a"));
-    const accountSource = new MutableAccountProviderConfigSource();
-    accountSource.replace({
-      revision: "account-1",
-      basedOnZCodeBuiltinRevision: "config-1",
-      providers: ProviderConfigMap.empty(),
-    });
-    const service = new ProviderRegistryService({ configSource, accountSource });
-    await service.start();
-
-    accountSource.replace(
-      {
-        revision: "account-2",
-        basedOnZCodeBuiltinRevision: "config-1",
-        providers: new ProviderConfigMap([
-          [
-            "account-provider",
-            createAccountProviderConfig({
-              models: ["model-a"],
-            }),
-          ],
-        ]),
-      },
-      "workspace-registry",
-    );
-
-    await service.refresh("wait-for-account-source");
-    await expect(accountSource.read()).resolves.toMatchObject({ revision: "account-2" });
   });
 
   it("通过注入的 Config 和 Account Source 初始化并发布完整快照", async () => {

@@ -92,7 +92,7 @@ const AmendWorkflowModelInputSchema = z.object({
     .nullable()
     .optional()
     .describe(
-      "Omit to keep the predecessor's choice, null for the session model, a model id to set one (only when the user asks).",
+      "Omit to keep the predecessor's choice, null for the session model, a model id to set one (only when the user asks, never a model under another provider the user did not name — ask them first if one would help).",
     ),
 });
 
@@ -115,6 +115,13 @@ export const AmendWorkflowPredecessorSchema = z
      * 被无条件覆盖，模型伪造无效。
      */
     script_inherited: z.literal(true).optional(),
+    /**
+     * 这次修订会让子代理用上的、前驱与会话都没用过的 provider（去重、按字母序），只在有新的时在场。
+     * 由 resolveInput 从会话模型、前驱 `run-launched` 上的模型与这次归一化后的模型算出，与整块一起
+     * 被无条件覆盖：模型既不能伪造它，也不能抹掉它。在场即退出本会话 run 的免确认
+     * （{@link isAmendWorkflowOwnedPredecessor}）：全称模型名只证明写法明确，不证明用户点过名。
+     */
+    introduces_providers: z.array(z.string().min(1)).nonempty().optional(),
   })
   .strict();
 
@@ -134,7 +141,14 @@ export type AmendWorkflowPredecessor = z.infer<typeof AmendWorkflowPredecessorSc
 export function isAmendWorkflowOwnedPredecessor(predecessor: unknown): boolean {
   if (!predecessor || typeof predecessor !== "object") return false;
   const facts = predecessor as Record<string, unknown>;
-  return facts.owned_by_this_session === true && facts.stop_reason !== "user";
+  // 引入新 provider 的修订不在免确认之内：键在场即照常 ask（docs/dynamic-workflow/launch.md
+  // 「Amending this session's runs」）。Bugfix：原先只看归属，主代理写一个别家 provider 的全称
+  // 模型名，就能不经用户把子代理换到另一张账单上。
+  return (
+    facts.owned_by_this_session === true &&
+    facts.stop_reason !== "user" &&
+    facts.introduces_providers === undefined
+  );
 }
 
 /**

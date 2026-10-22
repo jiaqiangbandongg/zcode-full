@@ -5,18 +5,19 @@
 ## 行为
 
 - 自由尺寸模式中，viewport、截图像素、模型坐标与 DOM 坐标保持同一 CSS 像素单位。
-- Desktop 放大时保留现有 native raster 的 metrics scale 补偿；所有鼠标事件（点击、双击、移动、拖拽、滚轮位置及 delta）在 guest CDP 边界换算。普通模式、缩小档位和未应用 metrics scale 的 tab 不额外乘倍率。
-- 设置或重放固定 viewport 时，Main 将 guest page zoom 归一为 1，避免依赖 renderer 回调与 Electron zoom 传播的先后顺序。
+- 固定 viewport 的 guest 布局补偿只在 renderer 完成，放大和缩小用同一公式：webview 布局按 `1 / desktopZoom` 缩放，再用 `scale(desktopZoom)` 合成回 frame。guest 的自然 viewport 因此在 CDP 是否 attach 时都等于目标 viewport。CDP metrics 只固定 CSS viewport 与截图 DPR，不带 `scale`；鼠标事件按 CSS 坐标原样下发（2026-10-16 起，见下文「CDP idle detach 后页面变大变小」）。
+- 设置或重放固定 viewport 时，Main 将 guest page zoom 归一为 1，避免依赖 renderer 回调与 Electron zoom 传播的先后顺序。Desktop zoom 变化时 renderer 仍重发一次当前 viewport，让 Main 在同一串行边界再次归一 guest zoom。
 - CDP idle detach 后，下一次截图即使已处于 viewport 队列内，也必须先恢复 metrics。截图临界区本身不等价于已经恢复 viewport；不得在重入时再次排队并等待自己。
 - 固定 viewport 的普通截图在预览缩小或 Desktop 放大时读取 Main 的 `guest.capturePage()`，再归一到 CSS 尺寸。renderer 上报 `surfaceScale=1` 只表示预览布局比例，不能证明 CDP raster 覆盖完整 viewport；clip / fullPage 仍由 CDP 执行。
 - 普通截图准备层的尺寸不能超过宿主可见窗口，并临时派生 Fit 预览；用户选择 100% / 200% 时也必须如此。否则 Windows 高 DPI 下 Chromium 的 guest raster 裁剪会造成图片缺边，随后归一化会把缺边误当成完整画面拉伸。临时准备层不修改用户的 viewport 或预览缩放偏好，释放后恢复原比例。录制的 `unscaled` 请求保留原有布局与 100% surface 契约。
 - 保持现有 idle detach、guest 生命周期、workspace/session 隔离以及 desktop-continuous / web-remote-replayable 路由边界。修改只发生在共用 guest 执行端。
 
 ```text
-Desktop zoom -> viewport mutation -> CDP metrics scale + guest zoom=1
+Desktop zoom -> renderer: webview 布局 ×1/zoom + scale(zoom)   (自然布局 = viewport)
+             -> viewport mutation -> CDP metrics(无 scale) + guest zoom=1
                                          |
 CSS 输入 (x,y,delta) ----------------------v
-                           乘已应用的 metrics scale
+                                  原样下发
                                          |
                                          v
                            Chromium -> 原 CSS 坐标事件
@@ -38,7 +39,30 @@ CDP idle detach -> 下一条截图 -> 恢复 Page / metrics / guest zoom
 
 ## 回归
 
+### CDP idle detach 后页面变大变小（2026-10-16）
+
+现象：应用放大一档、内置浏览器处于自由尺寸（含 Agent `newTab` 带出的 1280×720）时，Browser Use 每次操作期间页面变大，命令空闲约 1.5s 后变回。普通模式不受影响。
+
+根因：放大档的布局补偿原先只放在 CDP metrics 的 `scale` 里，而 metrics 是 per-session 状态。为防 UAF 加入的命令空闲 detach 会让 Chromium 清掉它，空闲时 guest 退回 webview 的自然布局（renderer 不做放大补偿，guest zoom=1），innerWidth 变成 `viewport × desktopZoom`。缩小档早就在 renderer 做 `1 / zoom` 布局补偿，所以两态一致。
+
+```text
+修复前（zoom=1.1，viewport=1280）
+  命令期  CDP attach -> metrics(1280, scale 1.1) -> innerWidth 1280
+  空闲    idle detach -> metrics 清空 -> 自然布局 -> innerWidth 1408   <- 来回跳
+修复后
+  renderer: webview 布局 ×1/zoom + scale(zoom) -> 自然布局 innerWidth 1280
+  命令期 / 空闲都是 1280；metrics 只固定 CSS viewport 与 DPR，不再带 scale
+```
+
+独立 Electron 41.0.3 实验（macOS，Retina）：布局 `vw / z` + `scale(z)` 时，z=1.1 / 1.21 / 0.9 的 guest innerWidth 都等于 vw，右、下边缘色块完整，没有留白；原放大档布局分别得到 `vw × z`。2026-07-22「放大时 transform 只扩大 webview DOM 而 raster 留白」的结论只对“不缩布局、只加 transform”成立，不适用于本方案。
+
+保持不变：idle detach、CDP 恢复屏障、guest zoom 归一、截图 prepare/release 与 `natural | emulated` 区分。Desktop 放大时普通 viewport 截图仍走 native capture + CSS 归一（Windows 平铺缺边的既有防护）。`appliedViewportScale` 与鼠标输入倍率随 metrics scale 一起删除。
+
+回归：缩放坐标 E2E 每轮在 idle detach 后、首条命令前读取 guest innerWidth/innerHeight，必须等于 1280×720；manager 单测断言放大档 metrics 不带 `scale`、输入坐标不乘倍率；UI 单测断言放大档 webview 布局为 `1 / zoom`、transform 为 `zoom`。
+
 ### Guest 换代后的倍率清理（CR-01）
+
+> 2026-10-16 起 metrics 不再带 scale，本节描述的倍率状态已删除，保留作历史。
 
 `appliedViewportScale` 是当前 guest 已安装 CDP metrics 的镜像，不能随逻辑 tab 跨 guest 换代保留。普通后台 fallback 在应用放大时安装倍率；旧 guest 销毁或被替换后，新 guest 若使用自然 viewport，不会重放 metrics，残留倍率会把 (300,200) 错发为 (330,220)。
 

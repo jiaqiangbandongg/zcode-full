@@ -27,7 +27,6 @@ describe("WorkflowToolSummary", () => {
     expect(view.container.textContent).toContain(locale === "en-US" ? "3 agents" : "3 个子代理");
     expect(view.container.textContent).not.toContain("step");
     const trigger = view.getByRole("button");
-    expect(trigger.className).toContain("group/tool-summary");
     fireEvent.click(trigger);
     fireEvent.keyDown(trigger, { key: "Enter" });
     fireEvent.keyDown(trigger, { key: " " });

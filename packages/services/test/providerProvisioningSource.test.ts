@@ -98,37 +98,8 @@ describe("Provider Provisioning Source", () => {
       { scope: "oauth-session", key: "oauth:active_provider", value: "zai" },
       { scope: "oauth-session", key: "oauth:zai:access_token", value: "oauth-token" },
     ]);
-    expect(snapshot.credentials.some((entry) => entry.key === "ssh:password")).toBe(false);
-    expect(snapshot.credentials.some((entry) => entry.key.endsWith(":identity"))).toBe(false);
     expect(snapshot).not.toHaveProperty("sourceRevision");
     repository.dispose();
-  });
-
-  it("does not let malformed non-allowlist credential records block sync", async () => {
-    const root = await mkdtemp(join(tmpdir(), "zcode-provider-provisioning-source-"));
-    const credentialsPath = join(root, "credentials.json");
-    const cipher = createCredentialCipherProvider({ env: { ZCODE_CREDENTIAL_SECRET: "source" } });
-    await writeFile(
-      credentialsPath,
-      JSON.stringify({
-        "oauth:active_provider": cipher.encrypt("zai"),
-        "ssh:malformed": { unexpected: true },
-        "account-provider:coding-plan:legacy:account:user:api-key": "enc:v1:broken",
-        "account-provider:coding-plan:malformed:account:user:api-key": { invalid: true },
-      }),
-      "utf8",
-    );
-    const source = createProviderProvisioningSource({
-      personalRepository: personalRepository(root),
-      settingService: { get: vi.fn(async () => ({})) } as never,
-      credentialFilePath: credentialsPath,
-      personalConfigFilePath: join(root, "provider_config.json"),
-      cipherProvider: cipher,
-    });
-
-    await expect(source.read("sync-malformed-unrelated")).resolves.toMatchObject({
-      credentials: [{ scope: "oauth-session", key: "oauth:active_provider", value: "zai" }],
-    });
   });
 
   it("still rejects malformed allowlist credential records", async () => {

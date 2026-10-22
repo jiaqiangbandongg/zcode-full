@@ -82,6 +82,11 @@ function makeApp(overrides: Record<string, unknown> = {}) {
  * 加速轮的协议原形：Selection 指向隐藏的加速卡内建 Provider（端点/能力来自 Provider Config），
  * 只有卡 JWT 与卡 ID 作为本次执行的动态鉴权随 modelExecution 下发。
  */
+const ORDINARY_MODEL_SELECTION = {
+  providerId: "builtin:bigmodel-coding-plan",
+  modelId: "GLM-5.3",
+};
+
 const HIGHSPEED_MODEL_SELECTION = {
   providerId: "account:bigmodel-highspeed-card",
   modelId: "GLM-5.3",
@@ -95,11 +100,17 @@ const HIGHSPEED_MODEL_EXECUTION = {
   },
   selectionFallback: {
     providerId: "account:bigmodel-highspeed-card",
+    target: ORDINARY_MODEL_SELECTION,
     rules: [
       { reason: "highspeed_card_expired" as const, providerErrorCode: "3402" },
       { reason: "highspeed_request_failed" as const },
     ],
   },
+};
+
+const HIGHSPEED_QUEUED_EXECUTION = {
+  modelSelection: HIGHSPEED_MODEL_SELECTION,
+  modelExecution: HIGHSPEED_MODEL_EXECUTION,
 };
 
 function queueItem(overrides: Partial<QueueItem> = {}): QueueItem {
@@ -356,8 +367,8 @@ describe("v4 原生 sendQueuedNow", () => {
     const host = makeHost(record, {
       getQueueItem: vi.fn().mockReturnValue(
         queueItem({
-          // 加速卡的 Selection 随队列项持久化；凭据不入队列面，只在 CLI 内存按 sourceCommandId 暂存。
-          modelSelection: HIGHSPEED_MODEL_SELECTION,
+          // 队列持久化普通提交模型；临时 Highspeed Selection 与凭据只在 CLI 内存暂存。
+          modelSelection: ORDINARY_MODEL_SELECTION,
           highspeed: {
             schemaVersion: 1,
             cardId: "card-1",
@@ -369,7 +380,7 @@ describe("v4 原生 sendQueuedNow", () => {
           },
         }),
       ),
-      readQueuedTurnExecution: vi.fn().mockReturnValue(HIGHSPEED_MODEL_EXECUTION),
+      readQueuedTurnExecution: vi.fn().mockReturnValue(HIGHSPEED_QUEUED_EXECUTION),
       deleteQueuedTurnExecution,
     });
 
@@ -391,6 +402,7 @@ describe("v4 原生 sendQueuedNow", () => {
     await expect(
       sendOptions.modelExecution.requestDependencies.requestAuth.source.resolve(),
     ).resolves.toEqual(HIGHSPEED_MODEL_EXECUTION.requestAuth);
+    expect(sendOptions.modelExecution.selectionFallback?.target).toEqual(ORDINARY_MODEL_SELECTION);
     // 凭据已冻结进本轮，暂存副本立即销毁，避免同一张卡被后续队列项复用。
     expect(deleteQueuedTurnExecution).toHaveBeenCalledWith("s1", "source-command-q1");
   });
@@ -418,7 +430,7 @@ describe("v4 原生 sendQueuedNow", () => {
       getQueueItem: vi
         .fn()
         .mockReturnValue(
-          queueItem({ highspeed: highspeedMeta, modelSelection: HIGHSPEED_MODEL_SELECTION }),
+          queueItem({ highspeed: highspeedMeta, modelSelection: ORDINARY_MODEL_SELECTION }),
         ),
       readQueuedTurnExecution: vi.fn().mockReturnValue(undefined),
     });
@@ -448,7 +460,7 @@ describe("v4 原生 sendQueuedNow", () => {
     ).resolves.toEqual(refreshedExecution.requestAuth);
   });
 
-  it("Highspeed queue 提升时卡已过期则去掉加速标记并使用 session 模型", async () => {
+  it("Highspeed queue 提升时卡已过期则去掉加速标记并使用队列项普通模型", async () => {
     const sessionSelection = {
       providerId: "builtin:bigmodel-team-coding-plan",
       modelId: "GLM-5.3",
@@ -461,7 +473,7 @@ describe("v4 原生 sendQueuedNow", () => {
     const host = makeHost(record, {
       getQueueItem: vi.fn().mockReturnValue(
         queueItem({
-          modelSelection: HIGHSPEED_MODEL_SELECTION,
+          modelSelection: ORDINARY_MODEL_SELECTION,
           highspeed: {
             schemaVersion: 1,
             cardId: "expired-card",
@@ -473,7 +485,7 @@ describe("v4 原生 sendQueuedNow", () => {
           },
         }),
       ),
-      readQueuedTurnExecution: vi.fn().mockReturnValue(HIGHSPEED_MODEL_EXECUTION),
+      readQueuedTurnExecution: vi.fn().mockReturnValue(HIGHSPEED_QUEUED_EXECUTION),
       deleteQueuedTurnExecution,
     });
 
@@ -482,9 +494,46 @@ describe("v4 原生 sendQueuedNow", () => {
     const sendOptions = app.sendInput.mock.calls[0]?.[1];
     expect(sendOptions?.modelExecution).toBeUndefined();
     expect(sendOptions?.intent?.highspeed).toBeUndefined();
-    // 退回必须同时改写 Selection：只删卡标记会让本轮带着加速 provider 却没有任何凭据。
-    expect(sendOptions?.intent?.modelSelection).toEqual(sessionSelection);
+    // 队列项是发送时快照；降级不得回看之后可能已变化的 Session 模型。
+    expect(sendOptions?.intent?.modelSelection).toEqual(ORDINARY_MODEL_SELECTION);
+    expect(sendOptions?.intent?.modelSelection).not.toEqual(sessionSelection);
     expect(deleteQueuedTurnExecution).toHaveBeenCalledWith("s1", "source-command-q1");
+  });
+
+  it("旧队列把 Highspeed Provider 持久化且 execution 缺失时迁移回会话普通模型", async () => {
+    const sessionSelection = {
+      providerId: "builtin:bigmodel-team-coding-plan",
+      modelId: "GLM-5.3",
+    };
+    const app = makeApp({
+      runtime: { getSessionModelSelection: vi.fn().mockReturnValue(sessionSelection) },
+    });
+    const record = makeRecord({ app });
+    const host = makeHost(record, {
+      getQueueItem: vi.fn().mockReturnValue(
+        queueItem({
+          modelSelection: HIGHSPEED_MODEL_SELECTION,
+          highspeed: {
+            schemaVersion: 1,
+            cardId: "legacy-card",
+            taskId: "s1",
+            provider: "bigmodel",
+            model: "GLM-5.3",
+            issuedAt: 1,
+            expiresAt: Date.now() + 60_000,
+          },
+        }),
+      ),
+      readQueuedTurnExecution: vi.fn().mockReturnValue(undefined),
+    });
+
+    await new V4CommandExecutor(host).execute(envelope("sendQueuedNow", { queueItemId: "q-1" }));
+
+    const sendOptions = app.sendInput.mock.calls[0]?.[1];
+    expect(sendOptions?.modelExecution).toBeUndefined();
+    expect(sendOptions?.intent?.highspeed).toBeUndefined();
+    expect(sendOptions?.intent?.modelSelection).toEqual(sessionSelection);
+    expect(sendOptions?.intent?.modelSelection).not.toEqual(HIGHSPEED_MODEL_SELECTION);
   });
 
   it("promotes quote-only input with its original sender metadata", async () => {
@@ -546,7 +595,7 @@ describe("v4 原生 sendQueuedNow", () => {
     },
   );
 
-  it("软门禁:TurnStarted projection commit 后直接 promoted/remove(不再等 review ACK)", async () => {
+  it("Core admission 后直接 promoted/remove，不等待 turn completion", async () => {
     const turnGate = deferred<void>();
     const app = makeApp({
       sendInput: vi.fn().mockResolvedValue({
@@ -560,7 +609,7 @@ describe("v4 原生 sendQueuedNow", () => {
 
     await new V4CommandExecutor(host).execute(envelope("sendQueuedNow", { queueItemId: "q-1" }));
 
-    // 软门禁:TurnStarted commit 后 queue item 直接 promoted/remove
+    // Core admission 完成后就移除队列项，不等待后台 turn 结束。
     expect(app.removeQueueItem).toHaveBeenCalledWith(
       "q-1",
       expect.objectContaining({ reason: "promoted", reservationId: "cmd-q1" }),
@@ -1067,21 +1116,5 @@ describe("v4 原生 sendQueuedNow", () => {
       expect.any(Object),
     );
     expect(app.removeQueueItem).not.toHaveBeenCalled();
-  });
-});
-
-describe("supports 分流", () => {
-  it("queue 组 6 命令均已原生", () => {
-    const executor = new V4CommandExecutor(makeHost(makeRecord()));
-    for (const type of [
-      "deleteQueueItem",
-      "editQueueItem",
-      "reorderQueueItem",
-      "setAutoDrain",
-      "setFollowupMode",
-      "sendQueuedNow",
-    ] as const) {
-      expect(executor.supports(type)).toBe(true);
-    }
   });
 });

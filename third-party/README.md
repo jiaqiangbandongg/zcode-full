@@ -85,3 +85,28 @@ Apache-2.0 复制内容中的 148 个已确认改编文件包含文件内来源�
 - 原清单提及 `apps/zcode-cli/.agents/skills/` 下的技能，但该目录在当前 checkout 中不存在；锁文件中残留来源信息不代表还分发那些文件。
 
 待核验条目以当前 `inventory.json` 的 `reviewRequired` 为准。其余来源疑点尚未证明属于第三方复制，不凭相似性推定权利人；需要另行核对。基础声明新鲜度检查通过不代表这些边界问题已经解决。具体规则与验收见 [SPEC.md](SPEC.md)。
+
+## 旧 npm 许可标识复核（2026-10-15）
+
+基础标识检查只对下列精确版本接受原发布方的 `MIT/X11` 标识，不扩展通用 allowlist，
+不把标识视为完整上游许可文本。升级版本或许可字段变化后重新阻断。
+
+- `buffers@0.1.1`：npm 包缺少许可字段。原作者在
+  [固定提交](https://github.com/bitpay/node-buffers/commit/1b745ee35d33eb166e15ef1866073a07c6d7de87)
+  为同一版本补充 `license: MIT/X11`。该提交的 `index.js` 与当前冻结安装的发布包逐字节一致；
+  SHA-256 为 `97801e296ba5f3c32242f647e1daac5917e300367fed7935ab1e62f40adb1b8a`。
+  原始 metadata 快照保存在 `upstream/buffers-0.1.1-package.json`，SHA-256 为
+  `eb42a43d5b685e6de2f2f4a5e18a70255be72349def7eedf504b912dd908913e`。
+- `chainsaw@0.1.0`：冻结安装的 npm 包自身声明 `MIT/X11`；保留原始 metadata 快照
+  `upstream/chainsaw-0.1.0-package.json`，不覆盖发布方字段。
+
+这两个包由表格解析构建依赖引入；当前生产依赖图未包含它们。若以后进入发行产物，
+仍须收集该版本的完整许可原文。现有 `reviewRequired` 材料缺口继续保留，严格检查不得绕过。
+
+## 文档查看器字体许可
+
+`@fontsource/noto-sans-sc@5.3.1` 的随包许可为 `OFL-1.1`；原文保存在 [字体许可快照](upstream/noto-sans-sc-5.3.1-LICENSE.txt)，SHA-256 为 `18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3`。官方条件见 [SIL OFL 1.1 原文](https://openfontlicense.org/open-font-license-official-text/)。
+
+该依赖由 `office-runtime` 声明为构建依赖。PDF 插件构建从 `400.css` 选择原有 WOFF2 分片并原样复制，不改字体内部名称；`apps/zcode-cli/packages/office-runtime/scripts/build.mjs` 将随包版权与完整许可写入插件的 `THIRD_PARTY_NOTICES.txt`。字体作为插件资源分发，继续保留 OFL 许可，不单独销售字体。
+
+许可门禁仅登记这一精确包名、版本与许可标识；其他包、版本或许可仍需核验。此记录不替代最终安装包审计，不关闭既有材料缺口。

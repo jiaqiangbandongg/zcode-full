@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { IntlInstance } from "@/i18n/IntlProvider.js";
 import type { PromptInputSuggestionItem } from "@/lib/promptInputTriggers.js";
+import { isAppSlashCommandSuggestion } from "@/slashCommandHelpers.js";
 import {
   type MentionPanelOption,
   type MentionPanelSection,
@@ -24,12 +25,16 @@ export function useSlashCommandMentionPanelSections(
         title: intl.formatMessage({ id: "chat.slash.commands.title" }),
         options: filteredCommandSuggestions.map<MentionPanelOption>((suggestion) => ({
           id: suggestion.id,
-          label: `/${suggestion.value}`,
+          label: isAppSlashCommandSuggestion(suggestion)
+            ? suggestion.label
+            : `/${suggestion.value}`,
           description: suggestion.description,
           content: (
             <span className="min-w-0 flex-1 flex items-center gap-2">
               <span className="truncate text-ui-base font-medium text-foreground max-w-[40%]">
-                {`/${suggestion.value}`}
+                {isAppSlashCommandSuggestion(suggestion)
+                  ? suggestion.label
+                  : `/${suggestion.value}`}
               </span>
               <span className="truncate text-ui-base text-foreground-subtlest flex-1">
                 {suggestion.description}

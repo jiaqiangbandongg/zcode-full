@@ -1,4 +1,5 @@
-import { clearAppData } from "../helpers/desktop-app.js";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
+import { clearAppData, setInputValueByTestIdDom } from "../helpers/desktop-app.js";
 import {
   assertUpstreamRequestCapture,
   assertUpstreamThoughtLevelCapture,
@@ -7,6 +8,7 @@ import {
 import { UPSTREAM_MODEL, UPSTREAM_PROVIDER_ID } from "../helpers/upstream-provider.js";
 import {
   getV4ModelConfig,
+  getV4ComposerText,
   prepareV4ConversationE2E,
   selectV4TaskById,
   sendV4Prompt,
@@ -69,6 +71,9 @@ describe("会话区思考深度 session 隔离 E2E", () => {
 
     await selectV4TaskById(sessionA);
     await assertSelectedSharedModelAndThought(INITIAL_THOUGHT_LEVEL);
+    // 空白 Composer 不持久化改选；隔离场景需保留非空草稿，才能验证 A 的选择恢复。
+    const promptAFollow = buildPrompt(`E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_FOLLOW_${runId}`);
+    await setInputValueByTestIdDom(TID_V4_COMPOSER_INPUT, promptAFollow);
     await selectSharedModelAndThought(SESSION_A_THOUGHT_LEVEL);
 
     await selectV4TaskById(sessionB);
@@ -83,7 +88,7 @@ describe("会话区思考深度 session 隔离 E2E", () => {
 
     await selectV4TaskById(sessionA);
     await assertSelectedSharedModelAndThought(SESSION_A_THOUGHT_LEVEL);
-    const promptAFollow = buildPrompt(`E2E_THOUGHT_LEVEL_SESSION_ISOLATION_A_FOLLOW_${runId}`);
+    expect(await getV4ComposerText()).toBe(promptAFollow);
     await sendPromptAndAssertThought(
       promptAFollow,
       SESSION_A_THOUGHT_LEVEL,

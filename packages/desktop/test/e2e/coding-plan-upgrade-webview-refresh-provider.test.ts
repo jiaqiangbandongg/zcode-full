@@ -1,4 +1,5 @@
-import { BUILTIN_MODEL_PROVIDER_IDS, TID_LOGIN_TRIGGER } from "@zcode/shared";
+import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
+import { TID_LOGIN_TRIGGER } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   DEFAULT_WORKSPACE,
@@ -6,18 +7,19 @@ import {
   seedCredentials,
   seedSettings,
   waitForWorkspaceApp,
-} from "./helpers/desktop-app.js";
+} from "#e2e/helpers/desktop-app";
 import {
   openBigModelCodingPlanPersonalUpgradePanel,
   openZaiCodingPlanPersonalUpgradePanel,
-} from "./helpers/coding-plan-upgrade.js";
+} from "#e2e/helpers/coding-plan-upgrade";
 import {
   readCodingPlanWebviewLocalStorage,
+  readCodingPlanUpgradeMockRequests,
   triggerCodingPlanWebviewPurchaseComplete,
   waitForCodingPlanUpgradeMockRequest,
   waitForCodingPlanWebviewClosed,
   waitForCodingPlanWebviewDisplayed,
-} from "./helpers/coding-plan-upgrade-webview.js";
+} from "#e2e/helpers/coding-plan-upgrade-webview";
 
 describe("BigModel Coding Plan 官网 webview 支付完成 E2E", () => {
   afterEach(async () => {
@@ -154,31 +156,22 @@ describe("BigModel Coding Plan 官网 webview 支付完成 E2E", () => {
       { timeout: 10000 },
     );
     expect(await readEntryEvents()).toHaveLength(1);
-    await triggerCodingPlanWebviewPurchaseComplete("bigmodel");
-    await waitForCodingPlanWebviewClosed();
-
-    await waitForCodingPlanUpgradeMockRequest(
-      (request) => request.path.endsWith("/api/biz/customer/getCustomerInfo"),
-      "购买完成后没有刷新 customerInfo",
-    );
+    // 账号已迁到 Key ID 换 PAT；Copy Secret 已删除，有效 PAT 在购买刷新时允许复用。
     await waitForCodingPlanUpgradeMockRequest(
       (request) =>
-        request.path.includes("/api/biz/v1/organization/org-e2e/projects/proj-e2e/api_keys") &&
-        !request.path.includes("/copy/"),
-      "购买完成后没有读取或创建 BigModel API key",
+        request.method === "POST" &&
+        request.path ===
+          "/api/biz/v1/organization/org-e2e/projects/proj-e2e/api_keys/bigmodel-personal-api-key/access_tokens" &&
+        request.headers.authorization === "Bearer e2e-bigmodel-oauth-token",
+      "账号初始化没有签发 BigModel PAT",
     );
-    await waitForCodingPlanUpgradeMockRequest(
-      (request) =>
-        request.path.endsWith(
-          "/api/biz/v1/organization/org-e2e/projects/proj-e2e/api_keys/copy/bigmodel-webview-refreshed-key",
-        ),
-      "购买完成后没有复制 BigModel API key secret",
-    );
-    await waitForCodingPlanUpgradeMockRequest(
-      (request) => request.path.endsWith("/api/biz/subscription/list"),
-      "购买完成后没有校验 subscription/list",
-    );
-    // Account 凭据属于 Credential Store，不恢复旧 Provider Store 的 apiKey 持久化断言。
+    await completePurchaseAndWaitForRefresh("bigmodel");
+    expect(
+      (await readCodingPlanUpgradeMockRequests()).requests.some((request) =>
+        request.path.includes("/copy/"),
+      ),
+    ).toBe(false);
+    // PAT 由账号 owner 管理，不落盘到 Personal Provider Config。
     expect(
       (await readModelProvider(BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan))?.apiKey ??
         "",
@@ -194,27 +187,42 @@ describe("BigModel Coding Plan 官网 webview 支付完成 E2E", () => {
 
     await waitForZaiWebviewCredentialsInjected();
 
-    await triggerCodingPlanWebviewPurchaseComplete("zai");
-    await waitForCodingPlanWebviewClosed();
-
-    await waitForCodingPlanUpgradeMockRequest(
-      (request) =>
-        request.path.endsWith("/api/biz/customer/getCustomerInfo") &&
-        request.headers.authorization === "Bearer zai-webview-oauth-token",
-      "购买完成后没有按 Z.ai token 刷新 customerInfo",
-    );
-    await waitForCodingPlanUpgradeMockRequest(
-      (request) =>
-        request.path.endsWith("/api/biz/subscription/enterprise/v2/pricing") &&
-        request.headers.authorization === "zai-webview-oauth-token",
-      "购买完成后没有刷新 Z.ai enterprise pricing",
-    );
-    // Account 凭据属于 Credential Store，不恢复旧 Provider Store 的 apiKey 持久化断言。
+    await completePurchaseAndWaitForRefresh("zai");
+    // PAT 由账号 owner 管理，不落盘到 Personal Provider Config。
     expect(
       (await readModelProvider(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan))?.apiKey ?? "",
     ).toBe("");
   });
 });
+
+async function completePurchaseAndWaitForRefresh(provider: "bigmodel" | "zai") {
+  // 旧断言会命中启动请求；冻结边界后只读购买完成后的新增请求。
+  const before = (await readCodingPlanUpgradeMockRequests()).requests;
+  // 订阅接口使用已签发的 PAT，企业目录仍使用 OAuth，不能把两种凭据混作同一个断言。
+  const subscriptionAuthorization = before.findLast(
+    (request) => request.path === "/api/biz/subscription/list",
+  )?.headers.authorization;
+  expect(Boolean(subscriptionAuthorization)).toBe(true);
+  await triggerCodingPlanWebviewPurchaseComplete(provider);
+  await waitForCodingPlanWebviewClosed();
+  const expectedToken =
+    provider === "bigmodel" ? "e2e-bigmodel-oauth-token" : "zai-webview-oauth-token";
+  await browser.waitUntil(
+    async () => {
+      const requests = (await readCodingPlanUpgradeMockRequests()).requests.slice(before.length);
+      return ["/api/biz/subscription/list", "/api/biz/subscription/enterprise/v2/pricing"].every(
+        (path) =>
+          requests.some(
+            (request) =>
+              request.path === path &&
+              request.headers.authorization ===
+                (path.endsWith("/subscription/list") ? subscriptionAuthorization : expectedToken),
+          ),
+      );
+    },
+    { timeout: 30000, timeoutMsg: `${provider} 购买完成后未按当前账号刷新订阅与企业套餐` },
+  );
+}
 
 async function prepareZaiCodingPlanUpgradeState() {
   await clearAppData();

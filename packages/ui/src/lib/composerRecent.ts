@@ -3,6 +3,7 @@ import { modelSelectionSchema, type ModelSelection } from "@zcode/shared/model-s
 import { submissionModeSchema, type SubmissionMode } from "@zcode/shared/zcode-protocol-v4";
 import type { ModelSelectionView } from "@zcode/services";
 import { logger } from "@/logger.js";
+import { composerScopeKey, type ComposerScope } from "@/v4/composer/composerDraftStore.js";
 
 // 沿用旧 key，读取时兼容只保存 ModelSelection 的历史记录。
 const COMPOSER_RECENT_KEY_PREFIX = "zcode-model-selection-recent-v1";
@@ -17,10 +18,62 @@ interface ComposerRecent {
   readonly mode?: SubmissionMode;
 }
 
+export interface ComposerRecentReceipt {
+  scope: ComposerScope;
+  selection: { modelSelection: ModelSelection; mode: SubmissionMode };
+  order: number;
+}
+let lastReceiptOrder = 0;
+export function prepareComposerRecentReceipt(
+  scope: ComposerScope,
+  selection: ComposerRecentReceipt["selection"],
+): ComposerRecentReceipt {
+  lastReceiptOrder = Math.max(Date.now() * 1000, lastReceiptOrder + 1);
+  return {
+    scope: { ...scope },
+    selection: JSON.parse(JSON.stringify(selection)),
+    order: lastReceiptOrder,
+  };
+}
+export function acceptComposerRecentReceipt(
+  receipt: ComposerRecentReceipt,
+  storage: StorageLike | null = browserStorage(),
+): boolean {
+  if (!storage) return false;
+  const selection = modelSelectionSchema.safeParse(receipt.selection.modelSelection);
+  const mode = submissionModeSchema.safeParse(receipt.selection.mode);
+  if (!selection.success || !mode.success || isHighspeedProviderId(selection.data.providerId))
+    return true;
+  const key = resolveComposerRecentKey("", undefined, receipt.scope);
+  try {
+    let previous: { order?: number } | null = null;
+    try {
+      previous = JSON.parse(storage.getItem(key) ?? "null");
+    } catch {
+      /* 损坏偏好可被真实接纳替换。 */
+    }
+    // 回执/查询/快照可能重复到达；持久化顺序让刷新后的旧回执也不能回滚默认配置。
+    if (typeof previous?.order === "number" && previous.order >= receipt.order) return true;
+    storage.setItem(
+      key,
+      JSON.stringify({ modelSelection: selection.data, mode: mode.data, order: receipt.order }),
+    );
+    return true;
+  } catch (error) {
+    logger.warn("[ComposerRecent] 接纳配置交接失败，保留命令恢复线索", error);
+    return false;
+  }
+}
+
 let submissionSequence = 0;
 const acceptedSequences = new WeakMap<StorageLike, Map<string, number>>();
 
-function resolveComposerRecentKey(workspacePath: string, workspaceIdentity?: string): string {
+function resolveComposerRecentKey(
+  workspacePath: string,
+  workspaceIdentity?: string,
+  scope?: ComposerScope,
+): string {
+  if (scope) return `zcode-composer-recent:v2:${composerScopeKey(scope)}`;
   const workspaceKey = workspaceIdentity?.trim() || workspacePath;
   return `${COMPOSER_RECENT_KEY_PREFIX}:${workspaceKey}`;
 }
@@ -29,10 +82,11 @@ export function readComposerRecent(
   workspacePath: string,
   workspaceIdentity?: string,
   storage: StorageLike | null = browserStorage(),
+  scope?: ComposerScope,
 ): ComposerRecent | null {
   if (!storage) return null;
   try {
-    const raw = storage.getItem(resolveComposerRecentKey(workspacePath, workspaceIdentity));
+    const raw = storage.getItem(resolveComposerRecentKey(workspacePath, workspaceIdentity, scope));
     if (!raw) return null;
     const record: unknown = JSON.parse(raw);
     if (!record || typeof record !== "object" || Array.isArray(record)) return null;
@@ -64,9 +118,10 @@ export function captureComposerRecentSubmission(
   submission: { readonly modelSelection: ModelSelection; readonly mode: SubmissionMode },
   workspaceIdentity?: string,
   storage: StorageLike | null = browserStorage(),
+  scope?: ComposerScope,
 ): () => void {
   if (!storage) return () => {};
-  const key = resolveComposerRecentKey(workspacePath, workspaceIdentity);
+  const key = resolveComposerRecentKey(workspacePath, workspaceIdentity, scope);
   const mode = submissionModeSchema.safeParse(submission.mode);
   const modelSelection = normalizeSparseModelSelection(submission.modelSelection);
   if (modelSelection && isHighspeedProviderId(modelSelection.providerId)) {

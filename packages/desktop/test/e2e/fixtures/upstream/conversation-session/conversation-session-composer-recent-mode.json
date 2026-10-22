@@ -28,6 +28,31 @@
       }
     },
     {
+      "id": "recent-mode-compact",
+      "description": "切换模型后压缩现有历史的受控响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "实际切模型会触发压缩；保留 Write 历史供后续提交继续，避免缺少压缩 fixture 造成 500 重试。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_COMPOSER_RECENT_MODE_WRITE", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "recent-mode-compact",
+          "text": "<summary>The user requested E2E_COMPOSER_RECENT_MODE_WRITE. The Write tool completed successfully and the assistant replied RECENT_MODE_DONE.</summary>",
+          "inputTokens": 80,
+          "outputTokens": 40
+        }
+      }
+    },
+    {
       "id": "recent-mode-seed",
       "description": "I74: 新任务继承最近提交权限的受控响应。",
       "metadata": {
@@ -84,6 +109,31 @@
       }
     },
     {
+      "id": "recent-mode-second",
+      "description": "TD02 第二次切模型和权限后发送。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定输出验证第二次实际提交更新 Recent 后，空白页不覆盖模型与权限。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_COMPOSER_RECENT_MODE_SECOND"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "recent-mode-second",
+          "text": "RECENT_MODE_SECOND_DONE",
+          "inputTokens": 80,
+          "outputTokens": 8
+        }
+      }
+    },
+    {
       "id": "recent-mode-write",
       "description": "I74: 新任务继承最近提交权限的受控响应。",
       "metadata": {
@@ -116,7 +166,7 @@
     },
     {
       "id": "recent-mode-final",
-      "description": "I74: 新任务继承最近提交权限的受控响应。",
+      "description": "I74: Write 工具结果后回复；最后一条 user 已是工具结果，按完整历史中的提示词和工具 ID 匹配。",
       "metadata": {
         "kind": "main",
         "timingPolicy": "fast-text",

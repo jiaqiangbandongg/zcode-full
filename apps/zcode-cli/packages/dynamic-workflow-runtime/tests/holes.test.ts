@@ -231,21 +231,14 @@ describe("holes — evaluated at the site", () => {
   });
 
   it("a filled hole (body present) sends no wire message", async () => {
-    const seen: string[] = [];
     const { settlement, driver } = await runLowered(
       [
         "const base = 5;",
         'const v = await __host.hole("hole#1", "Verdict", "p", (__src) => eval(__src), async () => { return base + 2; });',
         "return v;",
       ].join("\n"),
-      {
-        onEvent: (event) => {
-          seen.push(event.type);
-        },
-      },
     );
     expect(artifactOf(settlement)).toBe(7);
-    expect(seen).not.toContain("hole-reached");
     expect(driver.eventsOfType("hole-reached")).toEqual([]);
   });
 
@@ -342,7 +335,6 @@ describe("holes — a parked hole is a request in flight", () => {
       },
       timeoutMs: 15000,
     });
-    expect(typeof bound?.fillHole).toBe("function");
     // 快照投影的两个只读面也经这条绑定交出去（run 已结算：停驻表空、本世没有补全）。
     expect(bound?.openHoles()).toEqual([]);
     expect(bound?.filledHoles()).toEqual([]);

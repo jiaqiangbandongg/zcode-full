@@ -16,8 +16,8 @@ describe("listRegistryBackedModels", () => {
     const registry = new ProviderRegistry([
       {
         providerId: "provider-a",
+        providerName: "Provider A",
         config: createApiKeyProviderConfig({
-          label: "Provider A",
           models: ["model-a", "model-b"],
         }),
         models: [

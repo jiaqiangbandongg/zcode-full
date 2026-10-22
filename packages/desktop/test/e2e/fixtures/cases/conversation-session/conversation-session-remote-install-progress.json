@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-remote-install-progress",
+  "spec": "./test/e2e/conversation-session/conversation-session-remote-install-progress.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-remote-install-progress.json"
+  ],
+  "providerRequestPolicy": "none",
+  "fileFixtures": [],
+  "requests": []
+}

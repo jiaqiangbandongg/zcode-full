@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VSBuffer, type ConnectionFlowControl } from "@zcode/rpc";
+import { VSBuffer } from "@zcode/rpc";
 import {
   WEB_REMOTE_CONTROL_RPC_TRANSPORT_LIMITS,
   encodeWebRemoteControlRpcTransportMessage,
@@ -325,21 +325,6 @@ describe("createAcknowledgedWebRemoteControlRelayProtocol", () => {
     vi.useRealTimers();
   });
 
-  it("keeps the deprecated legacy factory separate from the production acknowledged adapter", () => {
-    const adapter = createAcknowledgedWebRemoteControlRelayProtocol({
-      ...acknowledgedIdentity,
-      sendFrame: () => true,
-    });
-    const flow: ConnectionFlowControl = adapter;
-
-    expect(adapter.protocol).toBeDefined();
-    expect(flow.unacknowledgedBytes).toBe(0);
-    expect(flow.onSaturated).toBeTypeOf("function");
-    expect(flow.onDrained).toBeTypeOf("function");
-    expect(createWebRemoteControlRelayProtocol).toBeTypeOf("function");
-    adapter.dispose();
-  });
-
   it("splits oversized raw messages and only delivers/ACKs after the final fragment", () => {
     const outbound: WebRemoteControlRpcTransportPayload[] = [];
     const sender = createAcknowledgedWebRemoteControlRelayProtocol({
@@ -613,13 +598,19 @@ describe("createAcknowledgedWebRemoteControlRelayProtocol", () => {
 
     deliverAcknowledgement = false;
     left.protocol.send(VSBuffer.wrap(new Uint8Array([4, 5, 6])));
-    expect(received).toEqual([[1, 2, 3], [4, 5, 6]]);
+    expect(received).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
     expect(left.unacknowledgedBytes).toBeGreaterThan(0);
     const replayedSeq = leftFrames.at(-1)?.seq;
 
     deliverAcknowledgement = true;
     expect(left.replayUnacknowledged()).toBe(true);
-    expect(received).toEqual([[1, 2, 3], [4, 5, 6]]);
+    expect(received).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
     expect(leftFrames.at(-1)?.seq).toBe(replayedSeq);
     expect(left.unacknowledgedBytes).toBe(0);
     left.dispose();

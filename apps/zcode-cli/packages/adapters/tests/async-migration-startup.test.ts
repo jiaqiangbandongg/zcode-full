@@ -58,7 +58,9 @@ describe("Todo144：迁移启动状态与真实 SQLite 锁", () => {
     expect(states.at(-1)?.phase).toBe("ready");
     expect(states.at(-1)?.migration?.lastAppliedMigrationId).toBeNull();
     // 本 hotfix 不改迁移算法；状态通知不能让执行路径偏离账本对应的冻结原 SQL。
-    const frozenSql = SQLITE_MIGRATIONS.map((migration) => migration.sql);
+    const frozenSql = SQLITE_MIGRATIONS.filter((migration) => !migration.apply).map(
+      (migration) => migration.sql,
+    );
     expect(exec.mock.calls.map(([sql]) => sql).filter((sql) => frozenSql.includes(sql))).toEqual(
       frozenSql,
     );
@@ -73,7 +75,11 @@ describe("Todo144：迁移启动状态与真实 SQLite 锁", () => {
       },
     });
     expect(replay.some((s) => s.phase === "migrating")).toBe(false);
-    expect(replay.at(-1)?.migration?.lastAppliedMigrationId).toBe(SQLITE_MIGRATIONS.at(-1)?.id);
+    expect(replay.at(-1)?.migration?.lastAppliedMigrationId).toBe(
+      SQLITE_MIGRATIONS.map((m) => m.id)
+        .sort()
+        .at(-1),
+    );
   });
 
   it("同库持锁超过旧 5 秒，异步等待不阻塞持有者提交；异库独立就绪", async () => {
@@ -81,7 +87,7 @@ describe("Todo144：迁移启动状态与真实 SQLite 锁", () => {
     dirs.push(dir);
     const path = join(dir, "db.sqlite");
     const holder = open(path);
-    runSqliteSessionMigrations(holder, path);
+    await runSqliteSessionMigrations(holder, path);
     holder.exec("BEGIN IMMEDIATE");
     const waiter = open(path);
     const phases: string[] = [];
@@ -130,7 +136,7 @@ describe("Todo144：迁移启动状态与真实 SQLite 锁", () => {
     dirs.push(dir);
     const path = join(dir, "db.sqlite");
     const holder = open(path);
-    runSqliteSessionMigrations(holder, path);
+    await runSqliteSessionMigrations(holder, path);
     holder.exec("BEGIN IMMEDIATE");
     const waiter = open(path);
     const phases: string[] = [];
@@ -150,13 +156,12 @@ describe("Todo144：迁移启动状态与真实 SQLite 锁", () => {
 it("openStartup 保留迁移原始错误，即使 close 也失败", async () => {
   const { SqliteSessionStore } =
     await import("../src/storage/session-store/sqlite-session-store.js");
-  const originalClose = SqliteSessionStore.prototype.close;
-  vi.spyOn(SqliteSessionStore.prototype, "close").mockImplementation(
-    function (this: InstanceType<typeof SqliteSessionStore>) {
-      originalClose.call(this);
-      throw new Error("secondary close failure");
-    },
-  );
+  // 迁移失败发生在 store 实例返回前；应在真正持有连接的 DatabaseSync 上注入关闭失败。
+  const originalClose = DatabaseSync.prototype.close;
+  vi.spyOn(DatabaseSync.prototype, "close").mockImplementation(function (this: DatabaseSync) {
+    originalClose.call(this);
+    throw new Error("secondary close failure");
+  });
   const original = Object.assign(new Error("primary storage failure"), { errcode: 13 });
   await expect(
     SqliteSessionStore.openStartup(
@@ -194,7 +199,9 @@ it("SILENTDB-02/04: reports real migration kind and counts only committed SQL as
     kind: "none",
     executedCount: 0,
     committedCount: 0,
-    lastAppliedMigrationId: SQLITE_MIGRATIONS.at(-1)?.id,
+    lastAppliedMigrationId: SQLITE_MIGRATIONS.map((m) => m.id)
+      .sort()
+      .at(-1),
   });
   db.exec("DELETE FROM schema_migration WHERE id >= '0020'");
   const failed: SqliteMigrationProgress[] = [];
@@ -219,7 +226,7 @@ it("SILENTDB-03: another writer can finish the observed migrations without this 
   dirs.push(dir);
   const path = join(dir, "db.sqlite");
   const holder = open(path);
-  runSqliteSessionMigrations(holder, path);
+  await runSqliteSessionMigrations(holder, path);
   holder.exec("DELETE FROM schema_migration WHERE id >= '0020'; BEGIN IMMEDIATE");
   const waiter = open(path);
   const states: SqliteMigrationProgress[] = [];
@@ -230,7 +237,7 @@ it("SILENTDB-03: another writer can finish the observed migrations without this 
       if (state.phase === "waiting_for_lock") {
         expect(state.migration?.kind).toBe("upgrade");
         holder.exec("COMMIT");
-        runSqliteSessionMigrations(holder, path);
+        await runSqliteSessionMigrations(holder, path);
       }
     },
   });
@@ -238,13 +245,19 @@ it("SILENTDB-03: another writer can finish the observed migrations without this 
     kind: "upgrade",
     executedCount: 0,
     committedCount: 0,
-    lastAppliedMigrationId: SQLITE_MIGRATIONS.at(-1)?.id,
+    lastAppliedMigrationId: SQLITE_MIGRATIONS.map((m) => m.id)
+      .sort()
+      .at(-1),
   });
   expect(exec.mock.calls.some(([sql]) => SQLITE_MIGRATIONS.some((m) => m.sql === sql))).toBe(false);
   expect(
     states.find((s) => s.phase === "waiting_for_lock")?.migration?.lastAppliedMigrationId,
   ).toBeUndefined();
-  expect(states.at(-1)?.migration?.lastAppliedMigrationId).toBe(SQLITE_MIGRATIONS.at(-1)?.id);
+  expect(states.at(-1)?.migration?.lastAppliedMigrationId).toBe(
+    SQLITE_MIGRATIONS.map((m) => m.id)
+      .sort()
+      .at(-1),
+  );
 });
 
 it("publishes confirmed migration demand when lock contention recurs after precheck", async () => {
@@ -278,7 +291,7 @@ it("publishes confirmed migration demand when lock contention recurs after prech
 
 it("does not send malformed ledger IDs as telemetry or fail an otherwise prepared database", async () => {
   const db = open();
-  runSqliteSessionMigrations(db, ":memory:");
+  await runSqliteSessionMigrations(db, ":memory:");
   db.prepare("INSERT INTO schema_migration VALUES (?, 'external', NULL, 0)").run(
     "private / unexpected ID",
   );

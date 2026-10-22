@@ -691,74 +691,56 @@ describe("ZCodeProtocolNdjsonConnection", () => {
     await connection.waitForClose();
   });
 
-  // M5 收口：prompt/enhance 全簇删除后，请求方法级 bypass 名单只剩 session/stop；
-  // 本用例保住「长请求占住串行队列时 stop 仍可进入 server」这一传输层语义。
-  it("lets session/stop bypass a long-running request in the serial queue", async () => {
+  it("answers plugin read requests while an install runs and another install waits behind it", async () => {
     const input = new PassThrough();
     const output = new PassThrough();
-    const responses: unknown[] = [];
-    let resolveStopHandled!: () => void;
-    const stopHandled = new Promise<void>((resolve) => {
-      resolveStopHandled = resolve;
-    });
-
-    output.on("data", (chunk: Buffer) => {
-      for (const line of chunk.toString("utf8").trim().split("\n")) {
-        if (line) {
-          responses.push(JSON.parse(line));
-        }
-      }
-    });
-
+    const installEntered = Promise.withResolvers<void>();
+    const finishInstall = Promise.withResolvers<void>();
+    const readsAnswered = Promise.withResolvers<void>();
+    const readMethods: string[] = [
+      zcodeProtocolMethods.pluginsDescribe,
+      zcodeProtocolMethods.pluginsList,
+      zcodeProtocolMethods.pluginsOverview,
+    ];
+    const order: string[] = [];
     const connection = new ZCodeProtocolNdjsonConnection({
       handleMessage: async (message) => {
-        if (!("method" in message)) {
-          return undefined;
+        if (!("method" in message) || !("id" in message)) return undefined;
+        order.push(`${message.method}#${message.id}`);
+        if (message.id === 1) {
+          installEntered.resolve();
+          await finishInstall.promise;
         }
-        if (message.method === zcodeProtocolMethods.sessionCompact) {
-          return await new Promise<never>(() => undefined);
-        }
-        if (message.method === zcodeProtocolMethods.sessionStop && "id" in message) {
-          resolveStopHandled();
-          return {
-            id: message.id,
-            result: {},
-          };
-        }
-        return undefined;
+        if (order.length === 1 + readMethods.length) readsAnswered.resolve();
+        return { id: message.id, result: {} };
       },
       input,
       output,
     });
     connection.start();
-
-    input.write(
-      [
-        frame({
-          id: 1,
-          method: zcodeProtocolMethods.sessionCompact,
-          params: { sessionId: "sess_1" },
-        }),
-        frame({
-          id: 2,
-          method: zcodeProtocolMethods.sessionStop,
-          params: { sessionId: "sess_1" },
-        }),
-      ].join(""),
-    );
-
-    const stopResult = await Promise.race([
-      stopHandled.then(() => "handled" as const),
-      new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 30)),
-    ]);
-
-    expect(stopResult).toBe("handled");
-    await vi.waitFor(() => {
-      expect(responses).toContainEqual({
-        id: 2,
-        result: {},
-      });
-    });
+    try {
+      input.write(frame({ id: 1, method: zcodeProtocolMethods.pluginsInstall, params: {} }));
+      await installEntered.promise;
+      // B 排在 A 后面时，详情和新标签页的列表加载也不能等「最后排队请求开始」这个屏障。
+      input.write(
+        frame({ id: 2, method: zcodeProtocolMethods.pluginsInstall, params: {} }) +
+          readMethods
+            .map((method, index) => frame({ id: index + 3, method, params: {} }))
+            .join(""),
+      );
+      await readsAnswered.promise;
+      expect(order).toEqual([
+        "plugins/install#1",
+        "plugins/describe#3",
+        "plugins/list#4",
+        "plugins/overview#5",
+      ]);
+    } finally {
+      finishInstall.resolve();
+      input.end();
+      await connection.waitForClose();
+    }
+    expect(order.at(-1)).toBe("plugins/install#2");
   });
 });
 

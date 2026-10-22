@@ -154,6 +154,7 @@ function cloneContentBlock(block: ModelMessageContentBlock): ModelMessageContent
       return { ...block, source: block.source ? { ...block.source } : undefined };
     case "text":
     case "reasoning":
+    case "tool_reference":
     case "resource_link":
       return { ...block };
   }

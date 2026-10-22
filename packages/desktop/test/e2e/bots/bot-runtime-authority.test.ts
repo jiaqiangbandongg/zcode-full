@@ -55,17 +55,20 @@ describe("Bot runtime authority E2E", () => {
     };
     const harness = createBotsServiceHarness({
       config: createFeishuConfig(),
+      // 与 services/node.ts 的 !isDesktopAttachedRemote 装配一致；这是 owner 权限，
+      // 不是跳过被测流程。下方保存配置还会触发 scheduleRefresh，验证 guard 仍生效。
       runStartupBackgroundTasks: false,
-      lastWorkspaceSession: [
+      projectWorkspaces: [
         {
           kind: "remote",
           workspacePath: "/workspace",
-          workspaceIdentity: "ssh://e2e-host/workspace",
+          workspaceIdentity: "remote:server:e2e-host:/workspace",
           remoteSessionId: "remote-session-e2e",
         },
       ],
     });
     try {
+      await harness.service.saveConfig(createFeishuConfig());
       await new Promise((resolve) => setTimeout(resolve, 100));
       const status = await harness.service.getStatus();
       expect(status.botRuntime).toEqual([
@@ -78,7 +81,7 @@ describe("Bot runtime authority E2E", () => {
       ]);
       expect(requests).toEqual([]);
     } finally {
-      harness.service.disposeAll();
+      await harness.service.disposeAllAndWait();
       globalThis.fetch = originalFetch;
     }
   });

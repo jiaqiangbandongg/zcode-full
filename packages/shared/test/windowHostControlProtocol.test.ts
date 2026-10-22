@@ -13,6 +13,49 @@ const sshTarget = {
 };
 
 describe("R1 window Host control protocol", () => {
+  it("WSL 安装等待只接受完整的实际发行版与用户", () => {
+    const response = {
+      type: HostResponseTypes.RemoteWorkspaceConnectFailed,
+      requestId: "install-wsl",
+      error: "install required",
+      reasonCode: "source-server-install-required",
+      profileId: "17ef20b3-622d-4a53-98c1-0cdff29f3e6d",
+      resolvedWslTarget: { kind: "wsl", distro: "Ubuntu", user: "dev" },
+    };
+    expect(hostResponseMessageSchema.parse(response)).toEqual(response);
+    for (const resolvedWslTarget of [
+      { kind: "wsl" },
+      { kind: "wsl", distro: "Ubuntu" },
+      { kind: "wsl", distro: " ", user: "dev" },
+      { kind: "wsl", distro: "Ubuntu", user: "" },
+      { ...response.resolvedWslTarget, password: "secret" },
+    ]) {
+      expect(hostResponseMessageSchema.safeParse({ ...response, resolvedWslTarget }).success).toBe(
+        false,
+      );
+    }
+  });
+  it("升级失败保留实际线路 ID，Host 响应拒绝无效 ID", () => {
+    const profileId = "17ef20b3-622d-4a53-98c1-0cdff29f3e6d";
+    const response = {
+      type: HostResponseTypes.RemoteWorkspaceConnectFailed,
+      requestId: "connect-wsl",
+      error: "upgrade required",
+      reasonCode: "source-server-upgrade-required",
+      profileId,
+    };
+    expect(hostResponseMessageSchema.parse(response)).toEqual(response);
+    expect(hostResponseMessageSchema.safeParse({ ...response, profileId: "" }).success).toBe(false);
+    expect(hostResponseMessageSchema.safeParse({ ...response, profileId: "invalid" }).success).toBe(
+      false,
+    );
+  });
+  it("连接结果可携带严格校验的复用目标", () => {
+    const result = { type: HostResponseTypes.RemoteWorkspaceConnected, requestId: "reused", descriptor: { remoteSessionId: "session", target: sshTarget, generation: 1, reusedConnectionTarget: sshTarget } };
+    expect(hostResponseMessageSchema.parse(result)).toEqual(result);
+    expect(hostResponseMessageSchema.safeParse({ ...result, descriptor: { ...result.descriptor, reusedConnectionTarget: { kind: "ssh", host: "dev.internal" } } }).success).toBe(false);
+  });
+
   it("validates monotonic-shape CUA PiP focus facts", () => {
     expect(
       hostIncomingMessageSchema.safeParse({
@@ -72,6 +115,23 @@ describe("R1 window Host control protocol", () => {
     ).toBe(true);
   });
 
+  it("validates structured remote workspace bind success and failure responses", () => {
+    expect(
+      hostResponseMessageSchema.safeParse({
+        type: HostResponseTypes.RemoteWorkspaceContextBound,
+        requestId: "bind-1",
+      }).success,
+    ).toBe(true);
+    expect(
+      hostResponseMessageSchema.safeParse({
+        type: HostResponseTypes.RemoteWorkspaceContextBindFailed,
+        requestId: "bind-1",
+        error: "workspace migration conflict",
+        reasonCode: "workspace-task-identity-conflict",
+      }).success,
+    ).toBe(true);
+  });
+
   it("所有异步控制请求都拒绝空 requestId", () => {
     const requests = [
       {
@@ -117,6 +177,15 @@ describe("R1 window Host control protocol", () => {
         workspacePath: "/work/demo",
       }).success,
     ).toBe(false);
+    expect(
+      windowHostAttachmentScopeSchema.safeParse({
+        kind: "source-settings",
+        sourceServerId: "source-1",
+      }).success,
+    ).toBe(true);
+    expect(windowHostAttachmentScopeSchema.safeParse({ kind: "source-settings" }).success).toBe(
+      false,
+    );
   });
 
   it("AttachServicePort 同时校验可信 clientMode 和 scope", () => {

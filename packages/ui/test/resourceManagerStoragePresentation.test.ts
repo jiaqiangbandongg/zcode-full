@@ -4,7 +4,6 @@ import {
   buildStorageLegend,
   joinStoragePath,
   STORAGE_LEGEND_MAX_ITEMS,
-  STORAGE_LEGEND_REST_COLOR,
   sumCategoriesAcrossRoots,
 } from "@/resource-manager/storage/storageCategoryPresentation.js";
 
@@ -37,7 +36,7 @@ describe("sumCategoriesAcrossRoots", () => {
 });
 
 describe("buildStorageLegend", () => {
-  it("colors the largest categories and folds the rest into a grey item", () => {
+  it("keeps distinct colors for the largest categories and folds remaining bytes", () => {
     const sizes = Object.fromEntries(
       ["a", "b", "c", "d", "e", "f", "g", "h"].map((id, index) => [id, 100 - index]),
     );
@@ -46,7 +45,6 @@ describe("buildStorageLegend", () => {
     expect(legend.at(-1)).toMatchObject({
       id: "rest",
       restCount: 2,
-      color: STORAGE_LEGEND_REST_COLOR,
       bytes: 94 + 93,
     });
     expect(new Set(legend.slice(0, -1).map((item) => item.color)).size).toBe(

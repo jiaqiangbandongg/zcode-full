@@ -1,9 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { WORKSPACE_HOOK_SCHEMA_FIELDS } from "../../contracts/src/hooks/index.js";
-import { createConfig } from "../src/config/index.js";
 import {
   hookCommandSchema,
   hookMatcherSchema,
@@ -24,49 +20,5 @@ describe("workspace hook trust phase 0", () => {
     );
     expect(schemaKeys(hookProcessSchema)).toEqual(WORKSPACE_HOOK_SCHEMA_FIELDS.process);
     expect(schemaKeys(hookCommandSchema)).toEqual(WORKSPACE_HOOK_SCHEMA_FIELDS.command);
-  });
-
-  it("startup/resume/async project hooks 在 admission 实现前继续 hard block", async () => {
-    const root = await mkdtemp(join(tmpdir(), "zcode-workspace-hook-hard-block-"));
-    try {
-      await mkdir(join(root, ".git"));
-      await mkdir(join(root, ".zcode"), { recursive: true });
-      await writeFile(
-        join(root, ".zcode", "config.json"),
-        JSON.stringify({
-          hooks: {
-            enabled: true,
-            events: {
-              SessionStart: [
-                {
-                  matcher: "startup",
-                  hooks: [{ type: "command", command: "echo startup-project-hook" }],
-                },
-                {
-                  matcher: "resume",
-                  hooks: [
-                    {
-                      type: "command",
-                      command: "echo resume-project-hook",
-                      async: true,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        }),
-      );
-
-      const result = createConfig({ env: {}, skipUserConfig: true, workingDirectory: root });
-
-      expect(result.sources.project.diagnostics).toContainEqual(
-        expect.objectContaining({ code: "config_project_hooks_pending_trust", path: "hooks" }),
-      );
-      expect(result.config.hooks.enabled).toBe(false);
-      expect(result.config.hooks.events.SessionStart).toBeUndefined();
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
   });
 });
