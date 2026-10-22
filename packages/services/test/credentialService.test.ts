@@ -67,6 +67,19 @@ describe("credentialService encryption", () => {
     await expect(service.load(credentialKey)).resolves.toBe("plain-access-token");
   });
 
+  it("round-trips an encrypted empty value", async () => {
+    const home = makeTempHome();
+    const service = await createCredentialServiceInHome(home);
+    const credentialKey = "provider-sync:empty-api-key";
+
+    await service.save(credentialKey, "");
+
+    const credentialsFile = join(home, ".zcode", "v2", "credentials.json");
+    const rawStore = JSON.parse(readFileSync(credentialsFile, "utf-8")) as Record<string, string>;
+    expect(rawStore[credentialKey]).toMatch(/^enc:v1:/);
+    await expect(service.load(credentialKey)).resolves.toBe("");
+  });
+
   it("keeps backward compatibility for legacy plaintext values", async () => {
     const home = makeTempHome();
     const credentialsDir = join(home, ".zcode", "v2");

@@ -132,6 +132,7 @@ export function isExploreToolCall({ kind, input }: { kind: string; input: unknow
   if (
     identity.family === "file-read" ||
     identity.family === "search" ||
+    identity.family === "web-fetch" ||
     identity.family === "explore"
   ) {
     return true;

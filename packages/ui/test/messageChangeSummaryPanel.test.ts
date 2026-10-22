@@ -161,7 +161,6 @@ describe("MessageChangeSummaryPanel", () => {
     const html = renderPanel();
 
     expect(html).toContain("1 个文件已更改");
-    expect(html).toContain('data-zcode-stream-animate="true"');
     expect(html).toContain("+1");
     expect(html).toContain("-1");
     expect(html).toContain('aria-label="展开已更改文件"');
@@ -173,9 +172,6 @@ describe("MessageChangeSummaryPanel", () => {
     expect(html).not.toContain("src/MessageChangeSummaryPanel.tsx");
     expect(html).not.toContain("打开");
     expect(html).not.toContain("选择打开方式");
-    expect(html).not.toContain("group/file flex w-full");
-    expect(html).not.toContain('aria-label="展开工具详情"');
-    expect(html).not.toContain("暂时无法预览这份 Diff。");
   });
 
   it("优先显示当前轮次的摘要，不把整个 session 的汇总混进来", () => {
@@ -276,7 +272,7 @@ describe("MessageChangeSummaryPanel", () => {
     });
   });
 
-  it("文件行和 Review 按钮复用同一个 diff 打开事件", () => {
+  it("有 source 和打开回调时委托一次，缺少任一时不调用", () => {
     const source = buildChangeSummaryDiffViewerSource({
       relativePath: "src/App.tsx",
       path: "/workspace/src/App.tsx",

@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-directory-resilience",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-directory-resilience.test.ts",
+  "fixtures": [
+    {
+      "id": "ssh-directory-reconnect-title",
+      "description": "SSH directory resilience task 标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_DIRECTORY_RESILIENCE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-directory-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH directory resilience\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-directory-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-directory-reconnect-main",
+      "description": "SSH directory resilience 首发和续发的通用响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "用固定回复准备和续聊真实远端历史，目录故障由专属 SSH 目标构造。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_SSH_DIRECTORY_RESILIENCE_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-directory-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_DIRECTORY_RESILIENCE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-directory-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

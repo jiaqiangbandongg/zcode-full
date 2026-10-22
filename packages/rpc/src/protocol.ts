@@ -51,9 +51,10 @@ function isMessagePortFlowControl(value: unknown): value is MessagePortFlowContr
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
-    Object.keys(record).length === 2 &&
+    // 二进制载荷可能有数百万字节；先看控制标记，避免为排除普通消息逐字节枚举。
     record.__zcodeRpcControl === "connection-flow-v1" &&
-    (record.state === "saturated" || record.state === "drained")
+    (record.state === "saturated" || record.state === "drained") &&
+    Object.keys(record).length === 2
   );
 }
 

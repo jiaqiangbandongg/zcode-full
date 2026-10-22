@@ -135,6 +135,10 @@ export type RevokeWorkspaceHookTrustInput =
 export type ZCodeAppRuntimeConfigInput = AgentRuntimeConfig;
 
 export interface ZCodeAppOptions {
+  /** 独立 CLI 的配置菜单编辑输入默认值；其他装配保留显式 Session 配置语义。 */
+  modelSelectionMode?: "cli-default";
+  /** Host 在运行实例创建时传入，运行中不刷新。 */
+  additionalDirectories?: readonly string[];
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;
@@ -193,6 +197,7 @@ export interface ZCodeAppOptions {
   mcpPortFactory?: (input: { workingDirectory?: string }) => McpPort;
   permissionBroker?: PermissionBrokerPort;
   eventSink?: SessionEventSink;
+  onOffPeakLifecycleEvent?: (event: import("@zcode/shared").OffPeakLifecycleNotification) => void;
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform | string;
   projectConfigPath?: string;
@@ -431,6 +436,9 @@ export interface ZCodeApp {
   ): Promise<McpReadResourceResult>;
   onMcpAppConnectionInvalidated(serverName: string, listener: () => void): () => void;
   getMcpAppConnectionSnapshot(serverName: string): { identity: string; generation: number } | null;
+  waitForMcpAppConnection(
+    serverName: string,
+  ): Promise<{ identity: string; generation: number } | null>;
   callMcpToolForUi(
     serverName: string,
     toolName: string,

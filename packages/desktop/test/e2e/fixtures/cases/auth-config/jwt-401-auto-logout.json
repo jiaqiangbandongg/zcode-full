@@ -9,7 +9,7 @@
     {
       "kind": "app-config-seed",
       "path": "~/.zcode/v2/credentials.json",
-      "purpose": "使用默认有效 OAuth 会话 seed，验证运行中 401 后的清理和重启动作。"
+      "purpose": "隔离的 OAuth/共享 JWT 和独立 Bot 凭据；本地 HTTP fixture 控制真实 Host 余额请求401，验证清理后直接重新登录。"
     }
   ],
   "requests": []

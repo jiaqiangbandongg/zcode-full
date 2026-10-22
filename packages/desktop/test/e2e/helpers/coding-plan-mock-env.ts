@@ -11,8 +11,26 @@ const CODING_PLAN_COMMON_ENV_KEYS = [
   "ZCODE_E2E_CODING_PLAN_MOCK_URL",
 ] as const;
 
-const DEFAULT_FULL_E2E_SPEC_GLOB = "./test/e2e/**/*.test.ts";
+// 正式 CI 在 launcher 阶段传入未展开的目录 glob；遗漏它会让 worker 缺少预启动的 mock。
+const CODING_PLAN_TEAM_SUITE_GLOBS = [
+  "test/e2e/**/*.test.ts",
+  "test/e2e/conversation-session/*.test.ts",
+];
 const CODING_PLAN_TEAM_SPEC_MARKERS = [
+  "conversation-session-toolsearch",
+  "conversation-session-tool-discovery-card.test.ts",
+  // 远程导航验收不依赖线上公告；隔离账号控制面，避免营销弹窗遮挡连接交互。
+  "conversation-session-rpn-project-navigation.test.ts",
+  "conversation-session-ssh-disconnect-experience.test.ts",
+  "conversation-session-ssh-remote-cold-reconnect.test.ts",
+  "conversation-session-r3-mixed-entries.test.ts",
+  "conversation-session-r3-mobile.test.ts",
+  // 模拟登录态访问线上账号接口会触发 401 弹窗，遮挡 Logo 的真实 hover 和截图。
+  "settings-ui-polish.test.ts",
+  "side-pane-tabs-responsive-interactions.test.ts",
+  "conversation-session-share-tool-presentation.test.ts",
+  // 分享浮窗仅测 Desktop 交互，账号与套餐旁路请求必须留在本地。
+  "conversation-session-share-popover.test.ts",
   "conversation-session-start-plan-independent.test.ts",
   // 创建埋点回归复用本地账号控制面，避免初始化/发送访问真实套餐与登录服务。
   "conversation-session-create-telemetry.test.ts",
@@ -20,6 +38,7 @@ const CODING_PLAN_TEAM_SPEC_MARKERS = [
   "coding-plan-team-usage.test.ts",
   "coding-plan-entitlement-presentation.test.ts",
   "provider-family-responsive.test.ts",
+  "provider-builtin-refresh-failure.test.ts",
   // Bugfix：登录后刷新子代理 catalog 的 case 与套餐用量 case 共用 team mock。
   // 抽取 spec 判定时必须保留该入口，否则单跑时 worker 会在业务断言前缺少 mock。
   "subagent-coding-plan-login-catalog-stale.test.ts",
@@ -33,6 +52,11 @@ const CODING_PLAN_TEAM_SPEC_MARKERS = [
   "conversation-session-highspeed-card.test.ts",
   "conversation-session-highspeed-card-draw-timeout.test.ts",
   "conversation-session-highspeed-card-draw-miss.test.ts",
+  // 创建期退回 case 也依赖同一份 Team 权益；漏配会让假账号请求真实控制面，
+  // 登录过期弹窗先于 Highspeed 断言遮住工作区。
+  "conversation-session-highspeed-card-fallback-unlocks-model.test.ts",
+  "conversation-session-highspeed-card-admission-retains-draft.test.ts",
+  "conversation-session-highspeed-queue-edit.test.ts",
   "conversation-session-model-provider-plan-surface.test.ts",
   // Bug 原因：连续切模回放也播种了模拟登录态；未隔离控制面时，线上 401
   // 会触发登录过期弹窗，遮住第二轮的模型菜单，导致与切模无关的失败。
@@ -45,13 +69,16 @@ const CODING_PLAN_TEAM_SPEC_MARKERS = [
   "conversation-session-offpeak-subagent-model-inheritance.test.ts",
   "conversation-session-off-peak-invalid-ticket.test.ts",
   "off-peak-create-manage.test.ts",
+  // 主页布局和额度门禁同样依赖 Registry 的账号模型事实，取号网关不提供这些数据。
+  "off-peak-automations-home-layout.test.ts",
+  "off-peak-limit-pre-gate.test.ts",
 ] as const;
 
 export function shouldPrepareCodingPlanTeamMock(specs: readonly string[]) {
   return specs.some((spec) => {
-    const normalized = spec.replaceAll("\\", "/");
+    const normalized = spec.replaceAll("\\", "/").replace(/^\.\//u, "");
     return (
-      normalized === DEFAULT_FULL_E2E_SPEC_GLOB ||
+      CODING_PLAN_TEAM_SUITE_GLOBS.includes(normalized) ||
       CODING_PLAN_TEAM_SPEC_MARKERS.some((marker) => normalized.includes(marker))
     );
   });
@@ -86,6 +113,14 @@ export function applyCodingPlanUpgradeMockEnv(environment: MutableEnvironment, b
   environment.BIGMODEL_TEST_API_BASE_URL = baseUrl;
   environment.VITE_CODING_PLAN_WEBVIEW_ORIGIN = baseUrl;
   environment.ZAI_BUSINESS_BASE_URL = baseUrl;
+}
+
+export function shouldReuseDesktopE2EBuild(environment: MutableEnvironment): boolean {
+  // 子 shard 的动态端口晚于父构建；构建决策和源码证据必须共用这个判据。
+  return (
+    environment.ZCODE_E2E_SKIP_BUILD === "1" &&
+    !environment[CODING_PLAN_UPGRADE_MOCK_BASE_URL_ENV]?.trim()
+  );
 }
 
 export function clearCodingPlanUpgradeMockEnv(environment: MutableEnvironment, baseUrl: string) {

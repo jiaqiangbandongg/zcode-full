@@ -28,6 +28,8 @@ export function createPluginUiPagePlane(events: {
   let stopLayout: (() => void) | undefined;
   let stopPreview: (() => void) | undefined;
   let preview: HTMLElement | null = null;
+  let executionActive = false;
+  let backgroundSize = { width: 640, height: 480 };
   let disposed = false,
     loaded = false,
     pluginLoaded = false,
@@ -90,10 +92,23 @@ export function createPluginUiPagePlane(events: {
   };
   const layout = () => {
     if (disposed) return;
-    const candidates = [...anchors].filter(([, a]) => a.placement.node.isConnected);
+    // forceMount 的隐藏 tab 仍连接 DOM，但尺寸为零；不能让它夺走后台初始化的承载表面。
+    const candidates = [...anchors].filter(([, a]) => {
+      const node = a.placement.node;
+      const rect = node.getBoundingClientRect();
+      return (
+        node.isConnected &&
+        node.checkVisibility({ visibilityProperty: true }) &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    });
     const chosen = candidates.find(([, a]) => a.placement.kind === "sidebar") ?? candidates.at(-1);
     visibility(Boolean(chosen && (chosen[1].visible || preview)));
     if (chosen && chosen[0] === current) return;
+    const bounds = root.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0)
+      backgroundSize = { width: bounds.width, height: bounds.height };
     current = chosen?.[0];
     stopLayout?.();
     stopLayout = undefined;
@@ -103,6 +118,18 @@ export function createPluginUiPagePlane(events: {
       move(parkingRoot());
       root.style.display = "none";
       root.inert = true;
+      if (executionActive) {
+        // display:none 会停止编辑器依赖的 rAF；保留的 MCP 页面始终需要可执行且不接收输入的表面。
+        Object.assign(root.style, {
+          display: "block",
+          position: "fixed",
+          top: "0",
+          left: "0",
+          width: `${backgroundSize.width}px`,
+          height: `${backgroundSize.height}px`,
+          opacity: "0.001",
+        });
+      }
       return;
     }
     root.inert = false;
@@ -110,7 +137,14 @@ export function createPluginUiPagePlane(events: {
     const parent = kind === "sidebar" ? parkingRoot() : (container ?? node);
     move(parent);
     if (kind !== "flow" && parent !== node)
-      stopLayout = track(node, () => position(node, parent, kind === "sidebar", layer));
+      stopLayout = track(node, () => {
+        const rect = node.getBoundingClientRect();
+        if (!node.checkVisibility({ visibilityProperty: true }) || !rect.width || !rect.height) {
+          layout();
+          return;
+        }
+        position(node, parent, kind === "sidebar", layer);
+      });
   };
   const intersection = new IntersectionObserver((entries) => {
     for (const entry of entries)
@@ -146,6 +180,11 @@ export function createPluginUiPagePlane(events: {
     handleId = null;
   };
   return {
+    setExecutionActive(active: boolean) {
+      if (executionActive === active) return;
+      executionActive = active;
+      layout();
+    },
     bind(placement: SandboxPagePlacement) {
       const token = Symbol();
       anchors.set(token, { placement, visible: true });

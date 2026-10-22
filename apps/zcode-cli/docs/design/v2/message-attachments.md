@@ -502,6 +502,36 @@ ZCode app-server 当前支持 `text` 和 `resource_link`。下一步：
 
 ## Session Store 与恢复
 
+### 首发与冷恢复一致性
+
+同一模型配置、相同可恢复附件事实下，普通发送、队列消费和 resume / rewind / fork
+恢复必须共用用户消息组装逻辑。正文在前，普通附件按提交顺序排列，粘贴图片在后；
+文本文件仍投影为独立 `prompt_attachment`，不改变 synthetic reminder 或空正文锚点语义。
+图片是否来自粘贴由持久化的附件来源决定，不能由恢复后的临时媒体 `source.kind` 判断。
+
+```text
+CLI / Desktop / mobile 输入 → Agent 解析 → 统一用户消息组装 → provider 投影
+                                  ↓
+                        TextPart + FilePart（唯一持久事实）
+                                  ↓
+resume / rewind / fork → hydrate 内容 → 同一用户消息组装 → provider 投影
+```
+
+路径引用附件保存 `metadata.pathReferenceText`，内容是首次发送给模型的完整三行说明，
+包括路径、降级原因和读取提示。恢复优先使用这份原文，不重新读取文件，也不根据当前
+解析规则重新生成文案。`preview` 仍表示文件内容预览，不复用为附件说明字段。
+该可选字段随既有 FilePart JSON 保存，无需数据库迁移；消费时校验它为字符串。
+
+旧消息同样使用统一顺序。若没有有效的 `pathReferenceText`，保留既有单行占位，
+不猜测丢失的原因、不回填或重写历史。旧历史首次切换到修复后的投影可能改变缓存前缀；
+新保存的消息必须在热态与冷恢复后的最终 provider 请求中保持附件顺序和说明文本一致。
+媒体 artifact 缺失、模型能力变化和 compact 的既有降级规则仍适用。
+
+回归覆盖路径引用、剪贴板文本、PDF、本地图片与粘贴图片混排、video、纯文本及附件单独发送；
+同时覆盖队列消费、MCS 开关、实际 SQLite 关闭重开以及最终 provider payload。
+Desktop 冷恢复通过发送附件、继续对话、重启并续发验证；mobile replayable 使用同一 Agent
+持久事实，不新增客户端消息组装状态。
+
 持久化时：
 
 - 用户原文保存为 text part。

@@ -146,21 +146,6 @@ describe("resolvePluginRuntimeFeatures", () => {
     ).toEqual({});
   });
 
-  // node_repl 的注册开关必须和 browserUse runtime feature 同源，避免以后再次分叉出
-  // 「工具在、bridge 不在」或「bridge 在、工具不在」的半开状态。
-  it("keeps node_repl registration in sync with the browserUse runtime feature", () => {
-    for (const enabled of [true, false]) {
-      const pluginOutcome = outcome([
-        plugin("node-repl-host@zcode-plugins-official", true, "/tmp/host"),
-        plugin("browser-use@zcode-plugins-official", enabled),
-      ]);
-      const hasNodeRepl =
-        resolveBuiltInNodeReplMcpServers({ pluginOutcome, workingDirectory: "/workspace" })
-          .node_repl !== undefined;
-      expect(hasNodeRepl).toBe(resolvePluginRuntimeFeatures(pluginOutcome).browserUse === true);
-    }
-  });
-
   it("keeps browser-use disabled for disabled or non-official plugins", () => {
     expect(
       resolvePluginRuntimeFeatures(outcome([plugin("browser-use@zcode-plugins-official", false)])),

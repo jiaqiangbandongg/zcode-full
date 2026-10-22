@@ -58,7 +58,7 @@ export function useSubagents(
     remoteTarget: workspaceRpcTarget.remoteTarget,
   });
   const contextKey = workspacePath
-    ? getSubagentsContextKey(workspacePath, provider, workspaceIdentity)
+    ? getSubagentsContextKey(workspacePath, provider, workspaceIdentity, subagentsService)
     : null;
   const context = useSubagentsContextStore((state) =>
     contextKey ? state.contexts[contextKey] : undefined,

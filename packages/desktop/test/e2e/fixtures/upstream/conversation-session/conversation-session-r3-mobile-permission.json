@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-mobile-permission",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-mobile-permission.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-mobp-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_MOBILE_PERMISSION"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mobp-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 mobile\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-mobp-permission-write",
+      "description": "Write 工具触发远端权限请求",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "权限阻塞必须由真实 blocking request 承载"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_MOBILE_PERMISSION_PERMISSION"],
+        "bodyIncludes": ["E2E_R3_MOBILE_PERMISSION_PERMISSION"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "toolu_r3_mobp_permission"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_r3_mobp_permission",
+          "name": "Write",
+          "input": {
+            "file_path": "/home/dev/r3-workspace-a/.zcode-e2e/r3-mobile-permission/permission-output.txt",
+            "content": "R3_MOBILE_PERMISSION_RESULT\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "r3-mobp-permission-final",
+      "description": "工具结果后的终态文本",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "终态"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_MOBILE_PERMISSION_PERMISSION", "toolu_r3_mobp_permission"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mobp-permission-final",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_MOBILE_PERMISSION_DONE"
+        }
+      }
+    },
+    {
+      "id": "r3-mobp-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_MOBILE_PERMISSION_"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_R3_MOBILE_PERMISSION_PERMISSION"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mobp-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_MOBILE_PERMISSION_REPLY"
+        }
+      }
+    }
+  ]
+}

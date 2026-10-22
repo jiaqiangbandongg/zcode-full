@@ -210,11 +210,47 @@ async function runSmokeScenario(scenario: SmokeScenario): Promise<void> {
   });
   expect(compactRequest.index).toBeLessThan(resumedMainRequest.index);
   expect(readMaxTokens(compactRequest.record)).toBe(COMPACT_SUMMARY_MAX_OUTPUT_TOKENS);
-  expect(readMaxTokens(resumedMainRequest.record)).toBe(scenario.baselineMaxOutputTokens);
+  // 压缩保留系统/项目指令，完整上下文可能仍超过 baseline 的输入预算；
+  // 适配器还会合并系统消息，改变逐条向上取整的结果；必须用适配前完整消息独立估算。
+  const resumedMessages = await readPostCompactModelMessages(sessionId, finalMarker);
+  let postCompactUsage = 0;
+  for (const message of resumedMessages) {
+    const content = parseJsonObject(message)?.content;
+    expect(typeof content).toBe("string");
+    postCompactUsage += estimateTextTokens(content as string);
+  }
+  expect(readMaxTokens(resumedMainRequest.record)).toBe(
+    Math.min(
+      scenario.baselineMaxOutputTokens,
+      scenario.contextWindow - postCompactUsage - PREFLIGHT_BUFFER,
+    ),
+  );
   expect(readMaxTokens(resumedMainRequest.record)).toBeGreaterThan(observedCappedValues.at(-1)!);
 
   const compactContexts = await readAutoCompactContexts(sessionId, "compact.auto.started");
   expect(compactContexts).toHaveLength(compactCountBefore + 1);
+}
+
+async function readPostCompactModelMessages(sessionId: string, marker: string): Promise<unknown[]> {
+  const logPath = join(paths.storageRoot, "cli", "debug", `model-io-${sessionId}.jsonl`);
+  const content = await readFile(logPath, "utf-8");
+  const record = content
+    .split("\n")
+    .map(parseJsonObject)
+    .find((entry) => {
+      const request = parseJsonObject(entry?.request);
+      return (
+        entry?.querySource === "main_turn" && readLatestUserMessageText(request).includes(marker)
+      );
+    });
+  const request = parseJsonObject(record?.request);
+  // Compact 重写历史后诊断记录应为完整消息，不能拿增量片段算出偏小的上下文。
+  expect(request?.messagesKind).toBe("full");
+  expect(request?.messageOffset).toBe(0);
+  expect(Array.isArray(request?.messages)).toBe(true);
+  const messages = request!.messages as unknown[];
+  expect(messages).toHaveLength(request!.messageCount as number);
+  return messages;
 }
 
 async function selectModel(modelId: string): Promise<void> {

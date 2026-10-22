@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-sidebar-activity-refresh",
+  "spec": "./test/e2e/conversation-session/conversation-session-sidebar-activity-refresh.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-sidebar-activity-refresh.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "sidebar-activity-title",
+      "description": "TSL40 固定标题，活动采样窗口内没有标题变化",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发会触发默认 title sidecar；固定 marker 响应避免回退共享 provider fixture。"
+    },
+    {
+      "id": "sidebar-activity-stream",
+      "description": "TSL40 连续输出期间保留完整桌面侧栏",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "连续内容更新用于验证侧栏没有按活动重查；Stop 是真实用户操作，不使用模型速度作为屏障。"
+    }
+  ]
+}

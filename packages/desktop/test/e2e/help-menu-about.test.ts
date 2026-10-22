@@ -2,13 +2,15 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  TID_WORKSPACE_HELP_MENU_TRIGGER,
-  TID_TASK_SETTINGS_BUTTON,
-  TID_SETTINGS_PAGE,
   PlatformChannels,
   type UpdateStatePayload,
   type UpdateCheckResultPayload,
 } from "@zcode/shared";
+import {
+  TID_WORKSPACE_HELP_MENU_TRIGGER,
+  TID_TASK_SETTINGS_BUTTON,
+  TID_SETTINGS_PAGE,
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clickTestIdByWebDriver,

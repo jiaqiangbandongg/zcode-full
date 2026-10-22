@@ -148,4 +148,48 @@ describe("model usage contracts", () => {
       ]),
     ).toBe("hello\n\n[Attached image/png: [Image 1]]\n\n[Resource: README]");
   });
+
+  it("counts failed response usage once alongside completed model usage", () => {
+    const sessionId = "usage" as SessionId;
+    const events = [
+      createSessionEvent(SessionEventType.ModelNetworkStatus, sessionId, {
+        type: "model_request_completed",
+        usage: { inputTokens: 3, outputTokens: 1 },
+      }),
+      createSessionEvent(SessionEventType.ModelComplete, "usage" as SessionId, {
+        content: "recovered",
+        stopReason: "stop",
+        usage: { inputTokens: 3, outputTokens: 1 },
+      }),
+    ];
+    const failed = createSessionEvent(SessionEventType.ModelNetworkStatus, sessionId, {
+      type: "model_request_failed",
+      requestId: "overflow",
+      reason: "context_exceeded",
+      usage: { inputTokens: 80, outputTokens: 5 },
+    });
+    expect(createModelUsageSummaryFromEvents([...events, failed])).toMatchObject({
+      inputTokens: 83,
+      outputTokens: 6,
+      totalTokens: 89,
+      modelRequestCount: 2,
+    });
+    expect(createModelUsageSummaryFromEvents(events)?.totalTokens).toBe(4);
+    expect(
+      createModelUsageSummaryFromEvents([
+        createSessionEvent(SessionEventType.ModelNetworkStatus, sessionId, {
+          type: "model_request_failed",
+          usage: {},
+        }),
+      ]),
+    ).toBeUndefined();
+    expect(
+      createModelUsageSummaryFromEvents([
+        createSessionEvent(SessionEventType.ModelNetworkStatus, sessionId, {
+          type: "model_request_failed",
+          usage: { totalTokens: 0 },
+        }),
+      ]),
+    ).toMatchObject({ totalTokens: 0, modelRequestCount: 1 });
+  });
 });

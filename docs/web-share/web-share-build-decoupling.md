@@ -25,7 +25,7 @@
 - `@zcode/share-ui` 提供 Share 所需的只读 presentation 入口；Desktop/Remote 继续使用完整
   `@zcode/ui`。
 - Share 与完整 Web 共用协议类型和已确认的只读展示实现，不共用运行态 service。
-- Remote 构建继续保留 CUA secret 与 CUA Git 依赖。
+- Remote v4 构建从 workspace 内的 `packages/zcode-cua` 构建 CUA，不涉及私有 Git 与凭据。
 
 ## 构建链路
 
@@ -36,12 +36,13 @@ Dockerfile.web-share
   -> nginx static image
 ```
 
-Share Dockerfile 不再需要 `zcode_cua_git_user` 和 `zcode_cua_git_token` BuildKit secret。
+`.npmrc` 为 `node-linker=hoisted`，`--filter` 不裁剪 lockfile 平铺；CUA 并入 monorepo 后 lockfile
+中已无 Git 来源，Share 镜像无需 git、BuildKit secret 或 Jenkins 凭据，也不需要 `packages/zcode-cua`。
 
 ## 验收
 
 - Share 镜像构建命令不包含 CUA secret。
-- Share 构建日志不访问 `git.example.invalid/codegeex/zcode-cua.git`。
+- Share 构建不访问任何 Git 仓库。
 - `/cn/share`、`/share`、callback、mock fixture 和资源路径保持可用。
 - 完整 Web 和 Remote v4 的构建依赖边界不变。
 - Share 页面不创建 Host、Agent、service 或 remote session。

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-compact-goal",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-compact-goal.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-compact-goal.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-cg-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-cg-compact",
+      "description": "M4 /compact 门禁：手动 compact 的 streaming summary 成功响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "手动 compact 的核心断言是 v4 投影产出 [compact] · completed marker；summary 文案固定即可。"
+    },
+    {
+      "id": "r3-cg-goal-continuation",
+      "description": "M4 /goal 设置后的 continuation 慢流，保持 active target 窗口以断言 goal 横幅。",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "goal 设置后需要一段 streaming 窗口稳定验证 active 目标横幅，真实模型可能过快完成或触发验证。"
+    },
+    {
+      "id": "r3-cg-goal-verifier",
+      "description": "自然完成 goal 的 verifier pass。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定 passed 结果，稳定制造 completed goal。"
+    },
+    {
+      "id": "r3-cg-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/fork/edit"
+    }
+  ]
+}

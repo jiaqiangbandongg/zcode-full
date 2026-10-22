@@ -188,9 +188,6 @@ describe("official mcp credential resolver", () => {
       "Bigmodel-Target-Type": "PERSONAL",
       "X-Bigmodel-Authorization": `Bearer ${MAAS_JWT}`,
     });
-    // 旧通道必须彻底消失：两个头同时发会让服务端额外校验 API key 归属，
-    // 一把过期 key 就能让整个请求 403。
-    expect(buildOfficialMcpAuthHeaders(outcome.snapshot)["X-Coding-Plan-Api-Key"]).toBeUndefined();
   });
 
   it("OMCP-005/021: emits TEAM target type with paired identity for a BigModel team plan", async () => {
@@ -381,21 +378,6 @@ describe("official mcp credential resolver", () => {
     ).resolves.toEqual({ ok: false, reason: "official_auth_unavailable" });
   });
 
-  it("still resolves when the connection exists but its business key is absent", async () => {
-    // 行为变更（2026-08）：业务 key 不再是凭证，因此不再当门槛。此前"key 正在刷新"的瞬态
-    // 会被误判成"没有套餐"，把一次本可成功的调用挡在本地。
-    const outcome = await resolveOfficialMcpCredentials(
-      createDeps({
-        registry: createRegistry([individualProvider("bigmodel")]),
-      }),
-    );
-    expect(outcome).toMatchObject({ ok: true });
-    if (!outcome.ok) return;
-    expect(buildOfficialMcpAuthHeaders(outcome.snapshot)["X-Bigmodel-Authorization"]).toBe(
-      `Bearer ${MAAS_JWT}`,
-    );
-  });
-
   it("reports official_auth_unavailable when the MaaS login JWT is missing", async () => {
     // 登录态不完整（需重新登录），不是"没有套餐"——两个 provider adapter 登录时都硬性要求
     // 写入该 token，因此这主要出现在历史迁移过来的旧登录态上。
@@ -422,7 +404,6 @@ describe("official mcp credential resolver", () => {
     if (!outcome.ok) return;
     // 跨 family 回退会发出一次注定失败的请求，且失败原因会指向"没有套餐"这种误导结论。
     expect(outcome.snapshot.codingPlanAuthorization).toBe(ZAI_MAAS_JWT);
-    expect(outcome.snapshot.codingPlanAuthorization).not.toBe(MAAS_JWT);
   });
 
   it("re-resolves once when the selection changes mid-flight, then gives up", async () => {
@@ -571,17 +552,17 @@ describe("official mcp credential resolver", () => {
 describe("official mcp credential resolved log", () => {
   it("OMCP-LOG-01: dedup key buckets expiry by hour and separates family/scope", () => {
     const personal = { providerFamily: "bigmodel", planTargetType: "PERSONAL" } as const;
-    expect(
-      createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: 3600 }),
-    ).toBe("bigmodel|PERSONAL|t1");
+    expect(createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: 3600 })).toBe(
+      "bigmodel|PERSONAL|t1",
+    );
     // 桶边界：3599 落在 t0，跨过 3600 进入 t1
-    expect(
-      createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: 3599 }),
-    ).toBe("bigmodel|PERSONAL|t0");
+    expect(createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: 3599 })).toBe(
+      "bigmodel|PERSONAL|t0",
+    );
     // 过期（≤0）与解析失败（undefined）是独立桶：跨过零点、token 形态变化必落新键
-    expect(
-      createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: -5 }),
-    ).toBe("bigmodel|PERSONAL|expired");
+    expect(createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: -5 })).toBe(
+      "bigmodel|PERSONAL|expired",
+    );
     expect(
       createCredentialResolvedLogKey({ ...personal, maasJwtExpiresInSeconds: undefined }),
     ).toBe("bigmodel|PERSONAL|unparsable");

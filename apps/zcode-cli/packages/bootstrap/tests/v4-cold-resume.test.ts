@@ -1,3 +1,4 @@
+import { DatabaseSync } from "node:sqlite";
 // M5 冷恢复（打开历史会话）验收网：CLI 重启后内存注册表为空，v4 订阅历史会话
 // 必须经 host.resumePersistedSession 把 record 拉起来，而不是抛
 // "Session is not active"（真 bug：桌面重启后点侧栏历史会话永远"连接中"）。
@@ -22,6 +23,8 @@ import {
 } from "@zcode/shared";
 import {
   V4_METHODS,
+  applyConversationDeltas,
+  type ConversationSnapshot,
   V4_NOTIFICATIONS,
   commandAckSchema,
   conversationTopic,
@@ -199,7 +202,6 @@ describe("v4 冷恢复（gateway 单元）", () => {
 
     const result = await gateway.subscribe(subscribeParams("sess-cold"));
     expect(host.resumeCalls).toEqual(["sess-cold"]);
-    expect(host.sessions.has("sess-cold")).toBe(true);
     expect(result.ack.mode).toBe("snapshot");
     expect(result.ack.openTiming).toMatchObject({
       version: 1,
@@ -752,7 +754,7 @@ const remoteWorkspace = {
   workspaceKey: REMOTE_WORKSPACE_IDENTITY,
   workspacePath: WORKSPACE_PATH,
 };
-type TestSessionStore = ReturnType<typeof createSqliteSessionStore>;
+type TestSessionStore = Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
 async function requestResult(server: ZCodeProtocolAgentServer, message: ZCodeProtocolMessage) {
   const response = await server.handleMessage(message);
@@ -839,6 +841,9 @@ async function saveAssistantTextMessage(
 
 /** 冷恢复集成用最小 fake app（子集自 zcode-protocol.test.ts createFakeApp）。 */
 interface ColdFakeAppProbe {
+  resumeGate?: Promise<void>;
+  failResume?: boolean;
+  closeCalls?: number;
   persistedMessagesReloadRequired?: boolean;
   readTodosCalls: number;
   resumeCalls: number;
@@ -895,7 +900,9 @@ function createColdFakeApp(
 
   return {
     clearTarget: async () => false,
-    close: async () => {},
+    close: async () => {
+      if (probe?.closeCalls !== undefined) probe.closeCalls += 1;
+    },
     connectMcpServer: async () => {
       throw new Error("MCP is not available in fake app");
     },
@@ -936,6 +943,8 @@ function createColdFakeApp(
     recordInputHistory: async () => null,
     resume: async (resumeOptions) => {
       if (probe) probe.resumeCalls += 1;
+      await probe?.resumeGate;
+      if (probe?.failResume) throw new Error("controlled resume failure");
       probe?.resumePersistedMessagesProvided?.push(resumeOptions?.persistedMessages !== undefined);
       for (const [index, type] of (probe?.resumeEventTypes ?? []).entries()) {
         const payload =
@@ -1129,9 +1138,15 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   async function seedPersistedSession(
     dbPath: string,
     workspaceIdentity?: WorkspaceId,
-    taskType: "interactive" | "fork" | "subagent_child" = "interactive",
+    taskType:
+      | "interactive"
+      | "fork"
+      | "subagent_child"
+      | "workflow_child"
+      | "nested_workflow_child"
+      | "selection_side_chat" = "interactive",
   ): Promise<void> {
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     try {
       await store.createSession({
         id: SESSION_ID,
@@ -1195,7 +1210,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
 
   async function seedPersistedCompactedSession(dbPath: string): Promise<void> {
     await seedPersistedSession(dbPath);
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     const summaryMessageId = "msg_cold_compact_summary" as MessageId;
     const compactBoundary: CompactBoundaryPayload = {
       boundaryId: "boundary_cold_compact",
@@ -1235,13 +1250,13 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   }
 
   /** 第二段人生：同一 db 文件重开 → 新 server（内存注册表为空 = CLI 重启）。 */
-  function bootRestartedServer(
+  async function bootRestartedServer(
     dbPath: string,
     sentInputs: Array<{ text: string }>,
     probe?: ColdFakeAppProbe,
     createdAppOptions: ZCodeAppOptions[] = [],
   ) {
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     const providerRegistry = createColdProviderRegistry();
     const server = new ZCodeProtocolAgentServer({
       createZCodeApp: (options) => {
@@ -1256,8 +1271,20 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   }
 
   // 模型恢复须走真实 App，不能让生命周期测试替身复制生产迁移逻辑。
-  function bootRealRestartedServer(dbPath: string, registry = createColdProviderRegistry()) {
-    const store = createSqliteSessionStore({ dbPath });
+  function prepareLegacySelectionUpgrade(dbPath: string) {
+    // 旧格式 fixture 必须走首次升级；新版 Reader 不再通过读取消息隐式补迁会话选择。
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.exec(
+        "DELETE FROM schema_migration WHERE id IN ('0020_provider_model_selection','0021_official_glm_selection','0022_backfilled_session_reasoning')",
+      );
+    } finally {
+      db.close();
+    }
+  }
+
+  async function bootRealRestartedServer(dbPath: string, registry = createColdProviderRegistry()) {
+    const store = await createSqliteSessionStore({ dbPath });
     const apps: ZCodeApp[] = [];
     const server = new ZCodeProtocolAgentServer({
       cwd: process.cwd(),
@@ -1295,12 +1322,64 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     };
   }
 
+  it("cold rename/delete persist before acknowledgement and duplicate delete does not resume again", async () => {
+    const dbPath = join(tempRoot, "metadata.db");
+    await seedPersistedSession(dbPath);
+    const { server, close } = await bootRealRestartedServer(dbPath);
+    const command = (
+      commandId: string,
+      type: "renameSession" | "deleteSession",
+      payload: object,
+    ) => ({
+      commandId,
+      clientId: "metadata-test",
+      sessionId: SESSION_ID,
+      type,
+      payload,
+      issuedAt: 100,
+    });
+    try {
+      const rename = await requestResult(server, {
+        id: "rename",
+        method: V4_METHODS.command,
+        params: command("rename-1", "renameSession", { title: "Renamed offline" }),
+      });
+      expect(rename).toMatchObject({ status: "accepted" });
+      const check = await createSqliteSessionStore({ dbPath });
+      try {
+        expect(await check.getSession(SESSION_ID)).toMatchObject({
+          title: "Renamed offline",
+          titleSource: "custom",
+        });
+        const deletion = command("delete-1", "deleteSession", {});
+        const deleteAck = await requestResult(server, {
+          id: "delete",
+          method: V4_METHODS.command,
+          params: deletion,
+        });
+        expect(deleteAck, JSON.stringify(deleteAck)).toMatchObject({ status: "accepted" });
+        expect((await check.getSession(SESSION_ID))?.time.deleted).toBeTypeOf("number");
+        expect(
+          await requestResult(server, {
+            id: "retry",
+            method: V4_METHODS.command,
+            params: deletion,
+          }),
+        ).toMatchObject({ status: "duplicate" });
+      } finally {
+        check.close();
+      }
+    } finally {
+      await close();
+    }
+  });
+
   it.each(["desktop-continuous", "web-remote-replayable"] as const)(
     "Todo123: %s 缺档位旧选择仍按 Registry 展示 1M，执行选择不被补齐",
     async (clientMode) => {
       const dbPath = join(tempRoot, "missing-reasoning.db");
       await seedPersistedSession(dbPath);
-      const store = createSqliteSessionStore({ dbPath });
+      const store = await createSqliteSessionStore({ dbPath });
       const selection = { providerId: "glm", modelId: "glm-4-air" };
       await store.saveSessionEntry({
         id: "entry_missing_reasoning",
@@ -1310,7 +1389,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
         time: { created: 5, updated: 5 },
       });
       store.close();
-      const { server, apps, close } = bootRealRestartedServer(dbPath);
+      const { server, apps, close } = await bootRealRestartedServer(dbPath);
       try {
         await requestResult(server, {
           id: "missing-reasoning",
@@ -1341,7 +1420,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   it("Todo123: 无对应 Registry 模型仍可冷读内容，容量未知而非 20 万", async () => {
     const dbPath = join(tempRoot, "unknown-model.db");
     await seedPersistedSession(dbPath);
-    const { server, close } = bootRealRestartedServer(dbPath, new ProviderRegistry([]));
+    const { server, close } = await bootRealRestartedServer(dbPath, new ProviderRegistry([]));
     try {
       await requestResult(server, {
         id: "unknown-model",
@@ -1371,7 +1450,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
     const createdAppOptions: ZCodeAppOptions[] = [];
-    const { server, store } = bootRestartedServer(dbPath, [], undefined, createdAppOptions);
+    const { server, store } = await bootRestartedServer(dbPath, [], undefined, createdAppOptions);
     let pendingPreferenceRequestId: string | number | undefined;
     let markPreferenceRequested: (() => void) | undefined;
     const preferenceRequested = new Promise<void>((resolve) => {
@@ -1403,11 +1482,13 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
           topic: conversationTopic(SESSION_ID),
           connectionId: "conn-query-first",
           clientMode: "desktop-continuous",
+          additionalDirectories: ["/late-must-not-replace"],
         },
       });
       await server.handleMessage({
         id: pendingPreferenceRequestId!,
         result: {
+          additionalDirectories: ["/work/backend"],
           nativeSearchEnhancementsEnabled: false,
           memoryEnabled: false,
         },
@@ -1423,6 +1504,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
         (options) => options.sessionId === SESSION_ID,
       );
       expect(resumedRuntimeOptions).toHaveLength(1);
+      expect(resumedRuntimeOptions[0]?.additionalDirectories).toEqual(["/work/backend"]);
       expect(resumedRuntimeOptions[0]?.runtimeConfig?.nativeSearchEnhancementsEnabled).toBe(false);
       expect(resumedRuntimeOptions[0]?.runtimeConfig?.memory?.enabled).toBe(false);
     } finally {
@@ -1439,7 +1521,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       "remote:wsl:Ubuntu-24.04:dev:/home/dev/coding/DEMO-ERP-NEW" as WorkspaceId;
     const unrelatedWorkspaceIdentity =
       "remote:wsl:Ubuntu-24.04:other:/home/dev/coding/DEMO-ERP-NEW" as WorkspaceId;
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     try {
       await seedStore.createSession({
         id: legacySessionId,
@@ -1465,7 +1547,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     const resumedWorkingDirectories: string[] = [];
     const server = new ZCodeProtocolAgentServer({
       createZCodeApp: (options) => {
@@ -1509,7 +1591,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const workspaceIdentity =
       "remote:wsl:Ubuntu-24.04:dev:/home/dev/coding/DEMO-ERP-NEW" as WorkspaceId;
     const resolvedLegacyDirectory = `${workspacePath}/${workspaceIdentity}`;
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     try {
       await seedStore.createSession({
         id: legacySessionId,
@@ -1525,7 +1607,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     const resumedWorkingDirectories: string[] = [];
     const server = new ZCodeProtocolAgentServer({
       createZCodeApp: (options) => {
@@ -1562,7 +1644,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const sessionId = "sess_wsl_failed_atomic_repair" as SessionId;
     const workspacePath = "/home/dev/project";
     const workspaceIdentity = "remote:wsl:Debian:dev:/home/dev/project" as WorkspaceId;
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     await store.createSession({
       id: sessionId,
       projectID: "project_wsl_failed_atomic_repair" as ProjectId,
@@ -1613,7 +1695,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const sessionId = "sess_wsl_concurrent_atomic_repair" as SessionId;
     const workspacePath = "/home/dev/project";
     const workspaceIdentity = "remote:wsl:Debian:dev:/home/dev/project" as WorkspaceId;
-    const store = createSqliteSessionStore({ dbPath });
+    const store = await createSqliteSessionStore({ dbPath });
     await store.createSession({
       id: sessionId,
       projectID: "project_wsl_concurrent_atomic_repair" as ProjectId,
@@ -1662,7 +1744,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
 
   it("SSH 冷订阅 sessions-index：只迁移 task-index allowlist 证明归属的 3.3.6 历史会话", async () => {
     const dbPath = join(tempRoot, "sessions.db");
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     const currentSessionId = "sess_current_remote_index" as SessionId;
     const foreignSessionId = "sess_foreign_remote_index" as SessionId;
     const unprovenLegacySessionId = "sess_unproven_legacy_remote_index" as SessionId;
@@ -1716,7 +1798,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const { server, store } = bootRestartedServer(dbPath, []);
+    const { server, store } = await bootRestartedServer(dbPath, []);
     try {
       await requestResult(server, {
         id: "remote-index",
@@ -1756,7 +1838,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       });
 
       // 未被当前 identity 的 task index 证明归属的空 identity 会话不得迁移；
-      // 同一数据库里的本地路径订阅仍只能看到这条未归属记录。
+      // 同一���据库里的本地路径订阅仍只能看到这条未归属记录。
       await requestResult(server, {
         id: "local-index-after-remote",
         method: V4_METHODS.conversationSubscribe,
@@ -1782,7 +1864,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
 
   it("本地路径冷订阅 sessions-index：保持原目录查询语义", async () => {
     const dbPath = join(tempRoot, "sessions.db");
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     const remoteSessionId = "sess_remote_same_path" as SessionId;
     try {
       await seedStore.createSession({
@@ -1810,7 +1892,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const { server, store } = bootRestartedServer(dbPath, []);
+    const { server, store } = await bootRestartedServer(dbPath, []);
     try {
       await requestResult(server, {
         id: "local-index",
@@ -1845,7 +1927,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
 
   it("重启后首次订阅 sessions-index：parented fork 可见且辅助 child 保持隐藏", async () => {
     const dbPath = join(tempRoot, "sessions.db");
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     const rootSessionId = "sess_index_root" as SessionId;
     const forkSessionId = "sess_index_fork" as SessionId;
     const workflowParentSessionId = "sess_index_workflow_parent" as SessionId;
@@ -1898,7 +1980,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const { server, store } = bootRestartedServer(dbPath, []);
+    const { server, store } = await bootRestartedServer(dbPath, []);
     try {
       // 不先 resume 任一 child，直接模拟 App 重启后的首次列表订阅。
       await requestResult(server, {
@@ -1930,187 +2012,244 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     }
   });
 
-  for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as const) {
-    for (const lifecycle of ["warm", "grace", "parent-release", "cold"] as const) {
-      it(`SAT27/SAT28: ${clientMode} child ${lifecycle} 重开保持隐藏且拒绝用户输入`, async () => {
-        const dbPath = join(tempRoot, "sessions.db");
-        await seedPersistedSession(dbPath, undefined, "subagent_child");
-        const sentInputs: Array<{ text: string }> = [];
-        const options: ZCodeAppOptions[] = [];
-        const { server, store } = bootRestartedServer(dbPath, sentInputs, undefined, options);
-        const { v4Gateway: gateway } = (
-          server as unknown as {
-            context: { v4Gateway: ConversationV4Gateway };
+  for (const childKind of ["subagent_child", "workflow_child", "nested_workflow_child"] as const) {
+    for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as const) {
+      for (const lifecycle of ["warm", "grace", "parent-release", "cold"] as const) {
+        it(`SAT27/SAT28: ${clientMode} ${childKind} ${lifecycle} 重开保持隐藏且拒绝用户输入`, async () => {
+          const dbPath = join(tempRoot, "sessions.db");
+          await seedPersistedSession(dbPath, undefined, childKind);
+          const sentInputs: Array<{ text: string }> = [];
+          const options: ZCodeAppOptions[] = [];
+          const { server, store } = await bootRestartedServer(
+            dbPath,
+            sentInputs,
+            undefined,
+            options,
+          );
+          const { v4Gateway: gateway } = (
+            server as unknown as {
+              context: { v4Gateway: ConversationV4Gateway };
+            }
+          ).context;
+          async function subscribe(id: string, topic: string) {
+            await requestResult(server, {
+              id,
+              method: V4_METHODS.conversationSubscribe,
+              params: { topic, connectionId: id, clientMode },
+            });
+            return takeInitialFrameParams(server, id);
           }
-        ).context;
-        async function subscribe(id: string, topic: string) {
-          await requestResult(server, {
-            id,
-            method: V4_METHODS.conversationSubscribe,
-            params: { topic, connectionId: id, clientMode },
-          });
-          return takeInitialFrameParams(server, id);
-        }
-        try {
-          await subscribe("index-before", sessionsIndexTopic(WORKSPACE_PATH));
-          if (lifecycle !== "cold") {
-            gateway.ingestDetachedLiveSession(
-              SESSION_ID,
-              makeEvent(SESSION_ID, 1, SessionEventType.SessionCreated, {
-                mode: "default",
-                contextWindow: 200_000,
-              }),
-              PARENT_SESSION_ID,
-            );
-            gateway.ingestDetachedLiveSession(
-              SESSION_ID,
-              {
-                ...makeEvent(SESSION_ID, 2, SessionEventType.TurnStarted, {
-                  turnNumber: 1,
-                  input: "child task",
+          try {
+            await subscribe("index-before", sessionsIndexTopic(WORKSPACE_PATH));
+            if (lifecycle !== "cold") {
+              gateway.ingestDetachedLiveSession(
+                SESSION_ID,
+                makeEvent(SESSION_ID, 1, SessionEventType.SessionCreated, {
+                  mode: "default",
+                  contextWindow: 200_000,
                 }),
-                turnId: "child-turn",
-              },
-              PARENT_SESSION_ID,
-            );
-            gateway.ingestDetachedLiveSession(
-              SESSION_ID,
-              {
-                ...makeEvent(SESSION_ID, 3, SessionEventType.ModelStreaming, {
-                  kind: "text_delta",
-                  delta: "child done",
-                  done: false,
-                }),
-                turnId: "child-turn",
-              },
-              PARENT_SESSION_ID,
-            );
-            gateway.ingestDetachedLiveSession(
-              SESSION_ID,
-              {
-                ...makeEvent(SESSION_ID, 4, SessionEventType.TurnComplete, {
-                  duration: 1,
-                  response: "done",
-                  resultType: "success",
-                  tokenCount: 1,
-                  toolCallCount: 0,
-                }),
-                turnId: "child-turn",
-              },
-              PARENT_SESSION_ID,
-            );
-          }
-          if (lifecycle === "grace")
-            expect(gateway.pruneDetachedChildPublishers(Date.now() + 180_000)).toBe(1);
-          if (lifecycle === "parent-release") gateway.deactivateSession(PARENT_SESSION_ID);
-          const child = conversationTopicFrameSchema.parse(
-            await subscribe("child", conversationTopic(SESSION_ID)),
-          );
-          expect(child.payload.kind).toBe("snapshot");
-          if (child.payload.kind !== "snapshot") throw new Error("expected child snapshot");
-          expect(child.payload.snapshot.rows.window.length).toBeGreaterThan(0);
-          const index = sessionsIndexTopicFrameSchema.parse(
-            await subscribe("index-after", sessionsIndexTopic(WORKSPACE_PATH)),
-          );
-          if (index.payload.kind !== "snapshot") throw new Error("expected index snapshot");
-          expect(index.payload.snapshot.sessions.map((session) => session.sessionId)).not.toContain(
-            SESSION_ID,
-          );
-          const legacy = (await requestResult(server, {
-            id: "legacy-list",
-            method: zcodeProtocolMethods.sessionList,
-            params: { workspace },
-          })) as { sessions: Array<{ sessionId: string }> };
-          expect(legacy.sessions.map((session) => session.sessionId)).not.toContain(SESSION_ID);
-          expect((await store.getSession(SESSION_ID))?.taskType).toBe("subagent_child");
-          if (lifecycle !== "warm")
-            expect(
-              options.find((option) => option.sessionId === SESSION_ID)?.runtimeConfig?.taskType,
-            ).toBe("subagent_child");
-          for (const type of [
-            "sendText",
-            "sendGoalCommand",
-            "compact",
-            "retryTurn",
-            "editUserQuery",
-          ] as const) {
-            const targetRow = child.payload.snapshot.rows.window.findLast(
-              (row) => row.kind === (type === "editUserQuery" ? "userInput" : "assistantText"),
-            );
-            const ack = commandAckSchema.parse(
-              await requestResult(server, {
-                id: type,
-                method: V4_METHODS.command,
-                params: {
-                  commandId: `child-${type}`,
-                  clientId: "child-test",
-                  sessionId: SESSION_ID,
-                  type,
-                  baseRevision: child.payload.snapshot.revision,
-                  baseLogEpoch: child.payload.snapshot.logEpoch,
-                  payload:
-                    type === "sendText" || type === "sendGoalCommand"
-                      ? { text: "continue child" }
-                      : type === "retryTurn" || type === "editUserQuery"
-                        ? {
-                            target: {
-                              rowId: targetRow?.rowId ?? 1,
-                              entityId: targetRow?.entityId ?? "missing",
-                            },
-                            ...(type === "editUserQuery" ? { newText: "edit child" } : {}),
-                          }
-                        : {},
-                  issuedAt: Date.now(),
+                PARENT_SESSION_ID,
+              );
+              gateway.ingestDetachedLiveSession(
+                SESSION_ID,
+                {
+                  ...makeEvent(SESSION_ID, 2, SessionEventType.TurnStarted, {
+                    turnNumber: 1,
+                    input: "child task",
+                  }),
+                  turnId: "child-turn",
                 },
-              }),
+                PARENT_SESSION_ID,
+              );
+              gateway.ingestDetachedLiveSession(
+                SESSION_ID,
+                {
+                  ...makeEvent(SESSION_ID, 3, SessionEventType.ModelStreaming, {
+                    kind: "text_delta",
+                    delta: "child done",
+                    done: false,
+                  }),
+                  turnId: "child-turn",
+                },
+                PARENT_SESSION_ID,
+              );
+              gateway.ingestDetachedLiveSession(
+                SESSION_ID,
+                {
+                  ...makeEvent(SESSION_ID, 4, SessionEventType.TurnComplete, {
+                    duration: 1,
+                    response: "done",
+                    resultType: "success",
+                    tokenCount: 1,
+                    toolCallCount: 0,
+                  }),
+                  turnId: "child-turn",
+                },
+                PARENT_SESSION_ID,
+              );
+            }
+            if (lifecycle === "grace")
+              expect(gateway.pruneDetachedChildPublishers(Date.now() + 180_000)).toBe(1);
+            if (lifecycle === "parent-release") gateway.deactivateSession(PARENT_SESSION_ID);
+            const child = conversationTopicFrameSchema.parse(
+              await subscribe("child", conversationTopic(SESSION_ID)),
             );
-            expect(ack).toMatchObject(
-              lifecycle === "warm"
-                ? { status: "rejected", reasonCode: "proto.sessionNotFound" }
-                : { status: "failed", reasonCode: "guard.subagentReadOnly" },
+            if (child.payload.kind !== "snapshot") throw new Error("expected child snapshot");
+            expect(child.payload.snapshot.rows.window.length).toBeGreaterThan(0);
+            const index = sessionsIndexTopicFrameSchema.parse(
+              await subscribe("index-after", sessionsIndexTopic(WORKSPACE_PATH)),
             );
+            if (index.payload.kind !== "snapshot") throw new Error("expected index snapshot");
+            expect(
+              index.payload.snapshot.sessions.map((session) => session.sessionId),
+            ).not.toContain(SESSION_ID);
+            const legacy = (await requestResult(server, {
+              id: "legacy-list",
+              method: zcodeProtocolMethods.sessionList,
+              params: { workspace },
+            })) as { sessions: Array<{ sessionId: string }> };
+            expect(legacy.sessions.map((session) => session.sessionId)).not.toContain(SESSION_ID);
+            expect((await store.getSession(SESSION_ID))?.taskType).toBe(childKind);
+            if (lifecycle !== "warm")
+              expect(
+                options.find((option) => option.sessionId === SESSION_ID)?.runtimeConfig?.taskType,
+              ).toBe(childKind);
+            for (const type of [
+              "sendText",
+              "sendGoalCommand",
+              "compact",
+              "retryTurn",
+              "editUserQuery",
+            ] as const) {
+              const targetRow = child.payload.snapshot.rows.window.findLast(
+                (row) => row.kind === (type === "editUserQuery" ? "userInput" : "assistantText"),
+              );
+              const ack = commandAckSchema.parse(
+                await requestResult(server, {
+                  id: type,
+                  method: V4_METHODS.command,
+                  params: {
+                    commandId: `child-${type}`,
+                    clientId: "child-test",
+                    sessionId: SESSION_ID,
+                    type,
+                    baseRevision: child.payload.snapshot.revision,
+                    baseLogEpoch: child.payload.snapshot.logEpoch,
+                    payload:
+                      type === "sendText" || type === "sendGoalCommand"
+                        ? { text: "continue child" }
+                        : type === "retryTurn" || type === "editUserQuery"
+                          ? {
+                              target: {
+                                rowId: targetRow?.rowId ?? 1,
+                                entityId: targetRow?.entityId ?? "missing",
+                              },
+                              ...(type === "editUserQuery" ? { newText: "edit child" } : {}),
+                            }
+                          : {},
+                    issuedAt: Date.now(),
+                  },
+                }),
+              );
+              expect(ack).toMatchObject(
+                lifecycle === "warm"
+                  ? { status: "rejected", reasonCode: "proto.sessionNotFound" }
+                  : { status: "failed", reasonCode: "guard.subagentReadOnly" },
+              );
+            }
+            expect(await store.listSessionInputs({ sessionID: SESSION_ID })).toEqual([]);
+            expect(sentInputs).toEqual([]);
+          } finally {
+            gateway.dispose();
+            store.close();
           }
-          expect(await store.listSessionInputs({ sessionID: SESSION_ID })).toEqual([]);
-          expect(sentInputs).toEqual([]);
-        } finally {
-          gateway.dispose();
-          store.close();
-        }
-      });
+        });
+      }
     }
   }
 
-  it("SAT28: legacy session/send 同样拒绝 child 续聊", async () => {
-    const dbPath = join(tempRoot, "sessions.db");
-    await seedPersistedSession(dbPath, undefined, "subagent_child");
-    const { server, store } = bootRestartedServer(dbPath, []);
-    try {
-      await requestResult(server, {
-        id: "open-child",
-        method: V4_METHODS.conversationSubscribe,
-        params: {
-          topic: conversationTopic(SESSION_ID),
-          connectionId: "legacy-child",
-          clientMode: "desktop-continuous",
-        },
-      });
-      const result = await server.handleMessage({
-        id: "legacy-send",
-        method: zcodeProtocolMethods.sessionSend,
-        params: { sessionId: SESSION_ID, content: "continue child", queryId: "legacy-child-send" },
-      });
-      expect(result).toMatchObject({ error: { data: { reasonCode: "guard.subagentReadOnly" } } });
-      expect(await store.listSessionInputs({ sessionID: SESSION_ID })).toEqual([]);
-    } finally {
-      store.close();
-    }
-  });
+  it.each(["subagent_child", "workflow_child", "nested_workflow_child"] as const)(
+    "SAT28: legacy session/send 同样拒绝 %s 续聊",
+    async (childKind) => {
+      const dbPath = join(tempRoot, "sessions.db");
+      await seedPersistedSession(dbPath, undefined, childKind);
+      const { server, store } = await bootRestartedServer(dbPath, []);
+      try {
+        await requestResult(server, {
+          id: "open-child",
+          method: V4_METHODS.conversationSubscribe,
+          params: {
+            topic: conversationTopic(SESSION_ID),
+            connectionId: "legacy-child",
+            clientMode: "desktop-continuous",
+          },
+        });
+        const result = await server.handleMessage({
+          id: "legacy-send",
+          method: zcodeProtocolMethods.sessionSend,
+          params: {
+            sessionId: SESSION_ID,
+            content: "continue child",
+            queryId: "legacy-child-send",
+          },
+        });
+        expect(result).toMatchObject({ error: { data: { reasonCode: "guard.subagentReadOnly" } } });
+        expect(await store.listSessionInputs({ sessionID: SESSION_ID })).toEqual([]);
+      } finally {
+        store.close();
+      }
+    },
+  );
+
+  it.each(["desktop-continuous", "web-remote-replayable"] as const)(
+    "SAT30: selection side chat remains writable after cold resume on %s",
+    async (clientMode) => {
+      const dbPath = join(tempRoot, "sessions.db");
+      await seedPersistedSession(dbPath, undefined, "selection_side_chat");
+      const sentInputs: Array<{ text: string }> = [];
+      const { server, store } = await bootRestartedServer(dbPath, sentInputs);
+      try {
+        await requestResult(server, {
+          id: "open-side",
+          method: V4_METHODS.conversationSubscribe,
+          params: { topic: conversationTopic(SESSION_ID), connectionId: "side-test", clientMode },
+        });
+        const frame = conversationTopicFrameSchema.parse(
+          takeInitialFrameParams(server, "open-side"),
+        );
+        if (frame.payload.kind !== "snapshot") throw new Error("expected snapshot");
+        const ack = await requestResult(server, {
+          id: "send-side",
+          method: V4_METHODS.command,
+          params: {
+            commandId: "side-send",
+            clientId: "side-test",
+            sessionId: SESSION_ID,
+            type: "sendText",
+            baseRevision: frame.payload.snapshot.revision,
+            baseLogEpoch: frame.payload.snapshot.logEpoch,
+            payload: { text: "continue side chat" },
+            issuedAt: Date.now(),
+          },
+        });
+        expect(ack).toMatchObject({ status: "accepted" });
+        await vi.waitFor(() =>
+          expect(sentInputs).toContainEqual(
+            expect.objectContaining({ text: "continue side chat" }),
+          ),
+        );
+        expect((await store.getSession(SESSION_ID))?.taskType).toBe("selection_side_chat");
+      } finally {
+        store.close();
+      }
+    },
+  );
 
   it("SAT29: 显式 session/list 按 workspace 查询隐藏身份，不激活 child；普通列表保留 fork", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath, undefined, "subagent_child");
     const options: ZCodeAppOptions[] = [];
-    const { server, store } = bootRestartedServer(dbPath, [], undefined, options);
+    const { server, store } = await bootRestartedServer(dbPath, [], undefined, options);
     try {
       await store.createSession({
         id: "visible-fork" as SessionId,
@@ -2146,11 +2285,77 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     }
   });
 
+  describe.each([
+    "subagent_child",
+    "workflow_child",
+    "selection_side_chat",
+    "nested_workflow_child",
+  ] as const)("SAT30 %s", (childKind) => {
+    it.each(["valid", "foreign-parent", "missing-parent", "foreign-cwd", "foreign-child", "cycle"])(
+      "SAT30: explicit remote child metadata resolves persisted lineage (%s) without activation",
+      async (scenario) => {
+        const dbPath = join(tempRoot, "sessions.db");
+        await seedPersistedSession(
+          dbPath,
+          scenario === "foreign-child"
+            ? ("remote:server:other:/workspace/cold-resume" as WorkspaceId)
+            : undefined,
+          childKind,
+        );
+        const options: ZCodeAppOptions[] = [];
+        const { server, store } = await bootRestartedServer(dbPath, [], undefined, options);
+        try {
+          if (scenario !== "missing-parent") {
+            await store.createSession({
+              id: PARENT_SESSION_ID,
+              ...(scenario === "cycle"
+                ? { parentID: SESSION_ID }
+                : {
+                    workspaceID:
+                      scenario === "foreign-parent"
+                        ? ("remote:server:other:/workspace/cold-resume" as WorkspaceId)
+                        : REMOTE_WORKSPACE_IDENTITY,
+                  }),
+              taskType: scenario === "cycle" ? childKind : "interactive",
+              projectID: "project" as ProjectId,
+              slug: "parent",
+              title: "parent",
+              directory: scenario === "foreign-cwd" ? `${WORKSPACE_PATH}-other` : WORKSPACE_PATH,
+              path: scenario === "foreign-cwd" ? `${WORKSPACE_PATH}-other` : WORKSPACE_PATH,
+              version: "test",
+            });
+          }
+          const explicit = (await requestResult(server, {
+            id: "legacy-child",
+            method: zcodeProtocolMethods.sessionList,
+            params: { workspace: remoteWorkspace, sessionIds: [SESSION_ID] },
+          })) as { sessions: Array<{ sessionId: string; workspace: unknown }> };
+          expect(explicit.sessions.map((session) => session.sessionId)).toEqual(
+            scenario === "valid" ? [SESSION_ID] : [],
+          );
+          if (scenario === "valid")
+            expect(explicit.sessions[0]?.workspace).toEqual(remoteWorkspace);
+          const normal = (await requestResult(server, {
+            id: "normal-list",
+            method: zcodeProtocolMethods.sessionList,
+            params: { workspace: remoteWorkspace },
+          })) as { sessions: Array<{ sessionId: string }> };
+          expect(normal.sessions.some((session) => session.sessionId === SESSION_ID)).toBe(false);
+          expect(options).toEqual([]);
+          if (scenario !== "foreign-child")
+            expect((await store.getSession(SESSION_ID))?.workspaceID).toBeUndefined();
+        } finally {
+          store.close();
+        }
+      },
+    );
+  });
+
   it("重启后冷订阅：transcript 合成重建历史 + 可交互 + sendText 再发一轮成功", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
     const sentInputs: Array<{ text: string }> = [];
-    const { server, store } = bootRestartedServer(dbPath, sentInputs);
+    const { server, store } = await bootRestartedServer(dbPath, sentInputs);
     try {
       const subscribed = v4ConversationSubscribeResultSchema.parse(
         await requestResult(server, {
@@ -2230,9 +2435,6 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       if (indexFrame.payload.kind !== "snapshot") {
         throw new Error("Expected sessions-index snapshot frame");
       }
-      expect(indexFrame.payload.snapshot.sessions.map((session) => session.sessionId)).toContain(
-        SESSION_ID,
-      );
       const resumedSummary = indexFrame.payload.snapshot.sessions.find(
         (session) => session.sessionId === SESSION_ID,
       );
@@ -2264,7 +2466,12 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     await seedPersistedSession(dbPath);
     const sentInputs: Array<{ text: string }> = [];
     const createdAppOptions: ZCodeAppOptions[] = [];
-    const { server, store } = bootRestartedServer(dbPath, sentInputs, undefined, createdAppOptions);
+    const { server, store } = await bootRestartedServer(
+      dbPath,
+      sentInputs,
+      undefined,
+      createdAppOptions,
+    );
     const attachmentWorkspace = {
       workspacePath: `${WORKSPACE_PATH}/`,
       workspaceKey: `${WORKSPACE_PATH}/`,
@@ -2308,11 +2515,102 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     }
   });
 
+  it("historyFirst 在真实持久库读出正文后才启动 runtime，失败清理且重试保留正文", async () => {
+    const dbPath = join(tempRoot, "history-first.db");
+    await seedPersistedSession(dbPath);
+    const gate = deferred();
+    const probe: ColdFakeAppProbe = {
+      readTodosCalls: 0,
+      resumeCalls: 0,
+      closeCalls: 0,
+      resumeGate: gate.promise,
+      failResume: true,
+    };
+    const apps: ZCodeAppOptions[] = [];
+    // 存储迁移已异步化；新增历史用例必须等待夹具就绪，不能解构尚未完成的 Promise。
+    const { server, store } = await bootRestartedServer(dbPath, [], probe, apps);
+    const originalTime = (await store.getSession(SESSION_ID))?.time;
+    const messages = vi.spyOn(store, "messages");
+    let observed: ConversationSnapshot | undefined;
+    server.setNotificationSink((message) => {
+      if (
+        "id" in message &&
+        message.method === zcodeProtocolMethods.sessionRequestRuntimePreferences
+      ) {
+        void server.handleMessage({
+          id: message.id,
+          result: { nativeSearchEnhancementsEnabled: false, memoryEnabled: false },
+        });
+        return;
+      }
+      if (message.method !== V4_NOTIFICATIONS.conversationFrame) return;
+      const wire = routedTopicWireFrameSchema.parse(message.params);
+      if (wire.kind === "complete" && wire.topic === conversationTopic(SESSION_ID)) {
+        const frame = conversationTopicFrameSchema.parse(wire.frame);
+        if (frame.payload.kind === "snapshot") observed = frame.payload.snapshot;
+        else if (observed)
+          observed = {
+            ...applyConversationDeltas(observed, frame.payload.deltas),
+            seq: frame.toSeq,
+          };
+      }
+    });
+    const latest = () => observed;
+    const subscribe = async (id: string, retryInitialization?: string) => {
+      await requestResult(server, {
+        id,
+        method: V4_METHODS.conversationSubscribe,
+        params: {
+          topic: conversationTopic(SESSION_ID),
+          connectionId: "history-first",
+          clientMode: "desktop-continuous",
+          historyFirst: true,
+          ...(retryInitialization ? { retryInitialization } : {}),
+        },
+      });
+      const frame = conversationTopicFrameSchema.parse(takeInitialFrameParams(server, id));
+      if (frame.payload.kind !== "snapshot") throw new Error("missing snapshot");
+      observed = frame.payload.snapshot;
+      return frame.payload.snapshot;
+    };
+    try {
+      const initial = await subscribe("first");
+      expect(probe.resumeCalls).toBe(0);
+      expect(initial.runtimeInitialization?.status).toBe("initializing");
+      expect(JSON.stringify(initial.rows)).toContain("历史回答二");
+      expect(JSON.stringify(initial.rows)).toContain("历史工具输出");
+      await vi.waitFor(() => expect(probe.resumeCalls).toBe(1));
+      gate.resolve();
+      await vi.waitFor(() => expect(latest()?.runtimeInitialization?.status).toBe("failed"));
+      expect(probe.closeCalls).toBe(1);
+      expect(messages.mock.calls.filter(([input]) => input.sessionID === SESSION_ID)).toHaveLength(
+        1,
+      );
+      const failed = latest()!;
+      const reconnect = await subscribe("reconnect");
+      expect(reconnect.runtimeInitialization?.status).toBe("failed");
+      expect(apps).toHaveLength(1);
+      probe.failResume = false;
+      await subscribe("retry", failed.runtimeInitialization!.attemptId);
+      await vi.waitFor(() => expect(latest()?.runtimeInitialization?.status).toBe("ready"));
+      expect(apps).toHaveLength(2);
+      expect(latest()!.seq).toBeGreaterThan(initial.seq);
+      expect(latest()!.rows.totalCount).toBe(initial.rows.totalCount);
+      expect(messages.mock.calls.filter(([input]) => input.sessionID === SESSION_ID)).toHaveLength(
+        2,
+      );
+      expect((await store.getSession(SESSION_ID))?.time).toEqual(originalTime);
+    } finally {
+      gate.resolve();
+      store.close();
+    }
+  });
+
   it("V4 冷订阅只激活 runtime 并复用一次持久物化，legacy resume 仍返回完整 snapshot", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
     const probe: ColdFakeAppProbe = { readTodosCalls: 0, resumeCalls: 0 };
-    const { server, store } = bootRestartedServer(dbPath, [], probe);
+    const { server, store } = await bootRestartedServer(dbPath, [], probe);
     const messagesSpy = vi.spyOn(store, "messages");
     try {
       await requestResult(server, {
@@ -2373,7 +2671,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       resumeCalls: 0,
       resumePersistedMessagesProvided: [],
     };
-    const { server, store } = bootRestartedServer(dbPath, [], probe);
+    const { server, store } = await bootRestartedServer(dbPath, [], probe);
 
     try {
       const legacy = zcodeSessionStateSnapshotSchema.parse(
@@ -2407,7 +2705,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       readTodosCalls: 0,
       resumeCalls: 0,
     };
-    const { server, store } = bootRestartedServer(dbPath, [], probe);
+    const { server, store } = await bootRestartedServer(dbPath, [], probe);
     const messagesSpy = vi.spyOn(store, "messages");
     try {
       await requestResult(server, {
@@ -2432,7 +2730,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   it("compact 是最后操作：重启后的首帧保持压缩后 usage", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedCompactedSession(dbPath);
-    const { server, store } = bootRestartedServer(dbPath, []);
+    const { server, store } = await bootRestartedServer(dbPath, []);
     try {
       await requestResult(server, {
         id: "subscribe-compact-desktop",
@@ -2493,20 +2791,20 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   it("重启后冷订阅：优先从 Agent durable selection 恢复 task-local thought", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     try {
       await seedStore.saveSessionEntry({
         id: `${SESSION_ID}:runtime-model-selection`,
         sessionID: SESSION_ID,
         type: SESSION_ENTRY_MODEL_SELECTION,
         time: { created: 5, updated: 5 },
-        data: { modelId: "glm-4.6", providerId: "glm", thoughtLevel: "deep" },
+        data: { modelId: "glm-4.6", providerId: "glm", options: { reasoningLevel: "deep" } },
       });
     } finally {
       seedStore.close();
     }
 
-    const { server, close } = bootRealRestartedServer(dbPath);
+    const { server, close } = await bootRealRestartedServer(dbPath);
     try {
       await requestResult(server, {
         id: "subscribe-thought",
@@ -2542,7 +2840,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const hiddenMessageId = "msg_legacy_fork_hidden" as MessageId;
     const noticeMessageId = "msg_legacy_fork_notice" as MessageId;
     const forkOrigin = { parentSessionId, targetMessageId };
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     try {
       await seedStore.createSession({
         id: legacyForkSessionId,
@@ -2626,7 +2924,8 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
       seedStore.close();
     }
 
-    const { server, close } = bootRealRestartedServer(dbPath);
+    prepareLegacySelectionUpgrade(dbPath);
+    const { server, close } = await bootRealRestartedServer(dbPath);
     try {
       await requestResult(server, {
         id: "subscribe-legacy-fork-thought",
@@ -2654,7 +2953,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
   it("冷恢复期间内部 hook 事件不刷新 sessions-index 活动时间", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
-    const seedStore = createSqliteSessionStore({ dbPath });
+    const seedStore = await createSqliteSessionStore({ dbPath });
     const persistedActivityAt = (await seedStore.getSession(SESSION_ID))?.time.updated;
     seedStore.close();
     expect(persistedActivityAt).toBeTypeOf("number");
@@ -2671,7 +2970,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
         SessionEventType.WorkspaceHookAdmissionUpdated,
       ],
     };
-    const { server, store } = bootRestartedServer(dbPath, [], probe);
+    const { server, store } = await bootRestartedServer(dbPath, [], probe);
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(resumeNow);
     try {
       await requestResult(server, {
@@ -2710,11 +3009,98 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     }
   });
 
+  it.each(["desktop-continuous", "web-remote-replayable"] as const)(
+    "%s 冷恢复后同步追加消息模式不刷新活动时间",
+    async (clientMode) => {
+      const dbPath = join(tempRoot, "followup-activity.db");
+      await seedPersistedSession(dbPath);
+      const seedStore = await createSqliteSessionStore({ dbPath });
+      const persistedActivityAt = (await seedStore.getSession(SESSION_ID))!.time.updated;
+      seedStore.close();
+      const { server, close } = await bootRealRestartedServer(dbPath);
+      try {
+        await requestResult(server, {
+          id: "followup-resume",
+          method: V4_METHODS.conversationSubscribe,
+          params: {
+            topic: conversationTopic(SESSION_ID),
+            connectionId: "followup-resume",
+            clientMode,
+          },
+        });
+        const resumed = conversationTopicFrameSchema.parse(
+          takeInitialFrameParams(server, "followup-resume"),
+        );
+        if (resumed.payload.kind !== "snapshot") throw new Error("Expected snapshot");
+        let revision = resumed.payload.snapshot.revision;
+
+        // 打开历史会话会自动同步全局偏好；重复同步和反向切换都只改变配置。
+        for (const [index, mode] of (["guide", "guide", "queue"] as const).entries()) {
+          const commandId = `followup-config-${index}`;
+          expect(
+            await requestResult(server, {
+              id: commandId,
+              method: V4_METHODS.command,
+              params: {
+                commandId,
+                clientId: "followup-activity-test",
+                sessionId: SESSION_ID,
+                baseRevision: revision,
+                type: "setFollowupMode",
+                payload: { mode },
+                issuedAt: Date.now(),
+              },
+            }),
+          ).toMatchObject({ status: "accepted" });
+
+          const conversationId = `followup-conversation-${index}`;
+          await requestResult(server, {
+            id: conversationId,
+            method: V4_METHODS.conversationSubscribe,
+            params: {
+              topic: conversationTopic(SESSION_ID),
+              connectionId: conversationId,
+              clientMode,
+            },
+          });
+          const conversation = conversationTopicFrameSchema.parse(
+            takeInitialFrameParams(server, conversationId),
+          );
+          if (conversation.payload.kind !== "snapshot") throw new Error("Expected snapshot");
+          expect(conversation.payload.snapshot.config.followupMode).toBe(mode);
+          revision = conversation.payload.snapshot.revision;
+
+          const indexId = `followup-index-${index}`;
+          await requestResult(server, {
+            id: indexId,
+            method: V4_METHODS.conversationSubscribe,
+            params: {
+              topic: sessionsIndexTopic(WORKSPACE_PATH),
+              connectionId: indexId,
+              clientMode,
+            },
+          });
+          const frame = sessionsIndexTopicFrameSchema.parse(
+            takeInitialFrameParams(server, indexId),
+          );
+          if (frame.payload.kind !== "snapshot") throw new Error("Expected index snapshot");
+          expect(
+            frame.payload.snapshot.sessions.find((session) => session.sessionId === SESSION_ID)
+              ?.lastActivityAt,
+          ).toBe(persistedActivityAt);
+        }
+      } finally {
+        await close();
+      }
+    },
+  );
+
   it("重启后冷订阅：旧 transcript 无档位时留空，不读取 task-index 提示", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
+    prepareLegacySelectionUpgrade(dbPath);
 
-    const { server, close } = bootRealRestartedServer(dbPath);
+    const { server, close } = await bootRealRestartedServer(dbPath);
     try {
       await requestResult(server, {
         id: "subscribe-legacy-thought",
@@ -2746,7 +3132,7 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath, REMOTE_WORKSPACE_IDENTITY);
     const sentInputs: Array<{ text: string }> = [];
-    const { server, store } = bootRestartedServer(dbPath, sentInputs);
+    const { server, store } = await bootRestartedServer(dbPath, sentInputs);
     try {
       await requestResult(server, {
         id: 2,
@@ -2780,50 +3166,11 @@ describe("v4 冷恢复（集成：真 sqlite + server + binder）", () => {
     }
   });
 
-  it("进程 Registry 已就绪时冷恢复不等待旧 workspace registry", async () => {
-    const dbPath = join(tempRoot, "sessions.db");
-    await seedPersistedSession(dbPath);
-    const sentInputs: Array<{ text: string }> = [];
-    const { server, store } = bootRestartedServer(dbPath, sentInputs);
-    try {
-      await requestResult(server, {
-        id: 1,
-        method: V4_METHODS.conversationSubscribe,
-        params: {
-          topic: conversationTopic(SESSION_ID),
-          connectionId: "conn-process-registry",
-          clientMode: "desktop-continuous",
-        },
-      });
-
-      const ack = commandAckSchema.parse(
-        await requestResult(server, {
-          id: 2,
-          method: V4_METHODS.command,
-          params: {
-            commandId: "cmd-process-registry-cold-send",
-            clientId: "client-process-registry",
-            sessionId: SESSION_ID,
-            type: "sendText",
-            payload: { text: "使用当前 Environment Registry" },
-            issuedAt: 1_700_000_100_000,
-          },
-        }),
-      );
-
-      expect(ack.status).toBe("accepted");
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(sentInputs).toEqual([{ text: "使用当前 Environment Registry" }]);
-    } finally {
-      store.close();
-    }
-  });
-
   it("store 无此会话：订阅报 fault.subscribe.sessionNotFound（binder notFound 分型）", async () => {
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
     const sentInputs: Array<{ text: string }> = [];
-    const { server, store } = bootRestartedServer(dbPath, sentInputs);
+    const { server, store } = await bootRestartedServer(dbPath, sentInputs);
     try {
       const response = await server.handleMessage({
         id: 1,

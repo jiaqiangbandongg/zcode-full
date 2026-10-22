@@ -30,6 +30,22 @@ function envelope(partial: Partial<CommandEnvelope> = {}): CommandEnvelope {
 }
 
 describe("CommandInbox ACK 裁决", () => {
+  it("cold preparation runs after deduplication inside session admission", async () => {
+    let revision: number | null = null;
+    const prepareDecision = vi.fn(async () => {
+      revision = 0;
+    });
+    const inbox = new CommandInbox(makeHost({ getRevision: () => revision, prepareDecision }));
+    const command = envelope({ type: "deleteSession", payload: {} });
+    const first = await inbox.handle(command);
+    expect(first.kind).toBe("execute");
+    if (first.kind !== "execute") return;
+    revision = null;
+    first.settle({ status: "accepted" });
+    const retry = await inbox.handle(command);
+    expect(retry.ack.status).toBe("duplicate");
+    expect(prepareDecision).toHaveBeenCalledTimes(1);
+  });
   it("合法命令 → accepted，revisionAtDecision = 当前 revision", async () => {
     const inbox = new CommandInbox(makeHost());
     const outcome = await inbox.handle(envelope());
@@ -288,9 +304,7 @@ describe("CommandInbox pinned facts 与持久化 fallback（§7.3）", () => {
     expect(inbox.hasPinnedSessionState("s-1")).toBe(false);
     expect(inbox.clearSession("s-1")).toBe(true);
 
-    const afterColdStart = await inbox.handle(
-      envelope({ commandId: "settled-before-deactivate" }),
-    );
+    const afterColdStart = await inbox.handle(envelope({ commandId: "settled-before-deactivate" }));
     expect(afterColdStart.kind).toBe("execute");
     if (afterColdStart.kind === "execute") {
       expect(afterColdStart.admissionSeq).toBe(1);

@@ -1,3 +1,9 @@
+import { ModelCallWrapperSchema } from "@zcode/contracts";
+import {
+  hydrateToolSearchContent,
+  hydrateCompactDiscovery,
+  hydrateToolSearchAnnouncement,
+} from "./tool-search-hydration.js";
 import { parseAgentListingDelta } from "./agent-listing-metadata.js";
 import { runtimeInputMetadata } from "./runtime-input-presentation.js";
 // ============================================================
@@ -6,10 +12,9 @@ import { runtimeInputMetadata } from "./runtime-input-presentation.js";
 
 import { modelMessageContentToText, selectActiveConversationBranch } from "@zcode/contracts";
 import type {
-  FilePart,
+  Logger,
   MessagePart,
   MessageWithParts,
-  ModelMessageContent,
   ModelMessageContentBlock,
   ModelReasoningContentBlock,
   MessageId,
@@ -21,15 +26,13 @@ import {
   wrapSystemReminderForSource,
   type SystemReminderSource,
 } from "../system-reminder/source.js";
-import {
-  buildPromptAttachmentReminderBodies,
-  type PromptAttachmentReminderInput,
-} from "../system-reminder/prompt-attachment.js";
 import { persistedTokenUsageBaseline } from "./message-history-usage.js";
 import {
   isKnownSystemReminderSource,
   legacySyntheticRuntimeMetadata,
   realUserRuntimeMetadata,
+  buildUserMessageEntries,
+  type UserMessageAttachment,
   systemReminderAttachmentEntry,
   systemReminderRuntimeMetadata,
   todoReminderRuntimeMetadata,
@@ -53,6 +56,7 @@ export interface SessionHistoryHydrationResult {
 }
 
 export async function hydrateMessageHistoryFromSession(input: {
+  logger?: Logger;
   artifactStore?: ToolArtifactStorePort;
   branchCutAfterMessageId?: MessageId;
   history: MessageHistory;
@@ -109,13 +113,7 @@ export async function hydrateMessageHistoryFromSession(input: {
       // user <system-reminder>，后续 mid-conversation system projection 会失去 attachment source。
       const syntheticAttachment = syntheticSystemReminderAttachmentFromParts(parts);
       if (syntheticAttachment) {
-        input.history.addEntries([
-          {
-            kind: "attachment",
-            content: syntheticAttachment.content,
-            metadata: syntheticAttachment.metadata,
-          },
-        ]);
+        input.history.addEntries([syntheticAttachment]);
         appliedMessageCount++;
         continue;
       }
@@ -125,10 +123,27 @@ export async function hydrateMessageHistoryFromSession(input: {
       const presentation = runtimeInputMetadata(
         (message.info.metadata as Record<string, unknown> | undefined)?.inputPresentation,
       );
+      const boundaryPart = parts.find(isActiveCompactionBoundaryPart);
+      const compactBoundary =
+        boundaryPart?.type === "compaction"
+          ? hydrateCompactDiscovery(boundaryPart.compactBoundary)
+          : undefined;
+      if (compactBoundary && entries[0]) {
+        entries[0] = {
+          ...entries[0],
+          metadata: {
+            ...legacySyntheticRuntimeMetadata(),
+            ...entries[0].metadata,
+            compactBoundary,
+          },
+        };
+      }
       input.history.addEntries(
         presentation
           ? entries.map((entry) =>
-              entry.kind === "attachment" ? entry : { ...entry, metadata: presentation },
+              entry.kind === "attachment"
+                ? entry
+                : { ...entry, metadata: { ...entry.metadata, ...presentation } },
             )
           : entries,
       );
@@ -156,7 +171,8 @@ export async function hydrateMessageHistoryFromSession(input: {
         (part): ToolCallInput => ({
           id: part.callID,
           input: part.state.input,
-          name: providerToolNameFromPart(part),
+          modelCallWrapper: modelCallWrapperFromPart(part),
+          name: historyToolNameFromPart(part),
         }),
       ),
       reasoning,
@@ -168,7 +184,8 @@ export async function hydrateMessageHistoryFromSession(input: {
     appliedMessageCount++;
 
     for (const part of toolParts) {
-      const providerToolName = providerToolNameFromPart(part);
+      const toolName = historyToolNameFromPart(part);
+      const modelCallWrapper = modelCallWrapperFromPart(part);
       if (part.state.status === "completed") {
         // live tool result 使用结构化媒体，但旧恢复只读取 output 摘要，
         // 导致模型切换或冷恢复后丢失 Read/MCP 产生的真实媒体。
@@ -188,8 +205,11 @@ export async function hydrateMessageHistoryFromSession(input: {
                 attachmentBlocks,
               )
             : undefined;
-        const content = projectedMediaContent ?? part.state.output;
-        input.history.addToolResult(part.callID, providerToolName, content, true);
+        const content =
+          hydrateToolSearchContent(part.state.metadata?.modelContent, input.logger) ??
+          projectedMediaContent ??
+          part.state.output;
+        input.history.addToolResult(part.callID, toolName, content, true, false, modelCallWrapper);
         continue;
       }
 
@@ -199,15 +219,24 @@ export async function hydrateMessageHistoryFromSession(input: {
         // 面向 UI / 日志的 state.error；优先使用持久化字符串并兼容旧 session。
         input.history.addToolResult(
           part.callID,
-          providerToolName,
+          toolName,
           typeof persistedModelContent === "string" ? persistedModelContent : part.state.error,
           false,
+          true,
+          modelCallWrapper,
         );
         continue;
       }
 
       interruptedToolCount++;
-      input.history.addToolResult(part.callID, providerToolName, INTERRUPTED_TOOL_RESULT, false);
+      input.history.addToolResult(
+        part.callID,
+        toolName,
+        INTERRUPTED_TOOL_RESULT,
+        false,
+        true,
+        modelCallWrapper,
+      );
     }
   }
 
@@ -288,22 +317,15 @@ async function userEntriesFromParts(
   parts: MessagePart[],
   artifactStore: ToolArtifactStorePort | undefined,
 ): Promise<RuntimeMessageEntry[]> {
-  const attachmentBlocks: ModelMessageContentBlock[] = [];
-  // 媒体数据块（image/video）统一后置组，恢复顺序对齐 live 主路径 [text, media]。
-  const inlineMediaBlocks: ModelMessageContentBlock[] = [];
+  const attachments: UserMessageAttachment[] = [];
   const promptBlocks: ModelMessageContentBlock[] = [];
   const syntheticAttachmentEntries: RuntimeMessageEntry[] = [];
-  const promptAttachmentEntries: RuntimeMessageEntry[] = [];
 
   for (const part of parts) {
     if (part.type === "text" && !part.ignored) {
       const syntheticAttachment = syntheticSystemReminderAttachmentFromTextPart(part);
       if (syntheticAttachment) {
-        syntheticAttachmentEntries.push({
-          kind: "attachment",
-          content: syntheticAttachment.content,
-          metadata: syntheticAttachment.metadata,
-        });
+        syntheticAttachmentEntries.push(syntheticAttachment);
         continue;
       }
       promptBlocks.push({ type: "text", text: textPartToProviderText(part) });
@@ -311,24 +333,10 @@ async function userEntriesFromParts(
     }
 
     if (part.type === "file") {
-      const block = await filePartToContentBlock(part, artifactStore);
-      // local_ref 是附件恢复历史时的唯一路径句柄，不能因为 metadata_only 过滤。
-      if (block.type === "text") {
-        const promptAttachmentInput = promptAttachmentReminderInputForFilePart(part, block);
-        if (promptAttachmentInput) {
-          const reminderBody =
-            buildPromptAttachmentReminderBodies(promptAttachmentInput).join("\n");
-          promptAttachmentEntries.push(
-            systemReminderAttachmentEntry("prompt_attachment", reminderBody),
-          );
-          continue;
-        }
-      }
-      if (block.type === "image" || block.type === "video") {
-        inlineMediaBlocks.push(block);
-      } else {
-        attachmentBlocks.push(block);
-      }
+      attachments.push({
+        ...part,
+        contentBlock: await filePartToContentBlock(part, artifactStore),
+      });
       continue;
     }
 
@@ -337,12 +345,15 @@ async function userEntriesFromParts(
     }
   }
 
-  const content = contentFromUserBlocks(
-    [...attachmentBlocks, ...promptBlocks, ...inlineMediaBlocks],
-    {
-      preserveBlocks: attachmentBlocks.length > 0 || inlineMediaBlocks.length > 0,
-    },
-  );
+  const prompt =
+    attachments.length > 0
+      ? promptBlocks
+      : promptBlocks
+          .map((block) => (block.type === "text" ? block.text : ""))
+          .filter(Boolean)
+          .join("\n\n");
+  const [userEntry, ...promptAttachmentEntries] = buildUserMessageEntries(prompt, attachments);
+  const content = userEntry.message.content;
   const hasUserContent = modelMessageContentToText(content).trim().length > 0;
   const userMetadata = metadataFromUserParts(parts);
   // 文本附件从原始 file part 恢复为 prompt_attachment 后，空正文的
@@ -371,54 +382,6 @@ async function userEntriesFromParts(
   ];
 }
 
-function contentFromUserBlocks(
-  blocks: readonly ModelMessageContentBlock[],
-  options: { preserveBlocks?: boolean } = {},
-): ModelMessageContent {
-  if (options.preserveBlocks) {
-    return blocks.map((block) => ({ ...block })) as ModelMessageContentBlock[];
-  }
-  const textBlocks = blocks.filter(
-    (block): block is Extract<ModelMessageContentBlock, { type: "text" }> => block.type === "text",
-  );
-  if (blocks.length === textBlocks.length) {
-    return textBlocks
-      .map((block) => block.text)
-      .filter(Boolean)
-      .join("\n\n");
-  }
-  return blocks.map((block) => ({ ...block })) as ModelMessageContentBlock[];
-}
-
-function promptAttachmentReminderInputForFilePart(
-  part: FilePart,
-  block: Extract<ModelMessageContentBlock, { type: "text" }>,
-): (PromptAttachmentReminderInput & { content: string; kind: "file" | "inline_text" }) | undefined {
-  if (!part.mime.startsWith("text/")) return undefined;
-  if (!part.source) {
-    return {
-      content: block.text,
-      kind: "inline_text",
-      label: part.filename,
-      preview: part.metadata?.preview,
-    };
-  }
-  if (part.metadata?.storageKind !== "inline") return undefined;
-  if (
-    part.metadata.recoverability !== "provider_ready" &&
-    part.metadata.recoverability !== "preview_only"
-  ) {
-    return undefined;
-  }
-  if (part.metadata.preview?.text !== block.text) return undefined;
-  return {
-    content: block.text,
-    kind: "file",
-    label: part.source.text.value ?? part.filename,
-    preview: part.metadata.preview,
-  };
-}
-
 function textPartToProviderText(part: Extract<MessagePart, { type: "text" }>): string {
   if (!part.synthetic) {
     return part.text;
@@ -441,10 +404,7 @@ function textPartToProviderText(part: Extract<MessagePart, { type: "text" }>): s
   return part.text;
 }
 
-interface SyntheticSystemReminderAttachment {
-  metadata: RuntimeMessageMetadata;
-  content: string;
-}
+type SyntheticSystemReminderAttachment = ReturnType<typeof systemReminderAttachmentEntry>;
 
 function syntheticSystemReminderAttachmentFromParts(
   parts: MessagePart[],
@@ -462,13 +422,24 @@ function syntheticSystemReminderAttachmentFromTextPart(
 ): SyntheticSystemReminderAttachment | undefined {
   if (!part.synthetic) return undefined;
   if (part.text.trim().length === 0) return undefined;
-  if (isProviderWrappedSystemReminderText(part.text)) return undefined;
   const metadata = metadataFromSyntheticTextPart(part);
+  // 只凭已校验的公告身份适配旧包装，不从普通用户正文推断提醒来源。
+  const announcement = metadata.toolSearchAnnouncement;
+  const wrapped = isProviderWrappedSystemReminderText(part.text);
+  if (wrapped && !announcement) return undefined;
   if (!isRestorableSystemReminderAttachmentSource(metadata.source)) return undefined;
 
   return {
+    ...systemReminderAttachmentEntry(
+      metadata.source,
+      wrapped && announcement
+        ? part.text
+            .trim()
+            .replace(/^<system-reminder>\s*/, "")
+            .replace(/\s*<\/system-reminder>$/, "")
+        : part.text,
+    ),
     metadata,
-    content: part.text,
   };
 }
 
@@ -557,8 +528,14 @@ function runtimeMessageMetadataFromPartMetadata(
   if (source === "real_user") {
     return realUserRuntimeMetadata();
   }
-  if (source === "legacy_synthetic") {
-    return legacySyntheticRuntimeMetadata();
+  if (source === "legacy_synthetic" || source === "tool_search_announcement") {
+    const announcement = hydrateToolSearchAnnouncement(runtimeMessage.toolSearchAnnouncement);
+    return {
+      ...legacySyntheticRuntimeMetadata(),
+      ...(announcement
+        ? { source: "tool_search_announcement" as const, toolSearchAnnouncement: announcement }
+        : {}),
+    };
   }
   if (source === "todo_reminder") {
     return todoReminderRuntimeMetadata();
@@ -606,7 +583,12 @@ function isToolPart(part: MessagePart): part is ToolPart {
   return part.type === "tool";
 }
 
-function providerToolNameFromPart(part: ToolPart): string {
+function modelCallWrapperFromPart(part: ToolPart) {
+  const parsed = ModelCallWrapperSchema.safeParse(part.metadata?.modelCallWrapper);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function historyToolNameFromPart(part: ToolPart): string {
   const providerToolName = part.metadata?.providerToolName;
   // 空字符串在 cold hydration 中曾只能依赖 non-empty ToolPart.tool；
   // 必须按字段存在性恢复原值，不能用 truthy 判断把空名重新覆盖成占位值。

@@ -8,6 +8,7 @@ import {
   formatWorkflowStallNotification,
 } from "../../runtime-task/notification.js";
 import type { AgentRuntimeInternal } from "../internal.js";
+import { noteWorkflowReminderRunEvent } from "./dynamic-workflow-blocked-reminder.js";
 import { notifyHoleReached } from "./dynamic-workflow-run-hole-notification.js";
 
 /**
@@ -36,6 +37,9 @@ export async function recordDynamicWorkflowRunProgress(
     ),
     traceContext,
   );
+  // 开集变了（提问 / 作答 / 到达留白 / 补全）：这个 run 的「欠着决定」提醒重新计数。先于下面的通知，
+  // 这样会话正闲着时空闲钟先归零，再被通知唤起的那一轮停掉。
+  noteWorkflowReminderRunEvent(this, payload);
   notifyEscalationRaised.call(this, payload, traceContext);
   notifyRunStalled.call(this, payload, traceContext);
   // 留白（dynamic-workflow-run-hole-notification.ts）：要读一次快照补齐类型 / 草稿 / 前后阶段，所以是
@@ -49,7 +53,7 @@ const RUN_STALLED_EVENT_TYPE = "run-stalled";
 /**
  * `run-stalled` → 一条模型可见的 run 中通知。与 {@link notifyEscalationRaised} 同一层、同三条
  * 纪律：每条事件恰好一条通知（driver 侧每个 stall 段只发一次，成功后重新上膛才会有下一条）；
- * 不催办；绝不抛异常——载荷形状不对就跳过并记一条日志。
+ * 不催办（停滞不需要主代理做任何事）；绝不抛异常——载荷形状不对就跳过并记一条日志。
  */
 function notifyRunStalled(
   this: AgentRuntimeInternal,
@@ -108,8 +112,10 @@ const ESCALATION_RAISED_EVENT_TYPE = "escalation-raised";
  * 同时看得见 run 事件与 AgentRuntime 的地方。再加一个端口只会让同一条事实走两条路。
  *
  * 三条纪律：
- *   - **每个 raised 恰好一条通知**，不重发、不催办。通知被丢弃（stale branch / shutdown）
- *     后的兜底是查询——GetWorkflowRun 的 pendingQuestions，不是重试。
+ *   - **每个 raised 恰好一条通知**，这条自己不重发。那一轮白跑了（请求失败、没作答就收尾）或通知
+ *     被丢弃（stale branch / shutdown）之后，接手的是另一条按状态铸的提醒
+ *     （dynamic-workflow-blocked-reminder.ts：会话闲着、run 还欠着决定），以及随时可查的
+ *     GetWorkflowRun 的 pendingQuestions——都不是把这条再发一遍。
  *   - **`escalation-resolved` 不发通知**：作答方就是主代理自己，回执已经是那次工具调用的结果。
  *   - **绝不抛异常**：这是观察面，而 run 的真相在 journal。载荷形状不对就跳过并记一条日志——
  *     它跨了端口边界又被有界化裁剪过，防御性读取是它应得的待遇。

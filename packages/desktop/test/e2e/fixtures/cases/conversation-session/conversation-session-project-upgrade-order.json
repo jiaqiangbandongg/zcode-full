@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-project-upgrade-order",
+  "spec": "./test/e2e/conversation-session/conversation-session-project-upgrade-order.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-project-upgrade-order.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "requests": []
+}

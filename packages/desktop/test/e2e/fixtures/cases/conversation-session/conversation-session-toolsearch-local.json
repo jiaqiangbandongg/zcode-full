@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-local",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-local.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-toolsearch-local.json"
+  ],
+  "fileFixtures": [],
+  "providerHarness": "./test/e2e/helpers/toolsearch-cli-process.ts",
+  "requests": [
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-search-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-search-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-bad-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-bad-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-good-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-good-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-done-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-anthropic-done-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-search-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-search-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-bad-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-bad-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-good-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-good-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-done-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    },
+    {
+      "id": "conversation-session-toolsearch-local-openai-done-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Local search and wrapper lifecycle contract response; actual CLI and HTTP adapter execute the tools."
+    }
+  ],
+  "notes": "Pending; controlled HTTP responses exercise real CLI/TUI, executor, persistence and adapters. No Docker or cross-platform admission."
+}

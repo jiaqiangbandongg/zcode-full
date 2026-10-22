@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-share-popover",
+  "spec": "./test/e2e/conversation-session/conversation-session-share-popover.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-share-popover.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "share-popover-one",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "Two completed turns with long text provide a real scroll distance for independent locate, selection rollback and select-all checks; no public link is published."
+    },
+    {
+      "id": "share-popover-two",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "Two completed turns with long text provide a real scroll distance for independent locate, selection rollback and select-all checks; no public link is published."
+    }
+  ]
+}

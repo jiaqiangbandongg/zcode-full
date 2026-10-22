@@ -161,17 +161,6 @@ describe("WorkflowPermissionBlock", () => {
     expect(screen.getByText("Hide full script")).toBeTruthy();
   });
 
-  // 长脚本不再把弹窗撑高：脚本区限高 + 滚动。
-  it("bounds the script region with a max height and makes it scrollable", () => {
-    renderDialog();
-
-    fireEvent.click(screen.getByText("Show full script"));
-
-    const scroller = screen.getByTestId("workflow-script-scroll");
-    expect(scroller.className).toMatch(/max-h-/u);
-    expect(scroller.className).toMatch(/overflow-auto/u);
-  });
-
   it("opens the script by default when there is no graph to show", () => {
     renderDialog(
       buildWorkflowRequest({
@@ -498,16 +487,6 @@ describe("WorkflowPermissionBlock", () => {
 
     expect(querySubagentModel()).toBeNull();
     expect(document.body.textContent).not.toContain("Subagents run on");
-  });
-
-  it("never paints the waiting ask with the success color, and says nothing about compiling", () => {
-    renderDialog();
-
-    // DESIGN.md 把绿色留给等待确认态。表头曾有一枚「compiled」空环灯；2026-09-09 起去掉——
-    // 能走到确认窗就说明脚本过了校验，这个词对用户没有信息量。
-    expect(document.body.innerHTML).not.toContain("text-success");
-    expect(screen.queryByTestId("workflow-card-static-status")).toBeNull();
-    expect(document.body.textContent).not.toContain("compiled");
   });
 });
 

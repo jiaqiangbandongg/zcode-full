@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServerRemoteWorkspaceIdentity,
-  isRemoteWorkspaceIdentity,
   parseRemoteWorkspaceIdentity,
 } from "../src/remote-workspace-identity.js";
-import {
-  hostIncomingMessageSchema,
-  remoteTargetSchema,
-} from "../src/validation.js";
+import { hostIncomingMessageSchema, remoteTargetSchema } from "../src/validation.js";
 
 describe("server remote target", () => {
   it("accepts server remote target payloads", () => {
@@ -41,8 +37,7 @@ describe("server remote target", () => {
       },
       remoteAssets: {},
       workspacePath: "/Users/dev/ZCodeProject",
-      workspaceIdentity:
-        "remote:server:studio:/Users/dev/ZCodeProject",
+      workspaceIdentity: "remote:server:studio:/Users/dev/ZCodeProject",
     });
 
     expect(parsed.success).toBe(true);
@@ -54,21 +49,16 @@ describe("server remote target", () => {
       workspacePath: "\\Users\\dev\\ZCodeProject\\",
     });
 
-    expect(identity).toBe(
-      "remote:server:studio-server-01:/Users/dev/ZCodeProject",
-    );
+    expect(identity).toBe("remote:server:studio-server-01:/Users/dev/ZCodeProject");
     expect(parseRemoteWorkspaceIdentity(identity)).toEqual({
       kind: "server",
+      sourceServerId: "studio-server-01",
       workspacePath: "/Users/dev/ZCodeProject",
     });
-    expect(isRemoteWorkspaceIdentity(identity)).toBe(true);
   });
 
   it("rejects malformed server targets and identities", () => {
-    expect(
-      remoteTargetSchema.safeParse({ kind: "server", url: "not a url" })
-        .success,
-    ).toBe(false);
+    expect(remoteTargetSchema.safeParse({ kind: "server", url: "not a url" }).success).toBe(false);
     expect(parseRemoteWorkspaceIdentity("remote:server::/workspace")).toBeNull();
     expect(parseRemoteWorkspaceIdentity("remote:server:studio:relative")).toBeNull();
   });

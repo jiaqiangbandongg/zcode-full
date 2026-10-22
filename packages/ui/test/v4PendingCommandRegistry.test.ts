@@ -1,4 +1,95 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  ensurePendingTaskDraft,
+  readPendingTaskDraft,
+  bindPendingTaskDraft,
+  persistV4ComposerDraft,
+  readV4ComposerDraft,
+  V4_DRAFT_SCOPE_ROOT,
+} from "@/v4/composer/composerDraftStore.js";
+import { prepareComposerRecentReceipt, readComposerRecent } from "@/lib/composerRecent.js";
+
+it.each(["next input", "  submitted draft  "])(
+  "PD06/07 首发未知跨 TTL 保留，重载后 duplicate 交接：%s",
+  (restoredText) => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    const scope = { clientNamespace: "desktop", hostId: "local", projectId: null };
+    try {
+      const pending = ensurePendingTaskDraft(scope);
+      bindPendingTaskDraft(scope, pending.draftId, "/task-a");
+      const command = envelope();
+      const receipt = prepareComposerRecentReceipt(scope, {
+        modelSelection: { providerId: "p", modelId: "m", options: { reasoningLevel: "high" } },
+        mode: "yolo",
+      });
+      const registry = new PendingCommandRegistry({ storage, now: () => 1000 });
+      registry.record(command, {
+        workspace: { workspacePath: "/task-a" },
+        composer: { ...receipt, draftId: pending.draftId, submittedText: "  submitted draft  " },
+      });
+      registry.applyQuery({
+        results: [
+          {
+            key: { sessionId: command.sessionId, commandId: command.commandId },
+            result: "unknown",
+          },
+        ],
+      });
+      persistV4ComposerDraft(
+        "/task-a",
+        undefined,
+        V4_DRAFT_SCOPE_ROOT,
+        { text: restoredText },
+        scope,
+      );
+      const restored = new PendingCommandRegistry({
+        storage,
+        now: () => PENDING_COMMAND_TTL_MS * 2,
+      });
+      expect(restored.list(command.sessionId)).toHaveLength(1);
+      expect(readPendingTaskDraft(scope)?.commandId).toBe(command.commandId);
+      restored.applyAck(command, ack(command.commandId, "duplicate"));
+      expect(readPendingTaskDraft(scope)).toBeNull();
+      expect(readV4ComposerDraft("/task-a", undefined, command.sessionId!)?.text).toBe(
+        restoredText === "next input" ? "next input" : undefined,
+      );
+      expect(readV4ComposerDraft("/task-b", undefined, V4_DRAFT_SCOPE_ROOT, scope)).toBeNull();
+      expect(readComposerRecent("/task-b", undefined, storage, scope)?.mode).toBe("yolo");
+      const next = ensurePendingTaskDraft(scope);
+      restored.applyAck(command, ack(command.commandId, "accepted"));
+      expect(readPendingTaskDraft(scope)?.draftId).toBe(next.draftId);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  },
+);
+it("PD06 首发账本写入失败时不能允许上行或留下不可恢复的锁定", () => {
+  const storage = new MemoryStorage();
+  vi.stubGlobal("window", { localStorage: storage });
+  try {
+    const scope = { clientNamespace: "desktop", hostId: "local", projectId: null };
+    const pending = ensurePendingTaskDraft(scope);
+    const registry = new PendingCommandRegistry({ storage });
+    const original = storage.setItem.bind(storage);
+    storage.setItem = (key, value) => {
+      if (key === "zcode-v4-pending-commands:v1") throw new Error("quota");
+      original(key, value);
+    };
+    const composer = {
+      ...prepareComposerRecentReceipt(scope, {
+        modelSelection: { providerId: "p", modelId: "m" },
+        mode: "build",
+      }),
+      draftId: pending.draftId,
+    };
+    expect(() => registry.record(envelope(), { composer })).toThrow();
+    expect(readPendingTaskDraft(scope)?.commandId).toBeUndefined();
+    expect(registry.findCommand("command-1")).toBeUndefined();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 import type {
   CommandAck,
   CommandEnvelope,
@@ -28,6 +119,17 @@ class MemoryStorage {
     this.values.delete(key);
   }
 }
+
+it("PD10 不把另一工作区的全局创建命令交给当前 Agent 查询", async () => {
+  const registry = new PendingCommandRegistry({ storage: new MemoryStorage() });
+  for (const path of ["/a", "/b"])
+    registry.record(envelope({ commandId: path, sessionId: null }), {
+      workspace: { workspacePath: path },
+    });
+  const query = vi.fn(async () => ({ results: [] }));
+  await registry.reconcileSession(null, query, "/a");
+  expect(query).toHaveBeenCalledWith({ commands: [{ sessionId: null, commandId: "/a" }] });
+});
 
 function envelope(overrides: Partial<CommandEnvelope> = {}): CommandEnvelope {
   return {
@@ -101,15 +203,10 @@ function snapshot(
 }
 
 describe("V4 pending command registry", () => {
-  it("createSession 重发会保留原始 grouped draft identity 与 placement", () => {
+  it("createSession 重发会保留原始项目选择与 workspace identity", () => {
     const storage = new MemoryStorage();
     const registry = new PendingCommandRegistry({ storage, now: () => 1_000 });
-    const groupedDraftTask = {
-      draftId: "grouped-draft-a",
-      workspacePath: "/repo",
-      placement: { type: "group" as const, groupId: "group-a" },
-      createdAt: 900,
-    };
+    const projectId = "project-a";
     registry.record(
       envelope({
         commandId: "create-session-1",
@@ -117,13 +214,13 @@ describe("V4 pending command registry", () => {
         type: "createSession",
         payload: { workspaceId: "/repo", firstInput: { text: "hello" } },
       }),
-      { workspace: { workspacePath: "/repo" }, groupedDraftTask },
+      { workspace: { workspacePath: "/repo" }, projectId },
     );
 
     const reloaded = new PendingCommandRegistry({ storage, now: () => 1_001 });
     expect(
       reloaded.consumeReplay({ sessionId: null, commandId: "create-session-1" })?.clientContext,
-    ).toEqual({ workspace: { workspacePath: "/repo" }, groupedDraftTask });
+    ).toEqual({ workspace: { workspacePath: "/repo" }, projectId });
   });
 
   it("createSession workspace key 优先使用 identity 并兼容旧 payload", () => {
@@ -279,6 +376,30 @@ describe("V4 pending command registry", () => {
     );
     expect(registry.list("session-1")).toEqual([]);
     expect(new PendingCommandRegistry({ storage, now: () => 2_000 }).list("session-1")).toEqual([]);
+  });
+
+  it("权威投影结算时通知同 commandId 的提交方", () => {
+    const registry = new PendingCommandRegistry({ storage: new MemoryStorage() });
+    const resolutions: string[] = [];
+    const unsubscribe = registry.subscribeResolution("command-1", (resolution) => {
+      resolutions.push(resolution);
+    });
+    registry.record(envelope());
+    registry.reconcileSnapshot(
+      snapshot([
+        {
+          rowId: 2,
+          kind: "userInput",
+          origin: "realUser",
+          sourceCommandId: "command-1",
+          text: "hello",
+        } as ConversationSnapshot["rows"]["window"][number],
+      ]),
+    );
+    unsubscribe();
+
+    expect(resolutions).toEqual(["authoritative"]);
+    expect(registry.list("session-1")).toEqual([]);
   });
 
   it("compact accepted 后保留恢复线索，直到 timeline marker 证明已开始执行", () => {

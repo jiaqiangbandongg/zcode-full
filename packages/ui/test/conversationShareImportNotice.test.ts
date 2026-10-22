@@ -63,14 +63,6 @@ function render(props: Parameters<typeof ConversationShareImportNotice>[0]) {
 }
 
 describe("conversation share import notice", () => {
-  it("可点击与静态分割线均使用导入图标，避免与 Fork 混淆", () => {
-    for (const onOpenShareUrl of [undefined, () => {}]) {
-      const html = render({ rows, locale: "en-US", onOpenShareUrl });
-      expect(html).toContain("lucide-square-arrow-right-enter");
-      expect(html).not.toContain("lucide-git-branch");
-    }
-  });
-
   it("渲染只读的分享对话与分割线", () => {
     const html = render({ rows, locale: "zh-CN", onOpenShareUrl: () => {} });
     expect(html).toContain('data-conversation-share-import-notice="true"');

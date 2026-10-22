@@ -64,7 +64,11 @@ describe("Guide refresh versus model switching", () => {
           { mode: "yolo", plan: planEnabled },
         ]);
         expect(onCreate).toHaveBeenCalledTimes(1);
-        expect(runtime.getSessionModelSelection()).toEqual(selection);
+        // 固定执行模型继续当前轮；已接受的用户 Guide 独立更新后续唤起选择。
+        expect(runtime.getSessionModelSelection()).toEqual({
+          ...selection,
+          modelId: "must-not-switch",
+        });
       } finally {
         runtime.beginShutdown();
       }

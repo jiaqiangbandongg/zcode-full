@@ -13,7 +13,7 @@ import type {
   CommandResult,
 } from "@zcode/shared/zcode-protocol-v4";
 import type { SteerTurnOptions, SubmitPromptOptions } from "../../../app/types.js";
-import { runWithSessionResidencyFinalization } from "../../../zcode-protocol/session-residency.js";
+import { runWithSessionResidencyFinalization } from "../../../session-execution/index.js";
 import { inputIntentMetadata } from "../input-intent.js";
 import { requireRecord } from "../record-access.js";
 import type { V4CommandCoreHost, V4SessionRecordView } from "../types.js";

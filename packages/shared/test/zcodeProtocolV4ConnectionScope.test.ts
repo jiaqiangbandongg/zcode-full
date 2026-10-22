@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { hostAttachServicePortMessageSchema } from "../src/index.js";
 import {
   subscribeParamsSchema,
   V4_METHODS,
@@ -71,34 +70,6 @@ describe("ZCode Protocol V4 trusted connection scope", () => {
         topic: "conversation/session-1",
         connectionId: "connection-1",
         clientMode: "mobile-self-declared",
-      }).success,
-    ).toBe(false);
-  });
-
-  it("AttachServicePort 只接受 host 可信的两种 clientMode", () => {
-    for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as const) {
-      expect(
-        hostAttachServicePortMessageSchema.safeParse({
-          type: "attach-service-port",
-          requestId: `request-${clientMode}`,
-          attachmentId: `attachment-${clientMode}`,
-          clientMode,
-          scope: { kind: "local" },
-        }).success,
-      ).toBe(true);
-    }
-    expect(
-      hostAttachServicePortMessageSchema.safeParse({
-        type: "attach-service-port",
-        requestId: "request-invalid",
-        attachmentId: "attachment-invalid",
-        clientMode: "mobile-self-declared",
-        scope: { kind: "local" },
-      }).success,
-    ).toBe(false);
-    expect(
-      hostAttachServicePortMessageSchema.safeParse({
-        type: "attach-service-port",
       }).success,
     ).toBe(false);
   });

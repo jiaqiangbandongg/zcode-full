@@ -6,15 +6,9 @@ import { getZCodeCopy } from "@zcode/i18n";
 import { shouldHandleInputHistoryNavigation } from "../src/app-keyboard.js";
 import {
   InputPane,
-  INPUT_DEFAULT_EDITOR_ROWS,
-  INPUT_PANE_BORDER,
   INPUT_PANE_MAX_HEIGHT,
-  INPUT_PANE_MIN_HEIGHT,
-  INPUT_PANE_STATUS_ROWS,
-  INPUT_PANE_STATUS_SPACER_STYLE,
   INPUT_MAX_EDITOR_ROWS,
   INPUT_MIN_EDITOR_ROWS,
-  INPUT_PANE_BORDER_STYLE,
   PROMPT_TEXTAREA_KEY_BINDINGS,
   inputPaneContainerStyle,
   inputPaneEditorRows,
@@ -46,10 +40,6 @@ test("prompt textarea binds Enter to submit and Shift+Enter to newline", () => {
     { name: "return", shift: true, action: "newline" },
     { name: "linefeed", shift: true, action: "newline" },
   ]);
-  assert.equal(INPUT_DEFAULT_EDITOR_ROWS, 2);
-  assert.equal(INPUT_PANE_STATUS_ROWS, 1);
-  assert.deepEqual(INPUT_PANE_STATUS_SPACER_STYLE, { flexGrow: 1, minHeight: 0 });
-  assert.equal(INPUT_PANE_BORDER, true);
 });
 
 test("sizes prompt textarea from draft content up to six visible rows", () => {
@@ -66,15 +56,6 @@ test("sizes prompt textarea from draft content up to six visible rows", () => {
   assert.equal(maxTextareaStyle.height, INPUT_MAX_EDITOR_ROWS);
   assert.equal(maxTextareaStyle.maxHeight, INPUT_MAX_EDITOR_ROWS);
   assert.equal(maxTextareaStyle.minHeight, INPUT_MIN_EDITOR_ROWS);
-});
-
-test("uses a complete border for the prompt container", () => {
-  const style = inputPaneContainerStyle(true);
-
-  assert.equal(style.border, INPUT_PANE_BORDER);
-  assert.equal(style.borderColor, "#7dd3fc");
-  assert.equal(style.borderStyle, INPUT_PANE_BORDER_STYLE);
-  assert.equal(style.height, INPUT_PANE_MIN_HEIGHT);
 });
 
 test("uses localized prompt title and placeholder copy", () => {
@@ -137,19 +118,6 @@ test("renders model, muted provider, and thought in the composer status row", ()
     fg: palette.warning,
     flexShrink: 0,
   });
-});
-
-test("renders the shared composer status row while idle", () => {
-  const text = collectTextNodes(
-    InputComposerStatus({
-      model: "default-deepseek/deepseek-v4-pro",
-      thoughtLevel: "max",
-    }),
-  )
-    .map((node) => node.text)
-    .join("");
-
-  assert.equal(text, "deepseek-v4-pro default-deepseek | max");
 });
 
 test("formats and renders the active status context meter on the right", () => {

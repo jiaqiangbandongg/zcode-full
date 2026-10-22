@@ -17,17 +17,25 @@ export async function setProviderFamilyDomain(
   domain: ProviderFamilyDomain,
 ): Promise<void> {
   const currentSettings = await settingService.get();
-  await settingService.update({
-    providerFamilyDomain: domain,
-    providerFamilyDomainUpdatedAt: Date.now(),
-    providerFamilyDomainMigrated: true,
-    // WelcomeScreen OAuth 登录表示用户选择的是同 family 的 Coding Plan/OAuth 模式。
-    // 只写 providerFamilyDomain 会保留之前 API Key 入口写入的 apiKey mode，导致登录成功后仍停在 API Key。
-    providerFamilyConnectionSelections: buildOAuthProviderFamilySelections(
-      domain,
-      currentSettings.providerFamilyConnectionSelections,
-    ),
-  });
+  await settingService.update(
+    {
+      providerFamilyDomain: domain,
+      providerFamilyDomainUpdatedAt: Date.now(),
+      providerFamilyDomainMigrated: true,
+      // WelcomeScreen OAuth 登录表示用户选择的是同 family 的 Coding Plan/OAuth 模式。
+      // 只写 providerFamilyDomain 会保留之前 API Key 入口写入的 apiKey mode，导致登录成功后仍停在 API Key。
+      providerFamilyConnectionSelections: buildOAuthProviderFamilySelections(
+        domain,
+        currentSettings.providerFamilyConnectionSelections,
+      ),
+    },
+    {
+      // 原因：登录入口也写完整映射，必须与 Composer 共用 CAS 准入。
+      providerFamilyDomain: currentSettings.providerFamilyDomain,
+      providerFamilyConnectionSelections: currentSettings.providerFamilyConnectionSelections,
+      providerFamilyDomainUpdatedAt: currentSettings.providerFamilyDomainUpdatedAt ?? 0,
+    },
+  );
 }
 
 export function buildOAuthProviderFamilySelections(

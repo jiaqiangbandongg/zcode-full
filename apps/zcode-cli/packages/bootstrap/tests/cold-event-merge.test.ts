@@ -493,11 +493,6 @@ describe("cold conversation three-source merge", () => {
     const messages = vi.fn(async () => [oldUser, oldAssistant, rewindNotice, newAssistant]);
     const readTarget = vi.fn(async () => target);
     const sessionEntries = vi.fn(async () => []);
-    const loadPersistedConversationMaterialization = (coldEventMerge as Record<string, unknown>)
-      .loadPersistedConversationMaterialization;
-
-    expect(loadPersistedConversationMaterialization).toBeTypeOf("function");
-    if (typeof loadPersistedConversationMaterialization !== "function") return;
     const loaded = await loadPersistedConversationMaterialization({
       memoryEvents: [],
       sessionId: "s1",

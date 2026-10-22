@@ -1,5 +1,6 @@
-// ONBOARD-REMOTE-01：真实引导组件、远程服务装配与 WebSocket RPC 的浏览器边界回归。
+// ONBOARD-REMOTE-01：真实引导组件、远程服务装配、手机 attachment allowlist 与 WebSocket RPC 的浏览器边界回归。
 // 首页按钮/Root key 重建由夹具驱动；不覆盖真实 relay 配对或 SSH/WSL/Docker transport。
+// R3 下 SSH/WSL/Docker 与 Server 都走 Source 全转发，引导记录 owner 是 Source，不是本机 Local Host。
 // 运行：pnpm exec tsx packages/desktop/test/e2e/manual-review/pending/mobile-remote-onboarding.mjs
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
@@ -12,13 +13,16 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { WebSocketServer } from "ws";
 import { ChannelServer, Emitter, Event, SocketProtocol, VSBuffer } from "@zcode/rpc";
-import { IBroadcastService, ISettingService } from "@zcode/services";
+import {
+  IBroadcastService,
+  IOnboardingRecordService,
+  ISettingService,
+  ServiceCollection,
+} from "@zcode/services";
 import { setDataBaseDir } from "@zcode/services/node";
 import { createOnboardingRecordService } from "../../../../../services/src/onboarding/onboardingRecordService.js";
-import {
-  createRemoteWorkspaceServiceCollection,
-  createServerRemoteWorkspaceServiceCollection,
-} from "../../../../src/host/remoteWorkspaceServiceCollection.js";
+import { createServerRemoteWorkspaceServiceCollection } from "../../../../src/host/remoteWorkspaceServiceCollection.js";
+import { exposeWindowHostAttachmentServices } from "../../../../src/host/windowHostAttachmentRpcPolicy.js";
 
 const repoRoot = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const artifacts = resolve(repoRoot, ".tmp/mobile-remote-onboarding-e2e");
@@ -29,38 +33,33 @@ const localRecord = createOnboardingRecordService({
   loadUserId: async () => "desktop-user",
   hasExistingLocalTask: async () => false,
 });
-const serverRecord = createOnboardingRecordService({
-  loadUserId: async () => "server-user",
+const sourceRecord = createOnboardingRecordService({
+  loadUserId: async () => "source-user",
   hasExistingLocalTask: async () => false,
 });
 const broadcastService = { onMessage: Event.None, send: async () => {} };
 const connectionServices = new Proxy(
   {
-    onboardingRecordService: serverRecord,
+    onboardingRecordService: sourceRecord,
     zcodeAgentService: { onDynamicSessionRuntimePreferencesRequest: () => Event.None },
   },
   { get: (target, key) => target[key] ?? {} },
 );
 const clientConfigService = { getSnapshot: async () => ({ pluginStoreOrder: null }) };
-const passthrough = (service) => service;
-const collections = {
-  attached: createRemoteWorkspaceServiceCollection({
-    clientConfigService,
-    connectionServices,
-    localOnboardingRecordService: localRecord,
-    parentPort: null,
-    createRemotePromptAttachmentTaskService: passthrough,
-    createRemotePromptAttachmentSessionService: passthrough,
-    createReportingRemoteZCodeTaskService: passthrough,
-    promptAttachmentTransferService: {},
-    runtimePreferencesBridge: {
-      onError: (error) => {
-        throw error;
-      },
-    },
-  }),
-  server: createServerRemoteWorkspaceServiceCollection({ clientConfigService, connectionServices }),
-};
+// 真实 Host 传入的 sourceServices 含本机记录服务；用例借此证明远程集合不会回落到本机记录。
+const sourceServices = new ServiceCollection().register(IOnboardingRecordService, localRecord);
+const targetKinds = ["ssh", "server"];
+const collections = Object.fromEntries(
+  targetKinds.map((targetKind) => [
+    targetKind,
+    createServerRemoteWorkspaceServiceCollection({
+      clientConfigService,
+      connectionServices,
+      targetKind,
+      sourceServices,
+    }),
+  ]),
+);
 // settings 故意没有 onboardingOccupation，确保通过来自真实记录 owner 的判定进入任务。
 for (const services of Object.values(collections)) {
   services.register(ISettingService, {
@@ -144,7 +143,12 @@ wsServer.on("connection", (socket, req) => {
     dispose: () => {},
   });
   const server = new ChannelServer(protocol, "mobile-onboarding", 1000);
-  collections[kind].exposeOnChannelServer(server);
+  // 与真实手机 attachment 相同的 allowlist；漏放行 onboarding-record 时调用会超时。
+  exposeWindowHostAttachmentServices({
+    server,
+    services: collections[kind],
+    clientMode: "web-remote-replayable",
+  });
   socket.on("message", (data) => onData.fire(VSBuffer.wrap(new Uint8Array(data))));
   socket.on("error", (error) => rpcErrors.push(error.message));
   socket.on("close", () => {
@@ -163,9 +167,9 @@ try {
   await vite.listen();
   const origin = `http://127.0.0.1:${vite.httpServer.address().port}`;
   browser = await chromium.launch({ channel: "chrome", headless: true });
-  for (const kind of ["attached", "server"]) {
-    const owner = kind === "attached" ? localRecord : serverRecord;
-    const other = kind === "attached" ? serverRecord : localRecord;
+  for (const kind of targetKinds) {
+    const owner = sourceRecord;
+    const other = localRecord;
     for (const completed of [true, false]) {
       await owner.clearRecords();
       if (completed)

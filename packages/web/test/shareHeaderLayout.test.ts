@@ -1,12 +1,5 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { resolveShareHeaderView } from "../src/share/shareHeaderLayout.js";
-
-const landingPageCss = readFileSync(
-  fileURLToPath(new URL("../src/share/conversationShareLandingPage.css", import.meta.url)),
-  "utf8",
-);
 
 describe("share header continuous layout", () => {
   const base = {
@@ -134,17 +127,5 @@ describe("share header continuous layout", () => {
 
     expect(view.continueVisible).toBe(false);
     expect(view.continueCompact).toBe(false);
-  });
-
-  it("uses one fixed-height continuous shell instead of binary layout selectors", () => {
-    expect(landingPageCss).toContain('[data-share-header-shell="true"]');
-    expect(landingPageCss).toContain('[data-share-header-row="true"]');
-    expect(landingPageCss).toContain("text-overflow: ellipsis");
-    expect(landingPageCss).toContain("white-space: nowrap");
-    expect(landingPageCss).toContain("--share-brand-left");
-    expect(landingPageCss).toContain("--share-title-width");
-    expect(landingPageCss).toContain("--share-continue-right");
-    expect(landingPageCss).not.toContain('data-share-header-layout="compact"');
-    expect(landingPageCss).not.toContain("min-height: 8rem");
   });
 });

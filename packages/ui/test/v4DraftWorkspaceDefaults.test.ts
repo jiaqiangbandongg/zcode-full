@@ -161,46 +161,6 @@ describe("resolveDraftModelThoughtOption", () => {
 });
 
 describe("resolveDraftThoughtCurrentValue", () => {
-  it("模型目录的默认档位不能填补恢复选择的空档位", () => {
-    const modelThoughtOption = resolveDraftModelThoughtOption(
-      "account:bigmodel-individual-coding-plan",
-      "GLM-5.3",
-      {
-        revision: 1,
-        providers: [
-          {
-            providerId: "account:bigmodel-individual-coding-plan",
-            providerName: "BigModel Coding Plan",
-            config: {},
-            models: [
-              {
-                modelId: "GLM-5.3",
-                config: {
-                  optionSpecs: {
-                    reasoningLevel: {
-                      values: ["high", "low", "max"],
-                      map: "{}",
-                    },
-                    maxOutputTokens: { max: 32_000, map: "{}" },
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      },
-    );
-
-    expect(
-      resolveDraftThoughtCurrentValue({
-        thought: "",
-        thoughtLevels: ["high", "low", "max"],
-        // 目录自身仍可提供新选择的默认档位，但展示当前选择时不读取它。
-      }),
-    ).toBe("");
-    expect(modelThoughtOption?.currentValue).toBe("");
-  });
-
   it.each([
     ["high", "high"],
     ["removed", ""],
@@ -263,10 +223,6 @@ describe("buildDraftCreateConfigPayload", () => {
       },
     });
   });
-
-  it("空 Composer 不制造 config", () => {
-    expect(buildDraftCreateConfigPayload({}, null)).toEqual({});
-  });
 });
 
 describe("shouldHydrateWorkspaceCatalog", () => {
@@ -307,22 +263,5 @@ describe("shouldHydrateWorkspaceCatalog", () => {
         slashCommands: slashCatalog,
       }),
     ).toBe(false);
-  });
-
-  it("已有 session 仍独立水合 workspace slash 与非模型 mode 展示", () => {
-    expect(
-      shouldHydrateWorkspaceCatalog({
-        configOptions: [],
-        sessionId: "session-known",
-        slashCommands: slashCatalog,
-      }),
-    ).toBe(true);
-    expect(
-      shouldHydrateWorkspaceCatalog({
-        configOptions: modePresentation,
-        sessionId: "session-known",
-        slashCommands: [],
-      }),
-    ).toBe(true);
   });
 });

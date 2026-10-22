@@ -2,9 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   markWebRemoteControlBridgeTaskRead,
   markWebRemoteControlTaskRead,
-} from "@web/webRemoteControlTaskRead.js";
+} from "#src/web-remote-control/index.js";
 
 describe("markWebRemoteControlTaskRead", () => {
+  it("file-only bridge without initialTaskId never changes unread metadata", async () => {
+    const setTaskUnread = vi.fn();
+    await markWebRemoteControlBridgeTaskRead({
+      bridge: { kind: "local", workspacePath: "/files" },
+      service: { setTaskUnread },
+    });
+    expect(setTaskUnread).not.toHaveBeenCalled();
+  });
   it("persists the exact mobile task target as read", async () => {
     const setTaskUnread = vi.fn(async () => ({}));
 

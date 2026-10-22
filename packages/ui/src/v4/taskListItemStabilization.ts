@@ -50,7 +50,8 @@ export function areTaskListItemsEquivalent(left: ZCodeTaskMeta, right: ZCodeTask
 /** 引用稳定化：等价条目复用旧对象；顺序与内容全等时复用整个旧数组。 */
 export function stabilizeTaskListItems<T extends ZCodeTaskMeta>(previous: T[], next: T[]): T[] {
   if (previous.length === 0) {
-    return next;
+    // 空快照仍然等价；每次返回新空数组会使无任务项目的整棵目录失效。
+    return next.length === 0 ? previous : next;
   }
   const previousByKey = new Map(
     previous.map((meta) => [buildTaskListItemIdentityKey(meta), meta] as const),

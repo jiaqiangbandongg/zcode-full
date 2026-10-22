@@ -4,14 +4,14 @@ import { seedProviderReadinessHistoryFixture } from "./provider-readiness-histor
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function seedAppUsageE2EFixture(options: {
+export async function seedAppUsageE2EFixture(options: {
   cliEntryPoint: string;
   e2eHomeDir: string;
   workspacePath: string;
-}): void {
+}): Promise<void> {
   const now = Date.now();
-  seedHistory(options, "sess_e2e_usage_primary", "E2E App Usage Primary");
-  seedHistory(options, "sess_e2e_usage_secondary", "E2E App Usage Secondary");
+  await seedHistory(options, "sess_e2e_usage_primary", "E2E App Usage Primary");
+  await seedHistory(options, "sess_e2e_usage_secondary", "E2E App Usage Secondary");
 
   const database = new DatabaseSync(appUsageDatabasePath(options.e2eHomeDir));
   try {
@@ -81,12 +81,12 @@ export function clearAppUsageE2EFixture(e2eHomeDir: string): void {
   }
 }
 
-function seedHistory(
+async function seedHistory(
   options: { cliEntryPoint: string; e2eHomeDir: string; workspacePath: string },
   sessionId: string,
   title: string,
-): void {
-  seedProviderReadinessHistoryFixture({
+): Promise<void> {
+  await seedProviderReadinessHistoryFixture({
     ...options,
     history: {
       assistantInputTokens: 0,

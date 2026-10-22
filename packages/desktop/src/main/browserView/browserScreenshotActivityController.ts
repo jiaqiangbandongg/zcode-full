@@ -81,7 +81,7 @@ export class DesktopBrowserScreenshotActivityController {
     windowId: number;
     webContentsId: number;
     requestId: string;
-    reason: "browser-screenshot";
+    reason: "browser-screenshot" | "plugin-execution";
   }): BrowserScreenshotActivityLease | undefined {
     const stateKey = this.getStateKey(input.windowId, input.webContentsId);
     let state = this.states.get(stateKey);

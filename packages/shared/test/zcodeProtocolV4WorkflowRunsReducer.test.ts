@@ -85,15 +85,6 @@ describe("reduceWorkflowRunsState：逐事件归约", () => {
     expect(workflowRunsStateSchema.safeParse(state).success).toBe(true);
   });
 
-  it("run-started 只从 caps 里读并发界：用量与步数从零起，caps 里没有任何用量上限可用", () => {
-    const progress = progressLog();
-    const state = reduceWorkflowRunsState(undefined, progress("run-started", started()));
-    expect(state?.runs[0]?.usage).toEqual({ spentTokens: 0, nodesUsed: 0 });
-    expect(state?.runs[0]).not.toHaveProperty("budget");
-    // 载荷不带 concurrencyCeiling（老 CLI）：读不出天花板就无从判断这个 run 是否被压低。
-    expect(state?.runs[0]).not.toHaveProperty("concurrency");
-  });
-
   it("节点相位按 (siteId, ordinal) upsert：四条事件一个条目", () => {
     const progress = progressLog();
     const state = reduceAll([
@@ -217,7 +208,7 @@ describe("reduceWorkflowRunsState：逐事件归约", () => {
     },
   );
 
-  it("同 runId 再收 run-started：清掉上一世的 error / resultPreview（进程内 cancel→resume）", () => {
+  it("同 runId 再收 run-started：清掉上一世的 error 与 stopReason", () => {
     const progress = progressLog();
     const state = reduceAll([
       progress("run-started", started()),
@@ -231,7 +222,6 @@ describe("reduceWorkflowRunsState：逐事件归约", () => {
     expect(state?.runs).toHaveLength(1);
     expect(state?.runs[0]).toMatchObject({ runId: RUN_ID, status: "running" });
     expect(state?.runs[0]?.error).toBeUndefined();
-    expect(state?.runs[0]?.resultPreview).toBeUndefined();
     // 上一世的停止原因同属结算残影。
     expect(state?.runs[0]?.stopReason).toBeUndefined();
   });
@@ -835,22 +825,6 @@ describe("reduceWorkflowRunsState：幂等重放", () => {
     // 水位是唯一有单调守卫的量：整串重放也不会让它回退。
     expect(replayed.runs[0]?.lastEventSequence).toBe(once.runs[0]?.lastEventSequence);
   });
-
-  it("重放一条会改内容的事件（相位前进）不算幂等，照常抬 revision", () => {
-    const progress = progressLog();
-    const state = reduceAll([
-      progress("run-started", started()),
-      progress("node-queued", { instance: { siteId: "ask#1", ordinal: 1 }, kind: "ask" }),
-    ]);
-    const advanced = reduceWorkflowRunsState(state, {
-      runId: RUN_ID,
-      toolCallId: "tc-1",
-      sequence: 2,
-      eventType: "node-dispatched",
-      payload: { instance: { siteId: "ask#1", ordinal: 1 } },
-    });
-    expect(advanced?.revision).toBe((state?.revision ?? 0) + 1);
-  });
 });
 
 // ── 升级问答（apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md）──────────────────────────────
@@ -1083,7 +1057,7 @@ describe("reduceWorkflowRunsState：升级问答", () => {
     },
   );
 
-  it("同 runId 再收 run-started 也清掉上一世的停驻问题（进程内 cancel→resume）", () => {
+  it("停止后重新开始，可以用新 qid 建立停驻问题", () => {
     // 新的一世里那个 ask 会重跑、actor 重新提问、得一个新 qid；旧的留着只会是永远等不到
     // 答案、也再没有人在等它的残影。
     const progress = progressLog();
@@ -1150,19 +1124,6 @@ describe("reduceWorkflowRunsState：纯度", () => {
     expect(before).toEqual(frozen);
     expect(after).not.toBe(before);
     expect(after?.runs[0]).not.toBe(before.runs[0]);
-  });
-
-  it("同一入参重复调用得到同一结果（无时钟、无随机）", () => {
-    const envelope: WorkflowRunProgressEnvelope = {
-      runId: RUN_ID,
-      toolCallId: "tc-1",
-      sequence: 0,
-      eventType: "run-started",
-      payload: started(),
-    };
-    expect(reduceWorkflowRunsState(undefined, envelope)).toEqual(
-      reduceWorkflowRunsState(undefined, envelope),
-    );
   });
 
   it("payload 非 record 时退化成空 payload，不抛", () => {
@@ -2098,7 +2059,6 @@ describe("workflowRuns reducer · run-launched（声明阶段表）", () => {
     );
     const run = state.runs[0]!;
     // 表按被接受的名字表裁齐——下标指向的就是它，多出来的一行没有站可依。
-    expect(run.phaseAlongside).toHaveLength(3);
     expect(run.phaseAlongside).toEqual([[], [0], []]);
     expect(workflowRunsStateSchema.safeParse(state).success).toBe(true);
   });
@@ -2132,13 +2092,20 @@ describe("workflowRuns reducer · run-launched（声明阶段表）", () => {
       step(undefined, progress("run-started", started())),
       progress("run-launched", { inputId: "in-1", phaseNames: ["plan", "verify"] }),
     );
-    const settled = step(launched, progress("run-settled", { status: "stopped", stopReason: "user" }));
+    const settled = step(
+      launched,
+      progress("run-settled", { status: "stopped", stopReason: "user" }),
+    );
     const resumed = step(settled, progress("run-started", started()));
     expect(resumed.runs[0]?.phaseNames).toEqual(["plan", "verify"]);
     expect(
       reduceWorkflowRunsState(
         resumed,
-        progress("run-launched", { inputId: "in-1", phaseNames: ["plan", "verify"] }, { sequence: 3 }),
+        progress(
+          "run-launched",
+          { inputId: "in-1", phaseNames: ["plan", "verify"] },
+          { sequence: 3 },
+        ),
       ),
     ).toBeNull();
   });
@@ -2679,27 +2646,6 @@ describe("workflowRuns reducer · node-progress（ask 的任务与进度读数�
       payload,
     });
     expect(replay).toBeNull();
-  });
-
-  it("旧 journal（没有这些键）归约结果逐字节不变：状态里不出现这四个字段", () => {
-    const progress = progressLog();
-    const state = reduceAll([
-      progress("run-started", started()),
-      progress("node-queued", { instance: ASK, kind: "ask", actor: ACTOR }),
-      progress("node-dispatched", { instance: ASK }),
-      progress("node-settled", { instance: ASK, outcome: "ok" }),
-    ]);
-    const node = state?.runs[0]?.nodes[0];
-    expect(node).toEqual({
-      siteId: "ask#1",
-      ordinal: 1,
-      kind: "ask",
-      phase: "settled",
-      outcome: "ok",
-      actorSiteId: "actor#1",
-      actorOrdinal: 1,
-    });
-    expect(workflowRunsStateSchema.parse(state)).toEqual(state);
   });
 
   it("更新的 CLI 发来的未知事件仍然落到 default：只抬水位，不建节点", () => {

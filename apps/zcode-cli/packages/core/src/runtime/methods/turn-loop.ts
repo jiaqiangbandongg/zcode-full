@@ -1,6 +1,8 @@
 import { getTurnTools } from "./turn-tool-visibility.js";
+import { refreshOffPeakTurnAfterTakeover } from "../off-peak/turn.js";
 import { appendRuntimeAgentListing } from "../helpers/agent-listing.js";
 import { beginLocalTurnPreparation } from "@zcode/contracts";
+import { buildToolSearchAnnouncement } from "../../tool/search/exposure.js";
 import {
   CompactPhase,
   CompactReason,
@@ -14,6 +16,7 @@ import {
   buildRuntimeOutputStyleReminderBody,
   buildTodoReminderBody,
   buildRuntimeProviderRequestMessages,
+  prepareRuntimeProviderRequest,
   createCompactRapidRefillError,
   throwIfTurnAborted,
   shouldBuildTodoReminder,
@@ -24,6 +27,8 @@ import {
 } from "../../agent/message-history.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import { runModelBackedTurnStep } from "./turn-model-step.js";
+import { persistRuntimeReminderMessage } from "./runtime-reminder-persistence.js";
+import { buildProjectionAnchor } from "./projection-anchor.js";
 import {
   evaluateRapidRefill,
   MAX_CONSECUTIVE_RAPID_REFILLS,
@@ -47,6 +52,7 @@ export async function runRegularTurnLoop(
 ): Promise<void> {
   while (true) {
     throwIfTurnAborted(state.turnAbortSignal);
+    refreshOffPeakTurnAfterTakeover(this, state);
     const outputTokenRecoveryActive = state.turnRequestState.outputTokenContinuationCount > 0;
     // guide 只允许由完整 tool result batch 设置这个一次性诊断；普通 queue 不在
     // model roundtrip 起点消费，避免把未来 turn 错并入当前 product turn。
@@ -97,6 +103,7 @@ export async function runRegularTurnLoop(
         rapidRefill,
         model: state.model,
         turnRequestState: state.turnRequestState,
+        getContinuationTools: () => getTurnTools(this, state),
       },
     );
     if (autoCompactOutcome === "rapid_refill_blocked") {
@@ -173,6 +180,29 @@ export async function runRegularTurnLoop(
         systemReminderAttachmentEntry("output_style", outputStyleReminderBody),
       ]);
     }
+    if (!outputTokenRecoveryActive) {
+      const announcement = buildToolSearchAnnouncement({
+        model: state.model,
+        mode: this.config.toolSearch?.mode,
+        tools,
+        registry: this.getToolRegistry(),
+        entries: state.turnRequestState.entries,
+      });
+      if (announcement) {
+        // 公告正文和增量事实必须先一起落盘；否则 fork/resume 会把已公告工具重新当成首次出现。
+        const messageId = await persistRuntimeReminderMessage.call(
+          this,
+          announcement,
+          state.turnTraceContext,
+          {
+            model: state.model,
+            anchor: buildProjectionAnchor(state.turnTraceContext, "synthetic"),
+          },
+        );
+        if (messageId) this.latestConversationMessageId = messageId;
+        commitTurnRequestEntries(this, state.turnRequestState, [announcement]);
+      }
+    }
     // （2026-09-12）：原"回合开始注入 plugin_ui_state reminder"已删除，插件给模型的信息
     // 一律走 ui/update-model-context。
     const providerEntries = [...state.turnRequestState.entries];
@@ -182,20 +212,32 @@ export async function runRegularTurnLoop(
       ? undefined
       : consumePendingProjectMemoryUpdate(this);
     const requestEntries = memoryUpdate ? [...providerEntries, memoryUpdate] : providerEntries;
-    // 修复原因：provider-visible user ordering projection 会改变最终 latest user 落点，
-    // cache-control 必须在 projection 后统一设置，避免 raw synthetic entry 抢占缓存锚点。
-    const providerProjection = buildRuntimeProviderRequestMessages(this, {
+    const prepared = prepareRuntimeProviderRequest(this, {
+      model: state.model,
+      tools,
+      registry: this.getToolRegistry(),
       entries: requestEntries,
       applyCacheControl: true,
-      model: state.model,
     });
-    const { messages } = providerProjection;
-    const recordableEntries = filterOutputTokenContinuationEntries(requestEntries);
+    this.logger?.debug("ToolSearch request exposure", {
+      event: "tool.search.exposure",
+      enabled: prepared.toolSearch.enabled,
+      mode: prepared.toolSearch.mode,
+      reason: prepared.reason,
+      catalogSize: prepared.toolSearch.catalog.length,
+      schemaCount: prepared.request.tools.length,
+    });
+    // 修复原因：provider-visible user ordering projection 会改变最终 latest user 落点，
+    // cache-control 必须在 projection 后统一设置，避免 raw synthetic entry 抢占缓存锚点。
+    const providerProjection = prepared.projection;
+    const { messages } = prepared.request;
+    const recordableEntries = filterOutputTokenContinuationEntries(prepared.entries);
     const recordableProjection =
-      recordableEntries === requestEntries
+      recordableEntries === prepared.entries
         ? providerProjection
         : buildRuntimeProviderRequestMessages(this, {
             entries: recordableEntries,
+            loadedToolCallIds: prepared.loadedToolCallIds,
             applyCacheControl: true,
             model: state.model,
           });
@@ -224,7 +266,8 @@ export async function runRegularTurnLoop(
       sourceEntries: providerProjection.sourceEntries,
       requestEntries,
       recordedMessages: recordableProjection.messages,
-      tools,
+      tools: prepared.request.tools,
+      toolSearch: prepared.toolSearch,
     });
 
     if (result === "break") {

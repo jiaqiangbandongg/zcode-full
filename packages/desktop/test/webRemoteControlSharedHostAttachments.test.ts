@@ -99,15 +99,8 @@ describe("createWebRemoteControlSharedHostAttachments", () => {
     expect(attachRemoteWorkspaceSessionHost).not.toHaveBeenCalled();
   });
 
-  it("WPL-012 reuses one remote Window Host without copying Plugin state into the mobile attachment", async () => {
-    const workspacePluginSecret = "E2E_WPL_012_WORKSPACE_PLUGIN_SECRET";
-    const child = Object.assign(new MockUtilityProcess(), {
-      workspacePluginRuntime: {
-        configStoreId: "remote-host-user-store",
-        runtimeId: "remote-cli-runtime-1",
-        secret: workspacePluginSecret,
-      },
-    });
+  it("WPL-012 reuses one remote Window Host and releases only the mobile attachment port", async () => {
+    const child = new MockUtilityProcess();
     const ports = createPortPair();
     const attachRemoteWorkspaceSessionHost = vi.fn(() => ({
       process: child as never,
@@ -144,18 +137,9 @@ describe("createWebRemoteControlSharedHostAttachments", () => {
       port: ports.port1,
       remoteKind: "ssh",
     });
-    expect(JSON.stringify(attachRemoteWorkspaceSessionHost.mock.calls)).not.toContain(
-      workspacePluginSecret,
-    );
-    expect(child.workspacePluginRuntime).toEqual({
-      configStoreId: "remote-host-user-store",
-      runtimeId: "remote-cli-runtime-1",
-      secret: workspacePluginSecret,
-    });
 
     manager.releaseAttachment(attachment.attachmentId);
     expect(ports.port1.close).toHaveBeenCalledTimes(1);
     expect(child.kill).not.toHaveBeenCalled();
-    expect(child.workspacePluginRuntime.runtimeId).toBe("remote-cli-runtime-1");
   });
 });

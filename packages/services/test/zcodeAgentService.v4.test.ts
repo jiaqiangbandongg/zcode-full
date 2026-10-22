@@ -1,3 +1,6 @@
+import { seedTaskIndex } from "./helpers/taskIndexFixture.js";
+import { fixture, port } from "#src/project-storage/test-fixture.js";
+import type { ZCodeSessionInfo } from "@zcode/shared";
 import { channelReplyHostRequestSchema, type ChannelReplyHostRequest } from "@zcode/shared";
 // v4 conversation 通道 host 转发面测试（M3 竖切，docs/v4-refactor/01-topology §host 通道层）。
 // 验证 host 只做透传：subscribe/unsubscribe/command 转发给 CLI v4 方法，
@@ -42,6 +45,11 @@ process.stdin.on("data", (chunk) => {
     let msg;
     try { msg = JSON.parse(line); } catch { continue; }
     if (logPath && msg.method) fs.appendFileSync(logPath, line + "\\n");
+    if (msg.method === "session/list" && msg.id !== undefined) {
+      const sessions = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+      send({ id: msg.id, result: { sessions: sessions.filter((session) => msg.params.sessionIds.includes(session.sessionId)) } });
+      continue;
+    }
     if (msg.method === "session/debug" && msg.id !== undefined) {
       send({ id: msg.id, result: { sessionId: msg.params.sessionId, rounds: [], networkEntries: [], cache: null } });
       continue;
@@ -49,6 +57,11 @@ process.stdin.on("data", (chunk) => {
     if (msg.method === "v4/conversation/backgroundBashOutput" && msg.id !== undefined) {
       if (msg.params.workId === "unsupported") send({ id: msg.id, error: { code: -32601, message: "Method not found" } });
       else send({ id: msg.id, result: { kind: "unavailable", workId: msg.params.workId } });
+      continue;
+    }
+    if (msg.method === "v4/conversation/offPeakControl" && msg.id !== undefined) {
+      send({ id: msg.id, result: { accepted: true } });
+      send({ method: "v4/offPeak/lifecycle", params: { sessionId: msg.params.sessionId, executionId: msg.params.executionId, offPeakTaskId: "idle-task", type: "ticket_released", ticketId: "old" } });
       continue;
     }
     if (msg.method === "v4/conversation/subscribe" && msg.params.topic.endsWith("/channel-reply-source")) {
@@ -328,6 +341,51 @@ function readRequests(logPath: string): Array<{ method: string; params: Record<s
 }
 
 describe("zcodeAgentService v4 conversation channel", () => {
+  it("闲时换票只更新已有 runtime，生命周期通知按工作区投递", async () => {
+    const { service, workspacePath, commandResolver, logPath } = setupService();
+    const events: unknown[] = [];
+    const foreign: unknown[] = [];
+    const listener = service.onDynamicOffPeakLifecycle({ workspacePath })((event) =>
+      events.push(event),
+    );
+    const other = service.onDynamicOffPeakLifecycle({ workspacePath: "/other-workspace" })(
+      (event) => foreign.push(event),
+    );
+    const control = {
+      sessionId: "session",
+      executionId: "execution",
+      action: "replace_ticket" as const,
+      renewalId: 1,
+      ticketId: "new",
+      requestAuth: { headers: { ticket: "new" } },
+    };
+    try {
+      await expect(
+        service.controlOffPeakExecutionV4({ workspacePath, control }),
+      ).rejects.toMatchObject({ code: "ZCODE_AGENT_RUNTIME_UNAVAILABLE" });
+      expect(commandResolver).not.toHaveBeenCalled();
+      await service.subscribeConversationV4({ workspacePath, sessionId: "session" });
+      expect(await service.controlOffPeakExecutionV4({ workspacePath, control })).toEqual({
+        accepted: true,
+      });
+      await expect.poll(() => events.length).toBe(1);
+      expect(events[0]).toMatchObject({
+        executionId: "execution",
+        type: "ticket_released",
+        ticketId: "old",
+      });
+      expect(foreign).toEqual([]);
+      expect(
+        readRequests(logPath)
+          .filter((entry) => entry.method === "v4/conversation/offPeakControl")
+          .map((entry) => entry.params),
+      ).toEqual([control]);
+    } finally {
+      listener.dispose();
+      other.dispose();
+      await service.disposeAllAndWait();
+    }
+  });
   const createdDirs: string[] = [];
 
   afterEach(() => {
@@ -356,6 +414,13 @@ describe("zcodeAgentService v4 conversation channel", () => {
     options: {
       providerReady?: boolean;
       authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
+      prepareSessionCreation?: NonNullable<
+        Parameters<typeof createZCodeAgentService>[0]
+      >["prepareSessionCreation"];
+      resolveSessionDirectories?: NonNullable<
+        Parameters<typeof createZCodeAgentService>[0]
+      >["resolveSessionDirectories"];
+      storedSessions?: (workspacePath: string) => ZCodeSessionInfo[];
       channelReplyExecutor?: NonNullable<
         Parameters<typeof createZCodeAgentService>[0]
       >["channelReplyExecutor"];
@@ -369,13 +434,19 @@ describe("zcodeAgentService v4 conversation channel", () => {
     setDataBaseDir(workspacePath);
     const scriptPath = join(workspacePath, "v4-fake-agent.cjs");
     const logPath = join(workspacePath, "protocol.log");
+    const sessionsPath = join(workspacePath, "sessions.json");
     writeFileSync(scriptPath, V4_FAKE_AGENT);
+    writeFileSync(sessionsPath, JSON.stringify(options.storedSessions?.(workspacePath) ?? []));
     const commandResolver = vi.fn(() => ({
       command: process.execPath,
-      args: [scriptPath, logPath],
+      args: [scriptPath, logPath, sessionsPath],
     }));
     const service = createZCodeAgentService({
       commandResolver,
+      prepareSessionCreation: options.prepareSessionCreation,
+      resolveSessionDirectories: options.resolveSessionDirectories,
+      repoSnapshotCaptureIntentScheduler: options.repoSnapshotCaptureIntentScheduler,
+      repoSnapshotSidecar: options.repoSnapshotSidecar,
       topicResourceExecutor: options.topicResourceExecutor,
       channelReplyExecutor: options.channelReplyExecutor,
       authorizeLocalMediaPreviewPath: options.authorizeLocalMediaPreviewPath,
@@ -406,6 +477,240 @@ describe("zcodeAgentService v4 conversation channel", () => {
     });
     return { service, workspacePath, logPath, commandResolver };
   }
+
+  const childHostId = "remote:server:subagent-view";
+  const childWorkspace = (workspacePath: string) => ({
+    workspacePath,
+    workspaceIdentity: `${childHostId}:${workspacePath}`,
+    workspaceKey: `${childHostId}:${workspacePath}`,
+  });
+  describe.each([
+    "subagent_child",
+    "workflow_child",
+    "selection_side_chat",
+    "nested_workflow_child",
+  ] as const)("SAT30 %s", (childKind) => {
+    const storedSession = (
+      workspacePath: string,
+      sessionId: string,
+      parentSessionId?: string,
+    ): ZCodeSessionInfo => ({
+      sessionId,
+      workspace: childWorkspace(workspacePath),
+      ...(parentSessionId ? { parentSessionId } : {}),
+      sessionKind: parentSessionId ? childKind : "interactive",
+      title: sessionId,
+      mode: "build",
+      status: "completed",
+      createdAt: 1,
+      updatedAt: 2,
+    });
+
+    for (const clientMode of ["desktop-continuous", "web-remote-replayable"] as const) {
+      it.each(["running", "completed"] as const)(
+        `SAT30: remote %s child resolves its persisted parent project on ${clientMode}`,
+        async (status) => {
+          const state = await fixture();
+          await port.migrate(state.db, { ...state.context, hostId: childHostId });
+          const repo = port.repository(state.db, childHostId);
+          const resolveDirectories = vi.fn(
+            async (target: {
+              workspacePath: string;
+              workspaceIdentity?: string;
+              sessionId: string;
+            }) =>
+              repo.resolveSessionDirectories({ ...target, taskId: target.sessionId })
+                .additionalDirectories,
+          );
+          const env = setupService({
+            resolveSessionDirectories: resolveDirectories,
+            storedSessions: (path) => [
+              storedSession(path, "parent"),
+              { ...storedSession(path, "child", "parent"), status },
+            ],
+          });
+          const project = repo.saveProject({ roots: [env.workspacePath] });
+          repo.reserveCreatedTask({
+            task: { ...childWorkspace(env.workspacePath), taskId: "parent" },
+            projectId: project.id,
+          });
+          if (status === "running") {
+            const legacyIndex = new TaskIndexRepo();
+            try {
+              await seedTaskIndex(legacyIndex, {
+                meta: {
+                  ...childWorkspace(env.workspacePath),
+                  taskId: "child",
+                  traceId: "trace-child",
+                  title: "Legacy child index",
+                  createdAt: 1,
+                  updatedAt: 2,
+                  mode: "build",
+                  provider: "glm",
+                },
+              });
+            } finally {
+              legacyIndex.close();
+            }
+          }
+          const scope = createZCodeAgentConnectionScope(env.service, {
+            connectionId: "child-view",
+            clientMode,
+          });
+          try {
+            await scope.service.helloConversationV4();
+            await scope.service.initializeConversationV4({
+              kind: "clientHello",
+              protocolVersion: 3,
+              clientId: "child-view",
+              appVersion: "test",
+            });
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+              const result = await scope.service.subscribeConversationV4({
+                ...childWorkspace(env.workspacePath),
+                sessionId: "child",
+              });
+              await scope.service.unsubscribeConversationV4({
+                ...childWorkspace(env.workspacePath),
+                subscriptionId: result.ack.subscriptionId,
+              });
+              if (attempt === 0)
+                await env.service.disposeWorkspace(childWorkspace(env.workspacePath));
+            }
+            expect(resolveDirectories).toHaveBeenCalledTimes(2);
+            expect(resolveDirectories).toHaveBeenCalledWith(
+              expect.objectContaining({ sessionId: "parent" }),
+            );
+            expect(
+              state.db.prepare("SELECT count(*) AS count FROM tasks WHERE task_id='child'").get()
+                ?.count,
+            ).toBe(0);
+            const subscriptions = readRequests(env.logPath).filter(
+              (entry) => entry.method === "v4/conversation/subscribe",
+            );
+            expect(subscriptions).toHaveLength(2);
+            expect(subscriptions[0]?.params).toMatchObject({
+              topic: "conversation/child",
+              clientMode,
+              additionalDirectories: [],
+            });
+          } finally {
+            await env.service.disposeAllAndWait();
+          }
+        },
+      );
+    }
+
+    it.each([
+      "missing-parent",
+      "missing-parent-id",
+      "foreign-child",
+      "foreign-parent",
+      "foreign-host",
+      "foreign-cwd",
+      "cycle",
+      "unclassified-parent",
+      "ordinary",
+    ])(
+      "SAT30: rejects remote subscription with %s without bypassing project admission",
+      async (failure) => {
+        const resolveDirectories = vi.fn(async () => {
+          throw new Error("project.remote-project-required");
+        });
+        const env = setupService({
+          resolveSessionDirectories: resolveDirectories,
+          storedSessions: (path) => {
+            const parent = storedSession(path, "parent");
+            const child = storedSession(path, "child", "parent");
+            if (failure === "missing-parent") return [child];
+            if (failure === "missing-parent-id") delete child.parentSessionId;
+            if (failure === "foreign-child") child.workspace = childWorkspace(`${path}-other`);
+            if (failure === "foreign-parent") parent.workspace = childWorkspace(`${path}-other`);
+            if (failure === "foreign-host") {
+              parent.workspace.workspaceIdentity = `remote:server:other:${path}`;
+              parent.workspace.workspaceKey = parent.workspace.workspaceIdentity;
+            }
+            if (failure === "foreign-cwd") parent.workspace.workspacePath = `${path}-other`;
+            if (failure === "cycle") {
+              parent.sessionKind = childKind;
+              parent.parentSessionId = "child";
+            }
+            if (failure === "ordinary") {
+              child.sessionKind = "interactive";
+              delete child.parentSessionId;
+            }
+            return [parent, child];
+          },
+        });
+        try {
+          await expect(
+            env.service.subscribeConversationV4({
+              ...childWorkspace(env.workspacePath),
+              sessionId: "child",
+            }),
+          ).rejects.toThrow();
+          expect(
+            readRequests(env.logPath).some((entry) => entry.method === "v4/conversation/subscribe"),
+          ).toBe(false);
+          if (failure === "ordinary")
+            expect(resolveDirectories).toHaveBeenCalledWith(
+              expect.objectContaining({ sessionId: "child" }),
+            );
+          else if (failure === "unclassified-parent")
+            expect(resolveDirectories).toHaveBeenCalledWith(
+              expect.objectContaining({ sessionId: "parent" }),
+            );
+          else expect(resolveDirectories).not.toHaveBeenCalled();
+        } finally {
+          await env.service.disposeAllAndWait();
+        }
+      },
+    );
+  });
+
+  it.each(["interactive", "fork", "workflow_parent"] as const)(
+    "SAT30: mixed auxiliary lineage stops at independent %s project",
+    async (rootKind) => {
+      const resolveDirectories = vi.fn(async () => []);
+      const env = setupService({
+        resolveSessionDirectories: resolveDirectories,
+        storedSessions: (path) =>
+          [
+            { sessionId: "owner", parentSessionId: "different-project", sessionKind: rootKind },
+            {
+              sessionId: "side",
+              parentSessionId: "owner",
+              sessionKind: "selection_side_chat" as const,
+            },
+            { sessionId: "actor", parentSessionId: "side", sessionKind: "workflow_child" as const },
+          ].map((session) => ({
+            ...session,
+            workspace: childWorkspace(path),
+            title: session.sessionId,
+            mode: "build" as const,
+            status: "completed" as const,
+            createdAt: 1,
+            updatedAt: 2,
+          })),
+      });
+      try {
+        await env.service.subscribeConversationV4({
+          ...childWorkspace(env.workspacePath),
+          sessionId: "actor",
+        });
+        expect(resolveDirectories).toHaveBeenCalledWith(
+          expect.objectContaining({ sessionId: "owner" }),
+        );
+        expect(
+          readRequests(env.logPath)
+            .filter((entry) => entry.method === "session/list")
+            .flatMap((entry) => entry.params?.sessionIds ?? []),
+        ).not.toContain("different-project");
+      } finally {
+        await env.service.disposeAllAndWait();
+      }
+    },
+  );
 
   it.each([false, true])(
     "projects only channel reply scope from a live V4 connection (remote=%s)",
@@ -766,7 +1071,7 @@ describe("zcodeAgentService v4 conversation channel", () => {
     const { service, workspacePath, logPath } = setupService();
     const repo = new TaskIndexRepo();
     try {
-      await repo.syncTaskMeta({
+      await seedTaskIndex(repo, {
         meta: {
           taskId: "persisted-thought-session",
           traceId: "trace-persisted-thought-session",
@@ -858,6 +1163,77 @@ describe("zcodeAgentService v4 conversation channel", () => {
       expect(String(subscribeRequest?.params.connectionId)).toMatch(/^host-/);
 
       disposable.dispose();
+    } finally {
+      await service.disposeAllAndWait();
+    }
+  });
+
+  it("reserves explicit NULL for legacy V4 callers that omit projectId", async () => {
+    const prepareSessionCreation = vi.fn(async () => [] as string[]);
+    const { service, workspacePath } = setupService({ prepareSessionCreation });
+    try {
+      await service.sendConversationCommandV4({
+        workspacePath,
+        envelope: {
+          commandId: "legacy-create",
+          clientId: "test",
+          sessionId: null,
+          type: "createSession",
+          payload: { workspaceId: workspacePath },
+          issuedAt: 1,
+        },
+      });
+      expect(prepareSessionCreation).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, sessionId: expect.any(String) }),
+      );
+    } finally {
+      await service.disposeAllAndWait();
+    }
+  });
+
+  it("reserves project ownership before create wire and passes only directories to CLI", async () => {
+    const prepareSessionCreation = vi.fn(
+      async (_target: { workspacePath: string; sessionId: string; projectId: string | null }) => [
+        "/extra",
+      ],
+    );
+    const { service, workspacePath, logPath } = setupService({ prepareSessionCreation });
+    const envelope = {
+      commandId: "project-create",
+      clientId: "test",
+      sessionId: null,
+      type: "createSession" as const,
+      payload: { workspaceId: workspacePath },
+      issuedAt: 1,
+    };
+    try {
+      await service.sendConversationCommandV4({ workspacePath, projectId: "project-a", envelope });
+      await service.sendConversationCommandV4({ workspacePath, projectId: "project-a", envelope });
+      const creates = readRequests(logPath).filter((entry) => entry.method === "v4/command");
+      expect(prepareSessionCreation).toHaveBeenCalledTimes(2);
+      const target = prepareSessionCreation.mock.calls[0]![0];
+      expect(target).toMatchObject({
+        workspacePath,
+        projectId: "project-a",
+        sessionId: expect.any(String),
+      });
+      expect(creates[0]?.params.payload).toMatchObject({
+        sessionId: target.sessionId,
+        additionalDirectories: ["/extra"],
+      });
+      expect(creates[1]?.params.payload.sessionId).toBe(target.sessionId);
+      expect(creates[0]?.params.payload).not.toHaveProperty("projectId");
+      prepareSessionCreation.mockRejectedValueOnce(new Error("database unavailable"));
+      await expect(
+        service.sendConversationCommandV4({
+          workspacePath,
+          projectId: null,
+          envelope: { ...envelope, commandId: "failed-create" },
+        }),
+      ).rejects.toThrow("database unavailable");
+      expect(readRequests(logPath).filter((entry) => entry.method === "v4/command")).toHaveLength(
+        2,
+      );
     } finally {
       await service.disposeAllAndWait();
     }
@@ -958,7 +1334,7 @@ describe("zcodeAgentService v4 conversation channel", () => {
     const workspaceIdentity = `remote:ssh:example.test:22:coder:${workspacePath}`;
     const foreignWorkspaceIdentity = `remote:ssh:other.example.test:22:coder:${workspacePath}`;
     try {
-      await repo.syncTaskMeta({
+      await seedTaskIndex(repo, {
         meta: {
           taskId: "legacy-current-ssh",
           traceId: "trace-legacy-current-ssh",
@@ -971,7 +1347,7 @@ describe("zcodeAgentService v4 conversation channel", () => {
           provider: "glm",
         },
       });
-      await repo.syncTaskMeta({
+      await seedTaskIndex(repo, {
         meta: {
           taskId: "legacy-foreign-ssh",
           traceId: "trace-legacy-foreign-ssh",
@@ -1306,7 +1682,7 @@ describe("zcodeAgentService v4 conversation channel", () => {
     const { service, workspacePath, logPath } = setupService();
     const repo = new TaskIndexRepo();
     try {
-      await repo.syncTaskMeta({
+      await seedTaskIndex(repo, {
         meta: {
           taskId: "cron-session",
           traceId: "trace-cron-session",

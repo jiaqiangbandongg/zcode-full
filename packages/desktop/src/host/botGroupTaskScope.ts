@@ -5,6 +5,10 @@ export function bindBotGroupTaskScope<T extends object>(
   params: T,
   scope: WindowHostAttachmentScope,
 ): T {
+  // Source settings 没有 workspace/task 权限，不能按 remote 分支读取不存在的路由字段。
+  if (scope.kind === "source-settings") {
+    throw new Error("Source settings attachment does not provide bot task routing");
+  }
   return scope.kind === "local"
     ? params
     : {

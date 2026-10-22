@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   isTasksStorageMigrated,
   isTasksStoragePrepared,
@@ -66,6 +67,9 @@ interface AutomationRow {
   workspace_key: string;
   workspace_path: string;
   workspace_identity: string | null;
+  project_id?: string | null;
+  host_id?: string | null;
+  additional_directories?: string | null;
   target_task_id: string | null;
   bot_delivery_target: string | null;
   location_kind: string;
@@ -125,6 +129,16 @@ function rowToAutomation(row: AutomationRow): ZCodeAutomation {
     workspaceKey: row.workspace_key,
     workspacePath: row.workspace_path,
     workspaceIdentity: row.workspace_identity ?? undefined,
+    ...(row.project_id == null ? {} : { projectId: row.project_id }),
+    ...(row.host_id == null ? {} : { hostId: row.host_id }),
+    ...(row.additional_directories == null
+      ? {}
+      : {
+          additionalDirectories: z
+            .array(z.string().min(1))
+            .max(256)
+            .parse(JSON.parse(row.additional_directories)),
+        }),
     targetTaskId: row.target_task_id ?? undefined,
     locationKind: row.location_kind === "remote" ? "remote" : "local",
     recurring: row.recurring === 1,
@@ -225,6 +239,7 @@ export function computeRetryAt(now: number, attempts: number): number {
  * 用 cron 库算好后传入，仓库不感知 cron 语义。
  */
 export class AutomationRepo {
+  migrationBackupSkipped = false;
   private db: DatabaseSyncInstance | null = null;
   private dbPath: string | null = null;
   private initializePromise: Promise<void> | null = null;
@@ -283,9 +298,9 @@ export class AutomationRepo {
       this.db.exec("PRAGMA journal_mode = WAL");
       this.db.exec("PRAGMA synchronous = NORMAL");
     }
-    // Worker 已完成该路径的原始准备，业务连接不再重复全表修复。
     if (isTasksStoragePrepared(path, this.db)) return;
-    if (!isTasksStorageMigrated(path, this.db)) runTasksDatabaseMigrations(this.db);
+    if (!isTasksStorageMigrated(path, this.db))
+      this.migrationBackupSkipped = (await runTasksDatabaseMigrations(this.db, path)).backupSkipped;
   }
 
   private getDatabase(): DatabaseSyncInstance {
@@ -336,7 +351,7 @@ export class AutomationRepo {
       db.prepare(
         `INSERT INTO automations (
           automation_id, title, cron_expr, prompt, model, provider, model_selection,
-          workspace_key, workspace_path, workspace_identity, target_task_id, bot_delivery_target, location_kind,
+          workspace_key, workspace_path, workspace_identity, project_id, host_id, additional_directories, target_task_id, bot_delivery_target, location_kind,
           recurring, max_runs, end_at, schedule_rule, schedule_edited_by_user,
           run_count, enabled, lifecycle_status,
           next_run_at, last_run_at, running, claimed_at,
@@ -345,7 +360,7 @@ export class AutomationRepo {
           created_at, updated_at
         ) VALUES (
           @automation_id, @title, @cron_expr, @prompt, @model, @provider, @model_selection,
-          @workspace_key, @workspace_path, @workspace_identity, @target_task_id, @bot_delivery_target, 'local',
+          @workspace_key, @workspace_path, @workspace_identity, @project_id, @host_id, @additional_directories, @target_task_id, @bot_delivery_target, 'local',
           @recurring, @max_runs, @end_at, @schedule_rule, 0,
           0, @enabled, @lifecycle_status,
           @next_run_at, NULL, 0, NULL,
@@ -367,6 +382,14 @@ export class AutomationRepo {
         workspace_key: workspaceKey,
         workspace_path: params.workspacePath,
         workspace_identity: params.workspaceIdentity ?? null,
+        project_id: params.projectId ?? null,
+        host_id: params.hostId ?? null,
+        additional_directories:
+          params.additionalDirectories === undefined
+            ? null
+            : JSON.stringify(
+                z.array(z.string().min(1)).max(256).parse(params.additionalDirectories),
+              ),
         target_task_id: params.targetTaskId ?? null,
         bot_delivery_target: params.botDeliveryTarget
           ? JSON.stringify(params.botDeliveryTarget)
@@ -802,6 +825,9 @@ export class AutomationRepo {
             a.workspace_key AS a_workspace_key,
             a.workspace_path AS a_workspace_path,
             a.workspace_identity AS a_workspace_identity,
+            a.project_id AS a_project_id,
+            a.host_id AS a_host_id,
+            a.additional_directories AS a_additional_directories,
             a.target_task_id AS a_target_task_id,
             a.location_kind AS a_location_kind,
             a.recurring AS a_recurring,
@@ -879,6 +905,9 @@ export class AutomationRepo {
             workspace_key: row["a_workspace_key"] as string,
             workspace_path: row["a_workspace_path"] as string,
             workspace_identity: (row["a_workspace_identity"] as string | null) ?? null,
+            project_id: row["a_project_id"] as string | null,
+            host_id: row["a_host_id"] as string | null,
+            additional_directories: row["a_additional_directories"] as string | null,
             target_task_id: (row["a_target_task_id"] as string | null) ?? null,
             location_kind: row["a_location_kind"] as string,
             recurring: row["a_recurring"] as number,

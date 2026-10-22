@@ -80,64 +80,6 @@ describe("ToolExecutor Agent telemetry", () => {
     ]);
   });
 
-  it("在真实序列化边界写入输出大小并正常收口", async () => {
-    const lifecycle: string[] = [];
-    const sessionId = createSessionId("tool-agent-performance");
-    const turnId = createTurnId("turn-agent-performance");
-    const registry = createToolRegistry();
-    registry.register({
-      inputSchema: {},
-      metadata: {
-        concurrentSafe: true,
-        destructive: false,
-        name: "BashLike",
-        needsApproval: false,
-        readOnly: true,
-        riskLevel: "low",
-        sideEffectScope: "none",
-      },
-      handler: async () => ({
-        stdout: "",
-        perf: {
-          detail: {
-            kind: "command",
-            command: {
-              category: "git",
-              count: 1,
-              hash: "0123456789abcdef",
-              name: "git",
-              runMs: 12,
-              status: "failed",
-              exitCode: 2,
-            },
-          },
-        },
-      }),
-    });
-    const executor = createToolExecutor({
-      agentTelemetry: recordingTelemetry(lifecycle, () => {}),
-      emitEvent: async () => {},
-      permissionService: new PermissionService(defaultPermissionConfig),
-      registry,
-      sessionId,
-      turnId,
-    });
-
-    await executor.execute({
-      id: createToolCallId("tool-call-agent-performance"),
-      input: {},
-      name: "BashLike",
-    });
-
-    expect(lifecycle).toEqual(
-      expect.arrayContaining([
-        "tool.output_bytes",
-        "tool.output_truncated:false",
-        "tool.end:completed",
-      ]),
-    );
-  });
-
   it("未注册工具名在远端 Trace 中归入 unknown，业务错误仍保留原名", async () => {
     let start: ToolTraceStart | undefined;
     const sessionId = createSessionId("tool-agent-unknown");

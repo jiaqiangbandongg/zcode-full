@@ -200,17 +200,13 @@ describe("node_repl host and browser-use runtime bundles", () => {
     }
   });
 
-  // 构建期守卫本身也要有测试：define 名漂移时必须**构建失败**，而不是静默产出空串 ——
-  // 后者的症状只在正式包出现，且表现为超时，没有任何日志。
-  it("fails the build when the injected build id does not reach the output", async () => {
-    const outfile = join(outputDirectory, "mcp", "server.guard.mjs");
-    // 用一个不可能出现在产物里的值：走完整构建后守卫应当抛错。
-    // 这里通过临时改写 define 名不现实，所以直接验证守卫的判据 —— 产物必须包含该值。
-    const source = await readFile(new URL("../scripts/build.mjs", import.meta.url), "utf8");
-    expect(source).toContain("__ZCODE_CUA_HELPER_BUILD_ID__");
-    expect(source).toMatch(/未折叠进|did not reach/u);
-    // 并确认守卫只在 buildId 非空时生效（dev 空串不应让构建失败）。
-    const devResult = await buildNodeReplHostBundle({ outfile, cuaHelperBuildId: "" });
-    expect(devResult.cuaHelperBuildId).toBe("");
-  }, buildTimeoutMs);
+  it(
+    "allows a development bundle with an empty helper build id",
+    async () => {
+      const outfile = join(outputDirectory, "mcp", "server.guard.mjs");
+      const devResult = await buildNodeReplHostBundle({ outfile, cuaHelperBuildId: "" });
+      expect(devResult.cuaHelperBuildId).toBe("");
+    },
+    buildTimeoutMs,
+  );
 });

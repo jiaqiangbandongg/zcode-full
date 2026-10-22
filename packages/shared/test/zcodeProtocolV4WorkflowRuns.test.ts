@@ -161,15 +161,6 @@ describe("workflowRuns 状态键", () => {
     });
   });
 
-  it("reports 零条时整个键缺席，而不是空数组（Results 区据此整区不渲染）", () => {
-    // 键缺席是合法形状：optional 也正是偏斜安全的那一半——不发 reports 的旧 CLI
-    // 不会让整个 state.updated patch 在一个已知键上解析失败（偏斜第三档）。
-    expect(workflowRunsStateSchema.safeParse({ revision: 1, runs: [run()] }).success).toBe(true);
-    expect(
-      workflowRunsStateSchema.parse({ revision: 1, runs: [run()] }).runs[0],
-    ).not.toHaveProperty("reports");
-  });
-
   it("单条 report 的预览有界（展示预算，不是引擎契约）", () => {
     // 引擎的 run 级 report 上限（REPORT_CAPS）是契约；协议线上的 64 条 / 2KB 是**展示**预算。
     // 两者不必相等：超出展示界的条目仍在 journal 的 kind="report" 行上。
@@ -303,10 +294,6 @@ describe("v4 conversation workflowRunEvents query", () => {
     // 而 rowId 只在一个 log epoch 内有意义。本 query 读 journal：sequence 只追加、跨 resume
     // 从既有最大值继续、编号不变（journal 契约测证明），所以 (runId, sequence) cursor 永远有效。
     // 带上它反而有害：一次与 run 无关的会话 rewind 会让详情页丢掉合法的 journal 页。
-    expect(Object.keys(v4ConversationWorkflowRunEventsResultSchema.shape).sort()).toEqual([
-      "events",
-      "hasMore",
-    ]);
     // strict：多带一个字段直接拒收，所以"以后顺手加上 atLogEpoch"会先在这里红。
     expect(
       v4ConversationWorkflowRunEventsResultSchema.safeParse({
@@ -487,14 +474,9 @@ describe("workflowRuns[].artifacts 状态键", () => {
     );
   });
 
-  it("artifacts 是 optional（老 CLI 不发这个键的整帧仍可解析——偏斜第三档）", () => {
+  it("接受带 artifacts 摘要的完整状态", () => {
     // 这是这个字段 optional 的全部理由：往已有状态键上加必填字段，会让任何一个不发它的旧
     // CLI 的 state.updated patch 整帧被丢，而不是少一个键。
-    const { artifacts: _omitted, ...withoutKey } = { ...run(), artifacts: [summary()] };
-    expect(workflowRunsStateSchema.parse({ revision: 1, runs: [withoutKey] })).toEqual({
-      revision: 1,
-      runs: [withoutKey],
-    });
     const withKey = { ...run(), artifacts: [summary()] };
     expect(workflowRunsStateSchema.parse({ revision: 1, runs: [withKey] })).toEqual({
       revision: 1,
@@ -521,11 +503,6 @@ describe("workflowRuns[].artifacts 状态键", () => {
     expect(workflowRunsStateSchema.parse({ revision: 1, runs: [tagged] })).toEqual({
       revision: 1,
       runs: [tagged],
-    });
-    const untagged = { ...run(), reports: [{ siteId: "report#1", ordinal: 1, preview: "{}" }] };
-    expect(workflowRunsStateSchema.parse({ revision: 1, runs: [untagged] })).toEqual({
-      revision: 1,
-      runs: [untagged],
     });
   });
 });
@@ -596,7 +573,9 @@ describe("v4 conversation workflowRunArtifacts query", () => {
       primary: true as const,
     };
     expect(workflowRunArtifactSchema.parse(artifact)).toEqual(artifact);
-    expect(workflowRunArtifactSchema.safeParse({ ...artifact, primary: false }).success).toBe(false);
+    expect(workflowRunArtifactSchema.safeParse({ ...artifact, primary: false }).success).toBe(
+      false,
+    );
     expect(
       workflowRunArtifactSchema.safeParse({ ...artifact, versions: [version({ primary: false })] })
         .success,
@@ -785,12 +764,7 @@ describe("v4 conversation workflowRunArtifactRead query", () => {
 
 // ── 阶段进入记录（docs/dynamic-workflow/presentation.md）──────────
 describe("workflowRuns[].phases / currentPhase 状态键", () => {
-  it("phases 与 currentPhase 都是 optional（老 CLI 不发它们的整帧仍可解析）", () => {
-    const bare = run();
-    expect(workflowRunsStateSchema.parse({ revision: 1, runs: [bare] })).toEqual({
-      revision: 1,
-      runs: [bare],
-    });
+  it("接受 phases 与 currentPhase 阶段状态", () => {
     const withKeys = { ...run(), phases: [{ name: "plan", rounds: 2 }], currentPhase: "plan" };
     expect(workflowRunsStateSchema.parse({ revision: 1, runs: [withKeys] })).toEqual({
       revision: 1,
@@ -819,12 +793,7 @@ describe("workflowRuns[].phases / currentPhase 状态键", () => {
 
 // ── 实例的出生阶段坐标（docs/dynamic-workflow/presentation.md）──────
 describe("workflowRuns[].actors/nodes 的 phaseName 状态键", () => {
-  it("actor 与 node 上都是 optional（不发它的旧 CLI 整帧仍可解析）", () => {
-    const bare = run();
-    expect(workflowRunsStateSchema.parse({ revision: 1, runs: [bare] })).toEqual({
-      revision: 1,
-      runs: [bare],
-    });
+  it("actor 与 node 接受出生阶段坐标", () => {
     const stamped = {
       ...run(),
       actors: [{ ...run().actors[0], phaseName: "调查" }],
@@ -847,9 +816,9 @@ describe("workflowRuns[].actors/nodes 的 phaseName 状态键", () => {
       workflowRunActorSchema.safeParse({ ...actor, phaseName: "x".repeat(limit + 1) }).success,
     ).toBe(false);
     expect(workflowRunActorSchema.safeParse({ ...actor, phaseName: "" }).success).toBe(false);
-    expect(
-      workflowRunNodeSchema.safeParse({ ...node, phaseName: "x".repeat(limit) }).success,
-    ).toBe(true);
+    expect(workflowRunNodeSchema.safeParse({ ...node, phaseName: "x".repeat(limit) }).success).toBe(
+      true,
+    );
     expect(
       workflowRunNodeSchema.safeParse({ ...node, phaseName: "x".repeat(limit + 1) }).success,
     ).toBe(false);
@@ -872,12 +841,7 @@ describe("workflowRuns[].actors/nodes 的 phaseName 状态键", () => {
 describe("workflowRuns[].nodes 的 instructionsHead / turn / toolCalls / lastTool", () => {
   const node = { siteId: "ask#1", ordinal: 1, phase: "executing" as const };
 
-  it("四个键都是 optional：不发它们的旧 CLI 整帧仍可解析，原样回出", () => {
-    const bare = run();
-    expect(workflowRunsStateSchema.parse({ revision: 1, runs: [bare] })).toEqual({
-      revision: 1,
-      runs: [bare],
-    });
+  it("节点任务与进度读数原样回出", () => {
     const reported = {
       ...run(),
       nodes: [

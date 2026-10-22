@@ -1,5 +1,7 @@
 # 新建 Task 的当前模型判定链路
 
+> 新建草稿、模型与权限默认值及未归类任务目录生命周期以 [统一设计](../ui/project-task-draft-lifecycle.md) 为准：按客户端、目标主机及项目 ID 隔离；首发接纳后消费未归类待发送目录。本文其他组织态与执行目录约束继续适用。
+
 更新日期：2026-07-16
 
 V4 中“新建 task”先表现为未绑定 session 的 draft pane。模型事实来自 renderer draft intent 与

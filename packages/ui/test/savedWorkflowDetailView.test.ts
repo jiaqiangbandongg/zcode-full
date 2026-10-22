@@ -7,6 +7,7 @@ import {
   TID_WORKFLOW_DETAIL,
   TID_WORKFLOW_DETAIL_DESCRIPTION,
   TID_WORKFLOW_DETAIL_MENU,
+  TID_WORKFLOW_DETAIL_PROJECT,
   TID_WORKFLOW_DETAIL_SCRIPT,
   TID_WORKFLOW_DETAIL_WHEN_TO_USE,
   TID_WORKFLOW_ACTION_MOVE,
@@ -14,11 +15,11 @@ import {
   TID_WORKFLOW_META_SAVE,
   TID_WORKFLOW_ARTIFACT_CHIP,
   TID_WORKFLOW_RUN_ROW,
-  testId,
   type ZCodeSavedWorkflowEntry,
   type ZCodeSavedWorkflowRun,
   type ZCodeWorkflowsGetResult,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 
 const toastMock = vi.fn();
@@ -250,13 +251,25 @@ describe("SavedWorkflowDetailView", () => {
     expect(screen.queryByText("查看实例")).toBeNull();
   });
 
-  it("面包屑带项目一级：[项目名, 工作流名]", async () => {
+  it("面包屑只有工作流名一级；项目归属写在标题旁的小标上", async () => {
     mount({ projectLabel: "Alpha" });
     await screen.findByTestId(TID_WORKFLOW_DETAIL_DESCRIPTION);
     const crumbs = Array.from(screen.getByTestId("breadcrumb").querySelectorAll("span")).map(
       (s) => s.textContent,
     );
-    expect(crumbs).toEqual(["Alpha", "release-check"]);
+    // 项目只是列表里的一组，不是一页：面包屑里放它就是一个点不动的假层级。
+    expect(crumbs).toEqual(["release-check"]);
+    const projectTag = screen.getByTestId(TID_WORKFLOW_DETAIL_PROJECT);
+    expect(projectTag.textContent).toBe("Alpha");
+    // 小标是纯文字，不是按钮也不是链接。
+    expect(projectTag.closest("button, a")).toBeNull();
+  });
+
+  it("文件读不到时标题旁仍写着项目归属", async () => {
+    detailResult.current = { ok: false, reason: "not_found" };
+    mount({ entry: undefined, projectLabel: "Alpha" });
+    await screen.findByText("这个工作流已不在项目里。");
+    expect(screen.getByTestId(TID_WORKFLOW_DETAIL_PROJECT).textContent).toBe("Alpha");
   });
 
   it("文件已不存在时给出提示而不是表单", async () => {

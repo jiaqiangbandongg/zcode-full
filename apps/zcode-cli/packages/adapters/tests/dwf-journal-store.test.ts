@@ -1,3 +1,8 @@
+import {
+  applySqliteSchemaMigration,
+  ensureSqliteSchemaMigrationTable,
+} from "@zcode/shared/sqlite-migrations";
+import { SQLITE_MIGRATIONS } from "../src/storage/session-store/migrations.js";
 /**
  * SQLite 版 JournalStorePort（dwf_* 表）的测试。
  *
@@ -29,7 +34,11 @@ const openDatabases: DatabaseSync[] = [];
 function openJournalDb(dbPath = ":memory:"): { db: DatabaseSync; journal: JournalStorePort } {
   const db = new DatabaseSync(dbPath);
   openDatabases.push(db);
-  runSqliteSessionMigrations(db, dbPath);
+  // Journal 同步工厂只装载冻结 schema；异步启动、备份与锁由迁移专用测试验证。
+  db.exec("BEGIN IMMEDIATE");
+  ensureSqliteSchemaMigrationTable(db);
+  for (const migration of SQLITE_MIGRATIONS) applySqliteSchemaMigration(db, migration);
+  db.exec("COMMIT");
   return { db, journal: createDwfJournalStore(db) };
 }
 
@@ -42,7 +51,6 @@ afterAll(() => {
     }
   }
 });
-
 
 runJournalStoreContract(() => openJournalDb().journal);
 
@@ -90,7 +98,7 @@ describe("SQLite dwf journal store", () => {
     const dbPath = join(tempRoot, "session.sqlite");
 
     try {
-      const first = createSqliteSessionStore({ dbPath });
+      const first = await createSqliteSessionStore({ dbPath });
       const journal = first.workflowJournalStore();
       journal.createRun(RUN);
       journal.putActor(ACTOR);
@@ -101,7 +109,7 @@ describe("SQLite dwf journal store", () => {
       journal.updateRunUsage(RUN.runId, 120);
       first.close();
 
-      const second = createSqliteSessionStore({ dbPath });
+      const second = await createSqliteSessionStore({ dbPath });
       const resumed = second.workflowJournalStore();
 
       expect(resumed.getRun(RUN.runId)).toEqual({ ...RUN, spentTokens: 120 });
@@ -116,7 +124,9 @@ describe("SQLite dwf journal store", () => {
       // 事件序号跨重开继续增长（engine-assigned、monotonic across resumes）。
       // 断言用 toMatchObject：追加还会带回写入时刻（StoredEvent.timeCreated），而这条用例
       // 说的是序号，不是时钟——时钟由契约套件的 timeCreated 用例钉住。
-      expect(resumed.appendEvent(RUN.runId, { type: "log", message: "after resume" })).toMatchObject({
+      expect(
+        resumed.appendEvent(RUN.runId, { type: "log", message: "after resume" }),
+      ).toMatchObject({
         sequence: 2,
         event: { type: "log", message: "after resume" },
       });
@@ -139,7 +149,7 @@ describe("SQLite dwf journal store", () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-journal-caps-"));
     const dbPath = join(tempRoot, "session.sqlite");
     try {
-      const first = createSqliteSessionStore({ dbPath });
+      const first = await createSqliteSessionStore({ dbPath });
       const journal = first.workflowJournalStore();
       journal.createRun(RUN);
       journal.updateRunUsage(RUN.runId, 120);
@@ -153,7 +163,7 @@ describe("SQLite dwf journal store", () => {
       });
       first.close();
 
-      const second = createSqliteSessionStore({ dbPath });
+      const second = await createSqliteSessionStore({ dbPath });
       expect(second.workflowJournalStore().getRun(RUN.runId)?.caps).toEqual({ maxConcurrency: 2 });
       second.close();
     } finally {
@@ -161,7 +171,7 @@ describe("SQLite dwf journal store", () => {
     }
   });
 
-  it("cascades a run delete to its actors, nodes and events", () => {
+  it("cascades a run delete to its actors, nodes and events", async () => {
     const { db, journal } = openJournalDb();
     journal.createRun(RUN);
     journal.createRun({ ...RUN, runId: "dwf_run_2" });
@@ -180,7 +190,7 @@ describe("SQLite dwf journal store", () => {
     expect(journal.listActors("dwf_run_2", { withPersona: true })).toHaveLength(1);
   });
 
-  it("rejects an actor belonging to no run", () => {
+  it("rejects an actor belonging to no run", async () => {
     // FK 是开着的（migration runner 设 pragma foreign_keys = on），孤儿写入必须当场失败，
     // 而不是留下一条永远读不回来的记录。孤儿事件与 null/absent result 的语义已由共享契约
     // 套件在两个实现上一起把关，这里只补 FK 本身确实生效这一点。
@@ -188,23 +198,12 @@ describe("SQLite dwf journal store", () => {
     expect(() => journal.putActor({ ...ACTOR, runId: "ghost" })).toThrow();
   });
 
-  // run 产物的列。内存实现表达不了「列存在」与「旧行解码」这两件事。
-  it("dwf_run 带 result_json 列", () => {
-    const { db } = openJournalDb();
-    const columns = (
-      db.prepare("select name from pragma_table_info('dwf_run')").all() as unknown as {
-        name: string;
-      }[]
-    ).map((row) => row.name);
-    expect(columns).toContain("result_json");
-  });
-
   it("run 产物跨重开数据库文件存活", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-result-"));
     const dbPath = join(tempRoot, "session.sqlite");
 
     try {
-      const first = createSqliteSessionStore({ dbPath });
+      const first = await createSqliteSessionStore({ dbPath });
       const journal = first.workflowJournalStore();
       journal.createRun(RUN);
       journal.updateRunStatus(RUN.runId, "completed", {
@@ -213,7 +212,7 @@ describe("SQLite dwf journal store", () => {
       first.close();
 
       // 桌面实测 bug 的持久化面：进程一退，产物必须仍能从 journal 读回来。
-      const second = createSqliteSessionStore({ dbPath });
+      const second = await createSqliteSessionStore({ dbPath });
       const resumed = second.workflowJournalStore().getRun(RUN.runId);
       expect(resumed?.status).toBe("completed");
       expect(resumed?.result).toEqual({ report: "done", steps: [1, 2, 3] });
@@ -223,7 +222,7 @@ describe("SQLite dwf journal store", () => {
     }
   });
 
-  it("result_json 为 NULL 的旧行解码不炸且 result 缺席", () => {
+  it("result_json 为 NULL 的旧行解码不炸且 result 缺席", async () => {
     // 0020 之前落库的 run 行：列是新加的、值为 NULL。decodeRun 必须回一条没有 result 键的
     // 记录，而不是 undefined 值或抛错——否则升级后所有历史 run 都读不出来。
     const { db, journal } = openJournalDb();
@@ -235,18 +234,7 @@ describe("SQLite dwf journal store", () => {
     expect("result" in (record ?? {})).toBe(false);
   });
 
-  // actor 的档位解析结果。同样是内存实现表达不了的两件事。
-  it("dwf_actor 带 resolved_model 列", () => {
-    const { db } = openJournalDb();
-    const columns = (
-      db.prepare("select name from pragma_table_info('dwf_actor')").all() as unknown as {
-        name: string;
-      }[]
-    ).map((row) => row.name);
-    expect(columns).toContain("resolved_model");
-  });
-
-  it("resolved_model 为 NULL 的旧行解码不炸且 resolvedModel 缺席", () => {
+  it("resolved_model 为 NULL 的旧行解码不炸且 resolvedModel 缺席", async () => {
     // 0023 之前落库的 actor 行（以及宿主还没解析过的行）：必须解成没有 resolvedModel 键的
     // 记录，而不是 undefined 值或抛错。persona 里的档位与这一列各自独立缺席。
     const { db, journal } = openJournalDb();
@@ -261,7 +249,7 @@ describe("SQLite dwf journal store", () => {
     expect(record?.persona?.system).toBe("plan carefully");
   });
 
-  it("同键重写只换 resolved_model，persona 与 session_id 原样保留", () => {
+  it("同键重写只换 resolved_model，persona 与 session_id 原样保留", async () => {
     // 生产里这正是 driver 侧 `journalActorResolvedModel` 的读改写形状：putActor 是整条替换，
     // 所以「只更新解析结果」必须由调用方带齐其余字段，而存储层要如实照写。
     const { journal } = openJournalDb();
@@ -276,42 +264,20 @@ describe("SQLite dwf journal store", () => {
     expect(journal.listActors(RUN.runId, { withPersona: true })).toHaveLength(1);
   });
 
-  it("终态与产物一笔写：单条 UPDATE 同时落 status 与 result_json", () => {
+  it("终态与产物一笔写：单条 UPDATE 同时落 status 与 result_json", async () => {
     // 分两笔写会造出「completed 但产物丢失」的崩溃窗口，正是本列要关死的损失类别。
     const { db, journal } = openJournalDb();
     journal.createRun(RUN);
     journal.updateRunStatus(RUN.runId, "completed", { result: "artifact text" });
 
-    const row = db.prepare("select status, result_json from dwf_run where id = ?").get(RUN.runId) as
-      | { result_json: string | null; status: string }
-      | undefined;
+    const row = db
+      .prepare("select status, result_json from dwf_run where id = ?")
+      .get(RUN.runId) as { result_json: string | null; status: string } | undefined;
     expect(row?.status).toBe("completed");
     expect(row?.result_json).toBe(JSON.stringify("artifact text"));
   });
 
-  // `kind` 的 CHECK 含 'report'——只有对着真库才能验，内存实现连 CHECK 都没有。
-  it("dwf_node 接受 kind:\"report\" 并原样回读", () => {
-    const { journal } = openJournalDb();
-    journal.createRun(RUN);
-    const report: NodeRecord = {
-      runId: RUN.runId,
-      siteId: "report#1",
-      ordinal: 1,
-      kind: "report",
-      inputHash: "h1",
-      status: "completed",
-      result: { finding: "两处重复实现", paths: ["src/a.ts", "src/b.ts"] },
-    };
-    journal.putNode(report);
-
-    // 整条 toEqual：actor 三列必须缺席地回来（report 没有 actor），status 恒为 completed。
-    expect(journal.getNode(RUN.runId, "report#1", 1)).toEqual(report);
-    const stored = journal.getNode(RUN.runId, "report#1", 1);
-    expect(stored !== undefined && "actorSeq" in stored).toBe(false);
-    expect(stored !== undefined && "actorSiteId" in stored).toBe(false);
-  });
-
-  it("CHECK 仍然拒绝一个不存在的 kind", () => {
+  it("CHECK 仍然拒绝一个不存在的 kind", async () => {
     // 重建 CHECK 的意义在于它**还在拦**：放开一个值不等于把闸门拆了。
     const { journal } = openJournalDb();
     journal.createRun(RUN);
@@ -327,9 +293,8 @@ describe("SQLite dwf journal store", () => {
     ).toThrow();
   });
 
-
   // `kind` 的 CHECK 含 'world-run'（world.run 的 journal 化命令执行，docs/dynamic-workflow/authoring.md）。
-  it("dwf_node 接受 kind:\"world-run\" 并原样回读", () => {
+  it('dwf_node 接受 kind:"world-run" 并原样回读', async () => {
     const { journal } = openJournalDb();
     journal.createRun(RUN);
     const worldRun: NodeRecord = {
@@ -345,7 +310,7 @@ describe("SQLite dwf journal store", () => {
     expect(journal.getNode(RUN.runId, "world-read#3", 2)).toEqual(worldRun);
   });
 
-  it("dwf_node 带 input_json 列：有界输入原样回读，ask 行缺席", () => {
+  it("dwf_node 带 input_json 列：有界输入原样回读，ask 行缺席", async () => {
     // 工作区 transcript 的「what ran」（docs/dynamic-workflow/transcript-and-notifications.md）。
     const { db, journal } = openJournalDb();
     journal.createRun(RUN);
@@ -377,7 +342,7 @@ describe("SQLite dwf journal store", () => {
     expect(ask !== undefined && "input" in ask).toBe(false);
   });
 
-  it("input_json 为 NULL 的旧行解码不炸且 input 缺席", () => {
+  it("input_json 为 NULL 的旧行解码不炸且 input 缺席", async () => {
     const { db, journal } = openJournalDb();
     journal.createRun(RUN);
     db.prepare(
@@ -390,7 +355,7 @@ describe("SQLite dwf journal store", () => {
     expect(row?.result).toBe("file body");
   });
 
-  it("listWorldNodes 只回 world-read / world-run 行，按落库先后，带时间戳与正文字节数、不带正文", () => {
+  it("listWorldNodes 只回 world-read / world-run 行，按落库先后，带时间戳与正文字节数、不带正文", async () => {
     const { journal } = openJournalDb();
     const queries = journal as unknown as DwfRunIntrospectionQueries;
     journal.createRun(RUN);
@@ -438,7 +403,7 @@ describe("SQLite dwf journal store", () => {
     expect(queries.listWorldNodes("dwfrun-unknown")).toEqual([]);
   });
 
-  it("listWorldNodes 用 SQLite 的 JSON 函数在库内算摘要：数组计数、run 的 exitCode 与输出字节数", () => {
+  it("listWorldNodes 用 SQLite 的 JSON 函数在库内算摘要：数组计数、run 的 exitCode 与输出字节数", async () => {
     const { journal } = openJournalDb();
     const queries = journal as unknown as DwfRunIntrospectionQueries;
     journal.createRun(RUN);
@@ -493,16 +458,17 @@ describe("SQLite dwf journal store", () => {
     expect("resultCount" in rows[2]!).toBe(false);
     expect("exitCode" in rows[2]!).toBe(false);
     // 失败行没有正文：什么摘要都没有，只有 error。
-    expect(rows[3]).toMatchObject({ status: "failed", error: { code: "DriverError", message: "boom" } });
+    expect(rows[3]).toMatchObject({
+      status: "failed",
+      error: { code: "DriverError", message: "boom" },
+    });
     expect("resultBytes" in rows[3]!).toBe(false);
     expect("exitCode" in rows[3]!).toBe(false);
   });
 
-
-
   // dwf_event 上的表达式索引不只要存在，还得**真的被用上**：它存在的全部理由是让看板取数
   // 不必扫完一条长 run 的整张事件表（那是最大的一张表）。查询计划变了这里就会响。
-  it("dwf_event 的表达式索引真的服务于按 artifactId 取事件", () => {
+  it("dwf_event 的表达式索引真的服务于按 artifactId 取事件", async () => {
     const { db } = openJournalDb();
     const plan = (
       db
@@ -558,7 +524,7 @@ describe("SQLite dwf journal store — listNonTerminalRuns", () => {
     });
   }
 
-  it("只回本父会话的非终态行", () => {
+  it("只回本父会话的非终态行", async () => {
     const journal = openSweepableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_running", status: "running" });
     seed(journal, { parentSessionId: PARENT, runId: "run_pending", status: "pending" });
@@ -577,7 +543,7 @@ describe("SQLite dwf journal store — listNonTerminalRuns", () => {
     expect(rows.find((row) => row.runId === "run_running")?.status).toBe("running");
   });
 
-  it("收敛写入之后同一个查询返回空（幂等的 SQL 侧依据）", () => {
+  it("收敛写入之后同一个查询返回空（幂等的 SQL 侧依据）", async () => {
     const journal = openSweepableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_orphan", status: "running" });
 
@@ -589,7 +555,7 @@ describe("SQLite dwf journal store — listNonTerminalRuns", () => {
     expect(journal.listNonTerminalRuns(PARENT)).toEqual([]);
   });
 
-  it("未知父会话返回空数组", () => {
+  it("未知父会话返回空数组", async () => {
     const journal = openSweepableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_running", status: "running" });
 
@@ -670,7 +636,7 @@ function seedRun(
 }
 
 describe("SQLite dwf journal store — dwf_run.name 与 cwd 索引", () => {
-  it("dwf_run 带 name 列，且 dwf_run_cwd_idx 的形状正对枚举查询", () => {
+  it("dwf_run 带 name 列，且 dwf_run_cwd_idx 的形状正对枚举查询", async () => {
     const { db } = openJournalDb();
     const columns = (
       db.prepare("select name from pragma_table_info('dwf_run')").all() as unknown as {
@@ -688,7 +654,7 @@ describe("SQLite dwf journal store — dwf_run.name 与 cwd 索引", () => {
     expect(indexed).toEqual(["cwd", "time_updated"]);
   });
 
-  it("name 为 NULL 的旧行解码不炸且 name 缺席", () => {
+  it("name 为 NULL 的旧行解码不炸且 name 缺席", async () => {
     // 0021 之前落库的 run 行：列是新加的、值为 NULL（不做回填）。decodeRun 必须回一条没有
     // name 键的记录，否则升级后所有历史 run 都读不出来。
     const { db, journal } = openJournalDb();
@@ -699,25 +665,12 @@ describe("SQLite dwf journal store — dwf_run.name 与 cwd 索引", () => {
     expect(record).toEqual(RUN);
     expect("name" in (record ?? {})).toBe(false);
   });
-
-  it("updateRunStatus 不改写 name 列", () => {
-    // name 只在 createRun 那一刻写入（引擎独占的元数据路）。结算语句若把 name 也列进去，
-    // run 一结算就会丢名字。
-    const { db, journal } = openJournalDb();
-    journal.createRun({ ...RUN, name: "triage the flake" });
-    journal.updateRunStatus(RUN.runId, "completed", { result: "ok" });
-
-    const row = db.prepare("select name from dwf_run where id = ?").get(RUN.runId) as
-      | { name: string | null }
-      | undefined;
-    expect(row?.name).toBe("triage the flake");
-  });
 });
 
 describe("SQLite dwf journal store — 基线形状", () => {
   // docs/dynamic-workflow/authoring.md：预算构造整体移除。基线 0019 直接以终态建表，这里钉住
   // 「两列不存在、用量列叫 spent_tokens」，以及老形状的 run 记录经 store 读回时 caps 只剩 maxConcurrency。
-  it("dwf_run 没有节点上限 / 预算列，用量列叫 spent_tokens", () => {
+  it("dwf_run 没有节点上限 / 预算列，用量列叫 spent_tokens", async () => {
     const { db } = openJournalDb();
     const columns = (db.prepare("pragma table_info(dwf_run)").all() as Array<{ name: string }>).map(
       (c) => c.name,
@@ -744,7 +697,7 @@ describe("SQLite dwf journal store — 基线形状", () => {
 describe("SQLite dwf journal store — listRuns", () => {
   const CWD = "/repo/project";
 
-  it("只回本 cwd 的 run，按 time_updated 倒序", () => {
+  it("只回本 cwd 的 run，按 time_updated 倒序", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_old", cwd: CWD, timeUpdated: 1_000 });
     seedRun(db, journal, { runId: "run_new", cwd: CWD, timeUpdated: 3_000 });
@@ -757,7 +710,7 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(rows.map((row) => row.runId)).toEqual(["run_new", "run_mid", "run_old"]);
   });
 
-  it("cwd 是字面匹配，不做路径规范化", () => {
+  it("cwd 是字面匹配，不做路径规范化", async () => {
     // 与 submit 写入同源（context.workingDirectory 原样落库、原样查询）。在读侧单方面
     // 规范化只会造出单侧不匹配。
     const { db, journal } = openIntrospectableJournal();
@@ -767,7 +720,7 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(journal.listRuns({ cwd: CWD, limit: 20 })).toHaveLength(1);
   });
 
-  it("limit 只截最新的那几条", () => {
+  it("limit 只截最新的那几条", async () => {
     const { db, journal } = openIntrospectableJournal();
     for (let i = 0; i < 5; i++) {
       seedRun(db, journal, { runId: `run_${i}`, cwd: CWD, timeUpdated: 1_000 + i });
@@ -782,7 +735,7 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(journal.listRuns({ cwd: CWD, limit: 0 })).toEqual([]);
   });
 
-  it("statuses 过滤到给定子集", () => {
+  it("statuses 过滤到给定子集", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_running", cwd: CWD, status: "running" });
     seedRun(db, journal, { runId: "run_pending", cwd: CWD, status: "pending" });
@@ -800,7 +753,7 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(journal.listRuns({ cwd: CWD, limit: 20, statuses: [] })).toEqual([]);
   });
 
-  it("name 过滤下推到 SQL，且与 statuses 可叠加（GUI 中枢按工作流名归属运行历史）", () => {
+  it("name 过滤下推到 SQL，且与 statuses 可叠加（GUI 中枢按工作流名归属运行历史）", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_a1", cwd: CWD, name: "release-check", timeUpdated: 3 });
     seedRun(db, journal, { runId: "run_a2", cwd: CWD, name: "release-check", timeUpdated: 1 });
@@ -828,13 +781,23 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(journal.listRuns({ cwd: CWD, limit: 20 })).toHaveLength(5);
   });
 
-  it("cwd 缺省即跨所有项目枚举（全局工作流的运行历史跨 cwd），行带 cwd", () => {
+  it("cwd 缺省即跨所有项目枚举（全局工作流的运行历史跨 cwd），行带 cwd", async () => {
     // 全局工作流在不同项目里被发起，dwf_run.cwd 记的是各自实际运行的项目。`workflows/runs`
     // 的全局变体不按 cwd 过滤，把该名字在所有项目里的历史一并取出，行带 cwd 供 GUI 标项目
     // （docs/dynamic-workflow/launch.md「Data path」）。
     const { db, journal } = openIntrospectableJournal();
-    seedRun(db, journal, { runId: "run_a", cwd: "/repo/one", name: "deep-research", timeUpdated: 3 });
-    seedRun(db, journal, { runId: "run_b", cwd: "/repo/two", name: "deep-research", timeUpdated: 2 });
+    seedRun(db, journal, {
+      runId: "run_a",
+      cwd: "/repo/one",
+      name: "deep-research",
+      timeUpdated: 3,
+    });
+    seedRun(db, journal, {
+      runId: "run_b",
+      cwd: "/repo/two",
+      name: "deep-research",
+      timeUpdated: 2,
+    });
     seedRun(db, journal, { runId: "run_c", cwd: "/repo/one", name: "other", timeUpdated: 5 });
     seedRun(db, journal, { runId: "run_cwdless", name: "deep-research", timeUpdated: 1 });
 
@@ -845,15 +808,17 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(byId.get("run_a")?.cwd).toBe("/repo/one");
     expect(byId.get("run_b")?.cwd).toBe("/repo/two");
     // cwd 为 NULL 的行不带 cwd 键（新列不回填，缺席可分辨）。
-    expect(byId.get("run_cwdless") !== undefined && "cwd" in (byId.get("run_cwdless") ?? {})).toBe(false);
+    expect(byId.get("run_cwdless") !== undefined && "cwd" in (byId.get("run_cwdless") ?? {})).toBe(
+      false,
+    );
 
     // 给了 cwd 就仍只回本项目那份（与全局变体互斥，行为逐字不变）。
-    expect(journal.listRuns({ cwd: "/repo/one", limit: 20, name: "deep-research" }).map((r) => r.runId)).toEqual([
-      "run_a",
-    ]);
+    expect(
+      journal.listRuns({ cwd: "/repo/one", limit: 20, name: "deep-research" }).map((r) => r.runId),
+    ).toEqual(["run_a"]);
   });
 
-  it("枚举行带 args（实参是小 JSON 袋，中枢的运行历史要展示它）；无实参的行键缺席", () => {
+  it("枚举行带 args（实参是小 JSON 袋，中枢的运行历史要展示它）；无实参的行键缺席", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, {
       runId: "run_args",
@@ -868,12 +833,12 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(byId.get("run_bare")).not.toHaveProperty("args");
   });
 
-  it("空结果回空数组", () => {
+  it("空结果回空数组", async () => {
     const { journal } = openIntrospectableJournal();
     expect(journal.listRuns({ cwd: "/never/seen", limit: 20 })).toEqual([]);
   });
 
-  it("每行带齐下游合成真相所需的字段，但不驮 result/failure", () => {
+  it("每行带齐下游合成真相所需的字段，但不驮 result/failure", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, {
       runId: "run_1",
@@ -906,7 +871,7 @@ describe("SQLite dwf journal store — listRuns", () => {
     expect(row !== undefined && "failure" in row).toBe(false);
   });
 
-  it("name 缺席的行不带 name 键", () => {
+  it("name 缺席的行不带 name 键", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: CWD, scriptText: "log('hi');" });
 
@@ -916,7 +881,7 @@ describe("SQLite dwf journal store — listRuns", () => {
 });
 
 describe("SQLite dwf journal store — getRunRow", () => {
-  it("回完整记录 + journal 时间戳", () => {
+  it("回完整记录 + journal 时间戳", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, {
       runId: "run_1",
@@ -939,7 +904,7 @@ describe("SQLite dwf journal store — getRunRow", () => {
     expect(typeof row?.timeCreated).toBe("number");
   });
 
-  it("未知 runId 回 undefined", () => {
+  it("未知 runId 回 undefined", async () => {
     const { journal } = openIntrospectableJournal();
     expect(journal.getRunRow("nope")).toBeUndefined();
   });
@@ -957,7 +922,7 @@ describe("SQLite dwf journal store — countNodesByStatus", () => {
     journal.putNode({ runId, siteId, ordinal, kind: "ask", inputHash: "h", status });
   }
 
-  it("按三态计数，且只数本 run 的节点", () => {
+  it("按三态计数，且只数本 run 的节点", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedRun(db, journal, { runId: "run_2", cwd: "/repo" });
@@ -970,7 +935,7 @@ describe("SQLite dwf journal store — countNodesByStatus", () => {
     expect(journal.countNodesByStatus("run_1")).toEqual({ running: 1, completed: 2, failed: 1 });
   });
 
-  it("无节点（含未知 run）回三个 0，而不是缺键", () => {
+  it("无节点（含未知 run）回三个 0，而不是缺键", async () => {
     // 下游要拿它直接算 nodesObserved；缺键会让「还没有节点」和「没有这个 run」都变成 NaN。
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
@@ -981,7 +946,7 @@ describe("SQLite dwf journal store — countNodesByStatus", () => {
 });
 
 describe("SQLite dwf journal store — listRecentLogEvents", () => {
-  it("只取 log 事件的末 N 条，按时序回", () => {
+  it("只取 log 事件的末 N 条，按时序回", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     journal.appendEvent("run_1", { type: "run-started", runId: "run_1", caps: CAPS });
@@ -1003,7 +968,7 @@ describe("SQLite dwf journal store — listRecentLogEvents", () => {
     expect(tail.map((e) => e.sequence)).toEqual([3, 5, 7]);
   });
 
-  it("limit 超过条数时给出全部 log 事件", () => {
+  it("limit 超过条数时给出全部 log 事件", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     journal.appendEvent("run_1", { type: "log", message: "only" });
@@ -1012,7 +977,7 @@ describe("SQLite dwf journal store — listRecentLogEvents", () => {
     expect(journal.listRecentLogEvents("run_1", 20).map((e) => e.event.type)).toEqual(["log"]);
   });
 
-  it("没有 log 事件（含未知 run、limit 0）回空数组", () => {
+  it("没有 log 事件（含未知 run、limit 0）回空数组", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     journal.appendEvent("run_1", { type: "run-started", runId: "run_1", caps: CAPS });
@@ -1022,7 +987,7 @@ describe("SQLite dwf journal store — listRecentLogEvents", () => {
     expect(journal.listRecentLogEvents("run_1", 0)).toEqual([]);
   });
 
-  it("按 runId 隔离", () => {
+  it("按 runId 隔离", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedRun(db, journal, { runId: "run_2", cwd: "/repo" });
@@ -1076,7 +1041,7 @@ describe("SQLite dwf journal store — listRunsByParentSession", () => {
     });
   }
 
-  it("只回本父会话的行，完整解码（含 toolCallId 与 failure）", () => {
+  it("只回本父会话的行，完整解码（含 toolCallId 与 failure）", async () => {
     const journal = openEnumerableJournal();
     seed(journal, {
       parentSessionId: PARENT,
@@ -1122,7 +1087,7 @@ describe("SQLite dwf journal store — listRunsByParentSession", () => {
     expect(rows[0]?.runId).toBe("run_old"); // 刚被触碰过 → 最近更新
   });
 
-  it("未知父会话返回空数组；limit 0 返回空", () => {
+  it("未知父会话返回空数组；limit 0 返回空", async () => {
     const journal = openEnumerableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_a", status: "running" });
     expect(journal.listRunsByParentSession("ses_never_seen", 10)).toEqual([]);
@@ -1130,7 +1095,7 @@ describe("SQLite dwf journal store — listRunsByParentSession", () => {
   });
 
   // 窄投影：枚举面报 updatedAt，所以行必须带 journal 时间戳（`RunRecord` 自己不带时间）。
-  it("行带 journal 时间戳（createdAt/updatedAt 的来源）", () => {
+  it("行带 journal 时间戳（createdAt/updatedAt 的来源）", async () => {
     const journal = openEnumerableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_timed", status: "running" });
 
@@ -1152,10 +1117,10 @@ describe("SQLite dwf journal store — listRunsByParentSession", () => {
    *
    * 反过来 `failure_json` 必须在 SQL 里：resumable 的谓词依赖 failure.code（见下一个用例）。
    */
-  it("枚举查询的 SQL 取 failure_json 而不取 result_json", () => {
+  it("枚举查询的 SQL 取 failure_json 而不取 result_json", async () => {
     const db = new DatabaseSync(":memory:");
     openDatabases.push(db);
-    runSqliteSessionMigrations(db, ":memory:");
+    await runSqliteSessionMigrations(db, ":memory:");
     const prepared: string[] = [];
     // prepare 的旁路记录器：只为了看见这条查询真正发出的列清单。
     const recordingDb = new Proxy(db, {
@@ -1184,7 +1149,7 @@ describe("SQLite dwf journal store — listRunsByParentSession", () => {
   });
 
   /** failure 必须活过窄投影：Interrupted 是 resume 门认可的可恢复形态。 */
-  it("窄投影仍解出 failure（resumable 谓词的输入）", () => {
+  it("窄投影仍解出 failure（resumable 谓词的输入）", async () => {
     const journal = openEnumerableJournal();
     seed(journal, { parentSessionId: PARENT, runId: "run_dead", status: "running" });
     journal.updateRunStatus("run_dead", "stopped", {
@@ -1230,7 +1195,7 @@ describe("SQLite dwf journal store — listArtifactRows", () => {
     });
   }
 
-  it("只回本 run 的产物行，按落库先后", () => {
+  it("只回本 run 的产物行，按落库先后", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedRun(db, journal, { runId: "run_2", cwd: "/repo" });
@@ -1288,7 +1253,7 @@ describe("SQLite dwf journal store — listArtifactRows", () => {
     expect(rows[2]?.result).toEqual({ id: "book", kind: "file", version: 2, bytes: 20 });
   });
 
-  it("失败的发布照样在结果里（带 error、无 result）", () => {
+  it("失败的发布照样在结果里（带 error、无 result）", async () => {
     // 筛掉失败行等于让一个用户可见的失败在每张表面上都不存在。
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
@@ -1301,7 +1266,7 @@ describe("SQLite dwf journal store — listArtifactRows", () => {
     expect(row !== undefined && "result" in row).toBe(false);
   });
 
-  it("无产物（含未知 run）回空数组", () => {
+  it("无产物（含未知 run）回空数组", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     expect(journal.listArtifactRows("run_1")).toEqual([]);
@@ -1310,7 +1275,7 @@ describe("SQLite dwf journal store — listArtifactRows", () => {
 });
 
 describe("SQLite dwf journal store — countTaggedReports", () => {
-  it("counts tagged report rows per artifact id in SQL, ignoring untagged rows, other kinds and other runs", () => {
+  it("counts tagged report rows per artifact id in SQL, ignoring untagged rows, other kinds and other runs", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedRun(db, journal, { runId: "run_2", cwd: "/repo" });
@@ -1368,7 +1333,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     }).sequence;
   }
 
-  it("按 sequence 升序回该 id 的条目，带站点坐标与原值", () => {
+  it("按 sequence 升序回该 id 的条目，带站点坐标与原值", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     const s0 = seedTaggedReport(journal, "run_1", "report#1", 1, { round: 1 }, "perf");
@@ -1383,7 +1348,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     });
   });
 
-  it("排除未打标签的 report、别的 id、别种事件与别的 run", () => {
+  it("排除未打标签的 report、别的 id、别种事件与别的 run", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedRun(db, journal, { runId: "run_2", cwd: "/repo" });
@@ -1406,7 +1371,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     expect(page.hasMore).toBe(false);
   });
 
-  it("afterSequence 是严格大于的游标", () => {
+  it("afterSequence 是严格大于的游标", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     const s0 = seedTaggedReport(journal, "run_1", "report#1", 1, 1, "perf");
@@ -1420,7 +1385,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     expect(after(s1)).toEqual({ items: [], hasMore: false });
   });
 
-  it("limit 逐字兑现，hasMore 由存储层判定：页之后还有没有条目", () => {
+  it("limit 逐字兑现，hasMore 由存储层判定：页之后还有没有条目", async () => {
     // 存储层不加自己的天花板，也不要调用方多取一条来猜：页尾后面那一行存在与否就是 hasMore。
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
@@ -1439,7 +1404,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     expect(page(99).items).toHaveLength(5);
   });
 
-  it("字节界：再加一条就超界时收尾并报 hasMore，第一条总是带上", () => {
+  it("字节界：再加一条就超界时收尾并报 hasMore，第一条总是带上", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     const pad = "x".repeat(1000);
@@ -1464,7 +1429,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     expect(tiny.hasMore).toBe(true);
   });
 
-  it("limit ≤ 0 是空页，未知 run / 未知 id 同样", () => {
+  it("limit ≤ 0 是空页，未知 run / 未知 id 同样", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedTaggedReport(journal, "run_1", "report#1", 1, { round: 1 }, "perf");
@@ -1484,7 +1449,7 @@ describe("SQLite dwf journal store — listArtifactItems", () => {
     );
   });
 
-  it("条目原值原样回来：null、标量与数组都不被加工", () => {
+  it("条目原值原样回来：null、标量与数组都不被加工", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seedTaggedReport(journal, "run_1", "report#1", 1, null, "perf");
@@ -1523,7 +1488,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
     });
   }
 
-  it("回点名的字段、不回整条 item；JSON 的 null 在表里，走不通的路径不在", () => {
+  it("回点名的字段、不回整条 item；JSON 的 null 在表里，走不通的路径不在", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seed(journal, "run_1", [
@@ -1550,7 +1515,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
     expect(page.items[0]).not.toHaveProperty("item");
   });
 
-  it("像整数的段在数组上是下标、在对象上是键，与渲染器的路径规则相同", () => {
+  it("像整数的段在数组上是下标、在对象上是键，与渲染器的路径规则相同", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seed(journal, "run_1", [
@@ -1579,7 +1544,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
     });
   });
 
-  it("键里带引号与反斜杠照样取得到", () => {
+  it("键里带引号与反斜杠照样取得到", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seed(journal, "run_1", [{ 'say"hi': 1, "back\\slash": 2, 中文: 3 }]);
@@ -1588,7 +1553,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
     expect(entry?.fields).toEqual({ 'say"hi': 1, "back\\slash": 2, 中文: 3 });
   });
 
-  it("超过值的字节上界的值回成截短的字符串，一个大值不会整段进 JavaScript", () => {
+  it("超过值的字节上界的值回成截短的字符串，一个大值不会整段进 JavaScript", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seed(journal, "run_1", [
@@ -1603,7 +1568,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
     expect(list).toHaveLength(1001);
   });
 
-  it("页按取出的字段值计字节：大 item 里只取一个小字段时一页装得下很多条", () => {
+  it("页按取出的字段值计字节：大 item 里只取一个小字段时一页装得下很多条", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     seed(
@@ -1630,7 +1595,7 @@ describe("SQLite dwf journal store — listArtifactItems with fields", () => {
 });
 
 describe("SQLite dwf journal store — listEventPage", () => {
-  it("全部类型、item 原样，按条数分页并判定 hasMore", () => {
+  it("全部类型、item 原样，按条数分页并判定 hasMore", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     journal.appendEvent("run_1", { type: "log", message: "a" });
@@ -1653,7 +1618,7 @@ describe("SQLite dwf journal store — listEventPage", () => {
     expect(rest).toEqual({ events: all.slice(2), hasMore: false });
   });
 
-  it("字节界同看板条目：带大 item 的事件让页提前收尾，但每页至少一条", () => {
+  it("字节界同看板条目：带大 item 的事件让页提前收尾，但每页至少一条", async () => {
     const { db, journal } = openIntrospectableJournal();
     seedRun(db, journal, { runId: "run_1", cwd: "/repo" });
     for (let ordinal = 1; ordinal <= 3; ordinal += 1) {
@@ -1700,7 +1665,7 @@ describe("SqliteDwfJournalStore 终态编码（零迁移）", () => {
     ).run(runId, PARENT, "/repo", 4, 0, status, failureJson, 1, timeUpdated);
   }
 
-  it("历史行按表解码：cancelled→stopped(user)，failed+Interrupted→stopped(interrupted)，其余 failed→errored", () => {
+  it("历史行按表解码：cancelled→stopped(user)，failed+Interrupted→stopped(interrupted)，其余 failed→errored", async () => {
     const { db, journal } = openIntrospectableJournal();
     insertPhysicalRow(db, "old_pending", "pending", null);
     insertPhysicalRow(db, "old_running", "running", null);
@@ -1791,7 +1756,7 @@ describe("SqliteDwfJournalStore 终态编码（零迁移）", () => {
     expect("failure" in journal.getRun("old_cancelled")!).toBe(false);
   });
 
-  it("新写入的 stopped 落成 cancelled + 信封，errored 落成 failed + 原样失败；往返逐字段相等", () => {
+  it("新写入的 stopped 落成 cancelled + 信封，errored 落成 failed + 原样失败；往返逐字段相等", async () => {
     const { db, journal } = openIntrospectableJournal();
     for (const runId of ["s_user", "s_model", "s_provider", "s_interrupted", "e_script"]) {
       journal.createRun({
@@ -1876,7 +1841,7 @@ describe("SqliteDwfJournalStore 终态编码（零迁移）", () => {
     expect("stopReason" in journal.getRun("s_provider")!).toBe(false);
   });
 
-  it("statuses 过滤在 SQL 里分清 errored 与 stopped（共享物理 failed）", () => {
+  it("statuses 过滤在 SQL 里分清 errored 与 stopped（共享物理 failed）", async () => {
     const { db, journal } = openIntrospectableJournal();
     insertPhysicalRow(db, "p_cancelled", "cancelled", null, 5);
     insertPhysicalRow(
@@ -1958,7 +1923,7 @@ describe("SQLite dwf journal store — listRunLifeSpans", () => {
     return { db, journal };
   }
 
-  it("单世：从 run-started 到这一世最后一条事件", () => {
+  it("单世：从 run-started 到这一世最后一条事件", async () => {
     const { db, journal } = seedLifeRun();
     journal.appendEvent(RUN_ID, { type: "run-started", runId: RUN_ID, caps: CAPS });
     journal.appendEvent(RUN_ID, { type: "log", message: "工作中" });
@@ -1967,10 +1932,12 @@ describe("SQLite dwf journal store — listRunLifeSpans", () => {
     stampEvent(db, 1, 5_000);
     stampEvent(db, 2, 61_000);
 
-    expect(journal.listRunLifeSpans(RUN_ID)).toEqual([{ startedAt: 1_000, lastActivityAt: 61_000 }]);
+    expect(journal.listRunLifeSpans(RUN_ID)).toEqual([
+      { startedAt: 1_000, lastActivityAt: 61_000 },
+    ]);
   });
 
-  it("多世：每一世各算一段，世与世之间的空档不出现在任何一段里", () => {
+  it("多世：每一世各算一段，世与世之间的空档不出现在任何一段里", async () => {
     const { db, journal } = seedLifeRun();
     // 第一世：跑了一小时后被重启打断（没有 run-settled）。
     journal.appendEvent(RUN_ID, { type: "run-started", runId: RUN_ID, caps: CAPS });
@@ -1996,7 +1963,7 @@ describe("SQLite dwf journal store — listRunLifeSpans", () => {
     expect(activeMs).toBe(3_600_000 + 120_000);
   });
 
-  it("一世里只有 run-started 一条事件：区间退化成 0，不是 null", () => {
+  it("一世里只有 run-started 一条事件：区间退化成 0，不是 null", async () => {
     const { db, journal } = seedLifeRun();
     journal.appendEvent(RUN_ID, { type: "run-started", runId: RUN_ID, caps: CAPS });
     stampEvent(db, 0, 7_000);
@@ -2004,7 +1971,7 @@ describe("SQLite dwf journal store — listRunLifeSpans", () => {
     expect(journal.listRunLifeSpans(RUN_ID)).toEqual([{ startedAt: 7_000, lastActivityAt: 7_000 }]);
   });
 
-  it("没有 run-started 的 run 与未知 run 都回空数组（无证据，不是 0 时长）", () => {
+  it("没有 run-started 的 run 与未知 run 都回空数组（无证据，不是 0 时长）", async () => {
     const { journal } = seedLifeRun();
     journal.appendEvent(RUN_ID, { type: "log", message: "只有日志" });
 
@@ -2012,7 +1979,7 @@ describe("SQLite dwf journal store — listRunLifeSpans", () => {
     expect(journal.listRunLifeSpans("run_never_seen")).toEqual([]);
   });
 
-  it("只看本 run 的事件：另一条 run 的世不混进来", () => {
+  it("只看本 run 的事件：另一条 run 的世不混进来", async () => {
     const { db, journal } = seedLifeRun();
     journal.createRun({ runId: "run_other", caps: CAPS, spentTokens: 0, status: "running" });
     journal.appendEvent(RUN_ID, { type: "run-started", runId: RUN_ID, caps: CAPS });

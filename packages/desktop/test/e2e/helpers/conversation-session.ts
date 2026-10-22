@@ -20,7 +20,7 @@ import {
   TID_V4_STOP,
   TID_V4_TIMELINE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import AppPage from "../pages/app.page.js";
 import {
   clickTestIdByDom,

@@ -79,7 +79,7 @@ for (const source of ["root", "recent", "default", "empty", "delayed"])
           await page.waitForFunction(
             () =>
               JSON.parse(document.querySelector('[data-testid="config"]').textContent).mode ===
-              "plan",
+              "build",
           );
           assert.equal((await getConfig()).modelSelection, undefined);
           assert.equal(
@@ -92,10 +92,7 @@ for (const source of ["root", "recent", "default", "empty", "delayed"])
               JSON.parse(document.querySelector('[data-testid="config"]').textContent)
                 .modelSelection?.options?.reasoningLevel === "high",
           );
-          assert.equal(
-            (await getConfig()).mode,
-            source === "root" ? "plan" : source === "recent" ? "yolo" : "build",
-          );
+          assert.equal((await getConfig()).mode, source === "recent" ? "yolo" : "build");
           assert.match(
             await page.getByTestId("chat-model-select-trigger").innerText(),
             /recipient-model/,
@@ -108,6 +105,7 @@ for (const source of ["root", "recent", "default", "empty", "delayed"])
           assert.deepEqual(JSON.parse(await page.getByTestId("submission").textContent()), {
             modelSelection: (await getConfig()).modelSelection,
             mode: (await getConfig()).mode,
+            planEnabled: (await getConfig()).planEnabled,
           });
         }
         if (source === "root" || source === "empty")
@@ -139,6 +137,80 @@ for (const source of ["root", "recent", "default", "empty", "delayed"])
             "high",
           );
         }
+        assert.deepEqual(errors, []);
+      } finally {
+        await writeFile(
+          join(artifacts, `${source}-${width}.log`),
+          JSON.stringify({ errors, logs }, null, 2),
+        );
+        await page.close();
+      }
+    });
+
+for (const source of ["session-empty", "session-text"])
+  for (const width of [390, 1200])
+    test(`CS01/02/03/10 current session ${source} ${width}`, async () => {
+      const page = await browser.newPage({ viewport: { width, height: 800 } });
+      const errors = [],
+        logs = [];
+      page.on("pageerror", (error) => errors.push(String(error)));
+      page.on("console", (message) => logs.push(message.text()));
+      const config = async () => JSON.parse(await page.getByTestId("config").textContent());
+      const check = async (mode, planEnabled) => {
+        logs.push(`expect ${mode}/${planEnabled}; actual ${JSON.stringify(await config())}`);
+        await page.waitForFunction(
+          ({ mode, planEnabled }) => {
+            const value = JSON.parse(document.querySelector('[data-testid="config"]').textContent);
+            return value.mode === mode && value.planEnabled === planEnabled;
+          },
+          { mode, planEnabled },
+          { timeout: 10000 },
+        );
+      };
+      const chooseMode = async (mode) => {
+        await page.getByTestId("chat-mode-select-trigger").click();
+        await page.getByTestId(`chat-mode-select-item-${mode}`).click();
+        await page.keyboard.press("Escape");
+        await page.getByRole("menu").waitFor({ state: "hidden" });
+      };
+      try {
+        await page.goto(
+          `${origin}fixture?source=${source}&locale=${width === 390 ? "zh-CN" : "en-US"}&theme=${width === 390 ? "light" : "dark"}`,
+        );
+        await check("build", false);
+        assert.equal(
+          await page.getByLabel("Message").inputValue(),
+          source === "session-text" ? "UNSENT TEXT" : "",
+        );
+        await chooseMode("yolo");
+        await chooseMode("plan");
+        await check("yolo", true);
+        await page.getByRole("button", { name: "Repeat snapshot", exact: true }).click();
+        await check("yolo", true);
+        await page.getByRole("button", { name: "Ordinary new task", exact: true }).click();
+        await page.getByRole("button", { name: "Open session", exact: true }).click();
+        await check("build", false);
+        await page.reload();
+        await check("build", false);
+        assert.equal(
+          await page.getByLabel("Message").inputValue(),
+          source === "session-text" ? "UNSENT TEXT" : "",
+        );
+        await page.getByRole("button", { name: "New grant", exact: true }).click();
+        await check("yolo", false);
+        await chooseMode("build");
+        await page.getByRole("button", { name: "Repeat snapshot", exact: true }).click();
+        await check("build", false);
+        await page.getByRole("button", { name: "New plan", exact: true }).click();
+        await check("build", true);
+        assert.equal((await config()).modelSelection.modelId, "recipient-model");
+        const storage = await page.evaluate(() => JSON.stringify(localStorage));
+        assert.doesNotMatch(
+          storage,
+          /lastPermissionGrantId|lastPlanTransitionId|initializeFromNewTask/,
+        );
+        if (source === "session-empty") assert.doesNotMatch(storage, /composer-draft/);
+        await page.screenshot({ path: join(artifacts, `${source}-${width}.png`) });
         assert.deepEqual(errors, []);
       } finally {
         await writeFile(

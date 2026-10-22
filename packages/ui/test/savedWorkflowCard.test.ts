@@ -8,10 +8,10 @@ import {
   TID_WORKFLOW_CARD_MENU,
   TID_WORKFLOW_CARD_RUN,
   TID_WORKFLOW_ACTION_MOVE,
-  testId,
   type ZCodeSavedWorkflowEntry,
   type ZCodeSavedWorkflowRun,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import {
   SavedWorkflowCard,

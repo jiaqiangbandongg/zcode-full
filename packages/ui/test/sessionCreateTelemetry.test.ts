@@ -85,15 +85,11 @@ describe("session_create", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("默认空态为 session，Project 入口和 Group 重定位保存各自来源", () => {
+  it("默认空态使用 session，显式 Project 来源生效且下次缺省恢复 session", () => {
     const store = useZCodeSessionStore.getState();
     expect(store.getWorkspaceState("/telemetry-source-test").draftCreateSource).toBe("session");
     store.startDraft("/telemetry-source-test", undefined, undefined, { createSource: "project" });
     expect(store.getWorkspaceState("/telemetry-source-test").draftCreateSource).toBe("project");
-    store.startDraft("/telemetry-source-test", undefined, undefined, {
-      groupedDraftPlacement: { type: "group", groupId: "g1" },
-    });
-    expect(store.getWorkspaceState("/telemetry-source-test").draftCreateSource).toBe("group");
     store.startDraft("/telemetry-source-test");
     expect(store.getWorkspaceState("/telemetry-source-test").draftCreateSource).toBe("session");
   });

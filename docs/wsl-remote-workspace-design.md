@@ -117,8 +117,11 @@ export class WSLBackend implements IRemoteBackend {
   }
 
   // 3. 执行命令：wsl.exe --exec
+  //    必须用 --exec 而不是 `--`：不带 --exec 时 wsl.exe 会把原始命令行整段交给用户默认 shell `-c`，
+  //    Node 加的双引号会让外层 shell 先展开 `"$var"`，局部变量在到达 bash -lc 前就变成空串
+  //    （2026-09-14 WSL 连接误报「远端缺少 tar」的根因）。--exec 按 CommandLineToArgvW 解析后直接 exec。
   async exec(command: string): Promise<StdioStream> {
-    const proc = spawn("wsl.exe", ["--distribution", this.distro, "--", "bash", "-c", command], {
+    const proc = spawn("wsl.exe", ["--distribution", this.distro, "--exec", "bash", "-c", command], {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -156,7 +159,7 @@ export class WSLBackend implements IRemoteBackend {
 
   private getHomeDir(): string {
     try {
-      return execSync(`wsl.exe --distribution ${this.distro} -- bash -c "printf %s \\$HOME"`, {
+      return execSync(`wsl.exe --distribution ${this.distro} --exec bash -c "printf %s \\$HOME"`, {
         encoding: "utf-8",
       }).trim();
     } catch {

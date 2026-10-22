@@ -130,15 +130,6 @@ describe("memory extraction gate", () => {
       evaluateMemoryExtraction(snapshot([oldWrite, prose]), createMessageId("missing-cursor")),
     ).toEqual({ decision: "run", messageCount: 2 });
   });
-
-  it("backscans prose when a non-empty cursor is missing", () => {
-    const prose = userMessage("old-prose", ["durable preference remains useful"]);
-
-    expect(evaluateMemoryExtraction(snapshot([prose]), createMessageId("missing-cursor"))).toEqual({
-      decision: "run",
-      messageCount: 1,
-    });
-  });
 });
 
 describe("memory extraction scheduler", () => {

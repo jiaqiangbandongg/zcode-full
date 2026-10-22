@@ -114,7 +114,7 @@ describe("WorkflowRunArtifactsSection", () => {
   });
 
   // 交付物（docs/dynamic-workflow/presentation.md「The run pane」第 4 项）：行 + 细线 + 单列索引；收起时节头带标题。
-  it("有交付物：交付物行领头（容器查询下窄面板收成 136 × 85），其余是细线之下的单列索引行；收起时节头在件数后带交付物标题", () => {
+  it("有交付物时领头，其他产物按原序列出；收起仍显示件数和交付物标题", () => {
     const view = renderSection([
       artifact({
         id: "perf",
@@ -134,7 +134,6 @@ describe("WorkflowRunArtifactsSection", () => {
       artifact({ title: "审计报告", description: "本轮审计的结论与修复建议。", primary: true }),
     ]);
     const body = view.getByTestId("workflow-run-artifact-primary-body");
-    expect(body.className).toContain("@container/wf-artifacts");
     const cards = within(body).getAllByTestId(TID_WORKFLOW_ARTIFACT_CARD);
     // 清单已由 hook 排成交付物在前；这里按旗子选行，不按位置。
     expect(cards[0]!.getAttribute("data-variant")).toBe("row");
@@ -146,11 +145,10 @@ describe("WorkflowRunArtifactsSection", () => {
       "文件·PDF·4.0 KB",
     );
     // 预览框是按钮的兄弟（缩略里的控件不能嵌进按钮），所以从瓦片容器里找。
-    const frame = within(cards[0]!.parentElement!).getByTestId("workflow-artifact-row-frame");
-    expect(frame.className).toContain("@max-[380px]/wf-artifacts:w-[136px]");
-    expect(frame.className).toContain("@max-[380px]/wf-artifacts:h-[85px]");
+    expect(
+      within(cards[0]!.parentElement!).getByTestId("workflow-artifact-row-frame"),
+    ).toBeTruthy();
     const index = view.getByTestId("workflow-run-artifact-index");
-    expect(index.className).toContain("grid-cols-1");
     expect(index.className).toContain("border-t");
     const lines = within(index).getAllByTestId(TID_WORKFLOW_ARTIFACT_CARD);
     expect(lines.map((card) => card.getAttribute("data-artifact-id"))).toEqual(["perf", "notes"]);

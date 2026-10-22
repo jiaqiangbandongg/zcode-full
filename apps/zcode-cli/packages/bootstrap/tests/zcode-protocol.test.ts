@@ -20,6 +20,7 @@ import {
   zcodeSessionStateSnapshotSchema,
   zcodeSessionSubscribeResultSchema,
   zcodeProviderTestModelConnectivityResultSchema,
+  zcodeProviderRefreshRegistryResultSchema,
   zcodeWorkspaceGenerateTextResultSchema,
   zcodeWorkspaceCancelGenerateTextResultSchema,
   zcodeWorkspacePresentationSchema,
@@ -72,7 +73,10 @@ import {
 import { ZCodeProtocolAgentServer } from "../src/zcode-protocol/server.js";
 import { ZCodeProtocolNdjsonConnection } from "../src/zcode-protocol/transport.js";
 import { shouldCloseSessionForExpectedPersistence } from "../src/zcode-protocol/server-operations.js";
-import type { ZCodeProtocolAgentServerContext } from "../src/zcode-protocol/server-types.js";
+import type {
+  ZCodeProtocolAgentServerContext,
+  ZCodeProtocolSessionRecord,
+} from "../src/zcode-protocol/server-types.js";
 import {
   buildSessionSnapshot,
   mapMessageWithParts,
@@ -430,7 +434,6 @@ describe("ZCodeProtocolAgentServer", () => {
     } as unknown as MessageWithParts);
 
     const part = zcodeMessagePartSchema.parse(mapped.parts[0]);
-    expect(part.type).toBe("tool");
     if (part.type !== "tool" || part.state.status !== "completed") {
       throw new Error("expected completed tool part");
     }
@@ -477,7 +480,6 @@ describe("ZCodeProtocolAgentServer", () => {
     } as unknown as MessageWithParts);
 
     const part = zcodeMessagePartSchema.parse(mapped.parts[0]);
-    expect(part.type).toBe("tool");
     if (part.type !== "tool" || part.state.status !== "completed") {
       throw new Error("expected completed tool part");
     }
@@ -2734,7 +2736,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("creates imported sessions as resumable protocol sessions", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const importedWorkspace = {
       ...workspace,
       workspaceIdentity: "ssh:example:/workspace/app",
@@ -2850,28 +2852,60 @@ describe("ZCodeProtocolAgentServer", () => {
     }
   });
 
-  it("rejects caller-provided session ids outside imported history creates", async () => {
+  it("accepts an assigned fresh ID and rejects replacement of the existing runtime", async () => {
     const server = new ZCodeProtocolAgentServer({
       createZCodeApp: (options) => createFakeApp(options),
       cwd: workspace.workspacePath,
       version: "test-version",
     });
-
-    const response = await server.handleMessage({
+    const params = { workspace, sessionId: "host-assigned-session" };
+    const first = await server.handleMessage({
       id: 1,
       method: zcodeProtocolMethods.sessionCreate,
-      params: {
-        workspace,
-        sessionId: "external-session-id",
-      },
+      params,
     });
+    expect(first).toHaveProperty("result.session.sessionId", params.sessionId);
+    const again = await server.handleMessage({
+      id: 2,
+      method: zcodeProtocolMethods.sessionCreate,
+      params,
+    });
+    expect(again).toMatchObject({ error: { code: -32602, message: "sessionId already exists" } });
+  });
 
-    expect(response).toMatchObject({
-      error: {
-        code: -32602,
-        message: "sessionId is only supported for imported history creates",
-      },
+  it("rejects concurrent creation of the same assigned ID while materializing", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
     });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const server = new ZCodeProtocolAgentServer({
+      createZCodeApp: async (options) => {
+        started();
+        await gate;
+        return createFakeApp(options);
+      },
+      cwd: workspace.workspacePath,
+      version: "test-version",
+    });
+    const params = { workspace, sessionId: "concurrent-create" };
+    const first = server.handleMessage({
+      id: 1,
+      method: zcodeProtocolMethods.sessionCreate,
+      params,
+    });
+    await entered;
+    const second = await server.handleMessage({
+      id: 2,
+      method: zcodeProtocolMethods.sessionCreate,
+      params,
+    });
+    release();
+    expect(second).toMatchObject({ error: { code: -32602, message: "sessionId already exists" } });
+    expect(await first).toHaveProperty("result.session.sessionId", params.sessionId);
   });
 
   it("keeps session title generation internals out of the visible event stream", async () => {
@@ -3220,7 +3254,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("session/read contentProfile=index 剥离大载荷，缺省仍返回完整历史", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const big = "y".repeat(512 * 1024);
     try {
       const server = new ZCodeProtocolAgentServer({
@@ -3478,18 +3512,6 @@ describe("ZCodeProtocolAgentServer", () => {
         modelId: "glm-5.1",
       }),
     ).toBe(true);
-    expect(
-      runtimeHeadersPort?.shouldRefreshBeforeModelRequest?.({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
-        modelId: "glm-5.1",
-      }),
-    ).toBe(true);
-    expect(
-      runtimeHeadersPort?.shouldRefreshBeforeModelRequest?.({
-        providerId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-        modelId: "glm-5.1",
-      }),
-    ).toBe(true);
 
     await expect(
       runtimeHeadersPort?.refreshBeforeModelRequest({
@@ -3517,7 +3539,7 @@ describe("ZCodeProtocolAgentServer", () => {
     );
   });
 
-  it("does not fail refreshed runtime headers when provider registry revision advances concurrently", async () => {
+  it("returns per-request auth and distinct IDs for concurrent runtime header refreshes", async () => {
     const createdAppOptions: ZCodeAppOptions[] = [];
     const requestClient = vi.fn(async () => ({
       headersApplied: true,
@@ -3741,6 +3763,7 @@ describe("ZCodeProtocolAgentServer", () => {
   it("reads materialization preferences once per root runtime and keeps active resumes stable", async () => {
     const createdAppOptions: ZCodeAppOptions[] = [];
     let nativeSearchEnabled = false;
+    let toolSearchMode: "off" | "local" = "off";
     let memoryEnabled = false;
     let modelContextBudgetStrategy: "legacy" | "preflight-v1" = "legacy";
     const server = new ZCodeProtocolAgentServer({
@@ -3753,6 +3776,7 @@ describe("ZCodeProtocolAgentServer", () => {
     });
     const preferenceRequests = attachSessionRuntimePreferencesResponder(server, () => ({
       nativeSearchEnhancementsEnabled: nativeSearchEnabled,
+      toolSearchMode,
       memoryEnabled,
       modelContextBudgetStrategy,
     }));
@@ -3765,6 +3789,7 @@ describe("ZCodeProtocolAgentServer", () => {
       }),
     );
     nativeSearchEnabled = true;
+    toolSearchMode = "local";
     memoryEnabled = true;
     modelContextBudgetStrategy = "preflight-v1";
     await requestResult(server, {
@@ -3782,6 +3807,8 @@ describe("ZCodeProtocolAgentServer", () => {
       preferenceRequests.map((request) => (request.params as { scope: string }).scope),
     ).toEqual(["runtime-materialization", "runtime-materialization"]);
     expect(createdAppOptions).toHaveLength(2);
+    expect(createdAppOptions[0]?.runtimeConfig?.toolSearch).toEqual({ mode: "off" });
+    expect(createdAppOptions[1]?.runtimeConfig?.toolSearch).toEqual({ mode: "local" });
     expect(createdAppOptions[0]?.runtimeConfig?.nativeSearchEnhancementsEnabled).toBe(false);
     expect(createdAppOptions[0]?.runtimeConfig?.memory?.enabled).toBe(false);
     expect(createdAppOptions[0]?.runtimeConfig?.modelContextBudgetStrategy).toBe("preflight-v1");
@@ -3792,7 +3819,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("reads the latest materialization preferences for a cold resume", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const sessionId = "sess_native_search_cold_resume" as SessionId;
     const createdAppOptions: ZCodeAppOptions[] = [];
     try {
@@ -3817,6 +3844,7 @@ describe("ZCodeProtocolAgentServer", () => {
       });
       const preferenceRequests = attachSessionRuntimePreferencesResponder(server, () => ({
         nativeSearchEnhancementsEnabled: false,
+        toolSearchMode: "auto",
         memoryEnabled: false,
         modelContextBudgetStrategy: "preflight-v1",
       }));
@@ -3828,6 +3856,7 @@ describe("ZCodeProtocolAgentServer", () => {
       });
 
       expect(preferenceRequests).toHaveLength(1);
+      expect(createdAppOptions[0]?.runtimeConfig?.toolSearch).toEqual({ mode: "auto" });
       expect(createdAppOptions[0]?.runtimeConfig?.nativeSearchEnhancementsEnabled).toBe(false);
       expect(createdAppOptions[0]?.runtimeConfig?.memory?.enabled).toBe(false);
       expect(createdAppOptions[0]?.runtimeConfig?.modelContextBudgetStrategy).toBe("preflight-v1");
@@ -3867,12 +3896,19 @@ describe("ZCodeProtocolAgentServer", () => {
           void server.handleMessage({
             id: message.id,
             result: {
-              documents: [{ path: "/agents/reviewer.md", source: "user", content }],
-              state: {
-                disabledAgentIds: [],
-                builtInModelSelectionOverrides: {},
-                pluginAgentModelSelectionOverrides: {},
-              },
+              kind: "ready",
+              // Host 返回已解析快照；磁盘文档及启停状态不再跨这个协议边界。
+              profiles: [
+                {
+                  name: "reviewer",
+                  description: "review",
+                  path: "/agents/reviewer.md",
+                  source: "user",
+                  systemPrompt: content,
+                },
+              ],
+              builtInModelSelectionOverrides: {},
+              pluginAgentModelSelectionOverrides: {},
             },
           });
         }
@@ -3893,14 +3929,13 @@ describe("ZCodeProtocolAgentServer", () => {
         expect(reader).toBeUndefined();
         return;
       }
-      expect(reader).toBeTypeOf("function");
       const input = {
         signal: new AbortController().signal,
         traceContext: { traceId: createTraceId(), sessionId: options[0]!.sessionId! },
       };
-      expect((await reader!(input)).documents[0]?.content).toBe("old");
+      expect((await reader!(input)).profiles[0]?.systemPrompt).toBe("old");
       content = "new";
-      expect((await reader!(input)).documents[0]?.content).toBe("new");
+      expect((await reader!(input)).profiles[0]?.systemPrompt).toBe("new");
       expect(reads).toEqual([
         { sessionId: options[0]!.sessionId },
         { sessionId: options[0]!.sessionId },
@@ -4144,6 +4179,36 @@ describe("ZCodeProtocolAgentServer", () => {
       ]),
     );
     expect(createdAppOptions).toHaveLength(0);
+  });
+
+  it("stops every active Session runtime when the owning protocol transport disconnects", () => {
+    const app = createFakeApp();
+    const stopActiveForegroundExecution = vi.fn(() => ({
+      foregroundExecutionId: "foreground-test",
+      kind: "stopped" as const,
+    }));
+    app.runtime.stopActiveForegroundExecution = stopActiveForegroundExecution;
+    const activeAbortController = new AbortController();
+    const server = new ZCodeProtocolAgentServer({
+      createZCodeApp: () => app,
+      cwd: workspace.workspacePath,
+      version: "test-version",
+    });
+    const context = (server as unknown as { context: ZCodeProtocolAgentServerContext }).context;
+    context.sessions.set("sess_active", {
+      activeAbortController,
+      app,
+    } as unknown as ZCodeProtocolSessionRecord);
+    const disconnectError = new Error("Core owner disconnected");
+
+    server.disconnectClient(disconnectError);
+
+    expect(stopActiveForegroundExecution).toHaveBeenCalledOnce();
+    expect(stopActiveForegroundExecution).toHaveBeenCalledWith({
+      reason: "ZCode Protocol owner disconnected",
+    });
+    expect(activeAbortController.signal.aborted).toBe(true);
+    expect(activeAbortController.signal.reason).toBe(disconnectError);
   });
 
   it("initializes the configured integrated terminal shell before the first prompt", async () => {
@@ -4612,7 +4677,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("resumes persisted sessions with the latest historical model and mode", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const sessionId = "sess_history" as SessionId;
     const userMessageId = "msg_user_history" as MessageId;
     const assistantMessageId = "msg_assistant_history" as MessageId;
@@ -4719,7 +4784,7 @@ describe("ZCodeProtocolAgentServer", () => {
     // 一直带着，resume 路径没带），createRecord 落回缺省 "interactive"。于是被 resume 的
     // dwf actor 会话通过 isTaskListSessionType 的筛，经 getSessionWorkspaceId 漏进
     // sessions-index，desktop 任务列表里长出 25 条「workflow actor actor#N@k」假任务。
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const sessionId = "sess_dwf_actor_tasktype" as SessionId;
     try {
       await store.createSession({
@@ -4814,12 +4879,32 @@ describe("ZCodeProtocolAgentServer", () => {
     expect(snapshot?.revision).toBe("account-1");
     expect(snapshot?.basedOnZCodeBuiltinRevision).toBe("zcode-builtin:1");
     expect(snapshot?.states?.["account:zai-individual-coding-plan"].current).toBe(false);
-    expect(snapshot?.providers.toJSON()).toEqual({
-      "account:zai-individual-coding-plan": {
-        access: { type: "zhipu-account", entitled: true },
-        builtinModelIds: ["GLM-5.2"],
-      },
+    expect(snapshot?.providers.get("account:zai-individual-coding-plan")?.toJSON()).toEqual({
+      access: { type: "zhipu-account", entitled: true },
+      builtinModelIds: ["GLM-5.2"],
     });
+  });
+
+  it("在执行前刷新 Worker 自己的 Provider Registry，不接收 Desktop 快照", async () => {
+    const refreshProviderRegistry = vi.fn(async (reason: string) => {
+      expect(reason).toBe("before-turn");
+    });
+    const server = new ZCodeProtocolAgentServer({
+      createZCodeApp: () => createFakeApp(),
+      cwd: workspace.workspacePath,
+      refreshProviderRegistry,
+    });
+
+    const result = await requestResult(server, {
+      id: 1,
+      method: zcodeProtocolMethods.providerRefreshRegistry,
+      params: { reason: "before-turn" },
+    });
+
+    expect(zcodeProviderRefreshRegistryResultSchema.parse(result)).toEqual({
+      refreshed: true,
+    });
+    expect(refreshProviderRegistry).toHaveBeenCalledTimes(1);
   });
 
   it("workspace presentation rejects legacy runtimeModel", async () => {
@@ -7286,7 +7371,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("forks sessions and lets selection children inherit parent runtime preferences", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const forkTargets: Array<{ targetCheckpointId?: string; targetMessageId?: string }> = [];
     const createdAppOptions: ZCodeAppOptions[] = [];
     const selectionChildId = "sess_selection_runtime_preferences" as SessionId;
@@ -7368,8 +7453,10 @@ describe("ZCodeProtocolAgentServer", () => {
         cwd: workspace.workspacePath,
         sessionStore: store,
       });
+      let toolSearchMode: "local" | "off" = "local";
       const preferenceRequests = attachSessionRuntimePreferencesResponder(server, () => ({
         nativeSearchEnhancementsEnabled: false,
+        toolSearchMode,
         memoryEnabled: false,
         subagentRuntimeConfigEnabled: true,
         modelContextBudgetStrategy: "preflight-v1",
@@ -7434,6 +7521,7 @@ describe("ZCodeProtocolAgentServer", () => {
         status: "active",
       });
 
+      toolSearchMode = "off";
       const result = zcodeSessionForkResultSchema.parse(
         await requestResult(server, {
           id: 6,
@@ -7462,6 +7550,7 @@ describe("ZCodeProtocolAgentServer", () => {
       expect(createdAppOptions).toHaveLength(2);
       expect(createdAppOptions[1]?.readSubagentRuntimeConfig).toBeTypeOf("function");
       expect(preferenceRequests).toHaveLength(1);
+      expect(createdAppOptions[1]?.runtimeConfig?.toolSearch).toEqual({ mode: "local" });
       expect(createdAppOptions[1]?.runtimeConfig?.nativeSearchEnhancementsEnabled).toBe(false);
       expect(createdAppOptions[1]?.runtimeConfig?.memory?.enabled).toBe(false);
       expect(createdAppOptions[1]?.runtimeConfig?.modelContextBudgetStrategy).toBe("preflight-v1");
@@ -7502,6 +7591,7 @@ describe("ZCodeProtocolAgentServer", () => {
       expect(createdAppOptions).toHaveLength(3);
       expect(createdAppOptions[2]?.readSubagentRuntimeConfig).toBeTypeOf("function");
       expect(preferenceRequests).toHaveLength(1);
+      expect(createdAppOptions[2]?.runtimeConfig?.toolSearch).toEqual({ mode: "local" });
       expect(createdAppOptions[2]?.runtimeConfig?.nativeSearchEnhancementsEnabled).toBe(false);
       expect(createdAppOptions[2]?.runtimeConfig?.memory?.enabled).toBe(false);
       expect(createdAppOptions[2]?.runtimeConfig?.modelContextBudgetStrategy).toBe("preflight-v1");
@@ -7512,7 +7602,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 
   it("resolves turn fork targets before later user, fork, and compact synthetic messages", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const sessionId = "sess_fork_turn_history" as SessionId;
     const forkTargets: Array<{ targetCheckpointId?: string; targetMessageId?: string }> = [];
     try {
@@ -7641,7 +7731,7 @@ describe("ZCodeProtocolAgentServer", () => {
   });
 });
 
-type TestSessionStore = ReturnType<typeof createSqliteSessionStore>;
+type TestSessionStore = Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
 async function saveUserTextMessage(
   store: TestSessionStore,
@@ -7834,6 +7924,7 @@ function attachSessionRuntimePreferencesResponder(
   server: ZCodeProtocolAgentServer,
   resolvePreferences: (scope: "runtime-materialization" | "user-execution") => {
     nativeSearchEnhancementsEnabled: boolean;
+    toolSearchMode?: "auto" | "local" | "off";
     memoryEnabled?: boolean;
     subagentRuntimeConfigEnabled?: boolean;
     modelContextBudgetStrategy?: "legacy" | "preflight-v1";

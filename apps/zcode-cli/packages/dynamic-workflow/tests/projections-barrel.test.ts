@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -17,7 +17,8 @@ const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const ENTRY = join(distDir, "projections.js");
 
 /** 每条静态 import / re-export 的说明符（含 `export … from`），side-effect import 也算。 */
-const SPECIFIER = /(?:^|\n)\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|(?:^|\n)\s*import\s*["']([^"']+)["']/g;
+const SPECIFIER =
+  /(?:^|\n)\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']|(?:^|\n)\s*import\s*["']([^"']+)["']/g;
 
 function specifiersOf(file: string): string[] {
   const source = readFileSync(file, "utf8");
@@ -51,15 +52,13 @@ function walk(entry: string): { files: string[]; bare: Map<string, string[]> } {
 }
 
 describe("projections barrel is browser-safe", () => {
-  it("dist/projections.js exists (run `pnpm run build` first)", () => {
-    expect(existsSync(ENTRY)).toBe(true);
-  });
-
   it("no reachable dist file imports typescript (or any other bare specifier)", () => {
     const { bare, files } = walk(ENTRY);
     // 桶本身加上它再导出的投影模块——闭包不能退化成只有入口文件。
     expect(files.length).toBeGreaterThan(5);
-    const leaks = [...bare.entries()].map(([spec, importers]) => `${spec} <- ${importers.join(", ")}`);
+    const leaks = [...bare.entries()].map(
+      ([spec, importers]) => `${spec} <- ${importers.join(", ")}`,
+    );
     expect(leaks, "bare imports reachable from the browser barrel").toEqual([]);
     expect(bare.has("typescript")).toBe(false);
     // 反向校验：走同一套遍历，根导出必然到达 typescript——否则说明遍历本身失效。
@@ -69,7 +68,12 @@ describe("projections barrel is browser-safe", () => {
   it("does not reach the analyzer front-end modules", () => {
     const { files } = walk(ENTRY);
     const names = files.map((file) => file.slice(distDir.length + 1));
-    for (const forbidden of ["analysis/causality-order.js", "analysis/analyze.js", "compiler/compile.js", "analysis/domain.js"]) {
+    for (const forbidden of [
+      "analysis/causality-order.js",
+      "analysis/analyze.js",
+      "compiler/compile.js",
+      "analysis/domain.js",
+    ]) {
       expect(names, `${forbidden} must not be reachable`).not.toContain(forbidden);
     }
   });

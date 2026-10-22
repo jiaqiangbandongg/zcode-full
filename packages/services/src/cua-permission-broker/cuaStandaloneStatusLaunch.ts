@@ -22,3 +22,22 @@ export function resolveStandaloneStatusLaunchCandidates(
   }
   return candidates;
 }
+
+export interface StandaloneStatusLaunchAppPathOptions {
+  env: NodeJS.ProcessEnv;
+  bundledAppPath: string | undefined;
+  exists: (path: string) => boolean;
+  ensureInstalled: (bundledAppPath: string) => Promise<string>;
+}
+
+export async function resolveStandaloneStatusLaunchAppPath({
+  env,
+  bundledAppPath,
+  exists,
+  ensureInstalled,
+}: StandaloneStatusLaunchAppPathOptions): Promise<string | null> {
+  if (bundledAppPath && exists(bundledAppPath)) {
+    return ensureInstalled(bundledAppPath);
+  }
+  return resolveStandaloneStatusLaunchCandidates(env).find(exists) ?? null;
+}

@@ -104,30 +104,6 @@ describe("read file state hydrator", () => {
     expect(readFileState.size).toBe(0);
   });
 
-  it("skips empty Read warning output when completed metadata is missing", async () => {
-    const sessionID = createSessionId("hydrate-read-state-empty-output");
-    const file = join(workspaceRoot, "src", "empty.ts");
-    const readFileState: ReadFileStateMap = new Map();
-
-    const result = await hydrateReadFileStateFromSession({
-      messages: [
-        assistantToolMessage(sessionID, "assistant-empty-read", 10, [
-          completedToolPart(sessionID, "assistant-empty-read", "tool-read-empty", "Read", {
-            input: { file_path: file },
-            output:
-              "<system-reminder>Warning: the file exists but the contents are empty.</system-reminder>",
-          }),
-        ]),
-      ],
-      readFileState,
-      workingDirectory: workspaceRoot,
-      workspaceRoot,
-    });
-
-    expect(result.restoredCount).toBe(0);
-    expect(readFileState.size).toBe(0);
-  });
-
   it("skips Read metadata without complete freshness fields", async () => {
     const sessionID = createSessionId("hydrate-read-state-incomplete-metadata");
     const file = join(workspaceRoot, "src", "incomplete.ts");
@@ -136,22 +112,28 @@ describe("read file state hydrator", () => {
     const result = await hydrateReadFileStateFromSession({
       messages: [
         assistantToolMessage(sessionID, "assistant-incomplete-read", 10, [
-          completedToolPart(sessionID, "assistant-incomplete-read", "tool-read-incomplete", "Read", {
-            input: { file_path: file },
-            output: "1\tincomplete\n2\t",
-            metadata: {
-              readFileState: {
-                content: "incomplete\n",
-                isPartialView: false,
-                path: file,
-                readAtMs: 2,
+          completedToolPart(
+            sessionID,
+            "assistant-incomplete-read",
+            "tool-read-incomplete",
+            "Read",
+            {
+              input: { file_path: file },
+              output: "1\tincomplete\n2\t",
+              metadata: {
+                readFileState: {
+                  content: "incomplete\n",
+                  isPartialView: false,
+                  path: file,
+                  readAtMs: 2,
+                  schemaVersion: 1,
+                  sizeBytes: Buffer.byteLength("incomplete\n", "utf8"),
+                  tool: "Read",
+                },
                 schemaVersion: 1,
-                sizeBytes: Buffer.byteLength("incomplete\n", "utf8"),
-                tool: "Read",
               },
-              schemaVersion: 1,
             },
-          }),
+          ),
         ]),
       ],
       readFileState,
@@ -195,11 +177,17 @@ describe("read file state hydrator", () => {
     const result = await hydrateReadFileStateFromSession({
       messages: [
         assistantToolMessage(sessionID, "assistant-full-read-before-range", 10, [
-          completedToolPart(sessionID, "assistant-full-read-before-range", "tool-read-full", "Read", {
-            input: { file_path: file },
-            output: "1\tline one\n2\tline two\n3\t",
-            metadata: readStateMetadata(file, "line one\nline two\n"),
-          }),
+          completedToolPart(
+            sessionID,
+            "assistant-full-read-before-range",
+            "tool-read-full",
+            "Read",
+            {
+              input: { file_path: file },
+              output: "1\tline one\n2\tline two\n3\t",
+              metadata: readStateMetadata(file, "line one\nline two\n"),
+            },
+          ),
         ]),
         assistantToolMessage(sessionID, "assistant-range-read-after-full", 20, [
           completedToolPart(
@@ -324,10 +312,16 @@ describe("read file state hydrator", () => {
     const result = await hydrateReadFileStateFromSession({
       messages: [
         assistantToolMessage(sessionID, "assistant-write-edit-legacy", 10, [
-          completedToolPart(sessionID, "assistant-write-edit-legacy", "tool-write-legacy", "Write", {
-            input: { file_path: writeFile, content: "written content\n" },
-            output: "The file has been updated successfully.",
-          }),
+          completedToolPart(
+            sessionID,
+            "assistant-write-edit-legacy",
+            "tool-write-legacy",
+            "Write",
+            {
+              input: { file_path: writeFile, content: "written content\n" },
+              output: "The file has been updated successfully.",
+            },
+          ),
           completedToolPart(sessionID, "assistant-write-edit-legacy", "tool-edit-legacy", "Edit", {
             input: { file_path: editFile, old_string: "old", new_string: "edited" },
             output: "The file has been updated successfully.",

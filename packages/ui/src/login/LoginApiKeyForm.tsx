@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { isApiKeyAccess } from "@zcode/provider";
 import { Loader2Icon, TriangleAlertIcon } from "lucide-react";
+import { BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID } from "@zcode/shared";
 import {
-  BIGMODEL_PROVIDER_ID,
   TID_LOGIN_API_KEY_CANCEL_BUTTON,
   TID_LOGIN_API_KEY_CONTINUE_BUTTON,
   TID_LOGIN_API_KEY_ERROR,
@@ -10,9 +10,8 @@ import {
   TID_LOGIN_API_KEY_PROVIDER_ITEM,
   TID_LOGIN_API_KEY_PROVIDER_TRIGGER,
   TID_LOGIN_API_KEY_SKIP_BUTTON,
-  ZAI_PROVIDER_ID,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Alert, AlertDescription } from "@/components/ui/alert.js";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";

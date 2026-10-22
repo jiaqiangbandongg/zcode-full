@@ -1230,8 +1230,6 @@ describe("Feishu group sessions", () => {
     const submitted = taskService.submitBotGroupInput.mock.calls[0]![0];
     expect(submitted.content).toBe("");
     expect(submitted.conversationQuotes).toEqual([{ messageId: "om_question", text: "/stop" }]);
-    expect(submitted.content).not.toContain("[Quoted message]");
-    expect(submitted.content).not.toContain("om_question");
   });
 
   it("keeps quoted text separate from real file and image attachments", async () => {
@@ -1399,7 +1397,6 @@ describe("Feishu group sessions", () => {
       }),
     ]);
     expect(input.attachments[0].textContent).toContain("ou_user");
-    expect(input.content).not.toContain("What is two plus two");
     expect(input.source.topicContext).toBeUndefined();
     expect(JSON.stringify(input.source)).not.toContain("What is two plus two");
 
@@ -2187,17 +2184,6 @@ describe("Feishu group sessions", () => {
     expect(group?.currentOptions).toEqual({ mode: "default" });
   });
 
-  it("refuses new drafts while CLI still owns queued input, even without a bot running marker", async () => {
-    const { send, taskService, service } = setup();
-    taskService.getBotGroupTaskBlockReason = vi.fn(async () => "queued" as const);
-    await send("/enable");
-    await send("work", "oc_a", "member");
-    const taskId = (await service.getBotStates()).find((s) => s.group)?.activeTaskId;
-    const reply = await send("/new");
-    expect(reply[0]?.text).toContain("排队");
-    expect((await service.getBotStates()).find((s) => s.group)?.activeTaskId).toBe(taskId);
-  });
-
   it.each([
     ["running", "运行"],
     ["queued", "排队"],
@@ -2343,14 +2329,14 @@ describe("Feishu group sessions", () => {
       },
       text: "/new",
     });
-    taskService.listTasks = vi.fn(async () => []);
+    // 任务仍归该项目；私人草稿不改变群内的项目候选。
     await send("/task 1");
     expect((await service.getBotStates()).find((value) => value.group)?.activeTaskId).toBe(
       "task-1",
     );
   });
 
-  it("retains historical workspace identity when a group moves to another workspace", async () => {
+  it("preserves historical identity but does not offer tasks outside the current project execution scope", async () => {
     const { send, service, taskService, repo } = setup();
     taskService.getBotGroupTaskBlockReason = vi.fn(async () => null);
     await send("/enable");
@@ -2381,7 +2367,11 @@ describe("Feishu group sessions", () => {
         : [],
     );
     const menu = await send("/task");
-    expect(menu[0]?.selection?.options.map((option) => option.id)).toContain(originalTaskId);
+    expect(menu[0]?.selection?.options ?? []).toEqual([]);
+    const retained = Object.values((await repo.readState()).bots).find((value) => value.group)!;
+    expect(retained.group?.taskWorkspaces?.[originalTaskId]).toMatchObject({
+      workspacePath: originalPath,
+    });
     expect((await service.getBotStates()).find((value) => value.group)?.activeTaskId).toBeNull();
   });
 

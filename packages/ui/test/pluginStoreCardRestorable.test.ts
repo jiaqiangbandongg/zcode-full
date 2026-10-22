@@ -46,7 +46,7 @@ function makeActions(overrides: Partial<PluginStoreActions> = {}): PluginStoreAc
     onUninstall: () => {},
     onSetEnabled: () => {},
     onUpdate: () => {},
-    operationId: null,
+    activeOperations: [],
     togglingPluginId: null,
     ...overrides,
   };
@@ -115,6 +115,139 @@ describe("PluginStoreCard restorable built-ins", () => {
     expect(html).toContain("Install");
   });
 
+  it.each([true, false])(
+    "side pane market adds an open button for installed UI plugins with enabled=%s",
+    async (enabled) => {
+      const item = installedItemWithRuntimeInfo();
+      item.info!.enabled = enabled;
+      item.info!.uiSurfaces = [
+        {
+          pluginId: item.id,
+          pluginName: item.name,
+          id: "panel",
+          title: "Panel",
+          server: "panel",
+          resourceUri: "ui://panel/app",
+          availability: "session",
+        },
+      ];
+      const onOpenUi = vi.fn();
+      const html = await renderCard(item, makeActions({ onOpenUi }));
+      expect(html).toContain(enabled ? "Open" : "Enable");
+      // 卡片整行进入详情，不再提供独立「详情」按钮。
+      expect(html).not.toContain('data-testid="plugin-store-ui-details"');
+      const button = buttonProps.find((props) => props["data-testid"] === "plugin-store-open-ui");
+      expect(button).toBeDefined();
+      (button!.onClick as (event: { stopPropagation: () => void }) => void)({
+        stopPropagation: () => {},
+      });
+      expect(onOpenUi).toHaveBeenCalledWith(item);
+    },
+  );
+
+  it("main navigation market has no UI open or details buttons", async () => {
+    const item = installedItemWithRuntimeInfo();
+    item.info!.uiSurfaces = [
+      {
+        pluginId: item.id,
+        pluginName: item.name,
+        id: "panel",
+        title: "Panel",
+        server: "panel",
+        resourceUri: "ui://panel/app",
+        availability: "session",
+      },
+    ];
+    const card = await renderCard(item, makeActions());
+    expect(card).not.toContain('data-testid="plugin-store-open-ui"');
+    expect(card).not.toContain('data-testid="plugin-store-ui-details"');
+    // 主导航详情不打开 UI，恢复普通插件的「立即试用」。
+    const detail = await renderDetail(item, makeActions(), vi.fn());
+    expect(detail).not.toContain('data-testid="plugin-store-open-ui"');
+    expect(detail).toContain('data-testid="plugin-store-try-now"');
+  });
+
+  it("shows a UI opening action and capability in details without creating a chat", async () => {
+    const item = installedItemWithRuntimeInfo();
+    item.info!.uiSurfaces = [
+      {
+        pluginId: item.id,
+        pluginName: item.name,
+        id: "panel",
+        title: "Panel",
+        server: "panel",
+        resourceUri: "ui://panel/app",
+        availability: "session",
+      },
+    ];
+    const onOpenUi = vi.fn();
+    const onUsePrompt = vi.fn();
+    const html = await renderDetail(item, makeActions({ onOpenUi }), onUsePrompt);
+    expect(html).toContain('data-testid="plugin-store-ui-capability"');
+    expect(html).not.toContain('data-testid="plugin-store-try-now"');
+    const button = buttonProps.find((props) => props["data-testid"] === "plugin-store-open-ui");
+    (button?.onClick as (event: { stopPropagation: () => void }) => void)({
+      stopPropagation: () => {},
+    });
+    expect(onOpenUi).toHaveBeenCalledWith(item);
+    expect(onUsePrompt).not.toHaveBeenCalled();
+  });
+
+  it("keeps project reset accessible outside the more menu", async () => {
+    const item = installedItemWithRuntimeInfo();
+    const onResetConfig = vi.fn();
+    await renderDetail(item, makeActions({ onResetConfig }));
+    const button = buttonProps.find(
+      (props) => props["data-testid"] === "plugin-store-reset-config",
+    );
+    (button?.onClick as () => void)();
+    expect(onResetConfig).toHaveBeenCalledWith(item.id);
+  });
+
+  it("keeps project reset enabled while another plugin installs and disables it for its own reset", async () => {
+    const item = installedItemWithRuntimeInfo();
+    const resetButton = () =>
+      buttonProps.findLast((props) => props["data-testid"] === "plugin-store-reset-config");
+    await renderDetail(
+      item,
+      makeActions({
+        onResetConfig: () => {},
+        activeOperations: [{ id: "plugin:install:other@personal" }],
+      }),
+    );
+    expect(resetButton()?.disabled).toBe(false);
+    await renderDetail(
+      item,
+      makeActions({
+        onResetConfig: () => {},
+        activeOperations: [{ id: `plugin:reset-config:${item.id}` }],
+      }),
+    );
+    expect(resetButton()?.disabled).toBe(true);
+  });
+
+  it("disables project reset while the same plugin saves its config", async () => {
+    const item = installedItemWithRuntimeInfo();
+    const resetButton = () =>
+      buttonProps.findLast((props) => props["data-testid"] === "plugin-store-reset-config");
+    await renderDetail(
+      item,
+      makeActions({
+        onResetConfig: () => {},
+        activeOperations: [{ id: `plugin:configure:${item.id}` }],
+      }),
+    );
+    expect(resetButton()?.disabled).toBe(true);
+    await renderDetail(
+      item,
+      makeActions({
+        onResetConfig: () => {},
+        activeOperations: [{ id: "plugin:configure:other@personal" }],
+      }),
+    );
+    expect(resetButton()?.disabled).toBe(false);
+  });
+
   it("invokes onInstall with the restorable item when the install button is clicked", async () => {
     const onInstall = vi.fn();
     await renderCard(restorableItem(), makeActions({ onInstall }));
@@ -171,7 +304,7 @@ describe("PluginStoreCard restorable built-ins", () => {
     expect(html).toContain("Install");
   });
 
-  it("keeps the Workspace config menu for a missing package without offering uninstall", async () => {
+  it("keeps Workspace reset outside the menu for a missing package", async () => {
     const html = await renderDetail(
       restorableItem({
         info: {
@@ -190,7 +323,7 @@ describe("PluginStoreCard restorable built-ins", () => {
       makeActions({ onResetConfig: () => {} }),
     );
 
-    expect(html).toContain('data-testid="plugin-store-item-menu"');
+    expect(html).toContain('data-testid="plugin-store-reset-config"');
     expect(html).not.toContain('data-testid="plugin-store-menu-uninstall"');
     expect(html).toContain("Install");
   });

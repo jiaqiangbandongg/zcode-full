@@ -1,0 +1,678 @@
+[
+  {
+    "id": "share-content-1",
+    "type": "workflow",
+    "version": 1,
+    "product_turn_id": "share-product-turn-1",
+    "fallback_row_id": 3,
+    "captured_at": 1000,
+    "resource_ids": [
+      "share-artifact-1",
+      "share-artifact-2"
+    ],
+    "payload": {
+      "name": "军棋游戏：人机对战 + 双人联网",
+      "completion": true,
+      "graph": {
+        "steps": [
+          {
+            "id": "ask-0-0",
+            "kind": "ask",
+            "label": "架构师",
+            "lane": "agent-0-0",
+            "phase": "p0"
+          },
+          {
+            "id": "ask-0-1",
+            "kind": "ask",
+            "label": "方案评审员",
+            "lane": "agent-0-1",
+            "phase": "p0"
+          },
+          {
+            "id": "ask-1-0",
+            "kind": "ask",
+            "label": "规则引擎工程师",
+            "lane": "agent-1-0",
+            "phase": "p1"
+          },
+          {
+            "id": "ask-2-0",
+            "kind": "ask",
+            "label": "AI 工程师",
+            "lane": "agent-2-0",
+            "phase": "p2"
+          },
+          {
+            "id": "ask-2-1",
+            "kind": "ask",
+            "label": "服务器工程师",
+            "lane": "agent-2-1",
+            "phase": "p2"
+          },
+          {
+            "id": "ask-2-2",
+            "kind": "ask",
+            "label": "客户端工程师",
+            "lane": "agent-2-2",
+            "phase": "p2"
+          },
+          {
+            "id": "ask-3-0",
+            "kind": "ask",
+            "label": "集成工程师",
+            "lane": "agent-3-0",
+            "phase": "p3"
+          },
+          {
+            "id": "ask-4-0",
+            "kind": "ask",
+            "label": "验收员",
+            "lane": "agent-4-0",
+            "phase": "p4"
+          },
+          {
+            "id": "ask-4-1",
+            "kind": "ask",
+            "label": "文档评审员",
+            "lane": "agent-4-1",
+            "phase": "p4"
+          }
+        ],
+        "lanes": [
+          {
+            "id": "agent-0-0",
+            "name": "架构师"
+          },
+          {
+            "id": "agent-0-1",
+            "name": "方案评审员"
+          },
+          {
+            "id": "agent-1-0",
+            "name": "规则引擎工程师"
+          },
+          {
+            "id": "agent-2-0",
+            "name": "AI 工程师"
+          },
+          {
+            "id": "agent-2-1",
+            "name": "服务器工程师"
+          },
+          {
+            "id": "agent-2-2",
+            "name": "客户端工程师"
+          },
+          {
+            "id": "agent-3-0",
+            "name": "集成工程师"
+          },
+          {
+            "id": "agent-4-0",
+            "name": "验收员"
+          },
+          {
+            "id": "agent-4-1",
+            "name": "文档评审员"
+          }
+        ],
+        "participants": [
+          {
+            "id": "part-0-0",
+            "phase": "p0",
+            "lane": "agent-0-0",
+            "steps": [
+              "ask-0-0"
+            ]
+          },
+          {
+            "id": "part-0-1",
+            "phase": "p0",
+            "lane": "agent-0-1",
+            "steps": [
+              "ask-0-1"
+            ]
+          },
+          {
+            "id": "part-1-0",
+            "phase": "p1",
+            "lane": "agent-1-0",
+            "steps": [
+              "ask-1-0"
+            ]
+          },
+          {
+            "id": "part-2-0",
+            "phase": "p2",
+            "lane": "agent-2-0",
+            "steps": [
+              "ask-2-0"
+            ]
+          },
+          {
+            "id": "part-2-1",
+            "phase": "p2",
+            "lane": "agent-2-1",
+            "steps": [
+              "ask-2-1"
+            ]
+          },
+          {
+            "id": "part-2-2",
+            "phase": "p2",
+            "lane": "agent-2-2",
+            "steps": [
+              "ask-2-2"
+            ]
+          },
+          {
+            "id": "part-3-0",
+            "phase": "p3",
+            "lane": "agent-3-0",
+            "steps": [
+              "ask-3-0"
+            ]
+          },
+          {
+            "id": "part-4-0",
+            "phase": "p4",
+            "lane": "agent-4-0",
+            "steps": [
+              "ask-4-0"
+            ]
+          },
+          {
+            "id": "part-4-1",
+            "phase": "p4",
+            "lane": "agent-4-1",
+            "steps": [
+              "ask-4-1"
+            ]
+          }
+        ],
+        "handoffs": [],
+        "phases": [
+          {
+            "id": "p0",
+            "name": "整体设计"
+          },
+          {
+            "id": "p1",
+            "name": "规则引擎"
+          },
+          {
+            "id": "p2",
+            "name": "并行开发"
+          },
+          {
+            "id": "p3",
+            "name": "集成联调"
+          },
+          {
+            "id": "p4",
+            "name": "独立验收"
+          }
+        ],
+        "phaseEdges": [
+          {
+            "from": "p0",
+            "to": "p1"
+          },
+          {
+            "from": "p1",
+            "to": "p2"
+          },
+          {
+            "from": "p2",
+            "to": "p3"
+          },
+          {
+            "from": "p3",
+            "to": "p4"
+          }
+        ],
+        "exits": [
+          "p4"
+        ],
+        "sink": [
+          "ask-0-0",
+          "ask-0-1",
+          "ask-1-0",
+          "ask-2-0",
+          "ask-2-1",
+          "ask-2-2",
+          "ask-3-0",
+          "ask-4-0",
+          "ask-4-1"
+        ]
+      },
+      "run": {
+        "status": "completed",
+        "usage": {
+          "spentTokens": 1000,
+          "nodesUsed": 9
+        },
+        "actors": [
+          {
+            "siteId": "agent-0-0",
+            "ordinal": 1,
+            "name": "架构师",
+            "status": "completed",
+            "phaseName": "整体设计"
+          },
+          {
+            "siteId": "agent-0-1",
+            "ordinal": 1,
+            "name": "方案评审员",
+            "status": "completed",
+            "phaseName": "整体设计"
+          },
+          {
+            "siteId": "agent-1-0",
+            "ordinal": 1,
+            "name": "规则引擎工程师",
+            "status": "completed",
+            "phaseName": "规则引擎"
+          },
+          {
+            "siteId": "agent-2-0",
+            "ordinal": 1,
+            "name": "AI 工程师",
+            "status": "completed",
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "agent-2-1",
+            "ordinal": 1,
+            "name": "服务器工程师",
+            "status": "completed",
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "agent-2-2",
+            "ordinal": 1,
+            "name": "客户端工程师",
+            "status": "completed",
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "agent-3-0",
+            "ordinal": 1,
+            "name": "集成工程师",
+            "status": "completed",
+            "phaseName": "集成联调"
+          },
+          {
+            "siteId": "agent-4-0",
+            "ordinal": 1,
+            "name": "验收员",
+            "status": "completed",
+            "phaseName": "独立验收"
+          },
+          {
+            "siteId": "agent-4-1",
+            "ordinal": 1,
+            "name": "文档评审员",
+            "status": "completed",
+            "phaseName": "独立验收"
+          }
+        ],
+        "nodes": [
+          {
+            "siteId": "ask-0-0",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-0-0",
+            "actorOrdinal": 1,
+            "phaseName": "整体设计"
+          },
+          {
+            "siteId": "ask-0-1",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-0-1",
+            "actorOrdinal": 1,
+            "phaseName": "整体设计"
+          },
+          {
+            "siteId": "ask-1-0",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-1-0",
+            "actorOrdinal": 1,
+            "phaseName": "规则引擎"
+          },
+          {
+            "siteId": "ask-2-0",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-2-0",
+            "actorOrdinal": 1,
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "ask-2-1",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-2-1",
+            "actorOrdinal": 1,
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "ask-2-2",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-2-2",
+            "actorOrdinal": 1,
+            "phaseName": "并行开发"
+          },
+          {
+            "siteId": "ask-3-0",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-3-0",
+            "actorOrdinal": 1,
+            "phaseName": "集成联调"
+          },
+          {
+            "siteId": "ask-4-0",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-4-0",
+            "actorOrdinal": 1,
+            "phaseName": "独立验收"
+          },
+          {
+            "siteId": "ask-4-1",
+            "ordinal": 1,
+            "phase": "settled",
+            "outcome": "ok",
+            "actorSiteId": "agent-4-1",
+            "actorOrdinal": 1,
+            "phaseName": "独立验收"
+          }
+        ],
+        "phases": [
+          {
+            "name": "整体设计",
+            "rounds": 1
+          },
+          {
+            "name": "规则引擎",
+            "rounds": 1
+          },
+          {
+            "name": "并行开发",
+            "rounds": 1
+          },
+          {
+            "name": "集成联调",
+            "rounds": 1
+          },
+          {
+            "name": "独立验收",
+            "rounds": 1
+          }
+        ],
+        "lastEventSequence": 50
+      },
+      "artifacts": [
+        {
+          "id": "board",
+          "title": "军棋项目进度看板",
+          "kind": "board",
+          "version": 1,
+          "spec": {
+            "key": "id",
+            "status": "status",
+            "columns": [
+              "done"
+            ],
+            "cardTitle": "title"
+          },
+          "items": [
+            {
+              "sequence": 1,
+              "siteId": "report",
+              "ordinal": 1,
+              "item": {
+                "id": "0",
+                "status": "done",
+                "title": "模块 1"
+              }
+            },
+            {
+              "sequence": 2,
+              "siteId": "report",
+              "ordinal": 2,
+              "item": {
+                "id": "1",
+                "status": "done",
+                "title": "模块 2"
+              }
+            },
+            {
+              "sequence": 3,
+              "siteId": "report",
+              "ordinal": 3,
+              "item": {
+                "id": "2",
+                "status": "done",
+                "title": "模块 3"
+              }
+            },
+            {
+              "sequence": 4,
+              "siteId": "report",
+              "ordinal": 4,
+              "item": {
+                "id": "3",
+                "status": "done",
+                "title": "模块 4"
+              }
+            },
+            {
+              "sequence": 5,
+              "siteId": "report",
+              "ordinal": 5,
+              "item": {
+                "id": "4",
+                "status": "done",
+                "title": "模块 5"
+              }
+            },
+            {
+              "sequence": 6,
+              "siteId": "report",
+              "ordinal": 6,
+              "item": {
+                "id": "5",
+                "status": "done",
+                "title": "模块 6"
+              }
+            },
+            {
+              "sequence": 7,
+              "siteId": "report",
+              "ordinal": 7,
+              "item": {
+                "id": "6",
+                "status": "done",
+                "title": "模块 7"
+              }
+            },
+            {
+              "sequence": 8,
+              "siteId": "report",
+              "ordinal": 8,
+              "item": {
+                "id": "7",
+                "status": "done",
+                "title": "模块 8"
+              }
+            },
+            {
+              "sequence": 9,
+              "siteId": "report",
+              "ordinal": 9,
+              "item": {
+                "id": "8",
+                "status": "done",
+                "title": "模块 9"
+              }
+            },
+            {
+              "sequence": 10,
+              "siteId": "report",
+              "ordinal": 10,
+              "item": {
+                "id": "9",
+                "status": "done",
+                "title": "模块 10"
+              }
+            },
+            {
+              "sequence": 11,
+              "siteId": "report",
+              "ordinal": 11,
+              "item": {
+                "id": "10",
+                "status": "done",
+                "title": "模块 11"
+              }
+            },
+            {
+              "sequence": 12,
+              "siteId": "report",
+              "ordinal": 12,
+              "item": {
+                "id": "11",
+                "status": "done",
+                "title": "模块 12"
+              }
+            },
+            {
+              "sequence": 13,
+              "siteId": "report",
+              "ordinal": 13,
+              "item": {
+                "id": "12",
+                "status": "done",
+                "title": "模块 13"
+              }
+            },
+            {
+              "sequence": 14,
+              "siteId": "report",
+              "ordinal": 14,
+              "item": {
+                "id": "13",
+                "status": "done",
+                "title": "模块 14"
+              }
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "title": "军棋项目交付报告",
+          "kind": "markdown",
+          "version": 1,
+          "resource_id": "share-artifact-1",
+          "content_type": "text/markdown",
+          "bytes": 12
+        },
+        {
+          "id": "readme",
+          "title": "军棋游戏启动说明",
+          "kind": "file",
+          "version": 1,
+          "resource_id": "share-artifact-2",
+          "content_type": "text/markdown",
+          "bytes": 12
+        },
+        {
+          "id": "table",
+          "title": "结果表格",
+          "kind": "table",
+          "version": 1,
+          "spec": {
+            "columns": [
+              {
+                "field": "value"
+              }
+            ]
+          },
+          "items": [
+            {
+              "sequence": 1,
+              "siteId": "report",
+              "ordinal": 1,
+              "item": {
+                "value": 42
+              }
+            }
+          ]
+        },
+        {
+          "id": "chart",
+          "title": "性能图表",
+          "kind": "chart",
+          "version": 1,
+          "spec": {
+            "x": {
+              "field": "x"
+            },
+            "y": {
+              "field": "y"
+            }
+          },
+          "items": [
+            {
+              "sequence": 1,
+              "siteId": "report",
+              "ordinal": 1,
+              "item": {
+                "x": 1,
+                "y": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "metrics",
+          "title": "验收指标",
+          "kind": "metrics",
+          "version": 1,
+          "spec": {
+            "metrics": [
+              {
+                "field": "value",
+                "label": "通过数"
+              }
+            ]
+          },
+          "items": [
+            {
+              "sequence": 1,
+              "siteId": "report",
+              "ordinal": 1,
+              "item": {
+                "value": 43
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

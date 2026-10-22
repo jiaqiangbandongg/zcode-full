@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "@zcode/shared";
@@ -44,6 +45,7 @@ async function createSettingServiceInHome(home: string): Promise<ISettingService
 
 afterEach(() => {
   vi.doUnmock("node:fs/promises");
+  vi.doUnmock("@zcode/shared/node");
   vi.restoreAllMocks();
   restoreEnvValue("HOME", originalHome);
   restoreEnvValue("ZCODE_DESKTOP_HOME_DIR", originalDesktopHome);
@@ -61,6 +63,196 @@ afterEach(() => {
 });
 
 describe("settingService", () => {
+  it.each([false, true])(
+    "读取时迁移旧介绍版本 3 并保留其他设置（并发更新=%s）",
+    async (concurrent) => {
+      const taskHome = makeTempHome();
+      process.env.ZCODE_DESKTOP_HOME_DIR = taskHome;
+      const { createSettingService } = await import("#src/setting/settingService.js");
+      const service = createSettingService();
+      const file = join(taskHome, ".zcode/v2/setting.json");
+      const retained = {
+        recentProjects: ["/example/project"],
+        memoryEnabled: true,
+        providerFamilyDomain: "zai",
+        providerFamilyConnectionSelections: { zai: { kind: "individual-coding-plan" } },
+        sourceServers: [
+          {
+            sourceServerId: "10000000-0000-4000-8000-000000000001",
+            displayName: "Example device",
+            installState: "installed",
+            declaredWorkspaces: [],
+          },
+        ],
+      };
+      await mkdir(join(taskHome, ".zcode/v2"), { recursive: true });
+      await writeFile(
+        file,
+        JSON.stringify({
+          ...retained,
+          remoteBoundaryOnboardingVersion: 3,
+          closeToTrayOnWindowsMigrationInitialized: true,
+          messageStreamShowReasoningMigrationInitialized: true,
+        }),
+      );
+      const reading = service.get();
+      if (concurrent) {
+        await Promise.all([reading, createSettingService().update({ locale: "en-US" })]);
+      } else {
+        await reading;
+      }
+      const persisted = JSON.parse(await readFile(file, "utf8"));
+      expect(persisted).toMatchObject({
+        ...retained,
+        remoteBoundaryOnboardingVersion: 2,
+        remoteBoundaryIntroAcknowledgedVersion: 1,
+        ...(concurrent ? { localePreference: "en-US" } : {}),
+      });
+      await service.get();
+      expect(JSON.parse(await readFile(file, "utf8"))).toEqual(persisted);
+    },
+  );
+
+  it("服务创建时固定 HOME，旧异步读取不写入后创建 Host 的设置目录", async () => {
+    const firstHome = makeTempHome();
+    const secondHome = makeTempHome();
+    const first = await createSettingServiceInHome(firstHome);
+    await first.update({ locale: "zh-CN" });
+    const second = await createSettingServiceInHome(secondHome);
+    await second.update({ locale: "en-US" });
+    await first.update({ memoryEnabled: true });
+    expect(
+      JSON.parse(readFileSync(join(firstHome, ".zcode/v2/setting.json"), "utf8")),
+    ).toMatchObject({ locale: "zh-CN", memoryEnabled: true });
+    expect(
+      JSON.parse(readFileSync(join(secondHome, ".zcode/v2/setting.json"), "utf8")),
+    ).toMatchObject({ locale: "en-US", memoryEnabled: false });
+  });
+
+  it("两个独立 Host 的并发补丁在同一文件锁内重读，不互相覆盖", async () => {
+    const home = makeTempHome();
+    const first = await createSettingServiceInHome(home);
+    const second = await createSettingServiceInHome(home);
+    await first.update({ locale: "zh-CN", memoryEnabled: false });
+    await Promise.all([first.update({ locale: "en-US" }), second.update({ memoryEnabled: true })]);
+    await expect(first.get()).resolves.toMatchObject({ locale: "en-US", memoryEnabled: true });
+  });
+
+  it("兼容集合只在锁内从目录派生，迟到的 UI 补丁不能带回删除的入口", async () => {
+    const home = makeTempHome();
+    process.env.HOME = home;
+    const { createSettingServiceWithMigrations } = await import("../src/setting/settingService.js");
+    const owner = createSettingServiceWithMigrations();
+    let paths = ["/retained"];
+    owner.setWorkspaceProjection(async (settings) => ({
+      lastWorkspaceSession: paths.map((workspacePath) => ({
+        kind: "local" as const,
+        workspacePath,
+      })),
+      recentProjects: paths,
+      lastActiveTabIndex: 0,
+      lastActiveWorkspace: settings.lastActiveWorkspace ?? null,
+    }));
+    await owner.service.get();
+    expect(
+      JSON.parse(readFileSync(join(home, ".zcode/v2/setting.json"), "utf8")).recentProjects,
+    ).toEqual(paths);
+    paths = [];
+    await owner.service.update({
+      recentProjects: ["/deleted"],
+      lastWorkspaceSession: [{ kind: "local", workspacePath: "/deleted" }],
+    });
+    await expect(owner.service.get()).resolves.toMatchObject({
+      recentProjects: [],
+      lastWorkspaceSession: [],
+      lastActiveWorkspace: null,
+    });
+  });
+
+  it("Main 保存窗口尺寸与 Host 记录远程目录交错时保留两份补丁", async () => {
+    const taskHome = makeTempHome();
+    const settingsDir = join(taskHome, ".zcode", "v2");
+    const settingsFile = join(settingsDir, "setting.json");
+    mkdirSync(settingsDir, { recursive: true });
+    writeFileSync(settingsFile, JSON.stringify({ sourceServerWorkspaceHistory: [] }), "utf8");
+    const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    let pauseFirstRead = true;
+    let observedFirstRead!: () => void;
+    let releaseFirstRead!: () => void;
+    const firstRead = new Promise<void>((resolve) => {
+      observedFirstRead = resolve;
+    });
+    const resumeFirstRead = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve;
+    });
+    vi.doMock("node:fs/promises", () => ({
+      ...actual,
+      readFile: async (...args: Parameters<typeof actual.readFile>) => {
+        const content = await actual.readFile(...args);
+        if (String(args[0]) === settingsFile && pauseFirstRead) {
+          pauseFirstRead = false;
+          observedFirstRead();
+          await resumeFirstRead;
+        }
+        return content;
+      },
+    }));
+    const sharedNode =
+      await vi.importActual<typeof import("@zcode/shared/node")>("@zcode/shared/node");
+    let settingsLockRequests = 0;
+    vi.doMock("@zcode/shared/node", () => ({
+      ...sharedNode,
+      acquireFileLock: (...args: Parameters<typeof sharedNode.acquireFileLock>) => {
+        if (args[0] === settingsFile && ++settingsLockRequests === 2) {
+          // 新实现中 Main 已持锁暂停于读；Host 请求同一把锁后才允许 Main 继续。
+          releaseFirstRead();
+        }
+        return sharedNode.acquireFileLock(...args);
+      },
+    }));
+    const main = await createSettingServiceInHome(taskHome);
+    const host = (await import("../src/setting/settingService.js")).createSettingService();
+    const windowSize = { width: 900, height: 900, maximized: false };
+    const mainWrite = main.update({ desktopWindowSize: windowSize });
+    await firstRead;
+    const history = [
+      {
+        sourceServerId: "be9e87fe-eedf-466b-8367-ea525fadd09f",
+        profileId: "1a14e51f-94bb-47f3-a47d-e3ee511014ff",
+        workspacePath: "/home/dev",
+        workspaceIdentity: "remote:server:be9e87fe-eedf-466b-8367-ea525fadd09f:/home/dev",
+        lastOpenedAt: 1,
+      },
+    ];
+    const hostWrite = host.update({ sourceServerWorkspaceHistory: history });
+    // 旧实现读时未持锁，Host 必须真实提交完毕才放行 Main；不能用固定延时赌调度顺序。
+    void hostWrite.then(releaseFirstRead, releaseFirstRead);
+    try {
+      await Promise.all([mainWrite, hostWrite]);
+      expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toMatchObject({
+        desktopWindowSize: windowSize,
+        sourceServerWorkspaceHistory: history,
+      });
+    } finally {
+      releaseFirstRead();
+    }
+  });
+
+  it("会跨服务重建持久化关闭启动自动重连", async () => {
+    const home = makeTempHome();
+    const service = await createSettingServiceInHome(home);
+
+    await service.update({ remoteStartupAutoReconnectEnabled: false });
+    await expect(service.get()).resolves.toMatchObject({
+      remoteStartupAutoReconnectEnabled: false,
+    });
+
+    const reloadedService = await createSettingServiceInHome(home);
+    await expect(reloadedService.get()).resolves.toMatchObject({
+      remoteStartupAutoReconnectEnabled: false,
+    });
+  });
+
   it("显式桌面 home 覆盖只写隔离实例设置，不污染普通 home", async () => {
     const ordinaryHome = makeTempHome();
     const desktopHome = makeTempHome();
@@ -72,25 +264,139 @@ describe("settingService", () => {
     expect(existsSync(join(ordinaryHome, ".zcode", "v2", "setting.json"))).toBe(false);
     expect((await service.get()).providerFamilyDomain).toBe("bigmodel");
   });
+  it("完整连接映射写入必须携带 CAS 版本，不能绕过 Composer 的已提交选择", async () => {
+    const service = await createSettingServiceInHome(makeTempHome());
+    await expect(service.update({ providerFamilyConnectionSelections: {} })).rejects.toThrow(
+      "Account connection CAS required",
+    );
+    const before = await service.get();
+    await expect(
+      service.update(
+        { providerFamilyConnectionSelections: {} },
+        {
+          providerFamilyDomain: before.providerFamilyDomain,
+          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+        },
+      ),
+    ).rejects.toThrow("Account connection CAS required");
+  });
+
+  it("两条写入路径共享锁内版本，后写旧快照明确失败", async () => {
+    const home = makeTempHome();
+    const first = await createSettingServiceInHome(home);
+    const second = await createSettingServiceInHome(home);
+    const before = await first.get();
+    const expected = {
+      providerFamilyDomain: before.providerFamilyDomain,
+      providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+      providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
+    };
+    const patch = {
+      providerFamilyDomain: "bigmodel" as const,
+      providerFamilyConnectionSelections: {
+        bigmodel: { kind: "individual-coding-plan" as const },
+      },
+    };
+    await first.update(patch, expected);
+    const saved = await first.get();
+    expect(saved.providerFamilyDomainUpdatedAt).toBeGreaterThan(
+      expected.providerFamilyDomainUpdatedAt,
+    );
+    await expect(second.update(patch, expected)).rejects.toThrow(
+      "Account connection settings changed",
+    );
+    expect(await second.get()).toEqual(saved);
+  });
+
+  it("账号连接值相同但操作版本更新时，锁内 CAS 拒绝旧回滚", async () => {
+    const service = await createSettingServiceInHome(makeTempHome());
+    const selection = {
+      kind: "team-coding-plan" as const,
+      productId: "p",
+      organizationId: "o",
+      projectId: "j",
+    };
+    await service.update(
+      {
+        providerFamilyDomain: "bigmodel",
+        providerFamilyDomainUpdatedAt: 1,
+        providerFamilyConnectionSelections: { bigmodel: selection },
+      },
+      { providerFamilyDomainUpdatedAt: 0 },
+    );
+    const before = await service.get();
+    await service.update({ providerFamilyDomainUpdatedAt: 2 });
+    await expect(
+      service.update(
+        { providerFamilyConnectionSelections: { bigmodel: { kind: "individual-coding-plan" } } },
+        {
+          providerFamilyDomain: before.providerFamilyDomain,
+          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+          providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt,
+        },
+      ),
+    ).rejects.toThrow("Account connection settings changed");
+    expect((await service.get()).providerFamilyConnectionSelections?.bigmodel).toEqual(selection);
+  });
+
+  it("未写过账号操作版本时，0 是可通过 RPC 传输的初始 CAS 版本", async () => {
+    const service = await createSettingServiceInHome(makeTempHome());
+    const before = await service.get();
+    await service.update(
+      { providerFamilyDomainUpdatedAt: 1 },
+      {
+        providerFamilyDomain: before.providerFamilyDomain,
+        providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+        providerFamilyDomainUpdatedAt: 0,
+      },
+    );
+    await expect(
+      service.update(
+        { providerFamilyDomainUpdatedAt: 2 },
+        {
+          providerFamilyDomain: before.providerFamilyDomain,
+          providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+          providerFamilyDomainUpdatedAt: 0,
+        },
+      ),
+    ).rejects.toThrow("Account connection settings changed");
+  });
+
   it("账号查询的迟到保存不能覆盖用户手动切换的连接", async () => {
     const home = makeTempHome();
     const service = await createSettingServiceInHome(home);
-    await service.update({
-      providerFamilyDomain: "bigmodel",
-      providerFamilyConnectionSelections: { bigmodel: { kind: "start-plan" } },
-    });
-    const original = await service.get();
-    await service.update({
-      providerFamilyConnectionSelections: {
-        bigmodel: { kind: "team-coding-plan", productId: "p", organizationId: "o", projectId: "j" },
+    await service.update(
+      {
+        providerFamilyDomain: "bigmodel",
+        providerFamilyConnectionSelections: { bigmodel: { kind: "start-plan" } },
       },
-    });
+      { providerFamilyDomainUpdatedAt: 0 },
+    );
+    const original = await service.get();
+    await service.update(
+      {
+        providerFamilyConnectionSelections: {
+          bigmodel: {
+            kind: "team-coding-plan",
+            productId: "p",
+            organizationId: "o",
+            projectId: "j",
+          },
+        },
+      },
+      {
+        providerFamilyDomain: original.providerFamilyDomain,
+        providerFamilyConnectionSelections: original.providerFamilyConnectionSelections,
+        providerFamilyDomainUpdatedAt: original.providerFamilyDomainUpdatedAt ?? 0,
+      },
+    );
     await expect(
       service.update(
         { providerFamilyConnectionSelections: { bigmodel: { kind: "individual-coding-plan" } } },
         {
           providerFamilyDomain: original.providerFamilyDomain,
           providerFamilyConnectionSelections: original.providerFamilyConnectionSelections,
+          providerFamilyDomainUpdatedAt: original.providerFamilyDomainUpdatedAt ?? 0,
         },
       ),
     ).rejects.toThrow("Account connection settings changed");
@@ -128,7 +434,15 @@ describe("settingService", () => {
       ...legacy,
       providerFamilyConnectionSelections: expected,
     });
-    await service.update({ providerFamilyConnectionSelections: {} });
+    const beforeClear = await service.get();
+    await service.update(
+      { providerFamilyConnectionSelections: {} },
+      {
+        providerFamilyDomain: beforeClear.providerFamilyDomain,
+        providerFamilyConnectionSelections: beforeClear.providerFamilyConnectionSelections,
+        providerFamilyDomainUpdatedAt: beforeClear.providerFamilyDomainUpdatedAt ?? 0,
+      },
+    );
     expect((await service.get()).providerFamilyConnectionSelections).toEqual({});
     expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
       modelProviderFamilySelectedKeys: legacy.modelProviderFamilySelectedKeys,
@@ -172,7 +486,7 @@ describe("settingService", () => {
       locale: "zh-CN",
       localePreference: "system",
       taskAutoArchiveEnabled: false,
-      taskAutoArchiveOlderThanDays: 7,
+      taskAutoArchiveOlderThanDays: 30,
       messageStreamShowReasoning: true,
       messageStreamShowReasoningMigrationInitialized: true,
       messageStreamShowTodos: false,
@@ -568,15 +882,6 @@ describe("settingService", () => {
     });
   });
 
-  it("Memory 开关会持久化并被后续读取", async () => {
-    const home = makeTempHome();
-    const service = await createSettingServiceInHome(home);
-
-    await service.update({ memoryEnabled: true });
-
-    await expect(service.get()).resolves.toMatchObject({ memoryEnabled: true });
-  });
-
   it("setting.json 不是合法 JSON 时会隔离坏文件并在后续写回合法配置", async () => {
     const home = makeTempHome();
     const settingsDir = join(home, ".zcode", "v2");
@@ -732,6 +1037,159 @@ describe("settingService", () => {
       taskAutoArchiveEnabled: true,
       taskAutoArchiveOlderThanDays: 14,
     });
+  });
+
+  it("旧自动归档配置在首轮扫描前关闭，重新开启后跨服务重建保留", async () => {
+    const home = makeTempHome();
+    const file = join(home, ".zcode/v2/setting.json");
+    await mkdir(join(home, ".zcode/v2"), { recursive: true });
+    await writeFile(
+      file,
+      JSON.stringify({
+        taskAutoArchiveEnabled: true,
+        taskAutoArchiveOlderThanDays: 14,
+        closeToTrayOnWindowsMigrationInitialized: true,
+        messageStreamShowReasoningMigrationInitialized: true,
+      }),
+    );
+    let service = await createSettingServiceInHome(home);
+    const { createTaskAutoArchiveScheduler } = await import("#src/project/autoArchiveScheduler.js");
+    const archiveInactive = vi.fn(() => []);
+    const scheduler = createTaskAutoArchiveScheduler({
+      readPolicy: async () => {
+        const settings = await service.get();
+        return settings.taskAutoArchiveEnabled
+          ? {
+              cutoff: Date.now() - settings.taskAutoArchiveOlderThanDays! * 86_400_000,
+              activeTasks: [],
+            }
+          : null;
+      },
+      repository: async () => ({ archiveInactive }),
+      afterChange: async () => {},
+    });
+    await scheduler.scan();
+    expect(archiveInactive).not.toHaveBeenCalled();
+    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({
+      taskAutoArchiveEnabled: false,
+      taskAutoArchiveOlderThanDays: 14,
+      taskAutoArchiveResetVersion: 1,
+    });
+    await service.update({ taskAutoArchiveOlderThanDays: 30 });
+    await scheduler.scan();
+    expect(archiveInactive).not.toHaveBeenCalled();
+    await service.update({ taskAutoArchiveEnabled: true });
+    service = await createSettingServiceInHome(home);
+    await scheduler.scan();
+    expect(archiveInactive).toHaveBeenCalledTimes(1);
+    const persisted = await readFile(file, "utf8");
+    await service.get();
+    expect(await readFile(file, "utf8")).toBe(persisted);
+    expect(JSON.parse(persisted)).toMatchObject({
+      taskAutoArchiveEnabled: true,
+      taskAutoArchiveOlderThanDays: 30,
+      taskAutoArchiveResetVersion: 1,
+    });
+    scheduler.dispose();
+  });
+
+  it("迟到的旧配置读取不会覆盖另一个设置服务刚提交的重新开启", async () => {
+    const home = makeTempHome();
+    const file = join(home, ".zcode/v2/setting.json");
+    await mkdir(join(home, ".zcode/v2"), { recursive: true });
+    await writeFile(file, JSON.stringify({ taskAutoArchiveEnabled: true }));
+    const captured = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let firstRead = true;
+    vi.doMock("node:fs/promises", async () => {
+      const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+      return {
+        ...actual,
+        readFile: vi.fn(async (...args: Parameters<typeof actual.readFile>) => {
+          const result = await actual.readFile(...args);
+          if (String(args[0]) === file && firstRead) {
+            firstRead = false;
+            captured.resolve();
+            await release.promise;
+          }
+          return result;
+        }),
+      };
+    });
+    const service = await createSettingServiceInHome(home);
+    const reading = service.get();
+    await captured.promise;
+    const { createSettingService } = await import("#src/setting/settingService.js");
+    try {
+      await createSettingService().update({ taskAutoArchiveEnabled: true, locale: "en-US" });
+    } finally {
+      release.resolve();
+    }
+    await expect(reading).resolves.toMatchObject({ taskAutoArchiveEnabled: true });
+    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({
+      taskAutoArchiveEnabled: true,
+      taskAutoArchiveResetVersion: 1,
+      locale: "en-US",
+    });
+  });
+
+  it("自动归档重新开启仅修改所属 Host 的设置", async () => {
+    const firstHome = makeTempHome();
+    const secondHome = makeTempHome();
+    for (const home of [firstHome, secondHome]) {
+      await mkdir(join(home, ".zcode/v2"), { recursive: true });
+      await writeFile(
+        join(home, ".zcode/v2/setting.json"),
+        JSON.stringify({ taskAutoArchiveEnabled: true }),
+      );
+    }
+    const first = await createSettingServiceInHome(firstHome);
+    const second = await createSettingServiceInHome(secondHome);
+    await Promise.all([first.get(), second.get()]);
+    await first.update({ taskAutoArchiveEnabled: true });
+    expect((await first.get()).taskAutoArchiveEnabled).toBe(true);
+    expect((await second.get()).taskAutoArchiveEnabled).toBe(false);
+  });
+
+  it("自动归档迁移写入失败时扫描不执行归档", async () => {
+    const home = makeTempHome();
+    const file = join(home, ".zcode/v2/setting.json");
+    await mkdir(join(home, ".zcode/v2"), { recursive: true });
+    await writeFile(
+      file,
+      JSON.stringify({
+        taskAutoArchiveEnabled: true,
+        closeToTrayOnWindowsMigrationInitialized: true,
+        messageStreamShowReasoningMigrationInitialized: true,
+      }),
+    );
+    const service = await createSettingServiceInHome(home);
+    process.env.ZCODE_ENV = "test";
+    process.env.ZCODE_E2E_FS_FAULTS = JSON.stringify([
+      {
+        id: "auto-archive-migration-write",
+        code: "EACCES",
+        pathIncludes: file,
+        operations: ["writeFile"],
+      },
+    ]);
+    process.env.ZCODE_E2E_FS_FAULTS_ALLOW = "1";
+    const { createTaskAutoArchiveScheduler } = await import("#src/project/autoArchiveScheduler.js");
+    const archiveInactive = vi.fn(() => []);
+    const scheduler = createTaskAutoArchiveScheduler({
+      readPolicy: async () =>
+        (await service.get()).taskAutoArchiveEnabled
+          ? { cutoff: Date.now(), activeTasks: [] }
+          : null,
+      repository: async () => ({ archiveInactive }),
+      afterChange: async () => {},
+    });
+    await expect(scheduler.scan()).rejects.toMatchObject({ code: "EACCES" });
+    expect(archiveInactive).not.toHaveBeenCalled();
+    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({
+      taskAutoArchiveEnabled: true,
+    });
+    scheduler.dispose();
   });
 
   it("保存 setting.json 时可以注入磁盘/权限类写入错误", async () => {
@@ -1041,22 +1499,6 @@ describe("settingService", () => {
       kind: "local",
       workspacePath: "/tmp/local-demo",
       workspacePurpose: "project",
-    });
-  });
-
-  it("在用户目录下兜底创建默认项目，并准确返回是否首次创建", async () => {
-    const home = makeTempHome();
-    const service = await createSettingServiceInHome(home);
-    const defaultProjectPath = join(home, "ZCodeProject");
-
-    await expect(service.ensureDefaultProject(home)).resolves.toEqual({
-      path: defaultProjectPath,
-      created: true,
-    });
-
-    await expect(service.ensureDefaultProject(home)).resolves.toEqual({
-      path: defaultProjectPath,
-      created: false,
     });
   });
 });

@@ -7,16 +7,13 @@ const PIN_ITEM_INDEX = 0;
 const RENAME_ITEM_INDEX = 1;
 const ARCHIVE_ITEM_INDEX = 2;
 const UNREAD_ITEM_INDEX = 3;
-const OPEN_IN_SPLIT_ITEM_INDEX = 4;
 const FILE_MANAGER_ITEM_INDEX = 4;
 const WORKSPACE_PATH_ITEM_INDEX = 5;
 const TASK_PATH_ITEM_INDEX = 6;
 const TASK_LOG_PATH_ITEM_INDEX = 7;
 const PROVIDER_CONFIG_ITEM_INDEX = 8;
 
-function renderMenu(
-  overrides: Partial<React.ComponentProps<typeof TaskActionMenuContent>> = {},
-) {
+function renderMenu(overrides: Partial<React.ComponentProps<typeof TaskActionMenuContent>> = {}) {
   const itemStates: Array<{ disabled?: boolean }> = [];
 
   const html = renderToStaticMarkup(
@@ -74,12 +71,6 @@ function renderMenu(
 }
 
 describe("TaskActionMenuContent", () => {
-  it("Header 不再渲染模型配置同步入口", () => {
-    const { html } = renderMenu();
-
-    expect(html).not.toContain("appHeader.syncModelConfig");
-  });
-
   it("provider 配置文件未落盘但路径已知时仍保留入口", () => {
     const { itemStates } = renderMenu({
       providerConfigFile: {
@@ -132,13 +123,9 @@ describe("TaskActionMenuContent", () => {
     expect(html).toContain("appHeader.copyLogPath");
   });
 
-  it("当前 session 的在分屏打开入口保持可见但置灰", () => {
-    const { html, itemStates } = renderMenu({
-      onOpenInSplitPane: vi.fn(),
-      openInSplitPaneDisabled: true,
-    });
+  it("不再提供在分屏打开入口", () => {
+    const { html } = renderMenu();
 
-    expect(html).toContain("taskList.openInSplitPane");
-    expect(itemStates[OPEN_IN_SPLIT_ITEM_INDEX]?.disabled).toBe(true);
+    expect(html).not.toContain("taskList.openInSplitPane");
   });
 });

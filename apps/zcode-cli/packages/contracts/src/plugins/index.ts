@@ -121,6 +121,8 @@ export interface PluginStoreListing {
   /** icon 图片：https URL 或内置插件的本地资源路径。 */
   icon?: string;
   category?: string;
+  /** 官方市场内的维护归属；不参与执行权限和安装来源判定。 */
+  publisherType?: "official" | "community";
   author?: string;
   authorUrl?: string;
   homepage?: string;

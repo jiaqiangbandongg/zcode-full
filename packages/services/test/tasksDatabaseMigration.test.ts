@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 import { once } from "node:events";
 import { build } from "esbuild";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runTasksDatabaseMigrations } from "../src/session/tasksDatabase/migrations.js";
 
 describe("DB109 App 库统一迁移", () => {
@@ -15,13 +15,20 @@ describe("DB109 App 库统一迁移", () => {
     databases.push(db);
     return db;
   };
-  afterEach(() => {
+  let backupRoot: string;
+  beforeEach(async () => {
+    backupRoot = await mkdtemp(join(tmpdir(), "zcode-db109-backup-"));
+  });
+  const migrate = (db: DatabaseSync) =>
+    runTasksDatabaseMigrations(db, join(backupRoot, "tasks.sqlite"));
+  afterEach(async () => {
     for (const db of databases.splice(0)) db.close();
+    await rm(backupRoot, { recursive: true, force: true });
   });
 
-  it("DB109-02/03：任意 Repo 所需八张表一次创建，重开不改账本", () => {
+  it("DB109-02/03：任意 Repo 所需八张表一次创建，重开不改账本", async () => {
     const db = open();
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
       .all();
@@ -29,6 +36,7 @@ describe("DB109 App 库统一迁移", () => {
       "automation_runs",
       "automations",
       "off_peak_tasks",
+      "task_group_admissions",
       "task_group_members",
       "task_group_view_node_orders",
       "task_group_workspace_bootstraps",
@@ -37,14 +45,14 @@ describe("DB109 App 库统一迁移", () => {
       "tasks_schema_migration",
     ]);
     const ledger = db.prepare("SELECT * FROM tasks_schema_migration").all();
-    expect(ledger).toHaveLength(3);
-    runTasksDatabaseMigrations(db);
+    expect(ledger).toHaveLength(5);
+    await migrate(db);
     expect(db.prepare("SELECT * FROM tasks_schema_migration").all()).toEqual(ledger);
   });
 
-  it("DB109-04/08：旧格式来源明确才转，原列/时间保留，不依赖账号", () => {
+  it("DB109-04/08：旧格式来源明确才转，原列/时间保留，不依赖账号", async () => {
     const db = open();
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     db.exec("DELETE FROM tasks_schema_migration WHERE id='0002_provider_selection'");
     const insert = db.prepare(
       `INSERT INTO automations(automation_id,cron_expr,prompt,workspace_key,workspace_path,created_at,updated_at,model,provider,thought_level,model_selection) VALUES(?, '* * * * *','正文','ws','/ws',1,2,?,?,?,?)`,
@@ -52,7 +60,7 @@ describe("DB109 App 库统一迁移", () => {
     insert.run("known", "custom:builtin%3Abigmodel-coding-plan:GLM-5.3", "zcode", "high", "null");
     insert.run("unknown", "unknown-model", "zcode", "high", "null");
     insert.run("default", null, null, null, null);
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     const known = db.prepare("SELECT * FROM automations WHERE automation_id='known'").get()!;
     expect(JSON.parse(String(known.model_selection))).toEqual({
       providerId: "account:bigmodel-individual-coding-plan",
@@ -76,16 +84,16 @@ describe("DB109 App 库统一迁移", () => {
         ?.model_selection,
     ).toBe("null");
     db.exec("UPDATE automations SET model_selection=NULL WHERE automation_id='known'");
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     expect(
       db.prepare("SELECT model_selection FROM automations WHERE automation_id='known'").get()
         ?.model_selection,
     ).toBeNull();
   });
 
-  it("GLM112：新增版本仅规范官方当前选择，旧列、坏值和回滚后缺失不改写", () => {
+  it("GLM112：新增版本仅规范官方当前选择，旧列、坏值和回滚后缺失不改写", async () => {
     const db = open();
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     db.exec("DELETE FROM tasks_schema_migration WHERE id='0003_official_glm_selection'");
     const oldLedger = db.prepare("SELECT * FROM tasks_schema_migration ORDER BY id").all();
     const cases = [
@@ -110,7 +118,7 @@ describe("DB109 App 库统一迁移", () => {
       db.prepare(`INSERT INTO automations(automation_id,cron_expr,prompt,workspace_key,workspace_path,created_at,updated_at,model,model_selection)
       VALUES(?, '* * * * *', '任务正文', 'remote:ws', '/ws', 1, 2, '旧选择原文', ?)`);
     for (const [id, selection] of cases) insert.run(id, selection);
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     expect(
       db
         .prepare(
@@ -132,7 +140,7 @@ describe("DB109 App 库统一迁移", () => {
     }
     const ledger = db.prepare("SELECT * FROM tasks_schema_migration ORDER BY id").all();
     db.exec("UPDATE automations SET model_selection=NULL WHERE automation_id='official'");
-    expect(() => runTasksDatabaseMigrations(db)).not.toThrow();
+    await expect(migrate(db)).resolves.toBeDefined();
     expect(
       db.prepare("SELECT model_selection FROM automations WHERE automation_id='official'").get()
         ?.model_selection,
@@ -140,22 +148,22 @@ describe("DB109 App 库统一迁移", () => {
     expect(db.prepare("SELECT * FROM tasks_schema_migration ORDER BY id").all()).toEqual(ledger);
   });
 
-  it("DB109-05/07：SQL 故障不记成功，checksum 错误不重跑", () => {
+  it("DB109-05/07：SQL 故障不记成功，checksum 错误不重跑", async () => {
     const db = open();
     db.exec("CREATE TABLE automations(automation_id TEXT)");
-    expect(() => runTasksDatabaseMigrations(db)).toThrow();
+    await expect(migrate(db)).rejects.toThrow();
     expect(
       db.prepare("SELECT name FROM sqlite_master WHERE name='tasks_schema_migration'").get(),
     ).toBeUndefined();
     const ready = open();
-    runTasksDatabaseMigrations(ready);
+    await migrate(ready);
     ready.exec("UPDATE tasks_schema_migration SET checksum='broken'");
-    expect(() => runTasksDatabaseMigrations(ready)).toThrow(/checksum/);
+    await expect(migrate(ready)).rejects.toThrow(/checksum/);
   });
 
-  it("DB109-02/05：部分旧 schema 补列，数据转换中途失败连补列一起回滚", () => {
+  it("DB109-02/05：部分旧 schema 补列，数据转换中途失败连补列一起回滚", async () => {
     const db = open();
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     db.exec(`DELETE FROM tasks_schema_migration;
       ALTER TABLE automations DROP COLUMN model_selection;
       ALTER TABLE automations DROP COLUMN scheduled_run_count;
@@ -163,7 +171,7 @@ describe("DB109 App 库统一迁移", () => {
       VALUES('legacy','* * * * *','旧任务正文','remote:/same','/same',11,12,'p/model','zcode',7);
       CREATE TRIGGER reject_migration BEFORE UPDATE ON automations
       BEGIN SELECT RAISE(ABORT,'injected failure'); END;`);
-    expect(() => runTasksDatabaseMigrations(db)).toThrow(/injected failure/);
+    await expect(migrate(db)).rejects.toThrow(/injected failure/);
     expect(db.prepare("SELECT * FROM tasks_schema_migration").all()).toEqual([]);
     expect(
       db
@@ -172,7 +180,7 @@ describe("DB109 App 库统一迁移", () => {
         .map((row) => row.name),
     ).not.toContain("model_selection");
     db.exec("DROP TRIGGER reject_migration");
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     expect(
       db.prepare("SELECT * FROM automations WHERE automation_id='legacy'").get(),
     ).toMatchObject({
@@ -199,13 +207,13 @@ describe("DB109 App 库统一迁移", () => {
     ["custom:proxy:vendor%2Fmodel%3Abeta", "proxy", "vendor/model:beta", "high"],
     ["proxy/vendor/model$low", "proxy", "vendor/model", "low"],
     ["custom:proxy:bad%escape", "proxy", "bad%escape", "high"],
-  ])("DB109-04：冻结旧选择编码 %s", (model, providerId, modelId, reasoningLevel) => {
+  ])("DB109-04：冻结旧选择编码 %s", async (model, providerId, modelId, reasoningLevel) => {
     const db = open();
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     db.exec("DELETE FROM tasks_schema_migration WHERE id='0002_provider_selection'");
     db.prepare(`INSERT INTO automations(automation_id,cron_expr,prompt,workspace_key,workspace_path,created_at,updated_at,model,provider,thought_level)
       VALUES('legacy','* * * * *','正文','ws','/ws',1,2,?,'zcode','high')`).run(model);
-    runTasksDatabaseMigrations(db);
+    await migrate(db);
     const row = db.prepare("SELECT model,model_selection FROM automations").get()!;
     expect(row.model).toBe(model);
     expect(JSON.parse(String(row.model_selection))).toEqual({
@@ -221,7 +229,7 @@ describe("DB109 App 库统一迁移", () => {
     const db = new DatabaseSync(path);
     const workers: Worker[] = [];
     try {
-      runTasksDatabaseMigrations(db);
+      await migrate(db);
       db.exec(`DELETE FROM tasks_schema_migration;
         INSERT INTO automations(automation_id,cron_expr,prompt,workspace_key,workspace_path,created_at,updated_at,model)
         VALUES('old','* * * * *','正文','ws','/ws',1,2,'proxy/model');
@@ -234,7 +242,7 @@ describe("DB109 App 库统一迁移", () => {
         write: false,
         platform: "node",
         format: "cjs",
-        alias: { "#src": resolve("packages/services/src") },
+        // #src 属于各自 package；全局 alias 会把 shared 的入口错误重定向到 services。
       });
       const gate = new SharedArrayBuffer(4);
       for (let index = 0; index < 2; index++) {
@@ -246,8 +254,7 @@ describe("DB109 App 库统一迁移", () => {
           const gate = new Int32Array(workerData.gate);
           parentPort.postMessage('ready');
           Atomics.wait(gate, 0, 0);
-          module.exports.runTasksDatabaseMigrations(database);
-          database.close();`,
+          module.exports.runTasksDatabaseMigrations(database, workerData.path).then(() => database.close());`,
             { eval: true, workerData: { path, gate } },
           ),
         );
@@ -257,7 +264,7 @@ describe("DB109 App 库统一迁移", () => {
       Atomics.store(new Int32Array(gate), 0, 1);
       Atomics.notify(new Int32Array(gate), 0);
       expect(await Promise.all(exits)).toEqual([[0], [0]]);
-      expect(db.prepare("SELECT * FROM tasks_schema_migration").all()).toHaveLength(3);
+      expect(db.prepare("SELECT * FROM tasks_schema_migration").all()).toHaveLength(5);
       expect(db.prepare("SELECT * FROM migration_probe").all()).toHaveLength(1);
       expect(db.prepare("PRAGMA integrity_check").get()?.integrity_check).toBe("ok");
     } finally {

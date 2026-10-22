@@ -656,7 +656,9 @@ describe("AgentRuntime session persistence", () => {
     await runtime.executeTurn("first prompt");
     await runtime.executeTurn("second prompt");
 
-    const userMessages = store.savedMessages.filter((message) => message.role === "user" && !message.synthetic);
+    const userMessages = store.savedMessages.filter(
+      (message) => message.role === "user" && !message.synthetic,
+    );
     const assistantSaves = store.savedMessages.filter((message) => message.role === "assistant");
     const assistantMessageIds = new Set(assistantSaves.map((message) => message.id));
     const completedAssistantSaves = assistantSaves.filter(
@@ -1974,71 +1976,6 @@ describe("AgentRuntime session persistence", () => {
     expect(providerText).toContain("The Bash tool shell is CMD.");
   });
 
-  it("announces Windows Git Bash shell for legacy cold-resume sessions", async () => {
-    const sessionId = createSessionId("runtime-persistence-windows-git-bash-migration");
-    const store = createRecordingSessionStore();
-    const workingDirectory = "/tmp/zcode-runtime-windows-git-bash-migration";
-    const firstRuntime = createTestAgentRuntime(
-      sessionId,
-      {
-        currentDate: "2026-06-26",
-        envInfo: {
-          cwd: workingDirectory,
-          platform: "win32",
-          shell: "CMD",
-          osVersion: "Windows 11",
-          nodeVersion: "v24.14.0",
-        },
-        workingDirectory,
-      },
-      {
-        eventStore: createTestSessionEventStore(),
-        modelFactory: createTestModelFactory({
-          async generateText() {
-            return {
-              text: "first answer",
-              finishReason: "stop",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-        sessionStore: store,
-      },
-    );
-    await firstRuntime.executeTurn("persisted prompt");
-
-    let resumedMessages: ModelInputMessage[] = [];
-    const resumedRuntime = createTestAgentRuntime(
-      sessionId,
-      {
-        bashShellSelection: createAutoGitBashSelection(),
-        currentDate: "2026-06-26",
-        workingDirectory,
-      },
-      {
-        eventStore: createTestSessionEventStore(),
-        modelFactory: createTestModelFactory({
-          async generateText(request) {
-            resumedMessages = request.messages;
-            return {
-              text: "resumed answer",
-              finishReason: "stop",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-        sessionStore: store,
-      },
-    );
-
-    await resumedRuntime.resumeFromStore();
-    await resumedRuntime.executeTurn("resumed prompt");
-
-    const providerText = providerMessagesToText(resumedMessages);
-    expect(providerText).toContain("- Shell: CMD");
-    expect(providerText).toContain("The Bash tool shell is Git Bash.");
-  });
-
   it("announces Windows Git Bash shell when legacy env shell is blank", async () => {
     const sessionId = createSessionId("runtime-persistence-windows-git-bash-blank-shell");
     const store = createRecordingSessionStore();
@@ -2178,6 +2115,7 @@ describe("AgentRuntime session persistence", () => {
     const firstProviderText = providerMessagesToText(firstResumeMessages);
     const secondProviderText = providerMessagesToText(secondResumeMessages);
     const reminder = "The Bash tool shell is Git Bash.";
+    expect(firstProviderText).toContain("- Shell: CMD");
     expect(firstProviderText.match(new RegExp(escapeRegExp(reminder), "g")) ?? []).toHaveLength(1);
     expect(secondProviderText.match(new RegExp(escapeRegExp(reminder), "g")) ?? []).toHaveLength(1);
   });
@@ -2822,7 +2760,11 @@ describe("AgentRuntime session persistence", () => {
 
     await runtime.executeTurn("summarize", [{ type: "file", path: "missing.md" }]);
 
-    const userMessages = capturedMessages.filter((message) => message.role === "user" && !providerContentToText(message.content).startsWith("<system-reminder>"));
+    const userMessages = capturedMessages.filter(
+      (message) =>
+        message.role === "user" &&
+        !providerContentToText(message.content).startsWith("<system-reminder>"),
+    );
     expect(userMessages.map((message) => message.content)).toEqual(["summarize"]);
     expect(providerMessagesToText(capturedMessages)).not.toContain(
       "[Attached text/plain: missing.md]",
@@ -4353,57 +4295,6 @@ describe("AgentRuntime session persistence", () => {
     expect(summaryEvents).toHaveLength(0);
     expect(runtime.hasResidencyBlockingWork()).toBe(false);
   });
-
-  it("does not generate a session title from model-only goal continuation input", async () => {
-    const sessionId = createSessionId("runtime-persistence-model-only-title");
-    const store = createRecordingSessionStore();
-    const titleRequests: ModelInputMessage[][] = [];
-    const defaultModel = createTestModelSelection("test-provider/default-model", {});
-    const runtime = createTestAgentRuntime(
-      sessionId,
-      {
-        mode: "build",
-        modelSelection: createTestModelSelection(defaultModel),
-        titleGeneration: {
-          modelSelection: createTestModelSelection(defaultModel),
-          timeoutMs: 1_000,
-        },
-      },
-      {
-        eventStore: createTestSessionEventStore(),
-        modelFactory: createTestModelFactory({
-          async generateText(_request, observation) {
-            if (isTitleGenerationObservation(observation)) {
-              titleRequests.push(request.messages);
-              return {
-                finishReason: "stop",
-                text: '{"title":"内部 Reminder 标题"}',
-                usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 },
-              };
-            }
-            return {
-              finishReason: "stop",
-              text: "done",
-              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            };
-          },
-        } as never),
-        sessionStore: store,
-      },
-    );
-
-    await runtime.executeTurn(
-      '<system-reminder source="goal-continuation">继续目标</system-reminder>',
-      undefined,
-      {
-        inputSource: "goal-continuation",
-        inputVisibility: "model-only",
-      },
-    );
-    await new Promise((resolveWait) => setTimeout(resolveWait, 20));
-
-    expect(titleRequests).toHaveLength(0);
-  });
 });
 
 interface RecordingSessionStore extends SessionStorePort, UsageStorePort {
@@ -4762,8 +4653,6 @@ function createRecordingSessionStore(): RecordingSessionStore {
             input.timeCompacting === null
               ? undefined
               : (input.timeCompacting ?? current.time.compacting),
-          archived:
-            input.timeArchived === null ? undefined : (input.timeArchived ?? current.time.archived),
         },
       };
       sessions.set(input.id, next);
@@ -4774,9 +4663,7 @@ function createRecordingSessionStore(): RecordingSessionStore {
     },
     async listSessions(input) {
       return Array.from(sessions.values()).filter(
-        (session) =>
-          (!input?.projectID || session.projectID === input.projectID) &&
-          (input?.includeArchived || session.time.archived === undefined),
+        (session) => !input?.projectID || session.projectID === input.projectID,
       );
     },
     async saveMessage(input) {

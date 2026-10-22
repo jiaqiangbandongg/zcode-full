@@ -14,9 +14,8 @@ import {
 import {
   assertStableAgentSelection,
   pickWorkspacePaths,
-  selectTaskOrganizeMode,
   waitForActiveWorkspacePath,
-  waitForRestoredWorkspaceItems,
+  waitForRestoredProjects,
 } from "./helpers/workspace-agent-warmup.js";
 
 describe("少量候选 workspace 恢复", () => {
@@ -25,7 +24,7 @@ describe("少量候选 workspace 恢复", () => {
     await clearAppData();
   });
 
-  it("TSL29: 有 2 个候选时只启动 active 1 个，切换 Grouped 也不补启动 recent", async function () {
+  it("TSL29: 只有 2 个候选时也只预热上次活动的 1 个，不凑数", async function () {
     this.timeout(90_000);
     const workspacePaths = getPassiveAgentStartupWorkspacePaths(
       dirname(DEFAULT_WORKSPACE),
@@ -40,16 +39,11 @@ describe("少量候选 workspace 恢复", () => {
 
     await waitForWorkspaceApp(activeWorkspacePath, 30_000);
     await waitForActiveWorkspacePath(activeWorkspacePath);
-    await waitForRestoredWorkspaceItems(workspacePaths);
+    await waitForRestoredProjects(workspacePaths);
 
     await openResourceManager();
     await switchToElectronRendererTarget(isResourceManagerUrl);
     await waitForResourceManagerReady();
-    await assertStableAgentSelection(workspacePaths, expectedWarmupWorkspacePaths);
-
-    await switchToElectronRendererTarget(isMainRendererUrl);
-    await selectTaskOrganizeMode(["分组", "Group"]);
-    await switchToElectronRendererTarget(isResourceManagerUrl);
     await assertStableAgentSelection(workspacePaths, expectedWarmupWorkspacePaths);
   });
 });

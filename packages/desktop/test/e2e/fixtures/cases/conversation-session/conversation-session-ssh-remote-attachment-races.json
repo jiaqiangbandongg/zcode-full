@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-attachment-races",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-attachment-races.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-ssh-remote-attachment-races.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssh-attachment-races-title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      }
+    },
+    {
+      "id": "ssh-attachment-races-main",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "先创建真实远端会话，再验证上传取消/断线后的拖入与发送；上传故障由实际 SSH 响应代理注入。"
+      }
+    }
+  ]
+}

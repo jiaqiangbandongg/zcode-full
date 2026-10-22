@@ -255,3 +255,32 @@ async function writeCommand(dir: string, name: string, description: string): Pro
     ["---", `description: ${description}`, "---", "", "# Body"].join("\n"),
   );
 }
+
+it("附加目录命令使用目录限定名并保留原 cwd 命令", async () => {
+  const root = await mkdtemp(join(tmpdir(), "zcode-additional-commands-"));
+  try {
+    const main = join(root, "frontend"),
+      extra = join(root, "backend");
+    for (const dir of [main, extra]) {
+      await mkdir(join(dir, ".zcode", "commands"), { recursive: true });
+      await writeFile(
+        join(dir, ".zcode", "commands", "review.md"),
+        `---\ndescription: review\n---\n${dir}`,
+      );
+    }
+    const adapter = createNodeCustomCommandAdapter({
+      homeDirectory: join(root, "home"),
+      additionalDirectories: [extra],
+    });
+    expect(
+      (await adapter.discoverCommands({ workingDirectory: main })).commands
+        .map((c) => c.name)
+        .sort(),
+    ).toEqual(["backend/review", "review"]);
+    expect(
+      (await adapter.loadCommand({ workingDirectory: main, name: "backend/review" })).content,
+    ).toContain(extra);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

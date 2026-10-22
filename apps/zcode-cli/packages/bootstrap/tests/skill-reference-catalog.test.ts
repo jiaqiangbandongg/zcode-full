@@ -4,11 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  zcodeProtocolMethods,
-  zcodeSkillsReferenceCatalogParamsSchema,
-  zcodeSkillsReferenceCatalogResultSchema,
-} from "@zcode/shared";
+import { zcodeSkillsReferenceCatalogResultSchema } from "@zcode/shared";
 import type { SkillLoadOutcome } from "@zcode/contracts";
 import { getSkillReferenceCatalog } from "../src/zcode-protocol/skill-reference-catalog.js";
 import type {
@@ -47,31 +43,6 @@ function contextWithSession(sessionId: string): ZCodeProtocolAgentServerContext 
 }
 
 describe("skills/referenceCatalog protocol", () => {
-  it("registers the method and strict schemas", () => {
-    expect(zcodeProtocolMethods.skillsReferenceCatalog).toBe("skills/referenceCatalog");
-    expect(() =>
-      zcodeSkillsReferenceCatalogParamsSchema.parse({
-        workspace: { workspacePath: "/w", workspaceKey: "/w" },
-        sessionId: "session-a",
-      }),
-    ).not.toThrow();
-    expect(() =>
-      zcodeSkillsReferenceCatalogResultSchema.parse({
-        authority: "session",
-        skills: [
-          {
-            id: "glm:workspace:/w/.zcode/skills/demo/SKILL.md",
-            name: "demo",
-            description: "Demo",
-            path: "/w/.zcode/skills/demo/SKILL.md",
-            scope: "workspace",
-            enabled: true,
-          },
-        ],
-      }),
-    ).not.toThrow();
-  });
-
   it("serves the Session runtime frozen catalog", async () => {
     const result = await getSkillReferenceCatalog(contextWithSession("session-a"), {
       workspace: { workspacePath: "/workspace", workspaceKey: "/workspace" },

@@ -35,6 +35,7 @@ export interface ZCodeAgentV4ConnectionContext {
    * 是**连接**的事实，不是某一次订阅可以自选的口味。缺席 = 按旧消费者处理。
    */
   workflowRunDeltas?: boolean;
+  historyFirst?: boolean;
 }
 
 const TRUSTED_CONNECTION_FIELD = "__zcodeTrustedV4Connection";
@@ -85,6 +86,7 @@ export function readTrustedZCodeAgentV4Connection(
     clientMode: context.clientMode,
     // 只认 true：缺席与 false 都是「旧消费者」，键在场与否是下游读端的判据。
     ...(context.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+    ...(context.historyFirst === true ? { historyFirst: true } : {}),
   };
 }
 
@@ -104,6 +106,7 @@ function withTrustedConnection<T extends object>(
   delete forwarded["subscriberScope"];
   // 与 clientMode 同族的可信位：UI 面的 subscribe 不能自己挑增量编码。
   delete forwarded["workflowRunDeltas"];
+  delete forwarded["historyFirst"];
   forwarded[TRUSTED_CONNECTION_FIELD] = context;
   return forwarded as T;
 }
@@ -221,6 +224,7 @@ function createHello(context: ZCodeAgentV4ConnectionContext): HelloMessage {
       // 本 Host 会转发 `workflowRun.*` 键级增量；客户端见到它才能在 clientHello 里回声明
       // （那个 capabilities 是 .strict() 的，反过来会让老 Host 握不上手）。
       workflowRunDeltas: true,
+      historyFirst: true,
     },
     auth: {},
   };
@@ -253,6 +257,7 @@ export function createZCodeAgentConnectionScope(
   let boundClientId: string | null = null;
   /** clientHello 里的增量声明；trusted relay 没有自己的 clientHello，只搬运下游的。 */
   let clientWorkflowRunDeltas = false;
+  let clientHistoryFirst = false;
   let commandQueryWorkspaceKey: string | null = null;
   let currentTransportFlowState: V4ConnectionFlowState = "drained";
   let flowClosed = false;
@@ -270,12 +275,14 @@ export function createZCodeAgentConnectionScope(
         clientMode: downstream.clientMode,
         // 增量位属于**下游那一端**：relay 自己不消费帧，只把下游 clientHello 的声明带上去。
         ...(downstream.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+        ...(downstream.historyFirst === true ? { historyFirst: true } : {}),
       };
     }
     return {
       connectionId: context.connectionId,
       clientMode: context.clientMode,
       ...(clientWorkflowRunDeltas ? { workflowRunDeltas: true } : {}),
+      ...(clientHistoryFirst ? { historyFirst: true } : {}),
     };
   };
 
@@ -679,6 +686,7 @@ export function createZCodeAgentConnectionScope(
       }
       boundClientId = parsed.clientId;
       clientWorkflowRunDeltas = clientSupportsWorkflowRunDeltas(parsed);
+      clientHistoryFirst = parsed.capabilities?.historyFirst === true;
       handshakeComplete = true;
     },
     async setConnectionFlowStateV4(params) {
@@ -887,6 +895,13 @@ export function createZCodeAgentConnectionScope(
         withTrustedConnection(workspaceTarget(params), forwardedConnection(params)),
       );
     },
+    onDynamicPluginUiToolResult() {
+      assertOpen();
+      // 页面创建只属于本地桌面；手机回放和 relay 不拥有原生 guest。
+      if (role !== "terminal-client" || context.clientMode !== "desktop-continuous")
+        return RpcEvent.None;
+      return base.onDynamicPluginUiToolResult();
+    },
     onDynamicCuaPermissionObservation() {
       assertOpen();
       // 权限弹窗是本地桌面副作用；手机 replay attachment 只能消费可恢复对话事实。
@@ -1067,3 +1082,6 @@ export function createZCodeAgentConnectionScope(
     },
   };
 }
+
+// Share RPC 复用同一内部 carrier 写入规则，不能复制一套连接身份拼装。
+export { withTrustedConnection as withTrustedZCodeAgentV4Connection };

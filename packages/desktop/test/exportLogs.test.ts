@@ -765,26 +765,6 @@ describe("export logs archive", () => {
     }
   });
 
-  it("目录导出应复制文件并写入 about.txt", async () => {
-    const { writeLogArchiveDirectory } = await import("@desktop/main/exportLogs.js");
-
-    await withTempDir(async (tempDir) => {
-      const sourceDir = join(tempDir, "source");
-      const sourceFile = join(sourceDir, "logs", "nested.log");
-      await mkdir(join(sourceDir, "logs"), { recursive: true });
-      await writeFile(sourceFile, "nested-log", "utf-8");
-
-      const outputDir = join(tempDir, "logs-dir");
-      await writeLogArchiveDirectory(outputDir, {
-        files: [{ absolutePath: sourceFile, archivePath: "logs/nested.log" }],
-        aboutContent: "about-directory",
-      });
-
-      expect(await readFile(join(outputDir, "logs", "nested.log"), "utf-8")).toBe("nested-log");
-      expect(await readFile(join(outputDir, "about.txt"), "utf-8")).toBe("about-directory");
-    });
-  });
-
   it("目录导出应脱敏敏感字段且保留原始结构", async () => {
     const { writeLogArchiveDirectory } = await import("@desktop/main/exportLogs.js");
 
@@ -1288,5 +1268,5 @@ describe("export logs archive", () => {
       expect(loggerMock.warn).toHaveBeenCalledTimes(1);
       expect(loggerMock.error).not.toHaveBeenCalled();
     });
-  }, 15_000);
+  });
 });

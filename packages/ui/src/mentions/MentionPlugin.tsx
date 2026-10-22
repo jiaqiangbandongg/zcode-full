@@ -6,8 +6,6 @@ import { createPortal } from "react-dom";
 import { PaletteIcon, WandSparkles } from "lucide-react";
 import {
   $createTextNode,
-  $getSelection,
-  $isRangeSelection,
   BLUR_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
   COMMAND_PRIORITY_LOW,
@@ -56,6 +54,7 @@ import {
   type ActivePromptInputTokenSnapshot,
 } from "./activePromptInputToken.js";
 import { getCurrentTextNodeSelection } from "./mentionHelpers.js";
+import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 
 interface MentionPluginProps {
   container?: HTMLElement | null;
@@ -147,6 +146,9 @@ export function MentionPlugin({
 }: MentionPluginProps & { provider: ZCodeProvider }) {
   const [editor] = useLexicalComposerContext();
   const { intl } = useZCodeIntl();
+  const draftProjectId = useZCodeSessionStore(
+    (state) => state.getWorkspaceState(workspacePath, workspaceIdentity).draftProjectId,
+  );
   const [activeTrigger, setActiveTrigger] = useState<ActivePromptInputTrigger | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const dismissedSignatureRef = useRef<string | null>(null);
@@ -195,6 +197,7 @@ export function MentionPlugin({
     intl.formatMessage({ id: "chat.mention.files.empty" }),
     intl.formatMessage({ id: "chat.mention.files.title" }),
     fileDefaultPreviewLimit,
+    { sessionId, projectId: draftProjectId },
   );
   const whiteboardResult = useWhiteboardMentionProvider(
     workspacePath,
@@ -213,6 +216,7 @@ export function MentionPlugin({
     getSessionMentionWorkspaceScope(activeTrigger?.trigger),
     intl.formatMessage({ id: "chat.mention.sessions.empty" }),
     intl.formatMessage({ id: "chat.mention.sessions.title" }),
+    intl.formatMessage({ id: "project.tasks" }),
   );
   // Plugins 分组：新建草稿（sessionId=null）读 workspace
   // 当前 catalog，已有 Session 读 session-owned 冻结 catalog；冲突项由 provider 标记禁选。
@@ -227,6 +231,16 @@ export function MentionPlugin({
   );
 
   const panelGroups = useMemo<MentionResultGroup<MentionItem>[]>(() => {
+    if (activeTrigger?.trigger === "#" && sessionsResult.groups?.length) {
+      return buildVisibleMentionGroups(
+        sessionsResult.groups.map((group) => ({
+          ...group,
+          emptyText: sessionsResult.emptyText,
+          loading: sessionsResult.loading,
+          errorText: sessionsResult.error?.message ?? null,
+        })),
+      );
+    }
     const groupsById = {
       files: {
         id: "files",
@@ -270,8 +284,7 @@ export function MentionPlugin({
       },
     } satisfies Record<MentionPanelGroupId, MentionResultGroup<MentionItem>>;
 
-    // 产品约束：@ 固定为 Plugin → 文件 → 对话 → 画板；旧 # / $ 面板继续走
-    // 原单分组 provider。这里仅重排发现入口，候选自身的 canonical markdown 不变。
+    // @ 的类别顺序与 $ 单分组保持原契约；# 的项目分组来自当前 Host 查询结果。
     return buildVisibleMentionGroups(
       getMentionPanelGroupOrder(activeTrigger?.trigger).map((groupId) => groupsById[groupId]),
     );
@@ -290,6 +303,7 @@ export function MentionPlugin({
     sessionsResult.emptyText,
     sessionsResult.error,
     sessionsResult.items,
+    sessionsResult.groups,
     sessionsResult.loading,
     sessionsResult.title,
     whiteboardResult.emptyText,
@@ -311,6 +325,7 @@ export function MentionPlugin({
       panelGroups.map((group) => ({
         id: group.id,
         title: group.title,
+        showHeader: activeTrigger?.trigger === "#",
         options: group.items.map<MentionPanelOption>((item) => ({
           id: item.id,
           label: item.displayLabel ?? item.label,
@@ -361,7 +376,7 @@ export function MentionPlugin({
         errorText: group.errorText,
         emptyText: group.emptyText,
       })),
-    [intl, panelGroups, workspacePath],
+    [intl, panelGroups, workspacePath, activeTrigger?.trigger],
   );
 
   useEffect(() => {

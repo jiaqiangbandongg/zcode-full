@@ -4,7 +4,11 @@
 // 因此与 prompt-turn.ts、record-access.ts 并列放在 commands/ 下，
 // 而不是寄居在某一个 handler 文件里。
 import type { SubmissionMode } from "@zcode/shared/zcode-protocol-v4";
-import { resolveExecutionState, type ModelSelection } from "@zcode/shared";
+import {
+  isHighspeedProviderId,
+  resolveExecutionState,
+  type ModelSelection,
+} from "@zcode/shared";
 import type { TurnAttachment } from "@zcode/core";
 import type { SteerTurnOptions } from "../../app/types.js";
 import { parseProviderQualifiedModelSelection } from "../../app/provider-registry-selection.js";
@@ -166,4 +170,26 @@ export function resolveSubmittedExecutionState(
  */
 export function resolveSessionFallbackModelSelection(record: V4SessionRecordView): ModelSelection {
   return resolveSubmittedExecutionState(record, {}).modelSelection;
+}
+
+/**
+ * 队列只能持久化普通提交模型。Bug 根因是协议允许任意 fallback target，旧写入点直接信任它，
+ * 因此旧版本或异常载荷可把内部 Highspeed Provider 写回 QueueItem。两个队列写入路径统一在此
+ * 按 Provider Family 过滤；会话常驻模型也被污染时拒绝入队，禁止继续扩散内部 Selection。
+ */
+export function resolveOrdinaryQueueModelSelection(
+  record: V4SessionRecordView,
+  candidate?: ModelSelection,
+): ModelSelection {
+  const selection =
+    candidate && !isHighspeedProviderId(candidate.providerId)
+      ? candidate
+      : resolveSessionFallbackModelSelection(record);
+  if (isHighspeedProviderId(selection.providerId)) {
+    throw new V4InputAdmissionRejectedError(
+      "fault.command.inputRejected",
+      "ordinary queue model selection is unavailable",
+    );
+  }
+  return selection;
 }

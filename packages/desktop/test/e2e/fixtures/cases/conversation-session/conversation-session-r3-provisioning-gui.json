@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-provisioning-gui",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-provisioning-gui.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-provisioning-gui.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-provisioning-gui-reconnect-title",
+      "description": "Provisioning 任务标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "r3-provisioning-gui-reconnect-main",
+      "description": "Provisioning 首发、新 Provider 与配置失败/重连/恢复后的续发响应。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "只验证配置、目标与任务历史；同步 RPC 故障由真实 SSH 回包代理和目录权限控制，模型回复无需人为延迟。"
+    }
+  ]
+}

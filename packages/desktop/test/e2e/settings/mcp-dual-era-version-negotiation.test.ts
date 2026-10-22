@@ -3,17 +3,19 @@ import { dirname, join, resolve } from "node:path";
 import {
   TID_MCP_SERVER_ROW,
   TID_SETTINGS_PAGE,
+  TID_SETTINGS_BACK_BUTTON,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
   getE2EAppDataPaths,
   waitForTestIdByDom,
 } from "../helpers/desktop-app.js";
-import { prepareConversationE2E } from "../helpers/conversation-session.js";
+// 正式用例已迁移到 V4，旧初始化在设置页返回后仍等待已移除的聊天入口。
+import { prepareV4ConversationE2E } from "../helpers/v4-conversation.js";
 
 const CASE_TIMEOUT_MS = 180_000;
 const MODERN_SERVER_NAME = "e2e_modern_728";
@@ -70,7 +72,7 @@ describe("MCP dual-era 真实 Desktop 版本协商 E2E", () => {
       },
       { timeout: 30_000, timeoutMsg: "首次使用引导关闭后未进入工作区" },
     );
-    await prepareConversationE2E({ skipProvider: true });
+    await prepareV4ConversationE2E({ skipProvider: true });
     await mkdir(CASE_ROOT, { recursive: true });
     await mkdir(dirname(CLI_CONFIG_FILE), { recursive: true });
     await rm(PINNED_LEGACY_WIRE_LOG, { force: true });
@@ -110,7 +112,9 @@ describe("MCP dual-era 真实 Desktop 版本协商 E2E", () => {
   it("MVN01/MVN02/MVN05/MVN06/MVN08: 真实 Agent 按 server 协商并记录精确版本", async function () {
     this.timeout(CASE_TIMEOUT_MS);
 
-    await prepareConversationE2E();
+    // 上一用例停在设置页；先通过返回入口恢复 Composer，再初始化下一条正式用例。
+    await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON);
+    await prepareV4ConversationE2E();
     await writeVersionNegotiationFixtures();
     await openMcpSettings();
     await waitForMcpRowConnected(MODERN_SERVER_NAME);

@@ -1,10 +1,39 @@
 # Sidebar Purpose Section Order
 
+## 当前交互修订（2026-09-15）
+
+本节替代下文历史设计的「专用手柄」约定。当前 ProjectSidebar 共用 PurposeSections 与 WorkspacePurposeSection：
+
+- 「项目」「任务」直接从标题文字或标题空白区域拖动，删除右侧六点按钮。点击仍只折叠当前分区；右侧新建按钮独立，不激活拖拽或折叠。
+- 沿用项目排序的 PointerSensor（移动 6px 后激活）与 KeyboardSensor；标题聚焦后 Space 开始、方向键移动、Space 提交、Escape 取消。触摸标题可拖动，内容区继续滚动。
+- 从同一 useSortable active / over / index 派生唯一目标插入线：向上在目标之前、向下在目标之后，整块展开内容一起移动。线使用项目排序的 2px icon-blue 与 8px 空心圆；不占布局、不拦截指针，释放/取消清除。
+- 分区位移约束到纵轴；侧栏列表显式禁止横向滚动，保留纵向滚动。拖出侧栏右边也不能撑宽滚动容器或产生横向滚动条。
+- 唯一已提交顺序仍为 renderer-local sectionOrder；无有效换位时不写偏好。折叠值、任务/项目内容不随排序改变，不新增持久化或计时器。
+
+```text
+标题 Pointer / Touch / Keyboard → dnd-kit active / over（纵轴）→ 目标边缘蓝线
+                                                           ├─ 提交 → 原 sectionOrder 偏好
+                                                           └─ 取消 → 清除暂态
+标题点击 → 原折叠偏好；右侧操作 → 原新建回调
+```
+
+共享 UI 同时用于桌面/Web；只约束侧栏展示，不改变 Host/CLI、workspaceIdentity、desktop continuous 或 mobile replayable。390px 桌面验证代表窄屏布局，不代表真实手机 shared-host 验证。
+
+验收：CWP02 更新标题触发断言；补充 pending 交互回归覆盖上下排序、展开/收起、点击/新建隔离、键盘取消/提交、重载持久化，明暗主题与窄屏下蓝线及拖到右侧无横向溢出。无模型请求。
+
+### 本次验证
+
+- 开发应用 CDP：修复前右拖让侧栏从 409px 撑到 1060px；修复后同类手势横向位移为 0、内容宽度等于可视宽度（264px），蓝线出现且 Escape 清除。
+- Electron pending run `desktop-e2e-20260915121039329-p28373-70b1989f9323c47a`：4/4 通过，已检查 1200px 深色和 390px 浅色截图；涵盖标题指针/键盘排序、取消/提交、重载、折叠与操作隔离、明暗主题和无水平溢出。
+- 原有 CWP02 formal run `desktop-e2e-20260915121257994-p30885-947e07257bcefaa2`：1/1 通过。两份 fixture check 通过，新增用例保持 pending。
+- 18 项相关单测、root typecheck、desktop typecheck:e2e、lint（47 个既有 warnings / 0 errors）、格式及 HEAD 增量架构检查通过。默认全分支架构检查仍有开工前的 `resolveConversationWorkspaceTarget.ts` unmanaged-new-file。
+- 真实手机 shared-host、触屏硬件、Windows/Linux GUI 未运行；本次仅改变共享侧栏交互与布局，不更改通信和任务数据。
+
 ## Feature Summary
 
 | Field                 | Value                                                                                                                     |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Change                | `Project + By project` 中的“项目 / 任务”二级分区支持拖拽换位，并持久化用户顺序                                            |
+| Change                | `Project + By project` 中的“项目 / 任务”二级分区支持拖拽换位，并持久化用户顺序；多设备共用顺序，但各设备独立折叠展开 |
 | User-visible surfaces | Desktop 与共享 Web workspace sidebar；共享 task-purpose 标签同步显示为“任务 / Tasks”                                      |
 | Existing docs         | `docs/ui/sidebar-task-view-switcher.md`、`docs/superpowers/specs/2026-07-10-non-project-conversation-workspace-design.md` |
 | State owner           | Renderer-local `zcode-sidebar-purpose-section-preferences`                                                                |
@@ -26,6 +55,7 @@
 pointer / touch / keyboard drag handle
   -> reorder [projects, conversations]
   -> update current renderer immediately
+  -> apply the same order inside every visible device group
   -> persist sectionOrder to localStorage
   -> restore on the next renderer mount
 
@@ -34,11 +64,17 @@ pointer / touch / keyboard drag handle
   -X-> live broadcast to another open window
 ```
 
-展开态跟随分区自身，不因换位改变：
+展开态跟随“设备 × 分区”，不因换位或其它设备的点击改变；只有未显示设备层级时才继续使用顶层兼容偏好：
 
 ```text
-projects      -> projectsExpanded
-conversations -> conversationsExpanded
+local           -> projects / conversations
+server:<id>     -> projects / conversations
+pending:<route> -> projects / conversations
+
+点击 server:A / projects
+  -> 只更新 server:A / projects
+  -X-> local / projects
+  -X-> server:B / projects
 ```
 
 ## Domain Scope And Dimensions
@@ -47,9 +83,9 @@ conversations -> conversationsExpanded
 | ------------------ | ------------------------------------------ | ----------------------------------------------------------------------- |
 | Input              | mouse pointer / touch pointer / keyboard   | accepted，统一走专用 drag handle                                        |
 | Section content    | non-empty / empty                          | accepted，都可拖                                                        |
-| Section expansion  | expanded / collapsed                       | accepted，整体移动且保留原展开态                                        |
+| Section expansion  | expanded / collapsed                       | accepted，按设备独立持久化；整体移动且保留各设备原展开态                 |
 | Initial preference | missing / legacy / valid / corrupt         | accepted；missing、legacy、corrupt 使用默认 `projects -> conversations` |
-| Surface            | Desktop / shared Web / mobile `/remote`    | 前两者 accepted 拖拽；mobile 只接受共享文案，拖拽 pruned，保持独立布局  |
+| Surface            | Desktop / shared Web / mobile `/remote`    | 前两者 accepted 拖拽；多设备内共享一份顺序；mobile 只接受共享文案，拖拽 pruned，保持独立布局 |
 | Window             | current / another open renderer / remount  | 当前立即更新；另一窗口实时同步 pruned；remount 恢复 accepted            |
 | Runtime delivery   | desktop-continuous / web-remote-replayable | ignored；排序不进入 runtime/realtime 链路                               |
 | Theme / locale     | Zai Light / Zai Dark；zh-CN / en-US        | accepted；使用现有语义 token 与双语文案                                 |
@@ -66,6 +102,8 @@ conversations -> conversationsExpanded
 | SPO06     | 在另一个已打开窗口观察顺序 | 不要求实时变化；该窗口下次挂载读取持久化值             | pruned，renderer-local 偏好不新增 broadcast |
 | SPO07     | 手机 `/remote` 查看或拖拽  | task-purpose 标签显示“任务”，但不提供拖拽入口，不改变 replayable 恢复 | copy accepted；drag pruned，独立移动端布局  |
 | SPO08     | 修改全产品其它“对话”文案   | 保持原文案                                             | ignored，本次只调整 sidebar purpose section |
+| SPO09     | 任一设备内拖动项目/任务顺序 | 所有设备内同步使用同一顺序，不新增 per-device 排序偏好 | accepted，保持单一 renderer-local owner      |
+| SPO10     | 任一设备内折叠项目或任务     | 仅该设备的对应分区折叠，其它设备展开态不变并独立持久化 | accepted，按 Source group key 隔离展开态      |
 
 ## Accepted Case And Evidence
 

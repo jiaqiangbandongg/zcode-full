@@ -6,7 +6,7 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -68,6 +68,14 @@ describe("Todo95 未知型号仅添加档位", () => {
       await smartSwitch.waitForEnabled({
         timeout: 15000,
       });
+      // 推荐容量只展示继承值；保存思考档位不能把新的通用容量固化为个人覆盖。
+      await browser.waitUntil(
+        async () =>
+          (await $('[data-model-settings-group="tokens"] input').getAttribute("placeholder")) ===
+          "1000000",
+        { timeout: 15000 },
+      );
+      expect(await $("[data-model-max-output] input").getAttribute("placeholder")).toBe("128000");
       await $('[data-model-advanced-trigger="true"]').click();
       await $('[data-model-reasoning-chip="true"] button').waitForExist({ timeout: 15000 });
       expect(await smartSwitch.getAttribute("aria-checked")).toBe("true");
@@ -100,6 +108,8 @@ describe("Todo95 未知型号仅添加档位", () => {
       await footer().$('.//button[normalize-space(.)="Save" or normalize-space(.)="保存"]').click();
       await footer().waitForExist({ reverse: true, timeout: 15000 });
       const rule = (await repository.read()).models.getExactRule(providerId, modelId);
+      expect(rule?.config.properties?.contextWindow).toBeUndefined();
+      expect(rule?.config.optionSpecs?.maxOutputTokens?.max).toBeUndefined();
       expect(rule?.config.optionSpecs?.reasoningLevel?.values).toEqual(["high"]);
       expect(rule?.config.optionSpecs?.reasoningLevel?.map).toBeUndefined();
       const probe = $(`[data-model-provider-model-id="${modelId}"] button:has(svg.lucide-unplug)`);

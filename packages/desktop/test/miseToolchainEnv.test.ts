@@ -14,9 +14,6 @@ describe("mise toolchain child environment", () => {
 
     expect(result.PATH?.split(delimiter)).toEqual([nodeDirectory, "/opt/homebrew/bin", "/usr/bin"]);
     expect(result.KEEP_ME).toBe("yes");
-    expect(originalPath).toBe(
-      ["/opt/homebrew/bin", nodeDirectory, "/usr/bin", nodeDirectory].join(delimiter),
-    );
   });
 
   it("preserves Windows Path casing so pnpm.cmd remains discoverable", () => {

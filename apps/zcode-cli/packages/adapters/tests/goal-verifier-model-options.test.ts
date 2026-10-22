@@ -24,7 +24,7 @@ describe("Goal Verifier bound model options", () => {
   ] as const)("inherits %s and the %i output limit (retry=%s)", async (level, limit, retry) => {
     const root = await mkdtemp(join(tmpdir(), "zcode-verifier-options-"));
     const sessionId = createSessionId("verifier-options");
-    const store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+    const store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
     const requests: Required<ModelOptions>[] = [];
     const selection = {
       providerId: retry ? "account:bigmodel-start-plan" : "fixture",

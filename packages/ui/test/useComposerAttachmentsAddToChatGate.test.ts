@@ -7,10 +7,7 @@ import {
   useComposerAttachments,
   type ComposerAttachmentsApi,
 } from "@/v4/composer/useComposerAttachments.js";
-import {
-  dispatchWhiteboardAddToChat,
-  WHITEBOARD_ADD_TO_CHAT_EVENT,
-} from "@/lib/whiteboard.js";
+import { dispatchWhiteboardAddToChat, WHITEBOARD_ADD_TO_CHAT_EVENT } from "@/lib/whiteboard.js";
 
 const mocks = vi.hoisted(() => ({
   platform: {
@@ -27,6 +24,7 @@ vi.mock("@/hooks/usePlatform.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useServices: () => ({ promptAttachmentTransferService: mocks.service }),
 }));
 

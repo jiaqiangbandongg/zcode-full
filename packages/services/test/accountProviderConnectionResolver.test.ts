@@ -460,9 +460,6 @@ describe("createAccountProviderConnectionResolver", () => {
         loadAccountIdentity: async () => null,
       });
       expect(loggedOut).toBeNull();
-      expect(migrateLegacyModelProviderId(`builtin:${family}-coding-plan`)).toBe(
-        `account:${family}-individual-coding-plan`,
-      );
     },
   );
 
@@ -564,13 +561,103 @@ describe("createAccountProviderConnectionResolver", () => {
       resolve({ configRevision: "config-1", configuredProviders: providers }),
     ).resolves.toEqual(
       expect.arrayContaining([
-        { providerId: "account:zai-offpeak-idle-plan", status: "available" },
+        {
+          providerId: "account:zai-offpeak-idle-plan",
+          status: "available",
+          entitlementSourceProviderId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
+        },
         {
           providerId: "account:bigmodel-offpeak-idle-plan",
           status: "unavailable",
         },
       ]),
     );
+  });
+
+  it("Highspeed 与 Off-Peak 派生连接引用所选 Coding Plan 母体状态", async () => {
+    const resolve = createAccountProviderConnectionResolver({
+      readSettings: async () => ({
+        providerFamilyDomain: "bigmodel",
+        selections: { bigmodel: { kind: "individual-coding-plan" } },
+      }),
+      loadCodingPlanApiKey: async () => "personal-key",
+      loadAccountIdentity: async () => "account-a",
+      resolveFamilyAvailability: async () => ({
+        [BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan]: { kind: "unknown" },
+      }),
+    });
+    const providers = configuredProviders()
+      .set(
+        "account:bigmodel-highspeed-card",
+        new ProviderConfig({
+          access: new ZhipuAccountAccessConfig({ accountType: "bigmodel", mode: "highspeed" }),
+        }),
+      )
+      .set(
+        "account:bigmodel-offpeak-idle-plan",
+        new ProviderConfig({
+          access: new ZhipuAccountAccessConfig({ accountType: "bigmodel", mode: "off-peak" }),
+        }),
+      );
+
+    const result = await resolve({ configRevision: "config", configuredProviders: providers });
+    for (const providerId of [
+      "account:bigmodel-highspeed-card",
+      "account:bigmodel-offpeak-idle-plan",
+    ]) {
+      expect(result).toContainEqual({
+        providerId,
+        status: "unknown",
+        entitlementSourceProviderId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+      });
+    }
+  });
+
+  it("派生连接的 last-known-good 作用域包含所选 Team 完整身份", async () => {
+    let projectId = "project-a";
+    const resolve = createAccountProviderConnectionResolver({
+      readSettings: async () => ({
+        providerFamilyDomain: "bigmodel",
+        selections: {
+          bigmodel: {
+            kind: "team-coding-plan",
+            organizationId: "org",
+            projectId,
+            productId: "product",
+          },
+        },
+      }),
+      loadCodingPlanApiKey: async () => null,
+      loadAccountIdentity: async () => "account-a",
+      resolveFamilyAvailability: async () => ({
+        [BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan]: { kind: "unknown" },
+      }),
+    });
+    const providers = configuredProviders({ bigmodelTeam: true }).set(
+      "account:bigmodel-highspeed-card",
+      new ProviderConfig({
+        access: new ZhipuAccountAccessConfig({ accountType: "bigmodel", mode: "highspeed" }),
+      }),
+    );
+    const input = { configRevision: "config", configuredProviders: providers };
+
+    const first = await resolve(input);
+    expect(
+      first.find((entry) => entry.providerId === "account:bigmodel-highspeed-card"),
+    ).toMatchObject({
+      status: "unknown",
+      entitlementSourceProviderId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+    });
+
+    projectId = "project-b";
+    const second = await resolve(input);
+    expect(
+      second.find((entry) => entry.providerId === "account:bigmodel-highspeed-card"),
+    ).toMatchObject({
+      status: "unknown",
+      entitlementSourceProviderId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+      resetPrevious: true,
+    });
   });
 
   it("把当前 Family 的 Start/Coding 权益映射为可用状态", async () => {

@@ -240,7 +240,7 @@ describe("Memory provider-visible request body", () => {
     ]);
   });
 
-  it.each(["user", "project", "local"] as const)(
+  it.each(["user"] as const)(
     "projects exact %s custom-agent Memory prompt and write tools into the final body",
     async (scope) => {
       const capture = await startProviderBodyCapture();

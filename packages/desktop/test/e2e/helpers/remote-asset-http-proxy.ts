@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
-import type { Socket } from "node:net";
+import { createConnection, type Socket } from "node:net";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface RemoteAssetHttpProxy {
@@ -56,7 +56,31 @@ export async function startRemoteAssetHttpProxy(options: {
     sockets.add(socket);
     socket.once("close", () => sockets.delete(socket));
   });
-  server.on("connect", (_request, socket) => socket.destroy());
+  server.on("connect", (request, socket, head) => {
+    // Bug 原因：Host 的 Undici ProxyAgent 对 HTTP 也使用 CONNECT；旧桩直接断开隧道，无法验证代理下载。
+    // 只允许本 case 的假 CDN，并固定转到本地 fixture server，不开放任意目标代理。
+    if (request.url !== `${options.expectedHost}:80`) {
+      socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+      return;
+    }
+    const upstream = createConnection({
+      host: "127.0.0.1",
+      port: (server.address() as AddressInfo).port,
+    });
+    sockets.add(upstream);
+    upstream.once("close", () => {
+      sockets.delete(upstream);
+      socket.destroy();
+    });
+    socket.once("close", () => upstream.destroy());
+    upstream.on("error", () => socket.destroy());
+    socket.on("error", () => upstream.destroy());
+    upstream.once("connect", () => {
+      socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+      if (head.length) upstream.write(head);
+      socket.pipe(upstream).pipe(socket);
+    });
+  });
 
   await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);

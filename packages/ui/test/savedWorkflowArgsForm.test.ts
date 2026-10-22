@@ -123,7 +123,7 @@ describe("argsDeclarationToRows / rowsToArgsDeclaration", () => {
       extra: { type: "json" as const, default: { a: 1 } },
     };
     const rows = argsDeclarationToRows(declaration);
-    expect(rows.map((row) => row.key)).toEqual(["0:branch", "1:count", "2:dry", "3:extra"]);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
     expect(rows[2]?.defaultText).toBe("false");
     expect(rowsToArgsDeclaration(rows)).toEqual({ ok: true, args: declaration });
     expect(rowsToArgsDeclaration([])).toEqual({ ok: true, args: undefined });

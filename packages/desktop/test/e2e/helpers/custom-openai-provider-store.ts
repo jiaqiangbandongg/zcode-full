@@ -31,20 +31,27 @@ const E2E_PROVIDER_RUNTIME_FILE = resolve(
 const E2E_MODEL_CONTEXT_WINDOW = 200_000;
 const E2E_MODEL_MAX_OUTPUT_TOKENS = 32_000;
 
-interface SeedCustomOpenAIProviderOptions {
-  inputModalities?: readonly E2EProviderModality[];
+export interface SeedCustomOpenAIProviderOptions {
+  reasoningLevel?: NonNullable<
+    ConstructorParameters<typeof ModelOptionSpecsConfig>[0]
+  >["reasoningLevel"];
+  baseURL?: string;
+  // null 专用于不完整配置回归；undefined 保持普通 text-only 夹具。
+  inputModalities?: readonly E2EProviderModality[] | null;
   modelId: string;
   providerId: string;
   providerName: string;
 }
 
 export async function seedCustomOpenAIChatCompletionsProvider({
+  baseURL: explicitBaseURL,
   inputModalities,
+  reasoningLevel,
   modelId,
   providerId,
   providerName,
 }: SeedCustomOpenAIProviderOptions): Promise<E2EModelProviderSnapshot> {
-  const baseURL = await resolveSeededReplayBaseUrl();
+  const baseURL = explicitBaseURL?.trim() || (await resolveSeededReplayBaseUrl());
   if (!baseURL) {
     throw new Error(
       "没有找到已 seed 的 replay provider Base URL，无法写入 OpenAI-compatible provider",
@@ -66,7 +73,11 @@ export async function seedCustomOpenAIChatCompletionsProvider({
     await repository.update((current) => ({
       ...current,
       providers: current.providers.setRule({ providerId, providerName, config: providerConfig }),
-      models: current.models.setExact(providerId, modelId, createE2EModelConfig(inputModalities)),
+      models: current.models.setExact(
+        providerId,
+        modelId,
+        createE2EModelConfig(inputModalities, reasoningLevel),
+      ),
     }));
   } finally {
     repository.dispose();
@@ -80,6 +91,65 @@ export async function seedCustomOpenAIChatCompletionsProvider({
     providerId,
     providerName,
   });
+}
+
+export async function seedCustomAnthropicMessagesProvider({
+  baseURL,
+  modelId,
+  providerId,
+  providerName,
+}: {
+  baseURL: string;
+  modelId: string;
+  providerId: string;
+  providerName: string;
+}): Promise<E2EModelProviderSnapshot> {
+  const providerConfig = new ProviderConfig({
+    group: "standard-personal",
+    access: new ApiKeyAccessConfig({ apiKey: getUpstreamApiKey() }),
+    api: new ProviderApiConfig({
+      type: "anthropic-messages",
+      baseUrl: baseURL.replace(/\/+$/u, ""),
+    }),
+    personalModelIds: [modelId],
+  });
+  const repository = new NodePersonalProviderConfigRepository({
+    filePath: PERSONAL_CONFIG_FILE,
+    pollingIntervalMs: false,
+  });
+  try {
+    await repository.update((current) => ({
+      ...current,
+      providers: current.providers.setRule({ providerId, providerName, config: providerConfig }),
+      models: current.models.setExact(providerId, modelId, createE2EModelConfig(["text"])),
+    }));
+  } finally {
+    repository.dispose();
+  }
+  const now = Date.now();
+  return {
+    id: providerId,
+    name: providerName,
+    apiFormat: "anthropic-messages",
+    apiKey: getUpstreamApiKey(),
+    apiKeyRequired: true,
+    defaultKind: "anthropic",
+    endpoints: { baseURL, paths: { anthropic: "" } },
+    models: [
+      createE2EProviderModelSnapshot({
+        id: modelId,
+        kinds: ["anthropic"],
+        defaultKind: "anthropic",
+        contextWindow: E2E_MODEL_CONTEXT_WINDOW,
+        maxOutputTokens: E2E_MODEL_MAX_OUTPUT_TOKENS,
+        supportsTools: true,
+        supportsJsonSchemaOutput: false,
+      }),
+    ],
+    source: "custom",
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export async function resolveSeededReplayBaseUrl() {
@@ -102,20 +172,26 @@ export async function resolveSeededReplayBaseUrl() {
 }
 
 function createE2EModelConfig(
-  inputModalities: readonly E2EProviderModality[] | undefined,
+  inputModalities: readonly E2EProviderModality[] | null | undefined,
+  reasoningLevel?: SeedCustomOpenAIProviderOptions["reasoningLevel"],
 ): ModelConfig {
   const inputs = new Set(inputModalities ?? ["text"]);
   return new ModelConfig({
+    // direct seed 曾只保存部分字段：本地设置页无法收录，远端也不能接受它作为默认模型。
+    enabled: true,
     properties: new ModelPropertiesConfig({
       requiresMfjsToolSchema: false,
       contextWindow: E2E_MODEL_CONTEXT_WINDOW,
-      inputFormat: {
-        supportsText: inputs.has("text"),
-        supportsImage: inputs.has("image"),
-        supportsVideo: inputs.has("video"),
-        supportsAudio: inputs.has("audio"),
-        supportsPdf: inputs.has("pdf"),
-      },
+      inputFormat:
+        inputModalities === null
+          ? null
+          : {
+              supportsText: inputs.has("text"),
+              supportsImage: inputs.has("image"),
+              supportsVideo: inputs.has("video"),
+              supportsAudio: inputs.has("audio"),
+              supportsPdf: inputs.has("pdf"),
+            },
       outputFormat: { supportsText: true },
       supportsToolCall: true,
       supportsJsonSchemaOutput: false,
@@ -123,8 +199,11 @@ function createE2EModelConfig(
       supportsMidConversationSystem: false,
     }),
     optionSpecs: new ModelOptionSpecsConfig({
+      // 专项需要完整声明待验证档位与 wire；默认夹具仍保持无思考参数。
+      reasoningLevel: reasoningLevel ?? { values: ["disabled"], map: "{}" },
       maxOutputTokens: {
         max: E2E_MODEL_MAX_OUTPUT_TOKENS,
+        map: '{"max_completion_tokens":maxOutputTokens}',
       },
     }),
   });

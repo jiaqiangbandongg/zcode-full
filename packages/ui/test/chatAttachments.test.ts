@@ -384,10 +384,6 @@ describe("clipboard text attachments", () => {
 });
 
 describe("video attachments", () => {
-  it("使用 30MiB 全局 video 输入上限", () => {
-    expect(VIDEO_INPUT_MAX_BYTES).toBe(30 * 1024 * 1024);
-  });
-
   it("无 localPath 的视频走 dataBase64 序列化为 kind video", async () => {
     const file = new File([new Uint8Array([1, 2, 3, 4])], "demo.mp4", {
       type: "video/mp4",

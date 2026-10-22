@@ -112,7 +112,6 @@ describe("walkStorageRoot", () => {
 describe("probeStorageVolume", () => {
   it("returns the volume of an existing path and null for a missing one", async () => {
     const volume = await probeStorageVolume(root);
-    expect(volume).not.toBeNull();
     expect(volume!.totalBytes).toBeGreaterThan(0);
     expect(volume!.freeBytes).toBeGreaterThanOrEqual(0);
     expect(root.startsWith(volume!.mountPoint)).toBe(true);

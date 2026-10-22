@@ -7,7 +7,7 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -54,7 +54,7 @@ describe("Model Settings Provider connection transition E2E", () => {
     await prepareV4ConversationE2E({ skipProvider: true });
     await seedReplayProvider({
       id: UPSTREAM_PROVIDER_ID,
-      models: [UPSTREAM_MODEL],
+      models: [{ id: UPSTREAM_MODEL, reasoningLevel: { values: ["high", "max"], map: "{}" } }],
       name: "Upstream E2E",
     });
   });

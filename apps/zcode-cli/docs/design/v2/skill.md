@@ -164,8 +164,9 @@ Project discovery 使用 nearest-first 语义：先检查当前 working director
   `apps/zcode-cli/packages/bundled-skills/skills/`，以 `source: "bundled"`、`scope: "system"`
   进入发现，与 plugin roots 并列注入 runtime、`zcode skills list` 与协议 skill catalog。它不是
   插件：不进市场目录、没有启停开关、不能卸载、不出现在 Settings 与 `$` 引用面板
-  （`skills/referenceCatalog` 过滤 `bundled`）。开发态/桌面态沿官方插件同款候选目录在入口旁
-  原地读取；SEA 按内容 hash 一次性解压到 `~/.zcode/cli/bundled-skills/<hash>/`。包内每个
+  （`skills/referenceCatalog` 过滤 `bundled`）。开发态/桌面态/ZCode Server 发行包沿官方插件同款
+  候选目录在入口旁原地读取（Server 发行包 stage 在 `runtime/packages/bundled-skills`）；SEA
+  按内容 hash 一次性解压到 `~/.zcode/cli/bundled-skills/<hash>/`。包内每个
   文件都是必需资产，缺一拒绝整包并告警。首个成员是 `dynamic-workflows`
   （`docs/dynamic-workflow/authoring.md`）。
 - plugin-provided skill roots。

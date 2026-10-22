@@ -1,3 +1,4 @@
+import { sanitizeRemoteConnectionLog } from "@zcode/shared";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export type RemoteConnectionProgressLevel = "info" | "warn" | "error";
@@ -42,7 +43,13 @@ export function createRemoteConnectionProgressContext(options: {
       if (!store?.active) {
         return;
       }
-      options.emit({ requestId: store.requestId, level, args });
+      // 不序列化配置对象；只有流水线主动上报的可读文本允许越过用户日志边界。
+      const message = args
+        .filter((arg): arg is string => typeof arg === "string")
+        .map((arg) => sanitizeRemoteConnectionLog(arg))
+        .filter(Boolean)
+        .join(" ");
+      if (message) options.emit({ requestId: store.requestId, level, args: [message] });
     },
   };
 }

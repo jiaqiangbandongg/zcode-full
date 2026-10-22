@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-chat-escape",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-chat-escape.test.ts",
+  "fixtures": [
+    {
+      "id": "ssc-escape-title",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "标题请求只需正常完成，不参与 Esc 焦点路由断言。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSC_ESCAPE_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\":\"ssc-escape-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"Esc focus isolation\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":128,\"output_tokens\":16}}"
+      }
+    },
+    {
+      "id": "ssc-escape-running",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "主辅对话必须同时保持 running，以验证 Esc 焦点隔离和停止后的重复按键。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSC_ESCAPE_RUNNING"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "events": [
+          {
+            "sequence": 0,
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"upstream-e2e-stop-held-running-slow-stream\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":120,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "sequence": 1,
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "sequence": 2,
+            "offsetMs": 400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-1 \"}}\n\n"
+          },
+          {
+            "sequence": 3,
+            "offsetMs": 1900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-2 \"}}\n\n"
+          },
+          {
+            "sequence": 4,
+            "offsetMs": 3400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-3 \"}}\n\n"
+          },
+          {
+            "sequence": 5,
+            "offsetMs": 4900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-4 \"}}\n\n"
+          },
+          {
+            "sequence": 6,
+            "offsetMs": 6400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-5 \"}}\n\n"
+          },
+          {
+            "sequence": 7,
+            "offsetMs": 7900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-6 \"}}\n\n"
+          },
+          {
+            "sequence": 8,
+            "offsetMs": 9400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-7 \"}}\n\n"
+          },
+          {
+            "sequence": 9,
+            "offsetMs": 10900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-8 \"}}\n\n"
+          },
+          {
+            "sequence": 10,
+            "offsetMs": 12400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-9 \"}}\n\n"
+          },
+          {
+            "sequence": 11,
+            "offsetMs": 13900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-10 \"}}\n\n"
+          },
+          {
+            "sequence": 12,
+            "offsetMs": 15400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-11 \"}}\n\n"
+          },
+          {
+            "sequence": 13,
+            "offsetMs": 16900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-12 \"}}\n\n"
+          },
+          {
+            "sequence": 14,
+            "offsetMs": 18400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-13 \"}}\n\n"
+          },
+          {
+            "sequence": 15,
+            "offsetMs": 19900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-14 \"}}\n\n"
+          },
+          {
+            "sequence": 16,
+            "offsetMs": 21400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-15 \"}}\n\n"
+          },
+          {
+            "sequence": 17,
+            "offsetMs": 22900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-16 \"}}\n\n"
+          },
+          {
+            "sequence": 18,
+            "offsetMs": 24400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-17 \"}}\n\n"
+          },
+          {
+            "sequence": 19,
+            "offsetMs": 25900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-18 \"}}\n\n"
+          },
+          {
+            "sequence": 20,
+            "offsetMs": 27400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-19 \"}}\n\n"
+          },
+          {
+            "sequence": 21,
+            "offsetMs": 28900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-20 \"}}\n\n"
+          },
+          {
+            "sequence": 22,
+            "offsetMs": 30400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-21 \"}}\n\n"
+          },
+          {
+            "sequence": 23,
+            "offsetMs": 31900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-22 \"}}\n\n"
+          },
+          {
+            "sequence": 24,
+            "offsetMs": 33400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-23 \"}}\n\n"
+          },
+          {
+            "sequence": 25,
+            "offsetMs": 34900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-24 \"}}\n\n"
+          },
+          {
+            "sequence": 26,
+            "offsetMs": 36400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-25 \"}}\n\n"
+          },
+          {
+            "sequence": 27,
+            "offsetMs": 37900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-26 \"}}\n\n"
+          },
+          {
+            "sequence": 28,
+            "offsetMs": 39400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-27 \"}}\n\n"
+          },
+          {
+            "sequence": 29,
+            "offsetMs": 40900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-28 \"}}\n\n"
+          },
+          {
+            "sequence": 30,
+            "offsetMs": 42400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-29 \"}}\n\n"
+          },
+          {
+            "sequence": 31,
+            "offsetMs": 43900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-30 \"}}\n\n"
+          },
+          {
+            "sequence": 32,
+            "offsetMs": 45400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-31 \"}}\n\n"
+          },
+          {
+            "sequence": 33,
+            "offsetMs": 46900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-32 \"}}\n\n"
+          },
+          {
+            "sequence": 34,
+            "offsetMs": 48400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-33 \"}}\n\n"
+          },
+          {
+            "sequence": 35,
+            "offsetMs": 49900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-34 \"}}\n\n"
+          },
+          {
+            "sequence": 36,
+            "offsetMs": 51400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-35 \"}}\n\n"
+          },
+          {
+            "sequence": 37,
+            "offsetMs": 52900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-36 \"}}\n\n"
+          },
+          {
+            "sequence": 38,
+            "offsetMs": 54400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-37 \"}}\n\n"
+          },
+          {
+            "sequence": 39,
+            "offsetMs": 55900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-38 \"}}\n\n"
+          },
+          {
+            "sequence": 40,
+            "offsetMs": 57400,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-39 \"}}\n\n"
+          },
+          {
+            "sequence": 41,
+            "offsetMs": 58900,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ssc-live-40 \"}}\n\n"
+          },
+          {
+            "sequence": 42,
+            "offsetMs": 62000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "sequence": 43,
+            "offsetMs": 62001,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":120,\"output_tokens\":12,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "sequence": 44,
+            "offsetMs": 62002,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ssc-escape-seed",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "只需建立可创建辅助对话的父 session；工具历史不参与键盘焦点回归。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_SSC_ESCAPE_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "text": "ssc-seed-ready",
+          "inputTokens": 128,
+          "outputTokens": 12
+        }
+      }
+    }
+  ]
+}

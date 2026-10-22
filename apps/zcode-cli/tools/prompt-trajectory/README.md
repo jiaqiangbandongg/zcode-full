@@ -5,6 +5,17 @@ Test-only OpenAI protocol trajectory recorder for zcode-cli prompt assembly chec
 This tool lives under `tools/` so it is available in the pnpm workspace but stays out of
 the production CLI and SEA packaging path.
 
+## Current limitations
+
+Validation on 2026-10-14 found two existing failures: `record:prompt` exits before
+the model request with `createModelAdapter requires executionConfig`, and `model-io`
+rejects the current default CLI log when `request.body.messages` has been pruned.
+The commands below describe the tool interface; these paths need repair and
+validation before use in a training-data pipeline. See the
+[CLI capture guide](../../docs/usage/13-automation.md) for the verified scope and
+capture boundaries. Do not reconstruct missing provider messages from a different
+message representation merely to make conversion succeed.
+
 ## Commands
 
 ```bash
@@ -25,7 +36,7 @@ pnpm --filter @zcode/prompt-trajectory derive -- \
   --out /tmp/zcode-prompt-trajectory/basic-live
 
 pnpm --filter @zcode/prompt-trajectory model-io -- \
-  --input ~/.zcode/cli/debug/model-io-<session>.jsonl \
+  --input ~/.zcode/cli/rollout/model-io-<session>.jsonl \
   --out /tmp/zcode-prompt-trajectory/model-io-session
 ```
 
@@ -103,3 +114,26 @@ the converter preserves that complete assistant message after verifying its text
 tool calls against the response summary. Appending blocks to the final user message
 also remains in the same trajectory. Rewriting existing content still starts a new
 segment. `non-incremental-change` is not a provider cache-miss indicator.
+
+For ToolSearch-only synthesis, `model-io` and `derive` accept
+`--ignore-tool-search-changes` (off by default):
+
+```bash
+pnpm --filter @zcode/prompt-trajectory model-io -- \
+  --input /path/to/model-io-session.jsonl --out /tmp/toolsearch-synthesis \
+  --ignore-tool-search-changes
+```
+
+This comparison mode ignores native `tool_reference` blocks and the two reference-removal
+placeholders inside results paired with `ToolSearch` calls, plus standalone ToolSearch
+catalog reminder blocks in user messages (current Native/Local and older log formats).
+It also ignores the derived `Tool loaded.` text
+immediately following a result batch, up to one per successful ToolSearch result containing
+native references. The same text elsewhere remains significant. Call IDs, inputs, error flags,
+ordinary result text, other tools, thinking, and unrelated history edits remain significant. Top-level
+`tools` changes already do not split trajectories.
+
+Only comparison changes: each output segment still contains its last recorded request
+and final response, without merging schemas or restoring earlier references. The manifest
+records `ignoreToolSearchChanges: true`. Original logs remain untouched. Use them to inspect
+individual requests; this synthesis mode does not establish provider cache hits.

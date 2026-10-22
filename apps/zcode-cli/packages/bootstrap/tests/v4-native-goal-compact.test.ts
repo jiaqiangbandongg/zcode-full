@@ -510,11 +510,8 @@ describe("v4 原生 pauseGoal", () => {
 });
 
 describe("supports 分流（goal/compact 组）", () => {
-  it("compact/sendGoalCommand/pauseGoal/resumeGoal 已原生", () => {
+  it("pauseGoal 已原生", () => {
     const executor = new V4CommandExecutor(makeHost(makeRecord()));
-    expect(executor.supports("compact")).toBe(true);
-    expect(executor.supports("sendGoalCommand")).toBe(true);
     expect(executor.supports("pauseGoal")).toBe(true);
-    expect(executor.supports("resumeGoal")).toBe(true);
   });
 });

@@ -61,63 +61,6 @@ describe("M2 completion boundary", () => {
     const matches = await findProductionFilesMatching(/\bModelProviderApiFormat\b/u);
     expect(matches).toEqual([...legacyApiFormatOwners].sort());
   });
-
-  it("旧 Runtime Model Config 只属于一次性导入与兼容解析边界", async () => {
-    const matches = await findProductionFilesMatching(/\bRuntimeModelConfig\b/u);
-    expect(matches).toEqual([]);
-  });
-
-  it("模型名硬编码缺省值不能重新进入 Process Registry 与正式 Model", async () => {
-    const matches = await findProductionFilesMatching(
-      /\b(?:resolveModelCapabilityDefaults|createDefaultModelCapability|applyModelCapabilityDefaults)\b/u,
-    );
-    expect(matches).toEqual([]);
-  });
-
-  it.each([
-    "ZCodeProviderRegistrySnapshot",
-    "workspace/updateProviderRegistry",
-    "RuntimeModelOverlayManager",
-    "ModelProviderService",
-    "modelProviderServiceStorage",
-    "providerSettingsLegacyProjection",
-    "workspaceModelCatalogs",
-    "workspaceModelMirror",
-    "setModelCatalogOverlay",
-    "ZCodeWorkspaceModelCatalogState",
-    "setProviderRuntimeHeaders",
-    "session/updateRuntimeModelConfig",
-    "hasProcessProviderRegistry",
-    "bootstrapModelConfig",
-    "includeLegacyProviderModels",
-    "BUILTIN_MODEL_PROVIDER_ORDER",
-    "ModelProviderDisplayOrderState",
-    "Workspace model catalog",
-    "workspace model catalog",
-    "appliedProviderRevision",
-    "providerRevision",
-    "createRuntimeAiSdkModelRegistryConfig",
-    "modelCatalog: options.modelCatalog",
-  ])("生产源码不再出现已退出边界 %s", async (retiredBoundary) => {
-    expect(await findProductionFilesContaining(retiredBoundary)).toEqual([]);
-  });
-
-  it.each([
-    "isModelProviderEnabled",
-    "getModelProviderModelId",
-    "getModelProviderModelLabel",
-    "findModelProviderModel",
-    "mapModelProviderKindToSupportedFormat",
-    "resolveModelSupportedFormatsForModel",
-    "hasRemoteProviderModelFacts",
-    "migrateLegacyOpenAiCompatibleReasoningOptions",
-    "isSystemDisabledCodingPlanProvider",
-    "isUserDisabledCodingPlanProvider",
-  ])("生产源码不再公开或消费无有效调用方的旧 helper %s", async (retiredHelper) => {
-    expect(
-      await findProductionFilesMatching(new RegExp(`\\b${escapeRegExp(retiredHelper)}\\b`, "u")),
-    ).toEqual([]);
-  });
 });
 
 async function findProductionFilesContaining(needle: string): Promise<string[]> {

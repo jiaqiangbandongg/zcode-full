@@ -15,6 +15,7 @@
 - 当 alias 含 `IdentityFile` 时，认证方式自动切换为 `privateKey`。
 - 用户后续手动改动 SSH 关键字段（host/port/username/privateKey）会清除“已选 alias”状态，避免误导。
 - 通过 alias 建立的 SSH remote workspace 会把 alias 作为非敏感连接元数据写入 remote target snapshot。
+- 通过 alias 首次识别一个 Source 设备时，alias 作为设备默认名称；已经存在或已经手工改名的设备不被后续握手覆盖。
 - 左侧任务列表和聊天区域 header 里的 SSH remote workspace 若带 alias，工作区标题显示为 `<workspaceName> [SSH: <alias>]`，例如 `root [SSH: linux-arm64]`；未使用 alias 或历史记录无 alias 时保持原工作区名/原 host 辅助信息。
 - Web 端非 remote-control 场景返回空列表，保持兼容。
 
@@ -29,6 +30,7 @@
   - 缓存 TTL（30s）
   - 失败隔离与回退到本地解析结果
 - `SSHConnectOptions` / `SSHRemoteTargetSnapshot` 保存可选 `sshConfigAlias` 字段；该字段不参与 workspace identity 计算，避免用户重命名 alias 或同目标 alias 变化导致同一远端 workspace 被误拆分。
+- Source 设备默认名称只在首次握手创建记录时读取 alias；alias 仍不参与设备身份、Profile 去重或 workspace identity。
 - 断连恢复、重连失败记录和 tab 持久化继续以 `workspaceIdentity?.trim() || workspacePath` 作为隔离 key；alias 只用于 UI 展示。
 - 兼容 macOS / Linux / Windows：
   - 配置入口统一从 `os.homedir()` 解析 `~/.ssh/config`

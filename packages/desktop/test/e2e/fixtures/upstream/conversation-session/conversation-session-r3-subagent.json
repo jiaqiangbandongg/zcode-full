@@ -1,0 +1,508 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-subagent",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-subagent.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-sub-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_SUBAGENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-stale-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 subagent\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-workflow-skill",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_WORKFLOW_START"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_r3_workflow_skill",
+          "name": "Skill",
+          "input": {
+            "skill": "dynamic-workflows"
+          }
+        }
+      }
+    },
+    {
+      "id": "r3-workflow-create",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["Writing dynamic workflows"],
+        "bodyIncludes": ["E2E_R3_WORKFLOW_START"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_r3_workflow_create",
+          "name": "CreateWorkflow",
+          "input": {
+            "name": "Remote workflow regression",
+            "script": "return await agent(\"remote-reviewer\").ask(\"E2E_R3_WORKFLOW_CHILD: Reply exactly R3_WORKFLOW_CHILD_DONE\");",
+            "subagent_model": "e2e-workflow-actors/GLM-5.3"
+          }
+        }
+      }
+    },
+    {
+      "id": "r3-workflow-started",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["run started in the background with ID:"],
+        "bodyIncludes": ["E2E_R3_WORKFLOW_START"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-workflow-started",
+          "text": "R3_WORKFLOW_STARTED"
+        }
+      }
+    },
+    {
+      "id": "r3-workflow-child",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_WORKFLOW_CHILD"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-workflow-child",
+          "text": "R3_WORKFLOW_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "r3-workflow-notification",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["workflow"],
+        "bodyIncludes": ["E2E_R3_WORKFLOW_START", "R3_WORKFLOW_STARTED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-workflow-notification",
+          "text": "R3_WORKFLOW_COMPLETED"
+        }
+      }
+    },
+    {
+      "id": "r3-side-chat",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_SIDE_CHAT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-side-chat",
+          "text": "R3_SIDE_CHAT_DONE"
+        }
+      }
+    },
+    {
+      "id": "r3-side-followup",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+      },
+      "maxMatches": 3,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "You are now acting as the memory extraction subagent"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_SIDE_FOLLOWUP"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-side-followup",
+          "text": "R3_SIDE_FOLLOWUP_DONE"
+        }
+      }
+    },
+    {
+      "id": "r3-sub-parent-agent",
+      "description": "BG25: main launches a long-running background Agent.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "稳定启动 background child，并用文件 barrier 保持 running 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_SUBAGENT_PARENT"],
+        "bodyExcludes": [
+          "Async agent launched successfully",
+          "E2E_R3_SUBAGENT_PARENT2",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_SUBAGENT_PARENT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_r3_sub_agent",
+          "name": "Agent",
+          "input": {
+            "description": "R3 remote subagent child",
+            "prompt": "R3_SUBAGENT_CHILD_TASK: Run the Bash tool to wait for the release file, then reply R3_SUBAGENT_CHILD_DONE.",
+            "run_in_background": true
+          }
+        }
+      }
+    },
+    {
+      "id": "r3-sub-parent-launched",
+      "description": "O19: parent finishes the background Agent launch turn.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "先让 parent 启动 turn 回到 idle，再释放 child 输入错误，避免 completion notification 合流竞态。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_SUBAGENT_PARENT", "Async agent launched successfully"],
+        "lastUserMessageIncludes": ["Async agent launched successfully"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-sub-parent-launched",
+          "text": "R3_SUBAGENT_PARENT_LAUNCHED"
+        }
+      }
+    },
+    {
+      "id": "r3-sub-child-bash",
+      "description": "BG25: child starts a foreground Bash barrier before coordinator steer arrives.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-tool-use",
+        "source": "synthetic",
+        "syntheticReason": "文件 barrier 稳定制造第一个 child tool call 尚未完成的 steer 窗口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["R3_SUBAGENT_CHILD_TASK"],
+        "bodyExcludes": [
+          "R3_SUBAGENT_CHILD_BASH_RELEASED",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["R3_SUBAGENT_CHILD_TASK"]
+      },
+      "response": {
+        "statusCode": 200,
+        "toolUse": {
+          "id": "toolu_r3_sub_child_bash",
+          "name": "Bash",
+          "input": {
+            "command": "while [ ! -f '.zcode-e2e/r3-subagent/release-child' ]; do sleep 0.2; done; printf 'R3_SUBAGENT_CHILD_BASH_RELEASED\\n'",
+            "description": "Wait for remote release file"
+          }
+        }
+      }
+    },
+    {
+      "id": "r3-sub-child-final",
+      "description": "BG25: child finishes normally after continued work.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "证明 child 回复后继续普通工具，并最终通过正常 completion 收口。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["R3_SUBAGENT_CHILD_BASH_RELEASED"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-sub-child-final",
+          "text": "R3_SUBAGENT_CHILD_DONE"
+        }
+      }
+    },
+    {
+      "id": "r3-sub-notification",
+      "description": "BG25: parent consumes the child final completion notification.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "task-notification",
+        "source": "synthetic",
+        "syntheticReason": "证明 child 最终仍通过标准 background completion notification 收口。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["<task-notification>"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["<task-notification>"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-sub-notification",
+          "text": "R3_SUBAGENT_NOTIFICATION_CONSUMED"
+        }
+      }
+    },
+    {
+      "id": "r3-sub-memory-noop",
+      "description": "BG25/O18: background Main memory extraction remains non-semantic for this renderer case.",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Memory extraction 默认在成功 Main turn 后异步运行；本 case 仅用 Nothing to save 收口，避免隐藏请求干扰严格 replay，不扩展 Memory 产品语义。"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["You are now acting as the memory extraction subagent"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "deepseek-e2e-subagent-response-memory-extraction-noop",
+          "text": "Nothing to save."
+        }
+      }
+    },
+    {
+      "id": "r3-sub-parent2-slow",
+      "description": "Model A 慢回合",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "在明确点击父会话 Stop 前保持运行窗口，停止需真实取消流，不能依赖45秒自然完成。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_SUBAGENT_PARENT2"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"r3-stale-slow\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_SUBAGENT_PARENT2_STREAMING \"}}\n\n"
+          },
+          {
+            "offsetMs": 45000,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 45100,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":80,\"output_tokens\":4,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 45200,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "text": {
+          "id": "v4-queue-slow",
+          "inputTokens": 80,
+          "outputTokens": 4,
+          "text": "V4_QUEUE_STREAMING"
+        },
+        "releaseAfterChunks": 3
+      }
+    },
+    {
+      "id": "r3-sub-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 12,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_SUBAGENT_A_FIRST_PROMPT"],
+        "bodyExcludes": [
+          "E2E_R3_SUBAGENT_PARENT",
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Verify whether the active session goal"
+        ],
+        "lastUserMessageIncludes": ["E2E_R3_SUBAGENT_A_FIRST_PROMPT"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-stale-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_SUBAGENT_REPLY"
+        }
+      }
+    }
+  ]
+}

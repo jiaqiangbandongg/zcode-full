@@ -21,6 +21,28 @@ function createIntl(messages: Record<string, string>): IntlInstance {
 }
 
 describe("ChatErrorBanner i18n", () => {
+  it("uses the remote wording for an empty remote workspace instead of local plan copy", () => {
+    const zhIntl = createIntl(zhCN);
+    const enIntl = createIntl(enUS);
+    const error = {
+      code: "model_config_missing",
+      message: "Model config is missing",
+    };
+
+    const zhRemote = resolveChatErrorBannerDisplayMessage(error, zhIntl, "remote");
+    const enRemote = resolveChatErrorBannerDisplayMessage(error, enIntl, "remote");
+
+    expect(zhRemote).toBe(zhCN["chat.error.remoteNoAvailableModel"]);
+    expect(zhRemote).not.toBe("chat.error.remoteNoAvailableModel");
+    expect(zhRemote).not.toBe(zhCN["chat.error.noAvailableModel"]);
+    expect(enRemote).toBe(enUS["chat.error.remoteNoAvailableModel"]);
+    expect(enRemote).not.toBe("chat.error.remoteNoAvailableModel");
+    expect(enRemote).not.toBe(enUS["chat.error.noAvailableModel"]);
+    expect(resolveChatErrorBannerDisplayMessage(error, zhIntl, "local")).toBe(
+      zhCN["chat.error.noAvailableModel"],
+    );
+  });
+
   it.each([
     [zhCN, "当前附件总量过大，请移除部分附件或压缩后重试。"],
     [

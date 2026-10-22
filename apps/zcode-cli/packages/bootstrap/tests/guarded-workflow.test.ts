@@ -10,11 +10,12 @@ import {
 } from "./helpers/registry-backed-test-app.js";
 
 describe("guarded workflow runtime ingress", () => {
+  // 真实 App、SQLite 与父子工作流有初始化开销；框架预算不改变权限及产品超时。
   it.each(["expert", "script"] as const)(
     "%s child stays YOLO while its parent remains guarded",
     async (kind) => {
       const root = await mkdtemp(join(tmpdir(), "guarded-workflow-"));
-      const store = createSqliteSessionStore({ dbPath: ":memory:" });
+      const store = await createSqliteSessionStore({ dbPath: ":memory:" });
       const selection = {
         providerId: "parent",
         modelId: "model",
@@ -115,5 +116,6 @@ describe("guarded workflow runtime ingress", () => {
         await rm(root, { recursive: true, force: true });
       }
     },
+    30_000,
   );
 });

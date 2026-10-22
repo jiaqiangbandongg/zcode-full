@@ -14,7 +14,7 @@ import { createSqliteSessionStore } from "../src/storage/index.js";
 describe("SQLite session recency", () => {
   it("uses recent message activity when listing resumable sessions", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "zcode-session-store-latest-"));
-    const store = createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
+    const store = await createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
     const olderSessionID = createSessionId("older-activity");
     const newerSessionID = createSessionId("newer-activity");
 

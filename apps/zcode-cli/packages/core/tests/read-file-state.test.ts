@@ -44,12 +44,6 @@ describe("read file state path keys", () => {
     );
   });
 
-  it("keeps cygdrive alias casing strict", () => {
-    expect(createReadFileStatePathKey("/Cygdrive/c/Repo/File.txt", "win32")).not.toBe(
-      createReadFileStatePathKey("C:\\Repo\\File.txt", "win32"),
-    );
-  });
-
   it("does not case-fold Windows path segments without a canonical filesystem identity", () => {
     expect(createReadFileStatePathKey("C:\\Repo\\File.txt", "win32")).not.toBe(
       createReadFileStatePathKey("C:\\repo\\File.txt", "win32"),

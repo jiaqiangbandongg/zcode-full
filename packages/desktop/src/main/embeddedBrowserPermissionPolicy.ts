@@ -110,10 +110,7 @@ export interface EmbeddedBrowserPermissionPolicyOptions {
    * 屏幕共享源选择（Step 2）注入；源列表与 callback 语义需要 desktopCapturer
    * 上下文，整体转发给 bridge，policy 只保留日志与默认拒绝。
    */
-  onDisplayMediaRequest?: (
-    input: { origin: string },
-    callback: (result: unknown) => void,
-  ) => void;
+  onDisplayMediaRequest?: (input: { origin: string }, callback: (result: unknown) => void) => void;
 }
 
 export const EMBEDDED_BROWSER_PERMISSION_LOG_TAG = "[embedded-browser-permission]";
@@ -127,7 +124,6 @@ export function originFromUrl(url: string | undefined): string {
     return UNKNOWN_ORIGIN;
   }
 }
-
 
 export async function applyEmbeddedBrowserPermissionPolicy(
   targetSession: EmbeddedBrowserPermissionSession,
@@ -220,8 +216,7 @@ export async function applyEmbeddedBrowserPermissionPolicy(
           });
           if (action === "allow-always") {
             void writeEmbeddedBrowserSitePermission(origin, permission, "allow");
-          }
-          else if (action === "allow-session") {
+          } else if (action === "allow-session") {
             const grantedSet = sessionAllow.get(origin) ?? new Set<string>();
             grantedSet.add(permission);
             sessionAllow.set(origin, grantedSet);
@@ -253,8 +248,10 @@ export async function applyEmbeddedBrowserPermissionPolicy(
     // select-* 监听独占把关（未选择不授权）。蓝牙不在 check 枚举里，不受影响。
     if (DEVICE_CHECK_PERMISSIONS.has(permission)) return true;
     if (!PROMPT_PERMISSIONS.has(permission)) return false;
-    if (getEmbeddedBrowserSitePermission(requestingOrigin, permission) === "allow") return true;
-    return sessionAllow.get(requestingOrigin)?.has(permission) === true;
+    // Electron check 可能传入带尾部斜杠或路径的 URL；必须与 request 使用相同的 origin 键。
+    const origin = originFromUrl(requestingOrigin);
+    if (getEmbeddedBrowserSitePermission(origin, permission) === "allow") return true;
+    return sessionAllow.get(origin)?.has(permission) === true;
   });
 
   // 实测语义修正：setDevicePermissionHandler 返回 false 会把 requestDevice 直接拦死
@@ -379,9 +376,11 @@ export async function applyEmbeddedBrowserPermissionPolicy(
     ) => {
       // 同 hid/usb：阻止默认取消，等待用户选择。
       (event as { preventDefault?: () => void }).preventDefault?.();
-      const contents = webContents as
-        | { hostWebContents?: { id?: number }; id?: number; getURL?: () => string }
-        | null;
+      const contents = webContents as {
+        hostWebContents?: { id?: number };
+        id?: number;
+        getURL?: () => string;
+      } | null;
       const hostWebContentsId = contents?.hostWebContents?.id ?? contents?.id;
       settleDeviceSelection(
         "select-serial-port",
@@ -395,4 +394,3 @@ export async function applyEmbeddedBrowserPermissionPolicy(
     },
   );
 }
-

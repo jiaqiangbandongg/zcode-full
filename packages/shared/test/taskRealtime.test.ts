@@ -5,7 +5,6 @@ import {
   taskOwnerCommandResultSchema,
   taskRealtimeDeliveredEventSchema,
   taskRealtimeEventSchema,
-  taskRealtimeHostDeliveryKindSchema,
   taskRunLeaseAcquireRequestSchema,
   taskRunLeaseResultSchema,
   taskStreamMirrorPublishOpSchema,
@@ -323,11 +322,6 @@ describe("task realtime contract", () => {
     expect(acquire.success).toBe(true);
     expect(result.success).toBe(true);
     expect(rejected.success).toBe(true);
-  });
-
-  it("validates host delivery kind schema", () => {
-    expect(taskRealtimeHostDeliveryKindSchema.safeParse("desktop_window").success).toBe(true);
-    expect(taskRealtimeHostDeliveryKindSchema.safeParse("relay_bridge").success).toBe(true);
   });
 
   it("validates owner command request and delivery schemas", () => {

@@ -8,7 +8,7 @@ import {
 } from "../helpers/index.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { RegularTurnLoopState } from "./turn-loop-state.js";
-import { systemReminderAttachmentEntry } from "../../agent/message-history.js";
+import { systemReminderAttachmentEntry, toModelToolCall } from "../../agent/message-history.js";
 import { commitTurnRequestEntries } from "./turn-output-token-continuation.js";
 
 export async function handleToolCallAnomalyWarnings(
@@ -50,7 +50,7 @@ export async function handleToolCallAnomalyWarnings(
   }
 
   const repeatedWarnings = detectRepeatedToolCallWarnings(
-    options.toolCalls,
+    options.toolCalls.map(toModelToolCall),
     state,
     runtime.config.modelAnomalyGuard,
   );

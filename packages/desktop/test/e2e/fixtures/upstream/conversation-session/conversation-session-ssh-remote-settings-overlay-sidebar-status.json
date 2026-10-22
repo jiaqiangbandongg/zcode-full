@@ -16,27 +16,87 @@
       "match": {
         "method": "POST",
         "pathIncludes": "/chat/completions",
-        "bodyIncludes": ["Generate a concise title", "E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR"]
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR"
+        ]
       },
       "response": {
         "statusCode": 200,
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
         "body": "data: {\"id\":\"ssh-settings-overlay-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH settings overlay\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-settings-overlay-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
       }
     },
     {
       "id": "ssh-settings-overlay-a-first",
       "description": "workspace A 首发响应。",
-      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "稳定创建远程 task 并让首发回到 idle。" },
-      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR_A_FIRST_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
-      "response": { "statusCode": 200, "delayMs": 1200, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-settings-overlay-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_SETTINGS_OVERLAY_SIDEBAR_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-settings-overlay-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "稳定创建远程 task 并让首发回到 idle。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR_A_FIRST_PROMPT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-settings-overlay-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_SETTINGS_OVERLAY_SIDEBAR_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-settings-overlay-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
     },
     {
       "id": "ssh-settings-overlay-a-follow",
-      "description": "workspace A 续发响应；延迟 15s 给用例留出「运行中打开并关闭设置页」的窗口。",
-      "metadata": { "kind": "main", "timingPolicy": "slow-stream", "source": "synthetic", "syntheticReason": "复现用户在任务运行中开关设置页，随后任务完成的时序。" },
-      "match": { "method": "POST", "pathIncludes": "/chat/completions", "lastUserMessageIncludes": ["E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR_A_FOLLOW_PROMPT"], "bodyExcludes": ["Generate a concise title"] },
-      "response": { "statusCode": 200, "delayMs": 15000, "headers": { "content-type": "text/event-stream; charset=utf-8" }, "body": "data: {\"id\":\"ssh-settings-overlay-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_SETTINGS_OVERLAY_SIDEBAR_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-settings-overlay-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n" }
+      "description": "续发写出首个流片段后等待开关设置页及运行态断言，显式释放后结束任务。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "确保设置页覆盖与返回都发生在远端任务运行期间，释放后验证侧栏订阅正确收口。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "lastUserMessageIncludes": [
+          "E2E_SSH_P0_SETTINGS_OVERLAY_SIDEBAR_A_FOLLOW_PROMPT"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "data: {\"id\":\"ssh-settings-overlay-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_SETTINGS_OVERLAY_SIDEBAR_REPLY\"},\"finish_reason\":null}]}\n\n"
+          },
+          {
+            "offsetMs": 100,
+            "text": "data: {\"id\":\"ssh-settings-overlay-a-follow\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+          },
+          {
+            "offsetMs": 200,
+            "text": "data: [DONE]\n\n"
+          }
+        ],
+        "releaseAfterChunks": 1
+      }
     }
   ]
 }

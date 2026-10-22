@@ -8,7 +8,6 @@ import {
   isTrustedCloudHeroMessage,
 } from "@/components/cloud-content-dialog/CloudDialogHero.js";
 import { createWeekendPlanResultDialogMock } from "./helpers/weekendPlanDialogFixture.js";
-import weekendPlanResultDialogFixture from "@/components/cloud-content-dialog/mocks/weekendPlanResultDialog.zh-CN.json" with { type: "json" };
 
 const mockInput = {
   locale: "zh-CN" as const,
@@ -25,82 +24,6 @@ const mockInput = {
 };
 
 afterEach(() => cleanup());
-
-describe("cloud content dialog mock", () => {
-  it("提供 HTTP mock 填充 ZIP 元数据之前的受控内容模板", () => {
-    expect(weekendPlanResultDialogFixture).toMatchObject({
-      schemaVersion: 1,
-      id: "weekend-plan-result-dialog",
-      revision: 1,
-      kind: "campaign",
-      locale: "zh-CN",
-      dialog: {
-        hero: {
-          type: "interactive_bundle",
-        },
-        title: "Weekend Plan 领取成功",
-        description: { format: "plain_text" },
-        buttons: expect.arrayContaining([
-          expect.objectContaining({ actionId: "open-model-settings" }),
-          expect.objectContaining({ actionId: "copy-share" }),
-        ]),
-      },
-      actions: {
-        "open-model-settings": { type: "navigate", destination: "model_settings" },
-        "copy-share": { type: "copy_text" },
-      },
-    });
-  });
-
-  it("使用未来云端协议形状描述当前 Weekend Hero 资源", () => {
-    const payload = createWeekendPlanResultDialogMock(mockInput);
-
-    expect(payload).toMatchObject({
-      schemaVersion: 1,
-      id: "weekend-plan-result-dialog",
-      revision: 1,
-      kind: "campaign",
-      locale: "zh-CN",
-      dialog: {
-        title: mockInput.title,
-        description: { format: "plain_text", text: mockInput.description },
-        hero: {
-          type: "interactive_bundle",
-          runtime: "zcode-hero-sandbox-v1",
-          resolvedUrl: expect.stringContaining("weekend-plan-hero"),
-          viewport: { aspectRatio: "4:3" },
-          data: {
-            planName: mockInput.planName,
-            amountLabel: mockInput.amountLabel,
-            benefits: mockInput.benefits,
-            endsAtLabel: mockInput.endsAtLabel,
-            replayLabel: mockInput.replayLabel,
-          },
-        },
-        buttons: [
-          {
-            id: "open-model-settings",
-            label: mockInput.confirmLabel,
-            actionId: "open-model-settings",
-          },
-          {
-            id: "copy-share",
-            label: mockInput.shareLabel,
-            actionId: "copy-share",
-          },
-        ],
-      },
-      actions: {
-        "open-model-settings": { type: "navigate", destination: "model_settings" },
-        "copy-share": { type: "copy_text", text: mockInput.shareText },
-      },
-    });
-    expect(payload.dialog.hero.type).toBe("interactive_bundle");
-    if (payload.dialog.hero.type !== "interactive_bundle") return;
-    expect(payload.dialog.hero.resolvedUrl).toContain("weekend-plan-hero");
-    expect(payload.dialog.hero.bundle).toBeUndefined();
-  });
-});
 
 describe("CloudDialogHero", () => {
   it("drops undeclared actions and falls back when ready times out", () => {

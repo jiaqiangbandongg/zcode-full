@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-project-settings-return",
+  "spec": "./test/e2e/conversation-session/conversation-session-project-settings-return.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-project-settings-return.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "项目草稿往返设置和真实SSH连接，不发送模型请求。",
+  "requests": []
+}

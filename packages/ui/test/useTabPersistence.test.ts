@@ -4,12 +4,17 @@ import { act, renderHook } from "@testing-library/react";
 import type { ISettingService } from "@zcode/services";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  buildRestoredRecentProjectPaths,
-  getRecentProjectPathsFromSettings,
   hasCompletedTabPersistenceInitialRestore,
+  type WorkspacePersistenceGate,
   useTabPersistence,
 } from "@/hooks/useTabPersistence.js";
 import { TabStoreProvider, useTabStoreApi } from "@/store/TabStoreProvider.js";
+import { createTabStore, isWorkspaceTab, type TabStoreState } from "@/store/tabStore.js";
+import {
+  buildRemoteWorkspacePersistPatch,
+  restorePersistedRemoteWorkspaceSessions,
+} from "@/root/remoteWorkspaceSessionPersistence.js";
+import type { AppSettings } from "@zcode/shared";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -18,6 +23,142 @@ afterEach(() => {
 });
 
 describe("useTabPersistence", () => {
+  it("builds a persistence patch from the latest settings snapshot", async () => {
+    vi.useFakeTimers();
+    let settings = {
+      lastWorkspaceSession: [{ kind: "local" as const, workspacePath: "/workspace/active" }],
+      lastActiveTabIndex: 0,
+      sourceServerWorkspaceHistory: [] as Array<{ workspacePath: string }>,
+    };
+    const update = vi.fn(async () => undefined);
+    const settingService = {
+      get: vi.fn(async () => settings),
+      update,
+    } as unknown as ISettingService;
+    const buildPersistPatch = vi.fn((_state: unknown, currentSettings: typeof settings) => ({
+      sourceServerWorkspaceHistory: currentSettings.sourceServerWorkspaceHistory,
+    }));
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(TabStoreProvider, null, children);
+    const { result } = renderHook(
+      () => {
+        const store = useTabStoreApi();
+        useTabPersistence({ settingService, buildPersistPatch });
+        return store;
+      },
+      { wrapper },
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    settings = {
+      ...settings,
+      sourceServerWorkspaceHistory: [{ workspacePath: "/workspace/remote" }],
+    };
+
+    act(() => result.current.getState().addTab("/workspace/next"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(buildPersistPatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sourceServerWorkspaceHistory: [{ workspacePath: "/workspace/remote" }],
+      }),
+    );
+    expect(update).toHaveBeenCalledWith({
+      sourceServerWorkspaceHistory: [{ workspacePath: "/workspace/remote" }],
+    });
+  });
+
+  it("关闭本地 tab 后只保存活动目录，重启不会从旧快照复活导航", async () => {
+    // 项目列表由 Host 持久化；Renderer 只写活动目录，不能以 tabs 覆盖项目入口集合。
+    // 新活动目录存在后，恢复不再回读旧 lastWorkspaceSession 快照。
+    vi.useFakeTimers();
+    let settings = {
+      lastWorkspaceSession: [
+        { kind: "local" as const, workspacePath: "/workspace/kept" },
+        { kind: "local" as const, workspacePath: "/workspace/closed" },
+      ],
+      lastActiveTabIndex: 0,
+    } as unknown as AppSettings;
+    const update = vi.fn(async (patch: Partial<AppSettings>) => {
+      settings = { ...settings, ...patch };
+    });
+    const settingService = {
+      get: vi.fn(async () => settings),
+      update,
+    } as unknown as ISettingService;
+    const persistenceGate: WorkspacePersistenceGate = {
+      canPersist: false,
+      restoreFailed: false,
+    };
+    let restoreTarget: ReturnType<typeof createTabStore> | null = null;
+    const restorePersistedSession = (currentSettings: AppSettings) => {
+      restorePersistedRemoteWorkspaceSessions({
+        settings: currentSettings,
+        tabStoreApi: restoreTarget!,
+      });
+    };
+    const buildPersistPatch = (state: TabStoreState, currentSettings: AppSettings) =>
+      buildRemoteWorkspacePersistPatch(
+        state,
+        [],
+        currentSettings.sourceServerWorkspaceHistory,
+        currentSettings.remoteConversationWorkspaceBySourceServerId,
+        { persistedWorkspaceSession: currentSettings.lastWorkspaceSession },
+      );
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(TabStoreProvider, null, children);
+    const { result } = renderHook(
+      () => {
+        const store = useTabStoreApi();
+        restoreTarget = store as never;
+        useTabPersistence({
+          settingService,
+          persistenceGate,
+          restorePersistedSession,
+          buildPersistPatch,
+        });
+        return store;
+      },
+      { wrapper },
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(persistenceGate.canPersist).toBe(true);
+    const closingTab = result.current
+      .getState()
+      .tabs.find((tab) => isWorkspaceTab(tab) && tab.workspacePath === "/workspace/closed");
+    expect(closingTab).toBeDefined();
+
+    act(() => result.current.getState().closeTab(closingTab!.id));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    expect(settings.lastActiveWorkspace).toEqual({
+      kind: "local",
+      workspacePath: "/workspace/kept",
+    });
+    expect(update).toHaveBeenCalled();
+    expect(update.mock.calls.every(([patch]) => !("lastWorkspaceSession" in patch))).toBe(true);
+
+    const restartedStore = createTabStore();
+    restorePersistedRemoteWorkspaceSessions({ settings, tabStoreApi: restartedStore });
+    expect(
+      restartedStore
+        .getState()
+        .tabs.filter(isWorkspaceTab)
+        .map((tab) => tab.workspacePath),
+    ).toEqual(["/workspace/kept"]);
+  });
+
   it("deferred restore 完成前不持久化 active-only 瞬态", async () => {
     vi.useFakeTimers();
     let runIdleCallback: (() => void) | undefined;
@@ -33,6 +174,10 @@ describe("useTabPersistence", () => {
       value: vi.fn(),
     });
     const update = vi.fn(async () => undefined);
+    const persistenceGate: WorkspacePersistenceGate = {
+      canPersist: false,
+      restoreFailed: false,
+    };
     const settingService = {
       get: vi.fn(async () => ({
         lastWorkspaceSession: [
@@ -60,6 +205,7 @@ describe("useTabPersistence", () => {
         const persistence = useTabPersistence({
           settingService,
           restorePersistedSession,
+          persistenceGate,
         });
         return { persistence, store };
       },
@@ -87,6 +233,7 @@ describe("useTabPersistence", () => {
 
     act(() => runIdleCallback?.());
     expect(result.current.persistence.hasCompletedFullRestore).toBe(true);
+    expect(persistenceGate.canPersist).toBe(true);
     expect(
       result.current.store
         .getState()
@@ -99,12 +246,50 @@ describe("useTabPersistence", () => {
     });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
-        lastWorkspaceSession: [
-          { kind: "local", workspacePath: "/workspace/active" },
-          { kind: "local", workspacePath: "/workspace/inactive" },
-        ],
+        lastActiveWorkspace: { kind: "local", workspacePath: "/workspace/active" },
       }),
     );
+  });
+
+  it("restore 失败时保持 fail-closed，后续 tab 变化不能覆盖磁盘快照", async () => {
+    vi.useFakeTimers();
+    const update = vi.fn(async () => undefined);
+    const settingService = {
+      get: vi.fn(async () => {
+        throw new Error("settings read failed");
+      }),
+      update,
+    } as unknown as ISettingService;
+    const persistenceGate: WorkspacePersistenceGate = {
+      canPersist: false,
+      restoreFailed: false,
+    };
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(TabStoreProvider, null, children);
+    const { result } = renderHook(
+      () => {
+        const store = useTabStoreApi();
+        useTabPersistence({ settingService, persistenceGate });
+        return store;
+      },
+      { wrapper },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(persistenceGate).toEqual({
+      canPersist: false,
+      restoreFailed: true,
+    });
+    act(() => result.current.getState().addTab("/workspace/after-failure"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("restoreSession 从关闭切到开启时会先等待当前恢复完成", () => {
@@ -154,67 +339,5 @@ describe("useTabPersistence", () => {
         },
       }),
     ).toBe(true);
-  });
-
-  it("会话工作区不会进入最近项目", () => {
-    expect(
-      getRecentProjectPathsFromSettings({
-        lastWorkspaceSession: [
-          {
-            kind: "local",
-            workspacePath: "/Users/demo/.zcode/workspace/default",
-            workspacePurpose: "conversation",
-          },
-          {
-            kind: "local",
-            workspacePath: "/Users/demo/project",
-            workspacePurpose: "project",
-          },
-          {
-            kind: "local",
-            workspacePath: "/Users/demo/legacy-project",
-          },
-        ],
-      }),
-    ).toEqual(["/Users/demo/project", "/Users/demo/legacy-project"]);
-  });
-
-  it("canonical conversation 路径即使旧数据缺少 purpose 也不会进入最近项目", () => {
-    const conversationWorkspacePath = "/Users/demo/.zcode/workspace/default";
-
-    expect(
-      getRecentProjectPathsFromSettings(
-        {
-          lastWorkspaceSession: [
-            {
-              kind: "local",
-              workspacePath: conversationWorkspacePath,
-            },
-            {
-              kind: "local",
-              workspacePath: "/Users/demo/project",
-            },
-          ],
-        },
-        [conversationWorkspacePath],
-      ),
-    ).toEqual(["/Users/demo/project"]);
-  });
-
-  it("恢复时会清理 recentProjects 里遗留的 canonical conversation 路径", () => {
-    const conversationWorkspacePath = "/Users/demo/.zcode/workspace/default";
-
-    expect(
-      buildRestoredRecentProjectPaths(
-        {
-          lastWorkspaceSession: [
-            { kind: "local", workspacePath: conversationWorkspacePath },
-            { kind: "local", workspacePath: "/Users/demo/project" },
-          ],
-          recentProjects: [conversationWorkspacePath, "/Users/demo/older-project"],
-        },
-        [conversationWorkspacePath],
-      ),
-    ).toEqual(["/Users/demo/older-project", "/Users/demo/project"]);
   });
 });

@@ -5,6 +5,7 @@ import {
   type ApiClient,
 } from "@zcode/shared";
 import type { ICredentialService } from "#src/credential/credential.js";
+import type { LocalCredentialService } from "#src/credential/credentialService.js";
 import { createServiceLogger } from "#src/logger/serviceLogger.js";
 import { readApiJson } from "#src/providers/api/apiJson.js";
 
@@ -14,7 +15,8 @@ const log = createServiceLogger("project-access-token");
 /** 本地与旧远程附加入口复用同一 HTTP/ID 存储约束，每个鉴权 owner 只持有一个实例。 */
 export function createAccountProjectTokenClient(
   apiClient: ApiClient,
-  credentialService: Pick<ICredentialService, "load" | "save" | "delete">,
+  credentialService: Pick<ICredentialService, "load" | "save" | "delete"> &
+    Partial<Pick<LocalCredentialService, "recoverUnreadable">>,
 ): ProjectAccessTokenClient {
   return new ProjectAccessTokenClient({
     request: async (url, init) => {
@@ -45,7 +47,11 @@ export function createAccountProjectTokenClient(
         undefined,
         event.code === "project_token_refresh_deferred"
           ? "项目 Token 提前刷新暂缓"
-          : "项目 Token 获取失败",
+          : event.code === "project_token_location_unreadable"
+            ? "项目定位缓存无法解密，准备局部恢复"
+            : event.code === "project_token_location_recovery"
+              ? "项目定位缓存复核完成"
+              : "项目 Token 获取失败",
         event,
       ),
   });

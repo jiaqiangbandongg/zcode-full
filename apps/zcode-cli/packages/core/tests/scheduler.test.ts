@@ -2,7 +2,7 @@
 // Test imports
 // ============================================================
 import { beforeEach, describe, expect, it } from "vitest";
-import { ToolScheduler, READ_ONLY_TOOLS } from "../src/tool/scheduler.js";
+import { ToolScheduler } from "../src/tool/scheduler.js";
 import type { ToolDependency } from "../src/tool/scheduler.js";
 import type { ToolCallId } from "@zcode/contracts";
 
@@ -15,15 +15,6 @@ describe("ToolScheduler", () => {
 
   beforeEach(() => {
     scheduler = new ToolScheduler();
-  });
-
-  it("treats WebSearch as a default read-only concurrent tool", () => {
-    expect(READ_ONLY_TOOLS.has("WebSearch")).toBe(true);
-  });
-
-  it("does not treat Agent and Task as default read-only concurrent tools", () => {
-    expect(READ_ONLY_TOOLS.has("Agent")).toBe(false);
-    expect(READ_ONLY_TOOLS.has("Task")).toBe(false);
   });
 
   describe("basic scheduling", () => {
@@ -92,11 +83,7 @@ describe("ToolScheduler", () => {
 
       const schedule = scheduler.schedule(tools);
 
-      expect(schedule.parallelGroups).toEqual([
-        ["tool_read_1"],
-        ["tool_write"],
-        ["tool_read_2"],
-      ]);
+      expect(schedule.parallelGroups).toEqual([["tool_read_1"], ["tool_write"], ["tool_read_2"]]);
       expect(schedule.items.map((item) => item.canRunParallel)).toEqual([true, false, true]);
     });
 

@@ -38,6 +38,8 @@ export type RemoteDisconnectReason = Exclude<
   "connected" | "none"
 >;
 
+type IntervalHandle = ReturnType<typeof setInterval> | number;
+
 interface RemoteUsageArmsTelemetryConfig {
   armsCustomContext: {
     deviceMid: string;
@@ -52,12 +54,12 @@ interface RemoteUsageArmsTelemetryConfig {
   setInterval?: (
     callback: () => void,
     delayMs: number,
-  ) => ReturnType<typeof setInterval>;
-  clearInterval?: (timer: ReturnType<typeof setInterval>) => void;
+  ) => IntervalHandle;
+  clearInterval?: (timer: IntervalHandle) => void;
 }
 
 let telemetryConfig: RemoteUsageArmsTelemetryConfig | null = null;
-let periodicTimer: ReturnType<typeof setInterval> | null = null;
+let periodicTimer: IntervalHandle | null = null;
 let lastGaugeRendererId: number | null = null;
 
 export function buildRemoteConnectResultArmsPayload(params: {
@@ -125,7 +127,9 @@ export function configureRemoteUsageArmsTelemetry(
   telemetryConfig = config;
   const schedule = config.setInterval ?? setInterval;
   periodicTimer = schedule(reportPeriodicGauge, REMOTE_USAGE_GAUGE_INTERVAL_MS);
-  periodicTimer.unref?.();
+  // Bug 根因：desktop main 同时被 Node 与 DOM lib 检查，setInterval handle 会被推导成
+  // Timeout | number；仅 Node handle 支持 unref，数字 handle 仍需保留给 clearInterval。
+  if (typeof periodicTimer !== "number") periodicTimer.unref?.();
 }
 
 function dispatchSafely(

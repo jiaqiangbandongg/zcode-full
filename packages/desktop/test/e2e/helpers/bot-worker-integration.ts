@@ -114,6 +114,10 @@ export async function createBotWorkerIntegration(baseUrl: string, dropTextContai
         }),
       );
     }
+    const repo = new TaskIndexRepo();
+    cleanup.push(() => repo.close());
+    const projects = await repo.getProjectRepository();
+    const project = projects.saveProject({ name: "Bot fixture", roots: [workspacePath] });
     const bot = createBotsServiceHarness({
       config: createFeishuConfig("feishu", "bot-worker"),
       modelSelectionService,
@@ -130,11 +134,18 @@ export async function createBotWorkerIntegration(baseUrl: string, dropTextContai
           },
         },
       },
-      lastWorkspaceSession: [{ kind: "local", workspacePath }],
+      projectWorkspaces: [{ kind: "local", workspacePath, projectId: project.id }],
     });
     const reverseReplies: unknown[] = [];
     const reverseResources: unknown[] = [];
     const agent = createZCodeAgentService({
+      // 项目化创建要求先预留 task 归属；旧夹具漏接此 Host 端口，在调用 CLI 前即失败。
+      prepareSessionCreation: async (target) =>
+        projects.reserveCreatedTask({
+          task: { ...target, taskId: target.sessionId },
+          projectId: target.projectId,
+          additionalDirectories: target.additionalDirectories,
+        }).additionalDirectories,
       commandResolver: () => ({
         command: process.execPath,
         args: [
@@ -199,8 +210,6 @@ export async function createBotWorkerIntegration(baseUrl: string, dropTextContai
             ...rest,
           );
     }
-    const repo = new TaskIndexRepo();
-    cleanup.push(() => repo.close());
     const syncer = createZCodeTaskIndexSyncer({ agentService: agent, taskIndexRepo: repo });
     cleanup.push(() => syncer.disposeAll());
     cleanup.push(() => bot.service.disposeAllAndWait());

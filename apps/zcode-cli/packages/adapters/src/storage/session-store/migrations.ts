@@ -1,15 +1,24 @@
+import type { SqliteMigration } from "@zcode/shared/sqlite-migrations";
+export type { SqliteMigration } from "@zcode/shared/sqlite-migrations";
 import { PROVIDER_MODEL_SELECTION_MIGRATION_SQL } from "./migrations/0020-provider-model-selection.js";
+import { SESSION_DATABASE_IDENTITY_MIGRATION } from "@zcode/shared/sqlite-migrations";
 
-export interface SqliteMigration {
-  appVersion: string;
-  id: string;
-  sql: string;
-}
+import { OFFICIAL_GLM_SELECTION_MIGRATION_SQL } from "./migrations/0021-official-glm-selection.js";
+import { BACKFILLED_SESSION_REASONING_MIGRATION_SQL } from "./migrations/0022-backfilled-session-reasoning.js";
 
 export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.2.0",
     id: "0001_base_session_store",
+    touchedTables: [
+      "input_history",
+      "message",
+      "part",
+      "permission",
+      "session",
+      "session_entry",
+      "todo",
+    ],
     sql: `
       create table if not exists session (
         id text primary key,
@@ -112,6 +121,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.2.0",
     id: "0002_local_setting",
+    touchedTables: ["local_setting"],
     sql: `
       create table if not exists local_setting (
         scope text not null,
@@ -135,6 +145,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.2.0",
     id: "0003_backfill_permission_local_setting",
+    touchedTables: ["local_setting"],
     sql: `
       insert or ignore into local_setting (
         scope,
@@ -162,6 +173,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.7.0",
     id: "0004_session_target",
+    touchedTables: ["session_target"],
     sql: `
       create table if not exists session_target (
         session_id text primary key references session(id) on delete cascade,
@@ -176,6 +188,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.7.0",
     id: "0005_session_target_accounting",
+    touchedTables: ["session_target", "session_target_next"],
     sql: `
       create table if not exists session_target_next (
         session_id text primary key references session(id) on delete cascade,
@@ -219,6 +232,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.11.0",
     id: "0006_input_history_attachments",
+    touchedTables: ["input_history"],
     sql: `
       alter table input_history add column attachments text;
     `,
@@ -226,6 +240,14 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.13.0",
     id: "0007_workflow_script_runtime",
+    touchedTables: [
+      "session",
+      "session_task_link",
+      "workflow_activity",
+      "workflow_definition",
+      "workflow_event",
+      "workflow_run",
+    ],
     sql: `
       alter table session add column task_type text not null default 'interactive';
 
@@ -368,6 +390,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.13.0",
     id: "0008_workflow_definition_scope",
+    touchedTables: ["workflow_definition"],
     sql: `
       alter table workflow_definition
         add column scope text not null default 'explicit'
@@ -377,6 +400,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.14.0",
     id: "0009_session_title_metadata",
+    touchedTables: ["session"],
     sql: `
       alter table session
         add column title_source text not null default 'first_input'
@@ -392,6 +416,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.0",
     id: "0010_usage_observability",
+    touchedTables: ["model_usage", "tool_usage", "turn_usage"],
     sql: `
       create table if not exists model_usage (
         id text primary key,
@@ -519,6 +544,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.0",
     id: "0011_session_target_summary_title",
+    touchedTables: ["session_target"],
     sql: `
       alter table session_target add column summary_title text;
     `,
@@ -526,6 +552,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.0",
     id: "0012_session_trace_id",
+    touchedTables: ["session"],
     sql: `
       alter table session add column trace_id text;
 
@@ -535,6 +562,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.0",
     id: "0013_session_target_active_run_accounting",
+    touchedTables: ["session_target"],
     sql: `
       alter table session_target add column active_input_id text;
       alter table session_target add column active_run_started_at integer;
@@ -544,6 +572,7 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.0",
     id: "0014_message_part_sequence",
+    touchedTables: ["message", "part"],
     sql: `
       alter table message add column sequence integer;
       alter table part add column sequence integer;
@@ -595,7 +624,8 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.2",
     id: "0015_message_part_sequence_backfill_and_guard",
-    // 背景：0014 backfill 之后仍持续出现 NULL sequence
+    touchedTables: ["message", "part"],
+    // 背景（16-timeline-authority-plan P0）：0014 backfill 之后仍持续出现 NULL sequence
     // （本机观测 message 1,690 / part 5,933 行，跨 331 sessions），主要嫌疑是旧版本二进制
     // 并存写同一 DB（其 INSERT 不含 sequence 列）。本迁移做两件事：
     // 1. 增量 backfill：只补 NULL 行，序号从各 scope 现有 max(sequence)+1 起、按
@@ -683,8 +713,9 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.2",
     id: "0016_session_input_ledger",
-    // session_input 账本：输入的 durable 生命周期
-    // admitted -> promoted / cancelled / discarded。队列/唤醒的存在性若只在
+    touchedTables: ["session_input"],
+    // session_input 账本（16-timeline-authority-plan P3）：输入的 durable 生命周期
+    // admitted -> promoted / cancelled / discarded。旧实现里队列/唤醒的存在性只在
     // 进程内存（事件日志也是内存的），崩溃即静默丢；账本让「queue 消失但不进
     // history」不可能静默发生，并为输入类 command 提供 durable 幂等。
     sql: `
@@ -712,7 +743,8 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.2",
     id: "0017_session_input_start_now_delivery",
-    // 所有 input command 都在执行前落 durable admission，startNow 也需要独立
+    touchedTables: ["session_input", "session_input_before_start_now"],
+    // 05C：所有 input command 都在执行前落 durable admission，startNow 也需要独立
     // delivery，不能伪装成 queue。SQLite 不能原地修改 CHECK，必须重建表并保全账本。
     sql: `
       alter table session_input rename to session_input_before_start_now;
@@ -754,7 +786,8 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.15.2",
     id: "0018_session_input_failed_status",
-    // fork bundle 提交后 child runtime 仍可能同步启动失败。该输入已经被 parent
+    touchedTables: ["session_input", "session_input_before_failed_status"],
+    // Bugfix：fork bundle 提交后 child runtime 仍可能同步启动失败。该输入已经被 parent
     // accepted fact 接受，不能伪装成 cancelled/discarded；新增 durable failed 终态，并通过
     // 重建 CHECK 保证旧库升级后也能写入，重启不会再次消费或改写它。
     sql: `
@@ -797,7 +830,8 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
   {
     appVersion: "0.16.5",
     id: "0019_dwf_journal",
-    // dynamic-workflow 执行引擎的 durable journal。
+    touchedTables: ["dwf_run", "dwf_actor", "dwf_artifact", "dwf_node", "dwf_event"],
+    // dynamic-workflow 执行引擎的 durable journal（docs/execution-engine.md 的 "Journal & storage"）。
     // legacy 的 workflow_* 表只是模板不是家：dwf_* 自成一套，与既有 workflow 机制彼此独立。
     //
     // 本条是 beta 前把开发期 0019–0030 十二条迁移**压成的单一基线**：四张表一次建齐、形状即
@@ -914,17 +948,40 @@ export const SQLITE_MIGRATIONS: readonly SqliteMigration[] = [
     appVersion: "0.16.5",
     id: "0020_provider_model_selection",
     sql: PROVIDER_MODEL_SELECTION_MIGRATION_SQL,
+    touchedTables: ["message", "part", "session_entry"],
   },
   {
     appVersion: "0.16.5",
     id: "0021_official_glm_selection",
     sql: OFFICIAL_GLM_SELECTION_MIGRATION_SQL,
+    touchedTables: ["session_entry"],
   },
   {
     appVersion: "0.16.5",
     id: "0022_backfilled_session_reasoning",
     sql: BACKFILLED_SESSION_REASONING_MIGRATION_SQL,
+    touchedTables: ["session_entry"],
   },
+  {
+    appVersion: "0.16.9",
+    id: "0023_session_soft_delete_outcome",
+    previousIds: ["0020_session_soft_delete_outcome"],
+    touchedTables: ["session"],
+    apply: (db) => {
+      const columns = new Set(
+        db
+          .prepare("pragma table_info(session)")
+          .all()
+          .map((row) => row.name),
+      );
+      if (!columns.has("time_deleted"))
+        db.exec("alter table session add column time_deleted integer");
+      if (!columns.has("last_outcome")) db.exec("alter table session add column last_outcome text");
+    },
+    sql: `
+      alter table session add column time_deleted integer;
+      alter table session add column last_outcome text;
+    `,
+  },
+  { ...SESSION_DATABASE_IDENTITY_MIGRATION, touchedTables: ["zcode_database_identity"] },
 ];
-import { OFFICIAL_GLM_SELECTION_MIGRATION_SQL } from "./migrations/0021-official-glm-selection.js";
-import { BACKFILLED_SESSION_REASONING_MIGRATION_SQL } from "./migrations/0022-backfilled-session-reasoning.js";

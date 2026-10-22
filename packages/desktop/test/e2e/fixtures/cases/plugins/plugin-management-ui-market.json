@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "caseName": "plugin-management-ui-market",
+  "spec": "./test/e2e/plugins/plugin-management-ui-market.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/plugin-management/plugin-management-ui-market.json"
+  ],
+  "fileFixtures": [
+    "runtime-generated local plugin with a real stdio MCP UI resource under isolated E2E HOME"
+  ],
+  "requests": [
+    {
+      "id": "plugin-market-session-ready",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "Create the existing session; UI discovery, MCP resource reads, sandbox handshake and project configuration use real services."
+    }
+  ]
+}

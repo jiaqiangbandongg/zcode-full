@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-project-device-selection",
+  "spec": "./test/e2e/conversation-session/conversation-session-project-device-selection.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-project-device-selection.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "RDUX15 项目表单和真实 SSH 设备目录验收，不发送模型请求。",
+  "requests": []
+}

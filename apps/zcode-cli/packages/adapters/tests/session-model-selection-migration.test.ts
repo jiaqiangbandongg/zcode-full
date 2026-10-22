@@ -17,13 +17,13 @@ const current = {
 
 describe("旧 Session 当前选择的单次迁移", () => {
   let root: string;
-  let store: ReturnType<typeof createSqliteSessionStore>;
+  let store: Awaited<ReturnType<typeof createSqliteSessionStore>>;
   let db: DatabaseSync;
   let opened = false;
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "zcode-selection-migration-"));
     const dbPath = join(root, "session.sqlite");
-    store = createSqliteSessionStore({ dbPath });
+    store = await createSqliteSessionStore({ dbPath });
     opened = true;
     db = new DatabaseSync(dbPath);
     await store.createSession({
@@ -40,7 +40,7 @@ describe("旧 Session 当前选择的单次迁移", () => {
   const migrate = async (_input: { sessionID: typeof sessionID }) => {
     if (opened) store.close();
     opened = false;
-    store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+    store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
     opened = true;
   };
   afterEach(async () => {
@@ -225,7 +225,7 @@ describe("旧 Session 当前选择的单次迁移", () => {
       };
       expect(oldReader(rawEntry())).toEqual(oldReader(legacy));
       store.close();
-      store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+      store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
       expect(await read()).toEqual(next);
     },
   );
@@ -249,7 +249,7 @@ describe("旧 Session 当前选择的单次迁移", () => {
       await migrate({ sessionID });
       await entry(selection);
       store.close();
-      store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+      store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
       await migrate({ sessionID });
       expect(rawEntry()).toEqual({ ...legacy, modelSelection: selection });
       expect(await read()).toEqual(selection);

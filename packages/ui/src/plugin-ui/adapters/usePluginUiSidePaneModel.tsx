@@ -40,11 +40,13 @@ const INLINE_AND_FULLSCREEN: readonly McpAppsDisplayMode[] = ["inline", "fullscr
 
 export function usePluginUiSidePaneModel({
   tab,
+  visible,
   scopeRef,
   onOpenBrowserUrl,
   onCloseTab,
 }: {
   tab: PluginUiSidePaneTab;
+  visible: boolean;
   scopeRef: PluginUiScopeRef;
   onOpenBrowserUrl?: (url: string) => void;
   onCloseTab?: (tabId: string) => void;
@@ -198,6 +200,7 @@ export function usePluginUiSidePaneModel({
   });
 
   return {
+    visible,
     scopeRef,
     host: {
       ...host,

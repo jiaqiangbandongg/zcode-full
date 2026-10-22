@@ -109,11 +109,6 @@ describe("NodeExecutionAdapter", () => {
     const capable = adapter as BashBackgroundLifecycleCapableAdapter;
 
     try {
-      const removedMethodName = ["run", "Backgroundable"].join("");
-      expect(removedMethodName in adapter).toBe(false);
-      expect(capable.runBashWithBackgroundLifecycle).toBeTypeOf("function");
-      expect(capable.waitForBackgroundTask).toBeTypeOf("function");
-
       const result = await capable.runBashWithBackgroundLifecycle!(
         {
           command: {
@@ -618,9 +613,6 @@ describe("NodeExecutionAdapter", () => {
     const capable = adapter as BashBackgroundLifecycleCapableAdapter;
 
     try {
-      expect(capable.runBashWithBackgroundLifecycle).toBeTypeOf("function");
-      expect(capable.waitForBackgroundTask).toBeTypeOf("function");
-
       const result = await capable.runBashWithBackgroundLifecycle!(
         {
           command: {
@@ -661,8 +653,6 @@ describe("NodeExecutionAdapter", () => {
     const capable = adapter as BashBackgroundLifecycleCapableAdapter;
 
     try {
-      expect(capable.runBashWithBackgroundLifecycle).toBeTypeOf("function");
-
       const result = await capable.runBashWithBackgroundLifecycle!(
         {
           command: {

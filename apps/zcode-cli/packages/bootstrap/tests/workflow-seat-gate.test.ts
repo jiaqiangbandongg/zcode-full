@@ -107,12 +107,11 @@ describe("workflow seat gate", () => {
     const workers = seatWorkers(gate, 4);
     gate.setLimit(1);
 
-    const parked: Promise<unknown>[] = [];
     for (const worker of workers) {
       // 快路径未命中正是 runner 发 `model_request_queued` 的条件 → driver 报 waiting(slot)。
       if (gate.stats().working > 1) {
         expect(worker.admission.tryAcquire?.({ model: MODEL })).toBeUndefined();
-        parked.push(worker.admission.acquire({ model: MODEL }));
+        void worker.admission.acquire({ model: MODEL });
       } else {
         expect(worker.admission.tryAcquire?.({ model: MODEL })).toBeDefined();
       }
@@ -121,9 +120,6 @@ describe("workflow seat gate", () => {
     expect(gate.stats()).toEqual({ limit: 1, working: 1, parked: 3 });
     // 每个停驻者都还没碰到治理器：座位在前、治理器在后。
     expect(workers.slice(0, 3).every((worker) => worker.governor.acquireCalls === 0)).toBe(true);
-    // activeAsks（调度器那一侧）= 4 = working + parked，所以调度器此刻一个新 ask 也派不出去。
-    expect(gate.stats().working + gate.stats().parked).toBe(4);
-    expect(parked.length).toBe(3);
   });
 
   it("上界 1、5 个在工作：恰好 4 个停驻，总有一个在跑（任何上界都不死锁）", () => {

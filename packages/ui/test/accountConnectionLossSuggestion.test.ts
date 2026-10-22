@@ -107,6 +107,19 @@ describe("套餐切换建议", () => {
     expect(await suggestion?.apply()).toBe("stale");
     expect(services.settingService.update).not.toHaveBeenCalled();
   });
+  it("相同身份重选产生新版操作后，旧失效建议不能提交", async () => {
+    const { services, event } = fixture();
+    const suggestion = await prepareAccountConnectionSwitch(services as never, event);
+    services.settingService.update.mockImplementationOnce(async (_patch, expected) => {
+      if (expected?.providerFamilyDomainUpdatedAt !== 1)
+        throw new Error("Account connection settings changed");
+    });
+    await expect(suggestion?.apply()).rejects.toThrow("Account connection settings changed");
+    expect(services.settingService.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ providerFamilyDomainUpdatedAt: 0 }),
+    );
+  });
   it("写入成功而刷新失败仍返回已保存", async () => {
     const { services, event, view } = fixture();
     const suggestion = await prepareAccountConnectionSwitch(services as never, event);

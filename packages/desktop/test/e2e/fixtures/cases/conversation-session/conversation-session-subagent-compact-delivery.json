@@ -1,0 +1,868 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-subagent-compact-delivery",
+  "spec": "./test/e2e/conversation-session/conversation-session-subagent-compact-delivery.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-subagent-compact-delivery.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "delivery-title",
+      "description": "辅助标题",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-completion-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-child-1-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-child-2-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-final-notice",
+      "description": "主动回复后的 child 终态通知",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "manual-reply-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-completion-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-child-1-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-child-2-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-final-notice",
+      "description": "主动回复后的 child 终态通知",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "auto-reply-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-completion-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-compact-12",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-compact-1",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-compact-2",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-compact-0",
+      "description": "摘要只归纳请求中实际可见的结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-child-1-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-child-2-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-final-notice",
+      "description": "主动回复后的 child 终态通知",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "reactive-reply-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-probe",
+      "description": "压缩后独立请求核对两个结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-arm",
+      "description": "返回入队前保持父请求；放行后进入压缩边界",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-child-1-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-child-1",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-child-2-continued",
+      "description": "child 已收到 RespondToCoordinator queued ack 后继续工作",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-child-2",
+      "description": "child 回传前的受控屏障",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-final-notice",
+      "description": "主动回复后的 child 终态通知",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-delivery",
+      "description": "父模型实际消费一份或多份结果",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-continue",
+      "description": "压缩完成后父模型继续",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-launch-ack",
+      "description": "两个真实 background Agent 的启动 ack",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-launch",
+      "description": "父模型启动两个 background Agent",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-seed-1",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    },
+    {
+      "id": "none-reply-seed-2",
+      "description": "建立可压缩的已完成历史",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "通过显式释放 HTTP 流固定 compact 与两个真实子代理回传的交错；只控制模型响应，不修改 runtime 队列或产品状态。"
+    }
+  ]
+}

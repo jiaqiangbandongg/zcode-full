@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-soak-dual",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-soak-dual.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-soak-dual.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-soakd-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-soakd-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/fork/edit"
+    }
+  ]
+}

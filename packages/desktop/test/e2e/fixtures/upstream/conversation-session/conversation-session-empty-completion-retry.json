@@ -15,10 +15,7 @@
       "match": {
         "method": "POST",
         "pathIncludes": "/messages",
-        "bodyIncludes": [
-          "Generate a concise title",
-          "E2E_EMPTY_COMPLETION_RETRY_STREAM"
-        ]
+        "bodyIncludes": ["Generate a concise title", "E2E_EMPTY_COMPLETION_RETRY_STREAM"]
       },
       "response": {
         "statusCode": 200,
@@ -43,13 +40,8 @@
       "match": {
         "method": "POST",
         "pathIncludes": "/messages",
-        "lastUserMessageIncludes": [
-          "E2E_EMPTY_COMPLETION_RETRY_STREAM"
-        ],
-        "bodyExcludes": [
-          "Generate a concise title",
-          "CRITICAL: Respond with TEXT ONLY"
-        ]
+        "lastUserMessageIncludes": ["E2E_EMPTY_COMPLETION_RETRY_STREAM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
       },
       "response": {
         "statusCode": 200,
@@ -74,13 +66,8 @@
       "match": {
         "method": "POST",
         "pathIncludes": "/messages",
-        "lastUserMessageIncludes": [
-          "E2E_EMPTY_COMPLETION_RETRY_STREAM"
-        ],
-        "bodyExcludes": [
-          "Generate a concise title",
-          "CRITICAL: Respond with TEXT ONLY"
-        ]
+        "lastUserMessageIncludes": ["E2E_EMPTY_COMPLETION_RETRY_STREAM"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
       },
       "response": {
         "statusCode": 200,
@@ -94,6 +81,174 @@
           "inputTokens": 96,
           "outputTokens": 8,
           "text": "EMPTY_COMPLETION_RETRY_OK"
+        }
+      }
+    },
+    {
+      "id": "empty-context-finish-title",
+      "description": "空 completion retry case 的标题 sidecar 固定响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不是空 completion retry 的产品语义；固定响应避免 title sidecar 依赖共享 legacy fixture。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_EMPTY_COMPLETION_CONTEXT_SEED"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "empty-context-finish-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"Empty Completion Retry E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "empty-context-finish-seed",
+      "description": "两轮已完成会话建立可压缩历史。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "Reactive Compact 需要完整历史；用真实主请求准备两轮，避免直接注入运行时状态。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_EMPTY_COMPLETION_CONTEXT_SEED"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "empty-context-finish-seed",
+          "inputTokens": 96,
+          "outputTokens": 16,
+          "text": "EMPTY_CONTEXT_SEED_OK"
+        }
+      }
+    },
+    {
+      "id": "empty-context-finish-first-empty",
+      "description": "首请求零输出且 raw finish 为明确上下文限制，交给 Reactive Compact。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "构造零 text/reasoning/tool、非零 usage（80 input / 5 output）的明确上下文限制，验证不叠加空响应重试且恢复前保留已发生用量。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_EMPTY_COMPLETION_CONTEXT_FINISH"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"empty-context-finish-first-empty\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0}}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"model_context_window_exceeded\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":80,\"output_tokens\":5}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "empty-context-finish-compact",
+      "description": "明确上下文限制后生成 Reactive Compact summary。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "验证首个空响应之后立即压缩，无额外空响应重试或 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["CRITICAL: Respond with TEXT ONLY", "E2E_EMPTY_COMPLETION_CONTEXT_SEED"],
+        "bodyExcludes": ["Generate a concise title", "Output token limit hit. Resume directly"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "empty-context-finish-compact",
+          "inputTokens": 96,
+          "outputTokens": 16,
+          "text": "<summary>EMPTY_CONTEXT_COMPACT_SUMMARY. Earlier setup turns completed with EMPTY_CONTEXT_SEED_OK.</summary>"
+        }
+      }
+    },
+    {
+      "id": "empty-context-finish-retry-success",
+      "description": "只接受携带压缩摘要且不含 Continue 的原请求重试。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "严格匹配压缩后的请求，区分 Reactive Compact 恢复与未压缩重发或 Continue。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["EMPTY_CONTEXT_COMPACT_SUMMARY", "E2E_EMPTY_COMPLETION_CONTEXT_FINISH"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "Output token limit hit. Resume directly"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "text": {
+          "id": "empty-context-finish-retry-success",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "EMPTY_CONTEXT_FINISH_OK"
+        }
+      }
+    },
+    {
+      "id": "empty-context-finish-unexpected-retry",
+      "description": "未压缩重发或错误 Continue 的诊断响应，立即使恢复断言失败。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "将未压缩的重复主请求变为确定性断言失败，避免 fixture miss 触发无关网络重试。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
+        "bodyIncludes": ["E2E_EMPTY_COMPLETION_CONTEXT_FINISH"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "text": {
+          "id": "empty-context-finish-unexpected-retry",
+          "inputTokens": 96,
+          "outputTokens": 8,
+          "text": "UNEXPECTED_EMPTY_CONTEXT_RETRY"
         }
       }
     }

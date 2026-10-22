@@ -37,6 +37,9 @@ export {
   validateAmendWorkflowSource,
 } from "./amend-workflow-source.js";
 
+/** 规范串里 provider 与模型之间的分隔符（`providerId/modelId[$level]`）。 */
+const CANONICAL_PROVIDER_SEPARATOR = "/";
+
 /** 前驱不存在：复用内省工具的 `run_not_found`，只补一句点名 `run_id`。 */
 export function predecessorNotFoundFailure(runId: string): ToolHandlerFailure {
   const base = workflowRunNotFoundFailure(runId);
@@ -165,10 +168,63 @@ export async function resolveAmendWorkflowInput(
   };
   // 脚本点名的模型：同名沿用前驱 run-launched 上的绑定（用户在前驱确认窗里换过的模型因此留得住），
   // 新名字对着目录解析（docs/dynamic-workflow/launch.md「The `AmendWorkflow` tool」）。
+  const bound = withScriptModelBindings(resolved, context.modelCatalogPort, snapshot.modelBindings);
+  // 最后一步、在绑定表落定之后：新 provider 只能从归一化后的模型里读，读模型给的原文会漏掉脚本绑定。
+  const introduced = introducedProviders(bound, snapshot, context.modelCatalogPort);
   return {
     result: true,
-    input: withScriptModelBindings(resolved, context.modelCatalogPort, snapshot.modelBindings),
+    input:
+      introduced.length === 0
+        ? bound
+        : {
+            ...bound,
+            predecessor: { ...resolved.predecessor, introduces_providers: introduced },
+          },
   };
+}
+
+/**
+ * 这次修订将让子代理用上、而会话与前驱都没用过的 provider（去重、字母序）——
+ * `predecessor.introduces_providers` 的唯一来源（docs/dynamic-workflow/launch.md「Amending this
+ * session's runs」）。
+ *
+ *   - 用过：会话当前模型的 provider，以及前驱 `run-launched` 上的子代理模型与脚本绑定的 provider。
+ *     前驱的选择在它自己那次确认窗里被用户批过，沿用或在同一 provider 下换名字都不是新的选择。
+ *   - 将用：归一化后的 `subagent_model`（缺席即会话模型，不会是新的）与 `model_bindings` 的值。
+ *
+ * 目录缺席时读不到会话的 provider，只与前驱比：那时模型给的模型名本来就解析不了（整次调用失败），
+ * 能走到这里的只有沿用来的，而沿用来的都在「用过」里。
+ */
+function introducedProviders(
+  input: Record<string, unknown>,
+  snapshot: { subagentModel?: string; modelBindings?: Record<string, string> },
+  catalog: ModelCatalogPort | undefined,
+): string[] {
+  const used = new Set<string>();
+  const sessionProvider = catalog?.listModels().find((entry) => entry.current)?.providerId;
+  if (sessionProvider !== undefined) used.add(sessionProvider);
+  for (const model of [snapshot.subagentModel, ...Object.values(snapshot.modelBindings ?? {})]) {
+    const provider = providerOfCanonical(model);
+    if (provider !== undefined) used.add(provider);
+  }
+  const bindings = input.model_bindings;
+  const next = [
+    input.subagent_model,
+    ...(typeof bindings === "object" && bindings !== null ? Object.values(bindings) : []),
+  ];
+  const introduced = new Set<string>();
+  for (const model of next) {
+    const provider = providerOfCanonical(model);
+    if (provider !== undefined && !used.has(provider)) introduced.add(provider);
+  }
+  return [...introduced].sort();
+}
+
+/** 规范串 `providerId/modelId[$level]` 的 provider 段；不是规范串即缺席。 */
+function providerOfCanonical(model: unknown): string | undefined {
+  if (typeof model !== "string") return undefined;
+  const separator = model.indexOf(CANONICAL_PROVIDER_SEPARATOR);
+  return separator > 0 ? model.slice(0, separator) : undefined;
 }
 
 /**

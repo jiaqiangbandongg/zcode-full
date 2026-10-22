@@ -124,7 +124,7 @@ export function createPluginSandboxProtocolHandler(options: {
     if (!absolute.startsWith(root)) return notFound();
     try {
       const body = await readAsset(absolute);
-      return new Response(body, {
+      return new Response(new Uint8Array(body), {
         status: 200,
         headers: {
           "Content-Type": MIME_BY_EXTENSION[extname(absolute)] ?? "application/octet-stream",

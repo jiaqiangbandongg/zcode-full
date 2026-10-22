@@ -9,6 +9,7 @@
 
 ## Todo95：未知型号仅配置推理档位
 
+- Todo147 扩展：同一 pending 用例在添加未知型号时检查推荐窗口 `1000000`、输出上限 `128000`；保存后确认这两项未写入 Personal。继续使用原连接测试预算，不因推荐上限提高而扩大实际探测请求。三协议、已知型号覆盖和别名顺序由配置层测试覆盖；不新增 UI 状态或主题布局。
 - Pending：`settings/manual-review/pending/provider-reasoning-fallback.test.ts`。仅本地 `desktop-continuous`；不代表手机或远端实机证明。
 - Setup：独立 loopback Chat Completions synthetic SSE 服务，空模型自定义 Provider；不写个人推理 Map，不用账号或真实额度。
 - Action：真实设置页添加未知 `E2E_T95_UNKNOWN`，仅把默认 disabled 档位改成 high，保留智能配置；保存后点击行内连接测试。

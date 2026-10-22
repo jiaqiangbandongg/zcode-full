@@ -1,91 +1,21 @@
 import { describe, expect, it } from "vitest";
-import type { WindowTabState } from "@/store/tabStore.js";
 import {
-  buildAutomationWorkspaceOptions,
   findAutomationWorkspaceOptionByKey,
   reconcileAutomationWorkspaceSelectionKey,
   resolveAutomationWorkspaceSelectionKey,
 } from "@/settings/automationWorkspaceOptions.js";
-
-describe("automation workspace options", () => {
-  it("只保留当前打开且可用的项目 tab", () => {
-    const tabs: WindowTabState[] = [
-      { id: "settings", kind: "settings", label: "settings" } as never,
-      {
-        id: "project-open",
-        kind: "workspace",
-        workspacePath: "/repo/open",
-        label: "open",
-        workspacePurpose: "project",
-      },
-      {
-        id: "conversation-default",
-        kind: "workspace",
-        workspacePath: "/app/default",
-        label: "default",
-        workspacePurpose: "conversation",
-      },
-      {
-        id: "project-deleted",
-        kind: "workspace",
-        workspacePath: "/repo/deleted",
-        label: "deleted",
-        availability: "unavailable-local-directory",
-        workspacePurpose: "project",
-      },
-    ] as WindowTabState[];
-
-    expect(buildAutomationWorkspaceOptions(tabs)).toEqual([
-      {
-        workspacePath: "/repo/open",
-        label: "open",
-      },
-    ]);
+describe("automation project selection", () => {
+  it("uses project identity for overlapping cwd, without changing workspace identity", () => {
+    const options = [
+      { projectId: "a", hostId: "local", workspacePath: "/same", label: "A" },
+      { projectId: "b", hostId: "local", workspacePath: "/same", label: "B" },
+    ];
+    const key = resolveAutomationWorkspaceSelectionKey(options[1]!);
+    expect(key).not.toBe(resolveAutomationWorkspaceSelectionKey(options[0]!));
+    expect(findAutomationWorkspaceOptionByKey(options, key)).toBe(options[1]);
+    expect(options[1]!.workspacePath).toBe("/same");
+    expect(reconcileAutomationWorkspaceSelectionKey(options, key)).toBe(key);
   });
-
-  it("远程同路径项目按 workspaceIdentity 隔离并保留会话信息", () => {
-    const tabs = [
-      {
-        id: "remote-a",
-        kind: "workspace",
-        workspacePath: "/repo",
-        label: "remote-a",
-        workspaceIdentity: "remote:ssh:a:/repo",
-        remoteSessionId: "session-a",
-      },
-      {
-        id: "remote-b",
-        kind: "workspace",
-        workspacePath: "/repo",
-        label: "remote-b",
-        workspaceIdentity: "remote:ssh:b:/repo",
-        remoteSessionId: "session-b",
-      },
-    ] as WindowTabState[];
-
-    expect(buildAutomationWorkspaceOptions(tabs)).toMatchObject([
-      {
-        label: "remote-a",
-        workspaceIdentity: "remote:ssh:a:/repo",
-        remoteSessionId: "session-a",
-      },
-      {
-        label: "remote-b",
-        workspaceIdentity: "remote:ssh:b:/repo",
-        remoteSessionId: "session-b",
-      },
-    ]);
-
-    const options = buildAutomationWorkspaceOptions(tabs);
-    const selectedKey = resolveAutomationWorkspaceSelectionKey(options[1]!);
-    expect(selectedKey).toBe("remote:ssh:b:/repo");
-    expect(findAutomationWorkspaceOptionByKey(options, selectedKey)).toMatchObject({
-      workspacePath: "/repo",
-      workspaceIdentity: "remote:ssh:b:/repo",
-      remoteSessionId: "session-b",
-    });
-  });
-
   it("无有效项目时选择收敛为 null，不回退到默认或 conversation workspace", () => {
     expect(
       reconcileAutomationWorkspaceSelectionKey([], "/app/default", {
@@ -111,14 +41,10 @@ describe("automation workspace options", () => {
       }),
     ).toBe("remote:ssh:b:/repo");
     expect(
-      reconcileAutomationWorkspaceSelectionKey(
-        options,
-        "/repo/first",
-        {
-          workspacePath: "/repo",
-          workspaceIdentity: "remote:ssh:b:/repo",
-        },
-      ),
+      reconcileAutomationWorkspaceSelectionKey(options, "/repo/first", {
+        workspacePath: "/repo",
+        workspaceIdentity: "remote:ssh:b:/repo",
+      }),
     ).toBe("/repo/first");
   });
 });

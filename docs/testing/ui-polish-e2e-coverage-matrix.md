@@ -1,5 +1,7 @@
 # UI Polish E2E Coverage Matrix
 
+- Logo 样式迁移：UP-00 验证 Windows 设置页旧位置与 18px 底座、11px 静态 SVG。Windows 实测通过：`desktop-e2e-20261009065931122-p21208-9f6085045aa4ea21`，1/1；明暗主题截图已检查。
+
 ## Todo153：思考档位展示与配置顺序
 
 依据 [控件 spec](../ui/chat-thought-level-control.md) 和 [Todo153](../working-memory/provider-refactor/steps/todo-153-thought-level-display-mapping.md)，以下语义已确认，浏览器候选位于 `packages/ui/test/browser/manual-review/pending/thought-level-display.test.mjs`，fixture 使用真实共享控件、SubagentReasoningField 及 toolbar 快捷键 hook，隔离设置服务，不发送模型请求。
@@ -152,3 +154,5 @@ UP-01 在 macOS 上增加 `DesktopWindowFrame` 计算背景透明断言。这是
 - 验证：修改前 macOS 单测失败，修改后四个平台分支单测全部通过；全仓类型检查、E2E 类型检查和 Lint 通过（41 个已有警告、0 错误）。
 - macOS Electron：3/3 通过，根框架计算背景为 `rgba(0, 0, 0, 0)`；运行 ID：`desktop-e2e-20260904082702490-p81892-0a8af92f6cb52575`。
 - Windows/Linux/Web 背景分支已做单测，未做独立平台视觉验证；设置页和错误页复用同一组件，未逐页截图验证。
+
+2026-10-09 平台尺寸：UP-00 Windows 设置页 6px 外沿、8px 圆角和右上操作组对齐通过，run `desktop-e2e-20261009070918592-p12424-e7971ff15e21066b`。

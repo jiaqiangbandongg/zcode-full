@@ -59,7 +59,7 @@ describe.each(["off", "on"] as const)(
       async (source, target) => {
         const root = await mkdtemp(join(tmpdir(), "zcode-reasoning-replay-"));
         const sessionID = createSessionId("reasoning-replay");
-        let store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+        let store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
         const db = new DatabaseSync(join(root, "session.sqlite"));
         let runtime: AgentRuntime | undefined;
         try {
@@ -79,7 +79,7 @@ describe.each(["off", "on"] as const)(
           const before = snapshot();
           // Todo109 已将迁移收进数据库启动；不能恢复已删除的逐 Session 迁移接口。
           store.close();
-          store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+          store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
           const migrated = snapshot();
           expect(migrated.messages).toHaveLength(before.messages.length);
           for (const [index, row] of before.messages.entries()) {
@@ -235,7 +235,7 @@ function observeModel(model: Model, requests: ModelRequest[]): Model {
 
 async function seedHistory(input: {
   db: DatabaseSync;
-  store: ReturnType<typeof createSqliteSessionStore>;
+  store: Awaited<ReturnType<typeof createSqliteSessionStore>>;
   root: string;
   sessionID: SessionId;
   providerId: string;

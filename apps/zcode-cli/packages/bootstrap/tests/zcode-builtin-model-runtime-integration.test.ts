@@ -41,11 +41,16 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
       personalProviders: new ProviderConfigMap([
         [
           providerId,
-          new ProviderConfig({
-            templateId: "zai-api",
-            group: "standard-personal",
-            access: new ApiKeyAccessConfig({ apiKey: "test-zai-api-key" }),
-          }),
+          // 实例在创建时复制模板；Resolver 不会从已退场的 templateId 字段隐式继承。
+          zcodeBuiltin.providerTemplates
+            .get("zai-api")!
+            .config.withPersonalModelIds([modelId])
+            .overlay(
+              new ProviderConfig({
+                group: "standard-personal",
+                access: new ApiKeyAccessConfig({ apiKey: "test-zai-api-key" }),
+              }),
+            ),
         ],
       ]),
     });
@@ -87,7 +92,7 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
         ],
       ]),
       personalProviders: new ProviderConfigMap([
-        [providerId, new ProviderConfig({ label: "Personal final label" })],
+        [providerId, new ProviderConfig({ visibility: "hidden" })],
       ]),
     });
     const capture = captureRuntime(registry);
@@ -100,7 +105,7 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
       modelId,
     ]);
     expect(capture.created[0]?.providerConfig).toMatchObject({
-      label: "Personal final label",
+      visibility: "hidden",
       access: {
         type: "zhipu-account",
         accountType: "zai",
@@ -112,7 +117,7 @@ describe("真实 ZCode Built-in Config 到 Active Model", () => {
 
   it("隐藏 Request Auth Provider 仍由普通 Registry 精确创建 Model", () => {
     const providerId = "account:zai-offpeak-idle-plan";
-    const modelId = "GLM-5.2";
+    const modelId = "GLM-5.3";
     const registry = resolveOneBuiltinProvider(providerId, {
       accountProviders: new ProviderConfigMap([
         [

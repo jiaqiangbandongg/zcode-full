@@ -11,7 +11,14 @@ const mocks = vi.hoisted(() => ({
     listWorkspaceFilesRange: vi.fn(),
   },
 }));
-vi.mock("@/hooks/useServices.js", () => ({ useServices: () => ({ fileService: mocks.service }) }));
+vi.mock("@/hooks/useWorkspaceServices.js", () => ({
+  useWorkspaceServicesResolution: () => ({
+    services: {
+      fileService: mocks.service,
+      broadcastService: { onMessage: () => ({ dispose() {} }) },
+    },
+  }),
+}));
 
 const entry = (name: string): WorkspaceFileEntry => ({
   name,
@@ -68,6 +75,7 @@ describe("@ 文件候选使用 Host 搜索", () => {
     const pending = deferred();
     mocks.service.searchWorkspaceFiles.mockReturnValueOnce(pending.promise);
     const hook = renderProvider();
+    await waitFor(() => expect(mocks.service.searchWorkspaceFiles).toHaveBeenCalledOnce());
     hook.rerender({ ...initial, query: "Main" });
     await waitFor(() => expect(hook.result.current.items[0]?.label).toBe("Main.ts"));
     await act(async () => pending.resolve([entry("old.ts")]));
@@ -94,6 +102,7 @@ describe("@ 文件候选使用 Host 搜索", () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
     const hook = renderProvider();
+    await waitFor(() => expect(mocks.service.searchWorkspaceFiles).toHaveBeenCalledOnce());
     hook.rerender({ ...initial, query: "next", identity: "host-b" });
     expect(hook.result.current.items).toEqual([]);
     await act(async () => second.resolve([entry("next.ts")]));
@@ -123,6 +132,7 @@ describe("@ 文件候选使用 Host 搜索", () => {
     const pending = deferred();
     mocks.service.searchWorkspaceFiles.mockReturnValueOnce(pending.promise);
     const hook = renderProvider();
+    await waitFor(() => expect(mocks.service.searchWorkspaceFiles).toHaveBeenCalledOnce());
     hook.rerender({ ...initial, enabled: false });
     await act(async () => pending.resolve([entry("old.ts")]));
     expect(hook.result.current.items).toEqual([]);

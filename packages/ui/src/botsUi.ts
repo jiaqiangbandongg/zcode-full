@@ -1,8 +1,4 @@
-import type {
-  BotConfig,
-  BotProvider,
-  BotReplyGranularity,
-} from "@zcode/shared";
+import type { BotConfig, BotProvider, BotReplyGranularity } from "@zcode/shared";
 import { getSupportedBotReplyGranularities } from "@zcode/shared";
 
 export type BotProviderEntryId = BotProvider | "dingding";
@@ -55,9 +51,7 @@ export function getBotReplyGranularitiesForProvider(
   provider: BotProvider,
 ): typeof BOT_REPLY_GRANULARITIES {
   const supportedIds = new Set(getSupportedBotReplyGranularities(provider));
-  return BOT_REPLY_GRANULARITIES.filter((granularity) =>
-    supportedIds.has(granularity.id),
-  );
+  return BOT_REPLY_GRANULARITIES.filter((granularity) => supportedIds.has(granularity.id));
 }
 
 export function getBotReplyGranularityEntryForProvider(
@@ -72,9 +66,7 @@ export function getBotReplyGranularityEntryForProvider(
   );
 }
 
-export function getBotProviderRegionTagLabelId(
-  provider: BotProviderEntryId,
-): string | null {
+export function getBotProviderRegionTagLabelId(provider: BotProviderEntryId): string | null {
   switch (provider) {
     case "lark":
       return "login.oauth.regionTag.zai";
@@ -83,13 +75,6 @@ export function getBotProviderRegionTagLabelId(
     default:
       return null;
   }
-}
-
-export function buildCurrentWorkspaceId(
-  workspacePath: string,
-  workspaceIdentity?: string,
-): string {
-  return workspaceIdentity?.trim() || workspacePath;
 }
 
 type BotProviderEntryResolution =

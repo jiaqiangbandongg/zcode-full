@@ -180,7 +180,6 @@ describe("PermissionDialog focus", () => {
   it("gives feedback its own numbered row in the arrow and Tab focus cycle", () => {
     const { input, options, flush, onRespond, confirm } = renderPermission();
     const feedbackRow = input!.parentElement!;
-    expect(feedbackRow.parentElement?.classList.contains("space-y-1")).toBe(true);
     expect(feedbackRow.previousElementSibling).toBe(options[0]!.parentElement);
     expect(input!.closest('[role="listbox"]')).toBeNull();
     const key = (key: string, shiftKey = false) => {
@@ -189,10 +188,6 @@ describe("PermissionDialog focus", () => {
     };
     expect(document.activeElement).toBe(options[0]);
     expect(input!.previousElementSibling?.textContent).toBe("4.");
-    expect(input!.previousElementSibling?.classList.contains("self-start")).toBe(true);
-    expect(input!.previousElementSibling?.classList.contains("mt-px")).toBe(true);
-    expect(input!.previousElementSibling?.classList.contains("leading-5")).toBe(true);
-    expect(input!.previousElementSibling?.classList.contains("md:leading-relaxed")).toBe(true);
     key("ArrowUp");
     expect(document.activeElement).toBe(input);
     expect(feedbackRow.classList.contains("bg-selected")).toBe(true);

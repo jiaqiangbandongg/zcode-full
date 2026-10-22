@@ -36,8 +36,8 @@ export function isWorkflowRunsCapabilityMissing(error: unknown): boolean {
  * 某会话名下的 journal run 摘要；查不到（或还没查到）为 `null`——回退整体缺席，卡片保持
  * 「编过但无 run」形态，绝不假装有入口。
  *
- * `live` 是「宿主 record 一定在册」的现成信号（订阅 ACK 已回）。冷开时 false→true 的那一跳
- * 是唯一值得重试的时刻，所以这里不轮询、不退避：`live` 之后仍失败就是真失败。
+ * historyFirst 的订阅 ACK 只表示历史可读；调用方必须等 runtime ready 才 enabled/live。
+ * `live` 抬升后仅补一次查询，不用轮询或退避猜测初始化进度。
  *
  * `refreshKey` 是收口之后**主动**重取的唯一缝（run 目录页与任务列表计数的新鲜度来源）：调用方按「已结算 run 的单调计数」
  * 给它，于是会话中途跑完一个 run 才多一次分页读。刻意不接投影的 `revision`——那个键每来一个

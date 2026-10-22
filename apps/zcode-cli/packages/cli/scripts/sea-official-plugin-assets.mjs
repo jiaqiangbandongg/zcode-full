@@ -17,6 +17,9 @@ const browserUseRequiredRuntimePaths = [
   "skills/web-gui-tester/SKILL.md",
 ];
 
+// 文档插件查看面板的构建产物（office-runtime 输出到各插件 dist/）。
+const officeViewerRuntimePaths = ["dist/server.mjs", "dist/ui/assets.json", "dist/ui/panel.html"];
+
 export const officialSeaPlugins = [
   {
     marketplace: "zcode-plugins-official",
@@ -76,11 +79,17 @@ export const officialSeaPlugins = [
     marketplace: "zcode-plugins-official",
     name: "documents",
     packageName: "@zcode/documents-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/docx/SKILL.md"],
+    // 0.2.0 起带查看面板：SEA 必须在嵌入前校验 office-runtime 构建出的 server 与面板资源。
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/docx/SKILL.md",
+      "skills/docx-viewer/SKILL.md",
+    ],
     rootPath: join("packages", "documents-plugin"),
     // 修复原因：SEA manifest 必须与 package、plugin manifest 和官方 definition 同步，避免发布产物嵌入旧版本。
-    version: "0.1.8",
+    version: "0.2.0",
   },
   {
     marketplace: "zcode-plugins-official",
@@ -96,31 +105,49 @@ export const officialSeaPlugins = [
     marketplace: "zcode-plugins-official",
     name: "pdf",
     packageName: "@zcode/pdf-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pdf/SKILL.md"],
+    // 0.2.0 起带查看面板：SEA 必须在嵌入前校验 office-runtime 构建出的 server 与面板资源。
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pdf/SKILL.md",
+      "skills/pdf-viewer/SKILL.md",
+    ],
     rootPath: join("packages", "pdf-plugin"),
     // 修复原因：SEA manifest 必须与 package、plugin manifest 和官方 definition 同步，避免发布产物嵌入旧版本。
-    version: "0.1.8",
+    version: "0.2.1",
   },
   {
     marketplace: "zcode-plugins-official",
     name: "presentations",
     packageName: "@zcode/presentations-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pptx/SKILL.md"],
+    // 0.2.0 起带查看面板：SEA 必须在嵌入前校验 office-runtime 构建出的 server 与面板资源。
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pptx/SKILL.md",
+      "skills/pptx-viewer/SKILL.md",
+    ],
     rootPath: join("packages", "presentations-plugin"),
     // 修复原因：SEA manifest 必须与 package、plugin manifest 和官方 definition 同步，避免发布产物嵌入旧版本。
-    version: "0.1.8",
+    version: "0.2.0",
   },
   {
     marketplace: "zcode-plugins-official",
     name: "spreadsheets",
     packageName: "@zcode/spreadsheets-plugin",
-    requiresRuntime: false,
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/xlsx/SKILL.md"],
+    // 0.2.0 起带查看面板：SEA 必须在嵌入前校验 office-runtime 构建出的 server 与面板资源。
+    requiresRuntime: true,
+    requiredRuntimePaths: officeViewerRuntimePaths,
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/xlsx/SKILL.md",
+      "skills/xlsx-viewer/SKILL.md",
+    ],
     rootPath: join("packages", "spreadsheets-plugin"),
     // 修复原因：SEA manifest 必须与 package、plugin manifest 和官方 definition 同步，避免发布产物嵌入旧版本。
-    version: "0.1.8",
+    version: "0.2.0",
   },
   {
     // browser-use 使用真实 node_repl MCP runtime，SEA 必须校验并嵌入 server.js。

@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-remote-hooks",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-remote-hooks.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-remote-hooks.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-hooks-local-title",
+      "description": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。"
+    },
+    {
+      "id": "r3-hooks-local-reply",
+      "description": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "在真实本机回合触发 UserPromptSubmit，验证远端 hook 不会在本机执行，也不会给远端 marker 追加记录。"
+    },
+    {
+      "id": "r3-hooks-reconnect-title",
+      "description": "R3 remote hooks task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "r3-hooks-reconnect-main",
+      "description": "R3 remote hooks 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "slow-stream",
+      "source": "synthetic",
+      "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+    }
+  ]
+}

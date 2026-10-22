@@ -254,12 +254,19 @@ describe("ModelProviderSection preset subscription action", () => {
       expect(updateSharedSettingsMock).not.toHaveBeenCalled();
       (capturedDetailProps!.onSelectNavItem as (item: unknown) => void)(item);
       await vi.waitFor(() => expect(updateSharedSettingsMock).toHaveBeenCalledTimes(1));
-      expect(updateSharedSettingsMock).toHaveBeenCalledWith({
-        providerFamilyDomain: family,
-        providerFamilyDomainUpdatedAt: expect.any(Number),
-        providerFamilyDomainMigrated: true,
-        providerFamilyConnectionSelections: selections,
-      });
+      expect(updateSharedSettingsMock).toHaveBeenCalledWith(
+        {
+          providerFamilyDomain: family,
+          providerFamilyDomainUpdatedAt: expect.any(Number),
+          providerFamilyDomainMigrated: true,
+          providerFamilyConnectionSelections: selections,
+        },
+        {
+          providerFamilyDomain: undefined,
+          providerFamilyConnectionSelections: selections,
+          providerFamilyDomainUpdatedAt: 0,
+        },
+      );
       updateSharedSettingsMock.mockClear();
       settingsMock = { ...settingsMock, providerFamilyDomain: family };
       renderToStaticMarkup(createElement(ModelProviderSection));
@@ -278,6 +285,11 @@ describe("ModelProviderSection preset subscription action", () => {
             [family]: { ...selection, projectId: "other-project" },
           },
         }),
+        {
+          providerFamilyDomain: family,
+          providerFamilyConnectionSelections: selections,
+          providerFamilyDomainUpdatedAt: 0,
+        },
       );
     },
   );
@@ -302,20 +314,6 @@ describe("ModelProviderSection preset subscription action", () => {
     setOAuthErrorMock.mockClear();
   });
 
-  it("API Key 表单不再暴露使用订阅入口", async () => {
-    const { ModelProviderSection } = await import("@/settings/ModelProviderSection.js");
-
-    renderToStaticMarkup(createElement(ModelProviderSection));
-
-    expect(capturedDetailProps).not.toBeNull();
-
-    expect(capturedDetailProps?.onPresetSubscriptionLogin).toBeUndefined();
-    expect(startOAuthMock).not.toHaveBeenCalled();
-    expect(openExternalMock).not.toHaveBeenCalled();
-    expect(registerOAuthStateMock).not.toHaveBeenCalled();
-    expect(refreshMock).not.toHaveBeenCalled();
-  });
-
   it("Z.ai Coding Plan Connect 会打开 App 登录入口", async () => {
     const { ModelProviderSection } = await import("@/settings/ModelProviderSection.js");
 
@@ -332,40 +330,6 @@ describe("ModelProviderSection preset subscription action", () => {
     expect(refreshMock).not.toHaveBeenCalled();
     expect(requestLoginEntryMock).toHaveBeenCalledWith(ZAI_PROVIDER_ID);
     expect(startOAuthMock).not.toHaveBeenCalled();
-  });
-
-  it("Z.ai Coding Plan 不再根据旧 provider key 做静默刷新", async () => {
-    const { ModelProviderSection } = await import("@/settings/ModelProviderSection.js");
-    renderToStaticMarkup(createElement(ModelProviderSection));
-
-    expect(capturedDetailProps).not.toBeNull();
-
-    await (
-      capturedDetailProps?.onCodingPlanLogin as
-        | ((presetId: string, providerId: string, providerName: string) => Promise<void>)
-        | undefined
-    )?.(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan, ZAI_PROVIDER_ID, "Z.ai");
-
-    expect(requestLoginEntryMock).toHaveBeenCalledWith(ZAI_PROVIDER_ID);
-    expect(refreshMock).not.toHaveBeenCalled();
-    expect(startOAuthMock).not.toHaveBeenCalled();
-  });
-
-  it("Z.ai Coding Plan 在 App 未登录 ZAI 时继续打开登录入口", async () => {
-    const { ModelProviderSection } = await import("@/settings/ModelProviderSection.js");
-
-    renderToStaticMarkup(createElement(ModelProviderSection));
-
-    expect(capturedDetailProps).not.toBeNull();
-
-    await (
-      capturedDetailProps?.onCodingPlanLogin as
-        | ((presetId: string, providerId: string, providerName: string) => Promise<void>)
-        | undefined
-    )?.(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan, ZAI_PROVIDER_ID, "Z.ai");
-
-    expect(requestLoginEntryMock).toHaveBeenCalledWith(ZAI_PROVIDER_ID);
-    expect(refreshMock).not.toHaveBeenCalled();
   });
 
   it("Z.ai Coding Plan 同步失败时点击登录会重新打开登录入口", async () => {

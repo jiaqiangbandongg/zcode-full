@@ -118,6 +118,7 @@ export async function runModelTextRequest(
   const modelRequest = {
     messages: projectedOptions.messages,
     tools: projectedOptions.tools,
+    toolSearchEnabled: projectedOptions.toolSearchEnabled,
     abortSignal: projectedOptions.abortSignal,
     ...(projectedOptions.maxOutputTokens !== undefined
       ? { options: { maxOutputTokens: projectedOptions.maxOutputTokens } }
@@ -328,6 +329,8 @@ export async function runModelTextRequest(
           break;
         }
 
+        // 原始参数流保留包装结构；目标身份由公共准入产生，再通过工具事件交给展示投影。
+        // 不从参数 delta 推测执行目标，也不为展示身份调整模型流或工具调度时序。
         case "tool_input_start": {
           const toolCallId = event.id as ToolCallId;
           toolInputDeltaBuffers.delete(toolCallId);

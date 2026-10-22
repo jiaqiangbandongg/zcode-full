@@ -10,7 +10,6 @@ describe("token estimation regression", () => {
   it("uses the shared three-character divisor for text and model messages", () => {
     const text = "x".repeat(10);
 
-    expect(ESTIMATED_TOKEN_CHAR_DIVISOR).toBe(3);
     expect(estimateTokens(text)).toBe(4);
     expect(estimateMessageTokens([{ role: "user", content: text }])).toBe(4);
   });
@@ -35,8 +34,7 @@ describe("token estimation regression", () => {
     const estimatedCharacters =
       content.length +
       toolCalls.reduce(
-        (total, toolCall) =>
-          total + (toolCall.name + JSON.stringify(toolCall.input ?? {})).length,
+        (total, toolCall) => total + (toolCall.name + JSON.stringify(toolCall.input ?? {})).length,
         0,
       );
 
@@ -86,8 +84,7 @@ describe("token estimation regression", () => {
     const estimatedTokenCount =
       Math.ceil(messages[0]!.content.length / ESTIMATED_TOKEN_CHAR_DIVISOR) +
       Math.ceil(
-        (toolCall.name + JSON.stringify(toolCall.input)).length /
-          ESTIMATED_TOKEN_CHAR_DIVISOR,
+        (toolCall.name + JSON.stringify(toolCall.input)).length / ESTIMATED_TOKEN_CHAR_DIVISOR,
       );
 
     expect(

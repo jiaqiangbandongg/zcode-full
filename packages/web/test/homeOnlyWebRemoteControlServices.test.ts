@@ -26,7 +26,7 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     vi.stubGlobal("window", {
       addEventListener: vi.fn(),
       matchMedia: () => ({ matches: false }),
-      location: { search: "", pathname: "/" },
+      location: new URL("https://zcode.z.ai/"),
     });
     vi.stubGlobal("navigator", { language: "zh-CN" });
 
@@ -90,7 +90,7 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     vi.stubGlobal("window", {
       addEventListener: vi.fn(),
       matchMedia: () => ({ matches: false }),
-      location: { search: "", pathname: "/" },
+      location: new URL("https://zcode.z.ai/"),
     });
     vi.stubGlobal("navigator", { language: "zh-CN" });
 
@@ -98,10 +98,36 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     const services = createHomeOnlyWebRemoteControlServices();
     const disposable = services.broadcastService.onMessage(() => {});
 
-    expect(typeof disposable.dispose).toBe("function");
     expect(() => disposable.dispose()).not.toThrow();
     await expect(
       services.broadcastService.send({ channel: "state:theme", payload: "dark" }),
     ).resolves.toBeUndefined();
+  });
+
+  it("returns synchronous empty events for unlisted dynamic subscriptions", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => null });
+    vi.stubGlobal("document", {
+      documentElement: { classList: { toggle: vi.fn() } },
+      getElementById: vi.fn(() => ({ nodeType: 1 })),
+    });
+    vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      matchMedia: () => ({ matches: false }),
+      location: new URL("https://zcode.z.ai/"),
+    });
+    vi.stubGlobal("navigator", { language: "zh-CN" });
+
+    const { createHomeOnlyWebRemoteControlServices } = await import("../src/main.js");
+    const services = createHomeOnlyWebRemoteControlServices();
+    const workspace = { workspacePath: "/remote/offline" };
+    const subscriptions = [
+      services.zcodeTaskService.onDynamicWorkspaceEvent(workspace)(() => {}),
+      services.zcodeAgentService.onDynamicSessionsIndexFrame(workspace)(() => {}),
+      services.zcodeAgentService.onDynamicConversationFrame(workspace)(() => {}),
+    ];
+
+    for (const subscription of subscriptions) {
+      expect(() => subscription.dispose()).not.toThrow();
+    }
   });
 });

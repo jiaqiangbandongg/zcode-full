@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type ComponentProps } from "react";
 import { cn } from "@/components/lib/utils.js";
-import { Command, CommandEmpty, CommandItem, CommandList } from "@/components/ui/command.js";
 import { Input } from "@/components/ui/input.js";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover.js";
 import { shouldIgnoreRemoteConnectionHistoryPopoverInteractOutside } from "@/remote-connection/remoteConnectionHistoryPopover.js";
@@ -39,13 +38,15 @@ export function RemoteConnectionHistoryInput({
   ComponentProps<typeof Input>,
   "children" | "onChange" | "placeholder" | "size" | "value"
 >) {
+  const generatedId = useId();
+  const inputId = inputProps.id ?? generatedId;
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [filterWithCurrentValue, setFilterWithCurrentValue] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const keepInputFocusOnOpenRef = useRef(false);
   const suppressOpenUntilRef = useRef(0);
-  const skipNextBlurRef = useRef(false);
 
   const filteredSuggestions = useMemo(() => {
     if (!filterWithCurrentValue) {
@@ -65,6 +66,7 @@ export function RemoteConnectionHistoryInput({
         setFilterWithCurrentValue(false);
       }
 
+      setActiveIndex(-1);
       keepInputFocusOnOpenRef.current = true;
       setOpen(true);
     },
@@ -79,19 +81,27 @@ export function RemoteConnectionHistoryInput({
 
     keepInputFocusOnOpenRef.current = false;
     setFilterWithCurrentValue(false);
-    if (skipNextBlurRef.current) {
-      skipNextBlurRef.current = false;
-    }
   }, []);
+
+  const selectSuggestion = (selected: string) => {
+    onChange(selected);
+    setFilterWithCurrentValue(false);
+    suppressOpenUntilRef.current = Date.now() + 120;
+    setOpen(false);
+    setActiveIndex(-1);
+  };
 
   return (
     <div ref={containerRef} className={cn("w-full", containerClassName)}>
       {label ? (
-        <label className="mb-1 block text-ui-base text-foreground-subtle">{label}</label>
+        <label htmlFor={inputId} className="mb-1.5 block text-ui-sm text-remote-foreground-muted">
+          {label}
+        </label>
       ) : null}
       <Popover open={open && suggestions.length > 0} onOpenChange={handleOpenChange}>
         <PopoverAnchor asChild>
           <Input
+            id={inputId}
             ref={inputRef}
             size="lg"
             placeholder={placeholder}
@@ -105,6 +115,40 @@ export function RemoteConnectionHistoryInput({
             }}
             autoComplete="off"
             {...inputProps}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={open && suggestions.length > 0}
+            aria-controls={open ? `${generatedId}-list` : undefined}
+            aria-activedescendant={
+              open && activeIndex >= 0 ? `${generatedId}-option-${activeIndex}` : undefined
+            }
+            onKeyDown={(event) => {
+              inputProps.onKeyDown?.(event);
+              if (event.defaultPrevented) return;
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                if (!filteredSuggestions.length) return;
+                event.preventDefault();
+                if (!open) requestOpenFromInput();
+                setActiveIndex((index) =>
+                  event.key === "ArrowDown"
+                    ? (index + 1) % filteredSuggestions.length
+                    : index <= 0
+                      ? filteredSuggestions.length - 1
+                      : index - 1,
+                );
+              } else if (open && event.key === "Enter" && activeIndex >= 0) {
+                event.preventDefault();
+                const selected = filteredSuggestions[activeIndex];
+                if (selected !== undefined) selectSuggestion(selected);
+              } else if (open && (event.key === "Escape" || event.key === "Tab")) {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+                setOpen(false);
+                setActiveIndex(-1);
+              }
+            }}
           />
         </PopoverAnchor>
         <PopoverContent
@@ -139,36 +183,36 @@ export function RemoteConnectionHistoryInput({
             keepInputFocusOnOpenRef.current = false;
           }}
         >
-          <Command className="rounded-lg bg-transparent p-0 text-foreground">
-            <CommandList className="max-h-56 scroll-py-1">
-              {filteredSuggestions.length === 0 ? (
-                <CommandEmpty className="px-3 py-5 text-ui-base text-foreground-subtle">
-                  {emptyText}
-                </CommandEmpty>
-              ) : (
-                filteredSuggestions.map((item) => (
-                  <CommandItem
-                    key={item}
-                    value={item}
-                    className="min-h-8 rounded-lg px-3 py-1.5 text-ui-base text-foreground data-selected:bg-menu-hover data-selected:text-foreground"
-                    onPointerDown={() => {
-                      skipNextBlurRef.current = true;
-                    }}
-                    onSelect={(selected) => {
-                      onChange(selected);
-                      setFilterWithCurrentValue(false);
-                      // 选中历史项后，input 的 click/focus 会立刻重放，弹层会出现“刚关就重开”。
-                      // 这里用一个很短的抑制窗口屏蔽这次连带事件，避免交互抖动。
-                      suppressOpenUntilRef.current = Date.now() + 120;
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="truncate">{item}</span>
-                  </CommandItem>
-                ))
-              )}
-            </CommandList>
-          </Command>
+          <div
+            id={`${generatedId}-list`}
+            role="listbox"
+            aria-label={label ?? placeholder}
+            className="max-h-56 overflow-y-auto rounded-lg"
+          >
+            {filteredSuggestions.length === 0 ? (
+              <p className="px-3 py-5 text-ui-base text-remote-foreground-muted">{emptyText}</p>
+            ) : (
+              filteredSuggestions.map((item, index) => (
+                <div
+                  key={item}
+                  id={`${generatedId}-option-${index}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  ref={(element) => {
+                    if (index === activeIndex) element?.scrollIntoView({ block: "nearest" });
+                  }}
+                  className={cn(
+                    "min-h-8 cursor-pointer rounded-md px-3 py-1.5 text-ui-base text-foreground hover:bg-menu-hover",
+                    index === activeIndex && "bg-menu-hover",
+                  )}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => selectSuggestion(item)}
+                >
+                  <span className="block truncate">{item}</span>
+                </div>
+              ))
+            )}
+          </div>
         </PopoverContent>
       </Popover>
     </div>

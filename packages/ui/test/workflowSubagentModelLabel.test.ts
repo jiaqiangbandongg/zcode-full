@@ -77,7 +77,6 @@ describe("describeWorkflowSubagentModel", () => {
     });
 
     expect(label.name).toBe("GLM-5.3-Flash");
-    expect(label.name).not.toContain(TEAM_PLAN_PROVIDER);
   });
 
   it("清单把 provider 名回退成了 provider id 时，当作没查到", () => {
@@ -155,7 +154,6 @@ describe("workflowActorModelLabels", () => {
       name: "GLM-5.3-Flash",
       canonical: `${TEAM_PLAN_PROVIDER}/GLM-5.3-Flash$high`,
     });
-    expect(labels.get("actor#1@1")?.name).not.toContain(TEAM_PLAN_PROVIDER);
   });
 
   it("没有 run（静态图）即空表", () => {

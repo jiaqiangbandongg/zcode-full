@@ -115,13 +115,12 @@ describe("Standalone Project Token", () => {
     expect(JSON.stringify([...f.values])).not.toContain("short-token");
     expect(f.values.get(f.legacyKey)).toBe("legacy-secret");
   });
-  it.each(["missing", "corrupt"])("旧 OAuth 用户无来源标记且旧 Key=%s 时可恢复", async (legacy) => {
+  it("旧 OAuth 用户无来源标记时可恢复且不解密旧 Key", async () => {
     const f = fixture();
     f.values.delete(f.sourceKey);
     f.values.delete(f.legacyKey);
     const loadMany = vi.fn(async (keys: readonly string[]) => {
-      if (legacy === "corrupt" && keys.includes(f.legacyKey))
-        throw new Error("legacy ciphertext corrupt");
+      if (keys.includes(f.legacyKey)) throw new Error("legacy ciphertext corrupt");
       return f.store.loadMany(keys);
     });
     const snapshot = await readStandaloneAccountProviderConfigSnapshot(

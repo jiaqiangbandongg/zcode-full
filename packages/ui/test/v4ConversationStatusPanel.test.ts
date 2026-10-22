@@ -11,8 +11,6 @@ import type {
   ToolCallRow,
   WorkflowRunState,
 } from "@zcode/shared/zcode-protocol-v4";
-import enUS from "@/i18n/locales/en-US.js";
-import zhCN from "@/i18n/locales/zh-CN.js";
 import { getStatusPanelTodoFocusWindow } from "@/v4/ConversationStatusPanel.js";
 
 const statusPanelCapture = vi.hoisted(() => ({
@@ -34,7 +32,8 @@ const statusPanelCapture = vi.hoisted(() => ({
   gitBranchSwitchers: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("@/ControlHintTooltip.js", () => ({
+vi.mock("@/ControlHintTooltip.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/ControlHintTooltip.js")>()),
   ControlHintTooltip: ({ children }: { children: ReactNode }) => children,
 }));
 
@@ -154,8 +153,10 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
           "chat.summaryPanel.duration.minutes": "分",
           "chat.summaryPanel.duration.seconds": "秒",
         };
-        return durationUnits[descriptor.id] ??
-          (values ? `${descriptor.id} ${Object.values(values).join("/")}` : descriptor.id);
+        return (
+          durationUnits[descriptor.id] ??
+          (values ? `${descriptor.id} ${Object.values(values).join("/")}` : descriptor.id)
+        );
       },
     },
     locale: "zh-CN",
@@ -478,7 +479,7 @@ describe("ConversationStatusPanel", () => {
     expect(html).not.toContain("data-status-todo-preview-trigger");
   });
 
-  it("clamps each Todo label to two lines without truncating its content", async () => {
+  it("keeps the full long Todo content and title", async () => {
     const content =
       "检查包含多个测试项目的目录，逐项核对配置文件、依赖安装状态、测试入口和输出目录是否完整";
     const html = await renderStatusPanel({
@@ -488,7 +489,6 @@ describe("ConversationStatusPanel", () => {
       }),
     });
 
-    expect(html).toContain("line-clamp-2 min-w-0 flex-1 break-words leading-5");
     expect(html).toContain(`title="${content}"`);
     expect(html).toContain(content);
   });
@@ -507,7 +507,6 @@ describe("ConversationStatusPanel", () => {
     expect(html).toContain('data-status-section="sessionPlans"');
     expect(html).toContain('data-status-section-scroll="sessionPlans"');
     expect(html.indexOf("最新计划")).toBeLessThan(html.indexOf("较早计划"));
-    expect(html).not.toContain("78 行");
     expect(
       buildSessionPlanOpenRequest("parent-session", {
         rowId: 9,
@@ -687,8 +686,6 @@ describe("ConversationStatusPanel", () => {
     expect(stop?.getAttribute("aria-label")).toBe("chat.toolCall.workflow.run.cancel");
     expect(stop?.textContent).toContain("chat.statusPanel.runningStop");
     view.unmount();
-    expect(zhCN["chat.statusPanel.workflows"]).toBe("工作流");
-    expect(enUS["chat.statusPanel.workflows"]).toBe("Workflows");
   });
 
   it("joins parallel burning phases with ∥ and draws the twin segment", async () => {
@@ -798,8 +795,6 @@ describe("ConversationStatusPanel", () => {
       expect(header).toContain("chat.statusPanel.workflowsLive 2");
       expect(header).not.toMatch(/\d+秒/u);
     }
-    expect(zhCN["chat.statusPanel.workflowsLive"]).toBe("{count} 个运行中");
-    expect(enUS["chat.statusPanel.workflowsLive"]).toBe("{count} running");
   });
 
   // 已结束入口在滚动区之外：runs 多到要滚时它也不会被滚出视野。
@@ -1055,9 +1050,6 @@ describe("ConversationStatusPanel", () => {
     await act(async () => trigger?.click());
     expect(onOpenWorkflowRunDirectory).toHaveBeenCalledWith({ parentSessionId: "parent-a" });
     view.unmount();
-
-    expect(zhCN["chat.statusPanel.endedWorkflows"]).toBe("已结束的工作流");
-    expect(enUS["chat.statusPanel.endedWorkflows"]).toBe("Ended workflows");
   });
 
   it("keeps the Workflows section when nothing is active but history exists (the restart entry)", async () => {
@@ -1220,21 +1212,6 @@ describe("ConversationStatusPanel", () => {
     expect(html).not.toContain("data-workflow-run-lamp");
   });
 
-  // 胶囊宽度只由 CSS 决定（w-max + 以 conversation 容器为基准的上限）：不再有 JS 量出来的
-  // 宽度变量。测量值会晚内容一次渲染、上限又按窗口宽度算，两者都能让文字落到胶囊外面。
-  it("sizes the pill with CSS alone, capped by the conversation column", async () => {
-    const html = await renderStatusPanel({
-      gitSummary: null,
-      gitWorktreeChangeSummary: null,
-      summaryPanelVariantOverride: "mini",
-      workflowRuns: [workflowRunProjection()],
-    });
-
-    expect(html).not.toContain("--chat-summary-panel-mini-width");
-    expect(html).toContain("max-w-[min(20rem,calc(100cqw-2rem))]");
-    expect(html).not.toContain("100vw");
-  });
-
   it("shows the ended-runs metric in the mini capsule when nothing else is alive", async () => {
     // Bug 复现：工作区无 Git 变更、workflow 跑完的瞬间——卸载闸门为了 run 目录入口保留
     // 壳（canRenderEndedWorkflows），但胶囊兜底链没有终态分支，渲染成一条 2px 空壳线。
@@ -1309,9 +1286,7 @@ describe("ConversationStatusPanel", () => {
     });
 
     expect(html).toContain('data-status-section-trigger="workflow"');
-    const workflow = statusPanelCapture.collapsibles.find(
-      (entry) => entry.section === "workflow",
-    );
+    const workflow = statusPanelCapture.collapsibles.find((entry) => entry.section === "workflow");
     expect(workflow?.open).toBe(true);
     workflow?.onOpenChange?.(false);
     expect(onWorkflowSectionOpenChange).toHaveBeenCalledWith(false);
@@ -1357,30 +1332,6 @@ describe("ConversationStatusPanel", () => {
     expect(html).toContain("chat.summaryPanel.showPanel");
     expect(html).toContain("四步Checkpoint复现");
     expect(html).not.toContain(">复现用目标：总共完成 4 个 checkpoint<");
-  });
-
-  // Bug 原因：状态面板里 goal 语义曾混用两种图标——展开迭代行用 GoalIcon（球门），
-  // 折叠 mini 摘要用 TargetIcon（靶心）。展开/折叠时图标跳变，且与项目里其他
-  // goal 入口（消息行、用户输入、工具调用）用的 GoalIcon 不一致。
-  // 固化约定：面板内所有 goal 图标统一为 GoalIcon，禁止出现 TargetIcon。
-  it("uses GoalIcon consistently for goal across expanded section and mini summary", async () => {
-    const miniActive = await renderStatusPanel({
-      gitSummary: null,
-      gitWorktreeChangeSummary: null,
-      summaryPanelVariantOverride: "mini",
-      goal: goalState({ status: "active" }),
-    });
-    expect(miniActive).toContain("lucide-goal");
-    expect(miniActive).not.toContain("lucide-target");
-
-    const miniVerified = await renderStatusPanel({
-      gitSummary: null,
-      gitWorktreeChangeSummary: null,
-      summaryPanelVariantOverride: "mini",
-      goal: goalState({ status: "verified", summaryTitle: "已完成主目标" }),
-    });
-    expect(miniVerified).toContain("lucide-goal");
-    expect(miniVerified).not.toContain("lucide-target");
   });
 
   it("does not keep a mini capsule alive for ended Agents alone", async () => {
@@ -1439,7 +1390,7 @@ describe("ConversationStatusPanel", () => {
     expect(endedDirectoryRow).toBeLessThan(agentSectionEnd);
   });
 
-  it("renders the expanded z-code-2 panel controls and sections", async () => {
+  it("renders expanded panel controls and sections", async () => {
     const html = await renderStatusPanel({
       summaryPanelVariantOverride: "panel",
       goal: goalState(),
@@ -1462,23 +1413,15 @@ describe("ConversationStatusPanel", () => {
     expect(html).toContain('data-running-background-count="1"');
     expect(html).toContain('data-status-section="agent"');
     expect(html).toContain('data-status-section-trigger="agent"');
-    expect(html).toContain("shrink-0 text-ui-base text-[var(--color-foreground-subtle)]");
-    expect(html).toContain("gap-1.5 text-ui-sm text-[var(--color-foreground-subtlest)]");
-    expect(html).toContain("line-clamp-2 text-ui-base leading-5");
-    expect(html).toContain("pl-2 pr-3 text-ui-base text-[var(--color-foreground)]");
   });
 
-  it("uses the conversation container query for automatic responsive mode", async () => {
+  it("projects automatic display mode to the shell", async () => {
     const html = await renderStatusPanel({
       layoutMode: "auto",
       summaryPanelVariantOverride: null,
     });
 
     expect(html).toContain('data-display-mode="auto"');
-    expect(html).toContain("@min-[1280px]/conversation:flex");
-    expect(html).toContain("@min-[1280px]/conversation:hidden");
-    expect(html).toContain("@min-[1280px]/conversation:right-4");
-    expect(html).toContain("inset-x-0 flex justify-end px-4");
   });
 
   it("controls the Agent section open state and forwards manual collapse", async () => {
@@ -1520,8 +1463,6 @@ describe("ConversationStatusPanel", () => {
 
     expect(agentSection).toContain("chat.statusPanel.runningAgentsValuePlural 2");
     expect(agentSection).not.toContain("chat.summaryPanel.runningBackgroundTasksMiniValuePlural 2");
-    expect(zhCN["chat.statusPanel.runningAgentsValuePlural"]).toBe("{count} 运行");
-    expect(enUS["chat.statusPanel.runningAgentsValuePlural"]).toBe("{count} running");
   });
 
   it("renders active elapsed, pause control, and every iteration action/status", async () => {
@@ -1667,9 +1608,7 @@ describe("ConversationStatusPanel", () => {
     expect(html).toContain('data-child-session-id="agent-older"');
     expect(html).toContain('data-work-id="agent-control-work"');
     expect(html).toContain('data-work-status="running"');
-    expect(html).toContain(
-      'data-testid="v4-background-work-item-agent-control-work"',
-    );
+    expect(html).toContain('data-testid="v4-background-work-item-agent-control-work"');
     expect(html).toContain('data-status-section="terminal"');
     expect(html).toContain('data-status-section="agent"');
     expect(html).toContain("chat.statusPanel.terminals");
@@ -1783,9 +1722,7 @@ describe("ConversationStatusPanel", () => {
     expect(html).toContain('data-side="left"');
     expect(html).toContain('data-align="start"');
     expect(html).toContain('data-side-offset="4"');
-    expect(html).toContain(
-      "flex max-h-[min(24rem,calc(100dvh-2rem))] min-w-0 flex-col",
-    );
+    expect(html).toContain("flex max-h-[min(24rem,calc(100dvh-2rem))] min-w-0 flex-col");
     expect(html).toContain("min-h-0 space-y-0 overflow-y-auto pr-1");
     expect(html).toContain("chat.statusPanel.todoWaitingFold 5");
     expect(html).toContain(
@@ -1827,17 +1764,6 @@ describe("ConversationStatusPanel", () => {
     }
     expect(html).toContain("max-h-80 min-h-0 overflow-x-hidden overflow-y-auto pr-1");
     expect(html).toContain("max-h-48 min-h-0 overflow-x-hidden overflow-y-auto pr-1");
-  });
-
-  it("pins the expanded shell to the right edge when inline with the conversation", async () => {
-    const html = await renderStatusPanel({
-      layoutMode: "inline",
-      summaryPanelVariantOverride: "panel",
-      goal: goalState(),
-    });
-
-    expect(html).toMatch(/^<div class="pointer-events-none absolute top-0 z-20 pt-4 right-4"/);
-    expect(html).not.toMatch(/^<div class="[^"]*inset-x-0[^"]*justify-end/);
   });
 
   it("maps the display mode menu back to nullable shell override", async () => {

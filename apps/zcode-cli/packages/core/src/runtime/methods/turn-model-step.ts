@@ -1,4 +1,6 @@
+import type { ToolSearchExecutionContext } from "@zcode/contracts";
 import { getTurnTools } from "./turn-tool-visibility.js";
+import { isOffPeakUserTakeover, refreshOffPeakTurnAfterTakeover } from "../off-peak/turn.js";
 
 import { beginLocalTurnPreparation } from "@zcode/contracts";
 import {
@@ -102,6 +104,7 @@ export async function runModelBackedTurnStep(
     recordedMessages: RunModelTextRequestOptions["messages"];
     requestEntries: readonly RuntimeMessageEntry[];
     tools: ModelToolContract[];
+    toolSearch?: ToolSearchExecutionContext;
   },
 ): Promise<ModelStepResult> {
   const assistantMessageId = createMessageId();
@@ -147,6 +150,7 @@ async function runModelBackedTurnStepImpl(
     recordedMessages: RunModelTextRequestOptions["messages"];
     requestEntries: readonly RuntimeMessageEntry[];
     tools: ModelToolContract[];
+    toolSearch?: ToolSearchExecutionContext;
   },
   assistantMessageId: MessageId,
 ): Promise<ModelStepResult> {
@@ -215,6 +219,7 @@ async function runModelBackedTurnStepImpl(
   const streamingToolCoordinator = createStreamingToolCoordinator(this, state, {
     assistantMessageId,
     model,
+    toolSearch: options.toolSearch,
     traceContext: modelTraceContext,
   });
   const networkEventStartIndex = state.events.length;
@@ -264,6 +269,7 @@ async function runModelBackedTurnStepImpl(
       onStreamToolCall: (toolCall) => streamingToolCoordinator.accept(toolCall),
       streamRecovery: streamRecoveryRequest,
       tools: options.tools,
+      toolSearchEnabled: options.toolSearch?.mode === "native",
       traceContext: modelTraceContext,
     });
     throwIfTurnAborted(state.turnAbortSignal);
@@ -322,6 +328,30 @@ async function runModelBackedTurnStepImpl(
       if (state.toolCallCount > toolCallCountBeforeStreamRecovery) {
         completeOutputTokenRecovery(state.turnRequestState);
       }
+      return "continue";
+    }
+    if (
+      !state.turnAbortSignal.aborted &&
+      isOffPeakUserTakeover(error) &&
+      refreshOffPeakTurnAfterTakeover(this, state)
+    ) {
+      await streamingToolCoordinator.abandon("model_failed");
+      await this.persistAssistantMessage(
+        assistantMessageId,
+        state.userMessageId,
+        assistantCreatedAt,
+        {
+          completed: Date.now(),
+          finish: "off_peak_request_replaced",
+        },
+        modelTraceContext,
+        model,
+      );
+      state.modelResponse = "";
+      state.modelStepCount += 1;
+      recordModelHistoryRound(state);
+      state.turnMachine = new TurnMachineImpl(state.turnMachine.receiveModelResponse(""));
+      state.turnMachine = new TurnMachineImpl(state.turnMachine.aggregateResults());
       return "continue";
     }
     const admissionRetryDelayMs = getStartPlanBusyAdmissionRetryDelayMs({
@@ -688,7 +718,9 @@ async function runModelBackedTurnStepImpl(
     toolCallCount: toolCalls.length,
   });
 
-  const executableToolCalls = toolCalls.filter((toolCall) => !toolCall.providerExecuted);
+  const executableToolCalls = toolCalls
+    .filter((toolCall) => !toolCall.providerExecuted)
+    .map((toolCall) => streamingToolCoordinator.admit(toolCall));
   const streamedToolResults = await streamingToolCoordinator.drain(executableToolCalls);
   if (outputTokenContinuation !== "none") {
     // 首次命中 output-limit 时，当前 request 可能带有一次性的 project-memory attachment；
@@ -768,6 +800,7 @@ async function runModelBackedTurnStepImpl(
     recordModelHistoryRound(state);
   }
   const toolStepResult = await executeToolCallsForModelStep.call(this, state, {
+    toolSearch: options.toolSearch,
     assistantCreatedAt,
     assistantMessageId,
     modelTraceContext,
@@ -829,6 +862,7 @@ async function recoverModelStepAfterContextExceeded(
       rapidRefillCount: rapidRefill.consecutiveRapidRefills,
       model: state.model,
       turnRequestState: state.turnRequestState,
+      getContinuationTools: () => getTurnTools(this, state),
     },
   );
   if (compactOutcome !== "compacted") {

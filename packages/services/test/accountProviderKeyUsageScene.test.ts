@@ -88,7 +88,7 @@ function assertRequests(
     const authorization = new Headers(request.init?.headers).get("authorization");
     const expected =
       request.url.endsWith("/access_tokens") ||
-      (family === "zai" && (!team || request.url.endsWith("/getCustomerInfo")))
+      (family === "zai" && !team && request.url.endsWith("/api_keys"))
         ? "Bearer login-token"
         : "login-token";
     expect(authorization, request.url).toBe(expected);

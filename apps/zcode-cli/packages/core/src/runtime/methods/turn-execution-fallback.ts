@@ -1,6 +1,7 @@
 import {
   STREAM_RECOVERY_DISCARDED_ERROR_NAME,
   STREAM_RECOVERY_DISCARDED_FINISH,
+  ModelErrorCode,
   SessionEventType,
   TurnMachineImpl,
   traceContextToLogContext,
@@ -21,6 +22,10 @@ export interface ExecutionSelectionFallbackMatch {
   statusCode?: number;
 }
 
+export interface ExecutionSelectionCreationFallbackMatch {
+  reason: "highspeed_selection_unavailable";
+}
+
 export type ExecutionFallbackCandidateSource = "declared_target" | "session_selection";
 
 export interface ExecutionFallbackCandidate {
@@ -31,6 +36,30 @@ export interface ExecutionFallbackCandidate {
 export interface ExecutionSelectionFallbackResult {
   applied: boolean;
   settledAcceptedTools: boolean;
+}
+
+/**
+ * 纯匹配：execution-scoped Selection 在请求发出前无法解析时，退回声明目标继续本轮。
+ * Bug 根因：请求期退回只观察 adapter 归因；Provider/Model 从 Registry 消失会在 createTurnModel
+ * 阶段先失败，永远到不了该边界。这里只接收明确的 Registry 解析错误，不能吞掉配置或请求构造错误。
+ */
+export function matchExecutionSelectionCreationFallback(input: {
+  error: unknown;
+  selection: ModelSelection | undefined;
+  selectionFallback: ModelExecutionContext["selectionFallback"];
+  selectionScope: ModelExecutionContext["selectionScope"] | undefined;
+}): ExecutionSelectionCreationFallbackMatch | undefined {
+  const fallback = input.selectionFallback;
+  if (input.selectionScope !== "execution" || !input.selection || !fallback) return undefined;
+  if (input.selection.providerId !== fallback.providerId) return undefined;
+  const code =
+    typeof input.error === "object" && input.error !== null && "code" in input.error
+      ? (input.error as { code?: unknown }).code
+      : undefined;
+  if (code !== ModelErrorCode.ProviderNotFound && code !== ModelErrorCode.ModelNotFound) {
+    return undefined;
+  }
+  return { reason: "highspeed_selection_unavailable" };
 }
 
 /**
@@ -129,7 +158,8 @@ export async function applyExecutionSelectionFallback(
   };
   const executionProviderId = String(executionModelSelection.providerId);
   const declaredTarget = state.selectionFallback?.target;
-  const sessionSelection = runtime.getSessionModelSelection();
+  // 后续输入可能已更新 Session；旧加速轮只能读取启动时固定的普通选择。
+  const sessionSelection = state.highspeedFallbackSelection;
   // 退回请求走用户自己的常规鉴权，因此不再携带本次执行的 requestDependencies，重试预算也回到默认档。
   const candidates = resolveExecutionFallbackCandidates({
     declaredTarget,
@@ -190,6 +220,9 @@ export async function applyExecutionSelectionFallback(
         ...failureAttribution,
       },
     );
+    // 没有 fallback 事件可供 Renderer 退卡，整轮错误的 code 又是 provider 错误码；把“已归因且无处可退”
+    // 记在本轮状态上，TurnError 归因据此发布（spec §2.2 失败即退卡）。
+    state.highspeedFallbackUnavailable = true;
     return { applied: false, settledAcceptedTools };
   }
   const fallbackSelection = resolved.candidate.selection;

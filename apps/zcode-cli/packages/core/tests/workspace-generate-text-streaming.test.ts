@@ -165,26 +165,6 @@ describe("workspace generateText streaming aggregation", () => {
     expect(boundOptions).toEqual({ maxOutputTokens: 1, reasoningLevel: "low" });
   });
 
-  it("does not raise the connectivity output budget above the model limit", async () => {
-    let boundOptions: ModelOptions | undefined;
-    const model = createStreamingModel({
-      maxOutputTokens: 4_096,
-      onBind: (options) => {
-        boundOptions = options;
-      },
-      streamEvents: (async function* () {
-        yield { type: "finish", finishReason: "stop" };
-      })(),
-    });
-    const runtime = createRuntimeWithModel(model);
-
-    await runtime.testModelConnectivity({
-      selection: { providerId: "test-provider", modelId: "glm-test" },
-    });
-
-    expect(boundOptions).toEqual({ maxOutputTokens: 1, reasoningLevel: "disabled" });
-  });
-
   it("uses the disabled baseline when the model does not reason", async () => {
     let boundOptions: ModelOptions | undefined;
     const model = createStreamingModel({

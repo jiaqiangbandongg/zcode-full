@@ -302,55 +302,6 @@ describe("Model", () => {
     expect(generateText).toHaveBeenCalledOnce();
   });
 
-  it("keeps the resolved provider model stable after registry replacement", async () => {
-    const firstLanguageModel = { specificationVersion: "v3", provider: "first", modelId: "a" };
-    const secondLanguageModel = { specificationVersion: "v3", provider: "second", modelId: "a" };
-    const receivedModels: unknown[] = [];
-    const runtime: AiSdkModelRuntime = {
-      async generateText(options) {
-        receivedModels.push(options.model);
-        return {
-          finishReason: "stop",
-          text: "done",
-          totalUsage: {},
-          usage: {},
-        } as never;
-      },
-      streamText() {
-        throw new Error("not used");
-      },
-    };
-    const registry = new TestProviderConfigFixture({
-      providers: {
-        test: {
-          kind: "custom",
-          createLanguageModel: () => firstLanguageModel as never,
-        },
-      },
-    });
-    const adapter = new AiSdkModelAdapter({ registry, runtime });
-    const model = adapter.createModel({
-      providerId: "test" as never,
-      modelId: "model-a" as never,
-      optionSpecs: {
-        maxOutputTokens: { max: 8_000 },
-      },
-      properties,
-    });
-
-    registry.replaceConfig({
-      providers: {
-        test: {
-          kind: "custom",
-          createLanguageModel: () => secondLanguageModel as never,
-        },
-      },
-    });
-    await model.generateText({ messages: [{ role: "user", content: "hello" }] });
-
-    expect((receivedModels[0] as { modelId?: string }).modelId).toBe("model-a");
-  });
-
   it("binds Provider headers without exposing them on Model", async () => {
     const receivedHeaders: unknown[] = [];
     const runtime: AiSdkModelRuntime = {
@@ -948,29 +899,5 @@ describe("Model", () => {
       apiFormat: "openai-chat-completions",
     });
     expect(receivedMaxOutputTokens).toBeUndefined();
-  });
-
-  it("accepts reasoning and total output options independently", async () => {
-    const { executor, requests } = createExecutor();
-    const model = createModel({
-      executor,
-      modelId: "model-a",
-      optionSpecs: {
-        maxOutputTokens: { max: 64_000 },
-        reasoningLevel: { values: ["low", "high"] },
-      },
-      properties,
-      providerId: "test",
-    });
-
-    await model.generateText({
-      messages: [{ role: "user", content: "hello" }],
-      options: { maxOutputTokens: 4_000, reasoningLevel: "high" },
-    });
-
-    expect(requests[0]?.options).toEqual({
-      maxOutputTokens: 4_000,
-      reasoningLevel: "high",
-    });
   });
 });

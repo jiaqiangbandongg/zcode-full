@@ -30,6 +30,9 @@ describe("desktop e2e beforeSession setup", () => {
         events.push("coding-plan-team");
       },
       configureCodingPlanTeamMockForSpecs,
+      startCodingPlanDataPlaneProxyIfNeeded: async () => {
+        events.push("coding-plan-data-plane");
+      },
       startCodingPlanUpgradeMockIfNeeded: async () => {
         events.push("coding-plan-upgrade");
       },
@@ -54,6 +57,7 @@ describe("desktop e2e beforeSession setup", () => {
       "coding-plan-team",
       "coding-plan-case-mode",
       "upstream-http",
+      "coding-plan-data-plane",
       "coding-plan-upgrade",
       "plugin-cdn",
       "off-peak-mock",

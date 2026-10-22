@@ -7,7 +7,7 @@ import {
   TID_BROWSER_MORE_BUTTON,
   TID_BROWSER_OPEN_EXTERNAL_ITEM,
   TID_BROWSER_REFRESH_BUTTON,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clickTestIdByWebDriver } from "./helpers/desktop-app.js";
 import { openFirstBrowserTab } from "./helpers/browser-side-pane.js";
 import { prepareConversationE2E } from "./helpers/conversation-session.js";

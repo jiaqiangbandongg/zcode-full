@@ -48,7 +48,7 @@ vi.mock("@/prompt-editor/usePromptEditorDragState.js", () => ({
   }),
 }));
 
-describe("ChatPromptEditor action order", () => {
+describe("ChatPromptEditor action menu", () => {
   it("passes side chat command exclusions to the action menu", () => {
     const html = renderToStaticMarkup(
       createElement(ChatPromptEditor, {
@@ -62,25 +62,35 @@ describe("ChatPromptEditor action order", () => {
     );
     expect(html).toContain('data-excluded="goal"');
   });
-  it("renders the + action menu before the permission mode selector", () => {
-    const html = renderToStaticMarkup(
-      createElement(ChatPromptEditor, {
-        workspacePath: "/tmp/workspace",
-        taskId: "session-1",
-        submitLabel: "Send",
-        showMentionButton: true,
-        leadingActions: createElement("span", {
-          "data-testid": "permission-mode-selector",
+
+  // Side Pane 完整视图浮窗：[+] 输入区 [控件][发送] 排成一行（docs/ui/side-pane-full-view.md）。
+  it("moves the action menu before the editor only in the inline layout", () => {
+    const render = (layout: "stacked" | "inline") =>
+      renderToStaticMarkup(
+        createElement(ChatPromptEditor, {
+          workspacePath: "/tmp/workspace",
+          taskId: null,
+          submitLabel: "Send",
+          showMentionButton: true,
+          layout,
+          onSubmit: vi.fn(),
         }),
-        onSubmit: vi.fn(),
-      }),
-    );
+      );
+    const order = (html: string) =>
+      ["composer-action-menu", "lexical-input", "data-composer-leading-content"].map((marker) =>
+        html.indexOf(marker),
+      );
 
-    const actionMenuIndex = html.indexOf('data-testid="composer-action-menu"');
-    const permissionModeIndex = html.indexOf('data-testid="permission-mode-selector"');
+    const inline = render("inline");
+    expect(inline).toContain('data-composer-layout="inline"');
+    const [inlineMenu, inlineEditor, inlineToolbar] = order(inline);
+    expect(inlineMenu).toBeLessThan(inlineEditor);
+    expect(inlineEditor).toBeLessThan(inlineToolbar);
 
-    expect(actionMenuIndex).toBeGreaterThanOrEqual(0);
-    expect(permissionModeIndex).toBeGreaterThanOrEqual(0);
-    expect(actionMenuIndex).toBeLessThan(permissionModeIndex);
+    const stacked = render("stacked");
+    expect(stacked).toContain('data-composer-layout="stacked"');
+    const [stackedMenu, stackedEditor, stackedToolbar] = order(stacked);
+    expect(stackedEditor).toBeLessThan(stackedToolbar);
+    expect(stackedToolbar).toBeLessThan(stackedMenu);
   });
 });

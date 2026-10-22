@@ -126,8 +126,9 @@ settings.get
 
 - 只在 Desktop 主窗口的本地 `desktop-continuous` 恢复链路启用 active-first。Web、手机
   `web-remote-replayable`、不恢复会话的次级窗口维持现状。
-- active workspace 的选择继续复用 `resolveStartupLocalWorkspaceSessionIndex`：持久化 active 为
-  断连 remote 时仍选择可用 local workspace；不改变远程自动重连禁用语义。
+- Renderer 按 `lastActiveTabIndex` 恢复上次激活项目，包括断连 remote。
+  `resolveStartupLocalWorkspaceSessionIndex` 只决定 Main 的本地预热目标，允许与 Renderer
+  激活项目不同；不改变远程自动重连禁用语义。
 - inactive 补齐必须是 merge，不得重建已经恢复的 active tab，不得抢焦点，也不得覆盖补齐前
   用户新开的 settings/workspace tab。
 - active-only 是瞬态投影，不是新的持久化事实。inactive 补齐完成或失败前，tab persistence

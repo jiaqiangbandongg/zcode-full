@@ -26,18 +26,6 @@ function fixedSource(id: string, role: ProcessRoleSample["role"]): ProcessResour
 }
 
 describe("processResourceSampleSources", () => {
-  it("按注册表顺序采集全部来源的样本", () => {
-    const samples: ProcessRoleSample[] = [];
-    runProcessResourceSampleSources([fixedSource("a", "main"), fixedSource("b", "host")], {
-      now: 0,
-      addRoleSample: (sample) => samples.push(sample),
-      addRoleHeapSample: () => {},
-      addAppProcessTotals: () => {},
-    });
-
-    expect(samples.map((sample) => sample.role)).toEqual(["main", "host"]);
-  });
-
   it("新增一个来源不改变已有来源的产出", () => {
     const existing = fixedSource("existing", "main");
     const before: ProcessRoleSample[] = [];

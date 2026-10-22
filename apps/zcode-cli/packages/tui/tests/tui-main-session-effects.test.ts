@@ -118,13 +118,6 @@ test("actor submit_result / tool_call_* create no transcript parts and no status
   assert.deepEqual(h.state.lastEvents, []);
 });
 
-test("actor model_streaming and assistant_message never reach the transcript", () => {
-  const h = harness();
-  h.apply(event(ACTOR, SessionEventType.ModelStreaming, { delta: "half a thought" }));
-  h.apply(event(ACTOR, SessionEventType.AssistantMessage, { content: "actor prose" }));
-  assert.deepEqual(h.state.messages, []);
-});
-
 test("actor turn lifecycle events do not touch the main status line", () => {
   const h = harness();
   h.apply(event(ACTOR, SessionEventType.TurnStarted, {}));
@@ -182,12 +175,12 @@ test("the actor gate does not depend on event kind — only on session", () => {
 
 // ── 闸门与去重的组合 ──
 
-test("the gate runs before dedup, so actor events never consume dedup slots", () => {
+test("drops actor events and deduplicates repeated main events", () => {
   const h = harness();
   const actorEvent = event(ACTOR, SessionEventType.AssistantMessage, { content: "noise" });
   h.apply(actorEvent);
   h.apply(actorEvent);
-  // 主会话事件仍照常去重（第一条应用、第二条丢弃），证明窗口没被 actor 事件搅乱。
+  // 同一主会话事件重复投递时只应用一次。
   const mainEvent = event(MAIN, SessionEventType.AssistantMessage, { content: "signal" });
   assert.equal(h.apply(mainEvent), true);
   assert.equal(h.apply(mainEvent), false);

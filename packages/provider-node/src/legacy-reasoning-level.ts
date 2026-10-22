@@ -34,15 +34,21 @@ export function resolveLegacyReasoningLevel(
   if (!oldRules) {
     oldRules = new ModelConfigRules(
       builtin.rules().map((rule) => {
-        // 必须是已裁决的原始无站点/无 API 限制规则；新增同名站点规则不能误继承旧别名。
+        // matcher 简化会改变字符串身份：同时认旧缓存和新选择器，但恢复范围仍用历史 matcher。
+        // 否则老选择会失效，或把新放宽的后缀误认成曾经支持 off/nothink 的型号。
         const rename =
           rule.type === "model"
-            ? renames.find((entry) => entry.modelMatch === rule.modelMatch)
+            ? renames.find(
+                (entry) =>
+                  entry.modelMatch === rule.modelMatch ||
+                  entry.simplifiedModelMatch === rule.modelMatch,
+              )
             : undefined;
         const values = rule.config.optionSpecs?.reasoningLevel?.values;
         return rename && values?.includes("disabled")
           ? {
               ...rule,
+              modelMatch: rename.modelMatch,
               config: rule.config.overlay(
                 new ModelConfig({
                   optionSpecs: new ModelOptionSpecsConfig({

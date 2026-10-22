@@ -2,6 +2,13 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  ModelConfigRules,
+  ProviderConfigMap,
+  ProviderConfigResolver,
+  ProviderRegistry,
+} from "@zcode/provider";
+import { decodeProviderConfigFile } from "@zcode/provider-node";
 
 describe("custom OpenAI Provider E2E seed", () => {
   afterEach(() => {
@@ -31,6 +38,22 @@ describe("custom OpenAI Provider E2E seed", () => {
     const personalConfig = JSON.parse(
       await readFile(join(homeDir, ".zcode", "v2", "provider_config.json"), "utf-8"),
     ) as { config: { modelConfigRules: unknown } };
+    const personal = decodeProviderConfigFile(personalConfig);
+    const resolved = new ProviderConfigResolver().resolve({
+      zcodeBuiltinProviders: new ProviderConfigMap(),
+      accountProviders: new ProviderConfigMap(),
+      zcodeBuiltinModelRules: new ModelConfigRules(),
+      personalProviders: personal.providers,
+      personalModels: personal.models,
+    });
+    expect(resolved.issues).toEqual([]);
+    expect(
+      new ProviderRegistry(resolved.registryProviders).validateSelection({
+        providerId: "e2e-openai",
+        modelId: "e2e-model",
+        options: { reasoningLevel: "disabled" },
+      }),
+    ).toEqual({ ok: true });
     expect(personalConfig).toMatchObject({
       schemaVersion: 1,
       config: {
@@ -92,6 +115,39 @@ describe("custom OpenAI Provider E2E seed", () => {
         ],
       }),
     ]);
+  });
+
+  it("E2E 观察保留 Coding Plan API Key，而不把已保存凭据投影为空", async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), "zcode-provider-key-read-"));
+    vi.stubEnv("ZCODE_E2E_HOME_DIR", homeDir);
+    await writeFileWithParents(
+      join(homeDir, ".zcode", "v2", "provider_config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        config: {
+          providerConfigRules: {
+            providerRules: [
+              {
+                providerId: "example-plan",
+                templateId: "example-template",
+                providerName: "Example Plan",
+                config: {
+                  group: "standard-personal",
+                  access: { type: "zhipu-coding-plan-api-key", apiKey: "e2e-plan-key" },
+                  personalModelIds: [],
+                },
+              },
+            ],
+          },
+          modelConfigRules: { providerModelRules: [], manualProviderModelRules: [] },
+        },
+      }),
+    );
+    const { readModelProvider } = await import("./e2e/helpers/desktop-app.js");
+    expect(await readModelProvider("example-plan")).toMatchObject({
+      id: "example-plan",
+      apiKey: "e2e-plan-key",
+    });
   });
 
   it("E2E 诊断不再读取旧 Provider Store", async () => {

@@ -149,6 +149,73 @@ describe("skillStore", () => {
     expect(useSkillStore.getState().skills[0]?.name).toBe("code-review");
   });
 
+  it("相同路径的不同 Source service 不复用 in-flight 请求", async () => {
+    let resolveFirst: ((value: Awaited<ReturnType<ISkillsService["list"]>>) => void) | null = null;
+    const firstList = vi.fn<ISkillsService["list"]>(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    const secondList = vi.fn<ISkillsService["list"]>(async () => ({
+      skills: [],
+      capability: { userScopeAvailable: true },
+      diagnostics: [],
+    }));
+    const workspacePath = "/root";
+
+    const first = useSkillStore
+      .getState()
+      .initialize(workspacePath, createSkillsServiceMock({ list: firstList }));
+    const second = useSkillStore
+      .getState()
+      .initialize(workspacePath, createSkillsServiceMock({ list: secondList }));
+
+    expect(firstList).toHaveBeenCalledOnce();
+    expect(secondList).toHaveBeenCalledOnce();
+    resolveFirst?.({ skills: [], capability: { userScopeAvailable: true }, diagnostics: [] });
+    await Promise.all([first, second]);
+  });
+
+  it("相同路径切换 Source authority 时不会复用上一份技能内容", async () => {
+    const workspacePath = "/root";
+    const oldSkill = {
+      id: "old",
+      name: "old-source",
+      description: "old",
+      body: "old",
+      path: "/old/SKILL.md",
+      scope: "user" as const,
+      enabled: true,
+    };
+    const firstService = createSkillsServiceMock({
+      list: vi.fn(async () => ({
+        skills: [oldSkill],
+        capability: { userScopeAvailable: true },
+        diagnostics: [],
+      })),
+    });
+    await useSkillStore.getState().initialize(workspacePath, firstService);
+    let resolveSecond!: (value: Awaited<ReturnType<ISkillsService["list"]>>) => void;
+    const secondService = createSkillsServiceMock({
+      list: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      ),
+    });
+
+    const loadingSecond = useSkillStore.getState().initialize(workspacePath, secondService);
+    expect(useSkillStore.getState().skills).toEqual([]);
+    resolveSecond({
+      skills: [],
+      capability: { userScopeAvailable: true },
+      diagnostics: [],
+    });
+    await loadingSecond;
+  });
+
   it("切换 legacy provider 时会归一到 ZCode Agent 并清理上一套缓存", async () => {
     let resolveList: ((value: Awaited<ReturnType<ISkillsService["list"]>>) => void) | null = null;
     const list = vi.fn<ISkillsService["list"]>(
@@ -207,5 +274,4 @@ describe("skillStore", () => {
     expect(useSkillStore.getState().loadedProvider).toBe("glm");
     expect(useSkillStore.getState().skills.map((skill) => skill.name)).toEqual(["code-review"]);
   });
-
 });

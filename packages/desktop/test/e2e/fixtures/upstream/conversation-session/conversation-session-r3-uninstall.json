@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-uninstall",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-uninstall.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-uninstall-title",
+      "description": "卸载重装任务的标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_UNINSTALL"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-account-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH directory resilience\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-account-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "r3-uninstall-main",
+      "description": "卸载前首发与保留身份重装后的续聊响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "创建真实任务，验证保留数据卸载重装后原设备历史可见且可续聊；独立环境替换时旧任务保留在封存环境。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_R3_UNINSTALL_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-account-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"R3_UNINSTALL_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-account-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

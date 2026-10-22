@@ -1,15 +1,41 @@
 {
   "name": "documents",
-  "version": "0.1.8",
-  "description": "DOCX document production skills, published as an official ZCode plugin.",
+  "version": "0.2.0",
+  "description": "DOCX document production skills and a Word viewer panel, published as an official ZCode plugin.",
   "description_i18n": {
-    "en": "Word document production skills for DOCX: create, edit, format, review, and comment.",
-    "zh-CN": "面向 DOCX 的 Word 文档制作技能：创建、编辑、排版、审阅与批注。"
+    "en": "Word document production skills for DOCX: create, edit, format, review, and comment. View Word files in a side panel: reference passages in chat, and the agent can read, search, point at and capture them.",
+    "zh-CN": "面向 DOCX 的 Word 文档制作技能：创建、编辑、排版、审阅与批注；并可在侧栏查看 Word 文件，把内容引用到对话，Agent 可以阅读、搜索、定位高亮并截取画面。"
   },
   "author": {
     "name": "Z.ai"
   },
   "license": "Apache-2.0",
   "skills": "skills",
-  "agents": "agents"
+  "agents": "agents",
+  "mcpServers": {
+    "documents": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/server.mjs"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "env": {
+        "ZCODE_WORKSPACE_ROOT": "${ZCODE_PROJECT_DIR}"
+      }
+    }
+  },
+  "ui": {
+    "surfaces": [
+      {
+        "id": "documents",
+        "title": {
+          "zh-CN": "Word 文档",
+          "en-US": "Documents"
+        },
+        "icon": "file-text",
+        "server": "documents",
+        "resourceUri": "ui://documents/panel.html",
+        "availability": "session"
+      }
+    ]
+  }
 }

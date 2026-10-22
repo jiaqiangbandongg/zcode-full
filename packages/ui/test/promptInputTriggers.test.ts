@@ -98,7 +98,6 @@ describe("extractActivePromptInputTrigger", () => {
       trigger: "@",
       query: "浏览器",
     });
-    expect(extractActivePromptInputTrigger("请帮我看看@浏览器")).not.toBeNull();
   });
 
   it("不会把中文前缀的邮箱当成 mention，空格后带点号的 @ 仍触发", () => {

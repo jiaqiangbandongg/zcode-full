@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createNodeExecutionAdapter } from "@zcode/adapters/exec";
 import { createNodeFileSystemAdapter } from "@zcode/adapters/fs";
 import { createJimpImageProcessorAdapter } from "@zcode/adapters/image";
-import { AiSdkModelAdapter, AiSdkModelRegistry } from "@zcode/adapters/model";
+import { createPdfProviderFixture } from "./helpers/pdf-provider-fixture.js";
 import { createPopplerPdfDocumentAdapter } from "@zcode/adapters/pdf";
 import {
   createInMemorySessionEventStore,
@@ -47,22 +47,20 @@ describe("Read PDF provider and cold-resume E2E", () => {
       rootDir: join(root, "artifacts"),
       videoCacheRootDir: join(root, "video-cache"),
     };
-    const liveStore = createSqliteSessionStore({ dbPath: databasePath });
+    const liveStore = await createSqliteSessionStore({ dbPath: databasePath });
     let liveStoreClosed = false;
-    let resumedStore: ReturnType<typeof createSqliteSessionStore> | undefined;
+    let resumedStore: Awaited<ReturnType<typeof createSqliteSessionStore>> | undefined;
     let liveRuntime: AgentRuntime | undefined;
     let resumedRuntime: AgentRuntime | undefined;
 
     const createRuntime = (
-      sessionStore: ReturnType<typeof createSqliteSessionStore>,
+      sessionStore: Awaited<ReturnType<typeof createSqliteSessionStore>>,
     ): AgentRuntime =>
       new AgentRuntime(
         sessionId,
         {
           mode: "yolo",
-          modelInputMediaCapabilities: { supportsImages: true, supportsPdf: true },
-          modelProviderOptions: { apiFormat: "openai-chat-completions" },
-          modelRef: CHAT_MODEL,
+          modelSelection: { ...CHAT_MODEL, options: { reasoningLevel: "disabled" } },
           modelStreaming: "off",
           workingDirectory: root,
         },
@@ -71,7 +69,9 @@ describe("Read PDF provider and cold-resume E2E", () => {
           eventStore: createInMemorySessionEventStore(),
           fileSystemPort: createNodeFileSystemAdapter(),
           imageProcessorPort: passthroughImageProcessor,
-          modelAdapter: createChatModelAdapter(capture.baseURL),
+          modelFactory: createPdfProviderFixture(capture.baseURL, CHAT_MODEL.providerId, [
+            { modelId: CHAT_MODEL.modelId, supportsPdf: true },
+          ]).modelFactory,
           pdfDocumentPort: deterministicPdfDocument,
           sessionStore,
         },
@@ -89,7 +89,7 @@ describe("Read PDF provider and cold-resume E2E", () => {
       liveRuntime.beginShutdown();
       liveStore.close();
       liveStoreClosed = true;
-      resumedStore = createSqliteSessionStore({ dbPath: databasePath });
+      resumedStore = await createSqliteSessionStore({ dbPath: databasePath });
       resumedRuntime = createRuntime(resumedStore);
       await resumedRuntime.resumeFromStore();
       await resumedRuntime.executeTurn("Continue after cold resume.");
@@ -126,7 +126,6 @@ describe.skipIf(!popplerAvailable)("Read PDF Poppler E2E", () => {
         sessionId,
         {
           mode: "yolo",
-          modelInputMediaCapabilities: { supportsImages: true, supportsPdf: true },
           workingDirectory: root,
         },
         {
@@ -140,7 +139,7 @@ describe.skipIf(!popplerAvailable)("Read PDF Poppler E2E", () => {
       const model = {
         providerId: createModelProviderId("test"),
         modelId: createModelId("pdf-e2e"),
-        properties: { supportsImages: true, supportsPdf: true },
+        properties: { inputFormat: { supportsImage: true, supportsPdf: true } },
       } as never;
 
       const readTool = runtime.getTools(model).find((tool) => tool.name === "Read")!;
@@ -181,28 +180,6 @@ describe.skipIf(!popplerAvailable)("Read PDF Poppler E2E", () => {
 async function commandSucceeds(command: string, args: string[]): Promise<boolean> {
   return await new Promise((resolve) => {
     execFile(command, args, { timeout: 5_000 }, (error) => resolve(error === null));
-  });
-}
-
-function createChatModelAdapter(baseURL: string): AiSdkModelAdapter {
-  const providerId = String(CHAT_MODEL.providerId);
-  const modelId = String(CHAT_MODEL.modelId);
-  return new AiSdkModelAdapter({
-    registry: new AiSdkModelRegistry({
-      env: {},
-      inputMediaCapabilities: {
-        [`${providerId}/${modelId}`]: { supportsImages: true, supportsPdf: true },
-      },
-      providers: {
-        [providerId]: {
-          apiKey: "pdf-e2e-key",
-          baseURL: `${baseURL}/v1`,
-          kind: "openai-compatible",
-          providerOptions: { apiFormat: "openai-chat-completions" },
-        },
-      },
-    }),
-    retry: { maxAttempts: 1 },
   });
 }
 

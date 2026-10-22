@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-mobile",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-mobile.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-mob-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 8,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_MOBILE"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mob-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 mobile\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-mob-slow",
+      "description": "手机断网期间桌面独立持续、完成后手机恢复回放",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "手机离线15秒仍保持桌面流；显式释放后桌面完成，手机恢复才 replay 最终独立标记。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_MOBILE_SLOW"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"r3-mob-slow\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_MOBILE_STREAMING \"}}\n\n"
+          },
+          {
+            "offsetMs": 600,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_MOBILE_STREAM_DONE\"}}\n\n"
+          },
+          {
+            "offsetMs": 700,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 800,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":80,\"output_tokens\":4,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 900,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "releaseAfterChunks": 3
+      }
+    },
+    {
+      "id": "r3-mob-from-mobile",
+      "description": "手机运行时桌面输入排队，释放手机回合后按FIFO消费",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "controlled-stream",
+        "source": "synthetic",
+        "syntheticReason": "用闸门保证桌面输入发生在手机回合running窗口内，验证统一队列。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_MOBILE_FROM_MOBILE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "cache-control": "no-cache",
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "chunks": [
+          {
+            "offsetMs": 0,
+            "text": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"r3-mob-from-mobile\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"service_tier\":\"standard\"}}}\n\n"
+          },
+          {
+            "offsetMs": 250,
+            "text": "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+          },
+          {
+            "offsetMs": 500,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_MOBILE_FROM_MOBILE_RUNNING \"}}\n\n"
+          },
+          {
+            "offsetMs": 600,
+            "text": "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"R3_MOBILE_FROM_MOBILE_REPLY\"}}\n\n"
+          },
+          {
+            "offsetMs": 700,
+            "text": "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+          },
+          {
+            "offsetMs": 800,
+            "text": "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":80,\"output_tokens\":4,\"service_tier\":\"standard\"}}\n\n"
+          },
+          {
+            "offsetMs": 900,
+            "text": "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+          }
+        ],
+        "releaseAfterChunks": 3
+      }
+    },
+    {
+      "id": "r3-mob-from-desktop",
+      "description": "桌面排队回合的独立完成标记",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "区分两端输入的实际回复，防止旧首发回复使断言提前通过。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_R3_MOBILE_FROM_DESKTOP"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mob-from-desktop",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_MOBILE_FROM_DESKTOP_REPLY"
+        }
+      }
+    },
+    {
+      "id": "r3-mob-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_MOBILE_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-mob-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_MOBILE_REPLY"
+        }
+      }
+    }
+  ]
+}

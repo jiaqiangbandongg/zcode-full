@@ -202,6 +202,7 @@ export default defineConfig(({ mode }) => {
     server: { port: 5174, strictPort: true },
     define: {
       __ZCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
+      __ZCODE_MIN_COMPATIBLE_VERSION__: JSON.stringify(buildMetadata.minCompatibleVersion),
       __ZCODE_COMMIT__: JSON.stringify(buildMetadata.buildCommitId),
       __ZCODE_BUILD_TIME__: JSON.stringify(buildMetadata.buildTime),
       __ZCODE_ENV__: JSON.stringify(zcodeEnv),

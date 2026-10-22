@@ -1,13 +1,11 @@
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  STARTUP_AGENT_WARMUP_LIMIT,
   createOpenWorkspaceStartupBootstrap,
-  resolveStartupAgentWarmupTargets,
   resolveStartupWindowBootstrap,
-  resolveStartupWorkspacePath,
 } from "../src/main/startupWorkspace.js";
 
 const tempDirs: string[] = [];
@@ -28,24 +26,38 @@ afterEach(() => {
 });
 
 describe("startup workspace", () => {
+  it("新版 main 只预热活动 cwd，不读旧会话列表或 recent 项目", async () => {
+    const root = makeTempDir("zcode-startup-active-");
+    const selected = join(root, "selected");
+    mkdirSync(selected);
+    const settingsFile = join(root, "setting.json");
+    writeFileSync(
+      settingsFile,
+      JSON.stringify({
+        lastActiveWorkspace: {
+          kind: "local",
+          workspacePath: selected,
+          workspacePurpose: "conversation",
+        },
+        lastWorkspaceSession: [{ kind: "local", workspacePath: "/deleted" }],
+        recentProjects: ["/legacy-recent"],
+      }),
+    );
+    expect(
+      await resolveStartupWindowBootstrap({
+        settingsFile,
+        conversationWorkspaceDir: join(root, "default"),
+      }),
+    ).toEqual({
+      agentWarmupTargets: [{ workspacePath: selected }],
+    });
+  });
   it("open-workspace 冷启动目录同时作为首窗初始 workspace 和 agent 预热目标", () => {
     expect(createOpenWorkspaceStartupBootstrap("C:\\Users\\demo\\Project A")).toEqual({
       initialWorkspacePath: "C:\\Users\\demo\\Project A",
       initialWorkspacePurpose: "project",
       agentWarmupTargets: [{ workspacePath: "C:\\Users\\demo\\Project A" }],
     });
-  });
-
-  it("启动预热只选 active workspace，recentProjects 不再补位", () => {
-    const settings = {
-      recentProjects: ["/repo/a", "/repo/b", "/repo/c", "/repo/d", "/repo/e"],
-      locale: "zh-CN" as const,
-    };
-
-    expect(resolveStartupAgentWarmupTargets(settings, { workspacePath: "/repo/c" })).toEqual([
-      { workspacePath: "/repo/c" },
-    ]);
-    expect(STARTUP_AGENT_WARMUP_LIMIT).toBe(1);
   });
 
   it("有可恢复会话时不覆盖成默认项目", async () => {
@@ -72,10 +84,10 @@ describe("startup workspace", () => {
     );
 
     await expect(
-      resolveStartupWorkspacePath({
+      resolveStartupWindowBootstrap({
         settingsFile,
         conversationWorkspaceDir,
-      }),
+      }).then((bootstrap) => bootstrap.initialWorkspacePath),
     ).resolves.toBeUndefined();
     expect(existsSync(conversationWorkspaceDir)).toBe(false);
   });
@@ -287,32 +299,66 @@ describe("startup workspace", () => {
     },
   );
 
-  it("active 为远端时不校验本地目录也不创建 conversation workspace", async () => {
-    const rootDir = makeTempDir("zcode-startup-workspace-");
+  it.each(["active", "legacy"])(
+    "远程活动项（%s）先准备本机存储 cwd，保持远程导航且不创建远程项目路径",
+    async (format) => {
+      const rootDir = makeTempDir("zcode-startup-remote-");
+      const settingsFile = join(rootDir, "setting.json");
+      const conversationWorkspaceDir = join(rootDir, "new-data", ".zcode", "workspace", "default");
+      const remotePath = join(rootDir, "remote-only-project");
+      const entry = {
+        kind: "remote",
+        workspacePath: remotePath,
+        workspaceIdentity: `remote:server:source-1:${remotePath}`,
+        target: { kind: "ssh", host: "dev.example.com", username: "dev" },
+        lastOpenedAt: 1,
+        lastConnectionStatus: "connected",
+      };
+      await writeFile(
+        settingsFile,
+        JSON.stringify(
+          format === "active"
+            ? { lastActiveWorkspace: entry }
+            : { lastWorkspaceSession: [entry], lastActiveTabIndex: 0 },
+        ),
+      );
+      await expect(
+        resolveStartupWindowBootstrap({ settingsFile, conversationWorkspaceDir }),
+      ).resolves.toEqual({});
+      expect((await stat(conversationWorkspaceDir)).isDirectory()).toBe(true);
+      await expect(stat(remotePath)).rejects.toMatchObject({ code: "ENOENT" });
+      // 目录准备是幂等的，不覆盖既有文件，也不把备用 cwd 变成活动项目。
+      const canary = join(conversationWorkspaceDir, "keep.txt");
+      await writeFile(canary, "existing data");
+      await expect(
+        resolveStartupWindowBootstrap({ settingsFile, conversationWorkspaceDir }),
+      ).resolves.toEqual({});
+      expect(await readFile(canary, "utf8")).toBe("existing data");
+    },
+  );
+
+  it("远程活动项的存储 cwd 无法创建时明确失败，不返回虚假的启动就绪", async () => {
+    const rootDir = makeTempDir("zcode-startup-remote-blocked-");
     const settingsFile = join(rootDir, "setting.json");
-    const conversationWorkspaceDir = join(rootDir, ".zcode", "workspace", "default");
-    writeFileSync(
+    const conversationWorkspaceDir = join(rootDir, "default");
+    await writeFile(conversationWorkspaceDir, "existing file");
+    await writeFile(
       settingsFile,
       JSON.stringify({
-        lastWorkspaceSession: [
-          {
-            kind: "remote",
-            workspacePath: "/missing/on-local-machine",
-            workspaceIdentity: "remote:ssh:dev:/missing/on-local-machine",
-            target: { kind: "ssh", host: "dev", username: "dev" },
-            lastOpenedAt: 1,
-            lastConnectionStatus: "connected",
-          },
-        ],
-        lastActiveTabIndex: 0,
+        lastActiveWorkspace: {
+          kind: "remote",
+          workspacePath: "/srv/project",
+          workspaceIdentity: "remote:server:source-1:/srv/project",
+          target: { kind: "ssh", host: "dev.example.com", username: "dev" },
+          lastOpenedAt: 1,
+          lastConnectionStatus: "connected",
+        },
       }),
-      "utf-8",
     );
-
     await expect(
       resolveStartupWindowBootstrap({ settingsFile, conversationWorkspaceDir }),
-    ).resolves.toEqual({});
-    expect(existsSync(conversationWorkspaceDir)).toBe(false);
+    ).rejects.toThrow();
+    expect(await readFile(conversationWorkspaceDir, "utf8")).toBe("existing file");
   });
 
   it("仅 active 本地 workspace 参与可用性校验", async () => {
@@ -357,10 +403,10 @@ describe("startup workspace", () => {
     );
 
     await expect(
-      resolveStartupWorkspacePath({
+      resolveStartupWindowBootstrap({
         settingsFile,
         conversationWorkspaceDir,
-      }),
+      }).then((bootstrap) => bootstrap.initialWorkspacePath),
     ).resolves.toBe(conversationWorkspaceDir);
     expect(existsSync(conversationWorkspaceDir)).toBe(true);
   });

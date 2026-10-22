@@ -5,7 +5,6 @@ import {
   createQueuePair,
   MessagePortProtocol,
   ProtocolMessageType,
-  type ConnectionFlowControl,
   type ISocket,
   type MessagePortLike,
   type MessagePortPayload,
@@ -90,16 +89,6 @@ function lastWrittenType(socket: FakeSocket): ProtocolMessageType {
 }
 
 describe("PersistentProtocol 拥塞信号（补丁 1）", () => {
-  it("结构上满足公共只读 ConnectionFlowControl", () => {
-    const socket = new FakeSocket();
-    const protocol: ConnectionFlowControl = new PersistentProtocol(socket);
-
-    expect(protocol.unacknowledgedBytes).toBe(0);
-    expect(protocol.onSaturated).toBeTypeOf("function");
-    expect(protocol.onDrained).toBeTypeOf("function");
-    (protocol as PersistentProtocol).dispose();
-  });
-
   it("unacknowledgedBytes 随 send 增长、随 ACK 回落", () => {
     const socket = new FakeSocket();
     const protocol = new PersistentProtocol(socket);
@@ -197,15 +186,6 @@ describe("PersistentProtocol 重放缓冲有界（补丁 2）", () => {
 });
 
 describe("createQueuePair", () => {
-  it("should deliver messages between protocol pair", async () => {
-    const [a, b] = createQueuePair();
-
-    const messagePromise = Event.toPromise(b.onMessage);
-    a.send(VSBuffer.fromString("hello from A"));
-    const received = await messagePromise;
-    expect(received.toString()).toBe("hello from A");
-  });
-
   it("should work bidirectionally", async () => {
     const [a, b] = createQueuePair();
 
@@ -225,11 +205,17 @@ class FakeMessagePort implements MessagePortLike {
   peer?: FakeMessagePort;
   readonly posted: unknown[] = [];
 
-  addEventListener(_type: "message", listener: (event: { data: MessagePortPayload }) => void): void {
+  addEventListener(
+    _type: "message",
+    listener: (event: { data: MessagePortPayload }) => void,
+  ): void {
     this.listeners.add(listener);
   }
 
-  removeEventListener(_type: "message", listener: (event: { data: MessagePortPayload }) => void): void {
+  removeEventListener(
+    _type: "message",
+    listener: (event: { data: MessagePortPayload }) => void,
+  ): void {
     this.listeners.delete(listener);
   }
 
@@ -249,6 +235,32 @@ class FakeMessagePort implements MessagePortLike {
 }
 
 describe("MessagePortProtocol connection flow sideband", () => {
+  it("大块二进制消息不枚举每个字节，非法控制对象仍丢弃", () => {
+    const port = new FakeMessagePort();
+    const protocol = new MessagePortProtocol(port);
+    const binary = new Uint8Array(3 * 1024 * 1024);
+    const receive = vi.fn();
+    const flow = vi.fn();
+    protocol.onMessage(receive);
+    protocol.onFlowState(flow);
+    const keys = vi.spyOn(Object, "keys");
+    try {
+      port.emit(binary);
+      const enumerated = keys.mock.calls.some(([value]) => value === binary);
+      expect(enumerated).toBe(false);
+      expect(receive).toHaveBeenCalledOnce();
+      expect(receive.mock.calls[0]![0].buffer).toBe(binary);
+      port.emit({ __zcodeRpcControl: "connection-flow-v1", state: "drained", extra: true });
+      port.emit({ __zcodeRpcControl: "connection-flow-v1", state: "invalid" });
+      expect(flow).not.toHaveBeenCalled();
+      expect(receive).toHaveBeenCalledOnce();
+      port.emit({ __zcodeRpcControl: "connection-flow-v1", state: "drained" });
+      expect(flow).toHaveBeenCalledWith("drained");
+    } finally {
+      keys.mockRestore();
+      protocol.disconnect();
+    }
+  });
   it("consumes strict control objects before Channel binary delivery", () => {
     const leftPort = new FakeMessagePort();
     const rightPort = new FakeMessagePort();

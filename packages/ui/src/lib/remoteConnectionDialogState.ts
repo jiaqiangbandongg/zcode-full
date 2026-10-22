@@ -24,33 +24,21 @@ export function isRemoteConnectionFlowActive(
   return snapshot.loading || Boolean(snapshot.connectedSessionId);
 }
 
-export function shouldResetRemoteConnectionOnOpen(
-  snapshot: RemoteConnectionDialogSnapshot,
-): boolean {
-  return !isRemoteConnectionFlowActive(snapshot);
-}
-
-export function getRemoteConnectionDialogResumeStep(
-  snapshot: RemoteConnectionDialogSnapshot,
-): RemoteWizardStep {
-  if (isRemoteConnectionFlowActive(snapshot)) {
-    return snapshot.currentStep;
-  }
-  if (snapshot.currentStep === "connecting") {
-    return "connecting";
-  }
-
-  return "kind";
-}
-
 export function getRemoteConnectionCompletionDialogState(
   status: RemoteConnectionCompletionStatus,
+  options?: { directToDirectory?: boolean },
 ): RemoteConnectionCompletionDialogState {
   return {
     // 远程连接弹窗收起后，连接完成只更新内部步骤但没有重新展示弹窗，
     // 用户会停留在其它页面且看不到选目录或失败原因。连接完成后统一拉起弹窗到结果步骤。
     open: true,
-    step: status === "success" ? "directory" : "connecting",
+    // 连接成功后先停留在连接阶段，让用户明确点击“前往选择目录”进入下一步；
+    // 唯一例外是第 1 步在线设备的「选择其他目录」直达流（原型 rail-foot：已有设备可从第 1 步直达第 5 步），
+    // 建链秒成后直接进入选目录，不再停留等待一次多余的点击。
+    step:
+      status === "success" && options?.directToDirectory
+        ? "directory"
+        : "connecting",
   };
 }
 

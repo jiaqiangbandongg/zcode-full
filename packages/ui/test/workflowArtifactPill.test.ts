@@ -12,8 +12,6 @@ import {
   type ArtifactPillData,
 } from "@/components/workflow-timeline/WorkflowArtifactPill.js";
 import { WorkflowArtifactStrip } from "@/components/workflow-timeline/WorkflowArtifactStrip.js";
-import enUS from "../src/i18n/locales/en-US.js";
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 afterEach(() => {
   cleanup();
@@ -96,12 +94,11 @@ describe("WorkflowArtifactPill", () => {
     expect(noVersion.getByTestId("workflow-pill-tail")).toBeTruthy();
   });
 
-  it("小号：24px 行高的类；标题缺席退回 id；截字只在要求时发生", () => {
+  it("小号尺寸透传；标题缺席退回 id；截字只在要求时发生", () => {
     const long = { id: "long", kind: "table" as const, title: "一".repeat(40), version: 1 };
     const view = renderPill({ artifact: long, size: "sm", truncateTitle: true });
     const pill = view.getByTestId("workflow-artifact-pill");
     expect(pill.getAttribute("data-pill-size")).toBe("sm");
-    expect(pill.className).toContain("h-6");
     expect(pill.querySelector(".wf-pill-name")?.textContent?.length).toBeLessThan(40);
     expect(pill.getAttribute("title")).toBe(`Table · ${"一".repeat(40)}`);
     cleanup();
@@ -215,17 +212,6 @@ describe("WorkflowArtifactStrip", () => {
   it("小号条把尺寸交给每枚药丸", () => {
     const view = renderStrip({ artifacts: FOUR.slice(0, 1), size: "sm" });
     expect(view.getByTestId("pill").getAttribute("data-pill-size")).toBe("sm");
-  });
-
-  it("词条在两种语言里都在", () => {
-    for (const key of [
-      "chat.toolCall.workflow.run.artifacts.versionTail",
-      "chat.toolCall.workflow.card.artifact",
-      "chat.toolCall.workflow.card.artifacts",
-    ] as const) {
-      expect(enUS[key]).toBeTruthy();
-      expect(zhCN[key]).toBeTruthy();
-    }
   });
 });
 

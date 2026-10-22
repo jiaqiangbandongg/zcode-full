@@ -1106,72 +1106,6 @@ describe("createUsageStatsService", () => {
     );
   });
 
-  it("Team Plan 用量允许已登录但被禁用的 BigModel Coding Plan provider", async () => {
-    vi.useFakeTimers({ now: new Date("2026-05-19T10:00:00.000Z") });
-    const requestUrls: string[] = [];
-    const apiClient: ApiClient = {
-      request: vi.fn(async (input) => {
-        const url = input.toString();
-        requestUrls.push(url);
-        if (url.endsWith("/api_keys")) {
-          return createJsonResponse({
-            code: 200,
-            data: [{ apiKey: "team-ak", keyType: 2, name: "zcode-team-api-key" }],
-          });
-        }
-        if (url.endsWith("/api_keys/copy/team-ak")) {
-          return createJsonResponse({
-            code: 200,
-            data: { secretKey: "team-secret" },
-          });
-        }
-        if (url.includes("/api/monitor/usage/quota/limit")) {
-          return createJsonResponse({
-            code: 200,
-            data: { level: "team", limits: [] },
-          });
-        }
-        if (url.includes("/api/monitor/credit-usage/activity")) {
-          return createJsonResponse({
-            code: 200,
-            data: { summary: { totalTokens: 0 }, series: [] },
-          });
-        }
-        return createJsonResponse({
-          code: 200,
-          data:
-            new URL(url).searchParams.get("usageType") === "MODEL"
-              ? { modelUsage: { xTime: ["2026-05-18"], modelDataList: [] } }
-              : { mcpUsage: { xTime: ["2026-05-18"], mcpDataList: [] } },
-        });
-      }),
-    };
-    const service = createUsageStatsServiceForTest({
-      apiClient,
-      providers: [
-        createProvider({
-          id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-          name: "BigModel - Coding Plan",
-          apiKey: "",
-          enabled: false,
-        }),
-      ],
-      credentialTokens: {
-        "oauth:bigmodel:access_token": "oauth-token",
-      },
-    });
-
-    await service.getCodingPlanUsageSnapshot({
-      range: "7d",
-      preferredProviderId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-      organizationId: "org-team-a",
-      projectId: "proj-team-a",
-      timeZone: "UTC",
-    });
-
-    expect(requestUrls[0]).toBe("https://bigmodel.cn/api/monitor/usage/quota/limit?type=2");
-  });
-
   it("Z.ai Team Plan 用量使用 Account Auth 返回的团队项目 API Key（对齐 BigModel）", async () => {
     vi.useFakeTimers({ now: new Date("2026-05-19T10:00:00.000Z") });
     const requestUrls: string[] = [];
@@ -1280,72 +1214,6 @@ describe("createUsageStatsService", () => {
     ]);
     expect(snapshot.modelUsage.totalTokensUsage).toBe(88);
     expect(snapshot.sourceProvider.id).toBe(BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan);
-  });
-
-  it("Z.ai Team Plan 用量允许已登录但被禁用的 Coding Plan provider（对齐 BigModel）", async () => {
-    vi.useFakeTimers({ now: new Date("2026-05-19T10:00:00.000Z") });
-    const requestUrls: string[] = [];
-    const apiClient: ApiClient = {
-      request: vi.fn(async (input) => {
-        const url = input.toString();
-        requestUrls.push(url);
-        if (url.endsWith("/api_keys")) {
-          return createJsonResponse({
-            code: 200,
-            data: [{ apiKey: "team-ak-zai", keyType: 2, name: "zcode-team-api-key" }],
-          });
-        }
-        if (url.endsWith("/api_keys/copy/team-ak-zai")) {
-          return createJsonResponse({
-            code: 200,
-            data: { secretKey: "team-secret-zai" },
-          });
-        }
-        if (url.includes("/api/monitor/usage/quota/limit")) {
-          return createJsonResponse({
-            code: 200,
-            data: { level: "team", limits: [] },
-          });
-        }
-        if (url.includes("/api/monitor/credit-usage/activity")) {
-          return createJsonResponse({
-            code: 200,
-            data: { summary: { totalTokens: 0 }, series: [] },
-          });
-        }
-        return createJsonResponse({
-          code: 200,
-          data:
-            new URL(url).searchParams.get("usageType") === "MODEL"
-              ? { modelUsage: { xTime: ["2026-05-18"], modelDataList: [] } }
-              : { mcpUsage: { xTime: ["2026-05-18"], mcpDataList: [] } },
-        });
-      }),
-    };
-    const service = createUsageStatsServiceForTest({
-      apiClient,
-      providers: [
-        createProvider({
-          id: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-          name: "Z.ai - Coding Plan",
-          apiKey: "",
-          enabled: false,
-        }),
-      ],
-      credentialTokens: {
-        "oauth:zai:access_token": "zai-oauth-token",
-      },
-    });
-
-    await service.getCodingPlanUsageSnapshot({
-      range: "7d",
-      preferredProviderId: BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
-      organizationId: "org-zai-team",
-      projectId: "proj-zai-team",
-      timeZone: "UTC",
-    });
-
-    expect(requestUrls[0]).toBe("https://api.z.ai/api/monitor/usage/quota/limit?type=2");
   });
 
   it("Team Plan monitor 缺少明确成功信号时不能把错误响应降级为空统计", async () => {
@@ -1557,37 +1425,6 @@ describe("createUsageStatsService", () => {
       }),
     ).rejects.toThrow("bigmodel_coding_plan_api_key_required");
     expect(apiClient.request).not.toHaveBeenCalled();
-  });
-
-  it("个人套餐缺少 Account Auth 凭据时不再触发旧 Provider 刷新", async () => {
-    const providers = [
-      createProvider({
-        id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-        name: "BigModel - Coding Plan",
-        apiKey: "",
-        enabled: false,
-      }),
-    ];
-    const requestHeaders: Record<string, string>[] = [];
-    const apiClient: ApiClient = {
-      request: vi.fn(async (_input, init) => {
-        requestHeaders.push((init?.headers ?? {}) as Record<string, string>);
-        return createJsonResponse({ code: 200, data: {} });
-      }),
-    };
-    const service = createUsageStatsServiceForTest({
-      apiClient,
-      providers,
-    });
-
-    await expect(
-      service.getCodingPlanUsageSnapshot({
-        range: "7d",
-        preferredProviderId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
-        timeZone: "UTC",
-      }),
-    ).rejects.toThrow("bigmodel_coding_plan_api_key_required");
-    expect(requestHeaders).toEqual([]);
   });
 
   it("Team Plan Account Auth 失败时透传真实错误", async () => {

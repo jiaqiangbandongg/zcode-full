@@ -344,9 +344,18 @@ export function withE2EDesktopBuildLock(
   }
 
   try {
-    return action();
-  } finally {
+    const result = action();
+    // 构建后的异步副本复制也必须持锁，否则另一 shard 重建 out 会混入不同 mock origin。
+    if (result && typeof result.then === "function") {
+      return Promise.resolve(result).finally(() =>
+        releaseE2EDesktopBuildLock(lockPath, ownerToken),
+      );
+    }
     releaseE2EDesktopBuildLock(lockPath, ownerToken);
+    return result;
+  } catch (error) {
+    releaseE2EDesktopBuildLock(lockPath, ownerToken);
+    throw error;
   }
 }
 

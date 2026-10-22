@@ -1,11 +1,11 @@
 import {
-  TID_CONVERSATION_NEW_TASK,
+  TID_VIRTUAL_PROJECT_NEW_TASK,
   TID_CONVERSATION_SECTION,
   TID_TASK_ARCHIVE,
   TID_TASK_ITEM,
   TID_V4_SESSION_PANE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "./helpers/desktop-app.js";
 import {
   E2E_REPLY_TOKEN,
@@ -56,22 +56,13 @@ describe("任务列表归档二次确认 E2E", () => {
     await waitForArchiveButtonState(taskId as string, (state) => state.visible);
 
     await $(sel(testId(TID_TASK_ARCHIVE, taskId as string))).click();
-    await waitForArchiveButtonState(
-      taskId as string,
-      (state) => state.confirming && state.visible,
-    );
+    await waitForArchiveButtonState(taskId as string, (state) => state.confirming && state.visible);
 
     await pointerDownArchiveConfirmButton(taskId as string);
-    await waitForArchiveButtonState(
-      taskId as string,
-      (state) => state.confirming && state.visible,
-    );
+    await waitForArchiveButtonState(taskId as string, (state) => state.confirming && state.visible);
 
     await movePointerAwayFromTaskRow();
-    await waitForArchiveButtonState(
-      taskId as string,
-      (state) => state.confirming && state.visible,
-    );
+    await waitForArchiveButtonState(taskId as string, (state) => state.confirming && state.visible);
 
     await clickBlankArea();
     await waitForArchiveButtonState(
@@ -82,10 +73,7 @@ describe("任务列表归档二次确认 E2E", () => {
     await hoverConversationTaskRow(taskId as string);
     await waitForArchiveButtonState(taskId as string, (state) => state.visible);
     await $(sel(testId(TID_TASK_ARCHIVE, taskId as string))).click();
-    await waitForArchiveButtonState(
-      taskId as string,
-      (state) => state.confirming && state.visible,
-    );
+    await waitForArchiveButtonState(taskId as string, (state) => state.confirming && state.visible);
     await $(sel(testId(TID_TASK_ARCHIVE, taskId as string))).click();
     await waitForConversationTaskRowAbsent(taskId as string);
   });
@@ -117,11 +105,9 @@ async function startConversationTaskDraft() {
   await browser.waitUntil(
     async () =>
       browser.execute((testIdValue) => {
-        const button = document.querySelector<HTMLButtonElement>(
-          `[data-testid="${testIdValue}"]`,
-        );
+        const button = document.querySelector<HTMLButtonElement>(`[data-testid="${testIdValue}"]`);
         return Boolean(button && !button.disabled);
-      }, TID_CONVERSATION_NEW_TASK),
+      }, TID_VIRTUAL_PROJECT_NEW_TASK),
     {
       timeout: 15000,
       timeoutMsg: "项目任务区水合后没有出现可用的“新建任务”按钮",
@@ -129,12 +115,10 @@ async function startConversationTaskDraft() {
   );
 
   const clicked = await browser.execute((testIdValue) => {
-    const button = document.querySelector<HTMLElement>(
-      `[data-testid="${testIdValue}"]`,
-    );
+    const button = document.querySelector<HTMLElement>(`[data-testid="${testIdValue}"]`);
     button?.click();
     return Boolean(button);
-  }, TID_CONVERSATION_NEW_TASK);
+  }, TID_VIRTUAL_PROJECT_NEW_TASK);
   expect(clicked).toBe(true);
   await waitForV4Pane(
     (snapshot) => snapshot.sessionId === "draft",
@@ -152,9 +136,7 @@ interface ArchiveButtonState {
 }
 
 async function hoverConversationTaskRow(taskId: string) {
-  const row = await $(
-    `${sel(TID_CONVERSATION_SECTION)} ${sel(testId(TID_TASK_ITEM, taskId))}`,
-  );
+  const row = await $(`${sel(TID_CONVERSATION_SECTION)} ${sel(testId(TID_TASK_ITEM, taskId))}`);
   await row.waitForDisplayed({
     timeout: 15000,
     timeoutMsg: `项目视图的“任务”分区没有显示目标 conversation task: ${taskId}`,
@@ -163,9 +145,7 @@ async function hoverConversationTaskRow(taskId: string) {
 }
 
 async function waitForConversationTaskRowAbsent(taskId: string) {
-  const row = await $(
-    `${sel(TID_CONVERSATION_SECTION)} ${sel(testId(TID_TASK_ITEM, taskId))}`,
-  );
+  const row = await $(`${sel(TID_CONVERSATION_SECTION)} ${sel(testId(TID_TASK_ITEM, taskId))}`);
   await row.waitForExist({
     reverse: true,
     timeout: 15000,
@@ -185,9 +165,7 @@ async function movePointerAwayFromTaskRow() {
 async function pointerDownArchiveConfirmButton(taskId: string) {
   const dispatched = await browser.execute(
     (archiveTestId) => {
-      const button = Array.from(
-        document.querySelectorAll<HTMLElement>("[data-testid]"),
-      ).find(
+      const button = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
         (element) =>
           element.dataset.testid === archiveTestId &&
           element.closest("[data-archive-confirming-task-id]"),
@@ -232,29 +210,20 @@ async function waitForArchiveButtonState(
   taskId: string,
   predicate: (state: ArchiveButtonState) => boolean,
 ) {
-  await browser.waitUntil(
-    async () => predicate(await getArchiveButtonState(taskId)),
-    {
-      timeout: 10000,
-      timeoutMsg: `归档按钮状态没有达到预期: ${JSON.stringify(
-        await getArchiveButtonState(taskId),
-      )}`,
-    },
-  );
+  await browser.waitUntil(async () => predicate(await getArchiveButtonState(taskId)), {
+    timeout: 10000,
+    timeoutMsg: `归档按钮状态没有达到预期: ${JSON.stringify(await getArchiveButtonState(taskId))}`,
+  });
 }
 
 async function getArchiveButtonState(taskId: string): Promise<ArchiveButtonState> {
   return browser.execute(
     (archiveTestId) => {
-      const button = document.querySelector<HTMLElement>(
-        `[data-testid="${archiveTestId}"]`,
-      );
+      const button = document.querySelector<HTMLElement>(`[data-testid="${archiveTestId}"]`);
       if (!button) {
         return {
           ariaLabel: null,
-          confirming: Boolean(
-            document.querySelector("[data-archive-confirming-task-id]"),
-          ),
+          confirming: Boolean(document.querySelector("[data-archive-confirming-task-id]")),
           display: null,
           exists: false,
           text: "",
@@ -266,9 +235,7 @@ async function getArchiveButtonState(taskId: string): Promise<ArchiveButtonState
       const rect = button.getBoundingClientRect();
       return {
         ariaLabel: button.getAttribute("aria-label"),
-        confirming: Boolean(
-          button.closest("[data-archive-confirming-task-id]"),
-        ),
+        confirming: Boolean(button.closest("[data-archive-confirming-task-id]")),
         display: style.display,
         exists: true,
         text: button.textContent?.trim() ?? "",

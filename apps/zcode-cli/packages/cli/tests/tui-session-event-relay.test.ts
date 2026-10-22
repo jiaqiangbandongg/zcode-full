@@ -83,7 +83,7 @@ test("reattach after an app swap detaches the old runtime and follows the new on
   assert.deepEqual(received, ["before-swap", "after-swap"]);
 });
 
-test("sinks survive the swap without re-registering", () => {
+test("remains attached across two app swaps", () => {
   const first = fakeRuntime("first");
   const second = fakeRuntime("second");
   let current: unknown = first.runtime;
@@ -150,29 +150,4 @@ test("a sink unsubscribing during fan-out does not break the dispatch", () => {
   assert.deepEqual(seen, ["a:e1", "b:e1"]);
   only.state.emit(event("e2"));
   assert.deepEqual(seen, ["a:e1", "b:e1", "b:e2"]);
-});
-
-// ── WP-F：会话闸门必须跟着 replaceApp 换会话（getter，不是快照）──
-
-test("the main session id is read per call, so it follows a replaceApp swap", () => {
-  // 这条钉的是 CLI 侧 getMainSessionId 的形状：现读 app.runtime.getSessionId()。
-  // 快照下来的 id 在 /new /resume /fork 之后会过期，然后把**整条**主转写误判成外来事件——
-  // 比它要修的 actor 噪音严重得多。
-  let currentSessionId = "session-main-1";
-  const getMainSessionId = () => currentSessionId;
-
-  assert.equal(getMainSessionId(), "session-main-1");
-  currentSessionId = "session-main-2";
-  assert.equal(getMainSessionId(), "session-main-2", "a snapshot would still report the old id");
-});
-
-test("a runtime with no getSessionId yields undefined, which fails the gate open", () => {
-  const readMainSessionId = (runtime: unknown): string | undefined => {
-    const sessionId = (runtime as { getSessionId?: () => string } | undefined)?.getSessionId?.();
-    return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
-  };
-  assert.equal(readMainSessionId(undefined), undefined);
-  assert.equal(readMainSessionId({}), undefined);
-  assert.equal(readMainSessionId({ getSessionId: () => "" }), undefined);
-  assert.equal(readMainSessionId({ getSessionId: () => "session-x" }), "session-x");
 });

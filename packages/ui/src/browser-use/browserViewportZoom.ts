@@ -65,21 +65,12 @@ export function resolveResponsiveBrowserGuestLayout(desktopZoomFactor: number): 
   const safeDesktopZoomFactor =
     Number.isFinite(desktopZoomFactor) && desktopZoomFactor > 0 ? desktopZoomFactor : 1;
 
-  if (safeDesktopZoomFactor > 1) {
-    // Desktop page zoom 放大时，外层 transform 只会扩大 webview DOM，
-    // guest native raster 仍只有 frame 的 1 / zoom，因而产生右/下留白。
-    // 放大补偿已下沉到 main 的 CDP metrics scale，renderer 必须保持真实 100% bounds。
-    return { layoutScale: 1, transformScale: 1 };
-  }
-
-  if (safeDesktopZoomFactor < 1) {
-    // 缩小档位若只缩放 surface 也会留白；先反向扩布局，再缩回 frame，
-    // 同时保留完整页面内容和正确的 guest 坐标映射。
-    return {
-      layoutScale: 1 / safeDesktopZoomFactor,
-      transformScale: safeDesktopZoomFactor,
-    };
-  }
-
-  return { layoutScale: 1, transformScale: 1 };
+  // 放大档曾把补偿交给 main 的 CDP metrics scale，但 metrics 是 per-session 状态，
+  // 命令空闲 detach 后被 Chromium 清掉，guest 退回 viewport × zoom，Browser Use 每次操作页面都会
+  // 变大又变回。放大和缩小统一在宿主布局补偿：先按 1 / zoom 布局，再缩放回 frame，
+  // guest 的自然 viewport 因此与 CDP 是否 attach 无关。
+  return {
+    layoutScale: 1 / safeDesktopZoomFactor,
+    transformScale: safeDesktopZoomFactor,
+  };
 }

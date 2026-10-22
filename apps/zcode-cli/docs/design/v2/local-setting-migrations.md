@@ -39,6 +39,14 @@ Older builds may have written `user/default/model/reasoningLevel`. Current code 
 
 SQLite migrations use a ledger table:
 
+R3 的 `0024_session_database_identity` 接管 Source Server 曾直接创建的
+`zcode_database_identity`。Agent 与 Source 通过 `@zcode/shared/sqlite-migrations`
+复用冻结 SQL 和记账原语，保持已有 migration 的 checksum 算法与错误类型。
+Source 在 Agent 尚未启动时只应用该独立附加表迁移；后续 Agent 初始化补齐自己的
+其他版本。两种先后顺序都在同一 `schema_migration` 中记录一次。结构接管保留既有
+identity，不生成新代际；generation 的选择、备份谱系和恢复规则仍属于 Source 合并计划。
+事务内 SQL 或记账失败均回滚；历史记录不修改、不手工补写成功状态。
+
 ```sql
 create table schema_migration (
   id text primary key,
@@ -51,7 +59,8 @@ create table schema_migration (
 Migration rules:
 
 - Migrations are append-only and run in deterministic order.
-- Each migration declares the app version that introduced it; future migrations use their own version while historical entries keep their original version.
+- The CLI migration registry uses unique full IDs and unique four-digit numeric prefixes in increasing order. Registry tests enforce these rules before release.
+- Each migration declares the CLI version that introduced it; future migrations use their own version while historical entries keep their original version. This is not the running desktop version.
 - Each migration is wrapped in `begin immediate` / `commit` so concurrent CLI startups serialize schema writes.
 - Applied migrations are checked by `id` and `checksum`. A checksum mismatch is a startup error because historical migration SQL must not be edited in place.
 - Migration SQL must be idempotent where practical, because old databases can already contain tables created by pre-ledger builds.

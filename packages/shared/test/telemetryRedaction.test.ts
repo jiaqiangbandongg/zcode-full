@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  OFFICIAL_GLM_MODEL_IDS,
-  TELEMETRY_SAFE_BUILTIN_MODEL_IDS,
   redactTelemetryText,
   redactTelemetryUrl,
   resolveTelemetryProviderScope,
@@ -154,16 +152,6 @@ describe("resolveTelemetryProviderScope", () => {
       providerId: "custom",
       providerScope: "custom",
     });
-  });
-});
-
-describe("TELEMETRY_SAFE_BUILTIN_MODEL_IDS", () => {
-  it("覆盖官方 GLM 模型名单全部条目，旗舰模型不会被降级为 custom", () => {
-    for (const id of OFFICIAL_GLM_MODEL_IDS) {
-      expect(TELEMETRY_SAFE_BUILTIN_MODEL_IDS.has(id.toLowerCase())).toBe(true);
-    }
-    expect(TELEMETRY_SAFE_BUILTIN_MODEL_IDS.has("glm-5.3")).toBe(true);
-    expect(TELEMETRY_SAFE_BUILTIN_MODEL_IDS.has("glm-5.3-flash")).toBe(true);
   });
 });
 

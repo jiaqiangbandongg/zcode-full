@@ -22,7 +22,6 @@ describe("visualize 源文件的预览卡片", () => {
       "/workspace",
       { changedFilePaths: [path, "/workspace/calendar.html", "/workspace/README.md"] },
     );
-    expect(cards.map((card) => card.id)).toHaveLength(3);
     expect(cards.map((card) => card.title)).toEqual(["report.pdf", "README.md", "calendar.html"]);
     expect(cards.some((card) => card.type === "website" && card.filePath === path)).toBe(false);
   });

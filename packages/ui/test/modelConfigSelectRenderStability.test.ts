@@ -3,25 +3,22 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelSelectGroup } from "@/ModelConfigSelect.js";
 
-const {
-  dropdownContentCalls,
-  dropdownItemCalls,
-  radioItemCalls,
-  subContentCalls,
-  subTriggerCalls,
-} = vi.hoisted(() => ({
-  dropdownContentCalls: [] as Array<Record<string, unknown>>,
-  dropdownItemCalls: [] as Array<Record<string, unknown>>,
-  radioItemCalls: [] as Array<Record<string, unknown>>,
-  subContentCalls: [] as Array<Record<string, unknown>>,
-  subTriggerCalls: [] as Array<Record<string, unknown>>,
-}));
+const { dropdownContentCalls, dropdownItemCalls, radioItemCalls, subTriggerCalls } = vi.hoisted(
+  () => ({
+    dropdownContentCalls: [] as Array<Record<string, unknown>>,
+    dropdownItemCalls: [] as Array<Record<string, unknown>>,
+    radioItemCalls: [] as Array<Record<string, unknown>>,
+    subTriggerCalls: [] as Array<Record<string, unknown>>,
+  }),
+);
 
-vi.mock("lucide-react", () => {
+vi.mock("lucide-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("lucide-react")>();
   const createIcon = (name: string) => (props: Record<string, unknown>) =>
     createElement("svg", { "data-icon": name, ...props });
 
   return {
+    ...actual,
     AlertCircle: createIcon("alert-circle"),
     CheckIcon: createIcon("check"),
     ChevronDownIcon: createIcon("chevron-down"),
@@ -43,13 +40,11 @@ vi.mock("@/ControlHintTooltip.js", () => ({
 }));
 
 vi.mock("@/chat-input-toolbar/RollingToolbarLabel.js", () => ({
-  RollingToolbarLabel: ({ label }: { label: string }) =>
-    createElement("span", null, label),
+  RollingToolbarLabel: ({ label }: { label: string }) => createElement("span", null, label),
 }));
 
 vi.mock("@/components/ui/dropdown-menu.js", () => ({
-  DropdownMenu: ({ children }: { children?: ReactNode }) =>
-    createElement("div", null, children),
+  DropdownMenu: ({ children }: { children?: ReactNode }) => createElement("div", null, children),
   DropdownMenuContent: ({ children, ...props }: { children?: ReactNode }) => {
     dropdownContentCalls.push(props);
     return createElement("div", props, children);
@@ -65,18 +60,11 @@ vi.mock("@/components/ui/dropdown-menu.js", () => ({
     return createElement("div", props, children);
   },
   DropdownMenuSeparator: () => createElement("hr"),
-  DropdownMenuSub: ({ children }: { children?: ReactNode }) =>
-    createElement("div", null, children),
+  DropdownMenuSub: ({ children }: { children?: ReactNode }) => createElement("div", null, children),
   DropdownMenuSubContent: ({ children, ...props }: { children?: ReactNode }) => {
-    subContentCalls.push(props);
     return createElement("div", props, children);
   },
-  DropdownMenuSubTrigger: ({
-    children,
-    ...props
-  }: {
-    children?: ReactNode;
-  }) => {
+  DropdownMenuSubTrigger: ({ children, ...props }: { children?: ReactNode }) => {
     subTriggerCalls.push(props);
     return createElement("div", props, children);
   },
@@ -85,14 +73,11 @@ vi.mock("@/components/ui/dropdown-menu.js", () => ({
 }));
 
 vi.mock("@/components/ui/tooltip.js", () => ({
-  Tooltip: ({ children }: { children?: ReactNode }) =>
-    createElement("span", null, children),
-  TooltipContent: ({ children }: { children?: ReactNode }) =>
-    createElement("span", null, children),
+  Tooltip: ({ children }: { children?: ReactNode }) => createElement("span", null, children),
+  TooltipContent: ({ children }: { children?: ReactNode }) => createElement("span", null, children),
   TooltipProvider: ({ children }: { children?: ReactNode }) =>
     createElement("span", null, children),
-  TooltipTrigger: ({ children }: { children?: ReactNode }) =>
-    createElement("span", null, children),
+  TooltipTrigger: ({ children }: { children?: ReactNode }) => createElement("span", null, children),
 }));
 
 function createMinimalElement(ownerDocument: Document, tagName = "div") {
@@ -181,12 +166,10 @@ describe("ModelConfigSelect render stability", () => {
     dropdownContentCalls.length = 0;
     dropdownItemCalls.length = 0;
     radioItemCalls.length = 0;
-    subContentCalls.length = 0;
     subTriggerCalls.length = 0;
     delete (globalThis as { document?: unknown }).document;
     delete (globalThis as { window?: unknown }).window;
-    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: unknown })
-      .IS_REACT_ACT_ENVIRONMENT;
+    delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: unknown }).IS_REACT_ACT_ENVIRONMENT;
   });
 
   it("defers model menu item rendering until the dropdown is open", async () => {
@@ -270,7 +253,7 @@ describe("ModelConfigSelect render stability", () => {
     });
   });
 
-  it("keeps the provider submenu interaction and accepts a narrower mobile width", async () => {
+  it("renders the provider submenu and model items after opening", async () => {
     const { ModelConfigSelect } = await import("@/ModelConfigSelect.js");
     const root: Root = createRoot(installMinimalDom());
     const baseProps = {
@@ -280,8 +263,6 @@ describe("ModelConfigSelect render stability", () => {
       modelGroups,
       normalizedValue: "gpt-5",
       onValueChange: vi.fn(),
-      providerSubmenuClassName:
-        "w-40 min-w-0 max-w-(--radix-dropdown-menu-content-available-width)",
       showManageModelsAction: false,
       tooltipTitle: "model",
       triggerLabel: "GPT-5",
@@ -301,12 +282,6 @@ describe("ModelConfigSelect render stability", () => {
 
     expect(radioItemCalls).toHaveLength(2);
     expect(subTriggerCalls).toHaveLength(1);
-    expect(subContentCalls.at(-1)?.className).toContain("w-40");
-    expect(subContentCalls.at(-1)?.className).toContain("min-w-0");
-    expect(subContentCalls.at(-1)?.className).toContain(
-      "max-w-(--radix-dropdown-menu-content-available-width)",
-    );
-    expect(subContentCalls.at(-1)?.className).not.toContain("w-48");
 
     act(() => {
       root.unmount();

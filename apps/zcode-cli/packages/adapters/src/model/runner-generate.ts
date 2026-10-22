@@ -26,6 +26,7 @@ import {
   shouldRecordModelIO,
 } from "./runner-debug.js";
 import {
+  createEmptyContextExceededError,
   getGenerateTextResultMetadata,
   isZeroOutputModelCompletion,
   logGenerateTextDiagnostics,
@@ -223,6 +224,18 @@ export async function runGenerateText(input: {
         ? serializeStructuredOutput(result)
         : result.text;
       const reasoning = normalizeReasoning(result.reasoning);
+      const contextError = createEmptyContextExceededError({
+        finishReason: result.finishReason,
+        rawFinishReason: result.rawFinishReason ?? result.providerMetadata?.rawFinishReason,
+        hasAssistantContent:
+          text.length > 0 ||
+          (reasoning ?? []).some(
+            (block) => block.text.length > 0 || Object.keys(block.providerOptions ?? {}).length > 0,
+          ),
+        toolCallCount: toolCalls?.length ?? 0,
+        usage,
+      });
+      if (contextError) throw contextError;
       const reasoningLength = (reasoning ?? []).reduce(
         (total, block) => total + block.text.length,
         0,
@@ -231,6 +244,9 @@ export async function runGenerateText(input: {
         input.request.preserveProviderStreamBoundaries !== true &&
         isZeroOutputModelCompletion({
           finishReason: result.finishReason,
+          rawFinishReason:
+            result.rawFinishReason ??
+            (result.providerMetadata as Record<string, unknown> | undefined)?.rawFinishReason,
           reasoningLength,
           textLength: text.length,
           toolCallCount: toolCalls?.length ?? 0,
@@ -429,6 +445,7 @@ export async function runGenerateText(input: {
           ...modelFailureStatusFields(error, failure, options ? "response" : "prepare"),
           timestamp: new Date(completedAt).toISOString(),
           type: "model_request_failed",
+          ...(error instanceof AiSdkModelAdapterError && error.usage ? { usage: error.usage } : {}),
         },
         {
           ...statusPublishOptions(input, admission),

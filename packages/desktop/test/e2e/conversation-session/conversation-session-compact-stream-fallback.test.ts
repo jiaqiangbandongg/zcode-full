@@ -1,5 +1,5 @@
 // SF 是 catalog F08 的 transport 接线门禁：compact 必须先发 stream 请求，首腿失败后才回退到 non-stream。
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { clearAppData, setInputValueByTestIdDom } from "../helpers/desktop-app.js";
 import { waitForUpstreamNetworkCapture } from "../helpers/upstream-capture.js";
 import { countUpstreamRequestsContainingAll } from "../helpers/conversation-session-network.js";

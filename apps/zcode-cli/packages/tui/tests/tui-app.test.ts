@@ -246,10 +246,10 @@ test("Shift+Tab switches mode through the injected mode setter", async () => {
       await view.renderOnce();
     });
 
-    assert.deepEqual(requestedModes, ["edit"]);
+    assert.deepEqual(requestedModes, ["guarded"]);
     const frame = view.captureCharFrame();
-    assert.equal(frame.includes("Input - Edit"), false);
-    assert.equal(frame.includes("Edit"), true);
+    assert.equal(frame.includes("Input - Guarded"), false);
+    assert.equal(frame.includes("Guarded"), true);
     assert.equal(frame.includes("keep this draft"), true);
   } finally {
     await act(async () => {
@@ -258,12 +258,12 @@ test("Shift+Tab switches mode through the injected mode setter", async () => {
   }
 });
 
-test("Shift+Tab can cycle edit mode to yolo mode", async () => {
+test("Shift+Tab can cycle guarded mode to yolo mode", async () => {
   let view: Awaited<ReturnType<typeof testRender>> | undefined;
   const requestedModes: string[] = [];
 
   const options: TuiOptions = {
-    initialMode: "edit",
+    initialMode: "guarded",
     noColor: true,
     stderr: process.stderr,
     stdin: process.stdin,
@@ -456,7 +456,7 @@ test("mode composer popup submits the highlighted explicit mode command", async 
   }
 });
 
-test("mode composer popup can submit edit mode command", async () => {
+test("mode composer popup can submit guarded mode command", async () => {
   let view: Awaited<ReturnType<typeof testRender>> | undefined;
   const submitted: string[] = [];
 
@@ -518,7 +518,7 @@ test("mode composer popup can submit edit mode command", async () => {
       await view.renderOnce();
     });
 
-    assert.deepEqual(submitted, ["/mode edit"]);
+    assert.deepEqual(submitted, ["/mode guarded"]);
   } finally {
     await act(async () => {
       view?.renderer.destroy();
@@ -526,7 +526,9 @@ test("mode composer popup can submit edit mode command", async () => {
   }
 });
 
-function reactElementChildren(node: unknown): Array<{ props?: Record<string, unknown>; type?: unknown }> {
+function reactElementChildren(
+  node: unknown,
+): Array<{ props?: Record<string, unknown>; type?: unknown }> {
   if (typeof node !== "object" || node === null || !("props" in node)) return [];
   const element = node as { props?: { children?: unknown } };
   const children = element.props?.children;

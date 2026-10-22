@@ -428,8 +428,14 @@ function toToolLifecycleEvent(input: {
 }): ZCodeStreamEvent {
   const { fact } = input;
   const skillMetadata =
-    fact.skillQualifiedName || fact.skillPluginId || fact.skillSource
+    fact.skillName || fact.skillQualifiedName || fact.skillPluginId || fact.skillSource
       ? {
+          // 旧 CLI 的 scheduled 名称来自任意请求；只接受带解析来源的终态名称。
+          ...(fact.skillName &&
+          fact.skillSource &&
+          (fact.phase === "completed" || fact.phase === "failed")
+            ? { name: fact.skillName }
+            : {}),
           ...(fact.skillQualifiedName ? { qualifiedName: fact.skillQualifiedName } : {}),
           ...(fact.skillPluginId ? { pluginId: fact.skillPluginId } : {}),
           ...(fact.skillSource ? { source: fact.skillSource } : {}),
@@ -465,6 +471,9 @@ function toToolLifecycleEvent(input: {
     error: fact.errorMessage,
     raw: {},
     ...(skillMetadata ? { skillMetadata } : {}),
+    ...(fact.pluginId
+      ? { pluginMetadata: { pluginId: fact.pluginId, component: "mcp" as const } }
+      : {}),
   } as Extract<ZCodeStreamEvent, { type: "tool_call_update" }>;
 }
 

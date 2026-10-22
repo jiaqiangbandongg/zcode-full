@@ -24,9 +24,7 @@ vi.mock("@pierre/diffs/react", () => ({
       {
         class: className,
         "data-code": file?.contents,
-        "data-selected-lines": selectedLines
-          ? `${selectedLines.start}-${selectedLines.end}`
-          : "",
+        "data-selected-lines": selectedLines ? `${selectedLines.start}-${selectedLines.end}` : "",
       },
       lineAnnotations?.map((annotation, index) =>
         createElement("div", { key: index }, renderAnnotation?.(annotation)),
@@ -130,9 +128,6 @@ describe("PreviewPaneContent text files", () => {
     expect(html).toContain("line 75");
     expect(html).toContain("我是中文");
     expect(html).toContain("line 77");
-    expect(html).toContain("overflow-auto");
-    expect(html).not.toContain("data-preview-file-scroll-container");
-    expect(html).not.toContain("data-scroll-mode");
   });
 
   it("shows a localized limit message instead of truncated text", () => {
@@ -144,7 +139,6 @@ describe("PreviewPaneContent text files", () => {
     expect(html).toContain(
       "This file exceeds the 256 KB preview limit. Open it in another editor to view the full contents.",
     );
-    expect(html).toContain("text-foreground-subtle");
     expect(html).not.toContain("<diffs-container");
   });
 

@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it, vi } from "vitest";
-import { prepareTasksIndexStorage } from "../src/session/tasksDatabase/startup.js";
+import { prepareTasksIndexStorage } from "../src/project-storage/startup.js";
 import { runTasksDatabaseMigrations } from "../src/session/tasksDatabase/migrations.js";
 
 it("prepares the same frozen ledger as the old runner and preserves completed data", async () => {
   const dir = await mkdtemp(join(tmpdir(), "zcode-startup-"));
   const expected = new DatabaseSync(":memory:");
   try {
-    runTasksDatabaseMigrations(expected);
+    await runTasksDatabaseMigrations(expected);
     const path = join(dir, "tasks.sqlite");
     const phases: string[] = [];
     await prepareTasksIndexStorage(path, (phase) => {
@@ -48,7 +48,7 @@ it("does not reuse an in-process preparation marker after the database was repla
   try {
     markTasksStoragePrepared("/replacement-test");
     expect(isTasksStoragePrepared("/replacement-test", db)).toBe(false);
-    runTasksDatabaseMigrations(db);
+    await runTasksDatabaseMigrations(db);
     expect(isTasksStoragePrepared("/replacement-test", db)).toBe(true);
     db.exec("UPDATE tasks_schema_migration SET checksum='invalid'");
     expect(() => isTasksStoragePrepared("/replacement-test", db)).toThrow("checksum mismatch");
@@ -94,8 +94,8 @@ it("SILENTDB-01/02: reports maintenance separately and no migration for a prepar
       expect.objectContaining({
         migration: {
           kind: "initialize",
-          executedCount: 3,
-          committedCount: 3,
+          executedCount: 5,
+          committedCount: 5,
           lastAppliedMigrationId: null,
         },
       }),
@@ -104,7 +104,7 @@ it("SILENTDB-01/02: reports maintenance separately and no migration for a prepar
     await prepareTasksIndexStorage(path, (phase, migration) => second.push({ phase, migration }));
     expect(second.some((s) => s.phase === "migrating")).toBe(false);
     expect(second.at(-1)).toMatchObject({
-      migration: { lastAppliedMigrationId: "0003_official_glm_selection" },
+      migration: { lastAppliedMigrationId: "0006_task_group_admissions" },
     });
     expect(second.some((s) => s.phase === "maintaining")).toBe(true);
     expect(second).toContainEqual(
@@ -135,8 +135,8 @@ it("retains committed facts if closing the migration connection fails", async ()
     expect(states.at(-1)).toMatchObject({
       migration: {
         kind: "initialize",
-        executedCount: 3,
-        committedCount: 3,
+        executedCount: 5,
+        committedCount: 5,
         lastAppliedMigrationId: null,
       },
     });
@@ -176,7 +176,7 @@ it("keeps the pre-upgrade task ledger ID after committing the remaining migratio
     await prepareTasksIndexStorage(path, () => {});
     const db = new DatabaseSync(path);
     try {
-      db.exec("DELETE FROM tasks_schema_migration WHERE id='0003_official_glm_selection'");
+      db.exec("DELETE FROM tasks_schema_migration WHERE id='0006_task_group_admissions'");
     } finally {
       db.close();
     }
@@ -188,9 +188,31 @@ it("keeps the pre-upgrade task ledger ID after committing the remaining migratio
         kind: "upgrade",
         executedCount: 1,
         committedCount: 1,
-        lastAppliedMigrationId: "0002_provider_selection",
+        lastAppliedMigrationId: "0004_project_execution_scopes",
       },
     });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+it("startup receives old settings before marking the project migration complete", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "zcode-startup-projects-"));
+  const path = join(dir, "tasks.sqlite");
+  try {
+    await prepareTasksIndexStorage(path, () => {}, {
+      lastWorkspaceSession: [
+        { kind: "local", workspacePath: "/saved-project", workspacePurpose: "project" },
+      ],
+    });
+    const db = new DatabaseSync(path);
+    try {
+      expect(db.prepare("SELECT root_path FROM project_roots").all()).toEqual([
+        { root_path: "/saved-project" },
+      ]);
+    } finally {
+      db.close();
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-task-faults",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-task-faults.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-task-faults.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-faults-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-faults-http-429-once",
+      "description": "真实HTTP 429限流响应",
+      "kind": "main",
+      "timingPolicy": "fault-stream",
+      "source": "synthetic",
+      "syntheticReason": "固定一次限流，随后恢复；核对HTTP状态与请求次数，支持当前重试策略。"
+    },
+    {
+      "id": "r3-faults-http-429-recover",
+      "description": "限流后的自动或显式重试恢复",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "与单次429组成明确的[429,200]恢复序列。"
+    },
+    {
+      "id": "r3-faults-auth-once",
+      "description": "首次请求 401 鉴权错误（不可重试），只消费一次",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "远端模型错误必须以明确错误呈现且保留输入"
+    },
+    {
+      "id": "r3-faults-rate-limit-recover",
+      "description": "重试后正常回复",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "重试恢复"
+    },
+    {
+      "id": "r3-faults-truncated-once",
+      "description": "流中途断开（无 message_stop）",
+      "kind": "main",
+      "timingPolicy": "fault-stream",
+      "source": "synthetic",
+      "syntheticReason": "truncated stream 不能假 completed 或永久 running"
+    },
+    {
+      "id": "r3-faults-truncated-recover",
+      "description": "重试后正常回复",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "重试恢复"
+    },
+    {
+      "id": "r3-faults-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发"
+    }
+  ]
+}

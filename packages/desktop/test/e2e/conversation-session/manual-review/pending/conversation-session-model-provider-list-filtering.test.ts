@@ -1,10 +1,10 @@
+import { encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
   TID_CHAT_MODEL_SELECT_TRIGGER,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,

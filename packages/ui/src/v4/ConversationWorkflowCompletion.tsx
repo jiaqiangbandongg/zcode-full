@@ -17,7 +17,7 @@ import {
   WorkflowRunSaveSlotsBoundary,
   type WorkflowRunSaveSlots,
   type WorkflowRunSaveSlotsHost,
-} from "@/components/workflow-timeline/WorkflowRunSaveControls.js";
+} from "@/project-workflow/WorkflowRunSaveControls.js";
 import type { ConversationRowRenderContext } from "@/v4/conversationRowContext.js";
 import { WorkflowArtifactTilePreview } from "@/app-shell/workflow-artifacts/WorkflowArtifactTilePreview.js";
 import { useHasV4Conversation } from "@/v4/V4ConversationContext.js";
@@ -95,6 +95,7 @@ export function ConversationWorkflowCompletion({
   // and running it again」）。两道门在 `onSendWorkflowSaveRequest` 的供给点上，与 Resume 同一处；
   // 芯片不受门的影响——它说的是磁盘上有没有那份文件，不是这张卡能不能动它。
   const saveHost: WorkflowRunSaveSlotsHost = {
+    sessionId: sessionId ?? undefined,
     workspacePath: context.workspacePath,
     ...(context.workspaceIdentity === undefined
       ? {}

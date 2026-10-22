@@ -8,7 +8,7 @@ import {
   TID_MODEL_PROVIDER_TEMPLATE_ITEM,
   TID_MODEL_PROVIDER_TEMPLATE_PICKER,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { ProviderTemplatePicker } from "@/settings/model-provider-section/ProviderTemplatePicker.js";
 import { ProviderDetailFeedbackBoundary } from "@/settings/model-provider-section/ProviderDetailFeedback.js";
 import { TooltipProvider } from "@/components/ui/tooltip.js";
@@ -75,12 +75,6 @@ describe("ProviderTemplatePicker", () => {
     expect(html.indexOf("深度求索")).toBeLessThan(
       html.indexOf("Alibaba Model Studio (International)"),
     );
-    expect(html).toContain("h-16");
-    expect(html).toContain("break-words");
-    expect(html).toContain("lucide-chevron-right");
-    expect(html).not.toContain("h-20");
-    expect(html).not.toContain("line-clamp-2");
-    expect(html).not.toContain('type="search"');
   });
 
   it("Template 创建失败时在详情底部显示错误并允许重试", async () => {

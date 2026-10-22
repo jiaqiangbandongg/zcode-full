@@ -334,7 +334,6 @@ test("events arriving during hydration are applied once above the snapshot water
     });
     await tui.action(() => resolve(snapshot()));
     const frame = await tui.expectText(/Child answer buffered/);
-    assert.match(frame, /Child answer buffered/);
     assert.equal(frame.split("Child answer").length - 1, 1);
   } finally {
     await tui.close();

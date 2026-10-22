@@ -39,10 +39,15 @@ async function waitFor(predicate: () => boolean, timeoutMs: number, what: string
   }
 }
 
-function settledEvents(harness: FaultServiceHarness, runId: string): Extract<RunEvent, { type: "run-settled" }>[] {
+function settledEvents(
+  harness: FaultServiceHarness,
+  runId: string,
+): Extract<RunEvent, { type: "run-settled" }>[] {
   return harness
     .eventsOf(runId)
-    .filter((event): event is Extract<RunEvent, { type: "run-settled" }> => event.type === "run-settled");
+    .filter(
+      (event): event is Extract<RunEvent, { type: "run-settled" }> => event.type === "run-settled",
+    );
 }
 
 // ————————————————————————————————————————————————————————————————
@@ -50,7 +55,9 @@ function settledEvents(harness: FaultServiceHarness, runId: string): Extract<Run
 // ————————————————————————————————————————————————————————————————
 
 describe("fault matrix · B15 flip — provider 停下后 resume 从断点续跑", () => {
-  it.each(cells([{ shape: "W4" }], [{ shape: "S-phase" }]).map((cell) => [cellName(cell), cell] as const))(
+  it.each(
+    cells([{ shape: "W4" }], [{ shape: "S-phase" }]).map((cell) => [cellName(cell), cell] as const),
+  )(
     "%s：第一段 stopped(provider)；翻转后 resume 完成，已完结 ask 不再请求",
     async (_name, cell: CellCoordinate) => {
       // 先放行 K+1 个请求（恰好让一个子代理完整走完），之后一律 401：第一段停下时
@@ -87,17 +94,19 @@ describe("fault matrix · B15 flip — provider 停下后 resume 从断点续跑
         ).length;
         const requestsBefore = server.requests.length;
         const asks = FAULT_MATRIX_SHAPES[cell.shape].asks;
-        expect(completedBefore).toBeGreaterThanOrEqual(0);
         expect(completedBefore).toBeLessThan(asks);
 
         // 翻转 → resume。
         server.setProgram(healthy());
         // resume 是端口上的可选能力；本装配的 service 恒有它，缺席即装配错了。
         const resume = harness.service.resume;
-        expect(resume).toBeDefined();
         const resumed = await resume!(runId);
         expect(resumed).toMatchObject({ ok: true, runId });
-        await waitFor(() => settledEvents(harness, runId).length >= 2, CELL_TIMEOUT_MS - 5_000, "second run-settled");
+        await waitFor(
+          () => settledEvents(harness, runId).length >= 2,
+          CELL_TIMEOUT_MS - 5_000,
+          "second run-settled",
+        );
         await pause(POST_SETTLE_GRACE_MS);
         const second = await harness.service.getTask(runId);
         expect(second?.runStatus).toBe("completed");
@@ -274,6 +283,17 @@ describe("fault matrix · B18 close — 宿主关闭停下自己拥有的 run，
 
         const settledAt = first.settledAt(runId);
         expect(settledAt).toBeDefined();
+        // 2) close 之后零事件、零新请求。服务端可能在 close 返回后才收到此前已发出且
+        // 已取消的报文；到达计数不是启动计数，不能据此误判仍在重试。
+        const eventsAtClose = first.runEvents.length;
+        const requestsStartedAtClose = statusCount(first.statusEvents, "model_request_started");
+        expect(requestsStartedAtClose).toBeGreaterThan(0);
+        await pause(POST_SETTLE_GRACE_MS);
+        expect(first.runEvents.length).toBe(eventsAtClose);
+        expect(statusCount(first.statusEvents, "model_request_started")).toBe(
+          requestsStartedAtClose,
+        );
+        // 等观察窗口结束再核对迟到请求与取消回声，避免在报文到达前空验不变量。
         assertCommonInvariants(
           {
             runId,
@@ -286,12 +306,6 @@ describe("fault matrix · B18 close — 宿主关闭停下自己拥有的 run，
           { status: "stopped", stopReason: "interrupted", server },
         );
 
-        // 2) 关闭之后零事件、零请求：退避定时器全被撤，没有落后的进度事件。
-        const eventsAtClose = first.runEvents.length;
-        const requestsAtClose = server.requests.length;
-        await pause(POST_SETTLE_GRACE_MS);
-        expect(first.runEvents.length).toBe(eventsAtClose);
-        expect(server.requests.length).toBe(requestsAtClose);
         // 关闭之后的 launch 是接线错误，不是业务拒绝。
         await expect(first.service.resume!(runId)).rejects.toThrow(/service is closed/);
       } finally {
@@ -307,7 +321,6 @@ describe("fault matrix · B18 close — 宿主关闭停下自己拥有的 run，
       });
       try {
         const resume = second.service.resume;
-        expect(resume).toBeDefined();
         expect(await resume!(runId)).toMatchObject({ ok: true, runId });
         await waitFor(
           () => settledEvents(second, runId).length >= 1,

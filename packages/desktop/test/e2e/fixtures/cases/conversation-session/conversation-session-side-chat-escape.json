@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-side-chat-escape",
+  "spec": "./test/e2e/conversation-session/conversation-session-side-chat-escape.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-side-chat-escape.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "ssc-escape-title",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "标题请求只需正常完成，不参与 Esc 焦点路由断言。"
+    },
+    {
+      "id": "ssc-escape-running",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "主辅对话必须同时保持 running，以验证 Esc 焦点隔离和停止后的重复按键。"
+    },
+    {
+      "id": "ssc-escape-seed",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "只需建立可创建辅助对话的父 session；工具历史不参与键盘焦点回归。"
+    }
+  ]
+}

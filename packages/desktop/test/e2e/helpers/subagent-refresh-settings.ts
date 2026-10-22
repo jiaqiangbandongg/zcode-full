@@ -2,6 +2,7 @@ import { subagentUpdateCursor } from "./subagent-snapshot-wait.js";
 import { basename, join } from "node:path";
 import { stat } from "node:fs/promises";
 import { Key } from "webdriverio";
+import { encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
@@ -14,9 +15,8 @@ import {
   TID_SUBAGENT_ROW,
   TID_SUBAGENT_BUILT_IN_MODEL_TRIGGER,
   TID_TASK_SETTINGS_BUTTON,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clickTestIdByDom,
   waitForTestIdByDom,

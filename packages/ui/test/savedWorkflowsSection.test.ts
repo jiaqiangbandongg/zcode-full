@@ -2,7 +2,7 @@
 // 已保存工作流中枢「页」层（docs/dynamic-workflow/launch.md「The hub page」 + docs/dynamic-workflow/launch.md「Names and scopes」）：顶部固定「全局」组，
 // 其下按已打开项目分组。两个组都换成桩——桩把 props.onStateChange 回报由可控 map 驱动、暴露按钮，
 // 只看页层的组顺序、当前标记、总数（含全局）、空态（只看项目组）、spinner、刷新广播、详情态与深链。
-import { createElement, useEffect, type ReactNode } from "react";
+import { createElement, useEffect, useMemo, type ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -15,8 +15,8 @@ import {
   TID_WORKFLOW_GLOBAL_GROUP,
   TID_WORKFLOW_PROJECT_GROUP,
   resolveWorkspaceKey,
-  testId,
 } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 import {
   resetDynamicWorkflowAvailabilityStoreForTests,
@@ -57,6 +57,30 @@ vi.mock("@/lib/settingsNavigation.js", async (importOriginal) => ({
 
 vi.mock("@/store/TabStoreProvider.js", () => ({
   useTabStore: (selector: (state: typeof tabStoreState) => unknown) => selector(tabStoreState),
+}));
+// 页层只消费项目目录；单独 hook 测试覆盖 Host 身份和离线过滤。
+vi.mock("@/project-sidebar/useSavedWorkflowProjectOptions.js", () => ({
+  useSavedWorkflowProjectOptions: () =>
+    useMemo(
+      () =>
+        tabStoreState.tabs
+          .filter(
+            (tab) =>
+              tab.kind === "workspace" &&
+              tab.workspacePurpose !== "conversation" &&
+              tab.availability !== "unavailable",
+          )
+          .map((tab) => ({
+            projectId: tab.id,
+            hostId: tab.remoteSessionId ? "remote:server:test" : "local",
+            ...(tab.remoteSessionId
+              ? { workspaceIdentity: `remote:server:test:${tab.workspacePath}` }
+              : {}),
+            workspacePath: tab.workspacePath,
+            label: tab.label,
+          })),
+      [tabStoreState.tabs],
+    ),
 }));
 vi.mock("@/ControlHintTooltip.js", () => ({
   ControlHintTooltip: ({ children }: { children: ReactNode }) => children,
@@ -299,7 +323,11 @@ describe("SavedWorkflowsSection（全局 + 多项目页）", () => {
     const { onCreateViaChat } = mount({ workspacePath: "/a" });
     await screen.findByTestId(TID_WORKFLOWS_EMPTY);
     fireEvent.click(screen.getByTestId(TID_WORKFLOWS_CREATE_VIA_CHAT));
-    expect(onCreateViaChat.mock.calls[0]?.[1]).toEqual({ workspacePath: "/a" });
+    expect(onCreateViaChat.mock.calls[0]?.[1]).toEqual({
+      projectId: "t-/a",
+      hostId: "local",
+      workspacePath: "/a",
+    });
     expect(onCreateViaChat.mock.calls[0]?.[0]).toEqual(expect.stringContaining("保存到本项目"));
   });
 
@@ -350,6 +378,21 @@ describe("SavedWorkflowsSection（全局 + 多项目页）", () => {
     fireEvent.click(button);
     expect(settingsNavigation.setPendingSettingsSectionIntent).toHaveBeenCalledWith("general");
     expect(tabStoreState.openSettingsTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("服务端默认 disabled、用户选了始终开启：中枢在，「工作流设置」也在", async () => {
+    useDynamicWorkflowAvailabilityStore.setState({
+      status: "ready",
+      enabled: true,
+      config: applyDynamicWorkflowUserMode(
+        createDynamicWorkflowClientConfig("disabled", "default"),
+        "alwaysOn",
+      ),
+    });
+    groupReadiness.global = { loaded: true, empty: true, count: 0 };
+    mount();
+    const button = await screen.findByTestId(TID_WORKFLOWS_OPEN_SETTINGS);
+    expect(button.textContent).toContain("始终开启");
   });
 
   it("旧 Host 的快照没有 offeredMode：不出「工作流设置」链接（它要打开的设置行不存在）", async () => {

@@ -2,7 +2,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ServiceChannels } from "@zcode/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const originalHome = process.env.HOME;
@@ -75,7 +74,6 @@ describe("conversation share service composition", () => {
       });
       const service = services.get(servicesModule.IConversationShareService);
       expect(typeof service.getCapabilities).toBe("function");
-      expect(ServiceChannels.ConversationShare).toBe("conversation-share");
     } finally {
       // 修复原因：同步 dispose 后删 HOME，会让尚未收口的初始化/释放任务晚到写日志，
       // 与 Vitest worker 关闭日志 RPC 竞争；先等待服务释放，再由 afterEach 清理目录。

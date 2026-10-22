@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "provider-builtin-refresh-failure",
+  "spec": "./test/e2e/settings/provider-builtin-refresh-failure.test.ts",
+  "providerFixtures": [],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "E2E_BUILTIN_REFRESH_FAILURE_CONTROL",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "本机控制面返回非法 HTTP 下载地址，真实下载器拒绝；套餐身份复用本地账号控制面，无真实账号或付费模型请求。"
+    }
+  ]
+}

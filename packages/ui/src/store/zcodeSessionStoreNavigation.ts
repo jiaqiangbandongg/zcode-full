@@ -4,6 +4,7 @@
  * 从 zcodeSessionStore.ts 拆分出来，封装所有任务导航相关的初始状态和 action。
  * 通过 createNavigationSlice(set, get) 返回可直接展开到 store 的对象。
  */
+import { Emitter } from "@zcode/rpc";
 import {
   createTaskNavigationHistory,
   goBack as navGoBack,
@@ -13,6 +14,7 @@ import {
   removeTaskFromHistory,
   type AutomationsNavigationTab,
   type WorkspaceNavEntry,
+  type TaskNavEntry,
 } from "@/lib/taskNavigationHistory.js";
 import type { ZCodeSessionStoreState } from "./zcodeSessionStoreTypes.js";
 
@@ -23,6 +25,13 @@ type SetFn = (
     | ((state: ZCodeSessionStoreState) => ZCodeSessionStoreState | Partial<ZCodeSessionStoreState>),
 ) => void;
 type GetFn = () => ZCodeSessionStoreState;
+
+// 查看事实只由完整导航提交发布；tab 激活与历史游标移动都可能暴露缓存任务，不能代替提交。
+const taskNavigationCommitted = new Emitter<TaskNavEntry>();
+export const onTaskNavigationCommitted = taskNavigationCommitted.event;
+export function notifyTaskNavigationCommitted(target: Omit<TaskNavEntry, "kind">): void {
+  taskNavigationCommitted.fire({ kind: "task", ...target });
+}
 
 /**
  * 创建导航切片，供 store creator 展开使用：

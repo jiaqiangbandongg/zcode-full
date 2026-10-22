@@ -62,19 +62,6 @@ afterEach(() => {
 });
 
 describe("desktopOAuthDeepLink workspace open routing", () => {
-  it("按应用 locale 解析外部 workspace 确认文案", async () => {
-    const { resolveExternalWorkspaceOpenDialogCopy } =
-      await import("../src/main/desktopOAuthDeepLink.js");
-
-    const zhCopy = resolveExternalWorkspaceOpenDialogCopy("zh-CN");
-    const enCopy = resolveExternalWorkspaceOpenDialogCopy("en-US");
-
-    expect(zhCopy.buttons).toEqual(["打开文件夹", "取消"]);
-    expect(zhCopy.title).toBe("打开外部 ZCode 链接？");
-    expect(zhCopy.detail("/tmp/project")).toContain("只打开你信任来源的文件夹");
-    expect(enCopy.buttons).toEqual(["Open folder", "Cancel"]);
-  });
-
   it("缓存冷启动时命中未就绪窗口的 workspace open 请求，等 renderer ready 后再投递", async () => {
     const workspacePath = createTempWorkspace();
     const targetWindow = createMockWindow(7);

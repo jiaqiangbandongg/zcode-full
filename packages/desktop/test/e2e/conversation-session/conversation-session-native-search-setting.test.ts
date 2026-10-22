@@ -1,3 +1,5 @@
+import { DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
+import { openWorkspaceDraftFromSidebar } from "../helpers/workspace-agent-warmup.js";
 // NSE01-NSE04/NSE09：增强 Find/Grep 只在根 Session runtime 物化时读取全局设置。
 import {
   TID_SETTINGS_BACK_BUTTON,
@@ -7,12 +9,8 @@ import {
   TID_TASK_SETTINGS_BUTTON,
   TID_TOOL_SUMMARY_TRIGGER,
   testId,
-} from "@zcode/shared";
-import {
-  clearAppData,
-  clickTestIdByDom,
-  readSettings,
-} from "../helpers/desktop-app.js";
+} from "@zcode/shared/test-ids";
+import { clearAppData, clickTestIdByDom, readSettings } from "../helpers/desktop-app.js";
 import {
   expandAssistantHistoriesWithContent,
   expandVisibleToolCallGroups,
@@ -25,7 +23,6 @@ import {
   prepareV4ConversationE2E,
   selectV4TaskById,
   sendV4Prompt,
-  startNewV4Draft,
   waitForV4Pane,
   waitForV4TimelineContaining,
 } from "../helpers/v4-conversation.js";
@@ -70,7 +67,8 @@ describe("增强 Find 与 Grep Session 生命周期", () => {
     assertEnabledOutput(activeOutput);
     expect(readRgVersion(activeOutput)).toBe(expectedRgVersion);
 
-    await startNewV4Draft();
+    // 冷恢复夹具固定在项目目录；全局新建会创建独立 cwd，不能复用该目录的记录器。
+    await openWorkspaceDraftFromSidebar(DEFAULT_WORKSPACE);
     await sendV4Prompt("E2E_NSE_DISABLED_NEW 检查关闭增强搜索后的新会话");
     expect(await approveV4Permission()).toBe(true);
     await waitForV4TimelineContaining("E2E_NSE_DISABLED_NEW_DONE", 60_000);
@@ -104,9 +102,7 @@ describe("增强 Find 与 Grep Session 生命周期", () => {
     await sendV4Prompt("E2E_NSE_DISABLED_COLD_RESUME 冷恢复后检查最新关闭设置");
     expect(await approveV4Permission()).toBe(true);
     await waitForV4TimelineContaining("E2E_NSE_DISABLED_COLD_RESUME_DONE", 60_000);
-    const disabledColdResumeOutput = await waitForBashOutput(
-      DISABLED_COLD_RESUME_TOOL_CALL_ID,
-    );
+    const disabledColdResumeOutput = await waitForBashOutput(DISABLED_COLD_RESUME_TOOL_CALL_ID);
     assertDisabledOutput(disabledColdResumeOutput);
     expect(readRgVersion(disabledColdResumeOutput)).toBe(expectedRgVersion);
   });
@@ -130,10 +126,10 @@ async function openNativeSearchSettings(): Promise<void> {
     timeout: 15_000,
     timeoutMsg: "设置页没有常规分区入口",
   });
-  await browser.waitUntil(
-    async () => (await readNativeSearchSwitch()) !== null,
-    { timeout: 15_000, timeoutMsg: "常规设置没有增强 Find 与 Grep 开关" },
-  );
+  await browser.waitUntil(async () => (await readNativeSearchSwitch()) !== null, {
+    timeout: 15_000,
+    timeoutMsg: "常规设置没有增强 Find 与 Grep 开关",
+  });
 }
 
 async function closeSettings(expectedSessionId?: string): Promise<void> {
@@ -178,9 +174,7 @@ async function setNativeSearchEnhancementsEnabled(
 
 function readNativeSearchSwitch(): Promise<boolean | null> {
   return browser.execute((switchTestId) => {
-    const control = document.querySelector<HTMLElement>(
-      `[data-testid="${switchTestId}"]`,
-    );
+    const control = document.querySelector<HTMLElement>(`[data-testid="${switchTestId}"]`);
     if (!control) return null;
     return (
       control.getAttribute("aria-checked") === "true" ||
@@ -205,9 +199,7 @@ async function waitForBashOutput(toolCallId: string): Promise<string> {
       await expandVisibleToolCallGroups();
       await browser.execute(
         (id, summaryTriggerPrefix) => {
-          const block = document.querySelector<HTMLElement>(
-            `[data-tool-call-id="${id}"]`,
-          );
+          const block = document.querySelector<HTMLElement>(`[data-tool-call-id="${id}"]`);
           const trigger = block?.querySelector<HTMLElement>(
             `[data-testid^="${summaryTriggerPrefix}-"][aria-expanded]`,
           );

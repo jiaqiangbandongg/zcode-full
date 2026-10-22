@@ -9,11 +9,18 @@
   "fileFixtures": [],
   "requests": [
     {
+      "id": "conversation-share-ssh-write",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "回放只固定模型决策；Write、远端产物读取和分享发布均走真实链路。"
+    },
+    {
       "id": "conversation-share-ssh-main",
       "kind": "main",
-      "source": "synthetic",
       "timingPolicy": "fast-text",
-      "syntheticReason": "The case validates remote file authority and publication wiring, not model content."
+      "source": "synthetic",
+      "syntheticReason": "回放只固定模型决策；Write、远端产物读取和分享发布均走真实链路。"
     }
   ]
 }

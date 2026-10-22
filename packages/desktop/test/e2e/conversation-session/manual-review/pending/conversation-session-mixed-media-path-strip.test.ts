@@ -1,7 +1,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import type { ElectronMock } from "@wdio/electron-types";
-import { TID_CHAT_ATTACHMENT_BUTTON, TID_CHAT_ATTACHMENT_MENU_ITEM } from "@zcode/shared";
+import { TID_CHAT_ATTACHMENT_BUTTON, TID_CHAT_ATTACHMENT_MENU_ITEM } from "@zcode/shared/test-ids";
 import { clearAppData, DEFAULT_WORKSPACE } from "../../../helpers/desktop-app.js";
 import {
   assertUpstreamRequestCapture,

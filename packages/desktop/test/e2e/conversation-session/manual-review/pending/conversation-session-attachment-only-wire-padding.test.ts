@@ -1,6 +1,6 @@
 // T06W：附件-only query 的 UI/session 事实保持空正文，只在 provider wire 边界补一个空格。
 // 证据层 L3：真实 paste → begin/chunk/commit → draft firstInput → Anthropic Messages request matcher。
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import { waitForUpstreamNetworkCapture } from "../../../helpers/upstream-capture.js";
 import {

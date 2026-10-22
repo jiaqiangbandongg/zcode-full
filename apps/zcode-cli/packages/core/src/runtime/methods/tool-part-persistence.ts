@@ -63,6 +63,9 @@ export async function persistPendingToolPart(
       metadata: {
         ...projected.metadata,
         ...options.metadata,
+        ...(options.toolCall.modelCallWrapper
+          ? { modelCallWrapper: options.toolCall.modelCallWrapper }
+          : {}),
       },
       state: {
         status: "pending",

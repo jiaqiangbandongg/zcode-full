@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createNodeContextSourceAdapter } from "@zcode/adapters/context";
 import { createNodeExecutionAdapter } from "@zcode/adapters/exec";
 import { createNodeFileSystemAdapter } from "@zcode/adapters/fs";
@@ -142,6 +143,8 @@ export function createScriptWorkflowAgentRuntime(input: {
       // 「Permissions inside a run」）。
       mode: "yolo",
       modelSelection,
+      // 父 Shell 在首条输入才解析，子会话须继承已初始化的会话快照。
+      bashShellSelection: input.deps.runtime.getSessionShellSelection(),
       parentSessionId: input.deps.sessionId,
       subagents: { enabled: false },
       taskType: "workflow_child",
@@ -183,9 +186,7 @@ export function createScriptWorkflowAgentRuntime(input: {
       ...(input.workflowSubmitPort && input.workflowSubmitSchema
         ? { workflowSubmitSchema: input.workflowSubmitSchema }
         : {}),
-      ...(input.workflowEscalatePort
-        ? { workflowEscalatePort: input.workflowEscalatePort }
-        : {}),
+      ...(input.workflowEscalatePort ? { workflowEscalatePort: input.workflowEscalatePort } : {}),
       ...(input.modelRequestAdmission
         ? { modelRequestAdmission: input.modelRequestAdmission }
         : {}),
@@ -243,6 +244,7 @@ function createRuntimeDeps(
           caCertFile: deps.configResult.config.network.caCertFile,
         },
         outputRootDir: join(deps.storageRoot, "cli", "exec"),
+        bashOutputTempDir: tmpdir(),
         processEnv: deps.appOptions.env ?? process.env,
       }),
     fileSystemPort: deps.appOptions.fileSystemPort ?? createNodeFileSystemAdapter(),

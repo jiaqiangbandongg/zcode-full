@@ -3,7 +3,6 @@
 // 「The sidebar run line」）。纯函数、无时钟。
 import { describe, expect, it } from "vitest";
 import {
-  SESSION_WORKFLOW_ACTIVITY_MAX_RUNS,
   deriveSessionWorkflowActivity,
   sessionWorkflowActivitySchema,
   type BackgroundWorkSummary,
@@ -305,7 +304,6 @@ describe("deriveSessionWorkflowActivity", () => {
         work({ workId: "new-done", status: "failed", endedAt: 20 }),
       ],
     });
-    expect(activity?.runs).toHaveLength(SESSION_WORKFLOW_ACTIVITY_MAX_RUNS);
     expect(activity?.runs.map((entry) => entry.runId)).toEqual([
       "live-1",
       "live-2",

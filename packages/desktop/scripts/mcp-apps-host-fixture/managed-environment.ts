@@ -23,6 +23,7 @@ export async function managedEnvironment(root: string, node: string, cli: string
     rendererDir: root,
     aliasDir: root,
     preloadPath: join(root, "guest.cjs"),
+    logger: { warn: (message) => process.stderr.write(`${message}\n`) },
   });
   const wire = (p: any) => {
     const {
@@ -78,6 +79,21 @@ export async function managedEnvironment(root: string, node: string, cli: string
     },
   });
   agent.client.onNotification((event) => {
+    if (event.method === "v4/plugin-ui/tool-result") {
+      for (const win of windows) {
+        if (win.isDestroyed()) continue;
+        const scope = scopes.get(win.webContents.id);
+        if (scope?.sessionId === event.params.sessionId)
+          win.webContents.send("fixture-notification", {
+            kind: "ui-result",
+            value: {
+              ...event.params,
+              workspacePath: scope.workspace.workspacePath,
+            },
+          });
+      }
+      return;
+    }
     if (event.method !== "v4/conversation/frame") return;
     for (const win of windows) {
       if (
@@ -94,7 +110,7 @@ export async function managedEnvironment(root: string, node: string, cli: string
       scope: {
         ...scope.workspace,
         sessionId: scope.sessionId,
-        scope: { kind: "surface", surfaceId: "same" },
+        scope: { kind: "surface", surfaceId: scope.surface ?? "same" },
       },
       presentation: {
         pluginId: scope.pluginId,
@@ -110,6 +126,7 @@ export async function managedEnvironment(root: string, node: string, cli: string
     const scope = scopes.get(event.sender.id);
     assert.equal(params.sessionId, scope.sessionId);
     assert.equal(params.serverName, scope.serverName);
+    events.emit({ type: "bridge-arrived", method, owner: event.sender.id });
     const result = await ({ ...bridge, ...sampling } as any)[method](params);
     events.emit({ type: "bridge", method, owner: event.sender.id });
     await gates.get(`return:${method}`);
@@ -176,13 +193,13 @@ export async function managedEnvironment(root: string, node: string, cli: string
   });
   async function createWindow(scope: any, mode = "local") {
     const win = new BrowserWindow({
-      show: false,
+      show: mode.startsWith("background"),
       width: 1000,
       height: 700,
       webPreferences: {
         preload: join(root, "preload.cjs"),
         webviewTag: true,
-        backgroundThrottling: false,
+        backgroundThrottling: mode.startsWith("background"),
       },
     });
     windows.push(win);
@@ -204,6 +221,16 @@ export async function managedEnvironment(root: string, node: string, cli: string
       native.attachGuest({ guest, hostWebContents: win.webContents, sandboxId: pending.shift()! });
     });
     await win.loadFile(join(root, "managed.html"));
+    if (mode.endsWith("-minimized")) {
+      // 已加载的宿主窗口先最小化，再发起首个插件请求，覆盖真实后台创建时序。
+      await win.webContents.executeJavaScript("window.fixturePaused");
+      win.minimize();
+      await win.webContents
+        .executeJavaScript(`document.hidden || new Promise(resolve=>document.addEventListener('visibilitychange',function changed(){
+        if(document.hidden){document.removeEventListener('visibilitychange',changed);resolve()}
+      }))`);
+      await win.webContents.executeJavaScript("window.startFixture()");
+    }
     await win.webContents.executeJavaScript("window.harnessReady");
     if (mode !== "local" && mode !== "sampling") return win;
     await evaluateGuest(

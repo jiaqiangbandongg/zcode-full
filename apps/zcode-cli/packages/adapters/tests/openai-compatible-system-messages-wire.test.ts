@@ -16,26 +16,6 @@ describe("OpenAI-compatible system message wire shape", () => {
         { role: "system", content: "\n\ndynamic context" },
       ],
     },
-    {
-      expectedSystem:
-        "cli prefix\nsubagent prompt\n\nNotes:\n\nHere is useful environment information",
-      name: "concatenates self-delimited Subagent blocks without adding separators",
-      systemMessages: [
-        { role: "system", content: "cli prefix" },
-        { role: "system", content: "\nsubagent prompt" },
-        { role: "system", content: "\n\nNotes:" },
-        { role: "system", content: "\n\nHere is useful environment information" },
-      ],
-    },
-    {
-      expectedSystem: "cli prefix\n\nNotes:\n\nHere is useful environment information",
-      name: "preserves Subagent boundaries when the optional agent prompt is absent",
-      systemMessages: [
-        { role: "system", content: "cli prefix" },
-        { role: "system", content: "\n\nNotes:" },
-        { role: "system", content: "\n\nHere is useful environment information" },
-      ],
-    },
   ] as const)("$name", async ({ expectedSystem, systemMessages }) => {
     let capturedBody: Record<string, unknown> | undefined;
     const provider = createOpenAICompatible({

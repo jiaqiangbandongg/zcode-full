@@ -17,6 +17,111 @@ rules:
     - "evidence-only"
 
 nodes:
+  - id: "capability.tool-search"
+    kind: "capability"
+    label: "Provider-aware deferred ToolSearch"
+    aliases: ["ToolSearch", "工具搜索", "延迟工具加载"]
+    docs: ["apps/zcode-cli/docs/design/v2/tool/19-tool-search.md"]
+    codeSeeds:
+      - file: "apps/zcode-cli/packages/core/src/tool/search/exposure.ts"
+        symbol: "buildToolExposure"
+      - file: "apps/zcode-cli/packages/core/src/tool/search/history.ts"
+        symbol: "collectDiscoveredTools"
+    invariants:
+      - "Current provider and launch override decide exposure; genuine results and effective compact boundaries own discovery."
+      - "Pure output-token continuation reuses its announcement snapshot; disabled projection never mutates raw history."
+  - id: "surface.tool-search-settings"
+    kind: "ui-surface"
+    label: "General Settings ToolSearch mode"
+    docs: ["apps/zcode-cli/docs/design/v2/tool/19-tool-search.md"]
+    codeSeeds:
+      - file: "packages/ui/src/SettingsPage.tsx"
+        symbol: "SettingsPage"
+      - file: "packages/ui/src/settingsPageHelpers.tsx"
+        symbol: "GeneralSectionContent"
+      - file: "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/server-operations.ts"
+        symbol: "resolveSessionStartupPreferences"
+    invariants:
+      - "Host settings own auto/local/off (default off); new and cold-restored runtimes read once. Active runtimes and warm resumes stay fixed; forks inherit the parent."
+  - id: "evidence.tool-search-lifecycle"
+    kind: "evidence"
+    label: "ToolSearch Desktop, CLI/TUI E2E and Runtime HTTP integration"
+    docs: ["docs/testing/conversation-session-e2e-coverage-matrix.md"]
+    codeSeeds:
+      - file: "packages/desktop/test/e2e/conversation-session/conversation-session-toolsearch-lifecycle.test.ts"
+      - file: "packages/desktop/test/e2e/conversation-session/conversation-session-toolsearch-cli.test.ts"
+      - file: "packages/desktop/test/e2e/conversation-session/conversation-session-toolsearch-tui.test.ts"
+      - file: "packages/desktop/test/e2e/conversation-session/conversation-session-toolsearch-catalog.test.ts"
+
+  - id: "capability.preview-pane-image-actions"
+    kind: "capability"
+    label: "Preview Pane image copy, download and draft file reference"
+    aliases: ["图片下载", "添加图片到聊天", "右侧图片操作"]
+    docs: ["docs/ui/preview-pane-image-copy.md"]
+    codeSeeds:
+      - { file: "packages/ui/src/previewPaneImageContent.tsx", symbol: "ImagePreviewContent" }
+      - { file: "packages/ui/src/PreviewPane.tsx", symbol: "resolvePreviewPaneImageFileReference" }
+    invariants:
+      - "Add to chat appends a file mention to the current focused draft without sending; remote references require matching workspace identity."
+      - "Only image paths inside the source workspace become relative references; outside paths remain absolute."
+      - "Download keeps original image bytes and MIME; file-backed SVG reads original bytes through the source workspace file service; clipboard copy keeps PNG output."
+      - "Workspace identity guards do not alter desktop continuous or mobile replayable state."
+  - id: "service.image-preview-download"
+    kind: "service"
+    label: "Shared image download through platform saveFile or browser download"
+    codeSeeds:
+      - {
+          file: "packages/ui/src/components/ai-elements/image-preview-dialog.tsx",
+          symbol: "downloadImagePreview",
+        }
+  - id: "service.workspace-file-draft-reference"
+    kind: "service"
+    label: "Existing focused Composer file reference event"
+    codeSeeds:
+      - {
+          file: "packages/ui/src/lib/workspaceFileDrag.ts",
+          symbol: "dispatchWorkspaceFileAddToChat",
+        }
+      - {
+          file: "packages/ui/src/lib/workspaceFileComposer.ts",
+          symbol: "appendWorkspaceFileMentionToComposer",
+        }
+  - id: "capability.side-pane-scope"
+    kind: "capability"
+    label: "Side pane display and commands share workspace and conversation ownership"
+    aliases: ["侧栏归属", "关闭其他标签", "最近关闭标签"]
+    docs: ["docs/ui/side-pane-tabs.md", "docs/testing/side-pane-tabs-e2e-case-catalog.md"]
+    codeSeeds:
+      - file: "packages/ui/src/lib/workspaceSidePane.ts"
+        symbol: "isSidePaneTabVisibleInScope"
+      - file: "packages/ui/src/hooks/useAppPanels.ts"
+        symbol: "useAppPanels"
+    invariants:
+      - "Display, close selection, recent-closed and reopen share one workspace/owner predicate."
+      - "Browser close keeps main authority; async completion only removes selected IDs in the originating workspace."
+      - "Workspace-global tools remain global inside their workspace; intrinsic session owners and draft owners remain distinct."
+  - id: "surface.archive-management"
+    kind: "ui-surface"
+    label: "Archived chats in Data and statistics settings"
+    aliases: ["归档管理", "已归档的聊天"]
+    docs: ["docs/superpowers/specs/2026-09-11-archive-management.md"]
+    codeSeeds:
+      - symbol: "ArchiveManagement"
+        file: "packages/ui/src/project-sidebar/ArchiveManagement.tsx"
+      - symbol: "useArchiveManagement"
+        file: "packages/ui/src/project-sidebar/useArchiveManagement.ts"
+  - id: "state.virtual-project-directory"
+    kind: "state-owner"
+    label: "Shared Host project tree projection for sidebar, composer and settings"
+    codeSeeds:
+      - symbol: "ProjectDirectoryProvider"
+        file: "packages/ui/src/project-sidebar/ProjectDirectoryProvider.tsx"
+  - id: "service.project-task-mutation"
+    kind: "service"
+    label: "UI adapter to existing Controller and TaskService mutations"
+    codeSeeds:
+      - symbol: "mutateProjectTask"
+        file: "packages/ui/src/project-sidebar/task-mutation.ts"
   - id: "capability.permission-full-access"
     kind: "capability"
     label: "Approval full access updates task and pending input permissions"
@@ -39,6 +144,32 @@ nodes:
         symbol: "V4InteractionDialogs"
       - file: "packages/ui/src/PermissionDialog.tsx"
         symbol: "PermissionDialog"
+  - id: "capability.plugin-market-ui"
+    kind: "capability"
+    label: "Plugin market publisher classification and UI entry points"
+    aliases: ["插件市场", "社区插件", "UI 插件", "Side Pane 插件市场"]
+    docs:
+      [
+        "docs/plugins/plugin-market-interactions-scope.md",
+        "docs/plugin-management-lifecycle-case-catalog.md",
+      ]
+    codeSeeds:
+      - file: "packages/ui/src/settings/PluginStorePage.tsx"
+        symbol: "PluginStorePage"
+      - file: "packages/ui/src/settings/PluginsSection.tsx"
+        symbol: "PluginsSection"
+      - file: "packages/ui/src/settings/pluginStoreListing.ts"
+        symbol: "isUiPluginItem"
+      - file: "packages/ui/src/plugin-ui/adapters/useMarketPluginUi.ts"
+        symbol: "useMarketPluginUi"
+      - file: "packages/ui/src/store/pluginManagementStore.ts"
+        symbol: "createPluginManagementStore"
+    invariants:
+      - "Publisher, use category and validated UI capability are independent; search stays within the selected source segment."
+      - "Installation is user-scoped; project enabled/config overrides and restoring inheritance remain supported."
+      - "Main market and side pane share the page but keep separate query projections; CLI owns installed/configured state."
+      - "UI opening reuses an existing local desktop session; unsupported clients can browse/manage but cannot open surfaces."
+      - "Default recommendations are curated independently of installed/development plugins; closing a panel does not uninstall."
   - id: "capability.plugin-store-mode-order"
     kind: "capability"
     label: "Public plugin categories ordered by interface mode"
@@ -453,6 +584,7 @@ nodes:
       - "docs/ui/chat-model-select-menu.md"
       - "docs/chat/manual-model-switch-resolution-chain.md"
       - "docs/chat/new-task-model-resolution-chain.md"
+      - "docs/ui/composer-text-draft-persistence.md"
       - "docs/working-memory/provider-refactor/steps/todo-12-model-selection-validation-boundary-cutover.md"
       - "docs/working-memory/provider-refactor/steps/todo-13-target-host-model-selection-authority.md"
       - "docs/working-memory/provider-refactor/steps/todo-14-post-refactor-mechanical-zero.md"
@@ -1389,6 +1521,7 @@ nodes:
       - "闲时模型"
       - "闲时任务模型执行"
     docs:
+      - "docs/off-peak-task/background-lifecycle-plan.md"
       - "docs/working-memory/provider-refactor/steps/04-model-execution-cutover.md"
       - "docs/working-memory/provider-refactor/design/execution/execution.md"
       - "docs/working-memory/provider-refactor/design/registry/model-creation.md"
@@ -1405,14 +1538,21 @@ nodes:
         file: "apps/zcode-cli/packages/core/src/runtime/methods/turn-model.ts"
       - symbol: "ApiProviderModelRuntime"
         file: "apps/zcode-cli/packages/bootstrap/src/app/provider-registry-model-runtime.ts"
+      - symbol: "prepareOffPeakTurn"
+        file: "apps/zcode-cli/packages/core/src/runtime/off-peak/runtime.ts"
+      - symbol: "OffPeakTicketAuthority"
+        file: "apps/zcode-cli/packages/core/src/runtime/off-peak/model-binding.ts"
+      - symbol: "retainTitleModelContext"
+        file: "apps/zcode-cli/packages/core/src/runtime/methods/title-generation-sidecar.ts"
     invariants:
+      - "Implemented: per-session cliDefaultSelection is separate from Runtime Session continuation selection; idle background Agent/Bash and SendMessage share the existing scheduler. Ticket ownership lasts through whole-task completion without config or database migration."
       - "Z.ai and BigModel each own one complete hidden Off-Peak Built-in Provider in the ordinary Registry. Account connection enables only the current family; neither Provider changes family at execution time, and visibility filters only Provider Settings and Model Selection."
       - "3.12.2: supported local hosts advertise OffPeak tools without reading client/configs; OffPeakCreate validates gray configuration, plan and model in the Host handler before ticket/task creation. Page visibility and remote/subagent restrictions stay separate."
       - "Off-Peak submissions use one standard ModelSelection and the ordinary ModelFactory; request auth, ticket, attribution, and child override are narrow execution context rather than a second model config."
-      - "An idle turn never writes or restores App Recent, Configured Default, or Session Selection, and never enters the ordinary busy queue."
+      - "Idle execution temporarily sets in-memory Session Selection for owned continuations while persistence retains the ordinary selection. It never changes App Recent or Configured Default and never enters the ordinary busy queue; accepted user input takes over subsequent execution."
       - "Todo104 storage refinement: editing migrated Off-Peak tasks updates model_selection without clearing or back-writing the published model/thought_level columns; those columns remain rollback snapshots, not a second execution selection. New records need not synthesize legacy values."
       - "Permission approval or denial continues the same automatic turn on the idle model; no provider handoff occurs."
-      - "Foreground children create their own Model from the idle override and request auth; background children are rejected before a model request."
+      - "Foreground and background children create their own Model and retain a ticket lease. Default session titles freeze execution ownership before asynchronous reads, carry request auth and independently retain the ticket until settlement; explicit title models remain independent."
 
   - id: "capability.official-server-mcp"
     kind: "capability"
@@ -1534,6 +1674,12 @@ nodes:
         file: "packages/provider/src/config/provider-config.ts"
       - symbol: "AccountProviderService"
         file: "packages/provider/src/account-provider-service.ts"
+      - symbol: "ProjectAccessTokenClient"
+        file: "packages/shared/src/project-access-token-client.ts"
+      - symbol: "createAccountProjectTokenClient"
+        file: "packages/services/src/model-provider/accountProjectTokenClient.ts"
+      - symbol: "createCredentialService"
+        file: "packages/services/src/credential/credentialService.ts"
       - symbol: "ApiProviderModelRuntime"
         file: "apps/zcode-cli/packages/bootstrap/src/app/provider-registry-model-runtime.ts"
       - symbol: "RuntimeModelFactory"
@@ -1542,6 +1688,7 @@ nodes:
         file: "apps/zcode-cli/packages/bootstrap/src/app/provider-registry-model-runtime.ts"
     invariants:
       - "Model input/output format facts use the same properties.input_format/output_format shape in Config, Model, Runtime, and protocol; no parallel media capability DTO is authoritative."
+      - "Project location metadata is recoverable cache, not OAuth identity. Unreadable metadata is rechecked and conditionally removed under the shared credential-file lock before one bounded rebuild; valid OAuth and unrelated credentials remain intact. Superseded requests cannot recover or commit cache changes."
       - "Provider/Model Config overlays and Personal updates may be sparse; after resolve, validateComplete supplies diagnostics and Provider/Model requireComplete boundaries are the only path into Registry, whose configs and properties are statically complete."
       - "Concrete Providers resolve from an optional Provider Template baseline followed by Built-in Concrete Provider, Account Config when applicable, and Personal Config; Personal remains the final user override."
       - "Account Config is derived only for concrete Built-in Account Providers and does not inspect or constrain Personal-only Providers."
@@ -1700,6 +1847,7 @@ nodes:
       - "docs/remote/provider-provisioning.md"
       - "docs/remote-workspace-session-unified-settings.md"
       - "docs/working-memory/provider-refactor/steps/todo-56-remote-provider-provisioning-environment-sync.md"
+      - "docs/testing/r3-remote-automation-plan.md"
     codeSeeds:
       - symbol: "ProviderProvisioningEnvironmentCoordinator"
         file: "packages/desktop/src/main/providerProvisioningEnvironmentCoordinator.ts"
@@ -1712,6 +1860,9 @@ nodes:
       - "Provisioning is deduplicated by Remote Environment rather than Workspace, window, workspacePath, workspaceIdentity, or remoteSessionId; one lane provides single-flight plus a latest-state trailing refresh."
       - "Desktop Main coordinates only Environment identity, trigger, generation, and correlation metadata. The selected Local Host reads Config and allowlisted credentials and sends the envelope to the Remote Target; Main never receives Config or Secret values."
       - "Desktop continuous and Web remote replayable session-delivery semantics are invariant under Provider Provisioning."
+      - "R3 Environment keys remain transport-target-derived rather than sourceServerId-derived; different routes to one Source may provision separately."
+      - "Initial provisioning success gates workspace ready; reconnect registers the new remoteSessionId, and subsequent provisioning failure warns without tearing down the recovered workspace."
+      - "Static config is frozen in each created Model, not the entire Session; a subsequent ordinary turn creates a Model from the refreshed target Registry."
 
   - id: "capability.remote-file-actions"
     kind: "capability"
@@ -2111,12 +2262,12 @@ nodes:
       - "workspace task rows"
       - "项目任务列表"
     codeSeeds:
-      - symbol: "WorkspaceSidebar"
-        file: "packages/ui/src/WorkspaceSidebar.tsx"
-      - symbol: "SortableWorkspaceSidebarItem"
-        file: "packages/ui/src/SortableWorkspaceSidebar.tsx"
-      - symbol: "WorkspaceSidebarItem"
-        file: "packages/ui/src/WorkspaceSidebarItem.tsx"
+      - symbol: "ProjectSidebar"
+        file: "packages/ui/src/project-sidebar/index.tsx"
+      - symbol: "ProjectSections"
+        file: "packages/ui/src/project-sidebar/ProjectSections.tsx"
+      - symbol: "ProjectTaskRows"
+        file: "packages/ui/src/project-sidebar/ProjectTaskRows.tsx"
 
   - id: "capability.task-title-overflow-marquee"
     kind: "capability"
@@ -2182,16 +2333,47 @@ nodes:
 
   - id: "surface.grouped-task-list"
     kind: "ui-surface"
-    label: "Custom grouped task list"
+    label: "Controller-owned cross-host grouped task view"
     aliases:
       - "Group sidebar"
       - "grouped tasks"
       - "分组任务列表"
+    docs:
+      - "docs/superpowers/specs/2026-09-09-virtual-project-design.md"
+      - "docs/ui/task-grouped-view.md"
     codeSeeds:
-      - symbol: "WorkspaceGroupedTasksSection"
-        file: "packages/ui/src/WorkspaceGroupedTasksSection.tsx"
-      - symbol: "useGroupedTaskView"
-        file: "packages/ui/src/hooks/useGroupedTaskView.ts"
+      - symbol: "TaskGroupedView"
+        file: "packages/ui/src/project-sidebar/TaskGroupedView.tsx"
+      - symbol: "useTaskGroups"
+        file: "packages/ui/src/project-sidebar/useTaskGroups.ts"
+      - symbol: "TaskGroupRepository"
+        file: "packages/services/src/task-groups/repository.ts"
+
+  - id: "surface.sidebar-search-view"
+    kind: "ui-surface"
+    label: "Sidebar capsule search and project/group/recent view switcher with option icons"
+    aliases: ["侧栏搜索", "最近更新", "按项目", "按分组", "sidebar filter"]
+    docs:
+      - "docs/superpowers/specs/2026-09-09-virtual-project-design.md"
+    codeSeeds:
+      - symbol: "ProjectSidebarNavigation"
+        file: "packages/ui/src/project-sidebar/ProjectSidebarNavigation.tsx"
+      - symbol: "ProjectSidebar"
+        file: "packages/ui/src/project-sidebar/index.tsx"
+  - id: "state.sidebar-view-preference"
+    kind: "state-owner"
+    label: "Client-local sidebar view and expansion preference"
+    codeSeeds:
+      - symbol: "useProjectSidebarPreferences"
+        file: "packages/ui/src/project-sidebar/useProjectSidebarPreferences.ts"
+  - id: "surface.recent-task-list"
+    kind: "ui-surface"
+    label: "Unarchived tasks in strict CLI update-time order with date headings and two-line cwd/time rows"
+    codeSeeds:
+      - symbol: "selectProjectRows"
+        file: "packages/ui/src/project-sidebar/view.ts"
+      - symbol: "ProjectTaskRows"
+        file: "packages/ui/src/project-sidebar/ProjectTaskRows.tsx"
 
   - id: "surface.pinned-task-list"
     kind: "ui-surface"
@@ -2201,8 +2383,8 @@ nodes:
       - "已置顶"
       - "置顶任务列表"
     codeSeeds:
-      - symbol: "WorkspacePinnedTasksSection"
-        file: "packages/ui/src/WorkspacePinnedTasksSection.tsx"
+      - symbol: "ProjectTaskRows"
+        file: "packages/ui/src/project-sidebar/ProjectTaskRows.tsx"
 
   - id: "surface.mobile-remote-task-home"
     kind: "ui-surface"
@@ -2230,18 +2412,16 @@ nodes:
       - "docs/web-remote-control/web-remote-control-architecture.md"
     codeSeeds:
       - symbol: "WebRemoteControlDialog"
-        file: "packages/ui/src/WebRemoteControlDialog.tsx"
+        file: "packages/ui/src/web-remote-control/WebRemoteControlDialog.tsx"
 
   - id: "state.task-list-row-projection"
     kind: "state-owner"
     label: "Task list row and membership projection"
     codeSeeds:
-      - symbol: "useWorkspaceTaskLists"
-        file: "packages/ui/src/hooks/useWorkspaceTaskLists.ts"
-      - symbol: "buildTaskListResult"
-        file: "packages/ui/src/v4/buildTaskListResultFromSessions.ts"
-      - symbol: "buildGroupedTaskViewFromSessions"
-        file: "packages/ui/src/lib/buildGroupedTaskViewFromSessions.ts"
+      - symbol: "useProjectTree"
+        file: "packages/ui/src/project-sidebar/useProjectTree.ts"
+      - symbol: "applyProjectTaskActivities"
+        file: "packages/ui/src/project-sidebar/view.ts"
 
   - id: "state.preview-pane-office-render"
     kind: "state-owner"
@@ -2309,6 +2489,40 @@ nodes:
     codeSeeds:
       - symbol: "createZCodeTaskIndexSyncer"
         file: "packages/services/src/zcode-agent/zcodeTaskIndexSyncer.ts"
+
+  - id: "state.composer-text-draft"
+    kind: "state"
+    label: "Text-only Composer draft persistence"
+    docs: ["docs/ui/composer-text-draft-persistence.md", "docs/ui/project-task-draft-lifecycle.md"]
+    codeSeeds:
+      - {
+          file: "packages/ui/src/v4/composer/composerDraftStore.ts",
+          symbol: "persistV4ComposerDraft",
+        }
+      - {
+          file: "packages/ui/src/v4/composer/useDraftConfigControl.ts",
+          symbol: "useDraftConfigControl",
+        }
+      - { file: "packages/ui/src/lib/composerRecent.ts", symbol: "acceptComposerRecentReceipt" }
+      - { file: "packages/ui/src/v4/pendingCommandRegistry.ts", symbol: "PendingCommandRegistry" }
+      - {
+          file: "packages/ui/src/root/useRootWorkspaceActions.ts",
+          symbol: "useRootWorkspaceActions",
+        }
+      - { file: "packages/services/src/project/index.ts", symbol: "createProjectService" }
+      - {
+          file: "packages/ui/src/v4/composer/composerDraftWorkspaceTransfer.ts",
+          symbol: "captureV4ComposerDraftHandoff",
+        }
+      - {
+          file: "packages/ui/src/v4/composer/composerDraftStore.ts",
+          symbol: "clearV4ComposerDraftTaskGroup",
+        }
+    invariants:
+      - "A Root draft with no original ModelSelection adopts the first valid target-host preferredSelection when providers become ready, preserving text, editor state, permission and Plan. Existing selections, including invalid ones, and existing/imported Sessions are never replaced by this rule. Recent still changes only on accepted Submission."
+      - "Only non-whitespace text creates a durable draft. Empty controls stay in the active Composer; New Task initializes from client-local host/project Recent; unclassified tasks have their own scope. Session restoration keeps draft text/model but takes permission and Plan from the current snapshot."
+      - "Historical grant/Plan records establish an observation baseline on entry; only newly observed changes update the mounted Composer. Observation IDs are never persisted in drafts. Reads are side-effect free."
+      - "Project/group creation intent accompanies durable text. Project ID isolates Root drafts even when primary roots match; formal session drafts retain workspace/session identity. Accepted user Submission updates frozen project Recent through the pending command registry. A pending task draft ID reuses its directory until accepted and protects later drafts from late acknowledgements."
 
   - id: "surface.conversation-model-control"
     kind: "ui-surface"
@@ -3155,7 +3369,7 @@ nodes:
 
   - id: "service.session-runtime-activation"
     kind: "service"
-    label: "Persisted session runtime activation"
+    label: "Persisted session history-first and runtime activation"
     docs:
       - "docs/v4-refactor/17-cold-resume-runtime-activation.md"
     codeSeeds:
@@ -3396,7 +3610,7 @@ nodes:
       - "docs/superpowers/specs/2026-08-14-cua-final-raster-integrity-contract.md"
       - "docs/cua/2026-08-18-frame-pixel-zoom-regression.md"
     codeSeeds:
-      - file: "apps/zcode-cli/packages/zcode-cua-plugin/upstream.json"
+      - file: "packages/zcode-cua/package.json"
       - file: "apps/zcode-cli/packages/core/src/mcp/index.ts"
     invariants:
       - "Official CUA raster bytes and adjacent image_ref reach the model unchanged."
@@ -3437,7 +3651,7 @@ nodes:
       - "docs/cua/2026-08-24-cua-node-repl-sdk-migration-spec.md"
     codeSeeds:
       - symbol: "createComputerUseRuntime"
-        file: "../zcode-cua/src/tools/computer-use-runtime.ts"
+        file: "packages/zcode-cua/src/tools/computer-use-runtime.ts"
       - symbol: "setupComputerUseRuntime"
         file: "apps/zcode-cli/packages/zcode-cua-plugin/scripts/computer-use-client.mjs"
     invariants:
@@ -4313,6 +4527,14 @@ nodes:
       - symbol: "createWebRemoteControlSharedHostAttachments"
         file: "packages/desktop/src/main/webRemoteControlSharedHostAttachments.ts"
 
+  - id: "evidence.r3-remote-automation-plan"
+    kind: "evidence"
+    label: "Planned R3 post-merge real remote automation cases and readiness inventory"
+    docs:
+      - "docs/testing/r3-remote-automation-plan.md"
+      - "docs/testing/r3-remote-automation-case-matrix.md"
+      - "docs/archive/remote-r3/r3-remote-automation-readiness-2026-09-07.md"
+
   - id: "state.window-host-controller-projection"
     kind: "state-owner"
     label: "Window Host workspace and task projection"
@@ -4368,8 +4590,36 @@ nodes:
       - "统一多端架构"
       - "多 Server 管理"
     docs:
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+      - "docs/archive/remote-r3/r3-source-server-remote-impact-brief.md"
       - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
       - "docs/architecture/zcode-code-architecture-overview.md"
+
+  - id: "capability.remote-environment-compatibility"
+    kind: "capability"
+    label: "Remote Source Server environment compatibility"
+    aliases:
+      - "SSH systemd fallback"
+      - "remote daemon capability"
+      - "远端环境兼容"
+      - "SSH 服务管理器探测"
+    docs:
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+      - "docs/archive/remote-r3/r3-source-server-remote-impact-brief.md"
+      - "docs/archive/remote-r3/r3-source-server-release-test-plan.md"
+    codeSeeds:
+      - symbol: "createSourceServerTransportAdapter"
+        file: "packages/server/src/source-server/transportAdapter.ts"
+      - symbol: "runServerCli"
+        file: "packages/zcode-server-cli/src/cli.ts"
+      - symbol: "registerService"
+        file: "packages/zcode-server-cli/src/platform/serviceManager.ts"
+      - symbol: "detectRemoteAssetTools"
+        file: "packages/server/src/remote/remoteAssetPreflight.ts"
+      - symbol: "writeStableLauncher"
+        file: "packages/zcode-server-cli/src/runtime/stableLauncher.ts"
+      - symbol: "stageRelease"
+        file: "packages/zcode-server-cli/src/packaging/stage.ts"
 
   - id: "surface.multi-server-controller-ui"
     kind: "ui-surface"
@@ -4382,32 +4632,212 @@ nodes:
       - file: "packages/web/src/main.tsx"
       - file: "packages/desktop/src/renderer/src/main.tsx"
 
+  - id: "capability.remote-conversation-workspace"
+    kind: "capability"
+    label: "Source-scoped legacy conversation data (UI retired)"
+    aliases:
+      - "remote no-project chat"
+      - "remote conversation backing workspace"
+      - "远程无项目聊天"
+      - "远程任务聊天"
+    docs:
+      - "docs/architecture/remote-domain-simplification-and-conversation-workspace-spec.md"
+      - "docs/superpowers/specs/2026-07-10-non-project-conversation-workspace-design.md"
+    codeSeeds:
+      - symbol: "ensureConversationWorkspace"
+        file: "packages/services/src/file/file.ts"
+      - symbol: "useRemoteWorkspaceHistory"
+        file: "packages/ui/src/root/useRemoteWorkspaceHistory.ts"
+      - symbol: "RemoteConnectionDeviceStep"
+        file: "packages/ui/src/RemoteConnectionDialogContent.tsx"
+
+  - id: "capability.remote-device-connection-ux"
+    kind: "capability"
+    label: "Remote device connection naming, status presentation, and entry routing"
+    aliases:
+      - "remote device connection"
+      - "SSH alias device name"
+      - "remote connection step 4"
+      - "远程设备连接"
+      - "连接状态"
+      - "收起远程连接弹窗"
+    docs:
+      - "docs/architecture/remote-device-connection-ux-spec.md"
+      - "docs/remote/project-first-remote-navigation-spec.md"
+      - "docs/collapsible-remote-connection-dialog.md"
+      - "docs/ui/ssh-config-alias.md"
+    codeSeeds:
+      - symbol: "SourceServerDirectory.recordHandshake"
+        file: "packages/desktop/src/host/sourceServerDirectory.ts"
+      - symbol: "RemoteConnectionDialog"
+        file: "packages/ui/src/SSHDialog.tsx"
+      - symbol: "SourceServerManagementPanel"
+        file: "packages/ui/src/settings/SourceServerManagementPanel.tsx"
+      - symbol: "RemoteProjectConnectionDetails"
+        file: "packages/ui/src/WorkspaceSidebar/RemoteProjectConnectionDetails.tsx"
+
+  - id: "surface.remote-device-settings"
+    kind: "ui-surface"
+    label: "Settings remote device and connection profile management"
+    codeSeeds:
+      - symbol: "SourceServerManagementPanel"
+        file: "packages/ui/src/settings/SourceServerManagementPanel.tsx"
+      - symbol: "useSourceServerManagementSnapshot"
+        file: "packages/ui/src/hooks/useSourceServerManagementSnapshot.ts"
+
+  - id: "surface.remote-connection-device-picker"
+    kind: "ui-surface"
+    label: "Remote connection device picker and project selection flow"
+    codeSeeds:
+      - symbol: "RemoteConnectionDeviceStep"
+        file: "packages/ui/src/RemoteConnectionDialogContent.tsx"
+      - symbol: "SSHDialog"
+        file: "packages/ui/src/SSHDialog.tsx"
+
+  - id: "surface.remote-source-task-sidebar"
+    kind: "ui-surface"
+    label: "Flat project sidebar and local projectless tasks"
+    codeSeeds:
+      - symbol: "WorkspaceSidebar"
+        file: "packages/ui/src/WorkspaceSidebar.tsx"
+      - symbol: "partitionWorkspaceTabsByPurpose"
+        file: "packages/ui/src/lib/workspacePurpose.ts"
+
+  - id: "shared.source-server-update-action"
+    kind: "shared-ui"
+    label: "Source Server guarded update action"
+    docs:
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+    codeSeeds:
+      - symbol: "runSourceServerUpdate"
+        file: "packages/ui/src/lib/sourceServerUpdateAction.ts"
+      - symbol: "createSourceServerUpdateNotificationController"
+        file: "packages/ui/src/root/sourceServerUpdateNotifications.ts"
+      - symbol: "ToastMessageView"
+        file: "packages/ui/src/components/ui/toast.tsx"
+
+  - id: "state.source-server-update-operation-progress"
+    kind: "state-owner"
+    label: "Host-owned Source Server update operation progress"
+    docs:
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+    codeSeeds:
+      - symbol: "createSourceServerManagementService"
+        file: "packages/desktop/src/host/sourceServerManagementService.ts"
+      - symbol: "useSourceServerOperationLogs"
+        file: "packages/ui/src/hooks/useSourceServerOperationLogs.ts"
+      - symbol: "SourceServerUpdateActivity"
+        file: "packages/ui/src/settings/SourceServerUpdateActivity.tsx"
+
+  - id: "state.remote-workspace-ui-projection"
+    kind: "state-owner"
+    label: "Unified remote device, open workspace, attachment, and purpose projection"
+    codeSeeds:
+      - symbol: "useSourceServerManagementSnapshot"
+        file: "packages/ui/src/hooks/useSourceServerManagementSnapshot.ts"
+      - symbol: "partitionWorkspaceTabsByPurpose"
+        file: "packages/ui/src/lib/workspacePurpose.ts"
+      - symbol: "useRemoteWorkspaceHistory"
+        file: "packages/ui/src/root/useRemoteWorkspaceHistory.ts"
+
+  - id: "service.remote-workspace-intent-controller"
+    kind: "service"
+    label: "Remote device/workspace intent controller"
+    docs:
+      - "docs/architecture/remote-domain-simplification-and-conversation-workspace-spec.md"
+    codeSeeds:
+      - symbol: "useRemoteWorkspaceHistory"
+        file: "packages/ui/src/root/useRemoteWorkspaceHistory.ts"
+      - symbol: "SourceServerConnectionManager"
+        file: "packages/desktop/src/host/sourceServerConnectionManager.ts"
+      - symbol: "createWindowRemoteConnectionRegistry"
+        file: "packages/desktop/src/host/windowRemoteConnectionRegistry.ts"
+
+  - id: "persistence.remote-open-workspace-set"
+    kind: "persistence"
+    label: "Remote open workspace set with project/conversation purpose"
+    docs:
+      - "docs/architecture/remote-domain-simplification-and-conversation-workspace-spec.md"
+      - "docs/remote-workspace-session-unified-settings.md"
+    codeSeeds:
+      - symbol: "buildRemoteWorkspacePersistPatch"
+        file: "packages/ui/src/root/remoteWorkspaceSessionPersistence.ts"
+      - symbol: "readPersistedWorkspaceSessionEntries"
+        file: "packages/ui/src/lib/remoteWorkspaceHistory.ts"
+
+  - id: "surface.source-settings-scope"
+    kind: "ui-surface"
+    label: "Non-Provider Settings Source user/server and project scope routing"
+    docs:
+      - "docs/archive/remote-r3/r3-provider-refactor-merge.md"
+    codeSeeds:
+      - symbol: "SettingsPage"
+        file: "packages/ui/src/SettingsPage.tsx"
+      - symbol: "useWorkspaceServicesResolution"
+        file: "packages/ui/src/hooks/useWorkspaceServices.tsx"
+
+  - id: "service.source-settings-attachment"
+    kind: "service"
+    label: "Desktop-only Source user/server settings attachment"
+    codeSeeds:
+      - symbol: "createSourceSettingsServiceCollection"
+        file: "packages/desktop/src/host/sourceSettingsServiceCollection.ts"
+      - symbol: "createWindowHostAttachmentRegistry"
+        file: "packages/desktop/src/host/windowHostAttachmentRegistry.ts"
+
+  - id: "persistence.source-workspace-migration-ledger"
+    kind: "persistence"
+    label: "Source workspace canonical alias, phase ledger and conflict report"
+    codeSeeds:
+      - symbol: "SourceServerWorkspaceAliasRepo"
+        file: "packages/services/src/session/sourceServerWorkspaceAliasRepo.ts"
+
   - id: "state.controller-server-directory"
     kind: "state-owner"
     label: "Controller-local server connections and aggregate projection"
     docs:
-      - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+    codeSeeds:
+      - symbol: "SourceServerDirectory"
+        file: "packages/desktop/src/host/sourceServerDirectory.ts"
 
   - id: "service.zcode-stable-launcher"
     kind: "service"
-    label: "Planned stable launcher, bootstrap, and version runtime manager"
+    label: "Stable launcher, bootstrap, and version runtime manager"
     docs:
-      - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
+      - "docs/architecture/r2-server-cli-and-daemon.md"
+    codeSeeds:
+      - symbol: "ReleaseManager"
+        file: "packages/zcode-server-cli/src/runtime/releaseManager.ts"
+      - symbol: "resolveCoreServerId"
+        file: "packages/zcode-server-cli/src/server-core/serverIdentity.ts"
 
   - id: "service.multi-server-controller"
     kind: "service"
-    label: "Planned Desktop and Lite multi-server connection controller"
+    label: "Desktop Source Server connection and logical session controller"
     docs:
-      - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
+      - "docs/architecture/r3-source-server-remote-architecture.md"
     codeSeeds:
-      - symbol: "connectRemote"
-        file: "packages/server/src/remote/connect.ts"
+      - symbol: "SourceServerConnectionManager"
+        file: "packages/desktop/src/host/sourceServerConnectionManager.ts"
+      - symbol: "createWindowRemoteConnectionRegistry"
+        file: "packages/desktop/src/host/windowRemoteConnectionRegistry.ts"
       - symbol: "createRemoteWorkspaceSessionManager"
         file: "packages/desktop/src/main/desktopRemoteSessions.ts"
 
+  - id: "service.source-server-workspace-mapper"
+    kind: "service"
+    label: "Source Server Core canonical workspace identity mapper"
+    docs:
+      - "docs/architecture/r3-source-server-remote-architecture.md"
+    codeSeeds:
+      - symbol: "createSourceServerWorkspaceService"
+        file: "packages/services/src/source-server-workspace/sourceServerWorkspaceService.ts"
+      - file: "packages/zcode-server-cli/src/server-core/http.ts"
+
   - id: "persistence.zcode-server-identity"
     kind: "persistence"
-    label: "Planned persistent server identity and server-local workspace registry"
+    label: "Persistent Source Server installation identity"
     docs:
       - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
 
@@ -4424,6 +4854,11 @@ nodes:
     docs:
       - "docs/architecture/unified-zcode-lite-server-multi-server-plan.md"
       - "docs/architecture/rpc.md"
+    codeSeeds:
+      - symbol: "createSourceServerTransportAdapter"
+        file: "packages/server/src/source-server/transportAdapter.ts"
+      - symbol: "connectServerRemoteOverDuplex"
+        file: "packages/desktop/src/host/serverRemoteConnection.ts"
 
   - id: "evidence.browser-screenshot-surface-tests"
     kind: "evidence"
@@ -4554,6 +4989,27 @@ nodes:
     codeSeeds:
       - file: "packages/desktop/test/browserGuestManager.test.ts"
       - file: "packages/ui/test/UnifiedBrowserView.test.ts"
+
+  - id: "capability.project-creation-folder-confirmation"
+    kind: "capability"
+    label: "Project creation folder confirmation"
+    aliases: ["创建项目信任文件夹", "项目目录确认", "project folder trust confirmation"]
+    docs: ["docs/specs/project-creation-folder-confirmation.md"]
+    codeSeeds:
+      - symbol: "ProjectFolderTrustDialog"
+        file: "packages/ui/src/project-sidebar/ProjectFolderTrustDialog.tsx"
+      - symbol: "ProjectEditor"
+        file: "packages/ui/src/project-sidebar/ProjectEditor.tsx"
+
+  - id: "surface.project-creation-form"
+    kind: "ui-surface"
+    label: "Project creation form and selected folder draft"
+    docs: ["docs/specs/project-creation-folder-confirmation.md"]
+    codeSeeds:
+      - symbol: "ProjectCreation"
+        file: "packages/ui/src/project-sidebar/ProjectCreation.tsx"
+      - symbol: "ProjectEditor"
+        file: "packages/ui/src/project-sidebar/ProjectEditor.tsx"
 
   - id: "capability.workspace-hook-persistent-trust"
     kind: "capability"
@@ -4996,7 +5452,12 @@ nodes:
     kind: "capability"
     label: "Bot group and topic collaboration"
     aliases: ["群聊机器人", "话题续接", "ReplyToChannel", "渠道提及", "Bot 历史附件"]
-    docs: ["docs/bots-feishu-group-collaboration.md", "docs/bots-topic-input-materials.md", "docs/testing/bots-e2e-coverage-matrix.md"]
+    docs:
+      [
+        "docs/bots-feishu-group-collaboration.md",
+        "docs/bots-topic-input-materials.md",
+        "docs/testing/bots-e2e-coverage-matrix.md",
+      ]
     codeSeeds:
       - file: "packages/services/src/bots/botsService.ts"
         symbol: "createBotsService"
@@ -5019,7 +5480,82 @@ nodes:
       - file: "packages/ui/src/v4/BotTopicPreparation.tsx"
         symbol: "BotTopicPreparationList"
 
+  - id: "shared-ui.tool-presentation"
+    kind: "shared-ui"
+    label: "Common App and share readonly tool presentation"
+    aliases: ["WebFetch", "Fetch", "工具公开展示"]
+    docs: ["docs/ui/tool-display-rendering.md", "docs/conversation-share-v1.md"]
+    codeSeeds:
+      - symbol: "ToolPresentation"
+        file: "packages/ui/src/ToolCallBlocks/ToolPresentation.tsx"
+      - symbol: "resolveToolCallRenderer"
+        file: "packages/ui/src/ToolCallBlocks/resolveRenderer.ts"
+
+  - id: "surface.conversation-share-tool-timeline"
+    kind: "ui-surface"
+    label: "Public and imported readonly tool timeline"
+    codeSeeds:
+      - symbol: "ConversationShareReadonlyTimeline"
+        file: "packages/ui/src/v4/ConversationShareReadonlyTimeline.tsx"
+
 edges:
+  - from: "capability.tool-search"
+    to: "surface.tool-search-settings"
+    type: "renders-in"
+    rank: "must-inspect"
+    condition: "Settings supplies the immutable startup policy through the existing Host preference request."
+  - from: "capability.tool-search"
+    to: "evidence.tool-search-lifecycle"
+    type: "verified-by"
+    rank: "evidence-only"
+
+  - from: "surface.conversation-model-control"
+    to: "state.composer-text-draft"
+    type: "commits-to"
+    rank: "must-inspect"
+  - from: "state.composer-text-draft"
+    to: "boundary.workspace-key"
+    type: "isolated-by"
+    rank: "must-inspect"
+  - from: "capability.preview-pane-image-actions"
+    to: "service.image-preview-download"
+    type: "commits-to"
+    rank: "must-inspect"
+  - from: "capability.shared-image-preview"
+    to: "service.image-preview-download"
+    type: "shares-component"
+    rank: "must-inspect"
+  - from: "capability.preview-pane-image-actions"
+    to: "service.workspace-file-draft-reference"
+    type: "commits-to"
+    rank: "must-inspect"
+  - from: "service.workspace-file-draft-reference"
+    to: "boundary.workspace-key"
+    type: "isolated-by"
+    rank: "must-inspect"
+  - from: "capability.plugin-market-ui"
+    to: "capability.plugin-source-acquisition"
+    type: "commits-to"
+    rank: "must-inspect"
+    condition: "Both marketplace surfaces reuse user-scoped installation, refresh, update and uninstall."
+  - from: "capability.plugin-market-ui"
+    to: "state.workspace-plugin-effective-config"
+    type: "projects-from"
+    rank: "must-inspect"
+    condition: "Project pause/configuration remain overrides; global defaults and other projects stay isolated."
+  - from: "capability.side-pane-scope"
+    to: "capability.workspace-identity"
+    type: "isolated-by"
+    rank: "must-inspect"
+  - from: "surface.conversation-tool-call"
+    to: "shared-ui.tool-presentation"
+    type: "shares-component"
+    rank: "must-inspect"
+  - from: "surface.conversation-share-tool-timeline"
+    to: "shared-ui.tool-presentation"
+    type: "shares-component"
+    rank: "must-inspect"
+    condition: "Public snapshots and product default grouping; no runtime authority or interactive plugin UI."
   - from: "capability.permission-full-access"
     to: "surface.permission-full-access"
     type: "renders-in"
@@ -6923,9 +7459,14 @@ edges:
     rank: "must-inspect"
   - from: "service.session-runtime-activation"
     to: "state.conversation-projection"
-    type: "activates-before-hydration"
+    type: "coordinates-history-and-runtime-readiness"
     rank: "must-inspect"
-    condition: "V4 cold subscribe preserves runtime/config/workspace/restore-warning side effects but must not materialize a legacy full session snapshot. One gateway READY promise covers activation and projection hydration; query and command wait before reading current facts."
+    condition: "Negotiated historyFirst publishes durable history before runtime activation. The gateway owns both readiness stages: rows range uses history readiness, runtime queries wait, and new execution commands reject until ready. Legacy clients still wait for full initialization."
+  - from: "service.session-runtime-activation"
+    to: "state.workflow-run-journal"
+    type: "gates-runtime-query"
+    rank: "must-inspect"
+    condition: "SessionPane enables workflow journal queries only after runtime readiness; subscribing to history must precede any query that could activate a cold runtime."
   - from: "service.session-runtime-activation"
     to: "boundary.desktop-continuous"
     type: "must-not-change-delivery"
@@ -7131,9 +7672,9 @@ edges:
     condition: "Context, output limits, input/output formats, options, and reasoning mappings come from Built-in Model Config Rules rather than Host inference."
   - from: "capability.off-peak-model-execution"
     to: "capability.subagents"
-    type: "overrides-foreground-child-selection-for"
+    type: "overrides-owned-child-selection-for"
     rank: "must-inspect"
-    condition: "Each foreground child creates its own Model with the idle selection and request auth; background children fail closed before requesting a model."
+    condition: "Each foreground/background child creates its own Model with the idle selection and request auth. Running child rounds keep their model; after user takeover, subsequent resumes and wakeups use the accepted user selection."
   - from: "capability.off-peak-model-execution"
     to: "state.off-peak-turn-attribution"
     type: "attributes-actual-model-through"
@@ -7349,10 +7890,6 @@ edges:
     type: "renders-in"
     rank: "must-inspect"
   - from: "capability.task-title-overflow-marquee"
-    to: "surface.grouped-task-list"
-    type: "renders-in"
-    rank: "must-inspect"
-  - from: "capability.task-title-overflow-marquee"
     to: "surface.pinned-task-list"
     type: "renders-in"
     rank: "must-inspect"
@@ -7367,10 +7904,6 @@ edges:
     rank: "should-inspect"
     condition: "Presentation must not mutate membership, navigation, activity, or workspace identity."
   - from: "capability.task-persistence"
-    to: "surface.grouped-task-list"
-    type: "renders-in"
-    rank: "must-inspect"
-  - from: "capability.task-persistence"
     to: "surface.pinned-task-list"
     type: "renders-in"
     rank: "must-inspect"
@@ -7378,19 +7911,10 @@ edges:
     to: "state.task-list-row-projection"
     type: "projects-from"
     rank: "must-inspect"
-  - from: "surface.grouped-task-list"
-    to: "state.task-list-row-projection"
-    type: "projects-from"
-    rank: "must-inspect"
   - from: "surface.pinned-task-list"
     to: "state.task-list-row-projection"
     type: "projects-from"
     rank: "must-inspect"
-  - from: "surface.grouped-task-list"
-    to: "surface.pinned-task-list"
-    type: "renders-alongside"
-    rank: "must-inspect"
-    condition: "Desktop Group view renders the global pinned section above the grouped body; pinned tasks are excluded from the grouped body so each task appears once."
   - from: "state.task-list-row-projection"
     to: "service.zcode-task-list"
     type: "queries-through"
@@ -7985,11 +8509,210 @@ edges:
     to: "surface.multi-server-controller-ui"
     type: "renders-in"
     rank: "must-inspect"
+  - from: "capability.remote-conversation-workspace"
+    to: "surface.remote-connection-device-picker"
+    type: "must-not-open-through"
+    rank: "must-inspect"
+    condition: "Device picker connects a Source Profile and requires a project directory. Legacy remote conversation data remains stored but has no UI creation or history entry."
+  - from: "capability.remote-device-connection-ux"
+    to: "surface.remote-device-settings"
+    type: "renders-status-and-connect-entry-in"
+    rank: "must-inspect"
+    condition: "Settings presents device and unbound Profile connectivity without exposing identification/line concepts; user connect actions open the global wizard at the connecting step."
+  - from: "capability.remote-device-connection-ux"
+    to: "surface.remote-source-task-sidebar"
+    type: "renders-status-and-connect-entry-in"
+    rank: "must-inspect"
+    condition: "Remote projects remain visible in one global project order, including offline and legacy identities; project connection actions retain the exact directory in the global wizard."
+  - from: "capability.remote-device-connection-ux"
+    to: "surface.remote-connection-device-picker"
+    type: "routes-profile-intent-through"
+    rank: "must-inspect"
+    condition: "A preferred Profile intent loads credentials and enters wizard step 4 before the Host connection call; install, upgrade, retry, and errors stay in that flow, while success selects a project directory or opens the explicitly requested project."
+  - from: "capability.remote-device-connection-ux"
+    to: "capability.remote-conversation-workspace"
+    type: "must-not-default-profile-connect-success-to"
+    rank: "must-inspect"
+    condition: "All user-clicked Profile connections are project flows; no remote projectless draft is created. Explicit directory intent survives install, upgrade and credential interaction."
+  - from: "capability.remote-device-connection-ux"
+    to: "state.remote-workspace-ui-projection"
+    type: "projects-display-state-from"
+    rank: "must-inspect"
+    condition: "The UI hides pending/unbound terminology without deleting Source/Profile ownership state or changing aggregation."
+  - from: "capability.remote-device-connection-ux"
+    to: "service.multi-server-controller"
+    type: "commits-connect-through"
+    rank: "must-inspect"
+    condition: "The dialog remains the only user-click connection commit seam; background reconnect and recovery keep their existing service path."
+  - from: "capability.remote-device-connection-ux"
+    to: "capability.workspace-identity"
+    type: "must-not-rekey"
+    rank: "invariant-only"
+    condition: "SSH alias and device display names are presentation/default metadata and never participate in device identity, Profile matching, or workspaceKey."
+  - from: "capability.remote-device-connection-ux"
+    to: "boundary.desktop-continuous"
+    type: "must-not-change-delivery"
+    rank: "invariant-only"
+  - from: "capability.remote-device-connection-ux"
+    to: "boundary.web-remote-replayable"
+    type: "must-remain-isolated-from"
+    rank: "invariant-only"
+    condition: "Desktop UI entry routing does not create a Mobile runtime, remote session, or replayable recovery path."
+  - from: "capability.remote-conversation-workspace"
+    to: "surface.remote-source-task-sidebar"
+    type: "is-hidden-from"
+    rank: "must-inspect"
+    condition: "Only local projectless tasks remain in the task section. Remote conversation tasks are hidden in groups, pinned, timeline, archive, search and startup restoration without deleting data."
+  - from: "capability.remote-conversation-workspace"
+    to: "capability.workspace-identity"
+    type: "isolates-by"
+    rank: "must-inspect"
+    condition: "Each Source Server has one idempotent conversation backing workspace; purpose does not participate in identity."
+  - from: "capability.remote-conversation-workspace"
+    to: "state.remote-workspace-ui-projection"
+    type: "projects-through"
+    rank: "must-inspect"
+    condition: "Settings, device picker, and sidebar consume one read projection but filter different row sets."
+  - from: "state.remote-workspace-ui-projection"
+    to: "state.controller-server-directory"
+    type: "joins-authoritative-device-facts-from"
+    rank: "must-inspect"
+  - from: "state.remote-workspace-ui-projection"
+    to: "state.desktop-tab-restore-projection"
+    type: "joins-open-workspace-membership-from"
+    rank: "must-inspect"
+    condition: "Restore/reload mutations are not interpreted as user-close and open membership remains distinct from known workspace history."
+  - from: "service.remote-workspace-intent-controller"
+    to: "service.multi-server-controller"
+    type: "dispatches-device-and-workspace-intents-through"
+    rank: "must-inspect"
+    condition: "User connection completion selects a project; open-project, disconnect-device, reconnect-workspace and user-close retain explicit intent origins. Legacy conversation data is not exposed through UI intents."
+  - from: "state.remote-workspace-ui-projection"
+    to: "persistence.remote-open-workspace-set"
+    type: "reads-and-persists"
+    rank: "must-inspect"
+    condition: "Remote purpose is optional for old data, defaults to project, and conversation backing paths are excluded from project history/count projections."
+  - from: "capability.remote-conversation-workspace"
+    to: "boundary.desktop-continuous"
+    type: "must-not-change-delivery"
+    rank: "invariant-only"
+  - from: "capability.remote-conversation-workspace"
+    to: "boundary.web-remote-replayable"
+    type: "reuses-existing-attachment-without-creating-runtime"
+    rank: "invariant-only"
+    condition: "Mobile hides remote projectless history while preserving local conversation and remote project attachments; no new runtime or recovery mechanism is introduced."
+  - from: "capability.unified-zcode-lite-server"
+    to: "capability.remote-environment-compatibility"
+    type: "depends-on"
+    rank: "must-inspect"
+    condition: "SSH/WSL/Docker bootstrap must select daemon ownership from observed remote capabilities instead of transport labels alone."
+  - from: "capability.unified-zcode-lite-server"
+    to: "surface.remote-device-settings"
+    type: "renders-required-update-in"
+    rank: "must-inspect"
+  - from: "capability.unified-zcode-lite-server"
+    to: "surface.remote-connection-device-picker"
+    type: "renders-required-update-in"
+    rank: "must-inspect"
+    condition: "An incompatible Server can be updated in place and the original connect intent resumes after the new handshake."
+  - from: "capability.unified-zcode-lite-server"
+    to: "surface.remote-source-task-sidebar"
+    type: "notifies-required-update-in"
+    rank: "must-inspect"
+    condition: "Reconnect failures defer to one actionable management toast instead of adding a duplicate bare error."
+  - from: "surface.remote-device-settings"
+    to: "shared.source-server-update-action"
+    type: "commits-update-through"
+    rank: "must-inspect"
+  - from: "surface.remote-connection-device-picker"
+    to: "shared.source-server-update-action"
+    type: "commits-update-through"
+    rank: "must-inspect"
+  - from: "surface.remote-source-task-sidebar"
+    to: "shared.source-server-update-action"
+    type: "commits-toast-update-through"
+    rank: "must-inspect"
+  - from: "shared.source-server-update-action"
+    to: "service.multi-server-controller"
+    type: "commits-to"
+    rank: "must-inspect"
+    condition: "Every entry first updates with force=false; only the running-task guard can lead to explicit force=true confirmation."
+  - from: "service.multi-server-controller"
+    to: "state.source-server-update-operation-progress"
+    type: "publishes-ephemeral-progress-to"
+    rank: "must-inspect"
+    condition: "Structured phase, message and real transfer progress stay in memory and never enter Source persistence."
+  - from: "state.source-server-update-operation-progress"
+    to: "surface.remote-device-settings"
+    type: "renders-in"
+    rank: "must-inspect"
+  - from: "state.source-server-update-operation-progress"
+    to: "surface.remote-connection-device-picker"
+    type: "renders-in"
+    rank: "must-inspect"
+  - from: "shared.source-server-update-action"
+    to: "boundary.web-remote-replayable"
+    type: "must-remain-isolated-from"
+    rank: "invariant-only"
+    condition: "Source management update actions remain Desktop-only and do not create a Mobile runtime or management channel."
+  - from: "capability.remote-environment-compatibility"
+    to: "service.zcode-stable-launcher"
+    type: "selects-service-or-detached-owner-for"
+    rank: "must-inspect"
+    condition: "Unavailable user service manager falls back; a reachable manager whose registration fails remains fatal."
+  - from: "capability.remote-environment-compatibility"
+    to: "boundary.unified-server-transport"
+    type: "probes-before-bootstrap"
+    rank: "must-inspect"
+    condition: "Daemon error JSON, archive tools and executable staging are validated before handshake without changing upper RPC semantics."
+  - from: "capability.remote-environment-compatibility"
+    to: "capability.build-release-engineering"
+    type: "constrains-posix-archive-output-of"
+    rank: "must-inspect"
+    condition: "macOS staging must omit host xattr/PAX metadata so Linux extraction does not flood diagnostics or alter release evidence."
+  - from: "capability.remote-environment-compatibility"
+    to: "evidence.ssh-remote-p0-e2e"
+    type: "covered-by"
+    rank: "evidence-only"
   - from: "surface.multi-server-controller-ui"
     to: "state.controller-server-directory"
     type: "projects-from"
     rank: "must-inspect"
     condition: "Desktop and Lite keep independent controller-local connection lists; attached Mobile reuses the selected controller directory."
+  - from: "capability.unified-zcode-lite-server"
+    to: "surface.source-settings-scope"
+    type: "renders-source-selection-in"
+    rank: "must-inspect"
+  - from: "surface.source-settings-scope"
+    to: "service.source-settings-attachment"
+    type: "commits-user-server-scope-to"
+    rank: "must-inspect"
+    condition: "A selected remote Source uses its Desktop-only source-settings attachment even when no workspace is open; offline never falls back to base services."
+  - from: "surface.source-settings-scope"
+    to: "boundary.window-host-scoped-service-attachment"
+    type: "commits-project-scope-to"
+    rank: "must-inspect"
+    condition: "Project scope selects an open workspace that belongs to the selected Source and keeps workspaceIdentity?.trim() || workspacePath isolation."
+  - from: "service.source-settings-attachment"
+    to: "boundary.web-remote-replayable"
+    type: "must-remain-unavailable-to"
+    rank: "invariant-only"
+    condition: "Mobile may read Source facts from existing workspace/task projection but cannot call management or source-settings channels."
+  - from: "capability.unified-zcode-lite-server"
+    to: "capability.remote-provider-provisioning"
+    type: "provisions-remote-config-through"
+    rank: "must-inspect"
+    condition: "Local model settings trigger automatic replace-style provisioning; the Remote Environment stores and Registry remain execution authorities. The removed manual provider-sync journal is not a recovery path."
+  - from: "capability.unified-zcode-lite-server"
+    to: "evidence.r3-remote-automation-plan"
+    type: "has-planned-regression-evidence"
+    rank: "evidence-only"
+    condition: "Cases and materials are planned or inventoried; the plan is not proof of runtime coverage."
+  - from: "service.source-server-workspace-mapper"
+    to: "persistence.source-workspace-migration-ledger"
+    type: "resolves-and-recovers-through"
+    rank: "must-inspect"
+    condition: "Abandoned paths stay open on the frozen canonical until explicit retry; resume-time conflicts fail the current phase before partial rekey can complete."
   - from: "state.controller-server-directory"
     to: "service.multi-server-controller"
     type: "connects-through"
@@ -8018,6 +8741,15 @@ edges:
     rank: "must-inspect"
     condition: "Global references use serverId plus server-local workspaceIdentity; workspacePath remains execution/display only."
   - from: "capability.unified-zcode-lite-server"
+    to: "service.source-server-workspace-mapper"
+    type: "maps-canonical-identity-through"
+    rank: "must-inspect"
+    condition: "Only the remote Core RPC seam maps controller-stable identity to the R3 canonical legacy storage key; Desktop Host and Mobile never own canonical storage identity."
+  - from: "service.source-server-workspace-mapper"
+    to: "capability.workspace-identity"
+    type: "preserves-controller-identity-for"
+    rank: "must-inspect"
+  - from: "capability.unified-zcode-lite-server"
     to: "capability.prompt-attachment-materialization"
     type: "replaces-host-path-with-resource-store-for"
     rank: "must-inspect"
@@ -8025,7 +8757,7 @@ edges:
     to: "persistence.zcode-resource-store"
     type: "persists-source-server-resource-to"
     rank: "must-inspect"
-    condition: "Long paste, image, and file bytes commit to the consuming Source Server before prompt admission."
+    condition: "Future/R4 boundary only: R3 retains the existing prompt-attachment-transfer contract and does not deliver Resource Store."
   - from: "capability.unified-zcode-lite-server"
     to: "capability.provider-registry"
     type: "keeps-server-local-and-syncs-explicitly"
@@ -8044,6 +8776,17 @@ edges:
     to: "boundary.web-remote-replayable"
     type: "must-not-change-recovery"
     rank: "invariant-only"
+
+  - from: "capability.project-creation-folder-confirmation"
+    to: "surface.project-creation-form"
+    type: "renders-in"
+    rank: "must-inspect"
+    condition: "Every creation with selected folders requires explicit confirmation, including folders used by another project. No persistent folder trust record; local zero-root projects skip confirmation and retain lazy default-directory creation."
+  - from: "capability.project-creation-folder-confirmation"
+    to: "capability.workspace-hook-persistent-trust"
+    type: "must-not-mutate"
+    rank: "invariant-only"
+    condition: "Confirmed boundary: project folder confirmation only acknowledges access for this creation; Hook declarations retain their existing independent trust and admission rules."
 
   - from: "capability.workspace-hook-persistent-trust"
     to: "surface.workspace-hook-settings-trust-row"
@@ -8328,6 +9071,21 @@ edges:
     type: "projects-banner-without-changing"
     rank: "invariant-only"
 
+  - from: "surface.archive-management"
+    to: "state.virtual-project-directory"
+    type: "reads-projection-from"
+    rank: "must-inspect"
+    condition: "Archived rows group by Host + virtual project ID, never root path; settings and workspace share one directory owner."
+  - from: "surface.archive-management"
+    to: "service.project-task-mutation"
+    type: "commits-through"
+    rank: "must-inspect"
+    condition: "Unarchive and confirmed deletion keep complete workspace identity; bulk results do not fabricate success for failed rows."
+  - from: "service.project-task-mutation"
+    to: "service.zcode-task-list"
+    type: "delegates-to"
+    rank: "must-inspect"
+    condition: "Existing Controller routing and service commands preserve Host organization and CLI existence ownership."
   - from: "capability.background-bash-output"
     to: "service.zcode-agent-connection-scope"
     type: "queries-through"
@@ -8341,6 +9099,30 @@ edges:
     type: "preserves"
     rank: "invariant-only"
 
+  - from: "surface.sidebar-search-view"
+    to: "state.sidebar-view-preference"
+    type: "commits-display-preference-to"
+    rank: "must-inspect"
+    condition: "Only localStorage view changes; Shell navigation and Host facts stay unchanged."
+  - from: "surface.sidebar-search-view"
+    to: "surface.recent-task-list"
+    type: "selects"
+    rank: "must-inspect"
+  - from: "surface.recent-task-list"
+    to: "state.virtual-project-directory"
+    type: "projects-from"
+    rank: "must-inspect"
+    condition: "Include all visible unarchived rows, including pinned; no running-first or project/Host grouping."
+  - from: "surface.project-task-list"
+    to: "state.virtual-project-directory"
+    type: "projects-from"
+    rank: "must-inspect"
+    condition: "Controller-local mixed project order by hostId/projectId; running-first task order with updated-time ordinary rows."
+  - from: "state.sidebar-view-preference"
+    to: "state.virtual-project-directory"
+    type: "owned-by"
+    rank: "must-inspect"
+    condition: "Sidebar and composer share one directory owner; view never changes composer project order."
   - from: "surface.composer-at-context-picker"
     to: "service.composer-host-file-search"
     type: "options-from"

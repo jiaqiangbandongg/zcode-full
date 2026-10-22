@@ -5,12 +5,16 @@ export interface ConfirmDialogRequest {
   title: string;
   testId?: string;
   description?: string;
+  /** E2E/可访问性使用的稳定业务语义，不依赖本地化标题文本。 */
+  intent?: string;
   /** 特定业务弹框的稳定视觉规范；默认确认框不受影响。 */
-  presentation?: "automation-confirmation";
+  presentation?: "automation-confirmation" | "source-server-boundary";
   confirmLabel?: string;
   cancelLabel?: string;
   confirmVariant?: "default" | "destructive";
   showCloseButton?: boolean;
+  /** 需要用户显式确认的告知弹窗：隐藏取消，并忽略遮罩/Escape 关闭。 */
+  requiredAcknowledgement?: boolean;
   showKeyboardHints?: boolean;
   compact?: boolean;
   checkbox?: { label: string; onCheckedChange: (checked: boolean) => void };

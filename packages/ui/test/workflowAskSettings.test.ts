@@ -4,7 +4,8 @@
 // 外观与键盘见 docs/dynamic-workflow/presentation.md「The confirmation window」）：纯规则逐条穷举，
 // 真实 DOM 上钉两句话、改过的那一行、选项描述、Allow 应答带出去的 content、「不可用」的门与 Shift+Tab。
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER, type ZCodePermissionRequest } from "@zcode/shared";
+import { type ZCodePermissionRequest } from "@zcode/shared";
+import { TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER } from "@zcode/shared/test-ids";
 import type { ConversationSnapshot } from "@zcode/shared/zcode-protocol-v4";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";

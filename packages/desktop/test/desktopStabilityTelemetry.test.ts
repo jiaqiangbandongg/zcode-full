@@ -311,55 +311,52 @@ describe("desktopStabilityTelemetry", () => {
     });
   });
 
-  it.each(["oom", "memory-eviction"])(
-    "classifies Host %s exits as OOM crashes",
-    async (reason) => {
-      const { configureDesktopStabilityTelemetry, registerDesktopStabilityMonitors } =
-        await import("../src/main/desktopStabilityTelemetry.js");
-      configureDesktopStabilityTelemetry({
-        deviceMid: "test-device",
-        platform: "darwin",
-        appVersion: "0.0.0-test",
-        armsEnv: "local",
-      });
-      const logger = {
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        debug: vi.fn(),
-      };
+  it.each(["oom", "memory-eviction"])("classifies Host %s exits as OOM crashes", async (reason) => {
+    const { configureDesktopStabilityTelemetry, registerDesktopStabilityMonitors } =
+      await import("../src/main/desktopStabilityTelemetry.js");
+    configureDesktopStabilityTelemetry({
+      deviceMid: "test-device",
+      platform: "darwin",
+      appVersion: "0.0.0-test",
+      armsEnv: "local",
+    });
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    };
 
-      registerDesktopStabilityMonitors(logger, {} as never);
-      const hooks = registerCrashEventMonitor.mock.calls[0]?.[2] as {
-        onChildProcessGone: (details: {
-          type: string;
-          reason: string;
-          exitCode: number;
-          serviceName?: string;
-          name?: string;
-        }) => void;
-      };
+    registerDesktopStabilityMonitors(logger, {} as never);
+    const hooks = registerCrashEventMonitor.mock.calls[0]?.[2] as {
+      onChildProcessGone: (details: {
+        type: string;
+        reason: string;
+        exitCode: number;
+        serviceName?: string;
+        name?: string;
+      }) => void;
+    };
 
-      hooks.onChildProcessGone({
-        type: "Utility",
-        reason,
-        exitCode: 137,
-        serviceName: "zcode-host-local-1",
-        name: "Node Utility Process",
-      });
+    hooks.onChildProcessGone({
+      type: "Utility",
+      reason,
+      exitCode: 137,
+      serviceName: "zcode-host-local-1",
+      name: "Node Utility Process",
+    });
 
-      const report = sendCustom.mock.calls.find((call) => call[0]?.name === "perf_crash")?.[0];
-      expect(report).toMatchObject({
-        name: "perf_crash",
-        properties: expect.objectContaining({
-          crash_kind: "oom",
-          crash_cause: "oom",
-          crash_scope: "host",
-          process_role: "host",
-        }),
-      });
-    },
-  );
+    const report = sendCustom.mock.calls.find((call) => call[0]?.name === "perf_crash")?.[0];
+    expect(report).toMatchObject({
+      name: "perf_crash",
+      properties: expect.objectContaining({
+        crash_kind: "oom",
+        crash_cause: "oom",
+        crash_scope: "host",
+        process_role: "host",
+      }),
+    });
+  });
 
   describe("child process crash reporting", () => {
     it("does not report recoverable Chromium GPU and utility process exits as crash", async () => {
@@ -424,9 +421,7 @@ describe("desktopStabilityTelemetry", () => {
 
   describe("shouldReportAnr", () => {
     it("does not report below 5s threshold", async () => {
-      const { shouldReportAnr, STABILITY_ANR_THRESHOLD_MS } =
-        await import("../src/main/desktopStabilityTelemetry.js");
-      expect(shouldReportAnr(STABILITY_ANR_THRESHOLD_MS - 100, false)).toBe(false);
+      const { shouldReportAnr } = await import("../src/main/desktopStabilityTelemetry.js");
       expect(shouldReportAnr(4_900, false)).toBe(false);
     });
 

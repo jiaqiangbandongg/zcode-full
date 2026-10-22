@@ -54,12 +54,6 @@ describe("formatTaskNotification（local_workflow）：三终态词", () => {
     expect(text).not.toContain("resumable as-is");
   });
 
-  it("stopped(model)：你自己 TaskStop 停的", () => {
-    const text = formatTaskNotification({ ...BASE, runStatus: "stopped", stopReason: "model" });
-    expect(text).toContain("<stop-reason>model</stop-reason>");
-    expect(text).toContain("You stopped this workflow with TaskStop.");
-  });
-
   it("stopped(interrupted)：指引直接给出 ResumeWorkflowRun 与 run_id", () => {
     const text = formatTaskNotification({
       ...BASE,
@@ -158,8 +152,10 @@ describe("formatTaskNotification（local_workflow）：三终态词", () => {
     );
   });
 
-  it("stopped(model) 不带 scriptPath：那一句不出现，其余逐字节不变", () => {
+  it("stopped(model) 不带 scriptPath：说明由模型停止、下次直接修订，不给文件路径", () => {
     const text = formatTaskNotification({ ...BASE, runStatus: "stopped", stopReason: "model" });
+    expect(text).toContain("<stop-reason>model</stop-reason>");
+    expect(text).toContain("You stopped this workflow with TaskStop.");
     expect(text).toContain(
       "(Next time, amend the running run directly: AmendWorkflow stops it for you.)",
     );

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createWebRemoteControlLifecycleRecovery } from "../src/webRemoteControlLifecycle.js";
+import { createWebRemoteControlLifecycleRecovery } from "#src/web-remote-control/index.js";
 
 class FakeDocument extends EventTarget {
   visibilityState: DocumentVisibilityState = "visible";

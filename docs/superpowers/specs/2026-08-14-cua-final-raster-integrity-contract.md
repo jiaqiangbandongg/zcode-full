@@ -7,7 +7,7 @@
 
 上游设计：飞书 `O3s2dIIooo1uuExdipOcVJ9Vnvg`，revision 75（V3）。
 
-producer 实现：`zcode-cua@4a3c507dd16f3ed840e87bc92e709ce339e6a4f3`（producer SDK feature 原子 pin；包含 image-first、transport 内部 frame 绑定与 raster-only 恢复指引）。
+producer 实现：workspace 包 `packages/zcode-cua`（导入基线 `zcode-cua@4a3c507dd16f3ed840e87bc92e709ce339e6a4f3`；包含 image-first、transport 内部 frame 绑定与 raster-only 恢复指引）。
 
 revision 同时包含 0.5.7 producer surface 简化、最终栅格/Zoom 权威、WindowServer
 截图点击、window-event Ghost Cursor 反馈、Helper 更名及 `PERMISSION_REQUIRED` 授权指引，

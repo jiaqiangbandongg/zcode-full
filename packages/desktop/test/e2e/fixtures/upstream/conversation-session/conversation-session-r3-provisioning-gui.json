@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-provisioning-gui",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-provisioning-gui.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-provisioning-gui-reconnect-title",
+      "description": "Provisioning 任务标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_PROVISIONING_GUI"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-provisioning-gui-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH cold reconnect\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-provisioning-gui-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "r3-provisioning-gui-reconnect-main",
+      "description": "Provisioning 首发、新 Provider 与配置失败/重连/恢复后的续发响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "只验证配置、目标与任务历史；同步 RPC 故障由真实 SSH 回包代理和目录权限控制，模型回复无需人为延迟。"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_R3_PROVISIONING_GUI_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-provisioning-gui-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"R3_PROVISIONING_GUI_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-provisioning-gui-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

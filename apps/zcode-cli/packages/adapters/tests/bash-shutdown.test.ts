@@ -35,7 +35,7 @@ async function main() {
     setInterval(() => {}, 1000);
     return;
   }
-  const adapter = new NodeExecutionAdapter({ outputRootDir: root });
+  const adapter = new NodeExecutionAdapter({ outputRootDir: root, ...(mode === 'crash' ? { bashOutputTempDir: root } : {}) });
   const controller = new AbortController();
   const request = {
     command: {
@@ -51,16 +51,21 @@ async function main() {
   const options = { signal: controller.signal, onEvent: (event) => {
     if (event.type === 'started') console.log('ROOT_PID ' + event.pid);
   } };
-  const pending = mode === 'background'
+  const pending = mode === 'background' || mode === 'crash'
     ? adapter.runBashWithBackgroundLifecycle(request, { mode: 'explicit' }, options)
     : adapter.run(request, options);
-  const background = mode === 'background' ? await pending : undefined;
+  const background = mode === 'background' || mode === 'crash' ? await pending : undefined;
   if (background) console.log('ROOT_PID ' + background.task.pid);
   const deadline = Date.now() + 5000;
   while (true) {
     try { await access(ready); break; } catch {}
     if (Date.now() >= deadline) throw new Error('Worker did not start');
     await sleep(20);
+  }
+  if (mode === 'crash') {
+    console.log('OUTPUT_PATH ' + background.task.outputPath);
+    await new Promise(() => {});
+    return;
   }
   if (mode === 'abort') controller.abort();
   if (mode === 'background') await adapter.cancelBackgroundTask(background.task.taskId);
@@ -104,6 +109,38 @@ describe.skipIf(process.platform === "win32")("Bash shutdown in an isolated Node
   afterAll(async () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
+
+  it("keeps named tmp output when the host is killed without cleanup", async () => {
+    const root = join(directory, "crash");
+    await mkdir(root);
+    const child = spawn(process.execPath, [driver, "crash", root], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    child.stdout!.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+    try {
+      await vi.waitFor(() => expect(stdout).toContain("OUTPUT_PATH "), { timeout: 10_000 });
+      const path = /OUTPUT_PATH ([^\r\n]+)/u.exec(stdout)![1]!;
+      expect(path).toContain("zcode-bash-");
+      expect(await readFile(path, "utf8")).toBe("root output");
+      child.kill("SIGKILL");
+      await closed;
+      expect(await readFile(path, "utf8")).toBe("root output");
+    } finally {
+      child.kill("SIGKILL");
+      const pid = Number(/ROOT_PID (\d+)/u.exec(stdout)?.[1]);
+      if (pid > 1) {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch {
+          /* 清理测试子进程。 */
+        }
+      }
+    }
+  }, 15_000);
 
   it.each(["abort", "close", "background", "timeout", "output_limit"])(
     "finishes cleanup before process exit after %s",

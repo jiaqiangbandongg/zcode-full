@@ -1,4 +1,6 @@
 import { expect, it, vi } from "vitest";
+// 大型工厂模块在准备阶段加载，避免转换开销占用端口行为用例的超时预算。
+import { createWorkspaceZCodeApp } from "../src/zcode-protocol/workspace-model-runtime.js";
 import { createProviderRuntimeHeadersPort } from "../src/zcode-protocol/provider-runtime-headers.js";
 import type { ZCodeProtocolAgentServerContext } from "../src/zcode-protocol/server-types.js";
 import type { ZCodeAppOptions } from "../src/app/types.js";
@@ -9,8 +11,6 @@ const workspace = {
   workspaceKey: "ssh:host:/work",
 };
 it("真实工厂同样装配唯一请求端口，完整账号事实透传而不写旧 ModelRef", async () => {
-  const { createWorkspaceZCodeApp } =
-    await import("../src/zcode-protocol/workspace-model-runtime.js");
   const requestAuth = { apiKey: "team-key", headers: { "X-Team": "team-a" } };
   const requestClient = vi.fn(
     async (_method: string, _params: ZCodeProviderRuntimeHeadersRequestParams) => ({

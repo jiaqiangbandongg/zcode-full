@@ -12,6 +12,7 @@ const UTF16LE_BOM = [0xff, 0xfe] as const;
 const LEGACY_CHINESE_ENCODINGS = ["gb2312", "gbk", "gb18030"] as const;
 const BINARY_CONTROL_BYTE_THRESHOLD = 0.3;
 const MAX_DETECTION_TRAILING_DROP_BYTES = 3;
+const MAX_UTF8_SEQUENCE_BYTES = 4;
 const NON_TEXT_ENCODINGS = new Set(["base64", "base64url", "hex"]);
 
 type LegacyChineseEncoding = (typeof LEGACY_CHINESE_ENCODINGS)[number];
@@ -133,7 +134,11 @@ function roundTripsWithOptionalTrailingDrop(
   encoding: LegacyChineseEncoding,
 ): boolean {
   if (buffer.length === 0) return true;
-  for (let drop = 0; drop <= Math.min(MAX_DETECTION_TRAILING_DROP_BYTES, buffer.length); drop += 1) {
+  for (
+    let drop = 0;
+    drop <= Math.min(MAX_DETECTION_TRAILING_DROP_BYTES, buffer.length);
+    drop += 1
+  ) {
     const candidate = drop === 0 ? buffer : buffer.subarray(0, buffer.length - drop);
     if (candidate.length === 0) continue;
     const decoded = iconv.decode(candidate, encoding);
@@ -143,8 +148,27 @@ function roundTripsWithOptionalTrailingDrop(
   return false;
 }
 
+export function getUtf8CompletionBytes(buffer: Buffer): number {
+  // 这里只计算尾部候选所缺的字节；补齐后仍须严格校验，不能据此确认编码。
+  let start = buffer.length - 1;
+  const earliestStart = Math.max(0, buffer.length - MAX_UTF8_SEQUENCE_BYTES);
+  while (start > earliestStart && (buffer[start]! & 0xc0) === 0x80) start -= 1;
+  const lead = buffer[start];
+  if (lead === undefined) return 0;
+  const sequenceBytes =
+    lead >= 0xc2 && lead <= 0xdf
+      ? 2
+      : lead >= 0xe0 && lead <= 0xef
+        ? 3
+        : lead >= 0xf0 && lead <= 0xf4
+          ? 4
+          : 0;
+  return Math.max(0, sequenceBytes - (buffer.length - start));
+}
+
 function isValidUtf8(buffer: Buffer): boolean {
   try {
+    // stream 模式会把 GBK 的 D6 暂存为 UTF-8 候选；必须补齐后严格校验，拒绝 D6 D0 等非法序列。
     new TextDecoder("utf-8", { fatal: true }).decode(buffer);
     return true;
   } catch {

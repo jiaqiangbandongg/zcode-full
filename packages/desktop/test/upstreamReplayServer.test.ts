@@ -20,6 +20,75 @@ afterEach(async () => {
 });
 
 describe("Upstream replay server", () => {
+  it("受控流在释放前保持 running，释放后不再等待旧的 45 秒时间轴", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zcode-replay-gate-"));
+    tempDirs.push(dir);
+    const fixture = join(dir, "fixture.json");
+    await writeFile(
+      fixture,
+      JSON.stringify({
+        version: 1,
+        fixtures: [
+          {
+            id: "controlled",
+            metadata: { timingPolicy: "controlled-stream" },
+            match: { pathIncludes: "/messages" },
+            response: {
+              statusCode: 200,
+              releaseAfterChunks: 1,
+              headers: { "content-type": "text/event-stream" },
+              chunks: [
+                { offsetMs: 0, text: "running\n" },
+                { offsetMs: 45000, text: "complete\n" },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const server = await startUpstreamReplayServer({
+      artifactPath: join(dir, "artifact.json"),
+      fixturePaths: [fixture],
+    });
+    activeServers.push(server);
+    const response = await fetch(`${server.baseUrl}/messages`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    const reader = response.body!.getReader();
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("running\n");
+    expect(
+      (await fetch(`${server.baseUrl}/__e2e__/release/unknown`, { method: "POST" })).status,
+    ).toBe(409);
+    const held = await fetch(`${server.baseUrl}/__e2e__/gates`).then((result) => result.json());
+    expect(held).toEqual(["controlled"]);
+    expect(
+      (await fetch(`${server.baseUrl}/__e2e__/release/controlled`, { method: "POST" })).status,
+    ).toBe(204);
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("complete\n");
+    expect((await reader.read()).done).toBe(true);
+    expect(
+      (await fetch(`${server.baseUrl}/__e2e__/release/controlled`, { method: "POST" })).status,
+    ).toBe(409);
+    // 第二个 runner 使用相同 fixture ID，也必须有独立的 gate 与请求台账。
+    const other = await startUpstreamReplayServer({
+      artifactPath: join(dir, "other.json"),
+      fixturePaths: [fixture],
+    });
+    activeServers.push(other);
+    const second = await fetch(`${other.baseUrl}/messages`, { signal: AbortSignal.timeout(5000) });
+    const secondReader = second.body!.getReader();
+    await secondReader.read();
+    expect(
+      (await fetch(`${server.baseUrl}/__e2e__/release/controlled`, { method: "POST" })).status,
+    ).toBe(409);
+    expect(await fetch(`${other.baseUrl}/__e2e__/gates`).then((value) => value.json())).toEqual([
+      "controlled",
+    ]);
+    await fetch(`${other.baseUrl}/__e2e__/release/controlled`, { method: "POST" });
+    expect(new TextDecoder().decode((await secondReader.read()).value)).toBe("complete\n");
+    expect((await secondReader.read()).done).toBe(true);
+  });
+
   it("closes the listener when the initial artifact write fails", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "zcode-upstream-start-failure-"));
     tempDirs.push(tempDir);
@@ -221,37 +290,42 @@ describe("Upstream replay server", () => {
     expect(record?.responseEvents).toHaveLength(1);
   });
 
-  it("destroys SSE response streams when closeMode is destroy", async () => {
-    const { artifactPath, server } = await startFixtureServer("destroy");
+  it.each(["events", "chunks", "body"] as const)(
+    "destroys %s SSE responses when closeMode is destroy",
+    async (format) => {
+      const { artifactPath, server } = await startFixtureServer("destroy", format);
 
-    let fetchFailed = false;
-    try {
-      const response = await fetch(`${server.baseUrl}/messages`, {
-        body: JSON.stringify({
-          messages: [{ role: "user", content: "SSE_CLOSE_MODE_PROBE" }],
-        }),
-        headers: { "content-type": "application/json" },
-        method: "POST",
-        signal: AbortSignal.timeout(5000),
+      let fetchFailed = false;
+      try {
+        const response = await fetch(`${server.baseUrl}/messages`, {
+          body: JSON.stringify({
+            messages: [{ role: "user", content: "SSE_CLOSE_MODE_PROBE" }],
+          }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+          signal: AbortSignal.timeout(5000),
+        });
+        await response.text();
+      } catch {
+        fetchFailed = true;
+      }
+
+      await server.stop();
+      activeServers.pop();
+
+      const record = (await readArtifact(artifactPath)).records[0];
+      expect(fetchFailed).toBe(true);
+      expect(record?.status).toBe("error");
+      expect(record?.error).toBe("Replay fixture destroyed SSE response stream");
+      expect(record?.replay).toEqual({
+        closeMode: "destroy",
+        fixtureId: "sse-close-mode-destroy",
       });
-      await response.text();
-    } catch {
-      fetchFailed = true;
-    }
-
-    await server.stop();
-    activeServers.pop();
-
-    const record = (await readArtifact(artifactPath)).records[0];
-    expect(fetchFailed).toBe(true);
-    expect(record?.status).toBe("error");
-    expect(record?.error).toBe("Replay fixture destroyed SSE response stream");
-    expect(record?.replay).toEqual({
-      closeMode: "destroy",
-      fixtureId: "sse-close-mode-destroy",
-    });
-    expect(record?.responseEvents).toHaveLength(1);
-  });
+      if (format === "events") expect(record?.responseEvents).toHaveLength(1);
+      if (format === "chunks") expect(record?.responseChunkTimeline).toHaveLength(1);
+      expect(record?.responseBodyBytes).toBe(Buffer.byteLength(SSE_EVENT_TEXT));
+    },
+  );
 
   it("injects a loopback Browser fixture URL without trailing punctuation", async () => {
     const server = await startBrowserVariableFixtureServer();
@@ -490,7 +564,10 @@ describe("Upstream replay server", () => {
   });
 });
 
-async function startFixtureServer(closeMode: "end" | "destroy") {
+async function startFixtureServer(
+  closeMode: "end" | "destroy",
+  format: "events" | "chunks" | "body" = "events",
+) {
   const tempDir = await mkdtemp(join(tmpdir(), "zcode-upstream-replay-"));
   tempDirs.push(tempDir);
   const fixturePath = join(tempDir, "fixture.json");
@@ -509,14 +586,18 @@ async function startFixtureServer(closeMode: "end" | "destroy") {
             },
             response: {
               closeMode,
-              events: [
-                {
-                  byteLength: Buffer.byteLength(SSE_EVENT_TEXT, "utf-8"),
-                  offsetMs: 0,
-                  sequence: 0,
-                  text: SSE_EVENT_TEXT,
-                },
-              ],
+              ...(format === "body"
+                ? { body: SSE_EVENT_TEXT }
+                : {
+                    [format]: [
+                      {
+                        byteLength: Buffer.byteLength(SSE_EVENT_TEXT, "utf-8"),
+                        offsetMs: 0,
+                        sequence: 0,
+                        text: SSE_EVENT_TEXT,
+                      },
+                    ],
+                  }),
               headers: { "content-type": "text/event-stream; charset=utf-8" },
               statusCode: 200,
               statusMessage: "OK",

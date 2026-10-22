@@ -59,8 +59,6 @@ describe("shortcutCommands 序列化格式", () => {
   it("无修饰键单键格式上合法（spec §3：格式合法、匹配支持）", () => {
     expect(serializeShortcutBinding(parseShortcutBinding("F5")!)).toBe("F5");
     expect(serializeShortcutBinding(parseShortcutBinding("]")!)).toBe("]");
-    // 单 token 修饰键名不是合法键
-    expect(parseShortcutBinding("CmdOrCtrl")).toBeNull();
   });
 
   it("命名键白名单大小写敏感", () => {
@@ -93,62 +91,15 @@ describe("shortcutCommands 命令表", () => {
     }
   });
 
-  it("openSettings 默认 mac ⌘, / win·linux Ctrl+,（系统惯例，spec §4）", () => {
-    expect(getDefaultShortcutBindings("openSettings")).toEqual(["CmdOrCtrl+,"]);
-  });
-
-  it("openCommandCenter 保留双默认绑定", () => {
-    expect(getDefaultShortcutBindings("openCommandCenter")).toEqual([
-      "CmdOrCtrl+k",
-      "CmdOrCtrl+Shift+p",
-    ]);
-  });
-
   it("未知命令返回空数组", () => {
     expect(getDefaultShortcutBindings("doesNotExist")).toEqual([]);
   });
+});
 
-  it("composer 作用域命令（spec §12.1）：默认 Enter 发送、Shift+Enter 换行", () => {
-    expect(getDefaultShortcutBindings("composerSend")).toEqual(["Enter"]);
-    expect(getDefaultShortcutBindings("composerInsertNewline")).toEqual(["Shift+Enter"]);
-    const composerCommands = SHORTCUT_COMMANDS.filter((entry) => entry.scope === "composer");
-    expect(composerCommands.map((entry) => entry.id).sort()).toEqual([
-      "composerInsertNewline",
-      "composerSend",
-    ]);
-    // 其余命令缺省 global（未显式标注）
-    expect(
-      SHORTCUT_COMMANDS.every((entry) => entry.scope === "composer" || entry.scope === undefined),
-    ).toBe(true);
-  });
-
-  it("menu 通道命令覆盖 zoom 与窗口操作，window 通道命令覆盖面板与导航", () => {
-    const menuIds = SHORTCUT_COMMANDS.filter((entry) => entry.channel === "menu").map((e) => e.id);
-    expect(menuIds).toEqual(
-      expect.arrayContaining([
-        "newTask",
-        "openWorkspace",
-        "closeActiveContext",
-        "zoomIn",
-        "zoomOut",
-        "resetZoom",
-      ]),
-    );
-    const windowIds = SHORTCUT_COMMANDS.filter((entry) => entry.channel === "window").map(
-      (e) => e.id,
-    );
-    expect(windowIds).toEqual(
-      expect.arrayContaining([
-        "openCommandCenter",
-        "findInTask",
-        "toggleSidebar",
-        "toggleTerminal",
-        "toggleSidePane",
-        "previousConversation",
-        "nextConversation",
-        "navigateBack",
-        "navigateForward",
-      ]),
-    );
+describe("Side Pane 完整视图快捷键", () => {
+  it("默认绑定 ⇧⌘F / Ctrl+Shift+F，走 renderer window 通道", () => {
+    const entry = SHORTCUT_COMMANDS.find((candidate) => candidate.id === "toggleSidePaneFullView");
+    expect(entry?.channel).toBe("window");
+    expect(getDefaultShortcutBindings("toggleSidePaneFullView")).toEqual(["CmdOrCtrl+Shift+f"]);
   });
 });

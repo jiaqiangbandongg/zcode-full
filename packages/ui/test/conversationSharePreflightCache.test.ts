@@ -311,3 +311,24 @@ it("内嵌图片变化会使轮次缓存失效", () => {
     ),
   ).not.toBe(before);
 });
+
+it.each([499, 500, 501])("累计 %i 行在500上限的精确边界", (count) => {
+  const entries = [
+    { ...cached("a"), rowBudget: { count: 250, limit: 500 } },
+    { ...cached("b"), rowBudget: { count: count - 250, limit: 500 } },
+  ];
+  expect(aggregateConversationShareBlockingIssues(entries)).toEqual(
+    count > 500 ? [{ code: "rows_limit", scope: "conversation", actual: count, limit: 500 }] : [],
+  );
+});
+it("服务改变上限时取最小约束，保留非容量阻断项", () => {
+  const issue = { code: "running_turn" as const, scope: "turn" as const, turnOrdinal: 1 };
+  const entries = [
+    { ...cached("a"), rowBudget: { count: 200, limit: 500 }, blockingIssues: [issue] },
+    { ...cached("b"), rowBudget: { count: 51, limit: 250 } },
+  ];
+  expect(aggregateConversationShareBlockingIssues(entries)).toEqual([
+    issue,
+    { code: "rows_limit", scope: "conversation", actual: 251, limit: 250 },
+  ]);
+});

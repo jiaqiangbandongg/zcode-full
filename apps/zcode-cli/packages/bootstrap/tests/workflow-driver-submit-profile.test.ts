@@ -55,7 +55,6 @@ describe("workflow driver — submit profile: mono subagent", () => {
     expect(settlement).toMatchObject({ status: "completed", artifact: SUMMARY });
 
     const tool = submitTool(modelCalls["actor#1@1"]);
-    expect(tool).toBeDefined();
     expect(tool?.strict).toBe(true);
     const result = (tool?.inputSchema.properties as Record<string, Record<string, unknown>>).result;
     expect(result.type).toBe("object");

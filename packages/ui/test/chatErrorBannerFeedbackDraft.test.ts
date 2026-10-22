@@ -6,6 +6,7 @@ import { ChatErrorBanner } from "@/ChatErrorBanner.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { PlatformProvider } from "@/hooks/usePlatform.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
+import zhCN from "@/i18n/locales/zh-CN.js";
 
 const buttonMock = vi.hoisted(() => ({
   props: [] as Array<Record<string, unknown>>,
@@ -95,4 +96,83 @@ describe("ChatErrorBanner feedback draft", () => {
     expect(description).not.toContain("我在使用过程中遇到了报错，请帮忙排查。");
     expect(description).not.toContain("报错摘要\nProvider authentication failed.");
   });
+
+  it("没有升级处理器时不展示不可用的升级动作", () => {
+    renderToStaticMarkup(
+      createElement(
+        ZCodeIntlProvider,
+        { initialLocale: "zh-CN" },
+        createElement(
+          PlatformProvider,
+          { platform: mockPlatform },
+          createElement(ChatErrorBanner, {
+            error: {
+              code: "model_config_missing",
+              message: "Model config is missing.",
+            },
+            onOpenModelSettings: vi.fn(),
+          }),
+        ),
+      ),
+    );
+
+    expect(buttonMock.props.some((props) => props["aria-label"] === "升级")).toBe(false);
+    expect(buttonMock.props.some((props) => props["aria-label"] === "配置")).toBe(true);
+  });
+
+  it("远程 workspace 缺模型时只切换措辞，动作仍是本机配置与升级", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        ZCodeIntlProvider,
+        { initialLocale: "zh-CN" },
+        createElement(
+          PlatformProvider,
+          { platform: mockPlatform },
+          createElement(ChatErrorBanner, {
+            error: {
+              code: "model_config_missing",
+              message: "Model config is missing.",
+            },
+            modelConfigTarget: "remote",
+            onOpenModelSettings: vi.fn(),
+            onOpenUpgrade: vi.fn(),
+          }),
+        ),
+      ),
+    );
+
+    expect(html).toContain(zhCN["chat.error.remoteNoAvailableModel"]);
+    expect(html).not.toContain(zhCN["chat.error.noAvailableModel"]);
+    expect(buttonMock.props.some((props) => props["aria-label"] === "配置")).toBe(true);
+    expect(buttonMock.props.some((props) => props["aria-label"] === "升级")).toBe(true);
+    expect(buttonMock.props.some((props) => props["aria-label"] === "去同步")).toBe(false);
+  });
+});
+
+it("远程发送竞态提供重连，反馈归属连接失败而非模型调用", async () => {
+  const reconnect = vi.fn();
+  renderToStaticMarkup(
+    createElement(
+      ZCodeIntlProvider,
+      { initialLocale: "zh-CN" },
+      createElement(
+        PlatformProvider,
+        { platform: mockPlatform },
+        createElement(ChatErrorBanner, {
+          error: {
+            code: "ZCODE_REMOTE_WORKSPACE_DISCONNECTED",
+            message: "ZCODE_REMOTE_WORKSPACE_DISCONNECTED",
+          },
+          remoteKind: "ssh",
+          onReconnect: reconnect,
+        }),
+      ),
+    ),
+  );
+  const button = buttonMock.props.find((props) => props.children === "重新连接");
+  expect(button).toBeDefined();
+  (button!.onClick as () => void)();
+  expect(reconnect).toHaveBeenCalledOnce();
+  await openFeedbackFromBanner();
+  expect(useFeedbackStore.getState().submitDraft?.module).toBe("SSH连接失败");
 });

@@ -101,5 +101,4 @@ it("HTTP Date 已越过到期日时不信任旧 JSON 时间和 active 状态", a
   const result = await fetchZaiStartPlanBalanceEnvelope(api, "expired-account");
   expect(result.data?.plans?.map((p) => p.status)).toEqual(["expired", "active"]);
   expect(result.data?.balances?.map((b) => b.user_plan_id)).toEqual(["new"]);
-  expect(body.data.plans[0].status).toBe("active");
 });

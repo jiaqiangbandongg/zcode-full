@@ -3,15 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { cp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  onTestFinished,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import { getSingularPatch } from "@pierre/diffs";
 import type {
   GitCommitMessageConversationContext,
@@ -23,8 +15,7 @@ import type { GitCommitMessageGenerator } from "../src/git/gitCommitMessageGener
 import { createGitService } from "../src/git/gitService.js";
 import type { GitCliRepo } from "../src/git/repo/gitCliRepo.js";
 
-const gitAvailable =
-  spawnSync("git", ["--version"], { stdio: "ignore" }).status === 0;
+const gitAvailable = spawnSync("git", ["--version"], { stdio: "ignore" }).status === 0;
 const describeIfGit = gitAvailable ? describe : describe.skip;
 let repoTemplatePath: string | null = null;
 const gitLocalEnvVars = gitAvailable
@@ -36,9 +27,7 @@ const gitLocalEnvVars = gitAvailable
       .filter((line) => line.length > 0)
   : [];
 
-function createSummary(
-  overrides: Partial<GitRepositorySummary> = {},
-): GitRepositorySummary {
+function createSummary(overrides: Partial<GitRepositorySummary> = {}): GitRepositorySummary {
   return {
     workspacePath: "/repo/packages/app",
     repoRoot: "/repo",
@@ -224,9 +213,7 @@ describeIfGit("gitService", () => {
       "feature/list-branches",
     ]);
     expect(
-      branches.branches.find(
-        (branch) => branch.name === "feature/list-branches",
-      ),
+      branches.branches.find((branch) => branch.name === "feature/list-branches"),
     ).toMatchObject({
       isCurrent: false,
       upstreamName: null,
@@ -248,13 +235,7 @@ describeIfGit("gitService", () => {
     writeFileSync(join(workspacePath, "main-graph.txt"), "main graph\n");
     runGit(repoPath, ["add", "packages/app/main-graph.txt"]);
     runGit(repoPath, ["commit", "-m", "feat: graph main"]);
-    runGit(repoPath, [
-      "merge",
-      "--no-ff",
-      "feature/git-graph",
-      "-m",
-      "merge graph branch",
-    ]);
+    runGit(repoPath, ["merge", "--no-ff", "feature/git-graph", "-m", "merge graph branch"]);
     runGit(repoPath, ["tag", "v-graph"]);
     const hiddenCheckpointOid = runGit(repoPath, [
       "commit-tree",
@@ -271,9 +252,7 @@ describeIfGit("gitService", () => {
     const graph = await service.getCommitGraph({ workspacePath, maxCount: 10 });
 
     expect(graph.hasMore).toBe(false);
-    expect(graph.commits.map((commit) => commit.subject)).not.toContain(
-      "zcode checkpoint hidden",
-    );
+    expect(graph.commits.map((commit) => commit.subject)).not.toContain("zcode checkpoint hidden");
     expect(graph.commits[0]).toMatchObject({
       subject: "merge graph branch",
       parents: expect.arrayContaining([
@@ -304,7 +283,7 @@ describeIfGit("gitService", () => {
     expect(secondPage.commits.map((commit) => commit.hash)).toEqual(
       graph.commits.slice(2, 4).map((commit) => commit.hash),
     );
-  }, 15_000);
+  });
 
   it("switches branches successfully and treats switching to the current branch as a no-op", async () => {
     const workspacePath = "/repo/packages/app";
@@ -358,16 +337,8 @@ describeIfGit("gitService", () => {
       created: false,
     });
     expect(noOp.summary.branchName).toBe("feature/switch-target");
-    expect(switchBranch).toHaveBeenNthCalledWith(
-      1,
-      workspacePath,
-      "feature/switch-target",
-    );
-    expect(switchBranch).toHaveBeenNthCalledWith(
-      2,
-      workspacePath,
-      "feature/switch-target",
-    );
+    expect(switchBranch).toHaveBeenNthCalledWith(1, workspacePath, "feature/switch-target");
+    expect(switchBranch).toHaveBeenNthCalledWith(2, workspacePath, "feature/switch-target");
   });
 
   it("keeps Git-native behavior and allows switching when dirty changes do not conflict", async () => {
@@ -472,13 +443,8 @@ describeIfGit("gitService", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.issues).toEqual([
-      expect.objectContaining({ code: "target-branch-not-found" }),
-    ]);
-    expect(switchBranch).toHaveBeenCalledWith(
-      workspacePath,
-      "feature/missing-branch",
-    );
+    expect(result.issues).toEqual([expect.objectContaining({ code: "target-branch-not-found" })]);
+    expect(switchBranch).toHaveBeenCalledWith(workspacePath, "feature/missing-branch");
   });
 
   it("returns structured issues for conflicts and in-progress operations before calling git switch", async () => {
@@ -491,10 +457,7 @@ describeIfGit("gitService", () => {
     runGit(repoPath, ["switch", "main"]);
     writeFileSync(join(workspacePath, "tracked.txt"), "main version\n");
     runGit(repoPath, ["commit", "-am", "feat: main conflict change"]);
-    const mergeResult = runGitAllowFailure(repoPath, [
-      "merge",
-      "feature/conflict",
-    ]);
+    const mergeResult = runGitAllowFailure(repoPath, ["merge", "feature/conflict"]);
     expect(mergeResult.status).not.toBe(0);
 
     const conflictResult = await service.switchBranch({
@@ -502,9 +465,7 @@ describeIfGit("gitService", () => {
       targetBranchName: "feature/conflict",
     });
     expect(conflictResult.ok).toBe(false);
-    expect(conflictResult.issues).toEqual([
-      expect.objectContaining({ code: "conflicts-present" }),
-    ]);
+    expect(conflictResult.issues).toEqual([expect.objectContaining({ code: "conflicts-present" })]);
 
     runGit(repoPath, ["merge", "--abort"]);
     const mergeHeadPath = resolveGitPath(
@@ -576,18 +537,14 @@ describeIfGit("gitService", () => {
       branchName: "bad name",
     });
     expect(invalid.ok).toBe(false);
-    expect(invalid.issues).toEqual([
-      expect.objectContaining({ code: "invalid-branch-name" }),
-    ]);
+    expect(invalid.issues).toEqual([expect.objectContaining({ code: "invalid-branch-name" })]);
 
     const existing = await service.createBranchAndSwitch({
       workspacePath,
       branchName: "main",
     });
     expect(existing.ok).toBe(false);
-    expect(existing.issues).toEqual([
-      expect.objectContaining({ code: "branch-already-exists" }),
-    ]);
+    expect(existing.issues).toEqual([expect.objectContaining({ code: "branch-already-exists" })]);
     expect(createBranchAndSwitch).toHaveBeenNthCalledWith(
       1,
       workspacePath,
@@ -600,24 +557,16 @@ describeIfGit("gitService", () => {
     const { repoPath, workspacePath } = await createRepo();
     const service = createGitService();
 
-    writeFileSync(
-      join(workspacePath, "tracked.txt"),
-      "line 1\nline 2 changed\n",
-    );
+    writeFileSync(join(workspacePath, "tracked.txt"), "line 1\nline 2 changed\n");
     writeFileSync(join(workspacePath, "staged.txt"), "staged content\n");
     writeFileSync(join(workspacePath, "untracked.txt"), "new file\n");
     mkdirSync(join(workspacePath, ".build"), { recursive: true });
     writeFileSync(join(workspacePath, ".build", "empty-generated.h"), "");
-    writeFileSync(
-      join(repoPath, "packages", "other", "skip.txt"),
-      "skip changed\n",
-    );
+    writeFileSync(join(repoPath, "packages", "other", "skip.txt"), "skip changed\n");
     runGit(repoPath, ["add", "packages/app/staged.txt"]);
 
     const summary = await service.getRepositorySummary({ workspacePath });
-    expect(summary.repoRoot).toBe(
-      runGit(workspacePath, ["rev-parse", "--show-toplevel"]),
-    );
+    expect(summary.repoRoot).toBe(runGit(workspacePath, ["rev-parse", "--show-toplevel"]));
     expect(summary.workspaceInRepoPath).toBe("packages/app");
     expect(summary.isDirty).toBe(true);
     expect(summary.isRepository).toBe(true);
@@ -633,14 +582,10 @@ describeIfGit("gitService", () => {
       sourceId: "unstaged",
     });
     expect(
-      unstagedChanges
-        .map((change) => `${change.section}:${change.workspaceRelativePath}`)
-        .sort(),
+      unstagedChanges.map((change) => `${change.section}:${change.workspaceRelativePath}`).sort(),
     ).toEqual(["unstaged:tracked.txt", "untracked:untracked.txt"]);
     expect(
-      unstagedChanges.some((change) =>
-        change.repoRelativePath.includes("packages/other"),
-      ),
+      unstagedChanges.some((change) => change.repoRelativePath.includes("packages/other")),
     ).toBe(false);
     expect(
       unstagedChanges.some((change) =>
@@ -652,9 +597,7 @@ describeIfGit("gitService", () => {
       workspacePath,
       sourceId: "staged",
     });
-    expect(stagedChanges.map((change) => change.workspaceRelativePath)).toEqual(
-      ["staged.txt"],
-    );
+    expect(stagedChanges.map((change) => change.workspaceRelativePath)).toEqual(["staged.txt"]);
 
     const refresh = await service.refresh({
       workspacePath,
@@ -672,9 +615,9 @@ describeIfGit("gitService", () => {
         change.workspaceRelativePath.endsWith(".build/empty-generated.h"),
       ),
     ).toBe(false);
-    expect(
-      refresh.stagedChanges.map((change) => change.workspaceRelativePath),
-    ).toEqual(["staged.txt"]);
+    expect(refresh.stagedChanges.map((change) => change.workspaceRelativePath)).toEqual([
+      "staged.txt",
+    ]);
     expect(refresh.branchComparison).toBeNull();
   });
 
@@ -695,9 +638,7 @@ describeIfGit("gitService", () => {
       workspacePath,
       sourceId: "staged",
     });
-    expect(stagedChanges.map((change) => change.workspaceRelativePath)).toEqual(
-      ["tracked.txt"],
-    );
+    expect(stagedChanges.map((change) => change.workspaceRelativePath)).toEqual(["tracked.txt"]);
 
     await service.unstagePaths({ workspacePath, paths: [trackedPath] });
     stagedChanges = await service.getChanges({
@@ -718,7 +659,7 @@ describeIfGit("gitService", () => {
 
     expect(commitResult.commitHash).toMatch(/^[0-9a-f]{40}$/);
     expect(commitResult.summary.isDirty).toBe(false);
-  }, 15_000);
+  });
 
   it("commits only requested paths when a path scope is provided", async () => {
     const workspacePath = "/repo/packages/app";
@@ -775,19 +716,15 @@ describeIfGit("gitService", () => {
     expect(runGit(repoPath, ["show", "--name-only", "--format=", "HEAD"])).toBe(
       ["packages/app/selected-new.txt", "packages/app/tracked.txt"].join("\n"),
     );
-    expect(runGit(repoPath, ["show", "HEAD:packages/app/tracked.txt"])).toBe(
-      "selected staged",
+    expect(runGit(repoPath, ["show", "HEAD:packages/app/tracked.txt"])).toBe("selected staged");
+    expect(runGit(repoPath, ["show", "HEAD:packages/app/selected-new.txt"])).toBe(
+      "selected new staged",
     );
-    expect(
-      runGit(repoPath, ["show", "HEAD:packages/app/selected-new.txt"]),
-    ).toBe("selected new staged");
     expect(readFileSync(selectedPath, "utf-8")).toBe("selected unstaged\n");
     expect(runGit(repoPath, ["diff", "--cached", "--name-only"])).toBe(
       "packages/app/unrelated.txt",
     );
-    expect(runGit(repoPath, ["diff", "--name-only"])).toBe(
-      "packages/app/tracked.txt",
-    );
+    expect(runGit(repoPath, ["diff", "--name-only"])).toBe("packages/app/tracked.txt");
   });
 
   it("generates commit messages from staged changes only when unstaged changes are excluded", async () => {
@@ -815,9 +752,7 @@ describeIfGit("gitService", () => {
       includeUnstaged: false,
     });
 
-    expect(capturedFiles.map((file) => file.repoRelativePath)).toEqual([
-      "packages/app/staged.txt",
-    ]);
+    expect(capturedFiles.map((file) => file.repoRelativePath)).toEqual(["packages/app/staged.txt"]);
     expect(capturedFiles.every((file) => file.section === "staged")).toBe(true);
   });
 
@@ -877,11 +812,7 @@ describeIfGit("gitService", () => {
 
     writeFileSync(join(workspacePath, "session.txt"), "session\n");
     writeFileSync(join(workspacePath, "unrelated.txt"), "unrelated\n");
-    runGit(repoPath, [
-      "add",
-      "packages/app/session.txt",
-      "packages/app/unrelated.txt",
-    ]);
+    runGit(repoPath, ["add", "packages/app/session.txt", "packages/app/unrelated.txt"]);
 
     await service.generateCommitMessage({
       workspacePath,
@@ -891,12 +822,8 @@ describeIfGit("gitService", () => {
     expect(capturedFiles.map((file) => file.repoRelativePath)).toEqual([
       "packages/app/session.txt",
     ]);
-    expect(capturedDiffs.map((diff) => diff.path).join("\n")).toContain(
-      "session.txt",
-    );
-    expect(capturedDiffs.map((diff) => diff.path).join("\n")).not.toContain(
-      "unrelated.txt",
-    );
+    expect(capturedDiffs.map((diff) => diff.path).join("\n")).toContain("session.txt");
+    expect(capturedDiffs.map((diff) => diff.path).join("\n")).not.toContain("unrelated.txt");
   });
 
   it("pushes the current branch to its tracked upstream", async () => {
@@ -919,34 +846,6 @@ describeIfGit("gitService", () => {
       trackingBranchName: "origin/main",
       remoteName: "origin",
       setUpstream: false,
-    });
-    expect(pushResult.summary.ahead).toBe(0);
-    expect(push).toHaveBeenCalledWith(workspacePath);
-  });
-
-  it("pushes a new local branch and sets upstream when tracking is missing", async () => {
-    const workspacePath = "/repo/packages/app";
-    const push = vi.fn().mockResolvedValue({
-      branchName: "feature/push-upstream",
-      trackingBranchName: "origin/feature/push-upstream",
-      remoteName: "origin",
-      setUpstream: true,
-      summary: createSummary({
-        branchName: "feature/push-upstream",
-        trackingBranchName: "origin/feature/push-upstream",
-      }),
-    });
-    const service = createGitService({
-      repo: createMockRepo({ push }),
-    });
-
-    const pushResult = await service.push({ workspacePath });
-
-    expect(pushResult).toMatchObject({
-      branchName: "feature/push-upstream",
-      trackingBranchName: "origin/feature/push-upstream",
-      remoteName: "origin",
-      setUpstream: true,
     });
     expect(pushResult.summary.ahead).toBe(0);
     expect(push).toHaveBeenCalledWith(workspacePath);
@@ -984,10 +883,7 @@ describeIfGit("gitService", () => {
     expect(stagedCreatedDiff.afterContent).toBeNull();
     runGit(repoPath, ["reset", "--", "packages/app/scratch.txt"]);
 
-    writeFileSync(
-      join(workspacePath, "tracked.txt"),
-      "line 1\nline 2\nworktree change\n",
-    );
+    writeFileSync(join(workspacePath, "tracked.txt"), "line 1\nline 2\nworktree change\n");
     const unstagedDiff = await service.getDiff({
       workspacePath,
       path: join(workspacePath, "tracked.txt"),
@@ -997,10 +893,7 @@ describeIfGit("gitService", () => {
     expect(unstagedDiff.beforeContent).toBe("line 1\nline 2\n");
     expect(unstagedDiff.afterContent).toBe("line 1\nline 2\nworktree change\n");
 
-    writeFileSync(
-      join(workspacePath, "tracked.txt"),
-      "line 1\nline 2\nbranch change\n",
-    );
+    writeFileSync(join(workspacePath, "tracked.txt"), "line 1\nline 2\nbranch change\n");
     runGit(repoPath, ["add", "packages/app/tracked.txt"]);
     runGit(repoPath, ["commit", "-m", "feat: branch change"]);
 
@@ -1009,13 +902,11 @@ describeIfGit("gitService", () => {
     });
     expect(branchComparison.baseRef).toBe("origin/main");
     expect(branchComparison.comparisonLabel).toBe("main -> origin/main");
+    expect(branchComparison.changes.map((change) => change.workspaceRelativePath)).toContain(
+      "tracked.txt",
+    );
     expect(
-      branchComparison.changes.map((change) => change.workspaceRelativePath),
-    ).toContain("tracked.txt");
-    expect(
-      branchComparison.changes.some((change) =>
-        change.repoRelativePath.includes("packages/other"),
-      ),
+      branchComparison.changes.some((change) => change.repoRelativePath.includes("packages/other")),
     ).toBe(false);
 
     const branchDiff = await service.getDiff({

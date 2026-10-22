@@ -76,3 +76,15 @@ export const mcpToolDisplayUiSchema = z
   })
   .strict();
 export type McpToolDisplayUi = z.infer<typeof mcpToolDisplayUiSchema>;
+
+/** 当前执行的成功 UI 工具结果；独立于 conversation 订阅，不用于历史回放。 */
+export const pluginUiToolResultNotificationSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    toolCallId: z.string().min(1),
+    serverName: z.string().min(1),
+    ui: mcpToolDisplayUiSchema.refine((ui) => !ui.isError),
+    input: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+export type PluginUiToolResultNotification = z.infer<typeof pluginUiToolResultNotificationSchema>;

@@ -30,6 +30,7 @@ import {
   resolveModelStreamIdleTimeoutMs,
 } from "./stream-idle-timeout.js";
 import {
+  createEmptyContextExceededError,
   createStreamDiagnostics,
   isZeroOutputModelCompletion,
   isSuspiciousStreamDiagnostics,
@@ -38,6 +39,7 @@ import {
   logStreamFailureDiagnostics,
   recordStreamChunkDiagnostic,
 } from "./runner-diagnostics.js";
+import { AiSdkModelAdapterError } from "./errors.js";
 import { canRetryEmptyCompletion, scheduleEmptyCompletionRetry } from "./empty-completion-retry.js";
 import { createStreamTextOptions } from "./runner-options.js";
 import {
@@ -390,12 +392,24 @@ export async function* runStreamText(input: {
           }
           throw error;
         }
+        if (event.visibleEvents.some((visibleEvent) => visibleEvent.type === "finish")) {
+          const contextError = createEmptyContextExceededError({
+            finishReason: diagnostics.finishReason,
+            rawFinishReason: diagnostics.rawFinishReason,
+            hasAssistantContent: diagnostics.textDeltaChars > 0 || diagnostics.hasReasoningContent,
+            toolCallCount: toolCallAssembler.snapshotNormalizedToolCalls().length,
+            usage: diagnostics.usage,
+          });
+          // 先于 yield finish 进入既有 catch，每个请求只发布一个失败终态。
+          if (contextError) throw contextError;
+        }
         const shouldHoldEmptyCompletionEvents =
           !event.emittedError &&
           event.visibleEvents.some((visibleEvent) => visibleEvent.type === "finish") &&
           input.request.preserveProviderStreamBoundaries !== true &&
           isZeroOutputModelCompletion({
             finishReason: diagnostics.finishReason,
+            rawFinishReason: diagnostics.rawFinishReason,
             reasoningLength: diagnostics.reasoningDeltaChars,
             textLength: diagnostics.textDeltaChars,
             toolCallCount: diagnostics.toolCallCount,
@@ -544,6 +558,7 @@ export async function* runStreamText(input: {
             input.request.preserveProviderStreamBoundaries !== true &&
             isZeroOutputModelCompletion({
               finishReason: diagnostics.finishReason,
+              rawFinishReason: diagnostics.rawFinishReason,
               reasoningLength: diagnostics.reasoningDeltaChars,
               textLength: diagnostics.textDeltaChars,
               toolCallCount: diagnostics.toolCallCount,
@@ -788,6 +803,7 @@ export async function* runStreamText(input: {
           ...modelFailureStatusFields(error, failure, errorPhase),
           timestamp: new Date(completedAt).toISOString(),
           type: "model_request_failed",
+          ...(error instanceof AiSdkModelAdapterError && error.usage ? { usage: error.usage } : {}),
         },
         {
           ...statusPublishOptions(input, admission),

@@ -58,6 +58,58 @@ function taskService(params: {
 const remoteIdentity = "remote:ssh:dev:22:user:/work/demo";
 
 describe("WindowHostControllerService", () => {
+  it("routes unopened remote task commands by Source identity without requiring a logical attachment or earlier list query", async () => {
+    const workspaceIdentity = "remote:server:source-1:/work/demo";
+    const remote = taskService({ active: [meta({ taskId: "remote", workspaceIdentity })] });
+    remote.renameTask = vi.fn(async ({ title }) => ({
+      ...meta({ taskId: "remote", workspaceIdentity }),
+      title,
+    }));
+    const runtime = createWindowHostControllerRuntime({
+      createId: () => "id",
+      resolveSource: (scope) =>
+        scope.workspaceIdentity === workspaceIdentity
+          ? {
+              scope: {
+                kind: "remote",
+                sourceServerId: "source-1",
+                workspacePath: scope.workspacePath,
+                workspaceIdentity,
+              },
+              taskService: remote,
+              sourceAvailability: "online",
+            }
+          : null,
+    });
+    const address = {
+      sourceServerId: "source-1",
+      workspacePath: "/work/demo",
+      workspaceIdentity,
+      taskId: "remote",
+    };
+    await runtime.service.mutateTask({ address, mutation: { kind: "rename", title: "New title" } });
+    expect(remote.renameTask).toHaveBeenCalledWith({
+      workspacePath: "/work/demo",
+      workspaceIdentity,
+      taskId: "remote",
+      title: "New title",
+    });
+    await expect(
+      runtime.service.mutateTask({
+        address: { ...address, sourceServerId: "other" },
+        mutation: { kind: "pin", pinned: true },
+      }),
+    ).rejects.toThrow();
+    expect(remote.setTaskPinned).not.toHaveBeenCalled();
+    const list = await runtime.service.listTaskList({
+      kind: "active",
+      workspaceScopes: [{ workspacePath: "/work/demo", workspaceIdentity }],
+      sortBy: "updated",
+    });
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]).toMatchObject({ taskId: "remote", sourceServerId: "source-1" });
+    expect(list.items[0]?.remoteSessionId).toBeUndefined();
+  });
   it("从 source Agent 的 existing-only sessions-index 读取 live activity", async () => {
     const frames = new Emitter<SessionsIndexTopicWireCandidate>();
     const runtimeLifecycle = new Emitter<{
@@ -250,6 +302,8 @@ describe("WindowHostControllerService", () => {
           ? {
               scope: {
                 kind: "remote" as const,
+                sourceServerId: "source-server-1",
+                serverDisplayName: "Dev Server",
                 remoteSessionId: "remote-1",
                 ...scope,
                 workspaceIdentity: scope.workspaceIdentity,
@@ -275,6 +329,8 @@ describe("WindowHostControllerService", () => {
 
     expect(result.items.map((item) => item.taskId)).toEqual(["remote", "local"]);
     expect(result.items[0]).toMatchObject({
+      sourceServerId: "source-server-1",
+      serverDisplayName: "Dev Server",
       remoteSessionId: "remote-1",
       sourceAvailability: "online",
     });
@@ -708,5 +764,86 @@ describe("WindowHostControllerService", () => {
         : [],
     ).toEqual(["remote-final"]);
     frameSubscription.dispose();
+  });
+
+  it("Registry replacement CAS 失效时丢弃 provisional source 并保留旧投影", async () => {
+    const oldService = taskService({
+      active: [meta({ taskId: "old", workspaceIdentity: remoteIdentity })],
+    });
+    const nextService = taskService({
+      active: [meta({ taskId: "new", workspaceIdentity: remoteIdentity })],
+    });
+    const disposeDynamicSubscription = vi.fn();
+    nextService.onDynamicWorkspaceEvent = vi.fn(() => () => ({
+      dispose: disposeDynamicSubscription,
+    }));
+    let sessionId = "remote-old";
+    let service: IZCodeTaskService = oldService;
+    let sourceAvailability: "online" | "offline" = "online";
+    const runtime = createWindowHostControllerRuntime({
+      createId: () => "id",
+      resolveSource: (scope) => ({
+        scope: {
+          kind: "remote" as const,
+          remoteSessionId: sessionId,
+          ...scope,
+          workspaceIdentity: scope.workspaceIdentity!,
+        },
+        taskService: service,
+        sourceAvailability,
+      }),
+    });
+    const query = {
+      kind: "active" as const,
+      workspaceScopes: [{ workspacePath: "/work/demo", workspaceIdentity: remoteIdentity }],
+      sortBy: "updated" as const,
+    };
+    await runtime.service.listTaskList(query);
+    runtime.disconnectSource({
+      kind: "remote",
+      remoteSessionId: "remote-old",
+      workspacePath: "/work/demo",
+      workspaceIdentity: remoteIdentity,
+    });
+    sourceAvailability = "offline";
+    sessionId = "remote-new";
+    service = nextService;
+
+    await expect(
+      runtime.replaceDisconnectedSource(
+        {
+          kind: "remote",
+          remoteSessionId: "remote-old",
+          workspacePath: "/work/demo",
+          workspaceIdentity: remoteIdentity,
+        },
+        {
+          scope: {
+            kind: "remote",
+            remoteSessionId: "remote-new",
+            workspacePath: "/work/demo",
+            workspaceIdentity: remoteIdentity,
+          },
+          taskService: nextService,
+          sourceAvailability: "online",
+        },
+        { canCommit: () => false, rollbackOnFailure: true },
+      ),
+    ).rejects.toThrow("Controller source replacement generation 已失效");
+
+    expect(disposeDynamicSubscription).toHaveBeenCalledTimes(1);
+    sessionId = "remote-old";
+    service = oldService;
+    expect(await runtime.service.listTaskList(query)).toEqual(
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            taskId: "old",
+            remoteSessionId: "remote-old",
+            sourceAvailability: "offline",
+          }),
+        ],
+      }),
+    );
   });
 });

@@ -206,34 +206,6 @@ describe("resolveAccountProviderConfigs", () => {
     });
   });
 
-  it("available 只设置 Account Access entitlement，不复制 Provider 静态事实", () => {
-    const result = resolveAccountProviderConfigs({
-      configuredProviders: new ProviderConfigMap([
-        [
-          "coding-plan",
-          createAccountProviderConfig({
-            models: ["model-a"],
-          }),
-        ],
-      ]),
-      previousProviders: ProviderConfigMap.empty(),
-      connections: [
-        {
-          providerId: "coding-plan",
-          status: "available",
-        },
-      ],
-    });
-
-    expect(
-      Object.fromEntries(result.entries().map(([id, config]) => [id, config.toJSON()])),
-    ).toEqual({
-      "coding-plan": {
-        access: { type: "zhipu-account", entitled: true },
-      },
-    });
-  });
-
   it("unknown 保留该 Provider 上次成功结果，unavailable 显式取消权益", () => {
     const previousProviders = new ProviderConfigMap([
       [
@@ -267,6 +239,120 @@ describe("resolveAccountProviderConfigs", () => {
       },
       "coding-plan": { access: { type: "zhipu-account", entitled: false } },
     });
+  });
+
+  it("派生 Provider 继承母体应用 last-known-good 后的最终权益", async () => {
+    const configured = new ProviderConfigMap([
+      [
+        "coding-plan",
+        createAccountProviderConfig({
+          apiFormat: "anthropic-messages",
+          baseURL: "https://coding.example.com",
+          models: ["model-a"],
+        }),
+      ],
+      [
+        "highspeed-card",
+        createAccountProviderConfig({
+          apiFormat: "anthropic-messages",
+          baseURL: "https://highspeed.example.com",
+          mode: "highspeed",
+          models: ["model-a"],
+        }),
+      ],
+    ]);
+    const resolve = createAccountProviderConfigResolver(async () => [
+      { providerId: "coding-plan", status: "unknown" },
+      {
+        providerId: "highspeed-card",
+        status: "unknown",
+        entitlementSourceProviderId: "coding-plan",
+      },
+    ]);
+
+    const result = await resolve({
+      configRevision: "config",
+      configuredProviders: configured,
+      previousProviders: new ProviderConfigMap([
+        [
+          "coding-plan",
+          new ProviderConfig({ access: new ZhipuAccountAccessConfig({ entitled: true }) }),
+        ],
+      ]),
+      previousStates: {
+        "coding-plan": { availability: "available", entitled: true },
+      },
+    });
+
+    expect(result.providers.get("coding-plan")?.access?.entitled).toBe(true);
+    expect(result.providers.get("highspeed-card")?.access?.entitled).toBe(true);
+    expect(result.states["highspeed-card"]).toMatchObject({
+      availability: "available",
+      entitled: true,
+    });
+  });
+
+  it("母体身份变化或明确不可用时，派生 Provider 不继承旧权益", async () => {
+    const configured = new ProviderConfigMap([
+      [
+        "coding-plan",
+        createAccountProviderConfig({
+          apiFormat: "anthropic-messages",
+          baseURL: "https://coding.example.com",
+          models: ["model-a"],
+        }),
+      ],
+      [
+        "highspeed-card",
+        createAccountProviderConfig({
+          apiFormat: "anthropic-messages",
+          baseURL: "https://highspeed.example.com",
+          mode: "highspeed",
+          models: ["model-a"],
+        }),
+      ],
+    ]);
+    let identityChanged = true;
+    const resolve = createAccountProviderConfigResolver(async () => [
+      {
+        providerId: "coding-plan",
+        status: identityChanged ? "unknown" : "unavailable",
+        ...(identityChanged ? { resetPrevious: true } : {}),
+      },
+      {
+        providerId: "highspeed-card",
+        status: identityChanged ? "unknown" : "unavailable",
+        entitlementSourceProviderId: "coding-plan",
+        ...(identityChanged ? { resetPrevious: true } : {}),
+      },
+    ]);
+    const previousProviders = new ProviderConfigMap([
+      [
+        "coding-plan",
+        new ProviderConfig({ access: new ZhipuAccountAccessConfig({ entitled: true }) }),
+      ],
+      [
+        "highspeed-card",
+        new ProviderConfig({ access: new ZhipuAccountAccessConfig({ entitled: true }) }),
+      ],
+    ]);
+
+    const changed = await resolve({
+      configRevision: "config-1",
+      configuredProviders: configured,
+      previousProviders,
+    });
+    expect(changed.providers.get("coding-plan")?.access?.entitled).toBe(false);
+    expect(changed.providers.get("highspeed-card")?.access?.entitled).toBe(false);
+
+    identityChanged = false;
+    const unavailable = await resolve({
+      configRevision: "config-2",
+      configuredProviders: configured,
+      previousProviders,
+    });
+    expect(unavailable.providers.get("coding-plan")?.access?.entitled).toBe(false);
+    expect(unavailable.providers.get("highspeed-card")?.access?.entitled).toBe(false);
   });
 
   it("首次 unknown 时以 entitled=false fail-closed", () => {
@@ -325,21 +411,6 @@ describe("resolveAccountProviderConfigs", () => {
       "start-plan": { access: { type: "zhipu-account", entitled: true }, builtinModelIds: [] },
       "coding-plan": { access: { type: "zhipu-account", entitled: false } },
     });
-  });
-
-  it("拒绝连接结果引用未配置或非 Account Provider", () => {
-    expect(() =>
-      resolveAccountProviderConfigs({
-        configuredProviders: configuredProviders(),
-        previousProviders: ProviderConfigMap.empty(),
-        connections: [
-          {
-            providerId: "api-provider",
-            status: "available",
-          },
-        ],
-      }),
-    ).toThrow("Account 连接指向非 Account Provider: api-provider");
   });
 
   it("普通 api-key Provider 不属于 Account Overlay", () => {

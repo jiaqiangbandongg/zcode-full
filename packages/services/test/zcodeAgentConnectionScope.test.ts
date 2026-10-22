@@ -1,3 +1,4 @@
+import type { PluginUiToolResultNotification } from "@zcode/shared/mcp-apps";
 import type { ZCodeMcpResourceSample } from "@zcode/shared";
 import { Emitter } from "@zcode/rpc";
 import type { ZCodeMcpTelemetryEvent, ZCodeProcessResourceSample } from "@zcode/shared";
@@ -12,7 +13,11 @@ import type {
   WorkspaceConfigTopicFrame,
   WorkspaceConfigTopicWireFrame,
 } from "@zcode/shared/zcode-protocol-v4";
-import { sessionsIndexTopic, workspaceConfigTopic } from "@zcode/shared/zcode-protocol-v4";
+import {
+  conversationTopic,
+  sessionsIndexTopic,
+  workspaceConfigTopic,
+} from "@zcode/shared/zcode-protocol-v4";
 import { describe, expect, it, vi } from "vitest";
 import type {
   IZCodeAgentService,
@@ -55,6 +60,7 @@ function completeWire<F extends { topic: string; subscriptionId: string }>(
 function setupBase() {
   const conversationFrames = new Emitter<ConversationTopicWireFrame>();
   const telemetryFacts = new Emitter<ConversationTelemetryFact>();
+  const pluginUiResults = new Emitter<PluginUiToolResultNotification & { workspacePath: string }>();
   const cuaPermissionObservations = new Emitter<ZCodeAgentCuaPermissionObservation>();
   const processResourceSamples = new Emitter<ZCodeProcessResourceSample>();
   const mcpResourceSamples = new Emitter<ZCodeMcpResourceSample[]>();
@@ -90,6 +96,7 @@ function setupBase() {
     })),
     onDynamicConversationFrame: vi.fn(() => conversationFrames.event),
     onDynamicConversationTelemetryFact: vi.fn(() => telemetryFacts.event),
+    onDynamicPluginUiToolResult: vi.fn(() => pluginUiResults.event),
     onDynamicCuaPermissionObservation: vi.fn(() => cuaPermissionObservations.event),
     onDynamicProcessResourceSample: vi.fn(() => processResourceSamples.event),
     onDynamicMcpResourceSamples: vi.fn(() => mcpResourceSamples.event),
@@ -156,6 +163,7 @@ function setupBase() {
     conversationFrames,
     telemetryFacts,
     cuaPermissionObservations,
+    pluginUiResults,
     processResourceSamples,
     mcpResourceSamples,
     mcpTelemetryEvents,
@@ -197,6 +205,88 @@ function makeRuntimeLifecycleEvent(
 }
 
 describe("ZCodeAgent connection-scoped service facade", () => {
+  it.each([
+    ["desktop continuous lane", "desktop-continuous"],
+    ["mobile replayable recovery", "web-remote-replayable"],
+  ] as const)(
+    "%s restores and clears the authoritative pending interaction snapshot",
+    async (_path, clientMode) => {
+      const { base, conversationFrames } = setupBase();
+      const connectionId = `${clientMode}-${_path.replaceAll(" ", "-")}`;
+      const scope = createZCodeAgentConnectionScope(base, { connectionId, clientMode });
+      await scope.service.helloConversationV4();
+      await scope.service.initializeConversationV4({
+        kind: "clientHello",
+        protocolVersion: 3,
+        clientId: connectionId,
+        appVersion: "4.0.0",
+      });
+      const sessionId = "pending-session";
+      const topic = conversationTopic(sessionId);
+      const subscription = await scope.service.subscribeConversationV4({
+        workspacePath: "/repo",
+        sessionId,
+      });
+      const seen: ConversationTopicWireFrame[] = [];
+      scope.service.onDynamicConversationFrame({ workspacePath: "/repo" })((frame) =>
+        seen.push(frame),
+      );
+      const pendingInteraction = {
+        interactionId: "permission-1",
+        createdAt: 1,
+        request: {
+          kind: "permission",
+          toolCallId: "tool-1",
+          toolName: "Bash",
+          summary: "Allow command",
+          detail: {},
+          options: [],
+        },
+      };
+
+      conversationFrames.fire(
+        completeWire({
+          topic,
+          subscriptionId: subscription.ack.subscriptionId,
+          fromSeq: 0,
+          toSeq: 1,
+          sentAt: 1,
+          payload: {
+            kind: "snapshot",
+            snapshot: { pendingInteractions: [pendingInteraction] },
+          },
+        } as unknown as ConversationTopicFrame),
+      );
+      conversationFrames.fire(
+        completeWire(
+          {
+            topic,
+            subscriptionId: subscription.ack.subscriptionId,
+            fromSeq: 1,
+            toSeq: 2,
+            sentAt: 2,
+            payload: {
+              kind: "deltas",
+              deltas: [{ op: "state.updated", revision: 2, pendingInteractions: [] }],
+            },
+          } as unknown as ConversationTopicFrame,
+          `resolved-${connectionId}`,
+          2,
+        ),
+      );
+
+      expect(seen).toHaveLength(2);
+      expect(
+        (seen[0] as { frame: { payload: { snapshot: { pendingInteractions: unknown[] } } } }).frame
+          .payload.snapshot.pendingInteractions,
+      ).toEqual([pendingInteraction]);
+      expect(
+        (seen[1] as { frame: { payload: { deltas: Array<{ pendingInteractions: unknown[] }> } } })
+          .frame.payload.deltas[0]?.pendingInteractions,
+      ).toEqual([]);
+    },
+  );
+
   it("desktop continuous 与 web replayable 都宣告 Host review domain capability", async () => {
     const { base } = setupBase();
     const desktop = createZCodeAgentConnectionScope(base, {
@@ -232,7 +322,7 @@ describe("ZCodeAgent connection-scoped service facade", () => {
     });
 
     await expect(declared.service.helloConversationV4()).resolves.toMatchObject({
-      capabilities: { workflowRunDeltas: true },
+      capabilities: { workflowRunDeltas: true, historyFirst: true },
     });
     await silent.service.helloConversationV4();
     await declared.service.initializeConversationV4({
@@ -240,7 +330,7 @@ describe("ZCodeAgent connection-scoped service facade", () => {
       protocolVersion: 3,
       clientId: "deltas-client",
       appVersion: "4.0.0",
-      capabilities: { workflowRunDeltas: true },
+      capabilities: { workflowRunDeltas: true, historyFirst: true },
     });
     await silent.service.initializeConversationV4({
       kind: "clientHello",
@@ -254,11 +344,13 @@ describe("ZCodeAgent connection-scoped service facade", () => {
       sessionId: "session-1",
       // UI 面自报的同名字段：facade 先清后写，伪造不了能力。
       workflowRunDeltas: false,
+      historyFirst: false,
     } as never);
     await silent.service.subscribeConversationV4({
       workspacePath: "/repo",
       sessionId: "session-1",
       workflowRunDeltas: true,
+      historyFirst: true,
     } as never);
 
     const calls = vi.mocked(base.subscribeConversationV4).mock.calls;
@@ -266,6 +358,7 @@ describe("ZCodeAgent connection-scoped service facade", () => {
       connectionId: "deltas-declared",
       clientMode: "desktop-continuous",
       workflowRunDeltas: true,
+      historyFirst: true,
     });
     expect(calls[0]?.[0]).not.toHaveProperty("workflowRunDeltas");
     expect(readTrustedZCodeAgentV4Connection(calls[1]?.[0])).toEqual({
@@ -273,6 +366,7 @@ describe("ZCodeAgent connection-scoped service facade", () => {
       clientMode: "web-remote-replayable",
     });
     expect(calls[1]?.[0]).not.toHaveProperty("workflowRunDeltas");
+    expect(calls[1]?.[0]).not.toHaveProperty("historyFirst");
   });
 
   it("trusted relay 把下游 clientHello 的 workflowRunDeltas 原样带到上游订阅", async () => {
@@ -568,6 +662,41 @@ describe("ZCodeAgent connection-scoped service facade", () => {
       connectionId: "relay:22:server-telemetry-relay28:desktop-telemetry-downstream",
       clientMode: "desktop-continuous",
     });
+  });
+
+  it("后台插件创建只投递本地桌面，不投递手机或 relay", () => {
+    const { base, pluginUiResults } = setupBase();
+    const desktop = createZCodeAgentConnectionScope(base, {
+      connectionId: "desktop-plugin",
+      clientMode: "desktop-continuous",
+    });
+    const mobile = createZCodeAgentConnectionScope(base, {
+      connectionId: "mobile-plugin",
+      clientMode: "web-remote-replayable",
+    });
+    const relay = createZCodeAgentConnectionScope(base, {
+      connectionId: "relay-plugin",
+      clientMode: "desktop-continuous",
+      role: "trusted-host-relay",
+    });
+    const seen = vi.fn(),
+      hidden = vi.fn();
+    desktop.service.onDynamicPluginUiToolResult()(seen);
+    mobile.service.onDynamicPluginUiToolResult()(hidden);
+    relay.service.onDynamicPluginUiToolResult()(hidden);
+    pluginUiResults.fire({
+      workspacePath: "/repo",
+      sessionId: "background",
+      toolCallId: "open",
+      serverName: "plugin:editor:editor",
+      ui: { pluginId: "editor@example", resourceUri: "ui://editor" },
+    });
+    expect(seen).toHaveBeenCalledOnce();
+    expect(hidden).not.toHaveBeenCalled();
+    expect(base.onDynamicPluginUiToolResult).toHaveBeenCalledOnce();
+    desktop.dispose();
+    mobile.dispose();
+    relay.dispose();
   });
 
   it("只有可信 desktop-continuous attachment 能订阅窗口级 CUA 权限观察", () => {

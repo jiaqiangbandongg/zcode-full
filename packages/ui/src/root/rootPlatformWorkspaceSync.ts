@@ -1,4 +1,5 @@
-import type { WebRemoteControlWorkspaceTarget } from "@zcode/shared";
+import { useEffect } from "react";
+import type { IPlatformService, WebRemoteControlWorkspaceTarget } from "@zcode/shared";
 import { isWorkspaceTab, type WindowTabState } from "@/store/tabStore.js";
 
 export function buildWebRemoteControlWorkspaceTargets({
@@ -59,4 +60,45 @@ export function shouldPublishCompleteWorkspaceSnapshot(
   hasCompletedFullTabRestore: boolean,
 ): boolean {
   return hasCompletedFullTabRestore;
+}
+
+/** workspace 同步只有一个完整快照入口，不依赖远控是否已有 runtime。 */
+export function useWebRemoteControlWorkspaceSync({
+  platform,
+  tabs,
+  isDesktop,
+  featureEnabled,
+  hasCompletedFullTabRestore,
+  reconnectingRemoteWorkspaceKeys,
+  remoteWorkspaceErrorByWorkspaceKey,
+}: {
+  platform: Pick<IPlatformService, "syncWebRemoteControlWorkspaces">;
+  tabs: WindowTabState[];
+  isDesktop: boolean;
+  featureEnabled: boolean;
+  hasCompletedFullTabRestore: boolean;
+  reconnectingRemoteWorkspaceKeys?: string[];
+  remoteWorkspaceErrorByWorkspaceKey?: Record<string, string>;
+}): void {
+  useEffect(() => {
+    if (!isDesktop || !hasCompletedFullTabRestore) return;
+    // 未运行时也必须发布本地+远端完整列表，否则登录后仅剩远端局部列表，丢失本地恢复目标。
+    // 特性关闭时仍保留 Bot 已连接远端的绑定入口。
+    const workspaces = featureEnabled
+      ? buildWebRemoteControlWorkspaceTargets({
+          tabs,
+          reconnectingRemoteWorkspaceKeys,
+          remoteWorkspaceErrorByWorkspaceKey,
+        })
+      : buildConnectedRemoteWorkspaceSessionTargets({ tabs });
+    platform.syncWebRemoteControlWorkspaces?.(workspaces);
+  }, [
+    platform,
+    tabs,
+    isDesktop,
+    featureEnabled,
+    hasCompletedFullTabRestore,
+    reconnectingRemoteWorkspaceKeys,
+    remoteWorkspaceErrorByWorkspaceKey,
+  ]);
 }

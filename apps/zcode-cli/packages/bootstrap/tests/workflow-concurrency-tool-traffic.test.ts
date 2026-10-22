@@ -46,7 +46,10 @@ const TOOL_REQUESTS_PER_ACTOR = 3;
 function testProviderConfig(providerId: string): RegistryProviderConfig {
   return new ProviderConfig({
     access: new ApiKeyAccessConfig({ apiKey: "test-api-key" }),
-    api: new ProviderApiConfig({ baseUrl: "https://adapter.test/v1", type: "openai-chat-completions" }),
+    api: new ProviderApiConfig({
+      baseUrl: "https://adapter.test/v1",
+      type: "openai-chat-completions",
+    }),
     builtinModelIds: [],
     enabled: true,
     id: providerId,
@@ -169,9 +172,8 @@ describe("workflow concurrency — 工具侧模型请求也过闸门（v3 决策
         requests.push(send("web_search_tool", `tc-${actor}-${tool}`));
       }
     }
-    const results = await Promise.all(requests);
+    await Promise.all(requests);
 
-    expect(results).toHaveLength(ACTORS * (1 + TOOL_REQUESTS_PER_ACTOR));
     // provider 看到的在飞从不超过治理器此刻的 cap（也就从不超过天花板）。
     expect(capAboveProviderObserved).toEqual([]);
     expect(maxInFlight).toBeLessThanOrEqual(DEFAULT_CONCURRENCY);

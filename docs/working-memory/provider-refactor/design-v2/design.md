@@ -104,6 +104,12 @@ Personal Config 只允许具体 `providerId + modelId` 的精确覆盖，不再�
 
 ### Match 配置维护原则（2026-09-10 裁决）
 
+- 2026-10-14：通用 Model 基线的 `contextWindow` 为 `1000000`、`maxOutputTokens.max` 为 `128000`；后者是能力上限，不是请求默认输出长度。已知型号的明确差异继续覆盖，Personal 仍最后生效。
+- Model / Model+API 按有限维护集合使用简单前后缀通配（例如 `.*deepseek-flash.*`），不要求后缀分隔符或日期格式；保留字面量转义和有语义的型号分组。通用族在前，具体变体在后，不增加运行时自动排序。Site URL 与 Template/Provider 精确身份规则保持不变。
+- 删除仅为 `[1m]` 设置窗口和仅为预览别名设置 128000 输出上限的两条 Model 规则。与新默认值重复且没有前层差异需要覆盖的声明可省略；不得机械删除覆盖较小族基线的同值字段。
+- 验收覆盖生产/测试配置同源、未知模型三协议基线、前后缀别名、基础/具体变体的继承、Site 与 Personal 覆盖，以及显式请求输出长度保持原值。历史型号补全、推理协议策略和配置可视化工具不属于本次调整。
+- 已维护型号的真实差异仍优先于形式统一：GLM-4.6 的 Messages 映射以 `(?!v)` 排除视觉型号，避免简化时改写其既有协议基线。历史 `off/nothink` 恢复同时识别旧/新 matcher 的身份，但用旧 matcher 限定恢复范围；新放宽的后缀不因此获得历史别名资格，不修改用户文件。
+
 - Built-in Match 以主流配置和官方能力为依据，官方优先；不为了落后或不完整的第三方兼容实现，降低已知模型的默认能力。
 - 已知模型在相应 API Schema 下支持的能力，写入模型／模型 API 规则，沿用前后缀匹配。不能仅因为通过第三方代理访问就默认关闭；代理不支持时，用户通过具体模型的 Personal 配置覆盖关闭。
 - 官方优先不等于同品牌所有型号都支持：不同型号、API Schema 的明确支持边界必须保留，不能把某型号能力用宽泛品牌正则授予全部型号。
@@ -113,8 +119,13 @@ Personal Config 只允许具体 `providerId + modelId` 的精确覆盖，不再�
 
 ### 2.3 Builtin Provider 维护清单
 
-Builtin 的维护范围用一张简短的入口库存表表达，不在文档中重复抄写完整 Provider Config，具体内容见
-[`Builtin Provider 维护清单`](./builtin-provider-inventory.md)：
+日常维护统一从[内置 Provider 模板与模型维护](../../../builtin-provider-maintenance/README.md)进入；
+其中[当前状态](../../../builtin-provider-maintenance/current-state.md)按实际配置记录模板、完整成员和默认启停，
+[范围原则](../../../builtin-provider-maintenance/scope.md)与[配置规范](../../../builtin-provider-maintenance/configuration.md)
+承接持续维护。下方旧库存链接保留调查历史，不再作为实时配置清单。
+
+Builtin 的维护范围用入口库存表达，不在文档中重复抄写完整 Provider Config；实际成员见上方当前状态，
+原调查依据保留在[`历史维护清单`](./builtin-provider-inventory.md)。清单口径为：
 
 ```text
 供应商 | 类型 | templateId / providerId | Base URL | 产品维护模型

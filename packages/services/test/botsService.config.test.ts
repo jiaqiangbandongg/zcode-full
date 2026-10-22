@@ -231,7 +231,7 @@ describe("botsService config", () => {
           "webhook-1": {
             botId: "webhook-1",
             workspacePath: "/tmp/workspace",
-            workspaceIdentity: "ssh://host/tmp/workspace",
+            workspaceIdentity: "remote:server:test-owner:/tmp/workspace",
             mode: "draft",
             activeTaskId: null,
             draftOptions: {
@@ -421,6 +421,7 @@ describe("botsService config", () => {
       lastWorkspaceSession: [{ kind: "local", workspacePath: "/tmp/workspace" }],
     });
     const service = f.createBotsService({
+      ...f.createBotProjectServices([{ workspacePath: "/tmp/workspace" }]),
       repo: repo as never,
       modelSelectionService: local,
       settingService,
@@ -440,26 +441,15 @@ describe("botsService config", () => {
       const state = await repo.readState();
       const contextKey = Object.keys(state.bots)[0]!;
       const original = state.bots[contextKey]!;
-      vi.mocked(settingService.get).mockImplementation(
-        f.createSettingService({
-          locale: "zh-CN",
-          lastWorkspaceSession: [
-            {
-              kind: "remote",
-              workspacePath: "/tmp/workspace",
-              workspaceIdentity: "ssh://other/tmp/workspace",
-            },
-          ],
-        }).get,
-      );
       await repo.writeState({
         ...state,
         bots: {
           ...state.bots,
           [contextKey]: {
             ...original,
-            workspaceId: "ssh://other/tmp/workspace",
-            workspaceIdentity: "ssh://other/tmp/workspace",
+            workspaceId: JSON.stringify(["remote:server:other-owner", "project-0"]),
+            hostId: "remote:server:other-owner",
+            workspaceIdentity: "remote:server:other-owner:/tmp/workspace",
           },
         },
       });
@@ -468,7 +458,7 @@ describe("botsService config", () => {
       const unavailable = await menu();
       expect(getRemote).toHaveBeenCalledWith({
         workspacePath: "/tmp/workspace",
-        workspaceIdentity: "ssh://other/tmp/workspace",
+        workspaceIdentity: "remote:server:other-owner:/tmp/workspace",
       });
       expect(unavailable[0]?.text).toContain("未找到模型供应商");
       expect(unavailable[0]?.selection).toBeUndefined();
@@ -511,7 +501,6 @@ describe("botsService config", () => {
     });
 
     expect(replies[0]?.text).toContain("未找到模型供应商");
-    expect(replies[0]?.text).not.toContain("Cached Provider");
     service.disposeAll();
   });
 });

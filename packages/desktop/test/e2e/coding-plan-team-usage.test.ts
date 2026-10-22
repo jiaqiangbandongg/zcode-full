@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { BUILTIN_MODEL_PROVIDER_IDS, type ProviderFamilyConnectionSelection } from "@zcode/shared";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   TID_MODEL_PROVIDER_CONNECTION_MODE_ITEM,
   TID_MODEL_PROVIDER_CONNECTION_MODE_TRIGGER,
   TID_MODEL_PROVIDER_NAV_ITEM,
@@ -10,11 +10,14 @@ import {
   TID_SETTINGS_USAGE_TAB,
   TID_SIDEBAR_CODING_PLAN_USAGE_BUTTON,
   TID_SETTINGS_PAGE,
+  TID_SETTINGS_BACK_BUTTON,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
+  TID_CHAT_MODEL_SELECT_TRIGGER,
+  TID_V4_MODEL_CONFIG,
+  TID_V4_COMPOSER_INPUT,
   testId,
-  type ProviderFamilyConnectionSelection,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -25,7 +28,7 @@ import {
   waitForWorkspaceApp,
 } from "./helpers/desktop-app.js";
 import { waitForProviderConfigPolling } from "./helpers/provider-config-polling.js";
-import { selectRegistryProviderModelById } from "./helpers/upstream-provider.js";
+import { selectRegistryProviderModelById, UPSTREAM_MODEL } from "./helpers/upstream-provider.js";
 import { seedPersistedModelSelection } from "./helpers/model-provider-restart.js";
 import { sel } from "./helpers/selectors.js";
 import { skipOccupationOnboardingIfPresent } from "./helpers/occupation-onboarding.js";
@@ -53,7 +56,10 @@ type CodingPlanFaultMode =
   | "quotaBusinessFailure"
   | "quotaFailure"
   | "startBalance"
-  | "startBalanceFailure";
+  | "startBalanceFailure"
+  | "unavailableTeam"
+  | "expiredTeam"
+  | "twoTeams";
 type CodingPlanResetScenario =
   | "none"
   | "emptyThenGrant"
@@ -162,8 +168,846 @@ describe("Team Plan 设置与使用统计 E2E", () => {
     );
   });
 
+  for (const empty of [false, true]) {
+    it(`CTP-${empty ? 26 : 25}: 未登录${empty ? "无 Provider 直接打开设置" : "API 正常选择且无团队登录错误"}`, async function () {
+      this.timeout(240000);
+      await prepareScenario("both", PERSONAL_PLAN_KEY, "none", "none", "en-US", true);
+      for (const width of [1100, 390]) {
+        for (const theme of ["zai-light", "zai-dark"] as const) {
+          const disabledProviders = await browser.execute(async (remove) => {
+            const element = document.querySelector('[data-testid="v4-model-config"]')!;
+            let fiber = (element as any)[
+              Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+            ];
+            let service: any;
+            while (fiber && !service) {
+              service =
+                fiber.memoizedProps?.value?.providerSettingsService ??
+                fiber.memoizedProps?.services?.providerSettingsService;
+              fiber = fiber.return;
+            }
+            if (!service) throw new Error("ProviderSettingsService not found");
+            const disabledProviders: { providerId: string; config: Record<string, unknown> }[] = [];
+            if (remove) {
+              const view = await service.getView();
+              for (const provider of view.providers) {
+                if (provider.effectiveConfig.access?.type !== "zhipu-account" && provider.enabled) {
+                  await service.savePersonalProviderOverlay(
+                    provider.providerId,
+                    provider.personalConfig ?? {},
+                    { enabled: false },
+                  );
+                  // 保存接口替换整个 Overlay，空对象会抹掉自定义 API 配置。
+                  disabledProviders.push({
+                    providerId: provider.providerId,
+                    config: provider.personalConfig ?? {},
+                  });
+                }
+              }
+            }
+            await service.refresh("e2e-logged-out-composer");
+            return disabledProviders;
+          }, empty);
+          await setRendererViewport(width, 850);
+          await setSettingsTheme(theme);
+          if (empty) {
+            await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+            await $(sel(TID_SETTINGS_PAGE)).waitForDisplayed({ timeout: 15000 });
+            expect(
+              await browser.execute(
+                () => document.querySelector("[data-composer-model-list]") === null,
+              ),
+            ).toBe(true);
+            await clickVisibleTestIdByDom(TID_SETTINGS_BACK_BUTTON, { timeout: 15000 });
+            // 空配置仅属于本次布局；恢复夹具，避免下一次启动被空配置引导接管。
+            await browser.execute(async (providers) => {
+              const element = document.querySelector('[data-testid="v4-model-config"]')!;
+              let fiber = (element as any)[
+                Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+              ];
+              let service: any;
+              while (fiber && !service) {
+                service =
+                  fiber.memoizedProps?.value?.providerSettingsService ??
+                  fiber.memoizedProps?.services?.providerSettingsService;
+                fiber = fiber.return;
+              }
+              if (!service) throw new Error("ProviderSettingsService not found");
+              for (const provider of providers)
+                await service.savePersonalProviderOverlay(provider.providerId, provider.config, {
+                  enabled: true,
+                });
+            }, disabledProviders);
+          } else {
+            await selectRegistryProviderModelById(UPSTREAM_MODEL, {
+              providerId: process.env.E2E_PROVIDER_ID,
+            });
+            await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+            expect(
+              await browser.execute(
+                () =>
+                  document.querySelector("[data-composer-model-list]")?.textContent?.length ?? 0,
+              ),
+            ).toBeGreaterThan(0);
+            expect(
+              await browser.execute(() =>
+                document.body.textContent?.includes("coding_plan_oauth_required"),
+              ),
+            ).toBe(false);
+            await browser.keys("Escape");
+          }
+        }
+      }
+      await clearRendererViewport();
+    });
+  }
+
+  it("CTP-30: 个人团队切换列表无横向溢出，保留纵向滚动", async function () {
+    this.timeout(240000);
+    try {
+      for (const width of [1100, 390])
+        for (const theme of ["zai-light", "zai-dark"] as const) {
+          await prepareScenario("both", PERSONAL_PLAN_KEY);
+          await setRendererViewport(width, 850);
+          await setSettingsTheme(theme);
+          await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+          await browser.execute(() => {
+            const samples: { client: number; scroll: number }[] = [];
+            const record = () => {
+              for (const list of document.querySelectorAll<HTMLElement>(
+                "[data-composer-provider-list]",
+              ))
+                if (list.getBoundingClientRect().width > 0)
+                  samples.push({ client: list.clientWidth, scroll: list.scrollWidth });
+            };
+            const observer = new MutationObserver(record);
+            observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+            Object.assign(window, {
+              __providerWidthProbe: { samples, stop: () => observer.disconnect() },
+            });
+          });
+          for (const [label, providerId] of [
+            ["BigModel Team Org", BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan],
+            ["BigModel Individual", BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan],
+          ]) {
+            await $('[data-testid="composer-provider-trigger"]').waitForClickable({
+              timeout: 15000,
+            });
+            await $('[data-testid="composer-provider-trigger"]').click();
+            const row = $('[aria-label="' + label + '"]');
+            await row.waitForDisplayed({ timeout: 15000 });
+            // 原因：负边距分隔线超出滚动列表 4px；实际布局尺寸才证明没有横向溢出。
+            const geometry = await browser.execute(() => {
+              const list = document.querySelector<HTMLElement>("[data-composer-provider-list]")!;
+              const before = { client: list.clientWidth, scroll: list.scrollWidth };
+              const style = list.getAttribute("style");
+              // 当前目录可能只有两项；固定 96px 不产生溢出，无法验证纵向滚动。
+              const rows = list.querySelectorAll<HTMLElement>('[role="menuitemradio"]');
+              if (rows.length < 2) throw new Error("滚动夹具至少需要两个 Provider");
+              list.style.maxHeight = `${rows[0]!.getBoundingClientRect().height}px`;
+              const vertical = list.scrollHeight > list.clientHeight;
+              list.scrollTop = 10;
+              const scrolled = list.scrollTop > 0;
+              list.scrollTop = 0;
+              if (style === null) list.removeAttribute("style");
+              else list.setAttribute("style", style);
+              return { ...before, vertical, scrolled };
+            });
+            expect(geometry.scroll).toBeLessThanOrEqual(geometry.client);
+            expect(geometry.vertical && geometry.scrolled).toBe(true);
+            await row.click();
+            await browser.waitUntil(
+              async () =>
+                (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) === providerId,
+              { timeout: 15000 },
+            );
+          }
+          const samples = await browser.execute(() => {
+            const probe = (window as any).__providerWidthProbe;
+            probe.stop();
+            return probe.samples as { client: number; scroll: number }[];
+          });
+          await writeFile(
+            join(process.env.ZCODE_E2E_ARTIFACT_DIR!, `provider-width-${width}-${theme}.json`),
+            JSON.stringify(samples, null, 2),
+          );
+          expect(samples.length).toBeGreaterThan(0);
+          expect(samples.every((sample) => sample.scroll <= sample.client)).toBe(true);
+          await browser.keys("Escape");
+        }
+    } finally {
+      await browser.execute(() => (window as any).__providerWidthProbe?.stop());
+      await clearRendererViewport();
+    }
+  });
+
+  it("CTP-27: 登录加载团队后登出，不保留旧组织目录", async function () {
+    this.timeout(240000);
+    try {
+      for (const width of [1100, 390])
+        for (const theme of ["zai-light", "zai-dark"] as const) {
+          await prepareScenario("both", PERSONAL_PLAN_KEY);
+          await setRendererViewport(width, 850);
+          await setSettingsTheme(theme);
+          await selectRegistryProviderModelById(UPSTREAM_MODEL, {
+            providerId: process.env.E2E_PROVIDER_ID,
+          });
+          await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+          await $('[data-testid="composer-provider-trigger"]').click();
+          await $('[aria-label="BigModel Team Org"]').waitForClickable({ timeout: 15000 });
+          await $('[aria-label="BigModel Team Org"]').click();
+          await browser.waitUntil(
+            async () =>
+              (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+              BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+            { timeout: 15000 },
+          );
+          await browser.keys("Escape");
+          const usageTrigger = await $(sel(TID_CHAT_CONTEXT_USAGE_TRIGGER));
+          await usageTrigger.waitForDisplayed({ timeout: 15000 });
+          await usageTrigger.moveTo();
+          await browser.waitUntil(
+            async () =>
+              (await readComposerTeamUsageSource())?.startsWith("team:bigmodel:") === true,
+            { timeout: 15000, timeoutMsg: "团队用量来源未加载" },
+          );
+          await browser.keys("Escape");
+          await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+          await $('[data-testid="composer-provider-trigger"]').click();
+          await $('[aria-label="BigModel Team Org"]').waitForDisplayed({ timeout: 15000 });
+          // 保持同一 Renderer 挂载：重启会抹掉内存缓存，不能验证登出清理边界。
+          await installConnectionBoundaryProbe("logout");
+          await browser.waitUntil(
+            async () => !(await $('[aria-label="BigModel Team Org"]').isExisting()),
+            { timeout: 15000, timeoutMsg: "登出后仍显示上一账号组织" },
+          );
+          await browser.keys("Escape");
+          await browser.waitUntil(async () => (await readComposerTeamUsageSource()) === null, {
+            timeout: 5000,
+            timeoutMsg: "Provider 刷新前旧团队用量仍可见",
+          });
+          await browser.execute(async () => {
+            await (window as any).__logoutBoundaryRelease();
+          });
+          await selectRegistryProviderModelById(UPSTREAM_MODEL, {
+            providerId: process.env.E2E_PROVIDER_ID,
+          });
+          await browser.saveScreenshot(
+            join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "logout-" + width + "-" + theme + ".png"),
+          );
+        }
+    } finally {
+      const diagnostic = await browser.execute(() => (window as any).__logoutBoundaryAuth?.());
+      await writeFile(
+        join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "logout-boundary.json"),
+        JSON.stringify({ auth: diagnostic, source: await readComposerTeamUsageSource() }),
+      );
+      await browser.execute(async () => {
+        await (window as any).__logoutBoundaryRelease?.();
+      });
+      await clearRendererViewport();
+    }
+  });
+
+  for (const mode of ["cas", "mismatch", "refresh-failure"] as const) {
+    it(
+      "CTP-" +
+        (mode === "cas" ? "28" : mode === "mismatch" ? "29" : "31") +
+        ": " +
+        mode +
+        " 冲突解除锁并允许重试",
+      async function () {
+        this.timeout(120000);
+        await prepareScenario(
+          "both",
+          mode === "refresh-failure" ? TEAM_PLAN_KEY : PERSONAL_PLAN_KEY,
+          mode === "refresh-failure" ? "twoTeams" : "none",
+        );
+        const targetRow =
+          mode === "refresh-failure"
+            ? '[aria-label="BigModel Active Team"]'
+            : '[aria-label="BigModel Team Org"]';
+        await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+        await $('[data-testid="composer-provider-trigger"]').click();
+        await $(targetRow).waitForClickable({ timeout: 15000 });
+        await installConnectionBoundaryProbe(mode);
+        try {
+          // 端口替换触发真实目录重读；等待它结束，再从正常菜单发起被测命令。
+          await browser.keys("Escape");
+          await browser.keys("Escape");
+          // SessionPane 是 memo owner；草稿编辑让它重新读取注入后的服务端口，不发送模型请求。
+          await $(sel(TID_V4_COMPOSER_INPUT)).click();
+          await browser.keys("E2E_CONNECTION_BOUNDARY");
+          if (mode === "refresh-failure") {
+            // 注入端口后的草稿重渲染会恢复默认 Provider；先用真实菜单建立 Team 起点，
+            // 否则实际测成 API → Team 的首次读取失败，不是同 Provider 的展示刷新失败。
+            await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+            await $('[data-testid="composer-provider-trigger"]').click();
+            await $('[aria-label="BigModel Team Org"]').waitForClickable({ timeout: 15000 });
+            await $('[aria-label="BigModel Team Org"]').click();
+            await browser.waitUntil(
+              async () =>
+                (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+                BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+              { timeout: 15000, timeoutMsg: "起点未进入团队 Provider" },
+            );
+            // 本例要求旧 ready 已显示；仅 providerId 就绪时，能力仍可能在首次水合中。
+            // 先等真实模型能力，避免把启动水合失败误当成“稳定连接的展示重读失败”。
+            await browser.waitUntil(
+              async () =>
+                (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought-levels"))
+                  ?.split(",")
+                  .includes("max") === true,
+              { timeout: 15000, timeoutMsg: "起点团队模型能力尚未水合" },
+            );
+            await browser.keys("Escape");
+            await browser.keys("Escape");
+          }
+          await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+          await $('[data-testid="composer-provider-trigger"]').waitForClickable({ timeout: 15000 });
+          await $('[data-testid="composer-provider-trigger"]').click();
+          await $(targetRow).waitForClickable({ timeout: 15000 });
+          await browser.execute(() => (window as any).__connectionBoundaryProbe.arm());
+          await $(targetRow).click();
+          if (mode === "mismatch") {
+            await browser.waitUntil(
+              async () =>
+                (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+                "e2e-upstream",
+              { timeout: 15000, timeoutMsg: "展示 owner 未投影冲突选择" },
+            );
+            // 展示冲突会更换当前 Provider，根菜单可能因此重挂载；重开正常入口检查错误。
+            await browser.keys("Escape");
+            await browser.keys("Escape");
+            await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+          }
+          await $('[role="alert"]').waitForDisplayed({ timeout: 15000 });
+          expect(await $('[data-testid="composer-provider-loading"]').isExisting()).toBe(false);
+          const trace = await browser.execute(
+            () => (window as any).__connectionBoundaryProbe.trace,
+          );
+          expect(trace.length).toBeGreaterThan(0);
+          await writeFile(
+            join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "connection-" + mode + ".json"),
+            JSON.stringify(trace, null, 2),
+          );
+          if (mode === "cas")
+            expect((await readSettings()).providerFamilyConnectionSelections?.zai).toEqual({
+              kind: "individual-coding-plan",
+            });
+        } finally {
+          const diagnostics = await browser.execute(() => {
+            const probe = (window as any).__connectionBoundaryProbe;
+            const element = document.querySelector(
+              '[data-testid="v4-model-config"]',
+            ) as HTMLElement;
+            return {
+              trace: probe.trace,
+              config: element?.dataset,
+              alerts: Array.from(document.querySelectorAll('[role="alert"]')).map(
+                (e) => e.textContent,
+              ),
+            };
+          });
+          await writeFile(
+            join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "boundary-" + mode + ".json"),
+            JSON.stringify(diagnostics, null, 2),
+          );
+          await browser.execute((mode) => {
+            const probe = (window as any).__connectionBoundaryProbe;
+            if (mode === "refresh-failure") probe.recover();
+            else probe.restore();
+          }, mode);
+        }
+        await browser.keys("Escape");
+        await browser.keys("Escape");
+        if (mode !== "refresh-failure") {
+          await $(sel(TID_V4_COMPOSER_INPUT)).click();
+          await browser.keys("E2E_CONNECTION_RETRY");
+        }
+        await clickVisibleTestIdByDom(TID_CHAT_MODEL_SELECT_TRIGGER, { timeout: 15000 });
+        const trigger = $('[data-testid="composer-provider-trigger"]');
+        await trigger.waitForClickable({ timeout: 15000 });
+        await trigger.click();
+        await $(targetRow).waitForClickable({ timeout: 15000 });
+        await $(targetRow).click();
+        await browser.waitUntil(
+          async () =>
+            (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+            BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+          { timeout: 15000 },
+        );
+        if (mode === "refresh-failure") {
+          await browser.waitUntil(
+            async () =>
+              browser.execute(() =>
+                (window as any).__connectionBoundaryProbe.trace.some(
+                  (entry: any) => entry.phase === "obsolete-started",
+                ),
+              ),
+            { timeout: 15000 },
+          );
+          await browser.execute(() => (window as any).__connectionBoundaryProbe.supersede());
+          await browser.waitUntil(
+            async () =>
+              browser.execute(() =>
+                (window as any).__connectionBoundaryProbe.trace.some(
+                  (entry: any) => entry.phase === "presentation-recovered",
+                ),
+              ),
+            { timeout: 15000 },
+          );
+          await browser.execute(() => (window as any).__connectionBoundaryProbe.rejectObsolete());
+        }
+        if (mode === "refresh-failure")
+          await browser.waitUntil(
+            async () =>
+              browser.execute(() =>
+                (window as any).__connectionBoundaryProbe.trace.some(
+                  (entry: any) => entry.phase === "presentation-recovered",
+                ),
+              ),
+            { timeout: 15000, timeoutMsg: "同连接重试没有请求展示重读" },
+          );
+        await browser.waitUntil(
+          async () => !(await $('[data-testid="composer-provider-loading"]').isExisting()),
+          { timeout: 15000 },
+        );
+        expect(await $('[role="alert"]').isExisting()).toBe(false);
+        await browser.keys("Escape");
+        if (mode === "refresh-failure") {
+          const trace = await browser.execute(
+            () => (window as any).__connectionBoundaryProbe.trace,
+          );
+          const recoveredAt = trace.findIndex((entry: any) => entry.phase === "fault-recovered");
+          expect(
+            trace.slice(recoveredAt + 1).some((entry: any) => entry.phase === "target-event"),
+          ).toBe(false);
+          // 冷启动目录刷新次数不是合同；恢复必须读取本次已同步的 revision，而非写死 2。
+          const synchronized = trace.findLast(
+            (entry: any) => entry.phase === "target-synchronized",
+          );
+          expect(synchronized).toBeDefined();
+          expect(
+            trace.some(
+              (entry: any) =>
+                entry.phase === "presentation-recovered" &&
+                entry.revision === synchronized.revision,
+            ),
+          ).toBe(true);
+          await writeFile(
+            join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "connection-retry-no-event.json"),
+            JSON.stringify(trace, null, 2),
+          );
+          await browser.execute(() => (window as any).__connectionBoundaryProbe.restore());
+        }
+      },
+    );
+  }
+
+  it("CTP-24: Composer 仅隐藏过期团队，其他有效团队可切换", async function () {
+    this.timeout(240000);
+    // 共用 Provider 的 availability 只描述当前团队；每个布局都从过期团队启动，验证真实切换。
+    try {
+      for (const width of [1100, 390]) {
+        for (const theme of ["zai-light", "zai-dark"] as const) {
+          await prepareScenario("both", TEAM_PLAN_KEY, "expiredTeam", "none", "en-US");
+          const states = await browser.execute(async () => {
+            const element = document.querySelector('[data-testid="v4-model-config"]')!;
+            let fiber = (element as any)[
+              Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+            ];
+            let service: any;
+            while (fiber && !service) {
+              service =
+                fiber.memoizedProps?.value?.providerSettingsService ??
+                fiber.memoizedProps?.services?.providerSettingsService;
+              fiber = fiber.return;
+            }
+            if (!service) throw new Error("ProviderSettingsService not found");
+            const view = await service.refresh("e2e-expired-team");
+            return view.providers.map((provider: any) => ({
+              id: provider.providerId,
+              state: provider.accountState?.availability,
+            }));
+          });
+          expect(
+            states.find(
+              (provider: { id: string; state?: string }) =>
+                provider.id === BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+            )?.state,
+          ).toBe("unavailable");
+          await setRendererViewport(width, 850);
+          await setSettingsTheme(theme);
+          const trigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
+          await trigger.waitForClickable({ timeout: 30000 });
+          await trigger.click();
+          const connection = $('[data-testid="composer-provider-trigger"]');
+          await connection.waitForDisplayed({ timeout: 15000 });
+          await connection.click();
+          await $("[data-composer-provider-list]").waitForDisplayed({ timeout: 10000 });
+          expect(await $('[aria-label="BigModel Team Org"]').isExisting()).toBe(false);
+          const activeTeam = $('[aria-label="BigModel Active Team"]');
+          await activeTeam.waitForClickable({ timeout: 15000 }).catch(async (cause) => {
+            const menu = await browser.execute(() => {
+              const element = document.querySelector('[data-testid="v4-model-config"]')!;
+              let fiber = (element as any)[
+                Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+              ];
+              while (fiber && !fiber.memoizedProps?.composerOptions) fiber = fiber.return;
+              return {
+                text: document.querySelector("[data-composer-provider-list]")?.textContent,
+                groups: fiber?.memoizedProps?.composerOptions?.providerMenu?.groups?.map(
+                  (g: any) => ({ key: g.key, badge: g.labelBadge }),
+                ),
+              };
+            });
+            throw new Error(`有效团队缺失：${JSON.stringify(menu)}`, { cause });
+          });
+          await activeTeam.click();
+          await browser.waitUntil(
+            async () => {
+              const selection = (await readSettings()).providerFamilyConnectionSelections?.bigmodel;
+              return (
+                selection?.kind === "team-coding-plan" &&
+                selection.organizationId === "org-team-b" &&
+                selection.projectId === "proj-team-b"
+              );
+            },
+            { timeout: 15000, timeoutMsg: "有效团队完整身份未写入" },
+          );
+          await browser.waitUntil(
+            async () =>
+              (await connection.getText()).includes("Active Team") &&
+              (await connection.getAttribute("aria-busy")) !== "true",
+            { timeout: 30000, timeoutMsg: "有效团队切换未完成" },
+          );
+          await browser.keys("Escape");
+          await browser.keys("Escape");
+        }
+      }
+    } finally {
+      await clearRendererViewport();
+    }
+  });
+
+  it("CTP-20: Composer 供应商列表直接展示团队，切换更新实际身份", async function () {
+    this.timeout(120000);
+    await prepareScenario("both", PERSONAL_PLAN_KEY, "unavailableTeam");
+    // 独立回放不能依赖前序用例留下的草稿；连接设置不等于 Composer 选模意图。
+    await selectRegistryProviderModelById(BIGMODEL_E2E_MODEL, {
+      includePlainModelFallback: false,
+      providerId: BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+    });
+    const trigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
+    await trigger.waitForClickable({ timeout: 30000 });
+    await trigger.click();
+    const connection = $('[data-testid="composer-provider-trigger"]');
+    await connection.waitForDisplayed({ timeout: 15000 });
+    expect(await $('[data-testid="composer-provider-trigger"]').getText()).toContain("BigModel");
+    expect(await $('[data-testid="composer-connection-trigger"]').isExisting()).toBe(false);
+    const slider = $('[data-testid="composer-thought-slider"]');
+    await slider.waitForDisplayed({ timeout: 10000 });
+    await slider.click();
+    await browser.keys("Home");
+    await browser.keys("ArrowRight");
+    await browser.waitUntil(
+      async () => Boolean(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")),
+      { timeout: 10000 },
+    );
+    const chosenThought = await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought");
+    await browser.execute(() => {
+      const samples: unknown[] = [];
+      const record = () => {
+        const config = document.querySelector('[data-testid="v4-model-config"]');
+        const slider = document.querySelector('[data-testid="composer-thought-slider"]');
+        samples.push({
+          at: performance.now(),
+          provider: config?.getAttribute("data-provider"),
+          thought: config?.getAttribute("data-thought"),
+          levels: config?.getAttribute("data-thought-levels"),
+          effort: slider?.getAttribute("aria-valuetext"),
+          title: document.querySelector('[data-testid="composer-provider-trigger"]')?.textContent,
+          loading: Boolean(document.querySelector('[data-testid="composer-provider-loading"]')),
+          busy: document
+            .querySelector('[data-testid="composer-provider-trigger"]')
+            ?.getAttribute("aria-busy"),
+        });
+      };
+      const observer = new MutationObserver(record);
+      observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+      Object.assign(window, {
+        __composerSwitchProbe: { samples, stop: () => observer.disconnect() },
+      });
+      record();
+    });
+    await connection.click();
+    const team = $('[aria-label="BigModel Team Org"]');
+    await team.waitForDisplayed({ timeout: 10000 });
+    expect(await $('[aria-label="BigModel Unavailable Team"]').isExisting()).toBe(false);
+    await browser.saveScreenshot(
+      join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "composer-connections-before.png"),
+    );
+    await team.click();
+    await browser.waitUntil(
+      async () =>
+        (await readSettings()).providerFamilyConnectionSelections?.bigmodel?.kind ===
+        "team-coding-plan",
+      { timeout: 15000 },
+    );
+    await browser.waitUntil(
+      async () =>
+        (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+        BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+      { timeout: 15000 },
+    );
+    expect(await trigger.getAttribute("aria-expanded")).toBe("true");
+    await connection.waitForClickable({ timeout: 15000 });
+    const samples = await browser.execute(() => {
+      const probe = (
+        window as unknown as { __composerSwitchProbe: { samples: unknown[]; stop: () => void } }
+      ).__composerSwitchProbe;
+      probe.stop();
+      return probe.samples;
+    });
+    await writeFile(
+      join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "composer-switch-state.json"),
+      JSON.stringify(samples, null, 2),
+    );
+    expect(samples.some((sample) => (sample as { loading?: boolean }).loading)).toBe(true);
+    expect(
+      samples
+        .filter((sample) => (sample as { loading?: boolean }).loading)
+        .every((sample) => (sample as { busy?: string }).busy === "true"),
+    ).toBe(true);
+    expect(await $('[data-testid="composer-provider-loading"]').isExisting()).toBe(false);
+    // 修复回归：只看最终值会漏掉重选模型触发的中间清空/控件收缩，检查整段 DOM 时序。
+    expect(
+      samples.every((sample) => {
+        const state = sample as { thought?: string; effort?: string; levels?: string };
+        return state.thought === chosenThought && Boolean(state.effort) && Boolean(state.levels);
+      }),
+    ).toBe(true);
+    expect(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")).toBe(chosenThought);
+
+    await connection.click();
+    const selectedTeam = $('[aria-label="BigModel Team Org"]');
+    await selectedTeam.waitForDisplayed({ timeout: 10000 });
+    expect(await selectedTeam.getAttribute("aria-checked")).toBe("true");
+    expect(await connection.getText()).toContain("Team Org");
+    expect((await readSettings()).providerFamilyConnectionSelections?.bigmodel).toEqual({
+      kind: "team-coding-plan",
+      productId: "product-team-a",
+      organizationId: "org-team-a",
+      projectId: "proj-team-a",
+    });
+    await browser.saveScreenshot(
+      join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "composer-connections-team.png"),
+    );
+    const personal = $(
+      `[data-model-provider-key="registry-provider:${BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan}"]`,
+    );
+    await personal.click();
+    await browser.waitUntil(
+      async () =>
+        (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+        BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan,
+      { timeout: 15000 },
+    );
+    await connection.waitForClickable({ timeout: 15000 });
+    expect(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")).toBe(chosenThought);
+    expect((await readSettings()).providerFamilyConnectionSelections?.bigmodel?.kind).toBe(
+      "individual-coding-plan",
+    );
+    await browser.keys("Escape");
+  });
+
   for (const locale of ["zh-CN", "en-US"] as const) {
-    it(`CTP-02B: 侧栏头像旁应显示当前已确认的 Team Plan 标签（${locale}）`, async function () {
+    it(`CTP-23: 团队激活时补充个人入口使用当前语言 ${locale}`, async function () {
+      this.timeout(120000);
+      await prepareScenario("both", TEAM_PLAN_KEY, "none", "none", locale);
+      const trigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
+      await trigger.waitForClickable({ timeout: 30000 });
+      await trigger.click();
+      const connection = $('[data-testid="composer-provider-trigger"]');
+      await connection.click();
+      const personalLabel = locale === "zh-CN" ? "个人" : "Individual";
+      await $(`[aria-label="BigModel ${personalLabel}"]`).waitForDisplayed({ timeout: 10000 });
+      expect(await $('[aria-label="BigModel Team Org"]').isDisplayed()).toBe(true);
+      if (locale === "zh-CN")
+        expect(await $('[aria-label="BigModel Individual"]').isExisting()).toBe(false);
+      await browser.keys("Escape");
+      await browser.keys("Escape");
+    });
+  }
+
+  for (const direction of ["personal-to-team", "team-to-personal"] as const) {
+    it(`CTP-22: 经过普通 API 切换账号连接后思考完整 ${direction}`, async function () {
+      this.timeout(120000);
+      const toTeam = direction === "personal-to-team";
+      await prepareScenario("both", toTeam ? PERSONAL_PLAN_KEY : TEAM_PLAN_KEY);
+      await selectRegistryProviderModelById(BIGMODEL_E2E_MODEL, {
+        includePlainModelFallback: false,
+        providerId: toTeam
+          ? BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan
+          : BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan,
+      });
+      const trigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
+      await trigger.waitForClickable({ timeout: 30000 });
+      await trigger.click();
+      const connection = $('[data-testid="composer-provider-trigger"]');
+      await browser.execute(() => {
+        let wasLoading = false;
+        const read = () =>
+          JSON.stringify({
+            models: document.querySelector("[data-composer-model-list]")?.textContent,
+            effort: document
+              .querySelector('[data-testid="composer-thought-slider"]')
+              ?.getAttribute("aria-valuetext"),
+          });
+        let previous = read();
+        const probe = {
+          count: 0,
+          samples: [] as { loading: boolean; display: string; previous: string }[],
+          stop: () => {},
+        };
+        const observer = new MutationObserver(() => {
+          const loading = Boolean(
+            document.querySelector('[data-testid="composer-provider-loading"]'),
+          );
+          if (loading && !wasLoading) probe.count++;
+          const display = read();
+          probe.samples.push({ loading, display, previous });
+          if (!loading) previous = display;
+          wasLoading = loading;
+        });
+        observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+        probe.stop = () => observer.disconnect();
+        Object.assign(window, { __connectionLoadingProbe: probe });
+      });
+      await connection.click();
+      // 使用 runner 注入的 Provider 身份，不依赖已移除的旧预设名称。
+      await $(
+        `[data-composer-provider-list] [data-model-provider-key="registry-provider:${process.env.E2E_PROVIDER_ID}"]`,
+      ).click();
+      await browser.waitUntil(
+        async () =>
+          !(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider"))?.startsWith(
+            "account:",
+          ),
+      );
+      await connection.waitForClickable({ timeout: 15000 });
+      expect(await browser.execute(() => (window as any).__connectionLoadingProbe.count)).toBe(1);
+      await connection.click();
+      await $(
+        toTeam
+          ? '[aria-label="BigModel Team Org"]'
+          : `[data-model-provider-key="registry-provider:${BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan}"]`,
+      ).click();
+      await connection.waitForClickable({ timeout: 15000 });
+      await browser.waitUntil(
+        async () =>
+          (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-provider")) ===
+          (toTeam
+            ? BUILTIN_MODEL_PROVIDER_IDS.bigmodelTeamCodingPlan
+            : BUILTIN_MODEL_PROVIDER_IDS.bigmodelIndividualCodingPlan),
+        { timeout: 15000 },
+      );
+      expect(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")).not.toBe("");
+      expect(
+        await $('[data-testid="composer-thought-slider"]').getAttribute("aria-valuetext"),
+      ).not.toContain("—");
+      const probe = await browser.execute(() => {
+        const probe = (window as any).__connectionLoadingProbe;
+        probe.stop();
+        return { count: probe.count, samples: probe.samples };
+      });
+      await writeFile(
+        join(process.env.ZCODE_E2E_ARTIFACT_DIR!, `connection-loading-${direction}.json`),
+        JSON.stringify(probe, null, 2),
+      );
+      expect(probe.count).toBe(2);
+      expect(await $('[role="alert"]').isExisting()).toBe(false);
+      expect(
+        probe.samples
+          .filter((sample: any) => sample.loading)
+          .every((sample: any) => sample.display === sample.previous),
+      ).toBe(true);
+      await browser.keys("Escape");
+    });
+  }
+
+  it("CTP-21: 调思考后解析未返回时选模型不能留下空档位", async function () {
+    this.timeout(120000);
+    await prepareScenario("both", PERSONAL_PLAN_KEY);
+    const trigger = $(sel(TID_CHAT_MODEL_SELECT_TRIGGER));
+    await trigger.waitForClickable({ timeout: 30000 });
+    await trigger.click();
+    await $('[data-testid="composer-thought-slider"]').waitForDisplayed();
+    // 挂起真实 Renderer -> Host 的下一次选择读取，确定性覆盖用户连续操作窗口。
+    await browser.execute(() => {
+      const element = document.querySelector('[data-testid="v4-model-config"]')!;
+      let fiber = (element as any)[
+        Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+      ];
+      let service: any;
+      while (fiber && !service) {
+        service =
+          fiber.memoizedProps?.value?.modelSelectionService ??
+          fiber.memoizedProps?.services?.modelSelectionService;
+        fiber = fiber.return;
+      }
+      if (!service) throw new Error("ModelSelectionService not found");
+      const original = service.getView.bind(service);
+      let release!: () => void;
+      const pending = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      service.getView = async (...args: any[]) => {
+        await pending;
+        return original(...args);
+      };
+      Object.assign(window, {
+        __releaseSelectionRead: () => {
+          service.getView = original;
+          release();
+        },
+      });
+    });
+    try {
+      const slider = $('[data-testid="composer-thought-slider"]');
+      await slider.click();
+      await browser.keys("Home");
+      expect(await $('[data-testid="composer-provider-loading"]').isExisting()).toBe(false);
+      await writeFile(
+        join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "reasoning-read-menu.json"),
+        JSON.stringify(
+          await browser.execute(() => ({
+            config: (document.querySelector('[data-testid="v4-model-config"]') as HTMLElement)
+              ?.dataset,
+            menu: Array.from(document.querySelectorAll('[role="menu"]')).map((e) => e.textContent),
+          })),
+          null,
+          2,
+        ),
+      );
+      const flash = (await $$('[data-composer-model-list] [role="menuitemradio"]'))[1]!;
+      await flash.click();
+      await browser.waitUntil(
+        async () =>
+          (await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-model")) === "GLM-5.3-Flash",
+      );
+      expect(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")).not.toBe("");
+    } finally {
+      await browser.execute(() => (window as any).__releaseSelectionRead());
+    }
+    await $('[data-testid="composer-thought-slider"]').waitForDisplayed();
+    expect(await $(sel(TID_V4_MODEL_CONFIG)).getAttribute("data-thought")).not.toBe("");
+    await browser.keys("Escape");
+  });
+
+  for (const locale of ["zh-CN", "en-US"] as const) {
+    it(`CTP-02B: 侧栏头像菜单应显示当前已确认的 Team Plan 标签（${locale}）`, async function () {
       this.timeout(120000);
 
       await prepareScenario("teamOnly", TEAM_PLAN_KEY, "none", "none", locale);
@@ -176,9 +1020,12 @@ describe("Team Plan 设置与使用统计 E2E", () => {
       });
       // 英文 UI 的套餐标签为 Team；只断言徽标本身，避免用户名包含团队文字时误通过。
       const teamLabel = locale === "zh-CN" ? "团队" : "Team";
-      const badge = profileTrigger.$(`span[title="${teamLabel}"]`);
+      // 套餐标签已移入头像菜单；不再从头像按钮的旧布局查找。
+      await profileTrigger.click();
+      const badge = $('[data-testid="profile-menu-plan"]').$(`span[title="${teamLabel}"]`);
       await badge.waitForDisplayed({ timeout: 30000 });
       await expect(badge).toHaveText(teamLabel);
+      await browser.keys("Escape");
     });
   }
 
@@ -261,7 +1108,7 @@ describe("Team Plan 设置与使用统计 E2E", () => {
   });
 
   for (const locale of ["zh-CN", "en-US"] as const) {
-    it(`CTP-05: 个人/团队套餐组合应跟随当前连接方式展示（${locale}）`, async function () {
+    it(`CTP-05: 切换连接后可分别查看个人与团队用量来源（${locale}）`, async function () {
       this.timeout(180000);
 
       await prepareScenario("both", TEAM_PLAN_KEY, "none", "none", locale);
@@ -281,7 +1128,12 @@ describe("Team Plan 设置与使用统计 E2E", () => {
       const personalTab = $(sel(testId(TID_SETTINGS_USAGE_TAB, `codingPlan:${PERSONAL_PLAN_KEY}`)));
       await expect(personalTab).toHaveText(locale === "zh-CN" ? "个人套餐" : "Individual Plan");
       await expect(personalTab).toHaveAttribute("aria-pressed", "true");
-      await assertBodyTextExcludes(["Team Org"]);
+      // 使用统计按账号展示全部来源；团队 tab 的名称不代表个人面板泄漏团队额度。
+      const teamTab = $(sel(testId(TID_SETTINGS_USAGE_TAB, `codingPlan:${TEAM_PLAN_KEY}`)));
+      // 个人额度先返回，团队来源随后异步加入；等待目标来源渲染后再校验未选中状态。
+      await teamTab.waitForDisplayed({ timeout: 30_000 });
+      await expect(teamTab).toHaveText("Team Org");
+      await expect(teamTab).toHaveAttribute("aria-pressed", "false");
 
       await openModelProviderSettings();
       await clickVisibleTestIdByDom(testId(TID_MODEL_PROVIDER_NAV_ITEM, BIGMODEL_ACCOUNT_NAV_KEY), {
@@ -709,6 +1561,7 @@ async function prepareScenario(
   faultMode: CodingPlanFaultMode = "none",
   resetScenario: CodingPlanResetScenario = "none",
   locale?: "zh-CN" | "en-US",
+  loggedOut = false,
 ) {
   // 修复原因：同一 spec 会连续切换个人/团队套餐场景。必须在旧 Electron 退出前清理
   // file:// origin 的 entitlement 缓存；退出后再执行 browser.execute 会被异常吞掉，
@@ -729,8 +1582,21 @@ async function prepareScenario(
       username: "bigmodel-e2e-user",
     }),
     zcodejwttoken:
-      resetScenario === "none" && !faultMode.startsWith("startBalance") ? "" : "e2e-zcode-jwt",
+      resetScenario === "none" &&
+      !faultMode.startsWith("startBalance") &&
+      faultMode !== "expiredTeam"
+        ? ""
+        : "e2e-zcode-jwt",
   });
+  if (loggedOut)
+    await writeCredentials({
+      "oauth:active_provider": "",
+      "oauth:bigmodel:access_token": "",
+      "oauth:bigmodel:user_info": "",
+      "oauth:zai:access_token": "",
+      "oauth:zai:user_info": "",
+      zcodejwttoken: "",
+    });
   const connectionSelection = parseBigModelConnectionSelection(bigmodelSelectedKey);
   await writeSettings({
     ...(locale ? { locale, localePreference: locale } : {}),
@@ -1491,6 +2357,7 @@ async function writeCredentials(patch: Record<string, unknown>) {
 async function readSettings(): Promise<{
   providerFamilyConnectionSelections?: {
     bigmodel?: ProviderFamilyConnectionSelection;
+    zai?: ProviderFamilyConnectionSelection;
   };
   [key: string]: unknown;
 }> {
@@ -1612,4 +2479,238 @@ async function assertContextReminderHiddenInSettings(phase: "initial" | "urgent"
     timeout: 5000,
     timeoutMsg: "设置页点击误将 Composer 提醒标记为已读",
   });
+}
+
+// 读取真实展示组件的输入：保留 DOM 和 Host owner，只观察同一挂载树中的用量投影。
+async function readComposerTeamUsageSource(): Promise<string | null> {
+  return browser.execute(() => {
+    const element = document.querySelector('[data-testid="v4-model-config"]');
+    if (!element) return null;
+    let fiber = (element as any)[
+      Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+    ];
+    while (fiber.return) fiber = fiber.return;
+    // DOM 上的 Fiber 可指向 alternate；必须从 React 当前 root 读取已提交展示。
+    const pending = [fiber.stateNode.current];
+    while (pending.length) {
+      const node = pending.pop();
+      if (Object.hasOwn(node.memoizedProps ?? {}, "codingPlanUsageRemaining"))
+        return node.memoizedProps.codingPlanUsageRemaining?.selectedProviderId ?? null;
+      if (node.sibling) pending.push(node.sibling);
+      if (node.child) pending.push(node.child);
+    }
+    return null;
+  });
+}
+
+// 注入请求交错，不伪造设置落盘或替换生产菜单。所有修改在 finally 恢复。
+async function installConnectionBoundaryProbe(
+  mode: "logout" | "cas" | "mismatch" | "refresh-failure",
+) {
+  await browser.execute(async (mode) => {
+    const element = document.querySelector('[data-testid="v4-model-config"]')!;
+    let fiber = (element as any)[
+      Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+    ];
+    let services: any;
+    let store: any;
+    const accessors = new Set<any>();
+    while (fiber) {
+      const value = fiber.memoizedProps?.value;
+      const candidate = value?.settingService ? value : fiber.memoizedProps?.services;
+      if (candidate?.settingService) accessors.add(candidate);
+      services ??= candidate;
+      if (value?.getState && value.getState().setUser) store ??= value;
+      fiber = fiber.return;
+    }
+    if (!services?.settingService) throw new Error("Workspace services not found");
+    if (mode === "logout") {
+      if (!store) throw new Error("Auth store not found");
+      // 原因：刷新后断言会漏掉旧 Provider 与新 user 并存的窗口；先阻塞 refresh 再登出。
+      const restorers: (() => void)[] = [];
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      for (const accessor of accessors) {
+        const original = accessor.providerSettingsService;
+        accessor.providerSettingsService = new Proxy(original, {
+          get(target, prop) {
+            if (prop !== "refresh") return Reflect.get(target, prop);
+            return async (...args: any[]) => {
+              await blocked;
+              return target.refresh(...args);
+            };
+          },
+        });
+        restorers.push(() => {
+          accessor.providerSettingsService = original;
+        });
+      }
+      const suppressedRestores: unknown[] = [];
+      // 测试屏障同时暂停旧凭据的恢复回执，保证断言窗口确实保持 user=null；不改生产鉴权流程。
+      const pauseAuthRestore = store.subscribe((state: any) => {
+        if (state.user) {
+          suppressedRestores.push({ userId: state.user.id, authSessionSeq: state.authSessionSeq });
+          state.setUser(null);
+        }
+      });
+      (window as any).__logoutBoundaryRelease = async () => {
+        pauseAuthRestore();
+        restorers.forEach((restore) => restore());
+        release();
+        await services.oauthService.logoutAll();
+        store.getState().setUser(null);
+        await services.providerSettingsService.refresh("e2e-signed-out");
+      };
+      (window as any).__logoutBoundaryAuth = () => ({
+        userId: store.getState().user?.id ?? null,
+        authSessionSeq: store.getState().authSessionSeq,
+      });
+      store.getState().setUser(null);
+      return;
+    }
+    const trace: unknown[] = [];
+    let restore = () => {};
+    const restorers: (() => void)[] = [];
+    let injected = false;
+    let armed = false;
+    let recovered = false;
+    let obsoleteStarted = false;
+    let rejectObsolete!: (cause: Error) => void;
+    const presentationListeners: ((candidate: any) => void)[] = [];
+    let releasePresentation!: () => void;
+    const synchronized = new Promise<void>((resolve) => {
+      releasePresentation = resolve;
+    });
+    for (const accessor of accessors) {
+      const key = mode === "cas" ? "settingService" : "modelSelectionService";
+      const service = accessor[key];
+      if (mode === "cas") {
+        accessor[key] = new Proxy(service, {
+          get(target, prop) {
+            if (prop !== "update") return Reflect.get(target, prop);
+            return async (patch: any, expected: any) => {
+              if (armed && !injected && patch.providerFamilyConnectionSelections) {
+                injected = true;
+                const before = await service.get();
+                await service.update(
+                  {
+                    providerFamilyConnectionSelections: {
+                      ...before.providerFamilyConnectionSelections,
+                      zai: { kind: "individual-coding-plan" },
+                    },
+                  },
+                  {
+                    providerFamilyDomain: before.providerFamilyDomain,
+                    providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+                    providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
+                  },
+                );
+                trace.push({ phase: "concurrent-write", expected });
+              }
+              return service.update(patch, expected);
+            };
+          },
+        });
+      } else {
+        accessor[key] = new Proxy(service, {
+          get(target, prop) {
+            if (mode === "refresh-failure" && prop === "onDidChange")
+              return (listener: any) => {
+                presentationListeners.push(listener);
+                let delivered = false;
+                return service.onDidChange((candidate: any) => {
+                  // 每个订阅收到一次目标事件；不能由另一订阅抢先吞掉 Composer 的回执。
+                  if (armed && delivered) return;
+                  if (armed) {
+                    delivered = true;
+                    trace.push({ phase: "target-event", revision: candidate.revision });
+                  }
+                  listener(candidate);
+                });
+              };
+            if (prop !== "getView") return Reflect.get(target, prop);
+            return async (input: any) => {
+              if (mode === "refresh-failure" && armed && input) {
+                trace.push({ phase: "presentation-failed" });
+                throw new Error("E2E presentation read failed");
+              }
+              if (mode === "refresh-failure" && recovered && input && !obsoleteStarted) {
+                obsoleteStarted = true;
+                trace.push({ phase: "obsolete-started" });
+                return new Promise((_resolve, reject) => {
+                  rejectObsolete = reject;
+                });
+              }
+              const view = await service.getView(input);
+              if (mode === "refresh-failure") {
+                if (recovered && input)
+                  trace.push({ phase: "presentation-recovered", revision: view.revision });
+                if (armed) trace.push({ phase: "target-synchronized", revision: view.revision });
+                return view;
+              }
+              if (!armed) return view;
+              if (!input) {
+                trace.push({ phase: "target-synchronized", revision: view.revision });
+                releasePresentation();
+                return view;
+              }
+              // 挂起展示读取直到连接同步完成，再读取同一 owner 的最新 revision；
+              // 旧 ready 不属于本次回执，不能拿它伪造 ready+mismatch。
+              await synchronized;
+              const latest = await service.getView(input);
+              trace.push({
+                phase: "ready-mismatch",
+                revision: latest.revision,
+                original: latest.effectiveSelection,
+              });
+              return {
+                ...latest,
+                // 固定的 Flash 恰好可能是目标首选模型，不能保证冲突；回放另一有效 Provider 的选择。
+                effectiveSelection: {
+                  providerId: "e2e-upstream",
+                  modelId: "deepseek-v4-flash",
+                  options: { reasoningLevel: "disabled" },
+                },
+              };
+            };
+          },
+        });
+      }
+      restorers.push(() => {
+        accessor[key] = service;
+      });
+    }
+    // RPC 方法 getter 不读取赋值；替换 accessor 的端口并重渲染，保持生产 RPC 和设置锁。
+    if (!store) throw new Error("Auth store not found");
+    store.getState().setUser({ ...store.getState().user });
+    restore = () => {
+      releasePresentation();
+      restorers.forEach((restore) => restore());
+      store.getState().setUser({ ...store.getState().user });
+    };
+    Object.assign(window, {
+      __connectionBoundaryProbe: {
+        trace,
+        restore,
+        recover: () => {
+          armed = false;
+          recovered = true;
+          trace.push({ phase: "fault-recovered" });
+        },
+        supersede: async () => {
+          const candidate = await Array.from(accessors)[0].modelSelectionService.getView();
+          presentationListeners.forEach((listener) => listener(candidate));
+        },
+        rejectObsolete: () => {
+          trace.push({ phase: "obsolete-failed" });
+          rejectObsolete(new Error("E2E obsolete presentation failed"));
+        },
+        arm: () => {
+          armed = true;
+        },
+      },
+    });
+  }, mode);
 }

@@ -30,6 +30,7 @@ const EMPTY_ARTIFACT_WORKSPACE_RELATIVE_PATHS: ReadonlyMap<string, string> = new
  */
 export const ConversationShareImportNotice = memo(function ConversationShareImportNotice({
   rows,
+  contentBlocks,
   locale,
   theme,
   codePreviewSettings,
@@ -44,6 +45,7 @@ export const ConversationShareImportNotice = memo(function ConversationShareImpo
   onOpenCodeViewer,
 }: {
   rows: readonly ConversationRow[];
+  contentBlocks?: readonly unknown[];
   locale: Locale;
   theme?: Theme;
   codePreviewSettings?: CodePreviewSettings;
@@ -63,6 +65,7 @@ export const ConversationShareImportNotice = memo(function ConversationShareImpo
     <div data-conversation-share-import-notice="true" className="flex w-full flex-col">
       <ConversationShareReadonlyTimeline
         rows={rows}
+        contentBlocks={contentBlocks}
         locale={locale}
         {...(theme ? { theme } : {})}
         {...(codePreviewSettings ? { codePreviewSettings } : {})}

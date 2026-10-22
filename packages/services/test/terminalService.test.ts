@@ -69,7 +69,6 @@ function createMockPty() {
   };
 }
 
-
 function createTestTerminalService(settings = {}) {
   return createTerminalService({
     settingService: {
@@ -83,7 +82,6 @@ function createTestTerminalService(settings = {}) {
       }),
       update: vi.fn(),
       updateDataBaseDir: vi.fn(),
-      ensureDefaultProject: vi.fn(),
     } as any,
   });
 }
@@ -280,7 +278,11 @@ describe("terminalService", () => {
     process.env.SHELL = join(tmpdir(), `zcode-missing-shell-${Date.now()}`);
 
     const service = createTestTerminalService();
-    await service.create({ cols: 80, rows: 24, cwd: join(tmpdir(), `zcode-missing-cwd-${Date.now()}`) });
+    await service.create({
+      cols: 80,
+      rows: 24,
+      cwd: join(tmpdir(), `zcode-missing-cwd-${Date.now()}`),
+    });
 
     expect(spawnMock).toHaveBeenCalledOnce();
     expect(spawnMock).toHaveBeenCalledWith(
@@ -298,8 +300,7 @@ describe("terminalService", () => {
   it("should wrap spawn failures with shell and cwd details", async () => {
     const home = makeTempDir("zcode-terminal-home-");
     process.env.HOME = home;
-    process.env.SHELL =
-      process.platform === "win32" ? "/bin/sh" : "/bin/sh";
+    process.env.SHELL = process.platform === "win32" ? "/bin/sh" : "/bin/sh";
     spawnMock.mockImplementationOnce(() => {
       throw new Error("posix_spawnp failed");
     });
@@ -308,7 +309,9 @@ describe("terminalService", () => {
     const expectedShell = resolveTerminalShell().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     await expect(service.create({ cols: 80, rows: 24, cwd: home })).rejects.toThrow(
-      new RegExp(`Failed to start terminal with shell '${expectedShell}' in '.*': posix_spawnp failed`),
+      new RegExp(
+        `Failed to start terminal with shell '${expectedShell}' in '.*': posix_spawnp failed`,
+      ),
     );
   });
 
@@ -367,15 +370,73 @@ describe("terminalService", () => {
     expect(spawnMock).toHaveBeenCalledOnce();
   });
 
+  describe("early output buffering", () => {
+    async function createTerminalWithPty() {
+      const home = makeTempDir("zcode-terminal-home-");
+      process.env.HOME = home;
+      process.env.SHELL = "/bin/sh";
+      const pty = createMockPty();
+      spawnMock.mockReturnValueOnce(pty);
+      const service = createTestTerminalService();
+      const { id } = await service.create({ cols: 80, rows: 24, cwd: home });
+      const emitPtyData = pty.onData.mock.calls[0]?.[0] as ((data: string) => void) | undefined;
+      if (!emitPtyData) throw new Error("pty.onData was not wired");
+      return { emitPtyData, id, service };
+    }
+
+    it("should replay output emitted before the first onDynamicData listener, then stream live", async () => {
+      // R3 远端终端 bash 提示符在 spawn 后约 10ms 就到达，而 renderer 要等 create() 返回后才能订阅；
+      // 订阅前的输出必须保留并按序回放，否则用户看到的是空白终端。
+      const { emitPtyData, id, service } = await createTerminalWithPty();
+      emitPtyData("banner\r\n");
+      emitPtyData("dev@host:~$ ");
+
+      const received: string[] = [];
+      service.onDynamicData(id)((data) => received.push(data));
+      emitPtyData("live");
+
+      expect(received).toEqual(["banner\r\n", "dev@host:~$ ", "live"]);
+    });
+
+    it("should retain output while no listener is attached and replay it to the next listener", async () => {
+      const { emitPtyData, id, service } = await createTerminalWithPty();
+      const first: string[] = [];
+      const subscription = service.onDynamicData(id)((data) => first.push(data));
+      emitPtyData("a");
+      subscription.dispose();
+      emitPtyData("b");
+
+      const second: string[] = [];
+      service.onDynamicData(id)((data) => second.push(data));
+      emitPtyData("c");
+
+      expect(first).toEqual(["a"]);
+      expect(second).toEqual(["b", "c"]);
+    });
+
+    it("should drop the oldest buffered output once the early buffer exceeds its bound", async () => {
+      const { emitPtyData, id, service } = await createTerminalWithPty();
+      const chunk = "x".repeat(600_000);
+      emitPtyData(chunk);
+      emitPtyData("y".repeat(600_000));
+      emitPtyData("tail");
+
+      const received: string[] = [];
+      service.onDynamicData(id)((data) => received.push(data));
+
+      expect(received).not.toContain(chunk);
+      expect(received.at(-1)).toBe("tail");
+      expect(received.join("").length).toBeLessThanOrEqual(1_048_576);
+    });
+  });
+
   it("should kill all active terminals when disposing the service", async () => {
     const home = makeTempDir("zcode-terminal-home-");
     process.env.HOME = home;
     process.env.SHELL = "/bin/sh";
     const firstPty = createMockPty();
     const secondPty = createMockPty();
-    spawnMock
-      .mockReturnValueOnce(firstPty)
-      .mockReturnValueOnce(secondPty);
+    spawnMock.mockReturnValueOnce(firstPty).mockReturnValueOnce(secondPty);
 
     const service = createTestTerminalService() as ReturnType<typeof createTestTerminalService> & {
       disposeAll: () => void;

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-settings",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-settings.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-toolsearch-settings.json"
+  ],
+  "fileFixtures": [],
+  "providerHarness": "./test/e2e/helpers/toolsearch-provider.ts",
+  "requests": [
+    {
+      "id": "conversation-session-toolsearch-settings-auxiliary",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-search",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-todo",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-local-todo",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+    }
+  ],
+  "notes": "Pending Desktop Settings UI and real provider wire; controlled responses, production runtime and SQLite."
+}

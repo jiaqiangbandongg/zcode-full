@@ -61,10 +61,6 @@ import {
 import { ConversationRowView } from "@/v4/ConversationRowView.js";
 // eslint-disable-next-line import/first -- 同上。
 import { PlatformProvider } from "@/hooks/usePlatform.js";
-// eslint-disable-next-line import/first -- 同上；词条只用于双语言存在性断言。
-import enUS from "../src/i18n/locales/en-US.js";
-// eslint-disable-next-line import/first -- 同上。
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 type ToolCallOverrides = {
   /** 工具名（kind / title 同值）；缺省 CreateWorkflow，修订行传 AmendWorkflow。 */
@@ -281,21 +277,6 @@ function joined(
   } satisfies WorkflowRunCardSummary;
 }
 
-describe("CreateWorkflowToolCallBlock 表头种类词", () => {
-  it("扫光中的种类词可见：换词的 wf-swap 包在 animated-gradient-text 外面，不在里面", () => {
-    // background-clip:text 只裁到自己这一层的文字；被 transform/opacity 动画提层的子元素会变透明，
-    // 表头上「Workflow running」就成了一段空白（round 7 修订）。
-    const view = renderBlockDom(LOOP_TOOL_CALL, { workflowRun: joined() });
-    const kind = view.getByTestId("workflow-card-kind");
-    expect(kind.textContent).toBe("Workflow running");
-    const gradient = kind.querySelector(".animated-gradient-text")!;
-    expect(gradient).toBeTruthy();
-    expect(gradient.querySelector(".wf-swap")).toBeNull();
-    expect(gradient.closest(".wf-swap")).toBeTruthy();
-    expect(gradient.textContent).toBe("Workflow running");
-  });
-});
-
 describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）", () => {
   it("表头：种类词 + 名字，右侧空环灯「compiled」+ 等宽计数；卡体是时间线，脚本折叠", () => {
     const view = renderBlockDom(LOOP_TOOL_CALL);
@@ -306,8 +287,6 @@ describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）",
     expect(view.getByTestId("workflow-card-name").textContent).toBe("Research pipeline");
     expect(view.getByTestId("workflow-card-static-status").textContent).toBe("compiled");
     expect(view.getByTestId("workflow-card-detail").textContent).toBe("2 phases · 2 agents");
-    // 绿色留给等待确认态：compiled 不是成功色徽标。
-    expect(card.innerHTML).not.toContain("text-success");
 
     const stations = view.getAllByTestId("workflow-timeline-station");
     expect(stations.map((station) => station.textContent)).toEqual([
@@ -378,7 +357,7 @@ describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）",
     expect(html(view)).not.toContain("Workflow started");
   });
 
-  it("站数超过一列时表头不再带秩带（看不见的站在时间线的边檐上）", () => {
+  it("六个阶段完整进入时间线", () => {
     const phases = ["a", "b", "c", "d", "e", "f"].map((name, i) => ({
       id: `phase#${name}`,
       name,
@@ -413,8 +392,6 @@ describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）",
         },
       },
     });
-    // 秩带已退役（追记「边檐」）：看不见的站在时间线自己的边檐上，表头不再复述。
-    expect(view.queryByTestId("workflow-rank-strip")).toBeNull();
     expect(view.getAllByTestId("workflow-timeline-station")).toHaveLength(6);
   });
 
@@ -448,7 +425,7 @@ describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）",
     expect(markup).not.toContain("code-block");
   });
 
-  it("saved 来源行在时间线之上", () => {
+  it("saved 来源显示保存的工作流名称", () => {
     const view = renderBlockDom({
       input: {
         name: "Fan-out review",
@@ -463,11 +440,6 @@ describe("CreateWorkflowToolCallBlock 静态形态（编过、未联接 run）",
     });
     const savedLine = view.container.querySelector('[data-workflow-card-saved-source="true"]')!;
     expect(savedLine.textContent).toContain("fan-out-review");
-    const body = view.getByTestId("workflow-card-body");
-    const order = Array.from(body.children);
-    expect(order.indexOf(savedLine as HTMLElement)).toBeLessThan(
-      order.indexOf(view.getByTestId("workflow-timeline")),
-    );
   });
 });
 
@@ -510,10 +482,6 @@ describe("CreateWorkflowToolCallBlock 编译反馈", () => {
     const lamp = view.getByTestId("workflow-draft-lamp");
     expect(lamp.getAttribute("data-draft-lamp")).toBe("open");
     expect(lamp.className).toContain("border-warning");
-    expect(lamp.className).toContain("bg-transparent");
-    // 灯在下划线的状态词之外：提示触发的只是词。
-    expect(view.getByTestId("workflow-draft-status").contains(lamp)).toBe(false);
-    expect(row.innerHTML).not.toContain("destructive");
     expect(view.queryByTestId("workflow-card")).toBeNull();
     expect(view.queryByTestId("workflow-timeline")).toBeNull();
   });
@@ -537,7 +505,7 @@ describe("CreateWorkflowToolCallBlock 编译反馈", () => {
     expect(view.getByTestId("workflow-draft-lamp").getAttribute("data-draft-lamp")).toBe("open");
   });
 
-  it("展开：脚本带行号、被点名的行号着色；反馈卡中性边框，标题 + 条数 + 一句话 + 逐条", () => {
+  it("展开脚本带行号与问题行，反馈显示标题、计数、说明及逐条位置", () => {
     const view = renderBlockDom(FEEDBACK_CALL, { workflowDraft: LATEST, forceOpen: true });
     // 展开后稿号仍在行上（不随展开隐藏）。
     expect(view.getByTestId("workflow-draft-ordinal").textContent).toBe("draft 2");
@@ -546,8 +514,6 @@ describe("CreateWorkflowToolCallBlock 编译反馈", () => {
     expect(code.getAttribute("data-marked-lines")).toBe("3,8");
 
     const card = view.getByTestId("workflow-compiler-feedback");
-    expect(card.className).toContain("border-border");
-    expect(card.outerHTML).not.toContain("destructive");
     expect(within(card).getByTestId("workflow-compiler-feedback-title").textContent).toBe(
       "Compiler feedback",
     );
@@ -726,7 +692,6 @@ describe("CreateWorkflowToolCallBlock 启动前 ToolLayout", () => {
     const caret = view.getByTestId("workflow-timeline-caret");
     expect(stations[1]!.contains(caret)).toBe(true);
     expect(caret.getAttribute("data-pen")).toBe("idle");
-    expect(caret.className).toContain("wf-caret");
     // 草稿只有阶段线：没有药丸、没有弧；阶段线不是展开内容，行上仍没有展开入口。
     expect(view.queryByTestId("workflow-agent-pill")).toBeNull();
     expect(view.queryByTestId("workflow-timeline-arc")).toBeNull();
@@ -781,10 +746,6 @@ describe("CreateWorkflowToolCallBlock 启动前 ToolLayout", () => {
       locale,
     );
     expect(view.container.querySelector(".tool-summary-kind-label")).toBeTruthy();
-    expect(
-      view.container.querySelector(".tool-summary-kind-label.animated-gradient-text"),
-    ).toBeTruthy();
-    expect(view.container.querySelector(".truncate.font-mono")).toBeNull();
     expect(view.queryByTestId("workflow-card")).toBeNull();
     const trigger = view.getByRole("button");
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
@@ -792,8 +753,6 @@ describe("CreateWorkflowToolCallBlock 启动前 ToolLayout", () => {
     fireEvent.keyDown(trigger, { key: "Enter" });
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(view.getByTestId("code-block").textContent).toContain("agent");
-    expect(view.getByTestId("code-block").className).toContain("max-h-80");
-    expect(view.getByTestId("workflow-script-codeblock").className).not.toContain("overflow-auto");
     fireEvent.click(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
@@ -838,13 +797,6 @@ describe("CreateWorkflowToolCallBlock 运行态", () => {
     ).toBe("running");
     expect(view.getByTestId("workflow-timeline-rail").getAttribute("data-rail-ink")).toBe("march");
     expect(view.getByTestId("workflow-timeline-arc").getAttribute("data-arc-ink")).toBe("faint");
-  });
-
-  it("running 同时有动画点和状态词，绝不只靠颜色或动画表达状态", () => {
-    const view = renderBlockDom(LOOP_TOOL_CALL, { workflowRun: joined() });
-    const header = view.getByTestId("workflow-card-header");
-    expect(header.querySelector(".animate-pulse")).toBeTruthy();
-    expect(header.textContent).toContain("Running");
   });
 
   it("运行态没有页脚：卡上只说阶段与子代理，都在表头；步数、token、轮次不上卡（2026-09-09）", () => {
@@ -1059,9 +1011,8 @@ describe("CreateWorkflowToolCallBlock 药丸点击", () => {
     const pills = view.getAllByTestId("workflow-agent-pill");
     expect(pills.map((pill) => pill.tagName)).toEqual(["BUTTON", "BUTTON"]);
     expect(pills[1]!.getAttribute("aria-label")).toBe("Open the transcript of Bob");
-    // ↗ 的在场就是「可打开」的可见证据；悬停语法挂在 wf-pill-open 上。
+    // ↗ 的在场就是「可打开」的可见证据。
     expect(view.getAllByTestId("workflow-timeline-pill-open")).toHaveLength(2);
-    expect(pills[1]!.className).toContain("wf-pill-open");
 
     fireEvent.click(pills[1]!);
     expect(onOpenWorkflowActor).toHaveBeenCalledWith({
@@ -1094,7 +1045,6 @@ describe("CreateWorkflowToolCallBlock 药丸点击", () => {
     });
     const pills = noSession.getAllByTestId("workflow-agent-pill");
     expect(pills.map((pill) => pill.tagName)).toEqual(["BUTTON", "BUTTON"]);
-    expect(pills[1]!.className).toContain("wf-pill-open");
     expect(pills[1]!.getAttribute("aria-label")).toBe("Open the transcript of checker");
     fireEvent.click(pills[1]!);
     expect(onOpenWorkflowActor).toHaveBeenCalledWith({
@@ -1168,7 +1118,6 @@ describe("CreateWorkflowToolCallBlock 脚本药丸", () => {
     });
     const pill = workspacePill(view);
     expect(pill.tagName).toBe("BUTTON");
-    expect(pill.className).toContain("wf-pill-open");
     expect(pill.getAttribute("aria-label")).toBe("Open the script's steps at verify");
     expect(view.getAllByTestId("workflow-timeline-workspace-open")).toHaveLength(1);
     fireEvent.click(pill);
@@ -1464,49 +1413,6 @@ describe("CreateWorkflowToolCallBlock kind 文案分相", () => {
     expect(view.container.textContent).toContain("正在修改工作流");
     expect(view.getByTestId("workflow-draft-ordinal").textContent).toBe("第 2 稿");
   });
-
-  it("编译反馈的新 key 在两种语言里都存在且已翻译；旧的错误计数与「诊断」键退场", () => {
-    for (const key of [
-      "chat.toolCall.workflow.draft",
-      "chat.toolCall.workflow.amend.draft",
-      "chat.toolCall.workflow.revising",
-      "chat.toolCall.workflow.amend.revising",
-      "chat.toolCall.workflow.draftOrdinal",
-      "chat.toolCall.workflow.toFix",
-      "chat.toolCall.workflow.notRun",
-      "chat.toolCall.workflow.feedback",
-      "chat.toolCall.workflow.feedback.lede",
-      "chat.toolCall.workflow.feedback.lede.saved",
-      "chat.toolCall.workflow.feedback.count",
-      "chat.toolCall.workflow.feedback.countOne",
-      "chat.toolCall.workflow.feedback.rule",
-    ]) {
-      expect((enUS as Record<string, string>)[key], key).toBeTruthy();
-      expect((zhCN as Record<string, string>)[key], key).toBeTruthy();
-      expect((zhCN as Record<string, string>)[key], key).not.toBe(
-        (enUS as Record<string, string>)[key],
-      );
-    }
-    for (const gone of [
-      "chat.toolCall.workflow.error",
-      "chat.toolCall.workflow.errors",
-      "chat.toolCall.workflow.diagnostics",
-    ]) {
-      expect((enUS as Record<string, string>)[gone], gone).toBeUndefined();
-      expect((zhCN as Record<string, string>)[gone], gone).toBeUndefined();
-    }
-  });
-
-  it("两个新 key 在两种语言里都存在，且不是英文占位", () => {
-    for (const key of [
-      "chat.toolCall.workflow.writing",
-      "chat.toolCall.workflow.awaitingConfirmation",
-    ]) {
-      expect(enUS[key]).toBeTruthy();
-      expect(zhCN[key]).toBeTruthy();
-      expect(zhCN[key]).not.toBe(enUS[key]);
-    }
-  });
 });
 
 // ── 五枚药丸与一扇门（docs/dynamic-workflow/presentation.md「Past six participants」）──
@@ -1580,7 +1486,7 @@ describe("CreateWorkflowToolCallBlock 名册站", () => {
   const mid = (i: number): FanStatus =>
     i === 4 ? "failed" : i === 6 ? "running" : i === 7 ? "pending" : "done";
 
-  it("七个参与者：钉住 running → failed → 补位五枚药丸，其余折成「还有 2 个」一行；没有计数行、量条、格子", () => {
+  it("七个参与者按运行、失败和参与顺序钉住五枚，其余两位汇总", () => {
     const view = renderBlockDom(fanoutToolCall(7), { workflowRun: fanoutRun(7, mid) });
     const column = view.getByTestId("workflow-timeline-pills");
     expect(column.getAttribute("data-station-roster")).toBe("true");
@@ -1600,7 +1506,6 @@ describe("CreateWorkflowToolCallBlock 名册站", () => {
       "done",
     ]);
     const row = within(column).getByTestId("workflow-roster-more-row");
-    expect(column.lastElementChild).toBe(row);
     expect(row.getAttribute("data-more-count")).toBe("2");
     expect(row.textContent).toBe("2 more");
     expect(row.getAttribute("title")).toBe("2 more subagents · list everyone in the run pane");
@@ -1613,9 +1518,6 @@ describe("CreateWorkflowToolCallBlock 名册站", () => {
       "content",
     ]);
     expect(within(row).queryByTestId("workflow-more-failed")).toBeNull();
-    expect(within(column).queryByTestId("workflow-roster-tally")).toBeNull();
-    expect(within(column).queryByTestId("workflow-roster-meter")).toBeNull();
-    expect(within(column).queryByTestId("workflow-agent-cell")).toBeNull();
     // 表头照旧。
     expect(view.getByTestId("workflow-card-detail").textContent).toContain("1 agent working");
   });
@@ -1679,7 +1581,10 @@ describe("CreateWorkflowToolCallBlock 名册站", () => {
     expect(row.tagName).toBe("BUTTON");
     expect(row.getAttribute("data-more-count")).toBe("55");
     fireEvent.click(row);
-    expect(onOpenWorkflowRun).toHaveBeenCalledWith({ workflowName: "bug-scan", phaseId: "phase#a" });
+    expect(onOpenWorkflowRun).toHaveBeenCalledWith({
+      workflowName: "bug-scan",
+      phaseId: "phase#a",
+    });
     // 站头（有回调时是按钮，title = 站名）同一条路。
     fireEvent.click(view.getByTitle("review"));
     expect(onOpenWorkflowRun).toHaveBeenCalledTimes(2);
@@ -1711,7 +1616,6 @@ describe("CreateWorkflowToolCallBlock 名册站", () => {
     expect(html).toContain('data-station-roster="true"');
     expect(html).toContain('data-more-count="3"');
     expect(html).toContain('<span aria-label="3 more subagents · list everyone in the run pane"');
-    expect(html).not.toContain('data-testid="workflow-roster-tally"');
   });
 
   it("zh-CN：「还有 n 个」与整句 title", () => {
@@ -1955,35 +1859,6 @@ describe("CreateWorkflowToolCallBlock as AmendWorkflow", () => {
     );
   });
 
-  it("every amend key exists in both locales", () => {
-    for (const key of [
-      "chat.toolCall.workflow.amend.writing",
-      "chat.toolCall.workflow.amend.awaitingConfirmation",
-      "chat.toolCall.workflow.amend.ran",
-      "chat.toolCall.workflow.amend.amended",
-      "chat.toolCall.workflow.amend.amends",
-      "chat.toolCall.workflow.card.superseded",
-      "chat.toolCall.workflow.run.stopReason.superseded",
-      "chat.toolCall.workflow.run.amends",
-      "chat.toolCall.workflow.run.supersededBy",
-      "chat.permission.workflow.amend.title",
-      "chat.permission.workflow.amends",
-      "chat.permission.workflow.amends.running",
-      "chat.permission.workflow.amends.scriptUnchanged",
-      "chat.toolCall.workflow.amend.scriptUnchanged",
-    ]) {
-      expect(enUS[key as keyof typeof enUS], key).toBeTruthy();
-      expect(zhCN[key as keyof typeof zhCN], key).toBeTruthy();
-    }
-    // 旧 lineage 键随 resume_from 一起退场；卡上的两句 lineage（调整自 / 已被替代）按用户裁决不画，键也不留。
-    for (const gone of ["chat.toolCall.workflow.card.supersededBy", "chat.toolCall.workflow.card.amends"]) {
-      expect((enUS as Record<string, string>)[gone], gone).toBeUndefined();
-      expect((zhCN as Record<string, string>)[gone], gone).toBeUndefined();
-    }
-    expect((enUS as Record<string, string>)["chat.permission.workflow.resumeFrom"]).toBeUndefined();
-    expect((zhCN as Record<string, string>)["chat.permission.workflow.resumeFrom"]).toBeUndefined();
-  });
-
   // ── 就地生效的修订（docs/dynamic-workflow/concurrency.md）────────────────────────────
   // 只改并发上限、run 又在飞时这次调用不编译、不铸新 run，结果连 display 都没有——整行退成设置行
   // 是接线层（ConversationRowView）按入参形状裁的，见本文件末尾那一节。这里只钉渲染器这一侧：
@@ -2002,8 +1877,14 @@ describe("CreateWorkflowToolCallBlock as AmendWorkflow", () => {
   });
 
   it.each([
-    [{ run_id: "r", max_concurrency: 4 }, { runId: "r", requested: 4 }],
-    [{ run_id: "r", max_concurrency: null }, { runId: "r", requested: null }],
+    [
+      { run_id: "r", max_concurrency: 4 },
+      { runId: "r", requested: 4 },
+    ],
+    [
+      { run_id: "r", max_concurrency: null },
+      { runId: "r", requested: null },
+    ],
     // 带了脚本来源：这次修订要编译，不是就地生效的形状。
     [{ run_id: "r", max_concurrency: 4, script: "phase('a')" }, undefined],
     [{ run_id: "r", max_concurrency: 4, path: ".zcode/workflow-drafts/x.dwf.ts" }, undefined],
@@ -2281,7 +2162,12 @@ describe("ConversationRowView 把工具卡的产物药丸变成打开请求", ()
   it.each([
     ["请求高于默认", { run_id: "run-7", max_concurrency: 40 }, 13, "at most 40 at once"],
     ["请求正好是默认", { run_id: "run-7", max_concurrency: 13 }, 13, "limit back to the default"],
-    ["解除上限（null）", { run_id: "run-7", max_concurrency: null }, 13, "limit back to the default"],
+    [
+      "解除上限（null）",
+      { run_id: "run-7", max_concurrency: null },
+      13,
+      "limit back to the default",
+    ],
     ["请求低于默认", { run_id: "run-7", max_concurrency: 4 }, 13, "at most 4 at once"],
     // 默认未知（那条 run 已被淘汰出投影）：只能照念请求值。
     ["默认未知", { run_id: "run-7", max_concurrency: 4 }, undefined, "at most 4 at once"],

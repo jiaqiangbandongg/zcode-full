@@ -3,7 +3,7 @@ import {
   TID_CHAT_SUMMARY_PANEL,
   TID_CHAT_TOOL_CALL_BLOCK,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {

@@ -50,6 +50,7 @@ import type {
 } from "./types.js";
 import type { RuntimeCommandQueue } from "./command-queue.js";
 import type { RuntimeTaskRegistry } from "../runtime-task/registry.js";
+import type { WorkflowBlockedReminderClock } from "../runtime-task/workflow-blocked-reminder.js";
 import type { DynamicWorkflowActivationSource } from "./methods/dynamic-workflow-activation.js";
 import type { AgentRuntimeCoreMethods } from "./internal-methods.js";
 import type { AgentRuntimeTurnMethods } from "./internal-turn-methods.js";
@@ -125,6 +126,11 @@ export interface AgentRuntimeInternal
   dynamicWorkflowRunPort?: DynamicWorkflowRunPort;
   modelCatalogPort?: ModelCatalogPort;
   runtimeTaskRegistry: RuntimeTaskRegistry;
+  /**
+   * 「run 还欠着决定、主代理闲着」的提醒钟（methods/dynamic-workflow-blocked-reminder.ts）。真实 runtime 上
+   * 恒在场；可选只为让手写的局部 runtime 桩不必带它。
+   */
+  workflowBlockedReminder?: WorkflowBlockedReminderClock;
   branchGeneration: number;
   artifactStore?: ToolArtifactStorePort;
   executionPort?: ExecutionPort;

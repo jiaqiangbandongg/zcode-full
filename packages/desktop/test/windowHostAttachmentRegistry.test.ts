@@ -187,6 +187,57 @@ describe("WindowHostAttachmentRegistry", () => {
     expect(registry.size()).toBe(0);
   });
 
+  it("Source 离线时只释放该 Source 的 settings attachments", () => {
+    const sourceDispose = vi.fn();
+    const localDispose = vi.fn();
+    const expose = vi
+      .fn()
+      .mockReturnValueOnce({ dispose: sourceDispose })
+      .mockReturnValueOnce({ dispose: localDispose });
+    const registry = createWindowHostAttachmentRegistry({
+      resolveScope: () => ({ services: "services", generation: 1 }),
+      expose,
+    });
+    registry.attach({
+      requestId: "source-settings",
+      attachmentId: "source-settings",
+      clientMode: "desktop-continuous",
+      scope: { kind: "source-settings", sourceServerId: "source-1" },
+      port: createPort().port,
+    });
+    registry.attach({
+      requestId: "local",
+      attachmentId: "local",
+      clientMode: "desktop-continuous",
+      scope: { kind: "local" },
+      port: createPort().port,
+    });
+
+    registry.detachSourceSettingsAttachments("source-1");
+
+    expect(sourceDispose).toHaveBeenCalledOnce();
+    expect(localDispose).not.toHaveBeenCalled();
+    expect(registry.size()).toBe(1);
+  });
+
+  it("rejects Source settings services from mobile replayable attachments", () => {
+    const expose = vi.fn();
+    const resolveScope = vi.fn(() => ({ services: "services", generation: 1 }));
+    const registry = createWindowHostAttachmentRegistry({ resolveScope, expose });
+
+    expect(() =>
+      registry.attach({
+        requestId: "mobile-source-settings",
+        attachmentId: "mobile-source-settings",
+        clientMode: "web-remote-replayable",
+        scope: { kind: "source-settings", sourceServerId: "source-1" },
+        port: createPort().port,
+      }),
+    ).toThrow("Desktop-only");
+    expect(resolveScope).not.toHaveBeenCalled();
+    expect(expose).not.toHaveBeenCalled();
+  });
+
   it("scope 验证失败时不暴露 port", () => {
     const expose = vi.fn();
     const registry = createWindowHostAttachmentRegistry({

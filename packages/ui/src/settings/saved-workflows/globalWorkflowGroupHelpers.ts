@@ -29,6 +29,7 @@ export function resolveGlobalActionTarget(
   const target = active ?? localProjects[0];
   if (!target) return null;
   return {
+    projectId: target.projectId, hostId: target.hostId,
     workspacePath: target.workspacePath,
     ...(target.workspaceIdentity ? { workspaceIdentity: target.workspaceIdentity } : {}),
   };

@@ -7,22 +7,23 @@ import type { ModelSelectionView } from "@zcode/services";
 import { completeNewModelSelection } from "@zcode/provider";
 import { FolderOpen } from "lucide-react";
 import {
-  TID_OFFPEAK_EDIT_SUBMIT,
-  TID_OFFPEAK_EDIT_VIEW,
-  TID_OFFPEAK_FORM_INSTRUCTIONS,
-  TID_OFFPEAK_FORM_TITLE,
   ZCODE_AGENT_PROVIDER,
   type ZCodeConfigOption,
   type ZCodeOffPeakTask,
   type ModelSelection,
 } from "@zcode/shared";
+import {
+  TID_OFFPEAK_EDIT_SUBMIT,
+  TID_OFFPEAK_EDIT_VIEW,
+  TID_OFFPEAK_FORM_INSTRUCTIONS,
+  TID_OFFPEAK_FORM_TITLE,
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { Input } from "@/components/ui/input.js";
 import { toast } from "@/components/ui/toast.js";
 import {
   AUTOMATION_FORM_FIELD_CLASSNAME,
-  AutomationChevronDownIcon,
   AutomationInfoIcon,
   AutomationSettingsHistoryTabs,
   type AutomationSettingsHistoryTab,
@@ -48,7 +49,14 @@ import {
   buildAutomationModeOption,
 } from "@/settings/automationAgentConfigOptions.js";
 import { ConfigSelect } from "@/chat-input-toolbar/display.js";
-import { ChatEmptyWorkspacePreviewMenu, type ChatEmptyWorkspaceMenuTab } from "@/ChatEmptyState.js";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.js";
+import { resolveAutomationWorkspaceSelectionKey } from "@/settings/automationWorkspaceOptions.js";
 import { useAutomationProjectOptions } from "@/hooks/useAutomationProjectOptions.js";
 import {
   OFF_PEAK_CREATE_TOOLTIP_CLASSNAME,
@@ -75,6 +83,7 @@ export function buildOffPeakSubmissionModelSelection(
 }
 
 export interface OffPeakEditSubmit {
+  projectId?: string | null;
   title: string;
   prompt: string;
   permissionMode: string;
@@ -183,8 +192,8 @@ export function OffPeakEditView({
     },
     [modelSelectionView, offPeakProviderId],
   );
-  const [createWorkspacePath, setCreateWorkspacePath] = useState(
-    preferredLocalWorkspace?.workspacePath ?? "",
+  const [createProjectKey, setCreateProjectKey] = useState(
+    preferredLocalWorkspace ? resolveAutomationWorkspaceSelectionKey(preferredLocalWorkspace) : "",
   );
   const modelSelectGroups = useMemo<ModelSelectGroup[]>(
     () =>
@@ -203,23 +212,20 @@ export function OffPeakEditView({
         : [],
     [allowedModels],
   );
-  const workspaceMenuTabs = useMemo<ChatEmptyWorkspaceMenuTab[]>(
-    () =>
-      localWorkspaceOptions.map((option) => ({
-        workspacePath: option.workspacePath,
-        label: option.label,
-      })),
-    [localWorkspaceOptions],
-  );
   useEffect(() => {
-    if (editing || localWorkspaceOptions.length === 0) return;
-    if (localWorkspaceOptions.some((option) => option.workspacePath === createWorkspacePath)) {
+    if (editing) return;
+    if (
+      localWorkspaceOptions.some(
+        (option) => resolveAutomationWorkspaceSelectionKey(option) === createProjectKey,
+      )
+    )
       return;
-    }
-    // 当前项目为远端或本地 tab 已关闭时，回落到仍可用的第一个本地项目。
-    setCreateWorkspacePath(preferredLocalWorkspace?.workspacePath ?? "");
-    initialRef.current.workspacePath = preferredLocalWorkspace?.workspacePath ?? "";
-  }, [createWorkspacePath, editing, localWorkspaceOptions, preferredLocalWorkspace?.workspacePath]);
+    const key = preferredLocalWorkspace
+      ? resolveAutomationWorkspaceSelectionKey(preferredLocalWorkspace)
+      : "";
+    setCreateProjectKey(key);
+    initialRef.current.projectKey = key;
+  }, [createProjectKey, editing, localWorkspaceOptions, preferredLocalWorkspace]);
   // 闲时任务模型和 reasoning 档位只读取 Host 投影的 Built-in Config，
   // 避免 Renderer 按模型名重建第二份模型事实。
   const thoughtLevelOption = useMemo<ZCodeConfigOption | null>(
@@ -247,7 +253,9 @@ export function OffPeakEditView({
     mode: editing?.permissionMode ?? AUTOMATION_DEFAULT_MODE,
     model: initialModel,
     thoughtLevel: editing?.modelSelection?.options?.reasoningLevel,
-    workspacePath: editing?.workspacePath ?? preferredLocalWorkspace?.workspacePath ?? "",
+    projectKey: preferredLocalWorkspace
+      ? resolveAutomationWorkspaceSelectionKey(preferredLocalWorkspace)
+      : "",
   });
   useEffect(() => {
     const nextTitle = resolveLocalizedOffPeakCreateTitle({
@@ -269,7 +277,7 @@ export function OffPeakEditView({
     mode !== initialRef.current.mode ||
     model !== initialRef.current.model ||
     thoughtLevel !== initialRef.current.thoughtLevel ||
-    (!editing && createWorkspacePath !== initialRef.current.workspacePath);
+    (!editing && createProjectKey !== initialRef.current.projectKey);
   const handleBack = useCallback(async () => {
     if (!dirty || readOnlyRef.current) {
       onBack();
@@ -291,11 +299,14 @@ export function OffPeakEditView({
   // queued/paused 全字段可编辑；running 起锁定编辑、终态只读。
   const readOnly = Boolean(editing && editing.status !== "queued" && editing.status !== "paused");
   readOnlyRef.current = readOnly;
-  const workspacePath = editing?.workspacePath ?? createWorkspacePath;
+  const selectedProject = localWorkspaceOptions.find(
+    (option) => resolveAutomationWorkspaceSelectionKey(option) === createProjectKey,
+  );
+  const workspacePath = editing?.workspacePath ?? selectedProject?.workspacePath ?? "";
   const canSubmit =
     title.trim().length > 0 &&
     prompt.trim().length > 0 &&
-    Boolean(workspacePath) &&
+    Boolean(editing || selectedProject) &&
     Boolean(model) &&
     Boolean(effectiveThoughtLevel) &&
     !saving &&
@@ -317,6 +328,7 @@ export function OffPeakEditView({
       });
     }
     const ok = await onSubmit({
+      ...(!editing && selectedProject ? { projectId: selectedProject.projectId } : {}),
       title: title.trim(),
       prompt: prompt.trim(),
       permissionMode: mode,
@@ -342,6 +354,7 @@ export function OffPeakEditView({
     prompt,
     title,
     workspacePath,
+    selectedProject,
   ]);
 
   // 闲时与定时任务复用同一权限 option，并通过 provider 保持会话权限词表一致。
@@ -561,7 +574,7 @@ export function OffPeakEditView({
               />
               <AutomationInstructionsToolbar>
                 <div className="flex min-w-0 flex-wrap items-center gap-0">
-                  {/* 项目：创建态仅当前窗口已打开的本地项目；编辑态锁定原项目。 */}
+                  {/* 项目：创建态读取本机虚拟项目；编辑态锁定原项目。 */}
                   {/* 修复原因：UI 字号会随设置缩放，固定 18px 行高会在大字号下挤压项目文案。 */}
                   {editing ? (
                     <span className="flex h-7 min-w-0 items-center gap-1 rounded-full px-2 text-ui-base font-normal leading-snug text-foreground-subtle">
@@ -570,33 +583,29 @@ export function OffPeakEditView({
                         {workspaceBasename(workspacePath)}
                       </span>
                     </span>
-                  ) : workspaceMenuTabs.length > 0 ? (
-                    // 仅 Automations 调用收敛到共享 trigger；普通会话 workspace chip 不受影响。
-                    <ChatEmptyWorkspacePreviewMenu
-                      workspacePath={workspacePath}
-                      workspaceTabs={workspaceMenuTabs}
-                      allowConversationWorkspaceSelection={false}
-                      onSelectWorkspace={(workspace) =>
-                        setCreateWorkspacePath(workspace.workspacePath)
-                      }
-                      onSelectConversationWorkspace={() => {}}
-                      allowOpenWorkspace={false}
-                      allowRemoteWorkspace={false}
-                      onOpenFolder={() => {}}
-                      onConnectRemote={async () => ""}
-                      onSelectRemoteProject={async () => {}}
-                      onCancelRemoteProject={async (_sessionId) => {}}
-                      containerClassName="contents"
-                      triggerClassName={cn(
-                        AUTOMATION_INSTRUCTIONS_TOOLBAR_TRIGGER_CLASSNAME,
-                        "min-w-0 gap-1 px-2",
-                      )}
-                      triggerIndicator={
-                        <span className="text-foreground-subtle">
-                          <AutomationChevronDownIcon size={14} containerSize={20} />
-                        </span>
-                      }
-                    />
+                  ) : localWorkspaceOptions.length > 0 ? (
+                    <Select value={createProjectKey} onValueChange={setCreateProjectKey}>
+                      <SelectTrigger
+                        data-testid="offpeak-project-select"
+                        variant="ghost"
+                        className={AUTOMATION_INSTRUCTIONS_TOOLBAR_TRIGGER_CLASSNAME}
+                      >
+                        <FolderOpen className="size-4" aria-hidden="true" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {localWorkspaceOptions.map((option) => (
+                          <SelectItem
+                            key={resolveAutomationWorkspaceSelectionKey(option)}
+                            value={resolveAutomationWorkspaceSelectionKey(option)}
+                            data-project-id={option.projectId}
+                            data-project-name={option.label}
+                          >
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <Button
                       type="button"

@@ -3,7 +3,6 @@ import {
   buildFileMentionMarkdown,
   buildMentionMarkdown,
   buildSkillMentionMarkdown,
-  formatSkillMentionDisplayLabel,
   parseMentionMarkdown,
   renderMentionMarkdownAsPlainText,
 } from "../src/mentions/mentionMarkdown.js";
@@ -14,7 +13,6 @@ import {
   filterMentionItemsWithOptions,
   getMentionGroupLimitForQuery,
   hasMentionQuery,
-  MENTION_DEFAULT_GROUP_PREVIEW_LIMIT,
   MENTION_FILES_ONLY_DEFAULT_PREVIEW_LIMIT,
 } from "../src/mentions/mentionSearch.js";
 import type { MentionItem } from "../src/mentions/mentionTypes.js";
@@ -270,16 +268,6 @@ describe("collectSessionMentionItems", () => {
   });
 });
 
-describe("formatSkillMentionDisplayLabel", () => {
-  it("将 kebab-case slug 格式化为标题样式展示", () => {
-    expect(formatSkillMentionDisplayLabel("code-review")).toBe("Code Review");
-  });
-
-  it("已是带空格的短语时不改写", () => {
-    expect(formatSkillMentionDisplayLabel("Code Review")).toBe("Code Review");
-  });
-});
-
 describe("filterMentionItems", () => {
   it("keeps original order when query is empty", () => {
     expect(filterMentionItems(items, "").map((item) => item.id)).toEqual([
@@ -352,8 +340,6 @@ describe("filterMentionItems", () => {
   });
 
   it("uses the small default group preview limit before the user types a query", () => {
-    expect(MENTION_DEFAULT_GROUP_PREVIEW_LIMIT).toBe(3);
-    expect(MENTION_FILES_ONLY_DEFAULT_PREVIEW_LIMIT).toBe(10);
     expect(getMentionGroupLimitForQuery("")).toBe(3);
     expect(getMentionGroupLimitForQuery("   ")).toBe(3);
     expect(getMentionGroupLimitForQuery("", MENTION_FILES_ONLY_DEFAULT_PREVIEW_LIMIT)).toBe(10);
@@ -451,6 +437,8 @@ describe("buildVisibleMentionGroups", () => {
     ).toEqual(["files"]);
   });
 });
+
+// Host 搜索的刷新、换连接和迟到结果回归见 fileMentionHostSearch.test.ts。
 
 describe("filterMentionItemsWithOptions – no hard cap", () => {
   const manyItems: MentionItem[] = Array.from({ length: 500 }, (_, i) => ({

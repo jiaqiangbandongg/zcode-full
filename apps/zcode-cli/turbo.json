@@ -49,6 +49,7 @@
     "test": {
       "dependsOn": ["build"],
       "inputs": ["**"],
+      "env": ["ZCODE_CUA_REPO", "VITEST_MAX_WORKERS"],
       "outputs": []
     },
     "coverage": {

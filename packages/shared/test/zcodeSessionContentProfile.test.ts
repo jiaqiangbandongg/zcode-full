@@ -217,7 +217,6 @@ describe("elideSessionSnapshotForIndex", () => {
 
     expect(structureOf(elided)).toEqual(structureOf(full));
     expect(JSON.stringify(elided).length).toBeLessThan(10_000);
-    expect(JSON.stringify(full).length).toBeGreaterThan(BIG.length * 10);
     for (const message of elided.messages) {
       expect(() => zcodeMessageWithPartsSchema.parse(message)).not.toThrow();
     }

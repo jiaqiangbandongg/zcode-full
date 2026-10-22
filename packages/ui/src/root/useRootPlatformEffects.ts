@@ -1,18 +1,22 @@
 /* oxlint-disable eslint(max-lines) -- 平台事件和分享导入共用同一生命周期。 */
+import { getConversationShareErrorDetails } from "@/lib/conversationShareError.js";
 import { useEffect, useRef, useState } from "react";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
-import type { IPlatformService } from "@zcode/shared";
+import type { CreateTaskOptions } from "@/app-shell/types.js";
+import type { IPlatformService, ZCodeTaskClientMode } from "@zcode/shared";
+import { readV4ComposerDraft, V4_DRAFT_SCOPE_ROOT } from "@/v4/composer/composerDraftStore.js";
+import { readComposerWorkspaceScope } from "@/v4/composer/composerDraftStore.js";
+import { useComposerClientNamespace } from "@/hooks/useServices.js";
 import { isWorkspaceTab, type TabStoreState, type WindowTabState } from "@/store/tabStore.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
 import { logger } from "@/logger.js";
-import { seedImportedSessionDraft } from "@/v4/composer/newTaskDraft.js";
+import { resolveImportedComposerConfig } from "@/v4/composer/newTaskDraft.js";
 import { dismissToast, toast, updateToast } from "@/components/ui/toast.js";
 import { matchesPrimaryShortcut } from "@/lib/keyboardShortcuts.js";
 import { isShortcutRecordingActive } from "@/shortcuts/bindings.js";
 import { isRendererReloadNavigation } from "@/lib/rendererNavigation.js";
 import {
-  buildConnectedRemoteWorkspaceSessionTargets,
-  buildWebRemoteControlWorkspaceTargets,
+  useWebRemoteControlWorkspaceSync,
   shouldPublishCompleteWorkspaceSnapshot,
 } from "@/root/rootPlatformWorkspaceSync.js";
 import { useOptionalBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
@@ -28,6 +32,8 @@ export function useRootPlatformEffects({
   initialWorkspaceIdentity,
   initialWorkspacePurpose,
   initialTaskId,
+  initialTaskDraft,
+  clientMode = "desktop-continuous",
   canBootstrapInitialWorkspace = true,
   addTab,
   setIsBootstrappingInitialWorkspace,
@@ -46,9 +52,7 @@ export function useRootPlatformEffects({
   activeWorkspaceIdentity,
   reconnectingRemoteWorkspaceKeys = [],
   remoteWorkspaceErrorByWorkspaceKey = {},
-  totalUnreadTaskCount,
   webRemoteControlFeatureEnabled = false,
-  webRemoteControlSessionActive = false,
   hasCompletedFullTabRestore = true,
   intl,
   isRestoringOAuthSession,
@@ -57,6 +61,8 @@ export function useRootPlatformEffects({
   initialWorkspaceIdentity?: string;
   initialWorkspacePurpose?: import("@zcode/shared").WorkspacePurpose;
   initialTaskId?: string;
+  initialTaskDraft?: CreateTaskOptions;
+  clientMode?: ZCodeTaskClientMode;
   canBootstrapInitialWorkspace?: boolean;
   addTab: (
     workspacePath: string,
@@ -68,7 +74,11 @@ export function useRootPlatformEffects({
   setIsBootstrappingInitialWorkspace: (value: boolean) => void;
   platform: IPlatformService;
   activateTabByPath: (workspacePath: string, options?: { workspaceIdentity?: string }) => boolean;
-  startDraftInWorkspace: (workspacePath: string, workspaceIdentity?: string) => void;
+  startDraftInWorkspace: (
+    workspacePath: string,
+    workspaceIdentity?: string,
+    options?: CreateTaskOptions,
+  ) => void;
   startNewTaskFromActiveWorkspace: (source: string) => void;
   openWorkspace: () => void;
   openWorkspacePath: (workspacePath: string) => void;
@@ -81,9 +91,7 @@ export function useRootPlatformEffects({
   activeWorkspaceIdentity?: string | null;
   reconnectingRemoteWorkspaceKeys?: string[];
   remoteWorkspaceErrorByWorkspaceKey?: Record<string, string>;
-  totalUnreadTaskCount: number;
   webRemoteControlFeatureEnabled?: boolean;
-  webRemoteControlSessionActive?: boolean;
   hasCompletedFullTabRestore?: boolean;
   intl: ReturnType<typeof import("@/i18n/IntlProvider.js").useZCodeIntl>["intl"];
   isRestoringOAuthSession: boolean;
@@ -92,6 +100,7 @@ export function useRootPlatformEffects({
   const baseServices = useOptionalBaseWorkspaceServices();
   const pendingShareImportRef = useRef<ShareImportIntent | null>(null);
   const [shareImportRevision, setShareImportRevision] = useState(0);
+  const composerClientNamespace = useComposerClientNamespace();
   const activeShareImportRef = useRef<ShareImportIntent | null>(null);
   const importOperationRef = useRef<string | null>(null);
   const lastImportProgressToastRef = useRef<{ phase: string; at: number } | null>(null);
@@ -106,6 +115,29 @@ export function useRootPlatformEffects({
 
     didBootstrapInitialWorkspaceRef.current = true;
     if (initialWorkspaceAbsPath) {
+      const savedScope = readComposerWorkspaceScope(
+        initialWorkspaceAbsPath,
+        initialWorkspaceIdentity,
+        composerClientNamespace,
+      );
+      // 手机重建 Root 时 bridge 只有地址；项目意图随已有浏览器草稿恢复，先于 prewarm。
+      const savedDraft =
+        clientMode === "web-remote-replayable" && !initialTaskId && !initialTaskDraft
+          ? readV4ComposerDraft(
+              initialWorkspaceAbsPath,
+              initialWorkspaceIdentity,
+              V4_DRAFT_SCOPE_ROOT,
+              savedScope,
+            )
+          : null;
+      const draftIntent =
+        initialTaskDraft ??
+        (savedScope
+          ? { projectId: savedScope.projectId, taskGroupId: savedDraft?.taskGroupId }
+          : undefined) ??
+        (savedDraft?.projectId !== undefined
+          ? { projectId: savedDraft.projectId, taskGroupId: savedDraft.taskGroupId }
+          : undefined);
       addTab(
         initialWorkspaceAbsPath,
         initialWorkspaceIdentity || initialWorkspacePurpose
@@ -119,11 +151,11 @@ export function useRootPlatformEffects({
         useZCodeSessionStore
           .getState()
           .setActiveTaskId(initialWorkspaceAbsPath, initialTaskId, initialWorkspaceIdentity);
-      } else if (!isRendererReloadNavigation()) {
-        // main 注入 initial workspace 只表达工作区入口；没有显式 taskId
+      } else if (draftIntent || !isRendererReloadNavigation()) {
+        // 修复原因：main 注入 initial workspace 只表达工作区入口；没有显式 taskId
         // 的 app 冷启动必须进入草稿，不能让 renderer-local last-session/group/pane
         // 抢回历史会话；同一 renderer reload 则保留当前 session 续流资格。
-        startDraftInWorkspace(initialWorkspaceAbsPath, initialWorkspaceIdentity);
+        startDraftInWorkspace(initialWorkspaceAbsPath, initialWorkspaceIdentity, draftIntent);
       }
     }
     // Dock 最近项目会通过 initialWorkspaceAbsPath 直达工作区。
@@ -135,6 +167,9 @@ export function useRootPlatformEffects({
     addTab,
     canBootstrapInitialWorkspace,
     initialTaskId,
+    initialTaskDraft,
+    composerClientNamespace,
+    clientMode,
     initialWorkspaceAbsPath,
     initialWorkspaceIdentity,
     initialWorkspacePurpose,
@@ -375,7 +410,7 @@ export function useRootPlatformEffects({
       .then((result) => {
         pending.status = "complete";
         // 先准备实际落地工作区的独立草稿，再激活；复用导入不覆盖会话选择。
-        seedImportedSessionDraft(result);
+        const composerConfig = resolveImportedComposerConfig(result, composerClientNamespace);
         const activated = activateTabByPath(
           result.workspacePath,
           result.workspaceIdentity ? { workspaceIdentity: result.workspaceIdentity } : undefined,
@@ -391,6 +426,7 @@ export function useRootPlatformEffects({
           result.workspacePath,
           result.sessionId,
           result.workspaceIdentity,
+          composerConfig,
         );
         // 导入可能复用当前已打开的 session；仅 setActiveTaskId 不会产生可观察的切换。
         // 每次成功都显式发出一次定位请求，目标 pane 准备好分享内容后再消费。
@@ -439,7 +475,11 @@ export function useRootPlatformEffects({
           typeof firstIssueRecord?.artifactDisplayName === "string"
             ? firstIssueRecord.artifactDisplayName
             : undefined;
+        const diagnostics = getConversationShareErrorDetails(error);
         logger.warn("[Root] share import failed", {
+          status: diagnostics.status,
+          code: diagnostics.code,
+          requestId: diagnostics.requestId,
           operationId,
           clientRequestId: pending.clientRequestId,
           kind,
@@ -496,6 +536,7 @@ export function useRootPlatformEffects({
     isRestoringOAuthSession,
     locale,
     shareImportRevision,
+    composerClientNamespace,
   ]);
 
   useEffect(() => {
@@ -513,43 +554,15 @@ export function useRootPlatformEffects({
     platform.syncWindowTabs(paths);
   }, [hasCompletedFullTabRestore, isDesktop, platform, tabs]);
 
-  useEffect(() => {
-    if (
-      !isDesktop ||
-      !shouldPublishCompleteWorkspaceSnapshot(hasCompletedFullTabRestore) ||
-      !platform.syncWebRemoteControlWorkspaces
-    ) {
-      return;
-    }
-
-    const connectedRemoteWorkspaces = buildConnectedRemoteWorkspaceSessionTargets({ tabs });
-    if (connectedRemoteWorkspaces.length > 0) {
-      // Bugfix: Bot 远端连接状态查询依赖 main 进程里 remoteSessionId -> workspaceIdentity 的绑定。
-      // 之前这条绑定复用 Web 远控 workspace 同步，Web 远控未开启时不会执行，导致 UI 已连接但 Bot 误判未连接。
-      platform.syncWebRemoteControlWorkspaces(connectedRemoteWorkspaces);
-    }
-
-    if (!webRemoteControlFeatureEnabled || !webRemoteControlSessionActive) {
-      return;
-    }
-
-    const workspaces = buildWebRemoteControlWorkspaceTargets({
-      tabs,
-      reconnectingRemoteWorkspaceKeys,
-      remoteWorkspaceErrorByWorkspaceKey,
-    });
-
-    platform.syncWebRemoteControlWorkspaces(workspaces);
-  }, [
-    hasCompletedFullTabRestore,
-    isDesktop,
+  useWebRemoteControlWorkspaceSync({
     platform,
+    tabs,
+    isDesktop: Boolean(isDesktop),
+    featureEnabled: webRemoteControlFeatureEnabled,
+    hasCompletedFullTabRestore,
     reconnectingRemoteWorkspaceKeys,
     remoteWorkspaceErrorByWorkspaceKey,
-    tabs,
-    webRemoteControlFeatureEnabled,
-    webRemoteControlSessionActive,
-  ]);
+  });
 
   useEffect(() => {
     if (isDesktop) {
@@ -609,12 +622,6 @@ export function useRootPlatformEffects({
       disposed = true;
     };
   }, [isDesktop, locale, platform]);
-
-  useEffect(() => {
-    // Dock badge 一期只统计“后台完成后还没点开”的 task 数。
-    // 失败态红点和 permission tag 仍留在各自 UI 语义里，避免把平台徽标混成泛化告警数。
-    platform.syncWindowUnreadCount(totalUnreadTaskCount);
-  }, [platform, totalUnreadTaskCount]);
 
   const activeTabId = useTabStore((state: TabStoreState) => state.activeTabId);
   const activeTabCandidate = useTabStore((state: TabStoreState) =>

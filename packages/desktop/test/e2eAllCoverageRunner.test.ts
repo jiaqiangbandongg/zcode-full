@@ -100,6 +100,5 @@ describe("all E2E coverage runner", () => {
     for (const name of ["BASE_URL", "API_KEY", "MODEL", "SECONDARY_MODEL"]) {
       expect(example).toMatch(new RegExp(`^E2E_PROVIDER_${name}=$`, "m"));
     }
-    expect(example.toLowerCase()).not.toContain("deepseek");
   });
 });

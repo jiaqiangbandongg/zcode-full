@@ -238,3 +238,40 @@ instead of path existence booleans.
   workspace, session, log epoch, turn, and card signature prevents virtualized
   remounts and equivalent re-renders from reopening a tab after the user closes
   it.
+
+## Card action menus
+
+The entire card supports a context menu. The existing Open button and dropdown retain their original labels, flat
+application list, width and path-action order. Only the card context menu adds
+new actions; both entry points reuse the same opening handlers. File context
+menus offer Preview, Open (the system default application), an Open with submenu,
+then copying relative and absolute paths. The context menu omits Open containing
+folder and its separator. Chinese labels are 预览 and 打开.
+Website cards use the same Preview and Open labels for side-pane and browser
+actions, followed by copying the URL; file-backed local HTML additionally offers path actions.
+The card primary button continues to read Open for all card types.
+
+Native file actions require the platform's explicit `canOpenLocalFiles` capability.
+Web and mobile omit them. Remote files never use the local default application;
+Open with retains the existing exact workspace identity/session match.
+Unavailable platform actions are omitted, while temporarily loading application
+choices display a disabled loading row. Preview keeps the existing scoped source
+and mobile pane presentation.
+
+```text
+card context menu / unchanged Open dropdown
+              -> shared action owner (OpenSplitButton)
+              -> existing preview callback / platform port / file action hook
+```
+
+The menu owns only transient UI state. It adds no runtime queue, protocol,
+snapshot, or recovery state; desktop continuous and mobile replayable delivery
+remain unchanged. Async app discovery is scoped to the target and ignores stale
+results after the target changes or unmounts. Both menus reuse the design system
+primitives, keyboard navigation, light/dark tokens and localized labels.
+
+APC14 acceptance: right-click a real Office card, verify its dropdown remains unchanged,
+assert the compact labels and absence of the directory entry, preview the file,
+and verify the default-app shell call with a mock. Focused
+component tests cover website links, HTML paths, unavailable preview, Web and
+remote-native capability exclusion.

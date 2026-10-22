@@ -130,6 +130,7 @@ function formatListModelsModelContent(output: unknown): ModelMessageContent {
 export const listModelsToolEntry: ToolEntry = {
   capability: "List the models this host has configured, for choosing a workflow's subagent model",
   metadata: {
+    shouldDefer: true,
     name: LIST_MODELS_TOOL_NAME,
     description: LIST_MODELS_DESCRIPTION,
     readOnly: true,

@@ -640,8 +640,11 @@ describe("AmendWorkflow — subagent_model", () => {
   it("a model id is resolved to its canonical form and named in the result", async () => {
     const { amends, outcome } = await amendWith("amend-model-set", {
       catalog: CATALOG,
-      requested: "gpt-5",
+      // 全称：`gpt-5` 不在会话的 provider（bigmodel）下，裸名会被 provider 边界挡回。
+      requested: "openai/gpt-5",
     });
+    // 换到前驱没用过的 provider：本会话的 run 也要开窗（下一组用例），桩 broker 默认 Allow。
+    expect(outcome.permissionRequested).toHaveLength(1);
     expect(amends[0]?.subagentModel).toEqual({ providerId: "openai", modelId: "gpt-5" });
     expect((outcome.result.output as CreateWorkflowOutput).response).toContain(
       "Subagents run on openai/gpt-5 (the main agent stays on the session model).",
@@ -751,7 +754,8 @@ describe("AmendWorkflow — subagent_model", () => {
       input: {
         run_id: "dwfrun-prev",
         script: cleanScript("amend-model-no-port"),
-        subagent_model: "gpt-5",
+        // 全称：`gpt-5` 不在会话的 provider（bigmodel）下，裸名会被 provider 边界挡回。
+        subagent_model: "openai/gpt-5",
       },
     });
     expect(resolved.result.success).toBe(true);
@@ -770,6 +774,167 @@ describe("AmendWorkflow — subagent_model", () => {
     });
     expect(removed.result.success).toBe(true);
     expect(removed.permissionRequested[0]!.input).not.toHaveProperty("subagent_model");
+  });
+});
+
+// 本会话的 run 免确认，但换 provider 不在免确认之内（docs/dynamic-workflow/launch.md「Amending
+// this session's runs」）：resolveInput 从会话模型、前驱用过的模型与这次将要用的模型算出
+// `predecessor.introduces_providers`，权限服务见它在场就照常 ask。全称模型名只证明写法明确，
+// 不证明用户点过名——跨 provider 的那一下要留下用户的 Allow / Deny。
+describe("AmendWorkflow — a new provider on this session's run", () => {
+  function entry(providerId: string, modelId: string, current = false): ModelCatalogEntry {
+    return { providerId, modelId, reasoningLevels: [], current };
+  }
+
+  const CATALOG: ModelCatalogPort = {
+    listModels: () => [
+      entry("bigmodel", "GLM-4.6", true),
+      entry("bigmodel", "GLM-4.5"),
+      entry("openai", "gpt-5"),
+      entry("acme", "atlas"),
+    ],
+  };
+
+  function personaScript(actor: string, model: string): string {
+    return [
+      "interface R { done: boolean }",
+      `const r = await agent("${actor}", { model: "${model}" }).ask<R>("do");`,
+      "return r.done;",
+    ].join("\n");
+  }
+
+  async function amendOwn(
+    name: string,
+    options: {
+      requested?: string | null;
+      script?: string;
+      inherited?: string;
+      inheritedBindings?: Record<string, string>;
+      broker?: PermissionBrokerPort;
+      forged?: Record<string, unknown>;
+    },
+  ) {
+    const { port, amends } = stubRunPort({
+      snapshot: {
+        parentSessionId: sessionOf(name),
+        status: "completed",
+        runStatus: "completed",
+        ...(options.inherited === undefined ? {} : { subagentModel: options.inherited }),
+        ...(options.inheritedBindings === undefined
+          ? {}
+          : { modelBindings: options.inheritedBindings }),
+      },
+    });
+    const outcome = await run({
+      name,
+      port,
+      modelCatalogPort: CATALOG,
+      ...(options.broker === undefined ? {} : { broker: options.broker }),
+      input: {
+        run_id: "dwfrun-prev",
+        script: options.script ?? cleanScript(name),
+        ...(options.requested === undefined ? {} : { subagent_model: options.requested }),
+        ...(options.forged === undefined ? {} : { predecessor: options.forged }),
+      },
+    });
+    return { amends, outcome };
+  }
+
+  it("asks when the amendment moves the subagents to a provider the run never used", async () => {
+    const { amends, outcome } = await amendOwn("amend-provider-new", {
+      requested: "openai/gpt-5",
+    });
+    expect(outcome.permissionRequested).toHaveLength(1);
+    expect(outcome.permissionRequested[0]!.input).toMatchObject({
+      predecessor: { owned_by_this_session: true, introduces_providers: ["openai"] },
+    });
+    // 桩 broker 默认 Allow：批准之后照常修订。
+    expect(amends).toHaveLength(1);
+  });
+
+  it("Deny leaves the predecessor untouched", async () => {
+    const { amends, outcome } = await amendOwn("amend-provider-deny", {
+      requested: "openai/gpt-5",
+      broker: { requestPermission: async () => ({ decision: "deny" as const }) },
+    });
+    expect(outcome.permissionRequested).toHaveLength(1);
+    expect(outcome.result.success).toBe(false);
+    expect(amends).toHaveLength(0);
+  });
+
+  it("asks when a model the new script names brings in a new provider", async () => {
+    const { amends, outcome } = await amendOwn("amend-provider-binding", {
+      script: personaScript("amend-provider-binding", "openai/gpt-5"),
+    });
+    expect(outcome.permissionRequested).toHaveLength(1);
+    expect(outcome.permissionRequested[0]!.input).toMatchObject({
+      model_bindings: { "openai/gpt-5": "openai/gpt-5" },
+      predecessor: { introduces_providers: ["openai"] },
+    });
+    expect(amends).toHaveLength(1);
+  });
+
+  it("stays window-free for another model under the session's provider", async () => {
+    const { amends, outcome } = await amendOwn("amend-provider-same", {
+      requested: "bigmodel/GLM-4.5",
+    });
+    expect(outcome.permissionRequested).toHaveLength(0);
+    expect(amends[0]?.subagentModel).toEqual({ providerId: "bigmodel", modelId: "GLM-4.5" });
+  });
+
+  it("stays window-free when the provider is one the run already used", async () => {
+    // 前驱的子代理已经跑在 openai 上（那次 CreateWorkflow 的确认窗里用户批过）：沿用它、
+    // 或在它下面换一个名字，都不是新的选择。
+    const inheritedModel = await amendOwn("amend-provider-inherited", {
+      inherited: "openai/gpt-5",
+    });
+    expect(inheritedModel.outcome.permissionRequested).toHaveLength(0);
+    expect(inheritedModel.amends[0]?.subagentModel).toEqual({
+      providerId: "openai",
+      modelId: "gpt-5",
+    });
+
+    const inheritedBinding = await amendOwn("amend-provider-inherited-binding", {
+      script: personaScript("amend-provider-inherited-binding", "gpt-5"),
+      inheritedBindings: { "gpt-5": "openai/gpt-5" },
+    });
+    expect(inheritedBinding.outcome.permissionRequested).toHaveLength(0);
+    expect(inheritedBinding.amends).toHaveLength(1);
+  });
+
+  it("names only the providers that are new, once each", async () => {
+    const { outcome } = await amendOwn("amend-provider-two", {
+      requested: "acme/atlas",
+      script: personaScript("amend-provider-two", "openai/gpt-5"),
+      inherited: "bigmodel/GLM-4.5",
+    });
+    expect(outcome.permissionRequested).toHaveLength(1);
+    const predecessor = (outcome.permissionRequested[0]!.input as Record<string, unknown>)
+      .predecessor as Record<string, unknown>;
+    expect(predecessor.introduces_providers).toEqual(["acme", "openai"]);
+  });
+
+  it("the model cannot suppress the fact by supplying its own predecessor block", async () => {
+    // 模型面 JSON schema 不列 predecessor（strict）：带它的入参在 schema 校验就被拒，
+    // 不带这个键、带空列表都一样——什么都没停、没建、没开窗。
+    for (const forged of [
+      { status: "completed", owned_by_this_session: true },
+      { status: "completed", owned_by_this_session: true, introduces_providers: [] },
+    ]) {
+      const { amends, outcome } = await amendOwn("amend-provider-forged", {
+        requested: "openai/gpt-5",
+        forged,
+      });
+      expect(outcome.result.success).toBe(false);
+      expect(outcome.permissionRequested).toHaveLength(0);
+      expect(amends).toHaveLength(0);
+    }
+  });
+
+  it("carries no such key when nothing new is introduced", async () => {
+    const { outcome } = await amendOwn("amend-provider-none", {});
+    expect(outcome.permissionRequested).toHaveLength(0);
+    expect(outcome.result.success).toBe(true);
   });
 });
 

@@ -20,6 +20,7 @@ export type SystemReminderProviderVisibility = "provider_visible" | "provider_hi
 export const SYSTEM_REMINDER_PREFIX_SOURCES = ["context_prefix", "skills_listing"] as const;
 
 export const SYSTEM_REMINDER_PERSISTED_SOURCES = [
+  "tool_search_announcement",
   "agent_listing_delta",
   "todo_reminder",
   "task_status",
@@ -90,6 +91,12 @@ const NON_MID_CONVERSATION_SYSTEM_SOURCES = new Set<SystemReminderSource>([
 ]);
 
 const SYSTEM_REMINDER_DESCRIPTORS: Record<SystemReminderSource, DescriptorShape> = {
+  tool_search_announcement: descriptor(
+    "current_turn",
+    "resume_history",
+    true,
+    "sr.tool_search_announcement",
+  ),
   agent_listing_delta: descriptor("current_turn", "resume_history", true, "sr.agent_listing_delta"),
   incoming_message: descriptor("mid_turn_event", "mid_turn_event", true, "sr.incoming_message"),
   bot_topic_context: descriptor(

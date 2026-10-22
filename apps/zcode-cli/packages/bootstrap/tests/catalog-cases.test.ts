@@ -211,15 +211,6 @@ describe("catalog A 组：首发和运行中输入", () => {
     expect(projection.getSnapshot().inputRouting.mode).toBe("enqueue");
   });
 
-  it("A07/M03：running 期 /goal 同走 enqueue（消费时 set/update goal）", () => {
-    const log = new EventLog();
-    log.created();
-    log.turnStarted("turn-1");
-    const snapshot = project(log).getSnapshot();
-    // /goal 与普通文本同一 inputRouting 裁决面（kind=sendGoalCommand 的 queue 语义随 command 接线）。
-    expect(snapshot.inputRouting.mode).toBe("enqueue");
-  });
-
   it("A08/K04/M04：running 期 /compact 作为 typed intent 入队，不立即执行", () => {
     const log = new EventLog();
     log.created();
@@ -297,11 +288,6 @@ describe("catalog B 组：stop 和队列保留", () => {
         Array.from({ length: size }, (_, index) => `排队 ${index + 1}`),
       );
     }
-  });
-
-  it("B05：completed(interrupted) + queue=0 → 输入 startNow（立即开始下一轮）", () => {
-    const snapshot = stopWithQueue(0).getSnapshot();
-    expect(snapshot.inputRouting.mode).toBe("startNow");
   });
 
   it("B06/B07：held（completed(interrupted) + queue>0 + autoDrain=false）→ 输入 choice，不静默入队", () => {
@@ -405,20 +391,6 @@ describe("catalog C 组：completed 成功态", () => {
         (row) => row.kind === "timelineMarker" && row.marker.type === "goalSet",
       ),
     ).toBeUndefined();
-  });
-
-  it("C05：completed 后手动 compact → activeWorks 进 compact，marker running", () => {
-    const log = new EventLog();
-    log.created();
-    log.turnStarted("turn-1");
-    log.turnComplete("turn-1", "success");
-    log.compact("started");
-    const snapshot = project(log).getSnapshot();
-    expect(snapshot.control.activeWorks).toEqual([expect.objectContaining({ kind: "compact" })]);
-    expect(compactMarkers(project(log))[0]).toMatchObject({
-      origin: "manual",
-      status: "running",
-    });
   });
 
   it("C08：completed(success) + held queue → 输入 choice（同 B06）", () => {

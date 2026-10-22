@@ -2,7 +2,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
-  resolveToastStackClassName,
   upsertToastItem,
   resolveToastAnchorLeft,
   ToastMessageView,
@@ -34,18 +33,7 @@ describe("toast", () => {
     expect(resolveToastAnchorLeft({ left: 280, width: 960 })).toBe(760);
   });
 
-  it("uses real viewport insets for every stack and never translates a bottom stack outside", () => {
-    expect(resolveToastStackClassName("top-center")).toContain("top-16");
-    expect(resolveToastStackClassName("top-right")).toContain("top-16");
-    expect(resolveToastStackClassName("bottom-left")).toContain("bottom-");
-    expect(resolveToastStackClassName("bottom-center")).toContain("bottom-");
-    expect(resolveToastStackClassName("bottom-left")).not.toContain("translate-y");
-    expect(resolveToastStackClassName("bottom-center")).not.toContain("translate-y");
-    expect(resolveToastStackClassName("bottom-center")).toContain("left-1/2");
-    expect(resolveToastStackClassName("bottom-center")).toContain("-translate-x-1/2");
-  });
-
-  it("renders update toasts as a softer actionable notice", () => {
+  it("renders update toast content and an action", () => {
     const html = renderToStaticMarkup(
       createElement(ToastMessageView, {
         item: {
@@ -64,36 +52,31 @@ describe("toast", () => {
 
     expect(html).toContain("反馈有新回复");
     expect(html).toContain("查看");
-    expect(html).toContain("border-popover-border");
-    expect(html).toContain("bg-toast/60");
-    expect(html).toContain("backdrop-blur-xl");
-    expect(html).toContain("rounded-2xl");
-    expect(html).not.toContain("rounded-full border");
-    expect(html).not.toContain("bg-popover");
-    expect(html).toContain("origin-bottom-left");
   });
 
-  it("keeps update toasts compact when title and action are present", () => {
+  it("renders Source Server update copy and an accessible dismiss action", () => {
     const html = renderToStaticMarkup(
       createElement(ToastMessageView, {
         item: {
-          id: 2,
-          message: "Update ready\nRestart the app to use the latest version.",
-          durationMs: 7000,
-          position: "bottom-left",
-          variant: "update",
-          actionLabel: "Restart",
+          id: 6,
+          message: "linux-amd64-dev 必须更新后才能连接\n当前 3.8.1，需要 3.9.0。",
+          durationMs: 8000,
+          position: "top-center",
+          variant: "source-server-update",
+          actionLabel: "立即更新",
           onAction: vi.fn(),
+          dismissible: true,
+          dismissLabel: "关闭",
         },
         visible: true,
-        isBottom: true,
+        onDismiss: vi.fn(),
       }),
     );
 
-    expect(html).toContain("max-w-[min(300px,calc(100vw-1rem))]");
-    expect(html).toContain("w-[min(300px,calc(100vw-1rem))]");
-    expect(html).toContain("grid-cols-[auto_minmax(0,1fr)_auto]");
-    expect(html).toContain("max-w-14");
+    expect(html).toContain("linux-amd64-dev 必须更新后才能连接");
+    expect(html).toContain("当前 3.8.1，需要 3.9.0。");
+    expect(html).toContain("立即更新");
+    expect(html).toContain('aria-label="关闭"');
   });
 
   it("renders a dismissible actionable info toast for subscription guidance", () => {
@@ -117,21 +100,9 @@ describe("toast", () => {
     expect(html).toContain("Coding Plan subscribers only");
     expect(html).toContain("Upgrade");
     expect(html).toContain('aria-label="Close"');
-    expect(html).toContain("w-[min(536px,calc(100vw-2rem))]");
-    expect(html).toContain("gap-4");
-    expect(html).toContain("flex-[1_0_0]");
-    expect(html).toContain("py-3");
-    expect(html).not.toContain("min-h-15");
-    expect(html).toContain("whitespace-normal");
-    expect(html).toContain("max-w-1/2");
-    expect(html).toContain("underline");
-    expect(html).toContain("bg-toast/60");
-    expect(html).toContain("backdrop-blur-xl");
-    expect(html).toContain("rounded-2xl");
-    expect(html).not.toContain("rounded-full border");
   });
 
-  it("centers a notice action vertically beside multiline content", () => {
+  it("renders multiline notice copy with its action", () => {
     const html = renderToStaticMarkup(
       createElement(ToastMessageView, {
         item: {
@@ -150,7 +121,6 @@ describe("toast", () => {
     expect(html).toContain("文档技能");
     expect(html).toContain("插件未安装");
     expect(html).toContain("一键安装");
-    expect(html).toContain("self-center");
   });
 
   it("moves top-right toasts from right to left with reduced-motion fallback", () => {

@@ -17,7 +17,6 @@ import {
   ReasoningTrigger,
   isReasoningSummaryOverflowing,
   resolveReasoningStreamingSummary,
-  scrollReasoningSummaryToEnd,
   shouldAutoCollapseReasoning,
 } from "../src/components/ai-elements/reasoning.js";
 
@@ -91,22 +90,6 @@ function renderReasoningContent(
 }
 
 describe("Reasoning layout", () => {
-  it("keeps collapsible spacing inside the animated content", () => {
-    const html = renderReasoningContent("先分析，再回答。");
-
-    expect(html).toContain('data-testid="chat-reasoning-trigger"');
-    expect(html).toMatch(
-      /data-testid="chat-reasoning-trigger"[^>]*class="[^"]*\binline-flex\b[^"]*\bmax-w-full\b/,
-    );
-    expect(html).not.toMatch(
-      /data-testid="chat-reasoning-trigger"[^>]*class="[^"]*(?:^|\s)w-full(?:\s|")/,
-    );
-    expect(html).toContain('class="not-prose flex flex-col w-full"');
-    expect(html).not.toContain('class="not-prose flex flex-col gap-2');
-    expect(html).toContain('class="pt-3"');
-    expect(html).not.toMatch(/data-slot="collapsible-content"[^>]*class="[^"]*\bpt-1\b[^"]*"/);
-  });
-
   it("renders expanded thought content as plain text instead of Markdown", () => {
     const html = renderReasoningContent("**阶段一**\n\n# 计划\n`命令`");
 
@@ -149,14 +132,6 @@ describe("Reasoning layout", () => {
     ).toBe(false);
   });
 
-  it("marks the expanded reasoning scroll container for conditional masks", () => {
-    const html = renderReasoningContent("先分析，再回答。");
-
-    expect(html).toContain('data-reasoning-scroll-mask="none"');
-    expect(html).toContain("max-h-60");
-    expect(html).toContain("overflow-auto");
-  });
-
   it("removes the left guide and indentation for nested reasoning content", () => {
     const html = renderReasoningContent("CUA 子思考。", {}, { variant: "nested" });
 
@@ -180,20 +155,8 @@ describe("Reasoning layout", () => {
     expect(html).not.toContain("<br");
     expect(html).toContain('data-state="closed"');
     expect(html).toContain('data-reasoning-label="true"');
-    expect(html).toMatch(
-      /class="[^"]*\bshrink-0\b[^"]*\bwhitespace-nowrap\b"[^>]*data-reasoning-label="true"/,
-    );
-    expect(html).toMatch(
-      /class="[^"]*\bmin-w-0\b[^"]*\bflex-1\b[^"]*\boverflow-hidden\b[^"]*\bwhitespace-nowrap\b[^>]*data-reasoning-streaming-line="true"/,
-    );
-    expect(html).not.toContain("ml-auto");
-    expect(html).not.toContain("text-right");
-    expect(html).not.toContain("text-ellipsis");
     expect(html).toContain('data-reasoning-streaming-text="true"');
     expect(html).toContain('data-reasoning-streaming-roll="true"');
-    expect(html).toMatch(
-      /class="[^"]*\btext-foreground-subtle\b[^>]*data-reasoning-streaming-mask=/,
-    );
   });
 
   it("derives a stable rolling key per non-empty reasoning line", () => {
@@ -236,21 +199,9 @@ describe("Reasoning layout", () => {
     expect(html).not.toContain("for 2 seconds");
   });
 
-  it("keeps the latest streaming tail visible after the summary fills its viewport", () => {
-    const viewport = { scrollLeft: 0, scrollWidth: 320 };
-
-    scrollReasoningSummaryToEnd(viewport);
-
-    expect(viewport.scrollLeft).toBe(320);
-  });
-
   it("adds a two-sided fade mask only while the streaming summary overflows", () => {
-    expect(
-      isReasoningSummaryOverflowing({ clientWidth: 240, scrollWidth: 240 }),
-    ).toBe(false);
-    expect(
-      isReasoningSummaryOverflowing({ clientWidth: 240, scrollWidth: 420 }),
-    ).toBe(true);
+    expect(isReasoningSummaryOverflowing({ clientWidth: 240, scrollWidth: 240 })).toBe(false);
+    expect(isReasoningSummaryOverflowing({ clientWidth: 240, scrollWidth: 420 })).toBe(true);
     expect(getReasoningSummaryMaskStyle(false)).toBeUndefined();
     expect(getReasoningSummaryMaskStyle(true)).toMatchObject({
       WebkitMaskImage:
@@ -260,7 +211,7 @@ describe("Reasoning layout", () => {
     });
   });
 
-  it("keeps completed reasoning collapsed by default", () => {
+  it("keeps completed reasoning closed when defaultOpen is false", () => {
     const html = renderReasoningContent("已经完成的思考。", {
       defaultOpen: false,
       isStreaming: false,
@@ -268,15 +219,6 @@ describe("Reasoning layout", () => {
 
     expect(html).toContain("思考");
     expect(html).not.toContain("思考过程");
-    expect(html).toMatch(
-      /class="inline-flex items-center gap-2"><span class="font-medium[^>]*">思考<\/span><span class="font-normal[^>]*">·<\/span><span class="font-normal/,
-    );
-    expect(html).toMatch(
-      /class="[^"]*\bfont-medium\b[^"]*">思考<\/span>/,
-    );
-    expect(html).not.toMatch(
-      /class="[^"]*\bfont-semibold\b[^"]*">思考<\/span>/,
-    );
     expect(html).toContain("持续了");
     expect(html).not.toContain("animated-gradient-text");
     expect(html).not.toContain("已经完成的思考。");

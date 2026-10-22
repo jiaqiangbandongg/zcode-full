@@ -162,28 +162,38 @@ describe("off-peak tools", () => {
   });
 });
 
-describe("闲时轮拒绝 SendMessage / Workflow（D52，ZCT-2099408932463325184）", () => {
+describe("闲时轮支持 SendMessage，保留 Workflow 与递归派发限制", () => {
   const sendMessageInput = { to: "agent_1", summary: "s", message: "continue" };
   const workflowInput = { scriptPath: "review.workflow.js" };
 
-  it("denylist 常量同时覆盖 OffPeakCreate、SendMessage、Workflow，且哨兵仍是 OffPeakCreate", () => {
-    expect([...OFF_PEAK_MUTATION_TOOL_NAMES]).toEqual(["OffPeakCreate", "SendMessage", "Workflow"]);
-    expect(OFF_PEAK_MUTATION_TOOL_NAMES[0]).toBe("OffPeakCreate");
+  it("denylist 保留 OffPeakCreate、Workflow，且哨兵仍是 OffPeakCreate", () => {
+    expect([...OFF_PEAK_MUTATION_TOOL_NAMES]).toEqual([
+      "OffPeakCreate",
+      "Workflow",
+      "CreateWorkflow",
+      "AmendWorkflow",
+      "ResumeWorkflowRun",
+      "EvalWorkflowSnippet",
+    ]);
   });
 
-  it("SendMessage 在闲时轮抛 PermissionDenied（recoverable，提示改用前台 Agent），不触达端口", async () => {
-    const sendMessage = vi.fn();
+  it("SendMessage 在闲时轮向端口传递当前执行模型，支持终态子 Agent 续跑", async () => {
+    const sendMessage = vi.fn(async () => ({ success: true, message: "queued" }));
+    const modelOverride = {
+      selection: { providerId: "idle", modelId: "model" },
+      background: "allow" as const,
+    };
     const context = {
       ...createContext(),
       offPeakTurn: true,
+      subagentModelOverride: modelOverride,
       subagentPort: { sendMessage } as never,
     };
-    await expect(sendMessageToolEntry.handler(sendMessageInput, context)).rejects.toMatchObject({
-      type: CoreErrorType.PermissionDenied,
-      recoverable: true,
-      message: expect.stringContaining("Spawn a new foreground Agent"),
-    });
-    expect(sendMessage).not.toHaveBeenCalled();
+    await expect(sendMessageToolEntry.handler(sendMessageInput, context)).resolves.toBeDefined();
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining(sendMessageInput),
+      expect.objectContaining({ modelOverride }),
+    );
   });
 
   it("Workflow 在闲时轮抛 PermissionDenied，不触达 WorkflowPort", async () => {

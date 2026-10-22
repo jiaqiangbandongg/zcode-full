@@ -1,6 +1,0 @@
-{
-  "version": 1,
-  "caseName": "conversation-session-grouped-header-pin-visibility",
-  "spec": "./test/e2e/conversation-session/conversation-session-grouped-header-pin-visibility.test.ts",
-  "fixtures": []
-}

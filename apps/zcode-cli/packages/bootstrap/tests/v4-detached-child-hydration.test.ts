@@ -39,7 +39,7 @@ import type {
   ZCodeProtocolSessionRecord,
 } from "../src/zcode-protocol/server-types.js";
 
-type TestSessionStore = ReturnType<typeof createSqliteSessionStore>;
+type TestSessionStore = Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
 const WORKSPACE_PATH = "/tmp/zcode-detached-child";
 const PARENT_SESSION_ID = "sess_parent_chat" as SessionId;
@@ -50,7 +50,11 @@ class EventLog {
 
   constructor(private readonly sessionId: string) {}
 
-  push(type: SessionEventTypeUnion, payload: unknown, opts: { turnId?: string } = {}): SessionEvent {
+  push(
+    type: SessionEventTypeUnion,
+    payload: unknown,
+    opts: { turnId?: string } = {},
+  ): SessionEvent {
     this.seq += 1;
     return {
       id: `${this.sessionId}-event-${this.seq}` as EventId,
@@ -249,7 +253,7 @@ describe("v4 detached live child 的首次订阅 hydration", () => {
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "zcode-detached-child-"));
-    store = createSqliteSessionStore({ dbPath: join(tempRoot, "sessions.db") });
+    store = await createSqliteSessionStore({ dbPath: join(tempRoot, "sessions.db") });
   });
 
   afterEach(async () => {

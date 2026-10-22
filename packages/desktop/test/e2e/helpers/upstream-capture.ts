@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { TID_CHAT_CONTEXT_USAGE_TRIGGER } from "@zcode/shared";
+import { TID_CHAT_CONTEXT_USAGE_TRIGGER } from "@zcode/shared/test-ids";
 import type {
   E2ENetworkCaptureArtifact,
   E2ENetworkCaptureRecord,

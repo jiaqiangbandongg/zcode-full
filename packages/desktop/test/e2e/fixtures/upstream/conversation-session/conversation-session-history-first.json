@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-history-first",
+  "spec": "./test/e2e/conversation-session/conversation-session-history-first.test.ts",
+  "fixtures": [
+    {
+      "id": "history-first-title",
+      "description": "HF01 固定历史正文，验证 resume hook 阻塞期间的首帧与草稿门禁。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "持久历史由隔离 fixture 播种；provider 验证 ready 后续发，初始化时序由文件事件屏障控制。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_HISTORY_FIRST"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "history-first-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"History First E2E\"}"
+        }
+      }
+    },
+    {
+      "id": "history-first-parent",
+      "description": "HF01 固定历史正文，验证 resume hook 阻塞期间的首帧与草稿门禁。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "持久历史由隔离 fixture 播种；provider 验证 ready 后续发，初始化时序由文件事件屏障控制。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": ["E2E_HISTORY_FIRST"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "history-first-parent",
+          "inputTokens": 96,
+          "outputTokens": 12,
+          "text": "HISTORY_FIRST_OK"
+        }
+      }
+    }
+  ]
+}

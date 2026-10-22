@@ -72,6 +72,95 @@ function makeConfirmRequest() {
 }
 
 describe("ConversationShareHttpClient", () => {
+  it.each([
+    [3216, 422, "safety_check_rejected"],
+    [3217, 503, "safety_check_unavailable"],
+    [2001, 500, "service_unavailable"],
+    [2005, 500, "service_unavailable"],
+    [2009, 500, "service_unavailable"],
+    [9876, 422, "unknown"],
+  ])("preserves code %s and classifies the failure", async (code, status, kind) => {
+    const request = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ code, msg: "server text", logid: "server-log-id" }), {
+          status,
+        }),
+    );
+    await expect(createClient(request).getCapabilities()).rejects.toMatchObject({
+      kind,
+      code,
+      status,
+      requestId: "server-log-id",
+      details: { code },
+    });
+  });
+
+  it.each([401, 429, 503])(
+    "classifies HTTP %s before parsing an HTML error page",
+    async (status) => {
+      const request = vi.fn(async () => new Response("<html>gateway</html>", { status }));
+      await expect(createClient(request).getCapabilities()).rejects.toMatchObject({
+        kind:
+          status === 401
+            ? "authentication_required"
+            : status === 429
+              ? "rate_limited"
+              : "service_unavailable",
+        status,
+      });
+    },
+  );
+
+  it("keeps bounded validation coordinates and strips raw payload fields", async () => {
+    const request = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 3205,
+            msg: "invalid",
+            data: {
+              rule: "field_type",
+              path: "projection.rows[0].state",
+              field: "state",
+              row_index: 0,
+              row_kind: "assistantText",
+              text: "secret-content",
+            },
+          }),
+          { status: 422 },
+        ),
+    );
+    const error = await createClient(request)
+      .getCapabilities()
+      .catch((error: unknown) => error);
+    expect(error).toMatchObject({
+      kind: "invalid_conversation",
+      details: {
+        rejection: {
+          rule: "field_type",
+          path: "projection.rows[0].state",
+          field: "state",
+          row_index: 0,
+          row_kind: "assistantText",
+        },
+      },
+    });
+    expect(JSON.stringify(error)).not.toContain("secret-content");
+  });
+
+  it("prefers millisecond retry advice for pending safety checks", async () => {
+    const request = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ code: 3215, msg: "pending" }), {
+          status: 409,
+          headers: { "Retry-After-Ms": "1250", "Retry-After": "2" },
+        }),
+    );
+    await expect(createClient(request).confirm("p1", makeConfirmRequest())).rejects.toMatchObject({
+      retryAfterMs: 1250,
+    });
+  });
+
   beforeEach(() => {
     debugLog.mockReset();
     warnLog.mockReset();
@@ -214,7 +303,6 @@ describe("ConversationShareHttpClient", () => {
 
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual(confirmRequest);
     expect(debugLog).not.toHaveBeenCalled();
-    expect(JSON.stringify(debugLog.mock.calls)).not.toContain("test-token");
   });
 
   it("uploads descriptor and binary as multipart fields", async () => {
@@ -387,7 +475,7 @@ describe("ConversationShareHttpClient", () => {
   // Bug 根因：LB/网关返回的 5xx HTML 错误页（502/504）此前因 body 无法按 JSON 解析被归类为
   // invalid_contract（语义：服务端违反契约）。这是基础设施故障，归类 network 才能给出正确的
   // 用户提示与排障方向；request id 仍需保留用于对账。
-  it("502 HTML 错误页归类 network 且保留 request id", async () => {
+  it("502 HTML 错误页归类 service_unavailable 且保留 request id", async () => {
     const request = vi.fn(
       async () =>
         new Response("<html>not-json</html>", {
@@ -397,26 +485,26 @@ describe("ConversationShareHttpClient", () => {
     );
 
     await expect(createClient(request).getCapabilities()).rejects.toMatchObject({
-      kind: "network",
+      kind: "service_unavailable",
       status: 502,
       requestId: "server-request-malformed",
     });
   });
 
-  it("504 空 body 响应也归类 network 而不是 unknown", async () => {
+  it("504 空 body 响应也归类 service_unavailable 而不是 unknown", async () => {
     const request = vi.fn(async () => new Response(null, { status: 504 }));
 
     await expect(createClient(request).getCapabilities()).rejects.toMatchObject({
-      kind: "network",
+      kind: "service_unavailable",
       status: 504,
     });
   });
 
-  it.each([400, 405])("HTTP %s 的非 JSON 错误响应归类接口契约异常", async (status) => {
+  it.each([400, 405])("HTTP %s 的非 JSON 拒绝不归类为成功响应契约损坏", async (status) => {
     const request = vi.fn(async () => new Response("<html>bad-request</html>", { status }));
 
     await expect(createClient(request).getCapabilities()).rejects.toMatchObject({
-      kind: "invalid_contract",
+      kind: "unknown",
       status,
     });
   });
@@ -530,6 +618,56 @@ describe("ConversationShareHttpClient", () => {
       status: 200,
       requestId: "server-request-contract",
     });
+  });
+
+  it.each([
+    [
+      JSON.stringify({
+        code: 0,
+        msg: "secret-message",
+        data: {
+          preparation_id: "p1",
+          status: "preparing",
+          access_mode: "private",
+          expires_at: "secret-value",
+        },
+      }),
+      "schema_mismatch",
+    ],
+    ["<html>secret-value</html>", "invalid_json"],
+  ])("logs safe diagnostics for invalid successful responses", async (body, responseFormat) => {
+    const request = vi.fn(
+      async () =>
+        new Response(body, {
+          headers: { "X-Request-Id": "server-contract-id" },
+        }),
+    );
+    await expect(
+      createClient(request).createPreparation({
+        client_request_id: "client-contract-id",
+        title: "secret-title",
+        schema_version: 1,
+        access_mode: "private",
+        payload_sha256: SHA_256,
+        artifact_count: 0,
+      }),
+    ).rejects.toMatchObject({ kind: "invalid_contract", status: 200 });
+    expect(warnLog).toHaveBeenCalledWith(
+      undefined,
+      "conversation share success response parsing failed",
+      expect.objectContaining({
+        path: "/shares/preparations",
+        method: "POST",
+        status: 200,
+        requestId: "server-contract-id",
+        clientRequestId: expect.any(String),
+        responseFormat,
+        ...(responseFormat === "schema_mismatch"
+          ? { issues: [{ path: ["data", "expires_at"], code: "invalid_type" }] }
+          : {}),
+      }),
+    );
+    expect(JSON.stringify(warnLog.mock.calls)).not.toMatch(/secret-|test-token/);
   });
 
   it("does not attach a request id to network errors", async () => {
@@ -706,7 +844,7 @@ it("非 JSON 错误诊断不记录响应正文或查询参数", async () => {
     .confirm("diagnostic-preparation", makeConfirmRequest())
     .catch((error: unknown) => error);
   expect(error).toMatchObject({
-    kind: "invalid_contract",
+    kind: "unknown",
     status: 405,
     details: { clientRequestId: expect.any(String) },
   });

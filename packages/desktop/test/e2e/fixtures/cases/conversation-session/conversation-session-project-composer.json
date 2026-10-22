@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-project-composer",
+  "spec": "./test/e2e/conversation-session/conversation-session-project-composer.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-project-composer.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "requests": []
+}

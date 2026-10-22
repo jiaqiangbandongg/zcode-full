@@ -1,102 +1,90 @@
-# 桌面端远程 Workspace Renderer 重挂设计
+# 桌面远程 Workspace Renderer 重挂
 
-> **当前状态**：renderer 重挂继续作用于同一 BrowserWindow 内仍存活的 logical remote session。
-> SSH session 可能共享 `sshHostsByPoolKey` 对应的 Remote Host；WSL session 按
-> `window + normalized(distro,user)` 共享池化 Host；Docker/Server 使用 dedicated Host。
-> 重挂只替换该 logical session 的 attachment/renderer port，不能销毁共享 Host 或改变 replayable 边界。
+当前规格。适用于同一 BrowserWindow 的 renderer reload / ErrorBoundary 恢复，以及 Source online 后的项目 attachment 挂回。
+SSH/WSL/Docker 统一由窗口 Local Host 管理，不再使用独立/池化 Remote Host 进程模型。
+项目入口与缓存的所有权以 [虚拟项目设计](../superpowers/specs/2026-09-09-virtual-project-design.md) 为准。
 
-## Feature Summary
+## 权威与投递顺序
 
-| Field                 | Value                                                                                                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Change                | 桌面端 renderer reload / React ErrorBoundary 刷新后，main 需要把仍然存活、承载该 workspace scope 的 Remote Host 重新挂到新的 renderer service store。                                                               |
-| User-visible surfaces | 已打开的 SSH / WSL / Docker remote workspace tab、远程任务列表、首次发送和文件树等 workspace RPC。                                                                                                                  |
-| Existing docs         | `docs/remote-workspace-session-unified-settings.md`、`docs/architecture/zcode-code-architecture-overview.md`、`docs/architecture/message-flow.md`、`docs/web-remote-control/web-remote-control-architecture.md`。   |
-| Existing code owners  | `packages/desktop/src/main/desktopRemoteSessions.ts`、`packages/desktop/src/main/desktopWindowLifecycle.ts`、`packages/desktop/src/renderer/src/main.tsx`、`packages/ui/src/store/remoteWorkspaceSessionStore.ts`。 |
-| Out of scope          | 不做 SSH 自动重连；不改变手机 `/remote` 的 `web-remote-replayable` 恢复语义；不把 disconnected history tab 启动时自动连回远端。                                                                                     |
+| 事实                                                              | 唯一 owner                                                         |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Source 物理连接及恢复                                             | Window Host `SourceServerConnectionManager`                        |
+| logical session、remoteSessionId、generation、workspace readiness | Window Host `WindowRemoteConnectionRegistry`                       |
+| 窗口路由与 Renderer 端口投递                                      | Main `desktopRemoteSessions.ts` 的 `routesBySessionId`             |
+| Renderer services 注册与门禁                                      | Renderer service store；tab 中的 sessionId 不是 ready 证据         |
+| 项目身份                                                          | `workspaceIdentity?.trim() \|\| workspacePath`，与实际执行路径分开 |
 
-## Clarification Log
+```text
+同窗口 renderer ready → Main 枚举 attachmentState=attachable 的 route
+  → 从既有 Window Host 请求 attachment → 投递 RemoteServicePort
+  → Renderer 注册 scoped services / ready ACK → 允许 workspace RPC
+Source 换代 → Registry 更换 session/generation → Main 换 route → 重新建立 attachment
+```
 
-| Round | Question                                                                            | User answer  | Boundary fixed                                                         | Follow-up needed |
-| ----- | ----------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------- | ---------------- |
-| 1     | renderer reload / 崩溃 / ErrorBoundary 刷新导致 remote session 绑定丢失是否值得修？ | 值得，继续。 | 优先修复桌面端 renderer 状态丢失但 main remote host 仍存活的失绑问题。 | no               |
+- 只重挂本窗口仍 attachable 的路由；pending、已 dispose 和过时代际不投递。
+- 重挂更换端口与 attachment，不销毁共享 Window Host、物理 Source 或远端任务。
+- remote port 早于 base ServicePort 时先暂存，base ready 后 flush，不能丢弃端口。
+- 相同 workspace 的并发 connect 可返回同一 sessionId；Main join 既有 route/attachment，不覆盖健康 route。
+- 迟到的 ready、port 或旧 timer 不能回收新 generation；失败精确释放本次 attachment。
+- Desktop 继续 continuous；手机继续共享已有 Host 的 replayable attachment，Main/relay 不持有业务 snapshot。
 
-## Boundary Decisions
+## 冷启动选择与存量 Renderer 挂回
 
-| Boundary   | Decision                                                                          | Includes                                                                           | Excludes / prunes                                        | Source    |
-| ---------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------- | --------- |
-| 重挂对象   | 只重挂 main 侧仍 tracked 且 `connected=true` 的 remote workspace session。        | renderer reload、ErrorBoundary `window.location.reload()` 后的同一 BrowserWindow。 | pending 连接、已 dispose session、host 已 exit session。 | code      |
-| 主路径语义 | 保持 desktop `desktop-continuous` 主链路。                                        | 重新投递 `RemoteServicePort`，让 renderer 重新注册 remote services。               | 不使用 mobile replayable snapshot/gap 恢复。             | docs      |
-| 启动恢复   | 仍只恢复 disconnected remote tab，不后台连接。                                    | settings 里的 remote history 保持手动重连。                                        | 不把 app 冷启动当成 live session 恢复。                  | docs      |
-| 远控桥接   | 复用现有 `AttachServicePort` 模式，但不改变手机 shared-host attachment 生命周期。 | main 给桌面 renderer 新端口。                                                      | relay/main 不拥有 task/session state。                   | docs/code |
-| 投递时序   | renderer 允许 remote service port 早于 base ServicePort 到达。                    | 早到的 remote port 先暂存，base services 注册后再 flush。                          | 不因为 base services 暂未 ready 而丢弃 remote port。     | code      |
+[虚拟项目 F5](../superpowers/specs/2026-09-09-virtual-project-design.md) 是新版持久化权威：
+冷启动只从 `lastActiveWorkspace` 恢复活动执行目录，其他项目入口从 Host SQLite 读取，用户打开时
+再创建 attachment。`lastWorkspaceSession` 是降级兼容投影，不是新版 open set；不得因其中有 A/B
+就要求冷启动生成 A/B 全部 tab。没有新字段的旧设置仍沿用一次性导入与 active-first 补齐。
+以下“全部 open 项目”只指当前 Renderer 实际保留的断连 tabs，不指旧字段中的所有目录。
 
-## Domain Scope
+```text
+冷启动：Host 保存的连接 → Source online
+        lastActiveWorkspace → 活动 tab → attachment
+        Host 项目入口 → 用户打开其他项目 → 该目录 attachment
+同窗口断线恢复：当前已有 tabs → Source online → 逐个挂回，不抢焦点
+```
 
-| Domain                            | Include? | Why it can change behavior                                                         | Primary sources                                              |
-| --------------------------------- | -------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Architecture/process boundary     | yes      | renderer、desktop main、remote host 三层重新建立 RPC transport。                   | `docs/architecture/zcode-code-architecture-overview.md`      |
-| Workspace identity/remote runtime | yes      | 重挂必须保留 `remoteSessionId`、`target`、`workspaceIdentity/workspacePath` 隔离。 | `docs/remote-workspace-session-unified-settings.md`          |
-| Mobile remote/replayable realtime | limited  | 需要确认不影响手机 replayable 远控 attachment。                                    | `docs/web-remote-control/web-remote-control-architecture.md` |
-| Conversation/session behavior     | no       | 不修改 session 内容、queue、snapshot 或 replay 规则。                              | `docs/testing/conversation-session-e2e-coverage-matrix.md`   |
+## 两级恢复门禁
 
-## Concept Map
+1. Host 冷启动对全部保存的连接按最近在线时间排序各尝试一次，不再按 7 天过滤；只使用默认 Profile 可静默取得的凭据，并尊重全局自动重连关闭开关。legacy、需交互/升级/迁移确认的候选保持手动。
+2. Renderer 只在 Management 观察到 Source online 后恢复当前窗口该 Source 下的 open、断连、stable identity 项目；不再按 workspace 年龄或上次 connected 状态过滤。
+3. 目录有效性由 Host admission 校验；某项目失败不阻止其它项目。远程 conversation UI 已停用，其历史 entries 不进入恢复候选。
+4. 每周期去重；terminal close 后未观察到 offline 不立即自恢复。active-first 后到 siblings 按 workspace key 检查，不能被 Source 级 attempted 标记吞掉。
 
-| Concept                            | Why it matters                                                                 | Source                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `RemoteServicePort`                | renderer 注册 remote services 的唯一运行态入口。                               | `packages/desktop/src/renderer/src/main.tsx`         |
-| `remoteWorkspaceSessionsById` | main 侧 logical session、Host 引用和 attachment 的权威索引。                   | `packages/desktop/src/main/desktopRemoteSessions.ts` |
-| `sshHostsByPoolKey`                 | 同窗口 SSH Host 存活和 readiness 的权威索引。                                  | `packages/desktop/src/main/desktopRemoteSessions.ts` |
-| `AttachServicePort`                | remote host 已有 `activeServices` 时可补挂新的 RPC port。                      | `packages/desktop/src/host/index.ts`                 |
-| disconnected remote tab            | settings 恢复的 remote tab 不含 live `remoteSessionId`，必须等待用户手动重连。 | `docs/remote-workspace-session-unified-settings.md`  |
+## 导航恢复与挂回门禁（RDUX-09）
 
-## State Owners
+主窗口恢复上次激活的远程项目与会话选择，见 [导航规格 §2.3](./project-first-remote-navigation-spec.md#23-重连与重启后回到原处rdux-09)。这里的“Source 上线不自动激活”约束保持：启动位置由页签持久化决定，后台重挂不改写焦点。Host 仍只预热本地路径，Renderer 可先激活远程占位；首次 ready 前不读取/渲染远端内容，失败或未连接保持原页签与横幅。已加载内容按现有 owner 保留只读；手机 replayable 不消费桌面导航恢复。
 
-| State / fact                       | Authority                     | Mirrors / caches      | Evidence                                       |
-| ---------------------------------- | ----------------------------- | --------------------- | ---------------------------------------------- |
-| SSH remote host process 是否存活   | desktop main                  | none                  | `sshHostsByPoolKey`                            |
-| renderer remote services 是否可用  | renderer Zustand store        | tab `remoteSessionId` | `registerRemoteWorkspaceSession`               |
-| remote workspace 身份              | tab/settings remote entry     | main session context  | `workspaceIdentity?.trim() \|\| workspacePath` |
-| remote host RPC service collection | host process `activeServices` | attached ports        | `AttachServicePort` log                        |
+## Manual Disconnect Boundary
 
-## Dimensions
+用户主动断开是当前窗口内的终止意图，不属于启动恢复或异常断线恢复。Source 状态事件只有进入
+`online` 时才可触发历史 workspace 的启动恢复；已有 tab 从 live session 变为断连占位时，只更新
+断连状态，不重新触发恢复。active-first 启动补齐新断连 tab 仍可触发一次候选重算。
 
-| Dimension      | Values / equivalence classes               | Source        | Include? | Reason                                        |
-| -------------- | ------------------------------------------ | ------------- | -------- | --------------------------------------------- |
-| session state  | pending / connected / disposed-exited      | code          | yes      | 只有 connected 应重挂。                       |
-| renderer event | initial create / same-window reload        | code          | yes      | 两者都走 `dom-ready` 后端口投递。             |
-| remote kind    | SSH / WSL / Docker                         | shared target | no       | 重挂只依赖 session host，不依赖具体 backend。 |
-| client mode    | desktop-continuous / web-remote-replayable | docs          | yes      | 本修复只作用 desktop renderer。               |
+Directory delta 本身仍不是重连信号；但当它首次补齐
+`legacyWorkspaceIdentity -> remote:server:*` 映射时，Renderer 必须先同步重投影已恢复的内存 session
+和断连 tab。后续是否恢复仍只由 Source `online`、open membership、stable identity 与每连接周期一次的去重门禁决定；静默凭据与全局自动重连开关在 Host 启动重连处执行。
+不得把普通重命名、删线路、记录打开项目或孤立的 `failed` history 扩大成自动恢复 initiator；Source
+flight 获准后，failed open entry 只作为该 flight 的恢复成员。
 
-## Candidate Combinations
+自动恢复的 owner 是 online Source，不是某个 workspace initiator。Source `online` 只决定是否允许启动
+本轮 Source flight；flight 启动后必须遍历该 Source 当前窗口内全部 open 且 disconnected 的 entries，不按工作区年龄或上次 connected 过滤。
+成员已经 live 或正在另一个恢复 flight 中时只结算该成员，不能把整组标记为 skipped。手动连接尚未 online
+的 Source 继续复用 Host 的设备连接 initiator/credential gate，不扩大本规则。
 
-| Candidate ID | State                    | Event                      | Target/surface   | Expected guard/effect                                                        | Initial status | Notes                |
-| ------------ | ------------------------ | -------------------------- | ---------------- | ---------------------------------------------------------------------------- | -------------- | -------------------- |
-| DRS-RR-01    | connected remote session | renderer reload/dom-ready  | desktop renderer | main 重新发送 `RemoteServicePort`，renderer 可重新注册同一 `sessionId`。     | accepted       | 本次实现。           |
-| DRS-RR-02    | pending remote session   | renderer reload/dom-ready  | desktop renderer | 不重挂，避免把未初始化 host 暴露给 renderer。                                | accepted       | 单测覆盖。           |
-| DRS-RR-05    | connected remote session | remote port 早于 base port | desktop renderer | renderer 暂存 remote port，base ServicePort ready 后再注册 remote services。 | accepted       | 本次实现。           |
-| DRS-RR-03    | disconnected history tab | app 冷启动恢复             | UI tab           | 仍保持断连占位，不自动创建 SSH runtime。                                     | pruned         | 由现有恢复设计覆盖。 |
-| DRS-RR-04    | mobile bridge attachment | mobile reconnect           | web remote       | 保持 shared-host attachment 现有逻辑，不新增 replayable 恢复。               | pruned         | 不在本次改动范围。   |
+## 回归与证据边界
 
-## Accepted Cases
+| 稳定 ID         | 合同与原记录状态                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| DRS-RR-01       | 同窗口 ready 更换 attachment、沿用 session；原 unit covered。                                                             |
+| DRS-RR-02/05    | pending 不投递；base ready 前暂存 remote port；原 Accepted Cases 为 planned，不能由候选表推定通过。                       |
+| DRS-RR-03/08    | 两级恢复、legacy→stable 重投影；原 unit / 真实 SSH covered，仅适用于记录基线。                                            |
+| DRS-RR-04/06/07 | 手机边界不变；不合格启动候选保持断连；主动断开不触发自恢复。                                                              |
+| DRS-RR-09       | 获准 Source flight 跳过已 live 成员并继续 siblings；当前 UI 只恢复项目。                                                  |
+| DRS-RR-10       | 重复 connect 的 route/attachment join；原 conversation 场景为 unit + real SSH pending。旧 UI 场景不作为当前导航通过证据。 |
 
-| Case ID   | Setup                                                                | Action                                                            | Assertions                                                                                                              | Evidence layers                 | E2E status |
-| --------- | -------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------- |
-| DRS-RR-01 | 已 connected 的 remote workspace session 属于 `webContents.id=99`。  | 同一窗口 renderer 重新 ready，main 调用 remote session reattach。 | 旧 attachment 被精确 detach，child 收到带新 `attachmentId` 的 `AttachServicePort`；renderer 收到同一 `sessionId` 的 `RemoteServicePort`。 | unit: main manager message/port | covered    |
-| DRS-RR-02 | pending remote workspace session 尚未收到 `Connected`。              | renderer 重新 ready。                                             | 不投递端口。                                                                                                            | unit: main manager no-op        | planned    |
-| DRS-RR-05 | renderer 收到 remote `RemoteServicePort` 时 base services 尚未注册。 | 随后收到本地 `ServicePort`。                                      | remote port 不丢弃；base services ready 后 flush pending remote ports。                                                 | unit: renderer source guard     | planned    |
+启动的 10 秒预算只属于 Host physical flight；超时先结算稳定错误，再 abort 并精确取消 transport。
+Renderer 不能抢先调用 connectProfile 扩大同一恢复 flight，迟到握手不得注册 online。
 
-## Pruning Decisions
-
-| Decision ID | Pruned combinations                | Guard/invariant                             | Product reason                                          | Representative coverage    |
-| ----------- | ---------------------------------- | ------------------------------------------- | ------------------------------------------------------- | -------------------------- |
-| PD-01       | app 冷启动 remote history 自动重连 | settings 恢复只生成 disconnected tab        | 用户关闭远端后不能被后台偷偷拉回。                      | existing persistence tests |
-| PD-02       | mobile replayable snapshot 恢复    | relay/main 不拥有 task/session/stream state | 手机远控只能 attach existing host，不创建独立 runtime。 | existing web remote tests  |
-
-## E2E Handoff Notes
-
-- Provider fixture: 不需要。
-- File-system fixture: 不需要。
-- Timing strategy: unit test 直接模拟 `Connected` 和 renderer ready。
-- Docker preset: 不需要。
-- Review risks: 需要确认 same-window reload 不重复注册 pending session；connected session 重挂不改变 remote host 生命周期。
+测试文件及执行证据见[覆盖矩阵](../testing/conversation-session-e2e-coverage-matrix.md)；旧候选表、
+Accepted Cases 和历史限制完整保存在 `git show a17a875588b8d66c2bee49236292e174df651363:docs/remote/desktop-remote-session-renderer-reattach.md`。
+本次仅修正文档，不补记运行结果或改变 formal/pending 状态。

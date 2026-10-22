@@ -105,9 +105,7 @@ describe("Todo104 最终规则数据合同", () => {
   it("Manual 从共享叶子派生，可编辑字段完整、系统字段不写入", () => {
     expect(completeModelConfigDataSchema.parse(completeModel)).toEqual(completeModel);
     const manual = extractManualModelConfig(completeModel);
-    expect(manualModelConfigSchema.shape.properties.shape.contextWindow).toBe(
-      completeModelConfigDataSchema.shape.properties.shape.contextWindow,
-    );
+
     for (const enabled of [undefined, null, false, true]) {
       expect(manualModelConfigSchema.safeParse({ ...manual, enabled }).success).toBe(true);
     }

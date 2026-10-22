@@ -4,16 +4,6 @@ export type V4VisibleSlashCommand =
       displayText: string;
     }
   | {
-      kind: "planShortcut";
-      task: string;
-      displayText: string;
-    }
-  | {
-      kind: "unsupportedPlanShortcut";
-      task: string;
-      displayText: string;
-    }
-  | {
       kind: "sendGoalCommand";
       objective: string;
       displayText: string;
@@ -61,16 +51,6 @@ export function parseV4VisibleSlashCommand(
   if (!match) return null;
   const commandName = match[1]?.toLowerCase() ?? "";
   const args = match[2]?.trim() ?? "";
-
-  if (commandName === "plan") {
-    const hasUnsupportedPayload =
-      attachments.length > 0 || (options.contextAttachmentCount ?? 0) > 0;
-    return {
-      kind: hasUnsupportedPayload ? "unsupportedPlanShortcut" : "planShortcut",
-      task: args,
-      displayText,
-    };
-  }
 
   if (attachments.length > 0 || (options.contextAttachmentCount ?? 0) > 0) {
     return null;

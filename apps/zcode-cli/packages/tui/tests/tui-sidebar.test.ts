@@ -14,18 +14,6 @@ import {
 import { createSidebarShortcutState, resolveSidebarShortcut } from "../src/app-sidebar-shortcut.js";
 import type { SidebarState } from "../src/app-model.js";
 
-test("uses the responsive sidebar width from the v2 layout contract", () => {
-  assert.equal(SIDEBAR_WIDTH, 42);
-  assert.equal(SIDEBAR_CONTENT_WIDTH, 40);
-});
-
-test("renders as a borderless background block", () => {
-  const style = reactElementStyle(Sidebar(baseSidebarState));
-
-  assert.equal(style.border, false);
-  assert.equal(style.backgroundColor, "#1f2937");
-});
-
 test("splits the current provider and model rows in the run section", () => {
   const lines = collectTextLines(
     Sidebar({

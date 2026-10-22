@@ -244,6 +244,7 @@ export const evalWorkflowSnippetToolEntry: ToolEntry = {
   capability:
     "Compile and synchronously run a small dynamic-workflow TypeScript snippet (world reads + pure logic) against the real workflow execution path, fully ephemerally",
   metadata: {
+    shouldDefer: true,
     name: EVAL_WORKFLOW_SNIPPET_TOOL_NAME,
     description: EVAL_WORKFLOW_SNIPPET_TOOL_DESCRIPTION,
     // world.run 落地后 snippet 可表达效应：readOnly 翻面，确认门在 prepareApproval

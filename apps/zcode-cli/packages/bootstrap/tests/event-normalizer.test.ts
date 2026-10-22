@@ -174,7 +174,6 @@ describe("Conversation Event Normalizer", () => {
     };
     const chunks = [
       { kind: "text_delta", delta: "one", done: false, partId: "part-1" },
-      { kind: "text_delta", delta: "two", done: false, partId: "part-1" },
       { kind: "text_end", delta: "", done: false, partId: "part-1" },
     ].map((payload, index) =>
       normalizeConversationEvent(
@@ -189,10 +188,8 @@ describe("Conversation Event Normalizer", () => {
     expect(chunks.map((fact) => fact.entityId)).toEqual([
       "message-assistant-1",
       "message-assistant-1",
-      "message-assistant-1",
     ]);
     expect(chunks.map((fact) => fact.transcriptMessageId)).toEqual([
-      "message-assistant-1",
       "message-assistant-1",
       "message-assistant-1",
     ]);

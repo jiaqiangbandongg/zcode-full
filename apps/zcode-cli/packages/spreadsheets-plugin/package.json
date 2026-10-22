@@ -1,8 +1,27 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@zcode/spreadsheets-plugin",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "private": true,
+  "description": "XLSX spreadsheet production skills and an Excel viewer panel, published as an official ZCode plugin.",
   "license": "Apache-2.0",
-  "description": "XLSX spreadsheet production skills, published as an official ZCode plugin."
+  "type": "module",
+  "scripts": {
+    "build": "node ../office-runtime/scripts/build.mjs",
+    "clean": "node ../../scripts/clean-dist.mjs",
+    "smoke": "node ../office-runtime/scripts/smoke.mjs",
+    "test:e2e": "node ../office-runtime/scripts/e2e.mjs"
+  },
+  "devDependencies": {
+    "@zcode/office-runtime": "workspace:*"
+  },
+  "office": {
+    "title": {
+      "en": "Spreadsheets",
+      "zh-CN": "电子表格"
+    },
+    "kinds": [
+      "xlsx"
+    ]
+  }
 }

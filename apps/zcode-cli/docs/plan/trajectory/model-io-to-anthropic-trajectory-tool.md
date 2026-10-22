@@ -42,6 +42,36 @@ pnpm --filter @zcode/prompt-trajectory model-io -- \
 - `manifest.json`：沿用现有 derive manifest。
 - `trajectories/*.openai_request_body.json` 与 `trajectories/*.anthropic_request_body.json`：沿用现有 per-trajectory 调试产物。
 
+### ToolSearch 合成模式
+
+`model-io` 和 `derive` 可选 `--ignore-tool-search-changes`，默认关闭，仅用于 provider
+已负责工具变化处理时的离线轨迹合成。顶层 `tools` 本就不参与连续性比较；此开关只放宽
+消息中的 ToolSearch 投影差异，不修改生产请求、日志、缓存策略或会话持久化。
+
+```text
+原始请求（保持不变） → 比较副本忽略 ToolSearch 投影 → 连续性判定
+                                                ↓
+                        合成片段使用最后真实请求 + 最终回复
+```
+
+- 比较时忽略真实 `ToolSearch` callID 对应的原生 `tool_result.content` 数组中的
+  `tool_reference` 及两种精确占位文本：`[Tool references removed - tools no longer available]`、
+  `[Tool references removed - tool search not enabled]`。引用增删、恢复和顺序变化不分段。
+- 比较时忽略 user 消息中独立的 ToolSearch 新增、移除、恢复目录 `system-reminder` block；
+  识别 Native／Local 当前文案及旧日志中的连接原因文案，其他 reminder 与用户正文保留。
+  公告独占的消息可在比较副本中省略；回归使用当前公告生成器输出验证识别规则。
+- 比较时忽略成功且含原生引用的 ToolSearch 结果批次后派生的 `Tool loaded.`，每个有效结果
+  最多对应一条提示；支持并行结果及相邻 user 合并形态。普通正文、其他工具输出、失败或
+  无引用结果后的同名文本仍严格比较，导出内容继续保留最后真实请求中的提示。
+- ToolSearch 的 callID、调用名、输入、结果错误状态、普通结果文本，以及其他工具结果、
+  thinking、普通正文、Continue 和 compact 历史变化仍严格比较。不通用忽略所有 tool 消息。
+- 开关只影响比较；导出内容仍使用该片段最后一条真实请求，保留其 tools、引用、公告、
+  占位文本及最终响应，不合并工具 schema、不复活被过滤的历史引用、不伪造调用或结果。
+- manifest 仅在开启时记录 `ignoreToolSearchChanges: true`，默认输出契约不变。合成产物
+  不代表逐轮 wire 相同或缓存已命中；原始 model-io/ledger 继续作为逐轮事实源。
+- 回归覆盖默认严格分段、开启后移除/恢复合并、公告迁移、mixed text/reference 保序、
+  call/result 身份及非 ToolSearch 负例、thinking 补全、delta/sidecar、CLI 两入口与文件输出。
+
 ## 验收
 
 ### 连续性判定（2026-09-12）

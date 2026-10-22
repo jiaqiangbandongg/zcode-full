@@ -1,9 +1,6 @@
 import { useCallback, type RefObject } from "react";
-import {
-  BROWSER_VIEW_RESTORE_BOOTSTRAP_URL,
-  TID_BROWSER_WEBVIEW,
-  type BrowserViewportSize,
-} from "@zcode/shared";
+import { BROWSER_VIEW_RESTORE_BOOTSTRAP_URL, type BrowserViewportSize } from "@zcode/shared";
+import { TID_BROWSER_WEBVIEW } from "@zcode/shared/test-ids";
 import { TriangleAlertIcon } from "lucide-react";
 import { ResponsiveBrowserViewport } from "@/browser-use/ResponsiveBrowserViewport.js";
 import {
@@ -161,8 +158,8 @@ export function BrowserViewportSurface({
               "browser-use-viewport h-full min-h-0 w-full",
               isEmptyBrowserState || guestFailure || loadError ? "hidden" : "inline-flex",
             )}
-            // Electron 的 `<webview>` 独立 guest surface 对 page zoom 的合成并不对称：放大时
-            // 由 main 的 CDP metrics scale 校正 raster；缩小时先按 1 / zoom 扩布局再缩放。
+            // Electron 的 `<webview>` 独立 guest surface 按布局尺寸分配 raster：放大和缩小都先按
+            // 1 / zoom 布局，再 transform 回 frame，guest 自然 viewport 即等于目标 viewport。
             // absolute 避免补偿布局污染 Fit 的 scroll extent。
             // 这里只改变宿主布局/合成；guest zoom、CSS viewport、DPR 与 Browser Use 回读保持不变。
             style={{

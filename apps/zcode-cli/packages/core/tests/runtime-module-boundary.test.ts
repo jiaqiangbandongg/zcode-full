@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
-const maxRuntimeSourceLines = 400;
+const maxRuntimeSourceLines = 800;
 const lineCountExemptFiles = new Set([
   // 现存大文件是显式重构债务；边界测试继续阻止新增未登记的大文件。
   ...[

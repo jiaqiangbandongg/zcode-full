@@ -17,7 +17,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { SettingsFormTextarea } from "@/settings/SettingsFormTextarea.js";
 import { SettingsFormActions } from "@/settings/SettingsFormActions.js";
 import { PluginScopeMenu, getPluginWorkspaceKey } from "@/settings/PluginScopeMenu.js";
-import type { WorkspaceTabState } from "@/store/tabStore.js";
+import type { ConfigWorkspaceTarget } from "@/workspace-config-catalog/index.js";
 
 interface HookFormProps {
   hook?: Hook;
@@ -27,7 +27,7 @@ interface HookFormProps {
   onCancel: () => void;
   onDelete?: (hook: Hook) => void;
   isEditing?: boolean;
-  workspaceTabs?: WorkspaceTabState[];
+  workspaceTabs?: ConfigWorkspaceTarget[];
   selectedScopeKey?: string;
   onScopeKeyChange?: (scopeKey: string) => void;
 }
@@ -54,7 +54,7 @@ function HookScopeMenu({
 }: {
   disabled: boolean;
   scopeKey: string;
-  workspaceTabs: WorkspaceTabState[];
+  workspaceTabs: ConfigWorkspaceTarget[];
   onChange: (scopeKey: string) => void;
 }) {
   const { intl } = useZCodeIntl();

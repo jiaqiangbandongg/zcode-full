@@ -7,6 +7,10 @@ export interface SidebarPurposeSectionPreferences {
   projectsExpanded: boolean;
   conversationsExpanded: boolean;
   sectionOrder: SidebarPurposeSectionId[];
+  sourceGroupExpandedSections?: Record<
+    string,
+    Partial<Record<SidebarPurposeSectionId, boolean>>
+  >;
 }
 
 export const SIDEBAR_PURPOSE_SECTION_IDS = ["projects", "conversations"] as const;
@@ -57,6 +61,116 @@ function normalizeSectionOrder(value: unknown): SidebarPurposeSectionId[] {
   return value as SidebarPurposeSectionId[];
 }
 
+function normalizeSourceGroupExpandedSections(
+  value: unknown,
+): SidebarPurposeSectionPreferences["sourceGroupExpandedSections"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized = Object.fromEntries(
+    Object.entries(value).flatMap(([sourceGroupKey, sections]) => {
+      if (
+        !sourceGroupKey ||
+        !sections ||
+        typeof sections !== "object" ||
+        Array.isArray(sections)
+      ) {
+        return [];
+      }
+      const sectionValue = sections as Record<string, unknown>;
+      const normalizedSections = Object.fromEntries(
+        SIDEBAR_PURPOSE_SECTION_IDS.flatMap((sectionId) =>
+          typeof sectionValue[sectionId] === "boolean"
+            ? [[sectionId, sectionValue[sectionId]]]
+            : [],
+        ),
+      );
+      return Object.keys(normalizedSections).length > 0
+        ? [[sourceGroupKey, normalizedSections]]
+        : [];
+    }),
+  );
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function getExpandedFallback(
+  preferences: SidebarPurposeSectionPreferences,
+  sectionId: SidebarPurposeSectionId,
+): boolean {
+  return sectionId === "projects"
+    ? preferences.projectsExpanded
+    : preferences.conversationsExpanded;
+}
+
+export function resolveSidebarPurposeSectionExpanded(
+  preferences: SidebarPurposeSectionPreferences,
+  sectionId: SidebarPurposeSectionId,
+  sourceGroupKey?: string,
+): boolean {
+  if (sourceGroupKey) {
+    const sourceValue =
+      preferences.sourceGroupExpandedSections?.[sourceGroupKey]?.[sectionId];
+    if (typeof sourceValue === "boolean") {
+      return sourceValue;
+    }
+  }
+  return getExpandedFallback(preferences, sectionId);
+}
+
+export function updateSidebarPurposeSectionExpanded(
+  preferences: SidebarPurposeSectionPreferences,
+  update: {
+    sectionId: SidebarPurposeSectionId;
+    expanded: boolean;
+    sourceGroupKey?: string;
+  },
+): SidebarPurposeSectionPreferences {
+  const { sectionId, expanded, sourceGroupKey } = update;
+  if (!sourceGroupKey) {
+    const field =
+      sectionId === "projects"
+        ? "projectsExpanded"
+        : "conversationsExpanded";
+    return preferences[field] === expanded
+      ? preferences
+      : { ...preferences, [field]: expanded };
+  }
+
+  const fallback = getExpandedFallback(preferences, sectionId);
+  const currentSourceSections =
+    preferences.sourceGroupExpandedSections?.[sourceGroupKey];
+  const currentExpanded = currentSourceSections?.[sectionId] ?? fallback;
+  if (currentExpanded === expanded) {
+    return preferences;
+  }
+
+  const nextSourceSections = { ...currentSourceSections };
+  if (expanded === fallback) {
+    delete nextSourceSections[sectionId];
+  } else {
+    nextSourceSections[sectionId] = expanded;
+  }
+
+  const sourceGroupExpandedSections = {
+    ...preferences.sourceGroupExpandedSections,
+  };
+  if (Object.keys(nextSourceSections).length === 0) {
+    delete sourceGroupExpandedSections[sourceGroupKey];
+  } else {
+    sourceGroupExpandedSections[sourceGroupKey] = nextSourceSections;
+  }
+
+  return {
+    ...preferences,
+    sourceGroupExpandedSections:
+      Object.keys(sourceGroupExpandedSections).length > 0
+        ? sourceGroupExpandedSections
+        : undefined,
+  };
+}
+
 export function reorderSidebarPurposeSections(
   sectionOrder: readonly SidebarPurposeSectionId[],
   activeSectionId: string,
@@ -94,6 +208,9 @@ export function readSidebarPurposeSectionPreferences(
     }
 
     const value = parsed as Partial<SidebarPurposeSectionPreferences>;
+    const sourceGroupExpandedSections = normalizeSourceGroupExpandedSections(
+      value.sourceGroupExpandedSections,
+    );
     return {
       projectsExpanded:
         typeof value.projectsExpanded === "boolean"
@@ -104,6 +221,7 @@ export function readSidebarPurposeSectionPreferences(
           ? value.conversationsExpanded
           : DEFAULT_SIDEBAR_PURPOSE_SECTION_PREFERENCES.conversationsExpanded,
       sectionOrder: normalizeSectionOrder(value.sectionOrder),
+      ...(sourceGroupExpandedSections ? { sourceGroupExpandedSections } : {}),
     };
   } catch {
     return getDefaultPreferences();
@@ -115,12 +233,16 @@ export function persistSidebarPurposeSectionPreferences(
   storage: StorageLike | null = getBrowserStorage(),
 ) {
   try {
+    const sourceGroupExpandedSections = normalizeSourceGroupExpandedSections(
+      preferences.sourceGroupExpandedSections,
+    );
     storage?.setItem(
       SIDEBAR_PURPOSE_SECTION_PREFERENCES_STORAGE_KEY,
       JSON.stringify({
         projectsExpanded: preferences.projectsExpanded,
         conversationsExpanded: preferences.conversationsExpanded,
         sectionOrder: normalizeSectionOrder(preferences.sectionOrder),
+        ...(sourceGroupExpandedSections ? { sourceGroupExpandedSections } : {}),
       }),
     );
   } catch {

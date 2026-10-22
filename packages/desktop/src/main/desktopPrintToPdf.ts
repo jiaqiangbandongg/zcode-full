@@ -22,7 +22,7 @@ export function registerDesktopPrintToPdfIpcHandler(logger: {
         margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
       // Buffer 可能是池化视图，切出独立 ArrayBuffer 再走 structured clone
-      const data = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      const data = Uint8Array.from(buffer).buffer;
       return { success: true, data };
     } catch (error) {
       logger.warn(

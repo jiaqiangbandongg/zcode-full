@@ -1,4 +1,5 @@
-import { TID_WORKSPACE_ITEM, formatZCodeAgentProcessName, testId } from "@zcode/shared";
+import { formatZCodeAgentProcessName } from "@zcode/shared";
+import { startDraftFromProject, waitForProjectRow } from "./project-sidebar.js";
 import {
   countAgentProcessRows,
   listAgentProcessIdentities,
@@ -46,126 +47,20 @@ export async function waitForActiveWorkspacePath(
   );
 }
 
-export async function waitForRestoredWorkspaceItems(
-  workspacePaths: string[],
-  timeout = 30_000,
-): Promise<void> {
-  const workspaceItemTestIds = workspacePaths.map((workspacePath) =>
-    testId(TID_WORKSPACE_ITEM, workspacePath),
-  );
-  await browser.waitUntil(
-    async () => {
-      try {
-        return await browser.execute((expectedTestIds) => {
-          const actual = new Set(
-            Array.from(document.querySelectorAll<HTMLElement>("[data-testid]"))
-              .map((element) => element.dataset.testid)
-              .filter((value): value is string => Boolean(value)),
-          );
-          return expectedTestIds.every((expected) => actual.has(expected));
-        }, workspaceItemTestIds);
-      } catch {
-        return false;
-      }
-    },
-    {
-      timeout,
-      interval: 250,
-      timeoutMsg: `${workspacePaths.length} 个恢复 workspace 没有全部出现在侧栏`,
-    },
-  );
-}
+export { waitForRestoredProjects } from "./project-sidebar.js";
 
+/**
+ * 从侧栏为指定 workspace 打开新任务草稿。虚拟项目重构后 workspace 不再是可点击的目录
+ * 节点，而是同名项目行；项目行的「新建任务」按钮就是显式草稿导航入口（cwd = 主要目录），
+ * 不再依赖旧的「先收起再展开」手势。
+ */
 export async function openWorkspaceDraftFromSidebar(workspacePath: string): Promise<void> {
-  const workspaceItemTestId = testId(TID_WORKSPACE_ITEM, workspacePath);
-  await browser.waitUntil(
-    () =>
-      browser.execute((expectedTestId) => {
-        return Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).some(
-          (element) => element.dataset.testid === expectedTestId,
-        );
-      }, workspaceItemTestId),
-    {
-      timeout: 15_000,
-      interval: 100,
-      timeoutMsg: `侧栏没有 dormant workspace: ${workspacePath}`,
-    },
-  );
-
-  const isExpanded = await browser.execute((expectedTestId) => {
-    return Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-      (element) => element.dataset.testid === expectedTestId,
-    )?.getAttribute("aria-expanded") === "true";
-  }, workspaceItemTestId);
-  if (isExpanded) {
-    // 修复原因：workspace 展开态与 active workspace 是两套状态；renderer reload 后目标行
-    // 可能已展开但仍 dormant。先真实收起，再点击展开，才能命中产品的显式草稿导航入口。
-    await clickWorkspaceItem(workspaceItemTestId);
-    await browser.waitUntil(
-      () =>
-        browser.execute((expectedTestId) => {
-          return Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-            (element) => element.dataset.testid === expectedTestId,
-          )?.getAttribute("aria-expanded") === "false";
-        }, workspaceItemTestId),
-      {
-        timeout: 10_000,
-        interval: 100,
-        timeoutMsg: `workspace 没有先收起: ${workspacePath}`,
-      },
-    );
-  }
-
-  await clickWorkspaceItem(workspaceItemTestId);
+  await waitForProjectRow(workspacePath, {
+    timeout: 15_000,
+    timeoutMsg: `侧栏没有 dormant workspace 对应的项目: ${workspacePath}`,
+  });
+  await startDraftFromProject(workspacePath);
   await waitForActiveWorkspacePath(workspacePath);
-}
-
-async function clickWorkspaceItem(workspaceItemTestId: string): Promise<void> {
-  const clicked = await browser.execute((expectedTestId) => {
-    const item = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-      (element) => element.dataset.testid === expectedTestId,
-    );
-    item?.click();
-    return Boolean(item);
-  }, workspaceItemTestId);
-  if (!clicked) {
-    throw new Error(`侧栏 workspace 在点击前消失: ${workspaceItemTestId}`);
-  }
-}
-
-export async function selectTaskOrganizeMode(labels: string[]): Promise<void> {
-  await browser.waitUntil(
-    () =>
-      browser.execute((expectedLabels) => {
-        const trigger = Array.from(
-          document.querySelectorAll<HTMLElement>('[role="tab"]'),
-        ).find((element) => {
-          const text = element.textContent?.replace(/\s+/gu, " ").trim() ?? "";
-          return expectedLabels.some((label) => text.includes(label));
-        });
-        if (!trigger) return false;
-        if (
-          trigger.hasAttribute("data-active") ||
-          trigger.getAttribute("data-state") === "active" ||
-          trigger.getAttribute("aria-selected") === "true"
-        ) {
-          return true;
-        }
-        trigger.dispatchEvent(
-          new MouseEvent("mousedown", {
-            bubbles: true,
-            cancelable: true,
-            button: 0,
-          }),
-        );
-        return false;
-      }, labels),
-    {
-      timeout: 15_000,
-      interval: 100,
-      timeoutMsg: `侧栏没有切换到任务组织视图: ${labels.join("/")}`,
-    },
-  );
 }
 
 export async function assertStableAgentSelection(
@@ -189,4 +84,13 @@ export async function assertStableAgentSelection(
   }
 
   return identities;
+}
+
+/** 旧组织模式入口退场后，所有项目型用例统一选择项目视图。 */
+export async function selectTaskOrganizeMode(_labels: string[]): Promise<void> {
+  await $('[data-testid="sidebar-view-menu"]').click();
+  await $('[role="menuitemradio"][data-state]') .waitForExist();
+  const item = $('[role="menuitemradio"][data-testid="sidebar-view-projects"]');
+  await item.click();
+  await $('[data-testid="project-section"]').waitForDisplayed();
 }

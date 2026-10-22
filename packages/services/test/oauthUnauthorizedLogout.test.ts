@@ -4,6 +4,7 @@ import { OAuthService } from "#src/oauth/oauthService.js";
 import {
   isCurrentOAuthCredentialRequest,
   isOAuthBusinessRequest,
+  resolveOAuthBusinessCredentialValidationRequest,
 } from "#src/oauth/oauthUnauthorizedRequest.js";
 import { createNodeApiClient } from "#src/providers/api/nodeApiClient.js";
 
@@ -63,12 +64,11 @@ function fixture(provider: OAuthProviderId = "zai", responseStatus = 401) {
   const headers = new Headers({ Authorization: "Bearer old-token" });
   const notified = vi.fn();
   const logoutTasks: Promise<void>[] = [];
+  const fetchImpl = vi.fn(async () =>
+    Response.json({ code: 401, msg: "登录状态已过期", success: false }, { status: responseStatus }),
+  );
   const client = createNodeApiClient({
-    fetchImpl: async () =>
-      Response.json(
-        { code: 401, msg: "登录状态已过期", success: false },
-        { status: responseStatus },
-      ),
+    fetchImpl,
     isZcodeJwtRequest: (input, requestHeaders) =>
       isCurrentOAuthCredentialRequest({
         input,
@@ -79,6 +79,13 @@ function fixture(provider: OAuthProviderId = "zai", responseStatus = 401) {
     isBusinessUnauthorizedRequest: (input, _requestHeaders) =>
       isOAuthBusinessRequest({
         input,
+        credentialService: credentials,
+        env,
+      }),
+    resolveBusinessCredentialValidationRequest: (input, headers) =>
+      resolveOAuthBusinessCredentialValidationRequest({
+        input,
+        headers,
         credentialService: credentials,
         env,
       }),
@@ -102,11 +109,95 @@ function fixture(provider: OAuthProviderId = "zai", responseStatus = 401) {
     onProviderLogout,
     notified,
     client,
+    fetchImpl,
     waitLogout: () => (logoutTasks.length ? Promise.all(logoutTasks) : undefined),
   };
 }
 
 describe("401 条件退出与会话写入串行化", () => {
+  it.each([
+    ["bigmodel", 200],
+    ["bigmodel", 403],
+    ["zai", 200],
+    ["zai", 403],
+  ] as const)("%s 有效身份遇到业务 HTTP %i 时不能因核验头格式被清理", async (provider, status) => {
+    const f = fixture(provider, status);
+    let identityAuthorization: string | null = null;
+    // 身份端点遵循裸 token 契约；错误前缀会返回401，必须验证真实退出链不会被误触发。
+    f.fetchImpl.mockImplementation(async (...args) => {
+      if (String(args[0]).endsWith("/getCustomerInfo")) {
+        identityAuthorization = new Headers(args[1]?.headers).get("authorization");
+        return identityAuthorization === "old-token"
+          ? Response.json({ code: 200, data: { customerNumber: "synthetic-account" } })
+          : Response.json({ code: 401 }, { status: 401 });
+      }
+      return new Response("", { status });
+    });
+    const origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
+    await f.client.request(origin + "/api/biz/subscription/enterprise/v2/pricing", {
+      headers: f.headers,
+    });
+    await f.waitLogout();
+    expect(identityAuthorization).toBe("old-token");
+    expect(f.store.get("oauth:active_provider")).toBe(provider);
+    expect(f.store.get(f.tokenKey)).toBe("old-token");
+    expect(f.onProviderLogout).not.toHaveBeenCalled();
+    expect(f.notified).not.toHaveBeenCalled();
+  });
+  it("BigModel 并发空定价响应只核验一次、清理一次并广播", async () => {
+    const f = fixture("bigmodel", 200);
+    const started = deferred(),
+      release = deferred();
+    f.fetchImpl.mockImplementation(async (...args) => {
+      if (String(args[0]).endsWith("/getCustomerInfo")) {
+        started.resolve();
+        await release.promise;
+      }
+      return new Response("");
+    });
+    const url = "https://bigmodel.cn/api/biz/subscription/enterprise/v2/pricing";
+    const requests = [
+      f.client.request(url, { headers: f.headers }),
+      f.client.request(url, { headers: f.headers }),
+    ];
+    await started.promise;
+    release.resolve();
+    await Promise.all(requests);
+    await f.waitLogout();
+    expect(
+      f.fetchImpl.mock.calls.filter(([url]) => String(url).endsWith("/getCustomerInfo")),
+    ).toHaveLength(1);
+    expect(f.store.has(f.tokenKey)).toBe(false);
+    expect(f.store.get("bot:test:credential")).toBe("independent");
+    expect(f.onProviderLogout).toHaveBeenCalledOnce();
+    expect(f.notified).toHaveBeenCalledOnce();
+  });
+
+  it("身份核验等待期间新 token 已提交，旧空响应不清理新会话", async () => {
+    const f = fixture("bigmodel", 200);
+    const started = deferred(),
+      release = deferred();
+    f.fetchImpl.mockImplementation(async (...args) => {
+      if (String(args[0]).endsWith("/getCustomerInfo")) {
+        started.resolve();
+        await release.promise;
+      }
+      return new Response("");
+    });
+    const request = f.client.request(
+      "https://bigmodel.cn/api/biz/subscription/enterprise/v2/pricing",
+      { headers: f.headers },
+    );
+    await started.promise;
+    await f.service.refreshToken();
+    release.resolve();
+    await request;
+    await f.waitLogout();
+    expect(f.store.get(f.tokenKey)).toBe("new-token");
+    expect(f.store.get("oauth:active_provider")).toBe("bigmodel");
+    expect(f.onProviderLogout).not.toHaveBeenCalled();
+    expect(f.notified).not.toHaveBeenCalled();
+  });
   it.each(["bigmodel", "zai"] as const)(
     "%s 条件退出保留重构后的 accountIdentity 清理边界",
     async (provider) => {

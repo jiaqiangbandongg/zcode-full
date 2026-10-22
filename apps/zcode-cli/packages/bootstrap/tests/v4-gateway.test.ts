@@ -625,7 +625,78 @@ describe("订阅与帧调度", () => {
     expect(JSON.stringify(host.telemetryFacts)).not.toContain("不能透传");
   });
 
-  it("Skill tool result 只透传受限 metadata，其他工具不继承", () => {
+  it.each([{ skill: "requested-skill" }, { name: "legacy-skill" }])(
+    "Skill 调度不提取任何请求名称: %#",
+    (input) => {
+      const host = makeHost();
+      const gateway = makeGateway(host);
+      const log = new EventLog();
+      gateway.ingest("session-1", sessionCreated(log));
+      gateway.ingest(
+        "session-1",
+        log.push(
+          SessionEventType.ToolCallScheduled,
+          {
+            toolCallId: "tool-skill-request",
+            toolName: "Skill",
+            input: { ...input, args: "private-arguments" },
+            schedule: { parallelGroups: [], executionOrder: [] },
+          },
+          { turnId: "turn-skill" },
+        ),
+      );
+      const fact = host.telemetryFacts.find((fact) => fact.kind === "tool.lifecycle");
+      expect(fact).toMatchObject({ toolName: "Skill", phase: "scheduled" });
+      expect(fact).not.toHaveProperty("skillName");
+      expect(JSON.stringify(host.telemetryFacts)).not.toContain("private-arguments");
+      const name = "skill" in input ? input.skill : input.name;
+      if (typeof name === "string") expect(JSON.stringify(host.telemetryFacts)).not.toContain(name);
+    },
+  );
+
+  it.each(["/Users/FAKE_USER/private", "demo\nsecret", "sk-" + "a".repeat(49), "a".repeat(5000)])(
+    "Skill 已解析 metadata 仍需名称校验: %#",
+    (name) => {
+      const host = makeHost();
+      const gateway = makeGateway(host);
+      const log = new EventLog();
+      gateway.ingest("session-1", sessionCreated(log));
+      gateway.ingest(
+        "session-1",
+        log.push(
+          SessionEventType.ToolCallScheduled,
+          {
+            toolCallId: "skill-private",
+            toolName: "Skill",
+            input: { skill: "demo" },
+            schedule: { parallelGroups: [], executionOrder: [] },
+          },
+          { turnId: "turn-skill" },
+        ),
+      );
+      gateway.ingest(
+        "session-1",
+        log.push(
+          SessionEventType.ToolCallResult,
+          {
+            toolCallId: "skill-private",
+            duration: 10,
+            skillMetadata: { name, source: "zcode" },
+            result: { success: true, content: "not-for-telemetry" },
+          },
+          { turnId: "turn-skill" },
+        ),
+      );
+      expect(
+        host.telemetryFacts.find(
+          (fact) => fact.kind === "tool.lifecycle" && fact.phase === "completed",
+        ),
+      ).toMatchObject({ skillName: "unknown", skillSource: "zcode" });
+      expect(JSON.stringify(host.telemetryFacts)).not.toContain(name);
+    },
+  );
+
+  it("Skill tool result 只透传受限 metadata", () => {
     const host = makeHost();
     const gateway = makeGateway(host);
     const log = new EventLog();
@@ -651,6 +722,7 @@ describe("订阅与帧调度", () => {
           toolCallId: "tool-skill",
           duration: 10,
           skillMetadata: {
+            name: "pptx",
             qualifiedName: "document-skills:pptx",
             pluginId: "document-skills@zcode-plugins-official",
             source: "plugin",
@@ -666,6 +738,7 @@ describe("订阅与帧调度", () => {
     );
     expect(skillFact).toMatchObject({
       toolName: "Skill",
+      skillName: "pptx",
       skillQualifiedName: "document-skills:pptx",
       skillPluginId: "document-skills@zcode-plugins-official",
       skillSource: "plugin",
@@ -698,6 +771,7 @@ describe("订阅与帧调度", () => {
         {
           toolCallId: "tool-skill-error",
           skillMetadata: {
+            name: "pptx",
             qualifiedName: "document-skills:pptx",
             pluginId: "document-skills@zcode-plugins-official",
             source: "plugin",
@@ -714,6 +788,7 @@ describe("订阅与帧调度", () => {
           kind: "tool.lifecycle",
           phase: "failed",
           toolName: "Skill",
+          skillName: "pptx",
           skillQualifiedName: "document-skills:pptx",
           skillPluginId: "document-skills@zcode-plugins-official",
           skillSource: "plugin",
@@ -1264,7 +1339,6 @@ describe("订阅与帧调度", () => {
     const toolFacts = host.telemetryFacts.filter(
       (fact) => fact.kind === "tool.lifecycle" && fact.toolName === "WebFetch",
     );
-    expect(toolFacts).toHaveLength(2);
     expect(toolFacts).toEqual([
       expect.objectContaining({
         phase: "scheduled",
@@ -3594,7 +3668,7 @@ describe("v4/command 收口", () => {
   });
 
   it("stable fork commit 后 registration 异常仍固化 accepted child 并可跨重启重放", async () => {
-    const store = createSqliteSessionStore({ dbPath: ":memory:" });
+    const store = await createSqliteSessionStore({ dbPath: ":memory:" });
     const parentSessionId = createSessionId("post-commit-parent");
     const childSessionId = createSessionId("post-commit-child");
     const childMessageId = createMessageId("post-commit-message");
@@ -4098,26 +4172,29 @@ describe("v4/command 收口", () => {
     });
     host.executeImpl = (envelope, admission) => executor.execute(envelope, admission);
 
-    let sendSettled = false;
-    const sending = gateway
-      .handleCommand(
-        commandParams({
-          commandId: "cmd-new",
-          baseRevision: snapshot!.revision,
-          payload: {
-            text: "你好",
-            modelSelection: { providerId: "glm", modelId: "glm-4-air" },
-            mode: "build",
-          },
-        }),
-      )
-      .then((ack) => {
-        sendSettled = true;
-        return ack;
-      });
+    const sending = gateway.handleCommand(
+      commandParams({
+        commandId: "cmd-new",
+        baseRevision: snapshot!.revision,
+        payload: {
+          text: "你好",
+          modelSelection: { providerId: "glm", modelId: "glm-4-air" },
+          mode: "build",
+        },
+      }),
+    );
     await vi.waitFor(() => expect(sendInput).toHaveBeenCalledTimes(1));
     await expect(sending).resolves.toMatchObject({ status: "accepted" });
-    expect(sendSettled).toBe(true);
+
+    // ACK 只确认输入已准入；投影 revision 必须由实际事件推进，不能由 ACK 自行制造。
+    gateway.ingest(
+      "session-1",
+      log.push(
+        SessionEventType.TurnStarted,
+        { turnNumber: 2, input: "你好", messageId: "msg-user-new" },
+        { turnId: "turn-new" },
+      ),
+    );
 
     const staleRetry = gateway.handleCommand(
       commandParams({
@@ -4308,7 +4385,6 @@ describe("v4/command 收口", () => {
         new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 100)),
       ]);
 
-      expect(pair).not.toBe("timeout");
       expect(pair).toEqual([
         expect.objectContaining({
           commandId: "cmd-measure-fault",

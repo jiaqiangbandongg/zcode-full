@@ -39,6 +39,76 @@ const call = (id: string) => ({
 });
 
 describe("subagent turn snapshot", () => {
+  it.each(
+    (["config", "reader", "loader"] as const).flatMap((source) =>
+      (["enabled", "disabled", "use-off", "deny-edit"] as const).map((mode) => ({ source, mode })),
+    ),
+  )(
+    "projects Memory tools from $source definitions ($mode) into child requests",
+    async ({ source, mode }) => {
+      const profile = {
+        ...snapshot("old").activeAgents[0]!,
+        tools: ["Grep"],
+        memory: "project" as const,
+        ...(mode === "deny-edit" ? { disallowedTools: ["Edit"] } : {}),
+      };
+      const definitions = { activeAgents: [profile] };
+      const children: ModelRequest[] = [];
+      let parentCalls = 0;
+      const runtime = createTestAgentRuntime(
+        createSessionId(),
+        {
+          mode: "yolo",
+          compact: { enabled: false },
+          titleGeneration: { enabled: false },
+          memory: {
+            enabled: mode !== "disabled",
+            use: mode !== "use-off",
+            storageRoot: "/storage",
+          },
+          ...(source === "config" ? { subagents: { profiles: [profile] } } : {}),
+        },
+        {
+          eventStore: createTestSessionEventStore(),
+          ...(source === "reader" ? { getAgentDefinitions: () => definitions } : {}),
+          ...(source === "loader" ? { loadAgentDefinitions: async () => definitions } : {}),
+          modelFactory: createTestModelFactory({
+            async generateText(request, observation) {
+              if (observation.invocationContext?.metadata?.querySource === "subagent") {
+                children.push(request);
+                return { finishReason: "stop", text: "child", usage };
+              }
+              return ++parentCalls % 2
+                ? {
+                    finishReason: "tool-calls",
+                    text: "",
+                    usage,
+                    toolCalls: [call(`memory_${parentCalls}`)],
+                  }
+                : { finishReason: "stop", text: "done", usage };
+            },
+          }),
+        },
+      );
+      try {
+        await runtime.executeTurn("first");
+        await runtime.executeTurn("second");
+        expect(children).toHaveLength(2);
+        for (const request of children) {
+          const tools = request.tools?.map((tool) => tool.name);
+          expect(tools).toContain("Grep");
+          expect(tools).not.toContain("Read");
+          expect(tools?.includes("Write")).toBe(mode === "enabled" || mode === "deny-edit");
+          expect(tools?.includes("Edit")).toBe(mode === "enabled");
+        }
+        // 有效工具是 Runtime 的派生视图，不能回写 Host 配置或跨会话污染快照。
+        expect(profile.tools).toEqual(["Grep"]);
+      } finally {
+        runtime.beginShutdown();
+      }
+    },
+  );
+
   it("discards a cancelled load and retains independent immutable snapshots", async () => {
     const pending = Promise.withResolvers<AgentDefinitionsSnapshot>();
     const initial = snapshot("old");

@@ -1,13 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { BUILTIN_MODEL_PROVIDER_IDS } from "@zcode/shared";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
   TID_MODEL_PROVIDER_ADD_MODEL_BUTTON,
   TID_MODEL_PROVIDER_NAV_ITEM,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   DEFAULT_WORKSPACE,
@@ -190,9 +190,17 @@ describe("套餐权益展示与购买入口", () => {
     await banners(true);
     const subscriptions = (await requests()).filter((r) => r.path === "/api/biz/subscription/list");
     expect(subscriptions.length).toBeGreaterThan(0);
-    expect(subscriptions.some((r) => r.headers.authorization?.includes("personal-secret"))).toBe(
-      true,
+    // 账号 Provider 已使用短期项目 Token；旧长期 Key 不会再进入订阅请求。
+    const tokens = subscriptions.map((request) =>
+      request.headers.authorization?.replace(/^Bearer\s+/i, "").split("."),
     );
+    expect(
+      tokens.some((parts) => {
+        if (parts?.length !== 3) return false;
+        const claims = JSON.parse(Buffer.from(parts[1]!, "base64url").toString("utf8"));
+        return claims.token_use === "project_access" && claims.api_key === "e2e-key";
+      }),
+    ).toBe(true);
   });
   for (const team of ["expired", "unassigned", "failure"] as const) {
     it(`CTP-16: 团队 ${team} 不误判为未登录`, async function () {

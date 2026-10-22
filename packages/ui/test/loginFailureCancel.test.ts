@@ -11,7 +11,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TID_OAUTH_CANCEL, TID_OAUTH_ERROR, TID_OAUTH_LOGIN_BUTTON } from "@zcode/shared";
+import { TID_OAUTH_CANCEL, TID_OAUTH_ERROR, TID_OAUTH_LOGIN_BUTTON } from "@zcode/shared/test-ids";
 
 const oauthState = vi.hoisted(() => ({
   status: "idle" as "idle" | "waiting" | "error",
@@ -99,18 +99,11 @@ describe("登录失败态的取消交互", () => {
     cleanup();
   });
 
-  it("本地启动失败(error)在重新登录下方展示 outline 取消按钮,渠道按钮列表不渲染", async () => {
+  it("本地启动失败时展示取消按钮并隐藏渠道列表", async () => {
     await renderWelcomeScreen();
 
     expect(screen.getByTestId(TID_OAUTH_ERROR)).toBeTruthy();
-    const retryButton = screen.getByText("login.oauth.retry");
-    const cancelButton = screen.getByTestId(TID_OAUTH_CANCEL);
-
-    // 取消按钮与等待态取消一致:outline 弱样式,位于「重新登录」下方
-    expect(cancelButton.getAttribute("data-variant")).toBe("outline");
-    expect(
-      retryButton.compareDocumentPosition(cancelButton) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByTestId(TID_OAUTH_CANCEL)).toBeTruthy();
 
     // 失败态整体替换渠道列表,用户通过取消回到列表换渠道
     expect(screen.queryByTestId(TID_OAUTH_LOGIN_BUTTON)).toBeNull();

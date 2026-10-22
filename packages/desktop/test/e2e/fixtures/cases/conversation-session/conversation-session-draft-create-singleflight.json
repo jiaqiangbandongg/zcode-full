@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-draft-create-singleflight",
+  "spec": "./test/e2e/conversation-session/conversation-session-draft-create-singleflight.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-draft-create-singleflight.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "draft-singleflight",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "验证预热创建在途的首发竞态；模型只用于完成真实发送与详情绑定。"
+    }
+  ]
+}

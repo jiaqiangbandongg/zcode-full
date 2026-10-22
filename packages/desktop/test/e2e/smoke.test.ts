@@ -1,4 +1,4 @@
-import { TID_V4_COMPOSER_INPUT, TID_V4_SESSION_PANE, testId } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT, TID_V4_SESSION_PANE, testId } from "@zcode/shared/test-ids";
 import { clearAppData, waitForDefaultWorkspaceReady } from "./helpers/desktop-app.js";
 import { V4_MAIN_PANE_ID } from "./helpers/v4-conversation.js";
 import { sel } from "./helpers/selectors.js";

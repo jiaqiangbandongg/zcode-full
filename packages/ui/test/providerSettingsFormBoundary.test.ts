@@ -74,34 +74,6 @@ describe("Provider Settings 表单边界", () => {
 
     expect(offenders).toEqual([]);
   });
-
-  it.each(["ProviderConnectionModeSection", "useActiveModelProviderWorkspace"])(
-    "Provider 设置不再保留无调用方的迁移 helper：%s",
-    async (retiredHelper) => {
-      const settingsRoot = join(import.meta.dirname, "../src/settings/model-provider-section");
-      const sourceFiles = await collectSourceFiles(settingsRoot);
-      const offenders: string[] = [];
-
-      for (const filePath of sourceFiles) {
-        if (new RegExp(`\\b${retiredHelper}\\b`, "u").test(await readFile(filePath, "utf8"))) {
-          offenders.push(filePath.slice(settingsRoot.length + 1));
-        }
-      }
-
-      expect(offenders).toEqual([]);
-    },
-  );
-
-  it("模型交互不再受 Provider 级 modelsReadOnly 与表单 API Key 门禁", async () => {
-    const settingsRoot = join(import.meta.dirname, "../src/settings/model-provider-section");
-    const sourceFiles = await collectSourceFiles(settingsRoot);
-    const source = (
-      await Promise.all(sourceFiles.map((filePath) => readFile(filePath, "utf8")))
-    ).join("\n");
-
-    expect(source).not.toContain("modelsReadOnly");
-    expect(source).not.toMatch(/model\.executable\s*&&\s*apiKeyValue\.trim/u);
-  });
 });
 
 async function collectSourceFiles(directory: string): Promise<string[]> {

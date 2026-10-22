@@ -9,6 +9,7 @@ import {
   XIcon,
 } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import type { IPlatformService } from "@zcode/shared";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
@@ -41,13 +42,33 @@ const defaultPreviewOffset: PreviewOffset = { x: 0, y: 0 };
 const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 
 const imageExtensionByMediaType: Record<string, string> = {
+  "image/apng": "apng",
   "image/avif": "avif",
+  "image/bmp": "bmp",
+  "image/x-ms-bmp": "bmp",
   "image/gif": "gif",
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/svg+xml": "svg",
   "image/webp": "webp",
+  "image/x-icon": "ico",
+  "image/vnd.microsoft.icon": "ico",
 };
+
+function imageDownloadFilename(item: ImagePreviewDialogItem, mediaType = item.mediaType ?? "") {
+  const knownExtension = imageExtensionByMediaType[mediaType.toLowerCase().split(";")[0] ?? ""];
+  let sourcePath: string | undefined;
+  if (item.src && isHttpSource(item.src)) sourcePath = new URL(item.src).pathname;
+  const supportedExtensions = new Set([...Object.values(imageExtensionByMediaType), "jpeg"]);
+  const sourceExtension = [item.filename, sourcePath, item.alt]
+    .map((name) => /\.([a-z0-9]+)$/iu.exec(name?.trim() ?? "")?.[1]?.toLowerCase())
+    .find((extension) => extension !== undefined && supportedExtensions.has(extension));
+  // 原字节不能统一命名成 PNG；未知 MIME 保留可信图片后缀，已知 MIME 拒绝不相容的后缀。
+  const compatible =
+    !knownExtension || (sourceExtension === "jpeg" ? "jpg" : sourceExtension) === knownExtension;
+  const extension = (compatible ? sourceExtension : undefined) ?? knownExtension ?? "bin";
+  return `${safeDownloadBaseName(item)}.${extension}`;
+}
 
 export function clampImagePreviewOffset(
   offset: PreviewOffset,
@@ -146,6 +167,52 @@ function startBrowserNativeDownload(source: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+export async function downloadImagePreview(
+  item: ImagePreviewDialogItem,
+  saveFile?: IPlatformService["saveFile"],
+): Promise<{ kind: "saved"; path: string } | { kind: "started" } | { kind: "canceled" }> {
+  if (!item.src) throw new ImageDownloadError("download_failed");
+  if (saveFile && isHttpSource(item.src)) {
+    const result = await saveFile({
+      sourceUrl: item.src,
+      suggestedName: imageDownloadFilename(item),
+    });
+    if (result.canceled) return { kind: "canceled" };
+    if (!result.success || !result.path) throw new Error(result.error || "save_failed");
+    return { kind: "saved", path: result.path };
+  }
+  let blob: Blob;
+  try {
+    blob = await readBoundedImageBlob(item.src);
+  } catch (error) {
+    if (
+      !saveFile &&
+      isHttpSource(item.src) &&
+      !(error instanceof ImageDownloadError && error.code === "file_too_large")
+    ) {
+      startBrowserNativeDownload(item.src);
+      return { kind: "started" };
+    }
+    throw error;
+  }
+  const filename = imageDownloadFilename(item, blob.type);
+  if (saveFile) {
+    const result = await saveFile({ data: await blob.arrayBuffer(), suggestedName: filename });
+    if (result.canceled) return { kind: "canceled" };
+    if (!result.success || !result.path) throw new Error(result.error || "save_failed");
+    return { kind: "saved", path: result.path };
+  }
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+  return { kind: "started" };
 }
 
 export function ImagePreviewDialog({
@@ -330,54 +397,12 @@ export function ImagePreviewDialog({
     if (!activeItem?.src || activeItemIsVideo || isDownloading) return;
     setIsDownloading(true);
     try {
-      if (platform?.saveFile && isHttpSource(activeItem.src)) {
-        const result = await platform.saveFile({
-          sourceUrl: activeItem.src,
-          suggestedName: `${safeDownloadBaseName(activeItem)}.png`,
-        });
-        if (result.canceled) return;
-        if (!result.success || !result.path) throw new Error(result.error || "save_failed");
-        toast(intl.formatMessage({ id: "markdownImage.downloadSucceeded" }, { path: result.path }));
-        return;
+      const result = await downloadImagePreview(activeItem, platform?.saveFile);
+      if (result.kind === "saved") {
+        toast(intl.formatMessage({ id: "markdownImage.downloadSucceeded" }));
+      } else if (result.kind === "started") {
+        toast(intl.formatMessage({ id: "markdownImage.downloadStarted" }));
       }
-
-      let blob: Blob;
-      try {
-        blob = await readBoundedImageBlob(activeItem.src);
-      } catch (error) {
-        if (
-          !platform?.saveFile &&
-          isHttpSource(activeItem.src) &&
-          !(error instanceof ImageDownloadError && error.code === "file_too_large")
-        ) {
-          // <img> 可显示无 CORS 资源，但 fetch 无法读取；交给浏览器原生导航避免假失败。
-          startBrowserNativeDownload(activeItem.src);
-          toast(intl.formatMessage({ id: "markdownImage.downloadStarted" }));
-          return;
-        }
-        throw error;
-      }
-      const extension = imageExtensionByMediaType[blob.type.toLowerCase()] ?? "png";
-      const filename = `${safeDownloadBaseName(activeItem)}.${extension}`;
-      if (platform?.saveFile) {
-        const result = await platform.saveFile({
-          data: await blob.arrayBuffer(),
-          suggestedName: filename,
-        });
-        if (result.canceled) return;
-        if (!result.success || !result.path) throw new Error(result.error || "save_failed");
-        toast(intl.formatMessage({ id: "markdownImage.downloadSucceeded" }, { path: result.path }));
-        return;
-      }
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
-      toast(intl.formatMessage({ id: "markdownImage.downloadStarted" }));
     } catch (error) {
       logger.warn("[ImagePreviewDialog] 图片下载失败", {
         // 签名 URL 的 userinfo/query/fragment 不参与排障，禁止写入持久化日志。

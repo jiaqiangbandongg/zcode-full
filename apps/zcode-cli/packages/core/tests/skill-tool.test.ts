@@ -4,7 +4,6 @@ import type { SkillContent, SkillLoadOutcome, SkillLoadRequest, SkillPort } from
 import { createContextBuilder } from "../src/context/index.js";
 import { registerBuiltInTools } from "../src/tool/handlers/index.js";
 import {
-  MAX_SKILL_BYTES,
   SKILL_RESULT_WRAPPER_BYTES,
   skillHandler,
   skillToolEntry,
@@ -47,7 +46,8 @@ describe("Skill integration", () => {
     });
 
     const result = builder.build();
-    const system = result.systemMessages.find((message) => message.role === "system")?.content ?? "";
+    const system =
+      result.systemMessages.find((message) => message.role === "system")?.content ?? "";
     const skillReminder =
       result.metaUserAttachments.find((attachment) => attachment.source === "skills_listing")
         ?.content ?? "";
@@ -55,7 +55,6 @@ describe("Skill integration", () => {
     expect(system).not.toContain("demo-skill");
     expect(skillReminder).toContain("The following skills are available");
     expect(skillReminder).toContain("demo-skill");
-    expect(skillReminder).not.toContain("Follow this workflow");
   });
 
   it("loads skill content through SkillPort using the legacy name field", async () => {
@@ -112,6 +111,7 @@ describe("Skill integration", () => {
   it("reports resolved skill metadata through the telemetry callback without changing content", async () => {
     const metadata = {
       ...skillOutcome.skills[0]!,
+      name: "pptx",
       pluginName: "document-skills",
       pluginId: "document-skills@zcode-plugins-official",
       qualifiedName: "document-skills:pptx",
@@ -142,6 +142,7 @@ describe("Skill integration", () => {
 
     expect(reported).toEqual([
       {
+        name: "pptx",
         qualifiedName: "document-skills:pptx",
         pluginId: "document-skills@zcode-plugins-official",
         source: "plugin",
@@ -174,12 +175,7 @@ describe("Skill integration", () => {
     await skillHandler({ skill: DYNAMIC_WORKFLOW_SKILL_NAME }, contextWithSkillPort(port));
     await skillHandler({ skill: "demo-skill" }, contextWithSkillPort(port));
 
-    expect(WORKFLOW_SKILL_MAX_BYTES).toBe(200_000);
-    expect(MAX_SKILL_BYTES).toBe(100_000);
-    expect(requested.map((request) => request.maxBytes)).toEqual([
-      WORKFLOW_SKILL_MAX_BYTES,
-      MAX_SKILL_BYTES,
-    ]);
+    expect(requested.map((request) => request.maxBytes)).toEqual([200_000, 100_000]);
   });
 
   // 结果预算是工具级的静态值：必须装得下最大上限的正文再加外壳，否则贴着上限的技能会被从尾部再截一刀。
@@ -188,6 +184,33 @@ describe("Skill integration", () => {
     expect(skillToolEntry.metadata.maxOutputBytes).toBeGreaterThanOrEqual(ceiling);
     expect(skillToolEntry.resultBudget.maxInlineBytes).toBeGreaterThanOrEqual(ceiling);
     expect(skillToolEntry.resultBudget.maxModelBytes).toBeGreaterThanOrEqual(ceiling);
+  });
+
+  it("上报 remote 来源的实际 skill name", async () => {
+    const reported: unknown[] = [];
+    const metadata = { ...skillOutcome.skills[0]!, source: "remote" as const };
+    await skillHandler(
+      { skill: "requested-alias" },
+      contextWithSkillPort(
+        {
+          async discoverSkills() {
+            return skillOutcome;
+          },
+          async loadSkill() {
+            return {
+              metadata,
+              content: "body",
+              baseDirectory: "/skills",
+              bytesRead: 4,
+              sizeBytes: 4,
+              truncated: false,
+            };
+          },
+        },
+        (value) => reported.push(value),
+      ),
+    );
+    expect(reported).toEqual([{ name: "demo-skill", source: "remote" }]);
   });
 
   it("can omit the Skill tool when the runtime has no SkillPort", () => {

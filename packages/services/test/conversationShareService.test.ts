@@ -193,7 +193,11 @@ function completedRowsWithFileChanges(): ConversationRow[] {
   return rows;
 }
 
-function createDependencies(rows = completedRows(), pollOptions: PollOptions = {}) {
+function createDependencies(
+  rows = completedRows(),
+  pollOptions: PollOptions = {},
+  workflow: Partial<IZCodeAgentService> = {},
+) {
   const conversationRowsRangeV4 = vi.fn(async ({ beforeRowId }: { beforeRowId?: number }) =>
     beforeRowId === undefined
       ? {
@@ -268,6 +272,7 @@ function createDependencies(rows = completedRows(), pollOptions: PollOptions = {
   };
   const service = new ConversationShareService({
     zcodeAgentService: {
+      ...workflow,
       conversationRowsRangeV4,
       conversationFileChangesV4,
       conversationAttachmentReadV4,
@@ -389,16 +394,19 @@ describe("ConversationShareService", () => {
     });
 
     expect(result.blockingIssues).toEqual([expect.objectContaining({ code: "running_turn" })]);
-    expect(result.skippableWarnings).toEqual([
-      expect.objectContaining({
-        code: "artifact_type_not_allowed",
-        artifactType: "image",
-      }),
-      expect.objectContaining({
-        code: "artifact_type_not_allowed",
-        artifactDisplayName: "video.mp4",
-      }),
-    ]);
+    expect(result.skippableWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "content_unavailable", rowId: 7 }),
+        expect.objectContaining({
+          code: "artifact_type_not_allowed",
+          artifactType: "image",
+        }),
+        expect.objectContaining({
+          code: "artifact_type_not_allowed",
+          artifactDisplayName: "video.mp4",
+        }),
+      ]),
+    );
     expect(result.skippableWarnings).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "inline_tool_image" }),
@@ -1182,7 +1190,7 @@ describe("ConversationShareService", () => {
     );
   });
 
-  it("内嵌工具图片复用 artifact 上传且预检与发布一致", async () => {
+  it.each([false, true])("内嵌工具图片预检与发布一致（工具块支持=%s）", async (supported) => {
     const rows = completedRows().slice(0, 2);
     rows.push({
       rowId: 5,
@@ -1204,6 +1212,7 @@ describe("ConversationShareService", () => {
     const { service, client, confirmRequests, artifactSource } = createDependencies(rows);
     vi.mocked(client.getCapabilities).mockResolvedValue({
       ...capabilities,
+      ...(supported ? { content_block_versions: { "tool-presentation": 1 } } : {}),
       max_artifact_count: 10,
       max_artifact_bytes: 1000,
       max_total_artifact_bytes: 10000,
@@ -1211,7 +1220,9 @@ describe("ConversationShareService", () => {
     });
     const preflight = await service.preflight(publishInput());
     expect(preflight.blockingIssues).toEqual([]);
-    expect(preflight.skippableWarnings).toEqual([]);
+    expect(preflight.skippableWarnings).toEqual(
+      supported ? [] : [expect.objectContaining({ code: "content_unavailable" })],
+    );
     const progress = collectPublishProgress(service, "publish-op-image");
 
     await expect(service.publish(publishInput(), "publish-op-image")).resolves.toEqual(shareRecord);
@@ -1220,7 +1231,21 @@ describe("ConversationShareService", () => {
     expect(toolCall).toMatchObject({ toolName: "NodeRepl", status: "success" });
     expect(toolCall).not.toHaveProperty("display");
     expect(JSON.stringify(confirmRequests.at(-1))).not.toContain("aGVsbG8=");
-    expect(firstWarnings(progress)).toBeUndefined();
+    if (supported) {
+      expect(firstWarnings(progress)).toBeUndefined();
+      const request = confirmRequests.at(-1)!;
+      const block = request.projection.content_blocks?.find(
+        (value) => value.type === "tool-presentation",
+      );
+      expect(block).toMatchObject({
+        fallback_row_id: toolCall!.rowId,
+        resource_ids: ["share-artifact-1"],
+        payload: { images: [{ resource_id: "share-artifact-1", mime_type: "image/png" }] },
+      });
+    } else
+      expect(firstWarnings(progress)).toEqual([
+        expect.objectContaining({ code: "content_unavailable" }),
+      ]);
     expect(client.uploadArtifact).toHaveBeenCalledWith(
       "preparation-1",
       expect.objectContaining({ artifact_type: "image", size_bytes: 5 }),
@@ -1439,14 +1464,6 @@ describe("ConversationShareService", () => {
     await expect(
       service.publish({ ...publishInput(), locale: "zh-CN" }, "publish-op-locale-zh"),
     ).resolves.toEqual(shareRecord);
-  });
-
-  it("未传 locale 时原样返回服务端下发的链接", async () => {
-    const { service } = createDependencies();
-
-    await expect(service.publish(publishInput(), "publish-op-locale-none")).resolves.toEqual(
-      shareRecord,
-    );
   });
 
   it("reports the exact historical preview file when capabilities reject it", async () => {
@@ -1784,7 +1801,7 @@ describe("ConversationShareService", () => {
     expect(client.confirm).not.toHaveBeenCalled();
   });
 
-  it("SHARE04：后端未允许结果物类型时不创建 preparation", async () => {
+  it("SHARE04：后端不支持的结果物只警告，正文仍发布", async () => {
     const rows = completedRows().slice(0, 2);
     rows[1] = { ...rows[1]!, text: "已生成 report.pdf" };
     const { service, client, artifactSource } = createDependencies(rows);
@@ -1808,7 +1825,7 @@ describe("ConversationShareService", () => {
     expect(artifactSource.read).not.toHaveBeenCalled();
   });
 
-  it("aggregates multiple preview-card whitelist issues without creating preparation", async () => {
+  it("aggregates preview-card whitelist warnings while publishing the remaining conversation", async () => {
     const rows = completedRows().slice(0, 2);
     rows[1] = { ...rows[1]!, text: "已生成 report.pdf 和 clip.mp4" };
     const { service, client } = createDependencies(rows);
@@ -2107,6 +2124,26 @@ describe("ConversationShareService", () => {
     expect(client.confirm).not.toHaveBeenCalled();
   });
 
+  it.each(["safety_check_rejected", "safety_check_unavailable"] as const)(
+    "does not poll after %s",
+    async (kind) => {
+      const sleep = vi.fn();
+      const { service, client } = createDependencies(completedRows(), { sleep });
+      client.confirm.mockRejectedValue(
+        new ConversationShareClientError({
+          kind,
+          message: "safety failed",
+          code: kind === "safety_check_rejected" ? 3216 : 3217,
+        }),
+      );
+      await expect(service.publish(publishInput(), "safety-terminal")).rejects.toMatchObject({
+        kind,
+      });
+      expect(client.confirm).toHaveBeenCalledTimes(1);
+      expect(sleep).not.toHaveBeenCalled();
+    },
+  );
+
   it("retries the same confirm request after safety-check pending", async () => {
     let now = 0;
     const sleep = vi.fn(async (delayMs: number) => {
@@ -2259,7 +2296,6 @@ describe("ConversationShareService", () => {
 
   it("connection-scoped facade uses the attachment Agent and shares publish progress", async () => {
     const { service, client, conversationRowsRangeV4 } = createDependencies(completedRows());
-    expect("createConnectionScopedService" in service).toBe(false);
     expect(() =>
       ProxyChannel.fromService(service as unknown as Record<string, unknown>).call(
         "host",
@@ -2419,4 +2455,82 @@ it("损坏的内嵌图片只警告，不丢工具文字或修改原 rows", () =>
     }),
   ]);
   expect(result.bytesBySourceRef.size).toBe(0);
+});
+
+it("workflow 预检与发布只上传显式产物，合成摘要不发现工作区同名文件", async () => {
+  const rows = completedRows().slice(0, 2);
+  rows[0] = {
+    ...rows[0]!,
+    originMeta: { backgroundSource: "workflow", workId: "run-1", title: "summary.pdf" },
+  } as ConversationRow;
+  const workflow = {
+    conversationWorkflowRunsV4: vi.fn().mockResolvedValue({ runs: [] }),
+    conversationWorkflowRunEventsV4: vi.fn().mockResolvedValue({
+      hasMore: false,
+      events: [
+        { sequence: 1, type: "run-started", payload: {} },
+        {
+          sequence: 2,
+          type: "artifact-published",
+          payload: {
+            artifact: { id: "report", kind: "markdown", title: "Report 2026.10", version: 1 },
+          },
+        },
+        { sequence: 3, type: "run-settled", payload: { status: "completed" } },
+      ],
+    }),
+    conversationWorkflowRunArtifactsV4: vi.fn().mockResolvedValue({
+      artifacts: [
+        {
+          id: "report",
+          kind: "markdown",
+          versions: [{ version: 1, title: "Report 2026.10", contentType: "text/markdown" }],
+        },
+      ],
+    }),
+    conversationWorkflowRunArtifactReadV4: vi.fn().mockResolvedValue({
+      dataBase64: Buffer.from("# Report").toString("base64"),
+      totalBytes: 8,
+      nextOffset: null,
+      mediaType: "text/markdown",
+    }),
+  };
+  const { service, client, artifactSource, confirmRequests } = createDependencies(
+    rows,
+    {},
+    workflow,
+  );
+  client.getCapabilities.mockResolvedValue({
+    ...capabilities,
+    max_artifact_count: 10,
+    max_artifact_bytes: 1000,
+    max_total_artifact_bytes: 10000,
+    content_block_versions: { workflow: 2 },
+    allowed_artifacts: [
+      { type: "text", extensions: ["md"], mime_types: ["text/markdown"] },
+      { type: "pdf", extensions: ["pdf"], mime_types: ["application/pdf"] },
+    ],
+  });
+  artifactSource.read.mockResolvedValue({
+    canonicalPath: "/workspace/summary.pdf",
+    bytes: Buffer.from("%PDF-"),
+  });
+  const preflight = await service.preflight(publishInput());
+  expect(workflow.conversationWorkflowRunArtifactReadV4).not.toHaveBeenCalled();
+  expect(preflight.blockingIssues).toEqual([]);
+  expect(preflight.skippableWarnings).toEqual([]);
+  expect(artifactSource.stat).not.toHaveBeenCalled();
+  expect(artifactSource.read).not.toHaveBeenCalled();
+  await service.publish(publishInput(), "workflow-regression");
+  expect(workflow.conversationWorkflowRunArtifactReadV4).toHaveBeenCalledTimes(1);
+  expect(artifactSource.stat).not.toHaveBeenCalled();
+  expect(artifactSource.read).not.toHaveBeenCalled();
+  expect(client.uploadArtifact).toHaveBeenCalledTimes(1);
+  expect(confirmRequests[0]?.projection.rows.filter((row) => row.kind === "artifact")).toHaveLength(
+    1,
+  );
+  expect(client.uploadArtifact.mock.calls[0]?.[1]).toMatchObject({
+    extension: "md",
+    display_name: "Report 2026.10.md",
+  });
 });

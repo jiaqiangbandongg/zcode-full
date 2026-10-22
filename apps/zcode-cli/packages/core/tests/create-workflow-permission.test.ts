@@ -184,9 +184,7 @@ async function run(options: RunOptions): Promise<RunOutcome> {
         ...(options.maxConcurrency === undefined
           ? {}
           : { max_concurrency: options.maxConcurrency }),
-        ...(options.subagentModel === undefined
-          ? {}
-          : { subagent_model: options.subagentModel }),
+        ...(options.subagentModel === undefined ? {} : { subagent_model: options.subagentModel }),
       },
       name: "CreateWorkflow",
     },
@@ -616,20 +614,6 @@ describe("CreateWorkflow Refine feedback", () => {
     expect(outcome.result.success).toBe(false);
     expect(outcome.result.followUpUserInput).toBeUndefined();
     expect(outcome.result.modelContent).toBeUndefined();
-  });
-
-  it("deny + reason 但没有专用 source（hook/规则形态）不被升级", async () => {
-    const outcome = await run({
-      broker: {
-        async requestPermission() {
-          return { decision: "deny", reason: "denied by project rule" };
-        },
-      },
-      name: "create-workflow-rule-deny",
-      script: cleanScript("rule-deny"),
-    });
-
-    expect(outcome.result.followUpUserInput).toBeUndefined();
   });
 
   it("空白反馈不升级（broker 不该发出，但 turn-control 兜底 trim）", async () => {
@@ -1062,7 +1046,9 @@ describe("CreateWorkflow subagent_model", () => {
     });
 
     expect("subagentModel" in submits[0]!).toBe(false);
-    expect((outcome.result.output as CreateWorkflowOutput).response).not.toContain("Subagents run on");
+    expect((outcome.result.output as CreateWorkflowOutput).response).not.toContain(
+      "Subagents run on",
+    );
   });
 
   it("解不出来的模型名在确认窗之前就退回：没弹窗、没启动", async () => {

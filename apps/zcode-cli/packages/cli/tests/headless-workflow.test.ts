@@ -80,7 +80,10 @@ test("headless broker leaves every other tool at today's deny semantics", async 
 // —————————————————————————————————————————————————————————————
 
 test("dwf progress events are recognised, other session events are not", () => {
-  assert.equal(isDynamicWorkflowRunProgressEvent(progressEvent({ eventType: "run-started" })), true);
+  assert.equal(
+    isDynamicWorkflowRunProgressEvent(progressEvent({ eventType: "run-started" })),
+    true,
+  );
   assert.equal(
     isDynamicWorkflowRunProgressEvent(
       progressEvent({ eventType: "run-started" }, { type: SessionEventType.AssistantMessage }),
@@ -203,7 +206,10 @@ test("node phase transitions are throttled but the first one gets through", () =
   const nodeEvent = (eventType: string, ordinal: number) =>
     progressEvent({
       eventType,
-      payload: { instance: { siteId: "ask#1", ordinal }, ...(eventType === "node-settled" ? { outcome: "ok" } : {}) },
+      payload: {
+        instance: { siteId: "ask#1", ordinal },
+        ...(eventType === "node-settled" ? { outcome: "ok" } : {}),
+      },
     });
   // 节流对**所有**节点相位一视同仁，`node-settled` 也会被吃掉——刻意如此：run 的
   // 端点由 run-settled 保证（上面那条用例），节点级的完成不是必达面，否则一个
@@ -226,7 +232,10 @@ test("node phase transitions are throttled but the first one gets through", () =
 test("counting-only and non-transition events produce no progress line", () => {
   const lines = collectProgress([
     progressEvent({ eventType: "usage-updated", payload: { spentTokens: 12 } }),
-    progressEvent({ eventType: "actor-created", payload: { actor: { siteId: "actor#1", ordinal: 1 } } }),
+    progressEvent({
+      eventType: "actor-created",
+      payload: { actor: { siteId: "actor#1", ordinal: 1 } },
+    }),
     progressEvent({ eventType: "compaction", payload: {} }),
     progressEvent({ eventType: "log", payload: {} }),
     progressEvent({ eventType: "run-started" }, { type: SessionEventType.AssistantMessage }),
@@ -274,7 +283,12 @@ const turnEvents: readonly SessionEvent[] = [
     },
     { id: "evt-2", sequenceNumber: 8 },
   ),
-  { ...progressEvent({ eventType: "run-started" }), id: "evt-3", type: SessionEventType.TurnComplete, payload: {} } as SessionEvent,
+  {
+    ...progressEvent({ eventType: "run-started" }),
+    id: "evt-3",
+    type: SessionEventType.TurnComplete,
+    payload: {},
+  } as SessionEvent,
 ];
 
 const createRunDeps = (): RunDependencies & { appOptions: () => unknown } => {
@@ -332,7 +346,6 @@ test("headless app creation installs the CreateWorkflow-only broker", async () =
 
   const broker = (deps.appOptions() as { permissionBroker?: { requestPermission: unknown } })
     .permissionBroker;
-  assert.ok(broker, "prompt-command must hand createZCodeApp a permission broker");
   const allowed = await (
     broker as { requestPermission: (r: unknown) => Promise<{ decision: string }> }
   ).requestPermission(permissionRequest("CreateWorkflow"));
@@ -503,7 +516,10 @@ test("aborting mid-wait breaks the loop even while the runtime stays busy", asyn
  * 若 prompt-command 两个都装，每条事件就会出现两行。
  */
 const createWaitingRunDeps = (
-  script: { busyPolls: number; notificationTurns?: readonly { turnId: string; response: string }[] } = {
+  script: {
+    busyPolls: number;
+    notificationTurns?: readonly { turnId: string; response: string }[];
+  } = {
     busyPolls: 2,
   },
 ): RunDependencies & { pollCount: () => number } => {

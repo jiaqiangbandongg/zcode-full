@@ -10,7 +10,6 @@ const isWindows = process.platform === "win32";
 const tempDirs: string[] = [];
 const TEST_FILE_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(TEST_FILE_DIR, "../../..");
-const doctorSource = readFileSync(join(REPO_ROOT, "scripts/doctor-macos-release-app.sh"), "utf-8");
 
 function makeTempDir(prefix: string) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -94,13 +93,6 @@ afterEach(() => {
 });
 
 describe.skipIf(isWindows)("doctor-macos-release-app.sh", () => {
-  it("keeps shell defaults aligned with producer Helper identity", () => {
-    expect(doctorSource).toContain(`${HELPER_APP_NAME}}"`);
-    expect(doctorSource).toContain(
-      `HELPER_EXECUTABLE_NAME="\${ZCODE_CUA_HELPER_EXECUTABLE_NAME:-${HELPER_DISPLAY_NAME}}"`,
-    );
-  });
-
   it("Preview 自动按 bundle 名推导主可执行，并验收 preview Helper 目录", () => {
     const workspaceDir = makeTempDir("zcode-macos-preview-doctor-");
     const binDir = join(workspaceDir, "bin");

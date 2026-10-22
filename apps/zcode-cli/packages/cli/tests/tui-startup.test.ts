@@ -47,6 +47,7 @@ async function terminalFixture(
     targetFps: 30,
     screenMode: "alternate-screen",
     useThread: false,
+    exitOnCtrlC: false,
   });
   const theme = deferred<UiThemeMode>();
   terminal.renderer.waitForThemeMode = () => theme.promise;
@@ -130,6 +131,22 @@ test("native first paint precedes initialization and theme detection; ready opti
       "late terminal detection preserves explicit theme",
     );
     assert.equal(calls, 1);
+  } finally {
+    await terminal.close();
+  }
+});
+
+test("ready app owns Ctrl+C after the startup screen unmounts", async () => {
+  const startup = deferred<TuiStartupOptions>();
+  const terminal = await terminalFixture({ loadStartupOptions: () => startup.promise });
+  try {
+    await terminal.action(() => terminal.renderOnce());
+    await terminal.action(() => startup.resolve({ loginRequired: false }));
+    assert.doesNotMatch(terminal.captureCharFrame(), /Starting ZCode/);
+    await terminal.action(() => terminal.mockInput.pressCtrlC());
+    assert.equal(terminal.renderer.isDestroyed, false);
+    await terminal.action(() => terminal.mockInput.pressCtrlC());
+    assert.equal(await terminal.outcome, 0);
   } finally {
     await terminal.close();
   }

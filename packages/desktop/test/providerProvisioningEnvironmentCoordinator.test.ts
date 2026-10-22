@@ -84,7 +84,7 @@ describe("Provider Provisioning Environment Coordinator", () => {
     expect(executeB).toHaveBeenCalledOnce();
   });
 
-  it("does not spin on an ordinary failure and retries on the next real trigger", async () => {
+  it("does not spin on an initial sync failure and retries on the next real trigger", async () => {
     const execute = vi
       .fn<() => Promise<void>>()
       .mockRejectedValueOnce(new Error("remote unavailable"))
@@ -97,5 +97,26 @@ describe("Provider Provisioning Environment Coordinator", () => {
 
     await coordinator.requestAll("personal-config");
     expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps an online Environment after a later failure and waits for the next real save", async () => {
+    vi.useFakeTimers();
+    try {
+      const execute = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      const coordinator = new ProviderProvisioningEnvironmentCoordinator();
+      await coordinator.register("ssh:one", "host-a", execute).initialSync;
+      execute.mockRejectedValueOnce(new Error("remote write denied"));
+
+      await expect(coordinator.requestAll("personal-config")).resolves.toBeUndefined();
+      expect(execute).toHaveBeenCalledTimes(2);
+      // 断言真实已连接分支，不用首次连接失败替代；计时器推进覆盖潜在的后台重试。
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(execute).toHaveBeenCalledTimes(2);
+      await coordinator.requestAll("personal-config");
+      expect(execute).toHaveBeenCalledTimes(3);
+      expect(execute).toHaveBeenNthCalledWith(3, "personal-config");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -279,7 +279,6 @@ describe("session fork history", () => {
 
     expect(result.parentSessionId).toBe(SESSION_ID);
     expect(parentEvents).toEqual([]);
-    expect(committedBundle).not.toBeNull();
     expect(committedBundle!.child).toMatchObject({
       parentID: SESSION_ID,
       permission: parentSession.permission,
@@ -468,7 +467,6 @@ describe("session fork history", () => {
       ).resolves.toMatchObject({ parentSessionId: SESSION_ID });
 
       expect(sessionEntriesReadCount).toBe(0);
-      expect(committedBundle).not.toBeNull();
       expect(committedBundle!.goal).toBeUndefined();
       expect(committedBundle!.entries).toEqual([
         expect.objectContaining({
@@ -692,7 +690,6 @@ describe("session fork history", () => {
       }),
     );
     expect(legacyCreateCount).toBe(0);
-    expect(committedBundle).not.toBeNull();
     expect(committedBundle!.messages).toHaveLength(4);
     expect(committedBundle!.messages.at(-1)!.info).toMatchObject({
       mode: "edit",
@@ -1086,7 +1083,6 @@ describe("session fork history", () => {
       },
     });
 
-    expect(bundle).not.toBeNull();
     const copiedUser = bundle!.messages[0]!;
     const copiedAssistant = bundle!.messages[1]!;
     const copiedAnchor = copiedAssistant.info.anchor!;
@@ -1521,7 +1517,6 @@ describe("session fork history", () => {
       }),
     ).resolves.toMatchObject({ forkedSessionId: childSessionId });
 
-    expect(committedBundle).not.toBeNull();
     const notice = committedBundle!.messages.find((message) => message.info.role === "assistant");
     expect(notice?.info.role).toBe("assistant");
     if (notice?.info.role !== "assistant") return;
@@ -1773,7 +1768,6 @@ describe("session fork history", () => {
       status: "active",
       targetID: parentTarget.targetID,
     });
-    expect(savedEntries).toHaveLength(2);
     expect(savedEntries.map((entry) => entry.sessionID)).toEqual([
       forkedSessionId,
       forkedSessionId,

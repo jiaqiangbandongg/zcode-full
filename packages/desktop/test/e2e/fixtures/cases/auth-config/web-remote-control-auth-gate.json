@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "web-remote-control-auth-gate",
+  "spec": "./test/e2e/web-remote-control-auth-gate.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "先以空 OAuth/JWT 凭据验证未登录门禁，再写入缓存用户与合成JWT验证远控401后的当前渠道重新登录；HTTP/WS/OAuth启动计数由case fixture配置。"
+    }
+  ],
+  "requests": []
+}

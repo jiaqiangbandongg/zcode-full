@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "project-location-decrypt-recovery",
+  "spec": "./test/e2e/manual-review/pending/project-location-decrypt-recovery.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "有效合成 OAuth 与坏项目位置共存，验证自动重建；503 保留登录，服务恢复后正常刷新换证；无额外登录或 App 重启。"
+    }
+  ],
+  "requests": []
+}

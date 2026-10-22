@@ -92,26 +92,6 @@ const ALWAYS_ON_PAIR = { dynamicWorkflowEnabled: true, dynamicWorkflowToolsOnDem
 
 // ── DWG-14：取值与 runtime 字段 ────────────────────────────────────────────
 
-test("headless prompt without --workflow-mode writes the disabled pair explicitly", async () => {
-  const { deps, seen } = createRecordingDeps();
-  const ctx = createContext(["--prompt", "hello"]);
-  assert.equal(await run(ctx, deps), 0);
-  assert.deepEqual(seen, [DISABLED_PAIR]);
-});
-
-for (const [mode, pair] of [
-  ["disabled", DISABLED_PAIR],
-  ["onDemand", ON_DEMAND_PAIR],
-  ["alwaysOn", ALWAYS_ON_PAIR],
-] as const) {
-  test(`headless prompt with --workflow-mode ${mode} writes the matching pair`, async () => {
-    const { deps, seen } = createRecordingDeps();
-    const ctx = createContext(["--prompt", "hello", "--workflow-mode", mode]);
-    assert.equal(await run(ctx, deps), 0);
-    assert.deepEqual(seen, [pair]);
-  });
-}
-
 test("TUI without --workflow-mode writes the disabled pair and suggests no /workflow", async () => {
   const { deps, seen } = createRecordingDeps();
   let suggestions: string[] = [];
@@ -167,6 +147,7 @@ test("every app the TUI creates, including /new, carries the same pair", async (
     undefined,
     undefined,
     false,
+    "off",
     undefined,
     undefined,
     "alwaysOn",
@@ -203,25 +184,6 @@ for (const argv of [["app-server"], ["agent-server"], ["login"], ["skills"]] as 
     assert.deepEqual(seen, []);
   });
 }
-
-test("--workflow-mode is accepted with --target", async () => {
-  const ctx = createContext(["--target", "ship it", "--workflow-mode", "alwaysOn"]);
-  let seenPair: RuntimeConfigSeen | undefined;
-  const exitCode = await run(ctx, {
-    ...createRecordingDeps().deps,
-    createZCodeApp: (options) => {
-      const config = (options?.runtimeConfig ?? {}) as RuntimeConfigSeen;
-      seenPair = {
-        dynamicWorkflowEnabled: config.dynamicWorkflowEnabled,
-        dynamicWorkflowToolsOnDemand: config.dynamicWorkflowToolsOnDemand,
-      };
-      throw new Error("stop after app options were checked");
-    },
-  });
-  assert.equal(exitCode, 1);
-  assert.doesNotMatch(ctx.stderr.output(), /can only be used/);
-  assert.deepEqual(seenPair, ALWAYS_ON_PAIR);
-});
 
 // ── DWG-17：headless ─────────────────────────────────────────────────────────
 

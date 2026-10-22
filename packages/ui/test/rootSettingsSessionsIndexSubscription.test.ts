@@ -160,7 +160,7 @@ describe("Settings 覆盖远程 workspace 时的 sessions-index 单订阅不变�
   it("通知 hook 复用侧栏订阅；关闭 Settings 后侧栏仍能收到任务完成", async () => {
     const { service, emitUpsert } = createSingleConnectionRemoteService();
     const remoteTab = { workspacePath, workspaceIdentity, remoteSessionId };
-    // 侧栏 useWorkspaceTaskLists 的远程 shard scope（endpointKey = remoteSessionId）。
+    // 侧栏（项目树）的远程 shard scope（endpointKey = remoteSessionId）。
     const sidebarScope: SessionsIndexScope = {
       workspaceKey: workspaceIdentity,
       workspacePath,

@@ -167,10 +167,6 @@ interface ManagedTab {
   active: boolean;
   /** Agent/UI 设置的单 tab CSS viewport；undefined 表示跟随宿主自然尺寸。 */
   viewportOverride?: BrowserViewportSize;
-  /** Desktop page zoom 放大时专用于校正 guest native raster；不改变 CSS viewport。 */
-  desktopZoomFactor?: number;
-  /** 已成功下发给 Chromium 的倍率；输入不得使用尚在 viewport 队列中的目标倍率。 */
-  appliedViewportScale?: number;
   /** pane 隐藏为 0×0 时仅供后台执行使用；重新前台可见后必须清除。 */
   backgroundViewportFallback?: BrowserViewportSize;
   /** 串行化 transient clear 与显式 set/reset，保证最后一次用户/Agent 设置胜出。 */
@@ -287,17 +283,9 @@ export interface BrowserGuestManagerResidencyOptions {
     now?: () => number;
   };
 }
-function normalizeDesktopZoomMetricsScale(desktopZoomFactor: number | undefined): number {
-  return Number.isFinite(desktopZoomFactor) && (desktopZoomFactor ?? 1) > 1
-    ? (desktopZoomFactor ?? 1)
-    : 1;
-}
-
-function buildViewportMetricsOverride(
-  viewport: BrowserViewportSize,
-  desktopZoomFactor?: number,
-): Record<string, unknown> {
-  const metricsScale = normalizeDesktopZoomMetricsScale(desktopZoomFactor);
+// Desktop zoom 的布局补偿只在 renderer 完成；metrics 是 per-session 状态，命令空闲 detach
+// 后会被清掉，若在这里带 scale，空闲时页面会退回另一套布局，操作期间变大、空闲变回。
+function buildViewportMetricsOverride(viewport: BrowserViewportSize): Record<string, unknown> {
   return {
     width: viewport.width,
     height: viewport.height,
@@ -307,10 +295,6 @@ function buildViewportMetricsOverride(
     deviceScaleFactor: 1,
     mobile: false,
     dontSetVisibleSize: true,
-    // Desktop page zoom > 1 时，Electron 的 guest target 截图本身已只有
-    // frame 的 1 / zoom 内容，外层 CSS transform 无法补齐 native raster。CDP scale
-    // 只在放大档位校正可见面；缩小保持默认 1，避免再次缩小内容。
-    ...(metricsScale > 1 ? { scale: metricsScale } : {}),
   };
 }
 
@@ -796,7 +780,6 @@ export class BrowserGuestManager {
     tabId: string,
     viewport: BrowserViewportSize | null,
     windowId: number,
-    desktopZoomFactor = 1,
   ): Promise<void> {
     const tab = this.tabs.get(tabId);
     if (!tab || tab.lifecycle === "closed" || tab.owner.windowId !== windowId) {
@@ -804,7 +787,6 @@ export class BrowserGuestManager {
     }
     if (viewport) {
       assertViewportOverride(viewport);
-      tab.desktopZoomFactor = normalizeDesktopZoomMetricsScale(desktopZoomFactor);
       await this.setTabViewport(tab, viewport);
       return;
     }
@@ -1726,33 +1708,27 @@ export class BrowserGuestManager {
         }
         const invalidationError = readScreenshotSurfaceInvalidation(lease.invalidated);
         if (invalidationError) throw invalidationError;
-        // 普通 fallback 也使用临时 responsive surface，必须补偿宿主放大后的 native raster。
-        // 普通模式不会回写 viewport；热态 zoom 改变时在同一 mutation 内同步，不能只等 idle 重连。
-        if (tab.backgroundViewportFallback) {
-          const desktopZoom = guest.hostWebContents?.getZoomFactor();
-          if (
-            !guest.debugger.isAttached() ||
-            tab.guestCdpRestoreFlight ||
-            (tab.appliedViewportScale ?? 1) !== normalizeDesktopZoomMetricsScale(desktopZoom)
-          ) {
-            await this.sendGuestCdpCommand(
-              tab,
-              guest,
-              "Emulation.setDeviceMetricsOverride",
-              buildViewportMetricsOverride(tab.backgroundViewportFallback, desktopZoom),
-            );
-          }
+        // 普通 fallback 也使用临时 responsive surface；idle detach 后先在同一 mutation 内重装 metrics。
+        if (
+          tab.backgroundViewportFallback &&
+          (!guest.debugger.isAttached() || tab.guestCdpRestoreFlight)
+        ) {
+          await this.sendGuestCdpCommand(
+            tab,
+            guest,
+            "Emulation.setDeviceMetricsOverride",
+            buildViewportMetricsOverride(tab.backgroundViewportFallback),
+          );
         }
         const normalizedScreenshot = Boolean(
           tab.viewportOverride || tab.backgroundViewportFallback,
         );
         // Windows 125% 显示缩放 + Desktop 110% 时，renderer 即使上报
         // surfaceScale=1，CDP 仍会把较小的 native raster 周期平铺成目标尺寸。
-        // 放大补偿后的 viewport 截图也必须读取实际 surface，再统一归一为 CSS px。
+        // Desktop 放大时的 viewport 截图也读取实际 surface，再统一归一为 CSS px。
         const captureViewportScreenshot =
           normalizedScreenshot &&
-          (lease.surfaceScale < 0.999 ||
-            (tab.appliedViewportScale ?? tab.desktopZoomFactor ?? 1) > 1)
+          (lease.surfaceScale < 0.999 || (guest.hostWebContents?.getZoomFactor() ?? 1) > 1)
             ? async (): Promise<string | undefined> => {
                 if (!this.resizeScreenshotToCssPixels) {
                   throw new Error("browser screenshot CSS pixel normalizer is unavailable");
@@ -1964,7 +1940,7 @@ export class BrowserGuestManager {
    */
   private isInFlightScreenshotAlive(tracked: InFlightScreenshot): boolean {
     const running = this.runningRequests.get(tracked.requestId);
-    return Boolean(running) && !running.controller.signal.aborted;
+    return running !== undefined && !running.controller.signal.aborted;
   }
 
   private createRecordingEntry(
@@ -2232,6 +2208,9 @@ export class BrowserGuestManager {
         if (result.kind === "timeout")
           throw new Error(`recording action timed out: ${result.reason}`);
         return;
+      }
+      if (action.type !== "click") {
+        throw new Error(`recording ${action.type} requires a selector`);
       }
       if (typeof action.x !== "number" || typeof action.y !== "number") {
         throw new Error("recording click requires selector or (x,y)");
@@ -2639,7 +2618,12 @@ export class BrowserGuestManager {
       // 如果 destroyed/mismatch 已经发起过重绑，沿用该请求，避免同一 tab 重复创建 webview。
       if (!tab.rebindRequested) this.onOpenTabRequested?.(tab.tabId, tab.owner);
       // 某些测试/旧 renderer 会在 Ready 回调内同步 attach；不能在 attach 已成功后再注册 waiter。
-      if (tab.guest && !safeBool(() => tab.guest.isDestroyed(), true)) return tab.guest;
+      // Bug 原因：guest 是可变字段，进入回调后 TypeScript 会撤销属性收窄；固定本轮引用，
+      // 同时保证销毁检查与返回的是同一个 guest。
+      const attachedGuest = tab.guest;
+      if (attachedGuest && !safeBool(() => attachedGuest.isDestroyed(), true)) {
+        return attachedGuest;
+      }
       const guest = await this.waitForGuest(tab.tabId);
       if (guest && !safeBool(() => guest.isDestroyed(), true)) return guest;
       if (attempt === 0 && !tab.hasAttachedGuest && !tab.attachFailure) return null;
@@ -2793,7 +2777,9 @@ export class BrowserGuestManager {
       title: tab.cachedTitle,
       viewport: await this.readTabViewport(tab),
       ...(this.effectiveActiveTabId(tab.owner) === tab.tabId ? { active: true } : {}),
-      ...(tab.lifecycle !== "active" ? { lifecycle: tab.lifecycle } : {}),
+      ...(tab.lifecycle === "deliverable" || tab.lifecycle === "handoff"
+        ? { lifecycle: tab.lifecycle }
+        : {}),
     };
   }
 
@@ -3243,7 +3229,7 @@ export class BrowserGuestManager {
         tab,
         guest,
         "Emulation.setDeviceMetricsOverride",
-        buildViewportMetricsOverride(viewport, tab.desktopZoomFactor),
+        buildViewportMetricsOverride(viewport),
       );
     });
   }
@@ -3251,7 +3237,6 @@ export class BrowserGuestManager {
   private async resetTabViewport(tab: ManagedTab): Promise<void> {
     if (tab.lifecycle === "closed") return;
     tab.viewportOverride = undefined;
-    tab.desktopZoomFactor = undefined;
     tab.backgroundViewportFallback = undefined;
     if (!tab.guest) return;
     const guest = tab.guest;
@@ -3285,7 +3270,7 @@ export class BrowserGuestManager {
           tab,
           guest,
           "Emulation.setDeviceMetricsOverride",
-          buildViewportMetricsOverride(fallback, guest.hostWebContents?.getZoomFactor()),
+          buildViewportMetricsOverride(fallback),
         );
       });
     } catch (error) {
@@ -3338,7 +3323,7 @@ export class BrowserGuestManager {
         tab,
         guest,
         "Emulation.setDeviceMetricsOverride",
-        buildViewportMetricsOverride(fallback, guest.hostWebContents?.getZoomFactor()),
+        buildViewportMetricsOverride(fallback),
       );
     }).catch((error: unknown) => {
       this.log?.(
@@ -3494,10 +3479,7 @@ export class BrowserGuestManager {
             tab,
             guest,
             "Emulation.setDeviceMetricsOverride",
-            buildViewportMetricsOverride(
-              viewport,
-              tab.viewportOverride ? tab.desktopZoomFactor : guest.hostWebContents?.getZoomFactor(),
-            ),
+            buildViewportMetricsOverride(viewport),
           );
         };
         // 截图也占用 viewport 队列，但并不重设 metrics。若把队列内 re-attach
@@ -3536,15 +3518,10 @@ export class BrowserGuestManager {
     try {
       const result = await guest.debugger.sendCommand(method, params, sessionId);
       if (!sessionId && tab.guest === guest) {
-        if (method === "Emulation.setDeviceMetricsOverride") {
-          tab.appliedViewportScale = normalizeDesktopZoomMetricsScale(
-            (params as { scale?: number }).scale,
-          );
-          // renderer 的归一化回调可能被 Electron 后续 page zoom 传播覆盖。
-          // 固定 viewport 的设置和 CDP 重连都必须在同一执行边界恢复 guest zoom。
-          if (guest.getZoomFactor() !== 1) guest.setZoomFactor(1);
-        } else if (method === "Emulation.clearDeviceMetricsOverride") {
-          tab.appliedViewportScale = undefined;
+        // renderer 的归一化回调可能被 Electron 后续 page zoom 传播覆盖。
+        // 固定 viewport 的设置和 CDP 重连都必须在同一执行边界恢复 guest zoom。
+        if (method === "Emulation.setDeviceMetricsOverride" && guest.getZoomFactor() !== 1) {
+          guest.setZoomFactor(1);
         }
       }
       return result;
@@ -3571,16 +3548,6 @@ export class BrowserGuestManager {
     // 串行屏障：Page.enable / viewport override 先于本命令被 Chromium 处理）。
     if (!safeBool(() => guest.debugger.isAttached(), false) || tab.guestCdpRestoreFlight) {
       await this.ensureGuestCdpAttached(tab, guest);
-    }
-    // native raster 的 metrics scale 同时影响 CDP 鼠标输入。工具、locator
-    // 和截图仍以 CSS px 表达，在唯一 guest 发送边界补偿位置和滚轮距离，避免各 API 重复换算。
-    const scale = tab.appliedViewportScale ?? 1;
-    if (!sessionId && method === "Input.dispatchMouseEvent" && scale !== 1 && params) {
-      const event = { ...(params as Record<string, unknown>) };
-      for (const key of ["x", "y", "deltaX", "deltaY"]) {
-        if (typeof event[key] === "number") event[key] *= scale;
-      }
-      params = event;
     }
     return this.sendGuestCdpCommandRaw(tab, guest, method, params, sessionId);
   }
@@ -3877,8 +3844,10 @@ export class BrowserGuestManager {
   ): Promise<GuestWebContents | null> {
     if (tab.lifecycle === "closed" || tab.guest !== guest) return null;
     const restored = await this.restoreGuestState(tab, guest);
-    if (!restored || tab.lifecycle === "closed" || tab.guest !== guest) {
-      if (tab.lifecycle !== "closed" && tab.guest === guest) {
+    // await 期间 tab 可能被关闭；lifecycle 是可变字段，重新读取以撤销上面的收窄。
+    const lifecycleAfterRestore = tab.lifecycle as TabLifecycle;
+    if (!restored || lifecycleAfterRestore === "closed" || tab.guest !== guest) {
+      if (lifecycleAfterRestore !== "closed" && tab.guest === guest) {
         this.warn(`browser tab guest rebind restore failed tabId=${tab.tabId}`);
       }
       return null;
@@ -4338,8 +4307,6 @@ export class BrowserGuestManager {
     tab.cdpAttached = false;
     tab.guestLifecycle = guestDestroyed ? "destroyed" : "detached";
     tab.backgroundViewportFallback = undefined;
-    // 倍率属于旧 guest 的 CDP session，换代后的自然 viewport 不会重放 metrics。
-    tab.appliedViewportScale = undefined;
     tab.viewportMutation = undefined;
     this.residencyCoordinator.markDetached(tab.tabId);
     this.refreshRuntimeProtection(tab.tabId);

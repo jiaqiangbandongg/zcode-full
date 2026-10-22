@@ -159,7 +159,13 @@ export class ContextBuilder {
           sections.push(memorySection);
         }
       }
-      sections.push(buildEnvInfoSection(this.config.envInfo, this.config.model));
+      sections.push(
+        buildEnvInfoSection(
+          this.config.envInfo,
+          this.config.model,
+          this.config.additionalDirectories,
+        ),
+      );
 
       // Output Style
       const outputStyleSection = buildOutputStyleSection(activeOutputStyle);

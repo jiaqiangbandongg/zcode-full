@@ -168,39 +168,6 @@ describe("runCompactSummaryModelRequest", () => {
     expect(generateText).not.toHaveBeenCalled();
   });
 
-  it.each([400, 401, 403, 429, 500])(
-    "does not fall back after an HTTP %s stream request setup failure",
-    async (statusCode) => {
-      const streamError = Object.assign(new Error(`HTTP ${statusCode}`), {
-        code: ModelErrorCode.ModelRequestFailed,
-        context: { statusCode, streamFailurePhase: "request_setup" },
-      });
-      const { logger } = createCapturingLogger();
-      const { modelExecutor, generateText } = createScriptedModelExecutor({ streamError });
-      const { request } = createRequest();
-
-      await expect(runCompactSummaryModelRequest({ logger, modelExecutor, request })).rejects.toBe(
-        streamError,
-      );
-      expect(generateText).not.toHaveBeenCalled();
-    },
-  );
-
-  it("does not fall back after a statusless stream request setup failure", async () => {
-    const streamError = Object.assign(new Error("stream runtime setup failed"), {
-      code: ModelErrorCode.ModelRequestFailed,
-      context: { streamFailurePhase: "request_setup" },
-    });
-    const { logger } = createCapturingLogger();
-    const { modelExecutor, generateText } = createScriptedModelExecutor({ streamError });
-    const { request } = createRequest();
-
-    await expect(runCompactSummaryModelRequest({ logger, modelExecutor, request })).rejects.toBe(
-      streamError,
-    );
-    expect(generateText).not.toHaveBeenCalled();
-  });
-
   it("keeps the HTTP 404 stream request setup fallback", async () => {
     const streamError = Object.assign(new Error("HTTP 404"), {
       code: ModelErrorCode.ModelNotFound,

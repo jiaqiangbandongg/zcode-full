@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-ssh-remote-upgrade-history",
+  "spec": "./test/e2e/conversation-session/conversation-session-ssh-remote-upgrade-history.test.ts",
+  "fixtures": [
+    {
+      "id": "ssh-history-reconnect-title",
+      "description": "SSH directory resilience task 标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_SSH_UPGRADE_HISTORY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-history-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH directory resilience\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-history-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "ssh-history-reconnect-main",
+      "description": "SSH directory resilience 首发和续发的通用响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "用固定回复准备和续聊真实远端历史，旧程序自然造数后切换当前程序与回退程序验证。"
+      },
+      "maxMatches": 20,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_SSH_UPGRADE_HISTORY_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-history-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_UPGRADE_HISTORY_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-history-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

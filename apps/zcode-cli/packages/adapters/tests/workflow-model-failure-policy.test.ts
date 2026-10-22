@@ -6,7 +6,6 @@ import {
   inspectWorkflowModelFailure,
   resolveWorkflowModelFailurePolicy,
   retryAllowedByFailurePolicy,
-  WORKFLOW_QUOTA_PROVIDER_CODES,
 } from "../src/model/workflow-model-failure-policy.js";
 
 // apps/zcode-cli/packages/dynamic-workflow/docs/execution-engine.md「Terminal states」：Stop 集逐行一例，其余一切 retry。
@@ -73,17 +72,6 @@ describe("resolveWorkflowModelFailurePolicy", () => {
         undefined,
       ),
     ).toEqual({ decision: "stop", kind: "invalid_request" });
-    for (const code of WORKFLOW_QUOTA_PROVIDER_CODES) {
-      expect(
-        resolveWorkflowModelFailurePolicy(
-          failure({ reason: ModelFailureReason.RateLimited }),
-          code,
-        ),
-      ).toEqual({
-        decision: "stop",
-        kind: "quota",
-      });
-    }
     // 1005 在分类器里是 invalid_request：配额按码判、先于 reason。
     expect(
       resolveWorkflowModelFailurePolicy(

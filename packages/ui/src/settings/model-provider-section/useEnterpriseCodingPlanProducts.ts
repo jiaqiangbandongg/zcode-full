@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getModelProviderFamilySpec,
   type CodingPlanStaticTeamProduct,
@@ -7,6 +7,7 @@ import {
 } from "@zcode/shared";
 import { useOptionalServices } from "@/hooks/useServices.js";
 import { isRemoteWorkspaceDisconnectedError } from "@/lib/remoteWorkspaceServiceError.js";
+import { useZCodeStoreWithDefault } from "@/store/StoreProvider.js";
 import { logger } from "@/logger.js";
 import {
   resolveEnterpriseCodingPlanProductList,
@@ -98,12 +99,47 @@ export function useEnterpriseCodingPlanProducts({
 }) {
   const services = useOptionalServices();
   const service = services?.codingPlanSubscriptionService;
+  const authScope = useZCodeStoreWithDefault(
+    (state) => (state.user ? state.user.id + ":" + state.authSessionSeq : "signed-out"),
+    "unscoped",
+  );
+  // 原因：鉴权布尔值不能区分两个账号或同账号重新登录，旧目录必须按完整身份隔离。
+  const scope = useMemo(() => ({}), [service, family, authenticated, authScope, staticOnly]);
+  const owner = useRef({ scope, enabled, mounted: true });
+  owner.current = { scope, enabled, mounted: true };
   const codingPlanProviderId = getModelProviderFamilySpec(family).individualCodingPlanProviderId;
-  const [state, setState] = useState<EnterpriseCodingPlanProductsState>({
-    snapshot: null,
-    loading: enabled,
-    error: null,
+  const [owned, setOwned] = useState<{ scope: object; state: EnterpriseCodingPlanProductsState }>({
+    scope,
+    state: {
+      snapshot: null,
+      loading: enabled,
+      error: null,
+    },
   });
+  // 渲染时立即隔离，不能等 effect 清理，否则登出仍会暴露一帧旧组织。
+  const state =
+    owned.scope === scope ? owned.state : { snapshot: null, loading: enabled, error: null };
+  const setState = useCallback(
+    (
+      next:
+        | EnterpriseCodingPlanProductsState
+        | ((state: EnterpriseCodingPlanProductsState) => EnterpriseCodingPlanProductsState),
+    ) => {
+      if (owner.current.scope !== scope || !owner.current.mounted) return;
+      setOwned((previous) => ({
+        scope,
+        state:
+          typeof next === "function"
+            ? next(
+                previous.scope === scope
+                  ? previous.state
+                  : { snapshot: null, loading: enabled, error: null },
+              )
+            : next,
+      }));
+    },
+    [scope, enabled],
+  );
 
   const refresh = useCallback(
     async (_options?: { force?: boolean }) => {
@@ -145,6 +181,9 @@ export function useEnterpriseCodingPlanProducts({
             ? Promise.resolve<EnterpriseCodingPlanPricingResponse>({ productList: [] })
             : service.getEnterprisePricing({ authenticated, family }),
         ]);
+        // 原因：登出、family 或服务切换后，旧网络响应不能复活上一个身份的目录。
+        if (owner.current.scope !== scope || !owner.current.enabled || !owner.current.mounted)
+          return;
         const staticProducts =
           staticResult.status === "fulfilled"
             ? Object.prototype.hasOwnProperty.call(staticResult.value, codingPlanProviderId)
@@ -220,11 +259,15 @@ export function useEnterpriseCodingPlanProducts({
         }));
       }
     },
-    [authenticated, codingPlanProviderId, enabled, family, service, staticOnly],
+    [authenticated, codingPlanProviderId, enabled, family, service, staticOnly, scope, setState],
   );
 
   useEffect(() => {
+    owner.current.mounted = true;
     void refresh();
+    return () => {
+      owner.current.mounted = false;
+    };
   }, [refresh]);
 
   return useMemo(

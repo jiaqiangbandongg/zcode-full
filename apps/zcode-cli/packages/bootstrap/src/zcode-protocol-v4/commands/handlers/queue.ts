@@ -9,7 +9,7 @@ import type {
   CommandResult,
 } from "@zcode/shared/zcode-protocol-v4";
 import { isHighspeedProviderId } from "@zcode/shared";
-import { createModelExecutionContext } from "../../../zcode-protocol/model-execution.js";
+import { createModelExecutionContext } from "../../../session-execution/index.js";
 import { mapAttachmentRefsToTurnAttachments } from "../attachment-refs.js";
 import { inputIntentMetadataFromQueueItem } from "../input-intent.js";
 import { startPromptTurn } from "../prompt-turn.js";
@@ -257,39 +257,61 @@ async function sendQueuedNow(
         queueItem.highspeed !== undefined &&
         payload.highspeedMeta.cardId === queueItem.highspeed.cardId &&
         payload.highspeedMeta.taskId === queueItem.highspeed.taskId;
+      const ordinarySelection = isHighspeedProviderId(intent.modelSelection?.providerId)
+        ? resolveSessionFallbackModelSelection(record)
+        : intent.modelSelection;
+      // Bug 根因：旧版本已把临时 Highspeed Selection 持久化到 QueueItem。进程升级后
+      // execution bundle 必然丢失；若不在提升边界迁移，会继续用内部 Provider 并直接报错。
+      intent.modelSelection = ordinarySelection;
       if (refreshedHighspeedMatchesQueue && payload.highspeedMeta) {
         intent.highspeed = payload.highspeedMeta;
-        // Selection 与执行材料必须同批替换（协议已用 superRefine 保证成对到达）。
-        if (payload.modelSelection) intent.modelSelection = payload.modelSelection;
       }
-      // 凭据不入队列持久化面：先用本次补供的材料，其次取 CLI 内存按 sourceCommandId 的暂存。
+      // 凭据不入队列持久化面：先用本次补供的完整 bundle，其次取 CLI 内存暂存。
+      const refreshedExecution =
+        refreshedHighspeedMatchesQueue && payload.modelSelection && payload.modelExecution
+          ? { modelSelection: payload.modelSelection, modelExecution: payload.modelExecution }
+          : undefined;
       const stagedExecution =
-        (refreshedHighspeedMatchesQueue ? payload.modelExecution : undefined) ??
+        refreshedExecution ??
         host.readQueuedTurnExecution?.(record.app.sessionId, queueItem.sourceCommandId);
-      const highspeedSelected = isHighspeedProviderId(intent.modelSelection?.providerId);
-      // 规则 9：卡在排队期间可能过期。提升前重新判定有效性，过期或凭据缺失都退回会话模型。
+      // Bug 根因：QueueItem.modelSelection 同时承担普通模型和临时加速模型，导致编辑恢复与
+      // 降级目标互相污染。提升边界才临时应用 bundle；失败时保留队列项自己的普通 Selection。
       const highspeedStillValid =
-        highspeedSelected &&
         intent.highspeed !== undefined &&
         intent.highspeed.expiresAt > Date.now() &&
-        stagedExecution !== undefined;
-      if (highspeedSelected && !highspeedStillValid) {
-        if (intent.highspeed && intent.highspeed.expiresAt > Date.now()) {
-          // Bug 原因：现场出现有效卡的队列项在手动提升时静默退回普通模型，原日志只覆盖
-          // provider 安装失败，无法区分「凭据暂存缺失」与「卡本身已过期」。
-          host.logger?.warn?.("v4 queued Highspeed execution unavailable; using session model", {
+        stagedExecution !== undefined &&
+        isHighspeedProviderId(stagedExecution.modelSelection.providerId);
+      if (highspeedStillValid && stagedExecution) {
+        intent.modelSelection = stagedExecution.modelSelection;
+      } else if (intent.highspeed) {
+        if (intent.highspeed.expiresAt > Date.now()) {
+          host.logger?.warn?.("v4 queued Highspeed execution unavailable; using queued model", {
             cardId: intent.highspeed.cardId,
             queueItemId: queueItem.queueItemId,
             reason: "execution_missing",
             sessionId: record.app.sessionId,
           });
         }
-        // 退回必须同时改写 Selection：只删卡标记会让本轮带着加速 provider 却没有任何凭据。
-        // 与 retry/edit 重发共用同一 fallback resolver（spec §3 规则 13）。
         delete intent.highspeed;
-        intent.modelSelection = resolveSessionFallbackModelSelection(record);
         host.deleteQueuedTurnExecution?.(record.app.sessionId, queueItem.sourceCommandId);
       }
+      // 退回目标统一为上面的普通 Selection（规则 9）。新队列项的 bundle target 本来就相同；
+      // 旧队列项“立即发送”且服务仍持有同一张卡时，Renderer 以持久化的临时 Provider 重新准备，
+      // target 也是临时 Provider，这里改回，避免降级仍落到内部 Provider。
+      const turnExecution =
+        highspeedStillValid && stagedExecution
+          ? {
+              ...stagedExecution.modelExecution,
+              ...(stagedExecution.modelExecution.selectionFallback
+                ? {
+                    selectionFallback: {
+                      ...stagedExecution.modelExecution.selectionFallback,
+                      target: ordinarySelection,
+                    },
+                  }
+                : {}),
+            }
+          : undefined;
       const started = await startPromptTurn(host, record, {
         content: queueItem.text,
         inputId: queueItem.sourceCommandId,
@@ -298,9 +320,7 @@ async function sendQueuedNow(
         intent,
         requireIdle: true,
         toolDisallowlist: queueItem.toolDisallowlist,
-        ...(highspeedStillValid && stagedExecution
-          ? { modelExecution: createModelExecutionContext(stagedExecution) }
-          : {}),
+        ...(turnExecution ? { modelExecution: createModelExecutionContext(turnExecution) } : {}),
         ...(attachments ? { attachments } : {}),
       });
       // 旧 fake app/兼容命令可能不返回 admission receipt；真实 app 已在 Core admission

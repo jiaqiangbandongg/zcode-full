@@ -9,7 +9,8 @@ import type { WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
 import type { WorkflowCausalityGraphData } from "@/components/workflow-graph/types.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
 
-vi.mock("@/ControlHintTooltip.js", () => ({
+vi.mock("@/ControlHintTooltip.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/ControlHintTooltip.js")>()),
   ControlHintTooltip: ({ children }: { children?: ReactNode }) => children,
 }));
 vi.mock("@/hooks/useWorkflowSubagentModelProviderName.js", () => ({

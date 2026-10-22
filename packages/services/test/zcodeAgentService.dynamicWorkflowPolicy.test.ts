@@ -173,16 +173,6 @@ describe("workspace/updateDynamicWorkflowPolicy 同步（DWG-02）", () => {
     }
   });
 
-  it("alwaysOn 也带 mode（launch.md「How the mode travels」：mode 与布尔同行）", async () => {
-    const { service, request } = await setup({ enabled: true });
-    try {
-      await service.initialize({ workspacePath: WORKSPACE_PATH });
-      expect(policyCalls(request)[0]?.[1]).toMatchObject({ enabled: true, mode: "alwaysOn" });
-    } finally {
-      service.disposeAll();
-    }
-  });
-
   it("resolver 抛错时按关闭处理，不发策略也不阻断就绪", async () => {
     const { service, request } = await setup({
       configResolver: async () => {
@@ -468,7 +458,7 @@ describe("session create / resume / v4 createSession 的 flag（DWG-02）", () =
   });
 });
 
-// DWG-20（launch.md「The user's choice」）：Host 只闩服务端的「提供」，用户选择每次使用时重新应用；
+// DWG-20（launch.md「The user's choice」）：Host 只闩服务端的「提供」（默认值），用户选择每次使用时重新应用且永远生效；
 // 选择变化后按 workspace 串行重发策略，只在生效模式真的变了时才发。
 describe("用户选择（DWG-20）", () => {
   it("闩住的提供 + 每次读取的用户选择：两次建会话之间改选择，第二次就带新模式", async () => {
@@ -515,13 +505,54 @@ describe("用户选择（DWG-20）", () => {
     }
   });
 
-  it("服务端未提供时用户选择不生效", async () => {
+  it("服务端默认 disabled 时用户选择照样生效：策略开启，建会话带所选模式", async () => {
     const { service, request } = await setup({
       enabled: false,
       userModeResolver: async () => "alwaysOn",
     });
     try {
-      await service.createSession({ workspacePath: WORKSPACE_PATH, sessionId: "s-gated" });
+      await service.createSession({ workspacePath: WORKSPACE_PATH, sessionId: "s-chosen" });
+      expect(policyCalls(request).map(([, value]) => value)).toEqual([
+        expect.objectContaining({ enabled: true, mode: "alwaysOn" }),
+      ]);
+      expect(paramsOf(request, zcodeProtocolMethods.sessionCreate)[0]).toMatchObject({
+        dynamicWorkflowEnabled: true,
+        dynamicWorkflowMode: "alwaysOn",
+      });
+    } finally {
+      service.disposeAll();
+    }
+  });
+
+  it.each([
+    [
+      "抛错",
+      async (): Promise<DynamicWorkflowClientConfig | undefined> => {
+        throw new Error("client configs unavailable");
+      },
+    ],
+    ["返回 undefined", async (): Promise<DynamicWorkflowClientConfig | undefined> => undefined],
+  ])("提供读取%s时按默认 disabled 处理，用户选择照样生效", async (_label, configResolver) => {
+    const { service, request } = await setup({
+      configResolver,
+      userModeResolver: async () => "onDemand",
+    });
+    try {
+      await service.createSession({ workspacePath: WORKSPACE_PATH, sessionId: "s-offline" });
+      expect(policyCalls(request)[0]?.[1]).toMatchObject({ enabled: true, mode: "onDemand" });
+      expect(paramsOf(request, zcodeProtocolMethods.sessionCreate)[0]).toMatchObject({
+        dynamicWorkflowEnabled: true,
+        dynamicWorkflowMode: "onDemand",
+      });
+    } finally {
+      service.disposeAll();
+    }
+  });
+
+  it("没有装配提供 resolver 的 Host 不接这个功能：用户选择不生效", async () => {
+    const { service, request } = await setup({ userModeResolver: async () => "alwaysOn" });
+    try {
+      await service.createSession({ workspacePath: WORKSPACE_PATH, sessionId: "s-unwired" });
       expect(policyCalls(request)).toHaveLength(0);
       expect(paramsOf(request, zcodeProtocolMethods.sessionCreate)[0]).not.toHaveProperty(
         "dynamicWorkflowMode",

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-chat-remote-folder-create",
+  "spec": "./test/e2e/conversation-session/conversation-session-chat-remote-folder-create.test.ts",
+  "fixtures": [
+    {
+      "id": "chat-remote-folder-create-title",
+      "description": "聊天远程目录首次发送身份验证。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型响应以检查真实任务的 Host、项目与目录。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_CHAT_REMOTE_FOLDER_CREATE", "Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-task-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"SSH lifecycle\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "chat-remote-folder-create-a-first",
+      "description": "聊天远程目录首次发送身份验证。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定模型响应以检查真实任务的 Host、项目与目录。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_CHAT_REMOTE_FOLDER_CREATE"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"ssh-task-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"SSH_P0_TASK_LIFECYCLE_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"ssh-task-a-first\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

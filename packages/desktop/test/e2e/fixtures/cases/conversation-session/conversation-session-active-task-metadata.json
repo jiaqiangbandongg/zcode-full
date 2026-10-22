@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-active-task-metadata",
+  "spec": "./test/e2e/conversation-session/conversation-session-active-task-metadata.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-active-task-metadata.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "requests": []
+}

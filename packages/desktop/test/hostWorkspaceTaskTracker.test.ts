@@ -25,9 +25,6 @@ describe("createHostWorkspaceTaskTracker", () => {
     expect(tracker.getRunningTaskCount(workspaceB)).toBe(1);
     expect(tracker.getTotalRunningTaskCount()).toBe(3);
 
-    // sendPrompt Promise 此时只返回 ACK；未收到 session ready 前不能减少 active run。
-    expect(tracker.getRunningTaskCount(workspaceA)).toBe(2);
-
     tracker.finish("task-a-1", workspaceA);
     tracker.finish("task-a-1", workspaceA);
     tracker.finish("task-b", workspaceB);

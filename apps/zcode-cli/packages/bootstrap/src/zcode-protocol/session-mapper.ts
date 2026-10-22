@@ -300,7 +300,6 @@ export function mapSessionInfo(input: {
     input.projection?.updatedAt.getTime() ??
     createdAt;
   return {
-    archivedAt: input.session?.time.archived,
     createdAt,
     mode: input.projection?.mode ?? input.app?.getMode?.() ?? "build",
     model: input.app ? optionalModelSelectionFromString(input.app.getModel()) : undefined,

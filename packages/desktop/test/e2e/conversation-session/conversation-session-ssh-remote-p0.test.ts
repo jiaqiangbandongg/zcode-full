@@ -1,34 +1,15 @@
-import { createConnection } from "node:net";
-import { Client as SSHClient, type TcpConnectionDetails } from "ssh2";
-import {
-  TID_TASK_ITEM,
-  TID_WORKSPACE_ITEM,
-  TID_COMPOSER_REMOTE_CONNECTION,
-  TID_COMPOSER_WORKSPACE_TRIGGER,
-  TID_REMOTE_KIND_SSH,
-  TID_SSH_DIALOG,
-  TID_SSH_ERROR,
-  TID_SSH_HOST_INPUT,
-  TID_SSH_PASSWORD_INPUT,
-  TID_SSH_PORT_INPUT,
-  TID_SSH_SUCCESS,
-  TID_SSH_USERNAME_INPUT,
-  buildRemoteWorkspaceIdentity,
-  testId,
-  type RemoteTarget,
-} from "@zcode/shared";
-import {
-  clearAppData,
-  clickTestIdByWebDriver,
-  setInputValueByTestIdDom,
-  waitForWorkspaceApp,
-} from "../helpers/desktop-app.js";
+import { releaseControlledReplay } from "#e2e/helpers/controlled-replay";
+import { parseRemoteWorkspaceIdentity } from "@zcode/shared";
+import { clearAppData, waitForWorkspaceApp } from "../helpers/desktop-app.js";
 import {
   refreshSeededOpenAIProvidersThroughSettings,
   seedCustomOpenAIChatCompletionsProvider,
 } from "../helpers/custom-openai-provider.js";
 import { resolveSeededReplayBaseUrl } from "../helpers/custom-openai-provider-store.js";
-import { selectUpstreamProviderModelById } from "../helpers/upstream-provider.js";
+import {
+  selectUpstreamProviderModelById,
+  selectUpstreamThoughtLevelValue,
+} from "../helpers/upstream-provider.js";
 import {
   getUpstreamRequestRecordCount,
   waitForUpstreamRequest,
@@ -37,7 +18,6 @@ import {
   prepareV4ConversationE2E,
   selectV4TaskById,
   sendV4PromptAndWaitAccepted,
-  startNewV4Draft,
   waitForV4AssistantMessageContaining,
   waitForV4ConversationState,
 } from "../helpers/v4-conversation.js";
@@ -46,19 +26,21 @@ import {
   waitForConversationReportInventory,
 } from "../helpers/conversation-telemetry-parity-capture.js";
 import {
-  isMainRendererUrl,
-  isResourceManagerUrl,
-  openResourceManager,
-  switchToElectronRendererTarget,
-  waitForResourceManagerReady,
-  listHostProcessIdentities,
-} from "../helpers/resource-manager.js";
-import { runSSHCommand } from "../helpers/ssh-remote-p0.js";
+  clickLastEnabledSSHDialogButton,
+  createSSHReplayTunnel,
+  readHostProcesses,
+  fillSSHPasswordSettings,
+  openSSHRemoteDialog,
+  openSSHSourceDirectory,
+  runSSHCommand,
+  selectSSHRemoteDirectory,
+  waitForSSHDirectoryStep,
+} from "../helpers/ssh-remote-p0.js";
+import { readProjectTaskRowState, type ProjectTaskRowState } from "../helpers/project-sidebar.js";
 
 const CASE_MARKER = "R1_SSH_P0_01";
 const PROMPT_MARKER = "E2E_SSH_REMOTE_P0";
 const MODEL_ID = "e2e-ssh-remote-p0-model";
-const CONNECT_TIMEOUT_MS = 10 * 60_000;
 const WORKSPACE_READY_TIMEOUT_MS = 2 * 60_000;
 const TURN_TIMEOUT_MS = 2 * 60_000;
 
@@ -98,6 +80,12 @@ interface TaskCase {
   workspacePath: string;
 }
 
+const runningRowMismatches: Array<{
+  taskId: string;
+  label: string;
+  observed: ProjectTaskRowState;
+}> = [];
+
 describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
   let replayTunnel: ReplayTunnel | null = null;
 
@@ -110,17 +98,9 @@ describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
 
   it("R1-SSH-P0-01 在两个 SSH workspace 各自首发，并切回 task 续发", async function () {
     this.timeout(20 * 60_000);
+    runningRowMismatches.length = 0;
     const config = readSSHRuntimeConfig();
-    const target: RemoteTarget = {
-      kind: "ssh",
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password,
-    };
     const [workspaceA, workspaceB] = config.workspacePaths;
-    const identityA = buildRemoteWorkspaceIdentity(workspaceA, target);
-    const identityB = buildRemoteWorkspaceIdentity(workspaceB, target);
 
     await prepareV4ConversationE2E({ skipProvider: true });
     const initialHosts = await readHostProcesses();
@@ -150,7 +130,6 @@ describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
 
     const taskA = await connectWorkspaceAndSendFirstTurn({
       config,
-      identity: identityA,
       label: "A",
       provider,
       workspacePath: workspaceA,
@@ -161,7 +140,6 @@ describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
     );
     const taskB = await connectWorkspaceAndSendFirstTurn({
       config,
-      identity: identityB,
       label: "B",
       provider,
       workspacePath: workspaceB,
@@ -196,9 +174,12 @@ describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
           candidate.element_name === "agent_step" ||
           candidate.element_name === "message_completion",
       )) {
+        // 遥测合同（docs/monitoring/conversation-telemetry-v4.md）：remote_kind 由稳定 workspace
+        // identity 经 parseRemoteWorkspaceIdentity 解析，R3 Source Server 工作区的 identity kind 是
+        // "server"（上方 waitForRemoteTab 亦按此断言）；SSH 只是物理线路，不是该字段的取值。
         expect(report.event_extra_detail).toMatchObject({
           workspace_kind: "remote",
-          remote_kind: "ssh",
+          remote_kind: "server",
         });
       }
     }
@@ -217,6 +198,7 @@ describe(`${CASE_MARKER}: SSH remote workspace P0`, () => {
         }),
       )}\n`,
     );
+    expect(runningRowMismatches).toEqual([]);
   });
 });
 
@@ -296,23 +278,24 @@ function requireSecretEnv(name: string): string {
 
 async function connectWorkspaceAndSendFirstTurn(options: {
   config: SSHRuntimeConfig;
-  identity: string;
   label: "A" | "B";
   provider: { id: string; name: string };
   workspacePath: string;
 }): Promise<TaskCase> {
-  // 第二个 workspace 从第一个已完成 task 进入；远程连接入口只在新任务草稿的
-  // workspace 选择器中展示，因此先显式创建草稿，再走真实 UI 连接链路。
-  await startNewV4Draft();
-  await waitForDraftWorkspaceSettled();
-  await openSSHRemoteDialog();
+  // Bug 原因：本 spec 曾自带一份 SSH 向导轮询副本，只认独立 ConfirmDialog 的安装确认和
+  // 目录页；产品已把安装确认内联到连接步骤（“安装并继续”），副本可能等满连接超时。
+  // 统一复用 helpers/ssh-remote-p0.ts 的共享流程，与 connection-p0 / soak-dual 保持同一状态机。
+  await openSSHRemoteDialog(CASE_MARKER);
   await fillSSHPasswordSettings(options.config);
-  await clickLastEnabledDialogButton();
-  await waitForSSHDirectoryStep();
-  await selectRemoteDirectory(options.workspacePath);
+  await clickLastEnabledSSHDialogButton(CASE_MARKER);
+  const flow = await waitForSSHDirectoryStep(CASE_MARKER);
+  if (flow === "closed") {
+    // 向导已收起：从已注册设备行进入目录选择，追加 project workspace。
+    await openSSHSourceDirectory(options.config, CASE_MARKER);
+  }
+  await selectSSHRemoteDirectory(options.workspacePath, CASE_MARKER);
   await waitForWorkspaceApp(options.workspacePath, WORKSPACE_READY_TIMEOUT_MS);
   const tab = await waitForRemoteTab({
-    expectedIdentity: options.identity,
     expectedPath: options.workspacePath,
   });
   expect(tab.remoteKind).toBe("ssh");
@@ -321,13 +304,20 @@ async function connectWorkspaceAndSendFirstTurn(options: {
   if (!tab.remoteSessionId) {
     throw new Error(`${CASE_MARKER}: workspace ${options.label} 缺少 remoteSessionId`);
   }
+  if (!tab.workspaceIdentity) {
+    throw new Error(`${CASE_MARKER}: workspace ${options.label} 缺少稳定 workspaceIdentity`);
+  }
 
   await selectUpstreamProviderModelById(MODEL_ID, {
     includePlainModelFallback: false,
     providerId: options.provider.id,
     providerName: options.provider.name,
   });
-  await startNewV4Draft();
+  // 项目创建已打开远程草稿；全局新建会切到本地未分类并丢失目标模型。
+  await selectUpstreamThoughtLevelValue("disabled");
+  const draft = await readRemoteTabSnapshot(tab.workspaceIdentity, options.workspacePath);
+  expect(draft.activeWorkspaceIdentity).toBe(tab.workspaceIdentity);
+  expect(draft.activeWorkspacePath).toBe(options.workspacePath);
 
   const firstPrompt = `${PROMPT_MARKER}_${options.label}_FIRST_PROMPT`;
   const firstReply = `${PROMPT_MARKER}_${options.label}_FIRST_REPLY`;
@@ -353,13 +343,14 @@ async function connectWorkspaceAndSendFirstTurn(options: {
     firstReply,
     followPrompt,
     followReply,
-    identity: options.identity,
+    identity: tab.workspaceIdentity,
     label: options.label,
     remoteSessionId: tab.remoteSessionId,
     taskId: running.taskId,
     workspacePath: options.workspacePath,
   };
   await assertTaskRow(task, { active: true, running: true });
+  await releaseControlledReplay(`ssh-remote-p0-${task.label.toLowerCase()}-first`);
   await waitForUpstreamRequest(
     {
       lastUserMessageIncludes: [firstPrompt],
@@ -377,52 +368,6 @@ async function connectWorkspaceAndSendFirstTurn(options: {
   );
   await assertTaskRow(task, { active: true, running: false });
   return task;
-}
-
-async function waitForDraftWorkspaceSettled(): Promise<void> {
-  let previousKey: string | null = null;
-  let stablePolls = 0;
-  await browser.waitUntil(
-    async () => {
-      const snapshot = await browser.execute((triggerTestId) => {
-        const store = (
-          window as Window & {
-            __zcodeTabStoreE2E?: {
-              getState?: () => {
-                activeTabId?: string | null;
-                activeWorkspaceIdentity?: string | null;
-                activeWorkspacePath?: string | null;
-              };
-            };
-          }
-        ).__zcodeTabStoreE2E;
-        const state = store?.getState?.();
-        const visibleTriggerCount = Array.from(
-          document.querySelectorAll<HTMLElement>(`[data-testid="${triggerTestId}"]`),
-        ).filter((element) => element.getClientRects().length > 0).length;
-        return {
-          activeTabId: state?.activeTabId ?? null,
-          activeWorkspaceIdentity: state?.activeWorkspaceIdentity ?? null,
-          activeWorkspacePath: state?.activeWorkspacePath ?? null,
-          visibleTriggerCount,
-        };
-      }, TID_COMPOSER_WORKSPACE_TRIGGER);
-      const key = JSON.stringify(snapshot);
-      stablePolls = key === previousKey ? stablePolls + 1 : 0;
-      previousKey = key;
-      return Boolean(
-        snapshot.activeTabId &&
-        snapshot.activeWorkspacePath &&
-        snapshot.visibleTriggerCount === 1 &&
-        stablePolls >= 2,
-      );
-    },
-    {
-      timeout: 15_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: 新任务草稿的 workspace 没有稳定`,
-    },
-  );
 }
 
 async function switchTaskAndSendFollowTurn(
@@ -443,6 +388,7 @@ async function switchTaskAndSendFollowTurn(
     `${task.label} 续发没有进入原 task`,
   );
   await assertTaskRow(task, { active: true, running: true });
+  await releaseControlledReplay(`ssh-remote-p0-${task.label.toLowerCase()}-follow`);
   await waitForUpstreamRequest(
     {
       excludes: [foreignFirstPrompt],
@@ -467,338 +413,55 @@ async function assertTaskRow(
   task: TaskCase,
   expected: { active: boolean; running: boolean },
 ): Promise<void> {
-  let latest: {
-    active: boolean;
-    error: boolean;
-    exists: boolean;
-    inWorkspace: boolean;
-    running: boolean;
-  } | null = null;
-  await browser.waitUntil(
-    async () => {
-      latest = await browser.execute(
-        (taskTestId, workspaceTestId) => {
-          const taskRow = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-            (element) => element.dataset.testid === taskTestId,
-          );
-          const workspaceRow = Array.from(
-            document.querySelectorAll<HTMLElement>("[data-testid]"),
-          ).find((element) => element.dataset.testid === workspaceTestId);
-          const workspaceContainer = workspaceRow?.closest("li");
-          return {
-            active: taskRow?.classList.contains("bg-selected") ?? false,
-            error: Boolean(taskRow?.querySelector('[data-error-indicator="true"]')),
-            exists: Boolean(taskRow),
-            inWorkspace: Boolean(taskRow && workspaceContainer?.contains(taskRow)),
-            running: Boolean(taskRow?.querySelector(".animate-spin")),
-          };
-        },
-        testId(TID_TASK_ITEM, task.taskId),
-        testId(TID_WORKSPACE_ITEM, task.workspacePath),
-      );
-      return (
-        latest.exists &&
-        latest.inWorkspace &&
-        latest.active === expected.active &&
-        latest.running === expected.running &&
-        !latest.error
-      );
-    },
-    {
-      timeout: 30_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: task ${task.label} 列表状态不正确 latest=${JSON.stringify(latest)}`,
-    },
-  );
-}
-
-async function createReplayTunnel(config: SSHRuntimeConfig): Promise<ReplayTunnel> {
-  const replayBaseURL = await resolveSeededReplayBaseUrl();
-  if (!replayBaseURL) {
-    throw new Error(`${CASE_MARKER}: 没有找到本轮 replay provider URL`);
-  }
-  const replayURL = new URL(replayBaseURL);
-  const replayPort = Number.parseInt(replayURL.port, 10);
-  if (!Number.isSafeInteger(replayPort) || replayPort < 1) {
-    throw new Error(`${CASE_MARKER}: replay provider URL 缺少有效端口`);
-  }
-  const client = new SSHClient();
-  client.on("tcp connection", (_details: TcpConnectionDetails, accept) => {
-    const channel = accept();
-    const socket = createConnection({
-      host: replayURL.hostname,
-      port: replayPort,
-    });
-    const closeBoth = () => {
-      channel.destroy();
-      socket.destroy();
-    };
-    channel.once("error", closeBoth);
-    socket.once("error", closeBoth);
-    socket.once("connect", () => {
-      channel.pipe(socket).pipe(channel);
-    });
-    socket.once("close", () => channel.destroy());
-    channel.once("close", () => socket.destroy());
-  });
-
-  const remotePort = await new Promise<number>((resolve, reject) => {
-    client.once("error", reject);
-    client.once("ready", () => {
-      client.forwardIn("127.0.0.1", 0, (error, assignedPort) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(assignedPort);
-      });
-    });
-    client.connect({
-      host: config.host,
-      password: config.password,
-      port: config.port,
-      readyTimeout: CONNECT_TIMEOUT_MS,
-      username: config.username,
-    });
-  });
-
-  return {
-    baseURL: `http://127.0.0.1:${remotePort}`,
-    close: () =>
-      new Promise<void>((resolve) => {
-        client.unforwardIn("127.0.0.1", remotePort, () => {
-          client.end();
-          resolve();
-        });
-      }),
-  };
-}
-
-async function openSSHRemoteDialog(): Promise<void> {
-  await clickTestIdByWebDriver(TID_COMPOSER_WORKSPACE_TRIGGER, {
-    timeout: 30_000,
-    timeoutMsg: `${CASE_MARKER}: 空草稿没有显示 workspace 菜单`,
-  });
-  await clickTestIdByWebDriver(TID_COMPOSER_REMOTE_CONNECTION, {
-    timeout: 30_000,
-    timeoutMsg: `${CASE_MARKER}: workspace 菜单没有显示远程连接入口`,
-  });
-  await clickTestIdByWebDriver(TID_REMOTE_KIND_SSH, {
-    timeout: 30_000,
-    timeoutMsg: `${CASE_MARKER}: 远程连接向导没有显示 SSH transport`,
-  });
-  await clickLastEnabledDialogButton();
-}
-
-async function fillSSHPasswordSettings(config: SSHRuntimeConfig): Promise<void> {
-  await setInputValueByTestIdDom(TID_SSH_HOST_INPUT, config.host);
-  await setInputValueByTestIdDom(TID_SSH_PORT_INPUT, String(config.port));
-  await setInputValueByTestIdDom(TID_SSH_USERNAME_INPUT, config.username);
-  await setInputValueByTestIdDom(TID_SSH_PASSWORD_INPUT, config.password);
-}
-
-async function clickLastEnabledDialogButton(): Promise<void> {
-  let lastState = "dialog-missing";
-  await browser.waitUntil(
-    async () => {
-      const result = await browser.execute((dialogTestId) => {
-        const dialog = document.querySelector<HTMLElement>(`[data-testid="${dialogTestId}"]`);
-        if (!dialog || dialog.getClientRects().length === 0) {
-          return { clicked: false, reason: "dialog-missing" };
-        }
-        const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>("button")).filter(
-          (button) => button.getClientRects().length > 0,
+  let latest: ProjectTaskRowState | null = null;
+  await browser
+    .waitUntil(
+      async () => {
+        // 虚拟项目侧栏：task 行必须落在其 workspace 对应的项目 section 内。
+        latest = await readProjectTaskRowState(task.taskId, task.workspacePath);
+        return (
+          latest.exists &&
+          latest.inProject &&
+          latest.active === expected.active &&
+          latest.running === expected.running &&
+          !latest.error
         );
-        const button = buttons.at(-1);
-        if (!button) return { clicked: false, reason: "button-missing" };
-        if (button.disabled) return { clicked: false, reason: "button-disabled" };
-        button.click();
-        return { clicked: true, reason: "clicked" };
-      }, TID_SSH_DIALOG);
-      lastState = result.reason;
-      return result.clicked;
-    },
-    {
-      timeout: 30_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: 远程连接向导主动作不可点击 (${lastState})`,
-    },
-  );
-}
-
-async function waitForSSHDirectoryStep(): Promise<void> {
-  let terminalState: {
-    error: string;
-    status: "connecting" | "error" | "success";
-  } = {
-    error: "",
-    status: "connecting",
-  };
-  await browser.waitUntil(
-    async () => {
-      terminalState = await browser.execute(
-        (successTestId, errorTestId) => {
-          const success = document.querySelector<HTMLElement>(`[data-testid="${successTestId}"]`);
-          if (success?.getClientRects().length) {
-            return { error: "", status: "success" as const };
-          }
-          const error = document.querySelector<HTMLElement>(`[data-testid="${errorTestId}"]`);
-          if (error?.getClientRects().length) {
-            return { error: error.innerText.trim(), status: "error" as const };
-          }
-          return { error: "", status: "connecting" as const };
-        },
-        TID_SSH_SUCCESS,
-        TID_SSH_ERROR,
-      );
-      return terminalState.status !== "connecting";
-    },
-    {
-      timeout: CONNECT_TIMEOUT_MS,
-      interval: 500,
-      timeoutMsg: `${CASE_MARKER}: SSH 部署/连接在 ${CONNECT_TIMEOUT_MS}ms 内没有完成`,
-    },
-  );
-  if (terminalState.status === "error") {
-    throw new Error(`${CASE_MARKER}: SSH 连接失败: ${terminalState.error}`);
-  }
-}
-
-async function selectRemoteDirectory(workspacePath: string): Promise<void> {
-  const normalizedPath = workspacePath.replace(/\/+$/, "") || "/";
-  const lastSlash = normalizedPath.lastIndexOf("/");
-  const parentPath = normalizedPath.slice(0, lastSlash) || "/";
-  const directoryName = normalizedPath.slice(lastSlash + 1);
-  if (!directoryName) {
-    throw new Error(`${CASE_MARKER}: P0 case 暂不支持选择根目录`);
-  }
-
-  await browser.waitUntil(
-    () =>
-      browser.execute((successTestId) => {
-        const success = Array.from(
-          document.querySelectorAll<HTMLElement>(`[data-testid="${successTestId}"]`),
-        ).find((element) => element.getClientRects().length > 0);
-        return Boolean(success?.querySelector<HTMLInputElement>('input[type="text"]'));
-      }, TID_SSH_SUCCESS),
-    {
-      timeout: 30_000,
-      timeoutMsg: `${CASE_MARKER}: SSH directory step 没有路径输入框`,
-    },
-  );
-
-  const pathInputs = await $$(`[data-testid="${TID_SSH_SUCCESS}"] input[type="text"]`);
-  let pathInputIndex = -1;
-  const pathInputCount = await pathInputs.length;
-  for (let index = 0; index < pathInputCount; index += 1) {
-    const candidate = pathInputs[index]!;
-    if (await candidate.isDisplayed()) {
-      pathInputIndex = index;
-      break;
-    }
-  }
-  if (pathInputIndex < 0) {
-    throw new Error(`${CASE_MARKER}: SSH directory step 没有可见路径输入框`);
-  }
-  const pathInput = pathInputs[pathInputIndex]!;
-  if (parentPath === "/") {
-    // 本 case 的 /root、/home 都是根目录的直接子目录。点击真实“上一级”控件直接使用
-    // DirectoryBrowser.currentPath，避免受控 path input 与 Enter 提交之间的竞态。
-    await browser.waitUntil(
-      () =>
-        browser.execute(
-          (successTestId, activeIndex) => {
-            const success = document.querySelectorAll<HTMLElement>(
-              `[data-testid="${successTestId}"]`,
-            )[activeIndex];
-            const upButton = Array.from(
-              success?.querySelectorAll<HTMLButtonElement>("button") ?? [],
-            ).find((button) => button.innerText.trim() === "..");
-            if (!upButton) return false;
-            upButton.click();
-            return true;
-          },
-          TID_SSH_SUCCESS,
-          pathInputIndex,
-        ),
+      },
       {
         timeout: 30_000,
         interval: 100,
-        timeoutMsg: `${CASE_MARKER}: directory browser 没有显示上一级入口`,
+        timeoutMsg: `${CASE_MARKER}: task ${task.label} 列表状态不正确`,
       },
-    );
-  } else {
-    await pathInput.setValue(parentPath);
-    await browser.executeAsync((done) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => done()));
+    )
+    .catch((cause: unknown) => {
+      // 运行图标缺失不应挡住历史隔离与遥测取证；严格保留末尾失败，不能放行归属或错误异常。
+      if (
+        expected.running &&
+        latest?.exists &&
+        latest.inProject &&
+        latest.active === expected.active &&
+        !latest.error &&
+        !latest.running
+      ) {
+        runningRowMismatches.push({ taskId: task.taskId, label: task.label, observed: latest });
+        process.stdout.write(
+          `[${CASE_MARKER}] running-row-mismatch ${JSON.stringify(runningRowMismatches.at(-1))}\n`,
+        );
+        return;
+      }
+      throw new Error(
+        `${CASE_MARKER}: task ${task.label} 列表状态不正确 expected=${JSON.stringify(expected)} latest=${JSON.stringify(latest)}`,
+        { cause },
+      );
     });
-    await pathInput.click();
-    await browser.keys("Enter");
-  }
+}
 
-  // Bug 根因：直接修改 path input 并 requestSubmit 只能证明输入态变化，不能证明
-  // DirectoryBrowser 的 currentPath 已切换。等待父目录项目出现并点击，才走真实导航状态。
-  await browser.waitUntil(
-    async () =>
-      browser.execute(
-        (successTestId, expectedName, activeIndex) => {
-          const success = document.querySelectorAll<HTMLElement>(
-            `[data-testid="${successTestId}"]`,
-          )[activeIndex];
-          const entry = Array.from(
-            success?.querySelectorAll<HTMLButtonElement>("button") ?? [],
-          ).find((button) => button.innerText.trim() === expectedName);
-          if (!entry) return false;
-          entry.click();
-          return true;
-        },
-        TID_SSH_SUCCESS,
-        directoryName,
-        pathInputIndex,
-      ),
-    {
-      timeout: 30_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: 父目录没有显示目标目录 ${directoryName}`,
-    },
-  );
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        (successTestId, expectedPath, activeIndex) => {
-          const success = document.querySelectorAll<HTMLElement>(
-            `[data-testid="${successTestId}"]`,
-          )[activeIndex];
-          const input = success?.querySelector<HTMLInputElement>('input[type="text"]');
-          return input?.value === expectedPath;
-        },
-        TID_SSH_SUCCESS,
-        normalizedPath,
-        pathInputIndex,
-      ),
-    {
-      timeout: 30_000,
-      interval: 100,
-      timeoutMsg: `${CASE_MARKER}: directory browser 没有完成目标路径导航`,
-    },
-  );
-  await clickLastEnabledDialogButton();
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        (dialogTestId) => !document.querySelector<HTMLElement>(`[data-testid="${dialogTestId}"]`),
-        TID_SSH_DIALOG,
-      ),
-    {
-      timeout: WORKSPACE_READY_TIMEOUT_MS,
-      interval: 250,
-      timeoutMsg: `${CASE_MARKER}: 选择远端目录后连接向导没有关闭`,
-    },
-  );
+async function createReplayTunnel(config: SSHRuntimeConfig): Promise<ReplayTunnel> {
+  return createSSHReplayTunnel(config, CASE_MARKER);
 }
 
 async function waitForRemoteTab(options: {
-  expectedIdentity: string;
+  expectedIdentity?: string;
   expectedPath: string;
   expectedRemoteSessionId?: string | null;
   timeoutMs?: number;
@@ -808,12 +471,19 @@ async function waitForRemoteTab(options: {
     await browser.waitUntil(
       async () => {
         try {
-          snapshot = await readRemoteTabSnapshot(options.expectedIdentity);
+          snapshot = await readRemoteTabSnapshot(options.expectedIdentity, options.expectedPath);
+          const parsedIdentity = snapshot.workspaceIdentity
+            ? parseRemoteWorkspaceIdentity(snapshot.workspaceIdentity)
+            : null;
+          const expectedIdentityMatches = options.expectedIdentity
+            ? snapshot.workspaceIdentity === options.expectedIdentity
+            : parsedIdentity?.kind === "server" &&
+              parsedIdentity.workspacePath === options.expectedPath;
           return (
             snapshot.workspacePath === options.expectedPath &&
             snapshot.activeWorkspacePath === options.expectedPath &&
-            snapshot.workspaceIdentity === options.expectedIdentity &&
-            snapshot.activeWorkspaceIdentity === options.expectedIdentity &&
+            expectedIdentityMatches &&
+            snapshot.activeWorkspaceIdentity === snapshot.workspaceIdentity &&
             Boolean(snapshot.remoteSessionId) &&
             (!options.expectedRemoteSessionId ||
               snapshot.remoteSessionId === options.expectedRemoteSessionId)
@@ -840,53 +510,51 @@ async function waitForRemoteTab(options: {
   return snapshot;
 }
 
-function readRemoteTabSnapshot(expectedIdentity: string): Promise<RemoteTabSnapshot> {
-  return browser.execute((identity) => {
-    type RemoteTab = {
-      id: string;
-      kind: string;
-      remoteSessionId?: string;
-      remoteTarget?: Record<string, unknown>;
-      workspaceIdentity?: string;
-      workspacePath?: string;
-    };
-    const store = (
-      window as Window & {
-        __zcodeTabStoreE2E?: {
-          getState?: () => {
-            activeTabId?: string | null;
-            activeWorkspaceIdentity?: string | null;
-            activeWorkspacePath?: string | null;
-            tabs?: RemoteTab[];
+function readRemoteTabSnapshot(
+  expectedIdentity?: string,
+  expectedPath?: string,
+): Promise<RemoteTabSnapshot> {
+  return browser.execute(
+    (identity, workspacePath) => {
+      type RemoteTab = {
+        id: string;
+        kind: string;
+        remoteSessionId?: string;
+        remoteTarget?: Record<string, unknown>;
+        workspaceIdentity?: string;
+        workspacePath?: string;
+      };
+      const store = (
+        window as Window & {
+          __zcodeTabStoreE2E?: {
+            getState?: () => {
+              activeTabId?: string | null;
+              activeWorkspaceIdentity?: string | null;
+              activeWorkspacePath?: string | null;
+              tabs?: RemoteTab[];
+            };
           };
-        };
-      }
-    ).__zcodeTabStoreE2E;
-    const state = store?.getState?.();
-    const matchingRemoteTab = state?.tabs?.find((tab) => tab.workspaceIdentity === identity);
-    const remoteTarget = matchingRemoteTab?.remoteTarget;
-    return {
-      activeWorkspaceIdentity: state?.activeWorkspaceIdentity ?? null,
-      activeWorkspacePath: state?.activeWorkspacePath ?? null,
-      remoteHost: typeof remoteTarget?.host === "string" ? remoteTarget.host : null,
-      remoteKind: typeof remoteTarget?.kind === "string" ? remoteTarget.kind : null,
-      remoteSessionId: matchingRemoteTab?.remoteSessionId ?? null,
-      secretPersistedInTab: Boolean(
-        remoteTarget && ("password" in remoteTarget || "privateKeyPassphrase" in remoteTarget),
-      ),
-      workspaceIdentity: matchingRemoteTab?.workspaceIdentity ?? null,
-      workspacePath: matchingRemoteTab?.workspacePath ?? null,
-    };
-  }, expectedIdentity);
-}
-
-async function readHostProcesses(): Promise<
-  Array<{ name: string; pid: number }>
-> {
-  await openResourceManager();
-  await switchToElectronRendererTarget(isResourceManagerUrl);
-  await waitForResourceManagerReady();
-  const hosts = await listHostProcessIdentities();
-  await switchToElectronRendererTarget(isMainRendererUrl);
-  return hosts;
+        }
+      ).__zcodeTabStoreE2E;
+      const state = store?.getState?.();
+      const matchingRemoteTab = state?.tabs?.find((tab) =>
+        identity ? tab.workspaceIdentity === identity : tab.workspacePath === workspacePath,
+      );
+      const remoteTarget = matchingRemoteTab?.remoteTarget;
+      return {
+        activeWorkspaceIdentity: state?.activeWorkspaceIdentity ?? null,
+        activeWorkspacePath: state?.activeWorkspacePath ?? null,
+        remoteHost: typeof remoteTarget?.host === "string" ? remoteTarget.host : null,
+        remoteKind: typeof remoteTarget?.kind === "string" ? remoteTarget.kind : null,
+        remoteSessionId: matchingRemoteTab?.remoteSessionId ?? null,
+        secretPersistedInTab: Boolean(
+          remoteTarget && ("password" in remoteTarget || "privateKeyPassphrase" in remoteTarget),
+        ),
+        workspaceIdentity: matchingRemoteTab?.workspaceIdentity ?? null,
+        workspacePath: matchingRemoteTab?.workspacePath ?? null,
+      };
+    },
+    expectedIdentity ?? null,
+    expectedPath ?? null,
+  );
 }

@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project-cold-roots",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project-cold-roots.test.ts",
+  "fixtures": [
+    {
+      "id": "vp16-create",
+      "description": "Actual runtime scope CREATE",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP16_CREATE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp16-create",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP16_CREATE_READY"
+        }
+      }
+    },
+    {
+      "id": "vp16-live",
+      "description": "Actual runtime scope LIVE",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP16_LIVE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp16-live",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP16_LIVE_READY"
+        }
+      }
+    },
+    {
+      "id": "vp16-cold",
+      "description": "Actual runtime scope COLD",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed replies drive real Agent requests; assertions inspect actual multi-root capabilities and instruction boundaries, not model output quality."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP16_COLD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp16-cold",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP16_COLD_READY"
+        }
+      }
+    }
+  ]
+}

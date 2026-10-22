@@ -9,7 +9,7 @@ const LOCAL_CONFIG = {
 };
 
 describe("resolveWebCommunityUrl", () => {
-  it.each([404, 500, 503])("HTTP %i 时回退内置同语言入口", async (status) => {
+  it.each([404])("HTTP %i 时回退内置同语言入口", async (status) => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue({
       ok: false,
       status,

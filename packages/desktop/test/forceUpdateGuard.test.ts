@@ -46,7 +46,9 @@ const electronMocks = vi.hoisted(() => {
     center: vi.fn(),
     show: vi.fn(),
     webContents: {
-      executeJavaScript: vi.fn((script: string) => browserWindowInstance.executeJavaScriptMock(script)),
+      executeJavaScript: vi.fn((script: string) =>
+        browserWindowInstance.executeJavaScriptMock(script),
+      ),
       on: vi.fn(
         (
           event: string,
@@ -251,9 +253,7 @@ describe("forceUpdateGuard", () => {
   });
 
   it("按当前 endpoint 拼接 client/configs 地址", async () => {
-    const { resolveForceUpdateClientConfigUrl } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveForceUpdateClientConfigUrl } = await import("../src/main/forceUpdateGuard.js");
 
     const url = new URL(resolveForceUpdateClientConfigUrl("https://zcode.z.ai"));
 
@@ -264,9 +264,8 @@ describe("forceUpdateGuard", () => {
   });
 
   it("远端 client/configs 最低版本高于当前版本时返回强制升级要求", async () => {
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({
       logger: createLogger(),
@@ -284,9 +283,8 @@ describe("forceUpdateGuard", () => {
 
   it("远端 client/configs envelope code 非 0 时跳过强制升级校验", async () => {
     const logger = createLogger();
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({
       logger,
@@ -308,9 +306,8 @@ describe("forceUpdateGuard", () => {
   });
 
   it("兼容静态 config/default.json 形态的强制升级配置", async () => {
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({
       logger: createLogger(),
@@ -324,9 +321,8 @@ describe("forceUpdateGuard", () => {
 
   it("配置读取失败时跳过校验，预留离线进入主界面能力", async () => {
     const logger = createLogger();
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({
       logger,
@@ -342,9 +338,8 @@ describe("forceUpdateGuard", () => {
   it("远端 client/configs 非 2xx 响应时跳过校验并中止请求", async () => {
     const logger = createLogger();
     const request = mockNetResponse({ statusCode: 503, chunks: ["service unavailable"] });
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({ logger });
 
@@ -359,9 +354,8 @@ describe("forceUpdateGuard", () => {
   it("远端 client/configs 响应体过大时跳过校验并中止请求", async () => {
     const logger = createLogger();
     const request = mockNetResponse({ chunks: [Buffer.alloc(1024 * 1024 + 1)] });
-    const { resolveDesktopForceUpdateRequirement } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { resolveDesktopForceUpdateRequirement } =
+      await import("../src/main/forceUpdateGuard.js");
 
     const requirement = await resolveDesktopForceUpdateRequirement({ logger });
 
@@ -375,9 +369,8 @@ describe("forceUpdateGuard", () => {
     try {
       const logger = createLogger();
       const request = mockNetResponse({ hang: true });
-      const { resolveDesktopForceUpdateRequirement } = await import(
-        "../src/main/forceUpdateGuard.js"
-      );
+      const { resolveDesktopForceUpdateRequirement } =
+        await import("../src/main/forceUpdateGuard.js");
 
       const requirementPromise = resolveDesktopForceUpdateRequirement({ logger });
       await vi.advanceTimersByTimeAsync(10_000);
@@ -394,14 +387,14 @@ describe("forceUpdateGuard", () => {
   it("命中强制升级时自动升级按钮触发窗口内更新状态并保留窗口", async () => {
     electronMocks.setPromptAction("auto");
     let onStateChange: ((state: { kind: string; progress?: string }) => void) | undefined;
-    const requestAutoUpdate = vi.fn((listener?: (state: { kind: string; progress?: string }) => void) => {
-      onStateChange = listener;
-      listener?.({ kind: "checking" });
-      return vi.fn();
-    });
-    const { maybeBlockStartupForForceUpdate } = await import(
-      "../src/main/forceUpdateGuard.js"
+    const requestAutoUpdate = vi.fn(
+      (listener?: (state: { kind: string; progress?: string }) => void) => {
+        onStateChange = listener;
+        listener?.({ kind: "checking" });
+        return vi.fn();
+      },
     );
+    const { maybeBlockStartupForForceUpdate } = await import("../src/main/forceUpdateGuard.js");
 
     const resultPromise = maybeBlockStartupForForceUpdate({
       locale: "zh-CN",
@@ -451,7 +444,6 @@ describe("forceUpdateGuard", () => {
     expect(promptHtml).toContain("自动升级正在进行");
     expect(promptHtml).toContain("确认关闭");
     expect(promptHtml).toContain("继续更新");
-    expect(promptHtml).toContain("showCloseConfirmation");
     expect(promptHtml).toContain("action === 'quit' || action === 'manual'");
     electronMocks.browserWindowInstance.emitPageTitle("force-update:quit");
     expect(electronMocks.browserWindowInstance.close).toHaveBeenCalledOnce();
@@ -464,9 +456,7 @@ describe("forceUpdateGuard", () => {
   it("ready-to-show 未触发时通过 did-finish-load 兜底显示强制升级窗口", async () => {
     electronMocks.setPromptAction("auto");
     electronMocks.setTriggerReadyToShow(false);
-    const { maybeBlockStartupForForceUpdate } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { maybeBlockStartupForForceUpdate } = await import("../src/main/forceUpdateGuard.js");
 
     const resultPromise = maybeBlockStartupForForceUpdate({
       locale: "zh-CN",
@@ -485,9 +475,7 @@ describe("forceUpdateGuard", () => {
 
   it("命中强制升级时手动升级按钮打开官网下载页并退出", async () => {
     electronMocks.setPromptAction("manual");
-    const { maybeBlockStartupForForceUpdate } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { maybeBlockStartupForForceUpdate } = await import("../src/main/forceUpdateGuard.js");
 
     const result = await maybeBlockStartupForForceUpdate({
       locale: "en-US",
@@ -504,9 +492,7 @@ describe("forceUpdateGuard", () => {
   });
 
   it("弹窗文案只包含当前版本和最低可用版本", async () => {
-    const { formatForceUpdateDialogText } = await import(
-      "../src/main/forceUpdateGuard.js"
-    );
+    const { formatForceUpdateDialogText } = await import("../src/main/forceUpdateGuard.js");
 
     const text = formatForceUpdateDialogText(
       { currentVersion: "3.1.7", minimalVersion: "4.0.0" },

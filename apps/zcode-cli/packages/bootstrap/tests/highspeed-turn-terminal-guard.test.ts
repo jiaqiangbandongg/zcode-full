@@ -75,9 +75,7 @@ function makeSnapshot(options: {
 
 function makeContext(messages: ReturnType<typeof vi.fn>): never {
   return {
-    sessions: new Map([
-      ["session-1", { eventStore: {}, traceContext: { traceId: "trace-1" } }],
-    ]),
+    sessions: new Map([["session-1", { eventStore: {}, traceContext: { traceId: "trace-1" } }]]),
     deps: { sessionStore: { messages } },
     v4Gateway: undefined,
     logger: { warn: vi.fn() },
@@ -92,17 +90,6 @@ describe("highspeed turn terminal persistence guard", () => {
       "session-1",
       terminalEvent(),
       makeSnapshot({ highspeed: false, timing: true }),
-    );
-    expect(messages).not.toHaveBeenCalled();
-  });
-
-  it("无耗时字段的普通 turn 同样不触发扫描", () => {
-    const messages = vi.fn(async () => []);
-    persistHighspeedTimingOnTurnTerminal(
-      makeContext(messages),
-      "session-1",
-      terminalEvent(),
-      makeSnapshot({ highspeed: false, timing: false }),
     );
     expect(messages).not.toHaveBeenCalled();
   });

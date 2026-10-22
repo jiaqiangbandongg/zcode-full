@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-connectivity-test",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-connectivity-test.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-conn-connectivity",
+      "description": "设置页“测试模型”连通性请求（本机回放 anthropic 路径）",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "连通性测试只需 finish"
+      },
+      "maxMatches": 6,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["You are ZCode connectivity probe."]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-conn-connectivity",
+          "inputTokens": 8,
+          "outputTokens": 4,
+          "text": "R3_CONNECTIVITY_OK"
+        }
+      }
+    },
+    {
+      "id": "r3-conn-reconnect-title",
+      "description": "R3 connectivity test task 标题辅助响应。",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      },
+      "maxMatches": 4,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_CONNECTIVITY_TEST"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-conn-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"R3 connectivity test\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-conn-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    },
+    {
+      "id": "r3-conn-reconnect-main",
+      "description": "R3 connectivity test 首发和续发的通用响应。",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "slow-stream",
+        "source": "synthetic",
+        "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+      },
+      "maxMatches": 10,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/chat/completions",
+        "bodyIncludes": ["E2E_R3_CONNECTIVITY_TEST_"],
+        "bodyExcludes": ["Generate a concise title"]
+      },
+      "response": {
+        "statusCode": 200,
+        "delayMs": 1200,
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
+        "body": "data: {\"id\":\"r3-conn-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"R3_CONNECTIVITY_TEST_REPLY\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"r3-conn-main\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-ssh-remote-lifecycle-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+      }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-mobile",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-mobile.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-mobile.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-mob-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-mob-slow",
+      "description": "手机断网期间桌面独立持续、完成后手机恢复回放",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "手机离线15秒仍保持桌面流；显式释放后桌面完成，手机恢复才 replay 最终独立标记。"
+    },
+    {
+      "id": "r3-mob-from-mobile",
+      "description": "手机运行时桌面输入排队，释放手机回合后按FIFO消费",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "用闸门保证桌面输入发生在手机回合running窗口内，验证统一队列。"
+    },
+    {
+      "id": "r3-mob-from-desktop",
+      "description": "桌面排队回合的独立完成标记",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "区分两端输入的实际回复，防止旧首发回复使断言提前通过。"
+    },
+    {
+      "id": "r3-mob-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/fork/edit"
+    }
+  ]
+}

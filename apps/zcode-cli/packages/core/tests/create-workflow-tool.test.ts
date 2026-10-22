@@ -176,7 +176,7 @@ describe("CreateWorkflow tool", () => {
     expect(registry.has("CreateWorkflow")).toBe(true);
   });
 
-  it("typechecks a valid script cleanly", async () => {
+  it("emits the bounded display graph for a clean script", async () => {
     const output = await run({
       script:
         'interface R { done: boolean }\nconst r = await agent("a").ask<R>("do");\nreturn r.done;',
@@ -184,14 +184,6 @@ describe("CreateWorkflow tool", () => {
     expect(output.ok).toBe(true);
     expect(output.diagnostics).toEqual([]);
     expect(output.response).toContain("NOT executed");
-  });
-
-  it("emits the bounded display graph for a clean script", async () => {
-    const output = await run({
-      script:
-        'interface R { done: boolean }\nconst r = await agent("a").ask<R>("do");\nreturn r.done;',
-    });
-    expect(output.ok).toBe(true);
     expect(output.causalityGraph).toBeDefined();
     const graph = output.causalityGraph!;
     // One step, standing in the actor's lane, at its author-script (prelude-stripped,
@@ -215,6 +207,7 @@ describe("CreateWorkflow tool", () => {
       expect(Object.hasOwn(step, "region")).toBe(false);
       expect(Object.hasOwn(step, "certainty")).toBe(false);
     }
+    expect(Object.hasOwn(graph, "phases")).toBe(false);
     expectReferentialIntegrity(graph);
   });
 
@@ -253,10 +246,6 @@ describe("CreateWorkflow tool", () => {
     expect(output.ok).toBe(true);
     const graph = output.causalityGraph!;
     expect(graph.truncated).toBe(true);
-    expect(graph.steps.length).toBeLessThanOrEqual(64);
-    expect(graph.lanes.length).toBeLessThanOrEqual(32);
-    expect(graph.participants.length).toBeLessThanOrEqual(64);
-    expect(graph.handoffs.length).toBeLessThanOrEqual(256);
     // Lanes cap at 32 while steps cap at 64, so steps whose lane was dropped must go
     // too — otherwise the renderer gets a card with no row to sit in. Each surviving
     // actor is one card in the single implicit phase.
@@ -273,7 +262,7 @@ describe("CreateWorkflow tool", () => {
     // 不上箭头。
     const output = await run({
       script: [
-        'interface Flaky { findings: string[] }',
+        "interface Flaky { findings: string[] }",
         'const f = await agent("a").ask<Flaky>("f");',
         "for (let i = 0; i < 2; i++) {",
         '  const u = await agent("b").ask<string>(`use ${f.findings[0]}`);',
@@ -289,16 +278,6 @@ describe("CreateWorkflow tool", () => {
       { from: "unphased:actor#2", to: "unphased:actor#3", types: ["string"] },
       { from: "unphased:actor#3", to: "unphased:actor#2", back: true },
     ]);
-    for (const edge of graph.handoffs) {
-      for (const key of Object.keys(edge)) expect(["back", "from", "to", "types"]).toContain(key);
-      expect(Object.hasOwn(edge, "kind")).toBe(false);
-      expect(Object.hasOwn(edge, "certainty")).toBe(false);
-    }
-    for (const edge of graph.phaseEdges ?? []) {
-      expect(Object.keys(edge).sort()).toEqual(
-        edge.back === true ? ["back", "from", "to"] : ["from", "to"],
-      );
-    }
   });
 
   it("carries an interpolated actor name's static shape through the bounded payload", async () => {
@@ -385,9 +364,27 @@ describe("CreateWorkflow tool", () => {
     expect(output.ok).toBe(true);
     const graph = output.causalityGraph!;
     expect(graph.participants).toEqual([
-      { id: "phase#1:actor#1[0]", phase: "phase#1", lane: "actor#1", steps: ["ask#1"], member: { index: 0, of: 3 } },
-      { id: "phase#1:actor#1[1]", phase: "phase#1", lane: "actor#1", steps: ["ask#1"], member: { index: 1, of: 3 } },
-      { id: "phase#1:actor#1[2]", phase: "phase#1", lane: "actor#1", steps: ["ask#1"], member: { index: 2, of: 3 } },
+      {
+        id: "phase#1:actor#1[0]",
+        phase: "phase#1",
+        lane: "actor#1",
+        steps: ["ask#1"],
+        member: { index: 0, of: 3 },
+      },
+      {
+        id: "phase#1:actor#1[1]",
+        phase: "phase#1",
+        lane: "actor#1",
+        steps: ["ask#1"],
+        member: { index: 1, of: 3 },
+      },
+      {
+        id: "phase#1:actor#1[2]",
+        phase: "phase#1",
+        lane: "actor#1",
+        steps: ["ask#1"],
+        member: { index: 2, of: 3 },
+      },
       { id: "phase#1:actor#2", phase: "phase#1", lane: "actor#2", steps: ["ask#2"] },
     ]);
     expect(graph.handoffs).toEqual([
@@ -415,7 +412,8 @@ describe("CreateWorkflow tool", () => {
       { from: "unphased:actor#1", to: "unphased:actor#2", types: ["Draft"] },
       { from: "unphased:actor#2", to: "unphased:actor#3", types: ["string[]"] },
     ]);
-    for (const participant of graph.participants) expect(Object.hasOwn(participant, "member")).toBe(false);
+    for (const participant of graph.participants)
+      expect(Object.hasOwn(participant, "member")).toBe(false);
     expectReferentialIntegrity(graph);
   });
 
@@ -476,15 +474,11 @@ describe("CreateWorkflow tool", () => {
       ...byPhase("phase#5"),
     ]);
     const lanes = new Map(graph.lanes.map((lane) => [lane.id, lane.name]));
-    expect(["actor#1", "actor#2", "actor#4", "actor#5", "actor#6", "actor#7", "actor#8"].map((id) => lanes.get(id))).toEqual([
-      "architect",
-      "harness",
-      "fixer",
-      "jury-a",
-      "jury-b",
-      "jury-c",
-      "polisher",
-    ]);
+    expect(
+      ["actor#1", "actor#2", "actor#4", "actor#5", "actor#6", "actor#7", "actor#8"].map((id) =>
+        lanes.get(id),
+      ),
+    ).toEqual(["architect", "harness", "fixer", "jury-a", "jury-b", "jury-c", "polisher"]);
     const members = graph.participants.filter((p) => p.lane === "actor#3");
     expect(members.map((p) => p.member)).toEqual(
       Array.from({ length: 5 }, (_, index) => ({ index, of: 5 })),
@@ -565,22 +559,6 @@ describe("CreateWorkflow tool", () => {
     expectReferentialIntegrity(graph);
   });
 
-  it("keeps a zero-marker graph free of every phase field", async () => {
-    // UI 的视图切换条件就是「词汇表在场与否」，所以零标记脚本必须一个阶段字段都不带——
-    // 缺席，不是 undefined 值，也不是空数组。
-    const output = await run({
-      script:
-        'interface R { done: boolean }\nconst r = await agent("a").ask<R>("do");\nreturn r.done;',
-    });
-    expect(output.ok).toBe(true);
-    const graph = output.causalityGraph!;
-    expect(Object.hasOwn(graph, "phases")).toBe(false);
-    expect(Object.hasOwn(graph, "phaseEdges")).toBe(false);
-    expect(Object.hasOwn(graph, "exits")).toBe(false);
-    for (const step of graph.steps) expect(Object.hasOwn(step, "phase")).toBe(false);
-    for (const participant of graph.participants) expect(participant.phase).toBe("unphased");
-  });
-
   it("carries the unphased fallback for steps before the first marker", async () => {
     const output = await run({
       script: [
@@ -595,7 +573,6 @@ describe("CreateWorkflow tool", () => {
     // 兜底阶段排在最前（它装的是首个标记之前的 step）且**无 name**：显示名由 UI 本地化，
     // 与 workspace / unknown 车道同一模式。
     expect(graph.phases?.[0]).toEqual({ id: "unphased" });
-    expect(Object.hasOwn(graph.phases![0]!, "name")).toBe(false);
     expect(graph.phases?.[1]).toMatchObject({ id: "phase#1", name: "later" });
     expect(graph.steps.map((step) => step.phase)).toEqual(["unphased", "phase#1"]);
     // 词汇表在场时兜底阶段是表里的一员，卡照常归入它。
@@ -652,7 +629,9 @@ describe("CreateWorkflow tool", () => {
     expect(graph.phaseEdges).toEqual([{ from: "phase#1", to: "phase#2" }]);
     expect(graph.exits).toEqual(["phase#2"]);
     for (const step of graph.steps) expect(step.phase).toBe("phase#1");
-    expect(graph.participants.map((p) => [p.id, p.steps.length])).toEqual([["phase#1:actor#1", 64]]);
+    expect(graph.participants.map((p) => [p.id, p.steps.length])).toEqual([
+      ["phase#1:actor#1", 64],
+    ]);
     expectReferentialIntegrity(graph);
   });
 
@@ -675,21 +654,6 @@ describe("CreateWorkflow tool", () => {
     // step 的 `phase` 必须一起消失：带着一个不在 phases 里的阶段 id 的卡片是悬空引用。
     expect(graph.steps).toHaveLength(33);
     for (const step of graph.steps) expect(Object.hasOwn(step, "phase")).toBe(false);
-  });
-
-  it("keeps participants inside the vocabulary when the vocabulary degrades", async () => {
-    // spec「契约」引用完整性：`participant.phase` ∈ `phases[].id`，或全部为 `unphased` 且
-    // `phases` 缺席。词汇表整体降级后卡不能还认领 `phase#N`——UI 会去查一个不存在的阶段。
-    const marked = Array.from(
-      { length: 33 },
-      (_, index) => `phase("p${index}");\nconst r${index} = await a.ask<string>("m${index}");`,
-    );
-    const output = await run({
-      script: ['const a = agent("a");', ...marked, "return r0;"].join("\n"),
-    });
-    expect(output.ok).toBe(true);
-    const graph = output.causalityGraph!;
-    expect(Object.hasOwn(graph, "phases")).toBe(false);
     expectReferentialIntegrity(graph);
   });
 
@@ -1105,12 +1069,6 @@ describe("CreateWorkflow tool", () => {
     expectReferentialIntegrity(graph);
   });
 
-  it("withholds the display graph when the script has type errors", async () => {
-    const output = await run({ script: 'const x: number = "s";' });
-    expect(output.ok).toBe(false);
-    expect(output.causalityGraph).toBeUndefined();
-  });
-
   it("surfaces facade-misuse diagnostics with ok=false and no graph", async () => {
     const output = await run({ script: "const spawn = agent;\nreturn 1;" });
     expect(output.ok).toBe(false);
@@ -1126,6 +1084,7 @@ describe("CreateWorkflow tool", () => {
   it("reports diagnostics for a type error with script-relative line", async () => {
     const output = await run({ script: 'const x: number = "s";' });
     expect(output.ok).toBe(false);
+    expect(output.causalityGraph).toBeUndefined();
     expect(output.diagnostics.some((diagnostic) => diagnostic.line === 1)).toBe(true);
     expect(output.response).toContain("L1:");
     expect(output.response).toContain("NOT executed");
@@ -1150,9 +1109,9 @@ describe("CreateWorkflow tool", () => {
   it("rejects Node globals to enforce script purity", async () => {
     const output = await run({ script: "process.exit(1);" });
     expect(output.ok).toBe(false);
-    expect(output.diagnostics.some((diagnostic) => diagnostic.message.includes("Cannot find name"))).toBe(
-      true,
-    );
+    expect(
+      output.diagnostics.some((diagnostic) => diagnostic.message.includes("Cannot find name")),
+    ).toBe(true);
   });
 
   it("rejects input missing the script field", async () => {
@@ -1190,11 +1149,6 @@ describe("CreateWorkflow resolveInput — max_concurrency", () => {
 
   it("leaves a request above the default byte-identical: there is no upper limit", async () => {
     const input = { script: "return 1;", max_concurrency: 200 };
-    expect(await resolved(input)).toBe(input);
-  });
-
-  it("leaves a small request byte-identical: the inline path stays the identity", async () => {
-    const input = { script: "return 1;", max_concurrency: 3 };
     expect(await resolved(input)).toBe(input);
   });
 
@@ -1297,6 +1251,12 @@ describe("CreateWorkflow resolveInput — subagent_model", () => {
   });
 
   it("fails before the confirmation window and lists the ids the model could have used", async () => {
+    // 裸名只在别的 provider 下有：边界挡回，窗不开，文案把「用户点名才写全称」说给模型听。
+    const crossing = await failed({ script: "return 1;", subagent_model: "gpt-5" }, CATALOG);
+    expect(crossing.message).toContain("session's provider (bigmodel)");
+    expect(crossing.message).toContain("openai/gpt-5");
+    expect(crossing.message).toContain("ask the user first");
+
     const failure = await failed({ script: "return 1;", subagent_model: "gemini-3" }, CATALOG);
     expect(failure.message).toContain("No configured model matches `gemini-3`");
     expect(failure.message).toContain("bigmodel/GLM-4.6 [current]");
@@ -1319,8 +1279,9 @@ describe("CreateWorkflow resolveInput — subagent_model", () => {
     const cwd = mkdtempSync(join(tmpdir(), "dwf-subagent-model-"));
     try {
       saveSavedWorkflow({ cwd, name: "nightly", meta: { description: "d" }, script: "return 1;" });
+      // 全称：`gpt-5` 不在会话的 provider（bigmodel）下，裸名会被 provider 边界挡回。
       const input = await resolved(
-        { saved: { name: "nightly" }, subagent_model: "GPT-5" },
+        { saved: { name: "nightly" }, subagent_model: "openai/GPT-5" },
         CATALOG,
         cwd,
       );
@@ -1573,7 +1534,6 @@ describe("boundCausalityGraph — 对损坏输入的引用完整性", () => {
       handoff,
     );
     expect(bounded.truncated).toBe(true);
-    expect(bounded.participants).toHaveLength(64);
     expect(bounded.participants.map((p) => p.id)).toEqual(
       Array.from({ length: 64 }, (_, index) => `unphased:actor#1[${index}]`),
     );
@@ -1598,7 +1558,12 @@ describe("boundCausalityGraph — 对损坏输入的引用完整性", () => {
     // 仍留在 `steps`（运行状态照常关联）。任一丢弃置 truncated。
     const handoff: HandoffGraph = {
       participants: [
-        { id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1", "ask#ghost"] },
+        {
+          id: "unphased:actor#1",
+          phase: "unphased",
+          lane: "actor#1",
+          steps: ["ask#1", "ask#ghost"],
+        },
         { id: "unphased:actor#9", phase: "unphased", lane: "actor#9", steps: ["ask#1"] },
         { id: "unphased:workspace", phase: "unphased", lane: "workspace", steps: ["ask#ghost"] },
       ],

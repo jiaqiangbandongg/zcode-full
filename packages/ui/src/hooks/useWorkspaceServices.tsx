@@ -57,12 +57,14 @@ export function resolveWorkspaceServicesForTarget(params: {
   baseServices: IServiceAccessor | null;
   sessionsById: Record<string, Pick<RemoteWorkspaceSession, "services">>;
   isRemoteTarget: boolean;
+  /** 无 workspace 的设置 user/server scope 可显式指定 SourceSettingsAttachment。 */
+  unscopedServices?: IServiceAccessor;
 }): IServiceAccessor {
   const resolvedServices = params.resolvedRemoteSessionId
     ? (params.sessionsById[params.resolvedRemoteSessionId]?.services ?? null)
     : params.isRemoteTarget
       ? getDisconnectedRemoteServices()
-      : params.baseServices;
+      : (params.unscopedServices ?? params.baseServices);
 
   if (params.isRemoteTarget && !resolvedServices) {
     return getDisconnectedRemoteServices();
@@ -158,6 +160,7 @@ export function useWorkspaceServicesResolution(
   preferredRemoteSessionId?: string | null,
   workspaceIdentity?: string | null,
   remoteTarget?: unknown,
+  options?: { unscopedServices?: IServiceAccessor; forceUnscoped?: boolean },
 ): WorkspaceServicesResolution {
   const currentContextServices = useServices();
   const resolvedRemoteSessionId = useResolvedRemoteWorkspaceSessionId(
@@ -166,7 +169,7 @@ export function useWorkspaceServicesResolution(
     workspaceIdentity,
     remoteTarget,
   );
-  const isRemoteTarget = useTabStore((state) =>
+  const inferredRemoteTarget = useTabStore((state) =>
     resolveWorkspaceServiceIsRemoteTarget({
       workspacePath,
       workspaceIdentity,
@@ -182,17 +185,20 @@ export function useWorkspaceServicesResolution(
       workspaceTabs: state.tabs.filter(isWorkspaceTab),
     }),
   );
+  const isRemoteTarget = options?.forceUnscoped ? false : inferredRemoteTarget;
+  const effectiveRemoteSessionId = options?.forceUnscoped ? null : resolvedRemoteSessionId;
   const resolvedServices = useRemoteWorkspaceSessionStore((state) =>
     resolveWorkspaceServicesForTarget({
       currentContextServices,
-      resolvedRemoteSessionId,
+      resolvedRemoteSessionId: effectiveRemoteSessionId,
       baseServices: state.baseServices,
       sessionsById: state.sessionsById,
       isRemoteTarget,
+      unscopedServices: options?.unscopedServices,
     }),
   );
   const connectionKind = isRemoteTarget
-    ? resolvedRemoteSessionId
+    ? effectiveRemoteSessionId
       ? "remote-ready"
       : "remote-waiting"
     : "local-ready";
@@ -205,12 +211,12 @@ export function useWorkspaceServicesResolution(
   return useMemo(
     () => ({
       services: resolvedServices,
-      remoteSessionId: resolvedRemoteSessionId,
+      remoteSessionId: effectiveRemoteSessionId,
       isRemoteTarget,
       connectionKind,
       rpcReady: connectionKind !== "remote-waiting",
     }),
-    [connectionKind, isRemoteTarget, resolvedRemoteSessionId, resolvedServices],
+    [connectionKind, effectiveRemoteSessionId, isRemoteTarget, resolvedServices],
   );
 }
 
@@ -219,11 +225,13 @@ export function useWorkspaceServices(
   preferredRemoteSessionId?: string | null,
   workspaceIdentity?: string | null,
   remoteTarget?: unknown,
+  options?: { unscopedServices?: IServiceAccessor; forceUnscoped?: boolean },
 ): IServiceAccessor {
   return useWorkspaceServicesResolution(
     workspacePath,
     preferredRemoteSessionId,
     workspaceIdentity,
     remoteTarget,
+    options,
   ).services;
 }

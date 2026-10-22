@@ -14,7 +14,7 @@ come out of this:
 
 | Surface | Where | When |
 |---|---|---|
-| the **notification row** | the transcript turn that a run event wakes | every terminal state, every escalated question, every stall |
+| the **notification row** | the transcript turn that a run event wakes | every terminal state, every escalated question, every hole, every stall, every reminder of a decision left open |
 | the **completion card** | the tail of that turn | completed runs only |
 | the **script transcript** | a side-pane tab, one per run | any run that has touched the project |
 | the **epilogue fold** | a subagent's transcript tab | every ask the engine dispatched |
@@ -61,6 +61,29 @@ workflowNotification?:
   | { kind: "stall"; sinceMs: number; reason?: string; cap?: number };
 ```
 
+The reminder for an idle main agent ("Reminding an idle main agent", below) is not a member
+of this union. It rides in a key of its own, beside `workflowNotification` on the same
+`BackgroundResultOriginMeta`:
+
+```ts
+workflowBlocked?: { questions: number; holes: number; sinceMs: number };
+```
+
+The reason is what a client does with a row it cannot read. A client parses a whole frame
+against its own copy of the schema, and the union is closed: a `kind` the client does not
+know fails the frame, not the row. The snapshot it then asks for carries the same row and
+fails the same way, so the client cannot open the session at all. A key the client does not
+know is different: the containing object is not strict, the key is stripped, and the row is
+read as a workflow notice with no payload, which draws as the bare title row. The CLI and
+the desktop ship together, but the phone's remote page is deployed on its own schedule and
+may be older than the CLI it talks to. So the rule for this payload is: a new kind of notice
+gets a new optional key, and `workflowNotification` gains no members. A row carries at most
+one of the two keys.
+
+`workflowBlocked` is also read tolerantly by clients that do know it: a value that fails its
+schema is treated as absent, so a later change to its shape degrades to the bare title row
+on those clients and does not cost them the session.
+
 The payload rides the turn-header row through the protocol and the snapshot, so it is
 bounded. Truncation is honest rather than silent: `resultTruncated` means the preview is
 partial and the full value is reachable through `GetWorkflowRun`; `reports.count` greater
@@ -88,7 +111,9 @@ their bytes through the artifact queries.
 |---|---|---|
 | `terminal` | the background task tracker's settlement path in `packages/core` (`background-tasks.ts`), for both `CreateWorkflow` and `ResumeWorkflowRun` launches | the run's terminal snapshot arrives |
 | `escalation` | `dynamic-workflow-run-progress.ts` in `packages/core`, next to the run progress event | an `escalation-raised` run event |
-| `stall` | the same file | a `run-stalled` run event |
+| `hole` | `dynamic-workflow-run-hole-notification.ts`, called from the same place | a `hole-reached` run event |
+| `stall` | `dynamic-workflow-run-progress.ts` | a `run-stalled` run event |
+| the reminder (`workflowBlocked`) | `dynamic-workflow-blocked-reminder.ts` in `packages/core` | the parent session has stayed idle while one of its live runs has an open question or a waiting hole ("Reminding an idle main agent", below) |
 
 The terminal payload exists only when the tracker status is terminal **and** a snapshot is
 present. A run whose in-process state was lost has no snapshot and gets no payload; the
@@ -98,11 +123,81 @@ row falls back to the bare title. The tracker's generic words map onto the run's
 
 The escalation and stall emitters never throw: they are observation, and the run's truth
 is the journal. A malformed event is skipped with a log line. Each `escalation-raised`
-yields exactly one notification, never re-sent; an answered question yields none, because
-the answer was the main agent's own tool call. Each stall segment yields one notification;
+and each `hole-reached` yields exactly one notification of its own, never re-sent; an
+answered question or a filled hole yields none, because the answer was the main agent's own
+tool call. A decision that stays open is picked up by the reminder below, which is a
+different notice built from the run's state, not a second copy of the first. Each stall
+segment yields one notification;
 a later success re-arms the clock without an "unstalled" message. The run label on both is
 the registry description of the run, else the run id, and an anonymous subagent is named by
 its structural reference `site@ordinal`, the same fallback the text uses.
+
+### Reminding an idle main agent
+
+A question or a hole is the one kind of event after which the run owes nothing and the main
+agent owes something, and nothing on the run's side times out. Its own notification wakes
+one turn. That turn can come to nothing in three ways: it fails (a provider error, the app
+quitting mid-request), the model ends it without answering, or it carried several notices
+and one was passed over. None of these leaves a mark the run can see, and if every branch
+of the script ends up parked the run never settles, so no terminal notification arrives
+either. So a second mechanism watches the state instead of the delivery: **while the parent
+session is idle and one of its live runs has an open decision, a clock runs, and when it
+expires the main agent is told again.**
+
+```
+a live run of this session exists?
+      │ no  ──────────────────────────────▶ nothing armed
+      │ yes
+the session is running a turn, or has one queued?
+      │ yes ──────────────────────────────▶ nothing armed
+      │ no: its command queue just drained (the idle edge)
+    armed ── any turn starts ─────────────▶ disarmed; armed afresh at the next idle edge
+      │ the delay passes
+read each due run's snapshot
+      │ open question or waiting hole ────▶ one reminder for that run
+      │ nothing open ─────────────────────▶ nothing; the next delay, if any, is armed
+```
+
+| Rule | Value |
+|---|---|
+| What the clock measures | how long the session has been idle: from the moment its command queue drains (the last turn finished, failed or was cancelled) until now. A turn of any origin stops it, and the next idle edge starts it from zero |
+| First reminder | after 15 idle minutes |
+| Second reminder | after 30 idle minutes, counted from the end of the turn the first one woke |
+| After the second | none, until a fresh start |
+| Fresh start for one run | its open set changes: an `escalation-raised`, `escalation-resolved`, `hole-reached` or `hole-filled` event of that run. If the session is idle at that moment the idle clock also restarts |
+| Fresh start for every run | the user sends a message: a prompt, or a message steered into a running turn |
+| Not a fresh start | a turn woken by another background notice (a Bash job, a stall, another run ending), and a reminder's own turn |
+| Coverage | one notice per run, listing every question and hole it has open; never one per decision |
+| Due | a run is due when the idle time has reached the delay its own count asks for (15 minutes with no reminder sent, 30 with one) |
+
+The clock is idle time rather than time since the decision was raised because the two
+other cases need no reminder: while a turn is running, the original notice is either in
+front of the model or queued behind the turn, and a second one beside it is a duplicate.
+A session whose turn is waiting on the user (a permission prompt, a question to the user)
+is in a turn, so its clock is not running.
+
+**One source of truth.** What is open is read from the run snapshot's `pendingQuestions`
+and its `holes` in state `waiting` at the moment the clock expires, the same projection
+`GetWorkflowRun` prints. The reminder keeps no copy of the open set; the only thing it
+remembers is how many reminders each run has had. The four events above are used solely to
+forget that count. A run that is no longer live (settled, or belonging to a conversation
+branch that was rewound away) is skipped and its count dropped.
+
+**A reminder counts when it is enqueued**, not when its turn succeeds. A provider that
+keeps failing therefore costs two reminder turns and then silence, rather than a retry
+loop; the user's next message starts a fresh pair.
+
+**The clock belongs to the session, not the run.** Idleness is a fact about the parent
+session, so the reminder is not a run event: the engine does not know about it and the
+journal does not record it, unlike `run-stalled`. It lives in the process that owns the
+session. When that process exits, a live run is stopped as `interrupted` and its resume
+re-raises every open decision with a notification of its own.
+
+**Delivery adds nothing new.** A reminder is an ordinary background notification command:
+the same queue, ledger admission, branch fencing and shutdown drop as the notices above,
+on the desktop's continuous stream and the phone's replayable stream alike. With several
+blocked runs their notices are enqueued together and follow the queue's ordinary rule: the
+later ones are steered into the turn the first one woke, or wake a turn of their own.
 
 ### The pipeline and cold restore
 
@@ -135,10 +230,15 @@ sits at the ordinary flow gap below the previous turn.
 | terminal, stopped | `Workflow` | Workflow stopped / 工作流已停止 `· <reason>` | `· <run name>` | the error panel when an error is present (provider, interrupted), else the result |
 | escalation | `MessageCircleQuestion` | one of three live states, below | the question, one line, 160 characters | the question in full, then the context in subtle text, then how long the subagent has waited, then the run link |
 | hole | `Pen` | one of three live states, below | `· <run name> · <hole name>` (the type is on the wire for the model, never on the row) | the prompt in full (the values the author interpolated as it carries them), where the hole stands (the phases before and after), the draft path, then how long it has waited, then the run link |
+| blocked | `Hourglass` | Workflow waiting on the agent / 工作流等待主代理 | `· <run name>` | one line of what was open when the reminder was sent, `2 questions · 1 hole · open for 17 min` (a zero count is left out; the minutes are the oldest open decision's wait), then the run link |
 | stall | `Hourglass` | Workflow waiting on the model / 工作流等待模型 | `· <run name>` | one sentence naming the minutes, then `Retry reason` and `Max concurrency` / 「最大并发数」 fact lines when present (the second is the shared cap at the moment of the stall: a bound, so it carries the bound's word, never a word that reads as a count of what is running) |
 
 The stop reason words are by you / by the agent / model error / process exited (你停止的 /
 代理停止的 / 模型侧错误 / 进程已退出).
+
+The blocked row, like the stall row, describes the moment it was sent and does not change
+afterwards. Whether each decision has since been answered is on that decision's own row,
+which does flip (below).
 
 A terminal row is expandable only when it has a result or an error; with neither, it has
 no chevron. Reports and usage are carried in the payload and not rendered. An errored run
@@ -297,6 +397,24 @@ the run keeps going, that nothing times out, that the body is compiled where the
 stands and sees every binding declared before it, that it must return the named type, and
 that `GetWorkflowRun` lists open holes if the notification is ever lost. It opens with the
 same banner as the other three.
+
+The reminder text is a `<workflow-blocked>` block followed by the next step. The block
+carries the run id and name, `<reminder>` (`1 of 2` or `2 of 2`), `<open-questions
+count shown>` with one `<question id subagent waited-ms>` per question holding its text and
+context, `<open-holes count shown>` with one `<hole id name type line waited-ms>` per hole,
+and the draft path when the run recorded one. At most eight questions and eight holes are
+listed, each text cut at 2,000 characters; `count` greater than `shown` says the rest is in
+`GetWorkflowRun`. The prose after the block says, in order:
+
+- the run is still waiting on the agent, how many decisions are open and for how long the
+  oldest has waited;
+- the next step, verbatim: `ResolveWorkflowQuestion` with each `question_id`, and
+  `FillWorkflowHole` with the `run_id` and each `hole_id` after reading the draft;
+- if a decision needs the user, tell the user exactly what is needed and end the turn, and
+  do not guess an answer to make the reminders stop;
+- on the first reminder, that one more follows if nothing changes; on the second, that it
+  is the last until the user writes or the run's open decisions change. Both say the parked
+  branches keep waiting and nothing times out on their behalf.
 
 ## The completion card
 
@@ -794,6 +912,25 @@ open state is local to the row and not persisted. The TUI shows the full text.
 
 ## Alternatives not taken
 
+- **A clock counted from the moment the decision was raised**: it fires while the main
+  agent is mid-turn with the original notice still queued, which adds a duplicate, and when
+  the agent is already idle it only delays a reminder that nothing is going to make
+  unnecessary.
+- **Reminding at a fixed interval for as long as the decision is open**: every reminder is
+  a full main-agent request over the whole conversation. A model that is rightly waiting on
+  the user would be asked again all night; two reminders and then the user's next message
+  bound the cost.
+- **One reminder per open decision**: twenty parked subagents would produce twenty notices
+  for one fact, "this run is waiting on you".
+- **Re-sending the question's or the hole's own notification**: the transcript would show
+  two live rows for one decision, and several open decisions would need the batch form that
+  carries no payload.
+- **Retrying the notification turn that failed**: it needs a durable record of which turn
+  delivered which notice and whether it finished. Reading what is still open answers the
+  same question from state that already exists.
+- **Recording the reminder as a run event**: the journal would hold a fact about the parent
+  session's idleness, and a resumed run would replay reminders that belong to a process
+  that is gone.
 - **A ledger-style notification entry** (double rules with the legend set into the top rule,
   an alignment grid, gutter marks): in a real transcript it introduced new visual elements
   for no information; the tool-row grammar makes a notification a sibling of every other
@@ -830,6 +967,12 @@ open state is local to the row and not persisted. The TUI shows the full text.
 
 ## Open questions
 
+- A reminder reaches only the main agent. Once both are spent the user is the one who can
+  move the run, and nothing outside the transcript rows tells them: whether a blocked run
+  should raise a signal for the user (the sidebar, an OS notification) is open.
+- A run with every branch parked waits the same 15 idle minutes as one with a single
+  parked branch. Telling the two apart needs a signal that joins the engine's parked holes
+  with the driver's parked questions.
 - Tokens are not in the terminal payload, because the tracker cannot know usage at emit
   time; the figure depends on the run projection. A journal-backed usage query would make
   the card whole without the projection.

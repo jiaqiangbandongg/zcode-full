@@ -137,7 +137,6 @@ describe("desktop BrowserView IPC", () => {
       "browser:owner-tab",
       { width: 375, height: 667 },
       23,
-      1.21,
     );
 
     await expect(

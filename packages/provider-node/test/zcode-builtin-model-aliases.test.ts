@@ -2,8 +2,77 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { NodeZCodeBuiltinProviderConfigSource } from "../src/index.js";
 import { compileModelOptionMaps } from "@zcode/model-option-map";
+import { parseModelConfig } from "@zcode/provider";
 
 describe("发布模型规则的前后缀与覆盖顺序", () => {
+  it.each(["zcode-builtin.json", "zcode-builtin.test.json"])(
+    "%s：默认容量由通用规则提供，专用型号与 Personal 保留覆盖权",
+    async (filename) => {
+      const source = new NodeZCodeBuiltinProviderConfigSource({
+        bundledFilePath: fileURLToPath(
+          new URL(`../../../config/provider/${filename}`, import.meta.url),
+        ),
+        watch: false,
+      });
+      try {
+        const snapshot = await source.read();
+        for (const apiType of [
+          "anthropic-messages",
+          "openai-chat-completions",
+          "openai-responses",
+        ]) {
+          const get = (modelId: string) =>
+            snapshot.models.resolve({
+              providerId: "custom-baseline",
+              modelId,
+              apiType,
+              baseUrl: "https://example.test/v1",
+            });
+          const fallback = get("future-unknown-model");
+          expect(fallback.properties?.contextWindow).toBe(1_000_000);
+          expect(fallback.optionSpecs?.maxOutputTokens?.max).toBe(128_000);
+          expect(get("claude-haiku-4-5").properties?.contextWindow).toBe(200_000);
+          expect(get("qwen3.8-omni-flash").optionSpecs?.maxOutputTokens?.max).toBe(16_384);
+          const personal = fallback.overlay(
+            parseModelConfig({
+              properties: { contextWindow: 64_000 },
+              optionSpecs: { maxOutputTokens: { max: 8_000 } },
+            }),
+          );
+          expect(personal.properties?.contextWindow).toBe(64_000);
+          expect(personal.optionSpecs?.maxOutputTokens?.max).toBe(8_000);
+          const request = compileModelOptionMaps(fallback.optionSpecs!.toJSON()).apply(
+            {},
+            {
+              reasoningLevel: "enabled",
+              maxOutputTokens: 1000,
+            },
+          );
+          const field =
+            apiType === "anthropic-messages"
+              ? "max_tokens"
+              : apiType === "openai-responses"
+                ? "max_output_tokens"
+                : "max_completion_tokens";
+          expect(request[field]).toBe(1000);
+        }
+        expect(
+          snapshot.models
+            .rules()
+            .filter((r) => r.type === "model")
+            .map((r) => r.modelMatch),
+        ).not.toContain(".*\\[1m\\]");
+        expect(
+          snapshot.models
+            .rules()
+            .filter((r) => r.type === "model")
+            .map((r) => r.modelMatch),
+        ).not.toContain(".*(?:ox-alpha|glm-x-preview-f|x-preview-f-free).*");
+      } finally {
+        source.dispose();
+      }
+    },
+  );
   it("OpenRouter Messages 的 GPT 选择实际生成对应 effort，保留完整请求型号", async () => {
     const source = new NodeZCodeBuiltinProviderConfigSource({
       bundledFilePath: fileURLToPath(
@@ -88,6 +157,7 @@ describe("发布模型规则的前后缀与覆盖顺序", () => {
             `${modelId}-20250901`,
             `gateway/${modelId}-20250901`,
             `gateway/${modelId}:free`,
+            `gateway/${modelId}_custom`,
           ]) {
             expect(get(alias), alias).toEqual(expected);
           }
@@ -101,6 +171,21 @@ describe("发布模型规则的前后缀与覆盖顺序", () => {
         expect(get("gateway/mimo-v2.5-pro-20250901").properties?.inputFormat?.supportsVideo).toBe(
           false,
         );
+        expect(get("gateway/gpt-5.4-mini_custom").properties?.contextWindow).toBe(400_000);
+        expect(get("gateway/gpt-5.4_custom").properties?.contextWindow).toBe(1_050_000);
+        if (apiType === "anthropic-messages") {
+          // GLM-4.6 文本型号的专用映射不能覆盖 V 视觉型号原先继承的协议基线。
+          const vision = get("GLM-4.6V");
+          expect(
+            compileModelOptionMaps(vision.optionSpecs!).apply(
+              {},
+              {
+                reasoningLevel: "enabled",
+                maxOutputTokens: 1000,
+              },
+            ).thinking,
+          ).toEqual({ type: "adaptive" });
+        }
         for (const modelId of [
           "GLM-5-Turbo",
           "GLM-4.7-Flash",

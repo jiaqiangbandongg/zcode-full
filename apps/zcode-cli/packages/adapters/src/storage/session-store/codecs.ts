@@ -60,6 +60,7 @@ export function decodeSessionRow(row: SessionRow): SessionInfo {
     directory: row.directory,
     path: row.path ?? undefined,
     title: row.title,
+    lastOutcome: row.last_outcome ?? undefined,
     titleSource: decodeSessionTitleSource(row.title_source),
     titleMessageID: row.title_message_id ? (row.title_message_id as MessageId) : undefined,
     version: row.version,
@@ -75,7 +76,7 @@ export function decodeSessionRow(row: SessionRow): SessionInfo {
       updated: row.time_updated,
       titleUpdated: row.time_title_updated ?? undefined,
       compacting: row.time_compacting ?? undefined,
-      archived: row.time_archived ?? undefined,
+      deleted: row.time_deleted ?? undefined,
     },
   };
 }

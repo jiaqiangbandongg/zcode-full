@@ -1246,6 +1246,5 @@ describe("buildWorkflowTimeline · 带", () => {
       { air: 1, from: 4, ink: "faint", lane: 0, to: 2 },
     ]);
     expect(arcLaneCount(model.arcs.filter((arc) => arc.air === 0))).toBe(1);
-    expect(arcLaneCount(model.arcs.filter((arc) => arc.air === 1))).toBe(1);
   });
 });

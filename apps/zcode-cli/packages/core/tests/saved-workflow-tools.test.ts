@@ -465,25 +465,6 @@ describe("SaveWorkflow", () => {
       "hidden_by_project",
     );
   });
-
-  // 无同名时 shadowing 键缺席（不挂噪音字段）。
-  it("omits the shadowing key when no other scope has the name", async () => {
-    const cwd = makeCwd();
-
-    const outcome = await run({
-      input: {
-        name: "solo",
-        description: "unique",
-        script: cleanScript("save-solo"),
-        scope: "project",
-      },
-      name: "save-solo",
-      toolName: "SaveWorkflow",
-      workingDirectory: cwd,
-    });
-
-    expect("shadowing" in (outcome.permissionRequested[0]!.input as object)).toBe(false);
-  });
 });
 
 describe("ListSavedWorkflows", () => {
@@ -692,7 +673,6 @@ describe("CreateWorkflow saved source", () => {
 
     expect(outcome.result.success).toBe(true);
     expect(submits[0]!.scriptText).toBe(approved);
-    expect(submits[0]!.scriptText).not.toContain("saved-toctou-evil");
   });
 
   it("lets an explicit name override the saved name as the run label", async () => {

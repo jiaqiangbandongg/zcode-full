@@ -55,22 +55,22 @@ describe("empty tool name provider projection", () => {
     expect((openAiCompatible[1] as any).content[0].toolName).toBe("empty_tool_name");
   });
 
-  it.each([
-    { toolCallId: undefined, toolName: "Read" },
-    { toolCallId: TOOL_CALL_ID, toolName: undefined },
-  ])("keeps rejecting incomplete tool-result identity %#", ({ toolCallId, toolName }) => {
-    expect(() =>
-      toAiSdkMessages([
-        {
-          role: "tool",
-          content: MODEL_CONTENT,
-          isError: true,
-          toolCallId,
-          toolName,
-        } as never,
-      ]),
-    ).toThrow("Tool model messages require toolCallId and toolName");
-  });
+  it.each([{ toolCallId: undefined, toolName: "Read" }])(
+    "keeps rejecting incomplete tool-result identity %#",
+    ({ toolCallId, toolName }) => {
+      expect(() =>
+        toAiSdkMessages([
+          {
+            role: "tool",
+            content: MODEL_CONTENT,
+            isError: true,
+            toolCallId,
+            toolName,
+          } as never,
+        ]),
+      ).toThrow("Tool model messages require toolCallId and toolName");
+    },
+  );
 
   it.each([undefined, null, 42, { invalid: true }])(
     "rejects non-string tool name %j at both projection call sites",

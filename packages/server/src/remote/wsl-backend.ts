@@ -79,7 +79,13 @@ export function buildWslArgs(
     args.push("-u", userName);
   }
 
-  args.push("--", ...commandArgs);
+  // Bug 原因：wsl.exe 不带 --exec 时会把 `--` 之后的原始命令行整段交给用户默认 shell 以 `-c` 执行，
+  // 而 Node 为含空格/引号的参数加的是双引号，外层 shell 会先展开 `"$var"`、`$(...)`，
+  // 再把剩余内容交给内层 `bash -lc`。局部变量（如 Source Server tar preflight 的 `$tar_tool`）
+  // 因此被提前展开成空串，远端输出 `tar=` 且退出码 0，被误判为「远端缺少 tar」。
+  // --exec 让 wsl.exe 按 CommandLineToArgvW 解析 argv 后直接 exec，argv 与 Node 的引号规则互逆，
+  // 命令字节原样到达 bash；登录环境仍由这里显式的 `bash -lc` 提供。
+  args.push("--exec", ...commandArgs);
   return args;
 }
 

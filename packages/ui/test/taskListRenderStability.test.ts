@@ -227,6 +227,10 @@ describe("TaskList render stability", () => {
 
     expect(html).toContain("taskList.showMore");
     expect(html).not.toContain("taskList.showLess");
+    expect(html).toContain('data-task-list-show-more="true"');
+    expect(html).toContain("bg-transparent");
+    expect(html).toContain("text-foreground-subtle");
+    expect(html).toContain("hover:text-foreground");
   });
 
   it("hides the show-more entry after the final page", async () => {

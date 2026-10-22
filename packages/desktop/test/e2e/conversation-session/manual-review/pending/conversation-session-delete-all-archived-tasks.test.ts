@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { TID_CONFIRM_DIALOG_CONFIRM } from "@zcode/shared";
+import { TID_CONFIRM_DIALOG_CONFIRM } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,

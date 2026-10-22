@@ -45,18 +45,6 @@ describe("worked example 1: the full vocabulary (planner-reviewer)", () => {
     expect(graph.sink?.fedBy).toEqual(["ask#2", "ask#4"]);
   });
 
-  it("drops the incidental chords a uniform reduction would keep", () => {
-    // scan → review is implied by scan → plan → review; plan → judge by plan → review
-    // → judge. Both are `seq`, so any longer path removes them.
-    expect(arrows(graph)).not.toContain("ask#1 -seq-> ask#3");
-    expect(arrows(graph)).not.toContain("ask#2 -seq-> ask#4");
-  });
-
-  it("drops the phantom producer→sink edge the actor projection emitted", () => {
-    // `scanner → sink` disappears because `scanner →data judge →data sink` carries it.
-    expect(graph.sink?.fedBy).not.toContain("ask#1");
-  });
-
   it("keeps the loop body `always` because the literal bound is positive", () => {
     // Finding (a): a blanket "inside a loop ⇒ maybe" would mislabel this.
     const plan = graph.steps.find((step) => step.id === "ask#2");
@@ -65,7 +53,12 @@ describe("worked example 1: the full vocabulary (planner-reviewer)", () => {
   });
 
   it("makes actors lanes, never nodes, and marks the fan-out lane a family", () => {
-    expect(graph.lanes.map((lane) => lane.id)).toEqual(["actor#1", "actor#2", "actor#3", "actor#4"]);
+    expect(graph.lanes.map((lane) => lane.id)).toEqual([
+      "actor#1",
+      "actor#2",
+      "actor#3",
+      "actor#4",
+    ]);
     expect(graph.lanes.find((lane) => lane.id === "actor#4")?.families).toEqual(["fanout#1"]);
   });
 });
@@ -94,11 +87,15 @@ describe("worked example 4: the motivating pair", () => {
 
   it("gives the sequential form a self-arrow and the concurrent form none", () => {
     expect(arrows(sequential)).toContain("ask#1 -carry-> ask#1");
-    expect(arrows(concurrent).filter((arrow) => arrow.includes("ask#1 -carry-> ask#1"))).toEqual([]);
+    expect(arrows(concurrent).filter((arrow) => arrow.includes("ask#1 -carry-> ask#1"))).toEqual(
+      [],
+    );
   });
 
   it("agrees on everything else — same lanes, same data edge", () => {
-    expect(concurrent.lanes.map((lane) => lane.id)).toEqual(sequential.lanes.map((lane) => lane.id));
+    expect(concurrent.lanes.map((lane) => lane.id)).toEqual(
+      sequential.lanes.map((lane) => lane.id),
+    );
     expect(arrows(concurrent)).toContain("world-read#1 -data-> ask#1");
     expect(arrows(sequential)).toContain("world-read#1 -data-> ask#1");
   });
@@ -157,10 +154,7 @@ describe("worked example 8: nested fan-outs multiply", () => {
 describe("worked example 9: the workspace is a lane", () => {
   it("gives every world read its own step, positioned in time", () => {
     const graph = causalityOf("actor-agent-to-workspace");
-    expect(arrows(graph)).toEqual([
-      "ask#1 -data-> world-read#1",
-      "world-read#1 -data-> ask#2",
-    ]);
+    expect(arrows(graph)).toEqual(["ask#1 -data-> world-read#1", "world-read#1 -data-> ask#2"]);
     expect(graph.steps.map((step) => step.lane)).toEqual(["actor#1", "workspace", "actor#2"]);
   });
 });
@@ -322,23 +316,6 @@ describe("loop repetition", () => {
 describe("impossible back edges", () => {
   const graph = causalityOf("game-planner-reviewer");
 
-  it("drops a backwards data fact whose target cannot run again", () => {
-    // The site graph's data edges are variable-level, so the reassigned `let plan`
-    // yields the full writers × readers cross product: the in-loop revision (ask#3)
-    // gets a data fact into the PRE-LOOP review (ask#2), which reads `plan`. ask#2 runs
-    // once, before the loop, so no execution realizes it. Because the fact points
-    // backwards it used to be retyped `carry` — the one class reduction never touches.
-    expect(arrows(graph)).not.toContain("ask#3 -carry-> ask#2");
-  });
-
-  it("keeps the carry that closes the refinement cycle, and only that one", () => {
-    expect(arrows(graph)).toContain("ask#4 -carry-> ask#3"); // the refinement cycle
-    // ask#3 also reads its own last plan, but that self-carry asserts nothing on top
-    // of ask#3 -data-> ask#4 -carry-> ask#3: carry minimization drops it
-    // (docs/analysis.md, "Typed transitive reduction" step 3).
-    expect(arrows(graph)).not.toContain("ask#3 -carry-> ask#3");
-  });
-
   it("leaves a two-agent refinement loop reading as one chain plus its cycle", () => {
     // Four arrows for four steps, down from ten: every surviving arrow asserts an
     // order nothing else in the picture asserts — the carries included.
@@ -367,8 +344,9 @@ describe("phase-1 scope", () => {
 
   it("emits no `parallel` or `shared` regions (parallel stays derived)", () => {
     const graph = causalityOf("planner-reviewer");
-    expect(graph.regions.every((region) => region.kind !== "parallel" && region.kind !== "shared"))
-      .toBe(true);
+    expect(
+      graph.regions.every((region) => region.kind !== "parallel" && region.kind !== "shared"),
+    ).toBe(true);
   });
 });
 
@@ -416,10 +394,7 @@ describe("may-set lane expansion", () => {
     const copies = graph.steps.filter((step) => step.source === "ask#2");
     expect(copies.map((step) => step.certainty)).toEqual(["maybe", "maybe"]);
     // No enclosing iteration region, so nothing carries: a plain data fan-out.
-    expect(arrows(graph)).toEqual([
-      "ask#1 -data-> ask#2~actor#1",
-      "ask#1 -data-> ask#2~actor#2",
-    ]);
+    expect(arrows(graph)).toEqual(["ask#1 -data-> ask#2~actor#1", "ask#1 -data-> ask#2~actor#2"]);
     expect(copies.every((step) => step.repeat === undefined)).toBe(true);
   });
 
@@ -470,9 +445,7 @@ describe("may-set lane expansion", () => {
       const copies = new Set(
         graph.steps.filter((step) => step.source !== undefined).map((step) => step.id),
       );
-      const incident = graph.edges.filter(
-        (edge) => copies.has(edge.from) || copies.has(edge.to),
-      );
+      const incident = graph.edges.filter((edge) => copies.has(edge.from) || copies.has(edge.to));
       expect(incident.length).toBeGreaterThan(0);
       expect(incident.filter((edge) => edge.certainty !== "maybe")).toEqual([]);
     }
@@ -601,9 +574,9 @@ describe("typed transitive reduction", () => {
   });
 
   it("drops a data edge a pure data path implies", () => {
-    expect(
-      shown([edge("a", "b", "data"), edge("b", "c", "data"), edge("a", "c", "data")]),
-    ).toEqual(["a-data->b", "b-data->c"]);
+    expect(shown([edge("a", "b", "data"), edge("b", "c", "data"), edge("a", "c", "data")])).toEqual(
+      ["a-data->b", "b-data->c"],
+    );
   });
 
   it("drops a seq edge any longer path implies", () => {

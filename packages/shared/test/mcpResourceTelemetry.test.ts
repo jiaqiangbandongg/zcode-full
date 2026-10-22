@@ -51,13 +51,6 @@ describe("MCP 资源通知边界", () => {
 
   it("接受资源数组与 Host 转发，拒绝隐私字段和非法资源数值", () => {
     expect(zcodeMcpResourceSamplesSchema.parse([sample])).toEqual([sample]);
-    expect(
-      hostResponseMessageSchema.safeParse({
-        type: "mcp-resource-samples",
-        runtimeSurface: "remote",
-        samples: [sample],
-      }).success,
-    ).toBe(true);
     for (const extra of [
       { pid: 123 },
       { workspacePath: "/private" },

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-connectivity-test",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-connectivity-test.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-connectivity-test.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-conn-connectivity",
+      "description": "设置页“测试模型”连通性请求（本机回放 anthropic 路径）",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "连通性测试只需 finish"
+    },
+    {
+      "id": "r3-conn-reconnect-title",
+      "description": "R3 connectivity test task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "r3-conn-reconnect-main",
+      "description": "R3 connectivity test 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "slow-stream",
+      "source": "synthetic",
+      "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+    }
+  ]
+}

@@ -1,5 +1,8 @@
 # Web 远控页面登录校验设计
 
+> 已被 [Web 远控 Relay V2 spec](../../issues/web-remote-control-relay-v2/01-relay-v2-login-pairing.md) 取代。以下为历史设计；当前登录入口、二维码与设备选择以 [Relay V2](../../web-remote-control/relay-v2-pairing.md) 为准。
+
+
 > 本文只适用于 OAuth-gated `/web-remote` 登录流程。`remoteControlToken` / `relayOrigin` 是旧 `/web-remote` 行为说明，不适用于新的 `/remote` QR route；新 route 使用外部 relay `sid/hash/t/mid/name/app_version`，且不得把 `sid` 或 `hash` 写入 OAuth state。
 
 ## 背景

@@ -4,8 +4,12 @@ import {
   TID_OAUTH_CANCEL,
   TID_OAUTH_ERROR,
   TID_OAUTH_LOGIN_BUTTON,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByDom, waitForTestIdByDom } from "./helpers/desktop-app.js";
+
+import { dismissOccupationOnboarding } from "./helpers/occupation-onboarding.js";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const CASE_TIMEOUT_MS = 240_000;
 // PlatformChannels.OAuthCallback 的 channel 值(main 进程 execute 里无法 import @zcode/shared,
@@ -24,6 +28,25 @@ describe("OAuth 登录失败态的取消交互", () => {
   it("AUTH-05: 回调失败进入失败态(重新登录+取消),取消后回到渠道列表", async function () {
     this.timeout(CASE_TIMEOUT_MS);
 
+    // 原因：隔离 profile 的职业引导可覆盖登录入口，先沿产品 Escape 路径退出。
+    await browser.waitUntil(
+      async () => !(await $('[data-testid="root-startup-loading"]').isExisting()),
+      { timeout: 30000 },
+    );
+    await dismissOccupationOnboarding();
+    await writeFile(
+      join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "auth-entry.json"),
+      JSON.stringify(
+        await browser.execute(() => ({
+          text: document.body.innerText,
+          ids: Array.from(document.querySelectorAll("[data-testid]")).map((e) =>
+            e.getAttribute("data-testid"),
+          ),
+        })),
+        null,
+        2,
+      ),
+    );
     await ensureLoginPanelOpen();
     await waitForTestIdByDom(TID_OAUTH_LOGIN_BUTTON, {
       timeout: 20_000,
@@ -52,6 +75,154 @@ describe("OAuth 登录失败态的取消交互", () => {
       timeoutMsg: "失败态取消后没有回到渠道列表",
     });
     expect(await hasOAuthError()).toBe(false);
+
+    // 回归：成功 session 的初始化冲突只能结束自动写入资格，不能重取新版本覆盖团队。
+    await browser.execute(() => {
+      const element = document.querySelector('[data-testid="oauth-login-button"]')!;
+      let fiber = (element as any)[
+        Object.keys(element).find((key) => key.startsWith("__reactFiber"))!
+      ];
+      const accessors = new Set<any>();
+      let store: any;
+      while (fiber) {
+        const value = fiber.memoizedProps?.value;
+        const services = value?.settingService ? value : fiber.memoizedProps?.services;
+        if (services?.settingService) accessors.add(services);
+        if (value?.getState && value.getState().setUser) store ??= value;
+        fiber = fiber.return;
+      }
+      if (!accessors.size || !store) throw new Error("OAuth owner not found");
+      const trace: any[] = [];
+      const restorers: (() => void)[] = [];
+      const newer = {
+        kind: "team-coding-plan",
+        productId: "e2e-team",
+        organizationId: "e2e-org",
+        projectId: "e2e-project",
+      };
+      let version = 0;
+      let injected = false;
+      const user = { id: "e2e-cas-user", username: "E2E CAS User", displayName: "E2E CAS User" };
+      for (const accessor of accessors) {
+        const settings = accessor.settingService;
+        const oauth = accessor.oauthService;
+        const provider = accessor.providerSettingsService;
+        accessor.settingService = new Proxy(settings, {
+          get(target, prop) {
+            if (prop !== "update") return Reflect.get(target, prop);
+            return async (patch: any, expected: any) => {
+              if (patch.providerFamilyConnectionSelections) {
+                trace.push({ phase: "selection-write" });
+                if (!injected) {
+                  injected = true;
+                  const before = await settings.get();
+                  await settings.update(
+                    {
+                      providerFamilyConnectionSelections: {
+                        ...before.providerFamilyConnectionSelections,
+                        bigmodel: newer,
+                      },
+                    },
+                    {
+                      providerFamilyDomain: before.providerFamilyDomain,
+                      providerFamilyConnectionSelections: before.providerFamilyConnectionSelections,
+                      providerFamilyDomainUpdatedAt: before.providerFamilyDomainUpdatedAt ?? 0,
+                    },
+                  );
+                  version = (await settings.get()).providerFamilyDomainUpdatedAt;
+                  trace.push({ phase: "concurrent-team", version });
+                }
+              }
+              return settings.update(patch, expected);
+            };
+          },
+        });
+        accessor.oauthService = new Proxy(oauth, {
+          get(target, prop) {
+            if (prop === "handleCallback")
+              return async () => ({ kind: "session", provider: "bigmodel", userInfo: user });
+            return Reflect.get(target, prop);
+          },
+        });
+        accessor.providerSettingsService = new Proxy(provider, {
+          get(target, prop) {
+            if (prop === "refresh")
+              return async (reason: string) => {
+                trace.push({ phase: "provider-refresh", reason });
+                const view = await provider.refresh(reason);
+                return {
+                  ...view,
+                  providers: view.providers.map((item: any) =>
+                    item.providerId === "account:bigmodel-individual-coding-plan"
+                      ? {
+                          ...item,
+                          accountState: {
+                            ...item.accountState,
+                            availability: "available",
+                            entitled: true,
+                          },
+                        }
+                      : item,
+                  ),
+                };
+              };
+            return Reflect.get(target, prop);
+          },
+        });
+        restorers.push(() => {
+          accessor.settingService = settings;
+          accessor.oauthService = oauth;
+          accessor.providerSettingsService = provider;
+        });
+      }
+      const accessor = Array.from(accessors)[0];
+      (window as any).__oauthCasProbe = {
+        trace,
+        read: async () => ({
+          settings: await accessor.settingService.get(),
+          user: store.getState().user,
+          version,
+        }),
+        restore: () => restorers.forEach((restore) => restore()),
+      };
+    });
+    try {
+      await deliverTamperedOAuthCallback();
+      await browser.waitUntil(
+        async () =>
+          browser.execute(async () => {
+            const probe = (window as any).__oauthCasProbe;
+            const state = await probe.read();
+            return (
+              state.user?.id === "e2e-cas-user" &&
+              probe.trace.some((entry: any) => entry.phase === "provider-refresh")
+            );
+          }),
+        { timeout: 20000 },
+      );
+      await $('[data-testid="oauth-login-button"]').waitForExist({ reverse: true, timeout: 20000 });
+      const result = await browser.execute(async () => {
+        const probe = (window as any).__oauthCasProbe;
+        return { ...(await probe.read()), trace: probe.trace };
+      });
+      expect(result.settings.providerFamilyConnectionSelections.bigmodel.kind).toBe(
+        "team-coding-plan",
+      );
+      expect(result.settings.providerFamilyDomainUpdatedAt).toBe(result.version);
+      expect(result.trace.filter((entry: any) => entry.phase === "selection-write")).toHaveLength(
+        1,
+      );
+      expect(result.trace.some((entry: any) => entry.reason === "oauth-login-entitlement")).toBe(
+        false,
+      );
+      expect(await hasOAuthError()).toBe(false);
+      await writeFile(
+        join(process.env.ZCODE_E2E_ARTIFACT_DIR!, "oauth-cas-success.json"),
+        JSON.stringify(result, null, 2),
+      );
+    } finally {
+      await browser.execute(() => (window as any).__oauthCasProbe.restore());
+    }
   });
 });
 

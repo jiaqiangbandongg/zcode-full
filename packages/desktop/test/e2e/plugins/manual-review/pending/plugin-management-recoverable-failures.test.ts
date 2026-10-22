@@ -65,7 +65,7 @@ describe("PLM-LC-008 插件管理关键可恢复失败 E2E", () => {
       timeout: 60000,
       timeoutMsg: "Catalog refresh retry did not clear the visible error",
     });
-    await clickPluginControl("plugin-store-manage-back");
+    await clickPluginControl("plugin-store-browse-all");
     await clickPluginControl("plugin-store-segment-personal");
 
     await removeLifecyclePluginSource(fixture);
@@ -99,7 +99,7 @@ describe("PLM-LC-008 插件管理关键可恢复失败 E2E", () => {
       "Update badge did not appear before failure injection",
       60000,
     );
-    await clickPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_LIFECYCLE_ID });
+    await clickPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_LIFECYCLE_ID });
     await removeLifecyclePluginPayload(fixture);
     await clickPluginControl("plugin-store-item-menu", { pluginId: PLUGIN_LIFECYCLE_ID });
     await clickPluginControl("plugin-store-menu-update", { pluginId: PLUGIN_LIFECYCLE_ID });

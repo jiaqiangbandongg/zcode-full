@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_CHAT_CONTEXT_USAGE_TRIGGER } from "@zcode/shared";
+import { TID_CHAT_CONTEXT_USAGE_TRIGGER } from "@zcode/shared/test-ids";
 import { getV4PaneSnapshot } from "./v4-conversation.js";
 import { sel } from "./selectors.js";
 

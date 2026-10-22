@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-settings",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-settings.test.ts",
+  "fixtures": [
+    {
+      "id": "conversation-session-toolsearch-settings-auxiliary",
+      "stage": "auxiliary",
+      "description": "auxiliary",
+      "metadata": {
+        "kind": "common",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyExcludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_settings_auxiliary\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"GLM-5.3\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_SETTINGS_DONE\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-done",
+      "stage": "done",
+      "description": "done",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_SETTINGS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_settings_done\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"GLM-5.3\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_SETTINGS_DONE\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-search",
+      "stage": "settings-search",
+      "description": "settings-search",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_SETTINGS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_settings_settings-search\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"GLM-5.3\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"toolu_settings_search\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:TodoWrite\\\", \\\"max_results\\\": 5}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-todo",
+      "stage": "settings-todo",
+      "description": "settings-todo",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_SETTINGS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_settings_settings-todo\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"GLM-5.3\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"toolu_settings_todo\", \"name\": \"TodoWrite\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"todos\\\": [{\\\"content\\\": \\\"E2E settings tool search verified\\\", \\\"status\\\": \\\"completed\\\", \\\"priority\\\": \\\"medium\\\"}]}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-settings-settings-local-todo",
+      "stage": "settings-local-todo",
+      "description": "settings-local-todo",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型响应验证 Settings 保存到真实 Runtime 搜索、执行和请求投影的链路；不模拟生产设置或工具执行。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_SETTINGS"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_settings_settings-local-todo\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"GLM-5.3\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"toolu_settings_todo\", \"name\": \"DeferredToolCall\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"name\\\": \\\"TodoWrite\\\", \\\"input\\\": {\\\"todos\\\": [{\\\"content\\\": \\\"E2E settings tool search verified\\\", \\\"status\\\": \\\"completed\\\", \\\"priority\\\": \\\"medium\\\"}]}}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    }
+  ]
+}

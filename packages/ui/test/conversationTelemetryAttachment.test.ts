@@ -367,6 +367,14 @@ describe("ConversationTelemetryWorkspaceAttachment", () => {
       "agent_step",
       "message_completion",
     ]);
+    expect(
+      localReports.find((payload) => payload.elementName === "agent_step")?.eventExtraDetail
+        .skill_name,
+    ).toBe("local-session-skill");
+    expect(
+      remoteReports.find((payload) => payload.elementName === "agent_step")?.eventExtraDetail
+        .skill_name,
+    ).toBe("remote-session-skill");
     for (const payload of localReports) {
       expect(payload.eventExtraDetail).toMatchObject({
         workspace_kind: "local",
@@ -463,10 +471,12 @@ async function emitSuccessfulConversation(
     sessionId,
     sourceCommandId: commandId,
     turnId: `${commandId}-turn`,
-    kind: "stream.chunk",
-    channel: "text",
-    chunkLength: 1,
-    firstChunk: true,
+    kind: "tool.lifecycle",
+    phase: "completed",
+    toolCallId: `${commandId}-skill`,
+    toolName: "Skill",
+    skillName: `${sessionId}-skill`,
+    skillSource: "zcode",
   });
   supervisor.handleFact({
     version: 1,

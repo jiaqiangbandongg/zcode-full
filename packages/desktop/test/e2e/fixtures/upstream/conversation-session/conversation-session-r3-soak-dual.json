@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-soak-dual",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-soak-dual.test.ts",
+  "fixtures": [
+    {
+      "id": "r3-soakd-title",
+      "description": "标题",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于断言"
+      },
+      "maxMatches": 500,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["Generate a concise title", "E2E_R3_SOAK_DUAL"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-soakd-title",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "{\"title\":\"R3 mobile\"}"
+        }
+      }
+    },
+    {
+      "id": "r3-soakd-main",
+      "description": "其它",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "首发/fork/edit"
+      },
+      "maxMatches": 500,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_R3_SOAK_DUAL_"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "r3-soakd-main",
+          "inputTokens": 64,
+          "outputTokens": 8,
+          "text": "R3_SOAK_DUAL_REPLY"
+        }
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import {
   decodeTextBuffer,
   detectLineEndings,
   detectTextEncoding,
+  getUtf8CompletionBytes,
   normalizeLineEndings,
   shouldNormalizeLineEndings,
 } from "./text-metadata.js";
@@ -167,9 +168,26 @@ async function detectEncodingFromHead(
   throwIfAborted(signal);
   const handle = await open(path, "r");
   try {
-    const sample = Buffer.alloc(ENCODING_SAMPLE_BYTES);
-    const { bytesRead } = await handle.read(sample, 0, sample.byteLength, 0);
-    return detectTextEncoding(sample.subarray(0, bytesRead));
+    let sample = Buffer.alloc(ENCODING_SAMPLE_BYTES);
+    let totalBytesRead = 0;
+    while (totalBytesRead < sample.byteLength) {
+      throwIfAborted(signal);
+      const { bytesRead } = await handle.read(
+        sample,
+        totalBytesRead,
+        sample.byteLength - totalBytesRead,
+        totalBytesRead,
+      );
+      if (bytesRead === 0) break;
+      totalBytesRead += bytesRead;
+      if (totalBytesRead === ENCODING_SAMPLE_BYTES) {
+        // 样本可能切在 UTF-8 字符中间；只补足当前候选，固定扩样会再次切开后一个字符。
+        const missingBytes = getUtf8CompletionBytes(sample);
+        if (missingBytes > 0) sample = Buffer.concat([sample, Buffer.alloc(missingBytes)]);
+      }
+    }
+    throwIfAborted(signal);
+    return detectTextEncoding(sample.subarray(0, totalBytesRead), path);
   } finally {
     await handle.close();
   }
@@ -184,9 +202,15 @@ function normalizeLimitLines(limitLines: number | undefined): number | undefined
   return Math.max(0, Math.trunc(limitLines));
 }
 
-function selectLines(lines: string[], offsetLine: number, limitLines: number | undefined): string[] {
+function selectLines(
+  lines: string[],
+  offsetLine: number,
+  limitLines: number | undefined,
+): string[] {
   const limit = normalizeLimitLines(limitLines);
-  return limit === undefined ? lines.slice(offsetLine) : lines.slice(offsetLine, offsetLine + limit);
+  return limit === undefined
+    ? lines.slice(offsetLine)
+    : lines.slice(offsetLine, offsetLine + limit);
 }
 
 function shouldSelectLine(

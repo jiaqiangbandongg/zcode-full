@@ -11,15 +11,22 @@ function HoverCardTrigger({ ...props }: React.ComponentProps<typeof HoverCardPri
   return <HoverCardPrimitive.Trigger data-slot="hover-card-trigger" {...props} />;
 }
 
+// 自定义锚点时 Portal 与内容必须共享 Root 的 scope，才能读取同一浮层的开关与定位上下文。
+type HoverCardScopeProps = {
+  __scopeHoverCard?: Parameters<ReturnType<typeof HoverCardPrimitive.createHoverCardScope>>[0];
+};
+
 function HoverCardContent({
   className,
   align = "center",
   sideOffset = 4,
+  __scopeHoverCard,
   ...props
-}: React.ComponentProps<typeof HoverCardPrimitive.Content>) {
+}: React.ComponentProps<typeof HoverCardPrimitive.Content> & HoverCardScopeProps) {
   return (
-    <HoverCardPrimitive.Portal data-slot="hover-card-portal">
+    <HoverCardPrimitive.Portal data-slot="hover-card-portal" {...{ __scopeHoverCard }}>
       <HoverCardPrimitive.Content
+        {...{ __scopeHoverCard }}
         data-slot="hover-card-content"
         align={align}
         sideOffset={sideOffset}

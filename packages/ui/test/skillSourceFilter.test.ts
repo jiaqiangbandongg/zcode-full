@@ -43,9 +43,7 @@ const demoSkills = [
 
 describe("skillSourceFilter", () => {
   it("把 .zcode/skills 和官方 plugin cache 识别为 ZCode Agent 技能来源", () => {
-    expect(resolveSkillSourceType("/tmp/workspace/.zcode/skills/my-skill/SKILL.md")).toBe(
-      "glm",
-    );
+    expect(resolveSkillSourceType("/tmp/workspace/.zcode/skills/my-skill/SKILL.md")).toBe("glm");
     expect(
       resolveSkillSourceType(
         "/tmp/home/.zcode/cli/plugins/cache/zcode-plugins-official/document-skills/0.1.0/skills/pdf/SKILL.md",
@@ -59,7 +57,7 @@ describe("skillSourceFilter", () => {
     );
   });
 
-  it("provider 参数只作兼容输入，过滤结果始终保留 ZCode Agent 技能", () => {
+  it("过滤混合来源时保留 ZCode Agent 技能", () => {
     const expectedIds = [
       "skill-glm-by-path",
       "glm:workspace:zcode-common:abc123",
@@ -70,12 +68,6 @@ describe("skillSourceFilter", () => {
     ];
 
     expect(filterSkillsForProvider(demoSkills, "glm").map((skill) => skill.id)).toEqual(
-      expectedIds,
-    );
-    expect(filterSkillsForProvider(demoSkills, "claude").map((skill) => skill.id)).toEqual(
-      expectedIds,
-    );
-    expect(filterSkillsForProvider(demoSkills, "codex").map((skill) => skill.id)).toEqual(
       expectedIds,
     );
   });

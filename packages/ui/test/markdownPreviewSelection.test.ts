@@ -116,7 +116,6 @@ describe("Markdown preview selections", () => {
     const popup = document.querySelector<HTMLElement>("[data-conversation-selection-tooltip]")!;
     expect(Number.parseFloat(popup.style.left)).toBeGreaterThanOrEqual(12);
     expect(Number.parseFloat(popup.style.maxWidth)).toBe(156);
-    expect(popup.style.width).toBe("max-content");
     const outside = document.createElement("p");
     outside.textContent = "Outside";
     document.body.append(outside);

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- BotsDialog 现在保留数据加载、保存和轮询编排；右侧卡片已拆到 BotsDialog/* 子组件，后续再继续下沉状态 hook。 */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import QRCode from "qrcode";
 import { Bot, Loader2, Plus } from "lucide-react";
 import type {
@@ -34,7 +34,6 @@ import { isImeComposingKeyEvent } from "@/lib/imeComposition.js";
 import { logger } from "@/logger.js";
 import {
   BOT_PROVIDERS,
-  buildCurrentWorkspaceId,
   getBotProviderRegionTagLabelId,
   resolveBotProviderEntry,
   type BotProviderEntryId,
@@ -85,14 +84,10 @@ function createDraftBot(params: { provider: BotProvider }): BotConfig {
 export function BotsDialog({
   open,
   onOpenChange,
-  workspacePath,
-  workspaceIdentity,
   entryProvider,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspacePath: string;
-  workspaceIdentity?: string;
   entryProvider?: BotProvider | null;
 }) {
   const { intl } = useZCodeIntl();
@@ -130,19 +125,6 @@ export function BotsDialog({
   const autoBindCreatingBotIdsRef = useRef(new Set<string>());
   const handledEntryProviderRef = useRef<BotProvider | null>(null);
 
-  const currentWorkspaceId = useMemo(
-    () => buildCurrentWorkspaceId(workspacePath, workspaceIdentity),
-    [workspaceIdentity, workspacePath],
-  );
-  const currentWorkspace = useMemo(
-    () => ({
-      id: currentWorkspaceId,
-      label: workspacePath.split(/[\\/]/u).filter(Boolean).at(-1) ?? workspacePath,
-      workspacePath,
-      workspaceIdentity,
-    }),
-    [currentWorkspaceId, workspaceIdentity, workspacePath],
-  );
   const selectedBot = config.bots.find((bot) => bot.id === selectedBotId) ?? null;
   const selectedBotState = botStates.find((state) => state.botId === selectedBotId) ?? null;
   const selectedBotName =
@@ -246,7 +228,7 @@ export function BotsDialog({
       const [nextConfig, nextStatus, nextWorkspaces, nextBotStates] = await Promise.all([
         botsService.getConfig(),
         botsService.getStatus(),
-        botsService.listWorkspaceRefs({ currentWorkspace }),
+        botsService.listWorkspaceRefs(),
         botsService.getBotStates(),
       ]);
       setConfig(nextConfig);
@@ -262,7 +244,7 @@ export function BotsDialog({
       logger.error("[BotsDialog] 加载 Bots 配置失败", message);
       toast(intl.formatMessage({ id: "bots.loadFailed" }, { error: message }));
     }
-  }, [botsService, creatingBot, currentWorkspace, intl]);
+  }, [botsService, creatingBot, intl]);
 
   useEffect(() => {
     if (
@@ -984,6 +966,7 @@ export function BotsDialog({
     // Bugfix: 删除机器人之前没有二次确认，误触会直接移除凭据和绑定入口。
     // 这里复用项目统一 ConfirmDialog，让破坏性操作和其它设置页保持一致。
     const confirmed = await confirmDialog({
+      confirmVariant: "destructive",
       title: intl.formatMessage(
         { id: "bots.deleteConfirmTitle" },
         { name: formatBotDisplayName(selectedBot.name, fallbackBotName) },
@@ -1239,7 +1222,6 @@ export function BotsDialog({
                   <WorkspaceAccessCard
                     bot={selectedBot}
                     workspaceRefs={workspaceRefs}
-                    currentWorkspace={currentWorkspace}
                     loading={workspaceAccessSaving}
                     onPatchAllowedWorkspaces={patchAllowedWorkspaces}
                     onToggleWorkspaceAccess={toggleWorkspaceAccess}

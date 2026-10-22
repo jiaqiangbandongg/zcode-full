@@ -3,8 +3,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DeleteAllArchivedTasksButton } from "@/DeleteAllArchivedTasksButton.js";
-import { WebRemoteControlTaskIndex } from "@/WebRemoteControlTaskIndex.js";
-import { ServiceProvider } from "@/hooks/useServices.js";
 
 const { confirm } = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock("@/hooks/useConfirmDialog.js", () => ({ useConfirmDialog: () => confirm }));
@@ -112,61 +110,5 @@ describe("归档更多菜单", () => {
     expect(service.listArchivedTasks).not.toHaveBeenCalled();
   });
 
-  it("Web 索引通过工具栏菜单删除后移除快照任务并保留禁用入口", async () => {
-    const toolbar = document.createElement("div");
-    document.body.append(toolbar);
-    const task = {
-      taskId: "web-archived",
-      title: "Web archived task",
-      workspacePath: "/project",
-      workspaceLabel: "Project",
-      workspaceKind: "local" as const,
-      createdAt: 1,
-      updatedAt: 1,
-      archived: true,
-    };
-    const result = {
-      workspaces: [{ workspacePath: "/project", label: "Project", kind: "local" as const }],
-      tasks: [task],
-    };
-    const service = {
-      listArchivedTasks: vi.fn(async () => [task]),
-      deleteArchivedTasks: vi.fn(async ({ taskIds }: { taskIds: string[] }) => ({
-        deletedTaskIds: taskIds,
-        skippedTaskIds: [],
-        failedTaskIds: [],
-      })),
-    };
-    confirm.mockResolvedValueOnce(true);
-    render(
-      createElement(
-        ServiceProvider,
-        { services: { zcodeTaskService: service } as never },
-        createElement(WebRemoteControlTaskIndex, {
-          activeWorkspacePath: "/project",
-          activeTaskId: null,
-          taskViewMode: "archived",
-          initialResult: result,
-          archivedActionsContainer: toolbar,
-          onSelectTask: vi.fn(),
-          switcher: {
-            listWorkspaces: vi.fn(async () => result),
-            switchWorkspace: vi.fn(async () => {}),
-          },
-        }),
-      ),
-    );
-    await waitFor(() =>
-      expect(within(toolbar).getByRole("button").hasAttribute("disabled")).toBe(false),
-    );
-    fireEvent.click(await openMenu(toolbar));
-    await waitFor(() =>
-      expect(service.deleteArchivedTasks).toHaveBeenCalledWith(
-        expect.objectContaining({ taskIds: ["web-archived"], workspacePath: "/project" }),
-      ),
-    );
-    await waitFor(() => expect(screen.queryByText("Web archived task")).toBeNull());
-    expect(within(toolbar).getByRole("button").hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("status").textContent).toBe("taskList.deleteAllArchivedResult");
-  });
+  // Web 与桌面统一使用 ArchiveManagement；批次身份与软删除见 archiveManagement.test.ts。
 });

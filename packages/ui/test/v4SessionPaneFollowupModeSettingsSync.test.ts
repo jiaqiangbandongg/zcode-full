@@ -99,6 +99,7 @@ vi.mock("@/hooks/useSettingService.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useOptionalServices: () => null,
   useServices: () => servicesMock,
 }));

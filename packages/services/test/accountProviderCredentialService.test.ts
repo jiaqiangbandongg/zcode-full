@@ -2,29 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createAccountProviderCredentialService } from "../src/model-provider/accountProviderCredentialService.js";
 
 describe("AccountProviderCredentialService", () => {
-  it("不依赖旧 Key Store，使用登录态解析短期 Token", async () => {
-    const resolveProviderMaterial = vi.fn(async () => ({
-      token: "remote-key",
-      apiKeyId: "id-remote-key",
-      organizationId: "org",
-      projectId: "proj",
-    }));
-    const service = createAccountProviderCredentialService({
-      loadOAuthAccessToken: vi.fn(async () => "oauth-token"),
-      resolveProviderMaterial,
-    });
-
-    await expect(
-      service.loadCodingPlanApiKey({
-        providerId: "account:zai-individual-coding-plan",
-        family: "zai",
-        accountIdentity: "account-a",
-      }),
-    ).resolves.toBe("remote-key");
-
-    expect(resolveProviderMaterial).toHaveBeenCalled();
-  });
-
   it("使用当前登录态取得 Token，不写入私有凭据键", async () => {
     const loadOAuthAccessToken = vi.fn(async () => "oauth-token");
     const resolveProviderMaterial = vi.fn(async () => ({

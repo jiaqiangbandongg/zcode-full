@@ -112,6 +112,27 @@ describe("MCP App page ownership", () => {
     expect(first.destroy).not.toHaveBeenCalled();
     expect(owner.get("first")).toBe(first);
   });
+  it("rejects capacity admission when idle pages refuse automatic recycling", async () => {
+    const owner = pool();
+    const retained = Array.from({ length: 64 }, (_, index) => ({
+      ...make(String(index), String(index % 30)),
+      suspend: vi.fn(async () => false),
+    }));
+    for (const page of retained) {
+      await owner.add(page);
+      await owner.reserve(page);
+    }
+    await expect(owner.add(make("new-task"))).rejects.toThrow("task capacity");
+    const extra = make("new-page", "0");
+    await owner.add(extra);
+    await expect(owner.reserve(extra)).rejects.toThrow("sandbox capacity");
+    for (const page of retained) {
+      expect(page.destroy).not.toHaveBeenCalled();
+      expect(owner.get(page.key)).toBe(page);
+    }
+    owner.clear();
+    for (const page of retained) expect(page.destroy).toHaveBeenCalledOnce();
+  });
   it("cancels queued admission when its task is removed", async () => {
     const owner = pool();
     const page = make("late");

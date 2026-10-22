@@ -1,51 +1,37 @@
 # 宽屏 Web 远控任务列表
 
-## 背景
+## 当前项目目录边界（2026-10-13）
 
-手机 `/remote` 窄屏已经有独立任务首页，使用 `listWorkspaces()` 返回的
-`WebRemoteControlWorkspaceListResult` 作为跨工作区任务事实源。宽屏 `/remote` 仍复用桌面
-sidebar 外壳，但左侧任务列表区域需要遵守同一远控事实源，否则用户在宽屏远控看到的任务、搜索、视图切换和归档入口会彼此不一致。
+宽屏和窄屏已共用 `ProjectSidebar`。侧栏、项目编辑、输入框项目选择和归档目录必须使用控制桌面窗口的项目目录：本机项目加本机保留的远端项目入口。进入远端任务、创建远端草稿或刷新页面不得将该集合替换成 Source 自己的项目全集，也不得显示未添加的远端项目。
 
-## 范围
+远端 `web-remote-replayable` attachment 在原 RPC 上额外提供整体可选的窗口目录能力：`window-project`、`window-remote-projects`、`window-project-changes`。前两者复用窗口 ProjectService/RemoteProjectService；第三者只提供项目变化通知与就绪校验，不暴露通用广播写入。Host 在确认完整服务组后按 attachment 装配；不修改共享 Source 服务集合。原 `project`、`remote-projects`、`broadcast` 仍属于当前工作区，文件/会话提及、工作流保存、自动化和配置目录调用保持原语义。
 
-- 仅影响宽屏 Web remote control shell 的左侧任务列表区域。
-- 桌面端 sidebar 继续使用原有 `WorkspaceGroupedTasksSection`、`WorkspaceTimelineTasksSection`、
-  `WorkspaceArchivedTasksFlatSection`、`WorkspacePinnedTasksSection` 和 continuous 实时链路。
-- 不改变 relay、desktop main、host process、task realtime、snapshot、queue 或 owner command 语义。
-- 宽屏 Web remote 继续通过 shared-host attachment 访问已有 desktop host，不启动独立 runtime。
+bridge-ready 显式声明能力，Web 只在声明支持时创建和校验整组代理。缺能力的旧端沿用原路径，旧行为不计为已修复；声明支持却缺服务必须报错，不静默降级。目录读取、修改和变化订阅必须同时选择同一服务组。bridge 换代重新订阅新代理，迟到结果和卸载后的回包不得提交。任务 pin/archive 继续走窗口 Controller，文件内容仍按 workspace identity 路由。
 
-## 行为
+能力校验中的待就绪 bridge 必须参加传输恢复后的未确认帧重放，不能被旧 active bridge 的降级状态阻断。重放沿用原序号去重和原始等待期限；能力校验成功后才发布服务。
 
-宽屏 Web remote 在任务工具栏内保留现有视图、排序、搜索和归档入口，但这些入口在远控模式下必须消费
-`listWorkspaces()` 返回的同一份任务索引：
+```text
+同一 shared-host attachment
+  ├─ window-project / window-remote-projects / window-project-changes → 窗口目录 owner
+  └─ project / remote-projects / broadcast → 当前 Source owner
+```
 
-1. `workspace` 视图按 desktop 返回的 workspace 顺序分组，只展示非置顶任务；置顶任务仅在独立置顶区展示，避免重复。
-2. `timeline` 视图跨所有可见 workspace 展示非置顶任务，并使用与桌面一致的两层排序：running 先于非 running，running 内按 `createdAt` 倒序稳定排列，非 running 再按用户选择的 `created` 或 `updated` 字段排序。运行层成员 = `displayStatus === "running"` 或 `hasBackgroundWork === true`（2026-09-09 追记：会话挂着后台 workflow run 时只推进 `updatedAt`、不改图标，不并入运行层就会随进度事件换位）。
-   任务行在标题下绘制与桌面一致的工作流运行行（`WebRemoteControlTaskTarget.workflowActivity`，2026-09-14 追记）：Workflow 图标 + 迷你轨道灯 + 当前 phase 名；结束的 run 行由远控端自己的已确认集合折叠，不依赖桌面 localStorage。
-3. 归档视图展示远控任务索引中的归档任务。归档任务仍按同一排序字段排序，并保留 workspace label，避免退回当前 bridge workspace。
-4. 搜索只过滤当前宽屏远控任务区里的任务和 workspace label，不打开桌面 Command Center；搜索词为空时恢复完整列表。
-5. `workspace` 视图的收起/展开全部只控制宽屏远控分组展开状态，不写入或复用桌面 sidebar 的展开状态。
-6. 切换排序、视图、搜索词或归档状态不得改变桌面端任务列表行为。
-7. 普通和置顶任务行在 hover 后展示置顶/取消置顶与归档入口，交互语义对齐桌面端侧栏：置顶直接切换 membership，归档先进入确认态，第二次点击才归档。
-8. 任务操作通过当前 shared-host bridge 可解析到的 `zcodeTaskService` 执行。本地 workspace 走 base services；远端 workspace 只有在已注册 remote session services 时才允许操作，避免把远端 `workspacePath` 误交给本机 host。
-9. 操作成功后宽屏远控本地任务索引立即按返回的 membership 更新，等待 desktop renderer 后续 task snapshot 同步收敛；失败时保留原索引并提示用户。
-10. 置顶、取消置顶、归档、取消归档属于 task list membership 变化。服务层必须广播明确的 membership reason，desktop renderer 收到后重新刷新对应 task list，不能把这类事件当作普通 `task_meta_changed` 增量保留 membership。
-11. Desktop renderer 把更新后的 Web remote task snapshot 同步给 desktop main 后，desktop main 只通过既有 app payload 通道通知已连接 Web remote 重新采用最新 `WebRemoteControlWorkspaceListResult`。relay 和 main 不新增 task 业务状态，只转发 renderer 已同步的任务索引快照。
+不新增 attachment、Agent runtime、持久缓存或数据库迁移；不改变账号归属、Root 重挂载、continuous/replayable 或任务队列语义。
 
-## 数据约定
+回归 MRO02：准备本机项目、置顶、已添加远端项目和未添加远端项目，跨本机/远端打开及刷新后可见集合不变；窗口项目变更同步、读写同 owner、Source 内提及查询隔离。覆盖宽屏与 390px、中英文、深浅主题；RPC 错误能力、订阅释放和迟到响应由定向测试验证，真实远端连接另行取证。
 
-`WebRemoteControlTaskTarget` 的 `pinned` 表示任务属于置顶分区；`archived` 表示任务属于归档分区。旧客户端可能没有
-`archived` 字段，缺省按普通任务处理。宽屏远控模型在 UI 层过滤这两个标记，不改变协议和 realtime 数据流。
+## 目录与实时状态
 
-宽屏远控的置顶/归档动作不新增 relay 业务协议，也不把 task 状态下沉到 desktop main。mobile Web 仍通过已经 attach
-的 host/service 调用任务服务；desktop main 只继续提供 `workspace-list-request` 的索引快照和 `rpc-frame` 透传。
-当 desktop renderer 由于 task list membership 变化调用 `syncWebRemoteControlTasks` 时，desktop main 可以发送
-`workspace-list-updated` app payload，把同一份 `buildWorkspaceListResult()` 快照推给 Web remote，避免 Web 端继续展示旧列表。
+项目树仍由 Host 的 app 库决定行集合、归属和置顶/归档。Controller 只提供既有行的实时活动，不因切入远端而改变行集合。项目视图、最近更新、输入框项目菜单与归档管理共用 ProjectDirectoryProvider；服务选择不创建第二份树、未读状态或排序偏好。
 
-## 测试要求
+普通桌面继续读取本机 base 目录；Web 本地 bridge 沿用原服务。远端 scope 的文件 IO、任务正文、提及与配置维持 Source 身份隔离。手机 home/chat 与宽屏布局仅决定展示，不决定目录 owner。
 
-- 单元测试覆盖排序字段切换、置顶去重、时间线跨工作区、归档跨工作区、搜索过滤、分组收起，以及操作后 task membership 更新。
-- 单元测试覆盖 `task_archived` / `task_unarchived` / `task_pinned` / `task_unpinned` 会触发跨端列表刷新，并覆盖 service 广播这些明确 reason。
-- 单元测试覆盖 desktop main 在 task snapshot membership 变化后推送 `workspace-list-updated`，Web payload schema 接受该消息。
-- 布局测试覆盖宽屏远控任务行渲染置顶和归档操作入口。
-- 运行 `pnpm typecheck` 和 `pnpm lint`。
+## 验证边界
+
+- 契约和 RPC 测试验证能力组、读写 owner、事件过滤、旧版兼容、就绪失败与订阅释放。
+- UI 测试验证同组服务选择、bridge 换代和迟到响应、首发可见性及相邻 Source 调用。
+- MRO02 受控 Web 用例使用真实项目服务与隔离 SQLite，覆盖宽窄屏、中英文和深浅主题。
+- Electron 与独立 SSH 容器用例经真实 Window Host、Source、bridge 和 relay 运行；只使用项目/草稿，不调用模型。受控桥接结果不能代替该主链证据。
+- pending 用例不自动转正，也不计入 formal/Docker 准入。
+
+2026-10-13 验证：MRO02 受控 Web 八组全部通过；真实 Electron + 独立 Linux SSH Source + loopback relay 的宽窄屏往返通过（`r3-server-wrc-directory-20261013-p2d`）。Source 的工作区 project 查询仍只返回其项目全集，窗口目录只显示本机保留入口；账号与引导继续属于 Source。真实手机、Windows/WSL 未由该结果覆盖。

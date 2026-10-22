@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { TID_V4_GOAL_BANNER } from "@zcode/shared";
+import { TID_V4_GOAL_BANNER } from "@zcode/shared/test-ids";
 import type { GoalState } from "@zcode/shared/zcode-protocol-v4";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 

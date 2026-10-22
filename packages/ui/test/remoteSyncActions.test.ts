@@ -5,40 +5,38 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { capturedSkillDialogProps, capturedMcpDialogProps, capturedPluginDialogProps } = vi.hoisted(() => ({
-  capturedSkillDialogProps: [] as Array<Record<string, unknown>>,
-  capturedMcpDialogProps: [] as Array<Record<string, unknown>>,
-  capturedPluginDialogProps: [] as Array<Record<string, unknown>>,
-}));
+const { capturedSkillDialogProps, capturedMcpDialogProps, capturedPluginDialogProps } = vi.hoisted(
+  () => ({
+    capturedSkillDialogProps: [] as Array<Record<string, unknown>>,
+    capturedMcpDialogProps: [] as Array<Record<string, unknown>>,
+    capturedPluginDialogProps: [] as Array<Record<string, unknown>>,
+  }),
+);
 
 vi.mock("lucide-react", () => {
   const createIcon = (name: string) => (props: Record<string, unknown>) =>
     createElement("svg", { "data-icon": name, ...props });
 
   return {
+    BlocksIcon: createIcon("blocks"),
+    CableIcon: createIcon("cable"),
     ChevronDown: createIcon("chevron-down"),
+    PackageIcon: createIcon("package"),
     UploadCloud: createIcon("upload-cloud"),
+    WandIcon: createIcon("wand"),
   };
 });
 
 vi.mock("@/components/ui/button.js", () => ({
-  Button: ({
-    children,
-    ...props
-  }: {
-    children: ReactNode;
-  }) => createElement("button", props, children),
+  Button: ({ children, ...props }: { children: ReactNode }) =>
+    createElement("button", props, children),
 }));
 
 vi.mock("@/components/ui/dropdown-menu.js", () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) =>
     createElement("div", { "data-testid": "dropdown-menu" }, children),
-  DropdownMenuContent: ({
-    children,
-    ...props
-  }: {
-    children: ReactNode;
-  }) => createElement("div", { "data-testid": "dropdown-menu-content", ...props }, children),
+  DropdownMenuContent: ({ children, ...props }: { children: ReactNode }) =>
+    createElement("div", { "data-testid": "dropdown-menu-content", ...props }, children),
   DropdownMenuItem: ({
     children,
     disabled,
@@ -56,6 +54,7 @@ vi.mock("@/components/ui/dropdown-menu.js", () => ({
       },
       children,
     ),
+  DropdownMenuSeparator: () => createElement("div", { "data-testid": "dropdown-menu-separator" }),
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => children,
 }));
 
@@ -64,10 +63,10 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
     intl: {
       formatMessage: ({ id }: { id: string }) => {
         const messages: Record<string, string> = {
-          "settings.skills.remoteSync.open": "同步 Skill",
-          "settings.mcp.remoteSync.open": "同步 MCP",
-          "settings.plugins.remoteSync.open": "同步 Plugin",
-          "settings.remoteSync.open": "同步",
+          "remote.syncSkills": "同步技能到该设备",
+          "remote.syncMcp": "同步 MCP 配置",
+          "remote.syncPlugins": "同步插件",
+          "remote.syncAll": "一键同步",
         };
         return messages[id] ?? id;
       },
@@ -102,12 +101,9 @@ afterEach(() => {
 
 describe("RemoteSyncActions", () => {
   it("drops dialog intent across disconnects and remote target changes", async () => {
-    const { useRemoteSyncDialogIntent } = await import(
-      "@/settings/RemoteSyncActions.js"
-    );
+    const { useRemoteSyncDialogIntent } = await import("@/settings/RemoteSyncActions.js");
     const hook = renderHook(
-      ({ rpcReady, targetKey }) =>
-        useRemoteSyncDialogIntent({ rpcReady, targetKey }),
+      ({ rpcReady, targetKey }) => useRemoteSyncDialogIntent({ rpcReady, targetKey }),
       {
         initialProps: {
           rpcReady: true,
@@ -238,35 +234,13 @@ describe("RemoteSyncActions", () => {
     });
   });
 
-  it("clears the remote sync preflight timeout after a successful response", async () => {
+  it("returns a successful remote sync preflight response", async () => {
     vi.useFakeTimers();
     const { REMOTE_SYNC_PREFLIGHT_TIMEOUT_MS, runRemoteSyncPreflightWithTimeout } =
       await import("@/settings/RemoteSyncActions.js");
 
-    await expect(
-      runRemoteSyncPreflightWithTimeout(async () => "ok"),
-    ).resolves.toBe("ok");
+    await expect(runRemoteSyncPreflightWithTimeout(async () => "ok")).resolves.toBe("ok");
     await vi.advanceTimersByTimeAsync(REMOTE_SYNC_PREFLIGHT_TIMEOUT_MS);
-  });
-
-  it("renders Skill, MCP, and Plugin menu actions for SSH remote contexts", async () => {
-    const { RemoteSyncMenuItems } = await import("@/settings/RemoteSyncActions.js");
-
-    const html = renderToStaticMarkup(
-      createElement(RemoteSyncMenuItems, {
-        canSyncSkills: true,
-        canSyncMcp: true,
-        canSyncPlugins: true,
-        onOpenSkillSync: vi.fn(),
-        onOpenMcpSync: vi.fn(),
-        onOpenPluginSync: vi.fn(),
-      }),
-    );
-
-    expect(html).toContain("同步 Skill");
-    expect(html).toContain("同步 MCP");
-    expect(html).toContain("同步 Plugin");
-    expect(html.match(/data-icon="upload-cloud"/g)?.length).toBe(3);
   });
 
   it("renders one sync dropdown button with Skill, MCP, and Plugin actions", async () => {
@@ -283,13 +257,11 @@ describe("RemoteSyncActions", () => {
       }),
     );
 
-    expect(html).toContain("同步");
-    expect(html).toContain("同步 Skill");
-    expect(html).toContain("同步 MCP");
-    expect(html).toContain("同步 Plugin");
+    expect(html).toContain("一键同步");
+    expect(html).toContain("同步技能到该设备");
+    expect(html).toContain("同步 MCP 配置");
+    expect(html).toContain("同步插件");
     expect(html.match(/data-testid="dropdown-menu-item"/g)?.length).toBe(3);
-    expect(html.match(/data-icon="upload-cloud"/g)?.length).toBe(4);
-    expect(html).toContain('data-icon="chevron-down"');
   });
 
   it("keeps the MCP dropdown action disabled until a remote workspace path exists", async () => {
@@ -307,9 +279,9 @@ describe("RemoteSyncActions", () => {
       }),
     );
 
-    expect(html).toContain("同步 Skill");
-    expect(html).toContain("同步 MCP");
-    expect(html).toContain("同步 Plugin");
+    expect(html).toContain("同步技能到该设备");
+    expect(html).toContain("同步 MCP 配置");
+    expect(html).toContain("同步插件");
     expect(html).toContain('data-disabled="true"');
   });
 

@@ -1,5 +1,29 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { sandboxPages, type SandboxPageOwner } from "./sandboxPageOwners.js";
+import { acquirePluginUiPage } from "@/plugin-ui/adapters/pluginUiPageRegistry.js";
+
+it("starts an admitted MCP owner once without any React subscriber or anchor", async () => {
+  const start = vi.fn();
+  const create = vi.fn(
+    () =>
+      ({
+        kind: "mcp",
+        key: "background",
+        task: "requested",
+        visible: false,
+        start,
+        busy: () => false,
+        running: () => false,
+        suspend: () => false,
+        destroy: vi.fn(),
+      }) as never,
+  );
+  const first = acquirePluginUiPage("background", create);
+  const second = acquirePluginUiPage("background", create);
+  expect(await first).toBe(await second);
+  expect(create).toHaveBeenCalledOnce();
+  expect(start).toHaveBeenCalledOnce();
+});
 
 afterEach(() => {
   sandboxPages.clear();

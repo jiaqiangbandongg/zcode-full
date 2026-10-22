@@ -194,6 +194,9 @@ function postDispatchRequest(
       : {}),
     ...(automation.mode ? { mode: automation.mode } : {}),
     workspacePath: automation.workspacePath,
+    projectId: automation.projectId,
+    hostId: automation.hostId,
+    additionalDirectories: automation.additionalDirectories,
     ...(automation.workspaceIdentity ? { workspaceIdentity: automation.workspaceIdentity } : {}),
   };
   parentPort?.postMessage(request);
@@ -243,6 +246,16 @@ async function handleOffPeakClaimed(task: ZCodeOffPeakTask, now: number): Promis
     await offPeakRepo.releaseClaim(task.offPeakTaskId, { now });
     return;
   }
+  if (!task.modelSelection) {
+    // 仓库只认领 schedulable=1 的任务，而清空 Selection 时会同步写 schedulable=0，
+    // 所以这里理论上不可达；保留守卫是为了不把"待修复"任务派发成无模型的 run。
+    await offPeakRepo.releaseClaim(task.offPeakTaskId, { now });
+    log(
+      "warn",
+      `off-peak task claimed without model selection, released task=${task.offPeakTaskId}`,
+    );
+    return;
+  }
   offPeakInFlight.add(task.offPeakTaskId);
   const request: SchedulerToMainMessage = {
     type: "offpeak-dispatch-request",
@@ -254,6 +267,9 @@ async function handleOffPeakClaimed(task: ZCodeOffPeakTask, now: number): Promis
     ...(task.sessionId ? { sessionId: task.sessionId } : {}),
     ...(task.serverTicketId ? { serverTicketId: task.serverTicketId } : {}),
     workspacePath: task.workspacePath,
+    projectId: task.projectId,
+    hostId: task.hostId,
+    additionalDirectories: task.additionalDirectories,
     ...(task.workspaceIdentity ? { workspaceIdentity: task.workspaceIdentity } : {}),
   };
   parentPort?.postMessage(request);

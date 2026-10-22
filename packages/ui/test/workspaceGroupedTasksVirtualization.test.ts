@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GROUPED_TASK_VIRTUALIZATION_THRESHOLD,
   shouldVirtualizeGroupedTasks,
-} from "@/workspace-grouped-tasks/virtualized-group-task-list.js";
+} from "@/project-sidebar/grouped/virtualized-group-task-list.js";
 import {
   GROUPED_TOP_LEVEL_VIRTUALIZATION_THRESHOLD,
   shouldVirtualizeGroupedTopLevelNodes,
-} from "@/workspace-grouped-tasks/virtualized-top-level-list.js";
+} from "@/project-sidebar/grouped/virtualized-top-level-list.js";
 import {
   isPotentialVerticalScrollContainer,
   scrollGroupedTaskVirtualizerToOffset,
-} from "@/workspace-grouped-tasks/virtualized-scroll.js";
+} from "@/project-sidebar/grouped/virtualized-scroll.js";
 
 describe("workspace grouped task virtualization", () => {
   it("only virtualizes large groups", () => {
@@ -23,8 +23,9 @@ describe("workspace grouped task virtualization", () => {
     expect(shouldVirtualizeGroupedTopLevelNodes(GROUPED_TOP_LEVEL_VIRTUALIZATION_THRESHOLD)).toBe(
       false,
     );
-    expect(shouldVirtualizeGroupedTopLevelNodes(GROUPED_TOP_LEVEL_VIRTUALIZATION_THRESHOLD + 1))
-      .toBe(true);
+    expect(
+      shouldVirtualizeGroupedTopLevelNodes(GROUPED_TOP_LEVEL_VIRTUALIZATION_THRESHOLD + 1),
+    ).toBe(true);
   });
 
   it("treats overflow auto containers as scroll targets before content overflows", () => {

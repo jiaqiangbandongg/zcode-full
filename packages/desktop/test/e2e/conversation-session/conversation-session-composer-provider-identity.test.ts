@@ -6,7 +6,7 @@ import {
   TID_LOGIN_USE_API_KEY_BUTTON,
   TID_TASK_SETTINGS_BUTTON,
   TID_CHAT_MODEL_SELECT_TRIGGER,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   DEFAULT_WORKSPACE,
@@ -64,7 +64,7 @@ describe("Composer provider 身份回归", () => {
     await clearAppData();
   });
 
-  it("CMP02: bigmodel-api 没有 providerName 时菜单和按钮仍显示相同 provider 身份", async function () {
+  it("CMP02: bigmodel-api 没有 providerName 时菜单显示 provider ID，按钮显示模型名", async function () {
     this.timeout(120000);
     await prepareV4ConversationE2E();
     await restartIntoWorkspacePreservingProfile(DEFAULT_WORKSPACE, {
@@ -100,7 +100,7 @@ describe("Composer provider 身份回归", () => {
       await browser.waitUntil(
         async () => {
           const current = await settledSnapshot();
-          return current.prefix === "bigmodel-api/" && current.title === "bigmodel-api/GLM-5.3";
+          return current.prefix === null && current.title === "GLM-5.3";
         },
         { timeout: 5000, timeoutMsg: "模型按钮未收敛到选中的 provider 身份" },
       );
@@ -108,9 +108,9 @@ describe("Composer provider 身份回归", () => {
       await mkdir(evidence, { recursive: true });
       await writeFile(join(evidence, "nameless-provider.json"), JSON.stringify(state, null, 2));
       await browser.saveScreenshot(join(evidence, "nameless-provider.png"));
-      // 回归用户截图：不能因为名称缺失而绕过七档规则，从源头不生成前缀。
-      assert.equal(state.prefix, "bigmodel-api/");
-      assert.ok(state.title?.includes("bigmodel-api/GLM-5.3"));
+      // 合并入口按当前规格只显示模型名；Provider 身份由菜单和实际配置共同验证。
+      assert.equal(state.prefix, null);
+      assert.equal(state.title, "GLM-5.3");
     } finally {
       await restoreElectronRendererContentSize(original);
     }

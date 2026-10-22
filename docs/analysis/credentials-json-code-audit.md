@@ -64,7 +64,7 @@ Server remote
 
 浏览器自身 OAuth
     `-- BrowserOAuthCredentialRepo --------------------------> localStorage
-        pending nonce --------------------------------------> sessionStorage
+        pending login（nonce/provider/回调地址）-------------> localStorage
 ```
 
 - `ICredentialService` 公开 `load/save/delete`；UI 使用 `useCredentials()` 等 hook。泛用存储层不理解 OAuth provider、账号或 workspace，只接受 key/value。[接口](../../packages/services/src/credential/credential.ts#L11)、[hook](../../packages/ui/src/hooks/useCredentials.ts#L8)。
@@ -348,7 +348,7 @@ Host credentials.json / CredentialService
 
 ### Web 浏览器同名字段的独立边界
 
-Web `BrowserOAuthCredentialRepo` 将同名 ZAI 字段放在 **localStorage**，不是磁盘 credentials.json；`oauth_pending_nonce` 放 sessionStorage。当前浏览器实现只支持 ZAI active provider。浏览器 token 交换直接将后端 `data.zai.access_token` 保存，未经过 Desktop `ZaiBusinessTokenResolver` 的业务转换，因此同名 `oauth:zai:access_token` 在两套存储中的来源语义不能直接混同。
+Web `BrowserOAuthCredentialRepo` 将同名 ZAI 字段放在 **localStorage**，不是磁盘 credentials.json；进行中的登录记录 `oauth_pending_logins` 同在 localStorage，按 nonce 区分。当前浏览器实现只支持 ZAI active provider。浏览器 token 交换直接将后端 `data.zai.access_token` 保存，未经过 Desktop `ZaiBusinessTokenResolver` 的业务转换，因此同名 `oauth:zai:access_token` 在两套存储中的来源语义不能直接混同。
 
 浏览器 cached restore 要求 active 为 zai、JWT/access/user_info 全部存在；任何残缺态、用户 JSON 不合法都会 clearAll；JWT 明确过期返回 reauthentication-required。浏览器 logout 仅清自己的 localStorage；它不是 Desktop credentialService 的 OAuth logout。远控 attachment / Host 权威及 credential 转发限制由远控章节说明。
 

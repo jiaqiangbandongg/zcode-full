@@ -87,8 +87,13 @@ export async function assertIncomingMessage(
         : Array.isArray(message.content)
           ? message.content.filter((block) => block.type === "text").map((block) => block.text)
           : [];
-    // 精确比较完整 block，防止正确模板前后夹入额外控制文案。
-    expect(blocks).toContain(expectedBlock);
+    // Provider 会合并相邻 system 消息；其边界不再等同于 runtime 提醒边界。
+    // system 仍校验全文与唯一性；user 包装必须独占完整 block，避免额外控制文案。
+    if (input.role === "system") {
+      expect(blocks.some((block) => block.includes(expectedBlock))).toBe(true);
+    } else {
+      expect(blocks).toContain(expectedBlock);
+    }
     if (wrapped) {
       const actualBlock = blocks.find(
         (block) => block.includes(prefix) && block.includes(input.marker),

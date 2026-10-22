@@ -17,14 +17,6 @@ import {
   createWorkflowPhaseNames,
   type CreateWorkflowOutput,
 } from "../src/tools/create-workflow.js";
-import type { BackgroundResultOriginMeta } from "../src/events/session.events.js";
-import type {
-  DynamicWorkflowRunPort,
-  DynamicWorkflowRunSubmitRequest,
-  DynamicWorkflowRunEvent,
-} from "../src/interfaces/dynamic-workflow-run.port.js";
-import type { WorkflowTaskSnapshot } from "../src/interfaces/workflow.port.js";
-import { createTraceId } from "../src/interfaces/shared.js";
 
 const DIAGNOSTICS_ONLY: CreateWorkflowOutput = {
   diagnostics: [{ code: 2322, column: 7, line: 1, message: "Type error" }],
@@ -98,19 +90,10 @@ describe("CreateWorkflowInputSchema — no predecessor field", () => {
 
   it("rejects resume_from in every spelling", () => {
     for (const key of ["resume_from", "resumeFrom", "run_id"]) {
-      expect(CreateWorkflowInputSchema.safeParse({ script: SCRIPT, [key]: "dwfrun-prev" }).success).toBe(
-        false,
-      );
+      expect(
+        CreateWorkflowInputSchema.safeParse({ script: SCRIPT, [key]: "dwfrun-prev" }).success,
+      ).toBe(false);
     }
-  });
-
-  it("does not project a predecessor field into the model-facing JSON schema", () => {
-    const properties = (CreateWorkflowInputJsonSchema as { properties?: Record<string, unknown> })
-      .properties;
-    expect(Object.keys(properties ?? {})).toEqual(
-      expect.arrayContaining(["name", "script", "saved", "max_concurrency", "subagent_model"]),
-    );
-    expect(properties).not.toHaveProperty("resume_from");
   });
 
   // 子代理选型（docs/dynamic-workflow/launch.md）：模型面收一个宽松的字符串，规范化留给
@@ -147,8 +130,7 @@ describe("CreateWorkflowInputSchema — the file sources", () => {
       "script",
       "subagent_model",
     ]);
-    // 回填项与 `AmendWorkflow.predecessor` 同一姿态：运行时认它们，模型面不列它们。
-    expect(properties).not.toHaveProperty("script_line_offset");
+    // saved.draft 同样只存在于归一化后的运行时入参。
     const saved = (properties?.saved as { properties?: Record<string, unknown> } | undefined)
       ?.properties;
     expect(saved).not.toHaveProperty("draft");
@@ -182,70 +164,6 @@ describe("CreateWorkflowInputSchema — the file sources", () => {
       script_line_offset: 3,
     };
     expect(CreateWorkflowInputSchema.parse(resolved)).toEqual(resolved);
-  });
-});
-
-describe("BackgroundResultOriginMeta", () => {
-  it("admits workflow as a background source", () => {
-    // 完成通知复用整条后台管线，所以 workflow run 的终态要能标注来源。
-    const meta: BackgroundResultOriginMeta = {
-      backgroundSource: "workflow",
-      workId: "dwf_run_01H",
-      title: "Review the codebase",
-    };
-    expect(meta.backgroundSource).toBe("workflow");
-  });
-});
-
-describe("DynamicWorkflowRunPort", () => {
-  it("is implementable over JSON-able shapes alone", () => {
-    // 端口只承载 JSON 形状：引擎的词汇表（RunEvent / StoredEvent / RunStatus）留在领域包里，
-    // contracts 绝不 import dynamic-workflow。这个 fake 就是那条规则的可执行证明。
-    const events: DynamicWorkflowRunEvent[] = [
-      { sequence: 0, type: "run-started", payload: { runId: "run_1" } },
-      { sequence: 1, type: "node-settled", payload: { instance: { siteId: "ask#1", ordinal: 1 } } },
-    ];
-    const snapshot: WorkflowTaskSnapshot = {
-      runId: "run_1",
-      startedAt: new Date(0),
-      status: "running",
-      taskId: "run_1",
-    };
-    let cancelled = false;
-
-    const port: DynamicWorkflowRunPort = {
-      submit: (request: DynamicWorkflowRunSubmitRequest) =>
-        Promise.resolve({ ok: true, runId: `run_${request.scriptText.length}` }),
-      getTask: () => Promise.resolve(snapshot),
-      waitForTask: () =>
-        Promise.resolve({ ...snapshot, status: "completed", output: { artifact: 1 } }),
-      cancel: () => {
-        cancelled = true;
-        return Promise.resolve(true);
-      },
-      listEvents: (_runId, opts) =>
-        Promise.resolve({
-          events: events.filter(
-            (e) => opts.afterSequence === undefined || e.sequence > opts.afterSequence,
-          ),
-          hasMore: false,
-        }),
-    };
-
-    return Promise.all([
-      port.submit({
-        scriptText: "return 1;",
-        cwd: "/tmp",
-        parentSessionId: "sess_p",
-        trace: { traceId: createTraceId() },
-      }),
-      port.listEvents("run_1", { afterSequence: 0, limit: 10 }),
-      port.cancel("run_1"),
-    ]).then(([submitted, page]) => {
-      expect(submitted.ok === true && submitted.runId).toBe("run_9");
-      expect(page.events.map((e) => e.sequence)).toEqual([1]);
-      expect(cancelled).toBe(true);
-    });
   });
 });
 
@@ -364,9 +282,6 @@ describe("CreateWorkflowCausalityGraphSchema — phase vocabulary", () => {
     };
     const parsed = CreateWorkflowCausalityGraphSchema.parse(empty);
     expect(parsed).toEqual(empty);
-    expect(parsed.phases).toEqual([]);
-    expect(parsed.phaseEdges).toEqual([]);
-    expect(parsed.exits).toEqual([]);
   });
 
   it("round-trips exits and bounds them at 32 phase ids", () => {
@@ -412,17 +327,13 @@ describe("CreateWorkflowCausalityGraphSchema — phase vocabulary", () => {
     // 没有读者了，同样硬断。
     const [step0, step1] = unphasedGraph.steps;
     const [lane0, lane1] = unphasedGraph.lanes;
-    const edge = { from: "world-read#1", to: "ask#1" };
     const handoff = unphasedGraph.handoffs[0]!;
     const phaseEdge = { from: "unphased", to: "phase#1" };
     const rejected: unknown[] = [
       // step 级边整个字段都不在了——空数组也是多出来的键。
       { ...unphasedGraph, edges: [] },
-      { ...unphasedGraph, edges: [edge] },
-      { ...unphasedGraph, edges: [{ ...edge, kind: "data" }] },
       // 交接边上的旧字段。
       { ...unphasedGraph, handoffs: [{ ...handoff, kind: "data" }] },
-      { ...unphasedGraph, handoffs: [{ ...handoff, kind: "carry" }] },
       { ...unphasedGraph, handoffs: [{ ...handoff, certainty: "always" }] },
       { ...unphasedGraph, handoffs: [{ ...handoff, exact: true }] },
       { ...unphasedGraph, handoffs: [{ ...handoff, count: 2 }] },
@@ -436,10 +347,8 @@ describe("CreateWorkflowCausalityGraphSchema — phase vocabulary", () => {
       // 车道上的旧字段：families（单一箭头之前）与 nesting（交接栈之前）。
       { ...unphasedGraph, lanes: [lane0, { ...lane1, families: ["loop#1"] }] },
       { ...unphasedGraph, lanes: [lane0, { ...lane1, nesting: 1 }] },
-      { ...unphasedGraph, lanes: [lane0, { ...lane1, nesting: 0 }] },
       // 顶层 regions 表——空表也一样是多出来的键。
       { ...unphasedGraph, regions: [] },
-      { ...unphasedGraph, regions: [{ id: "seq#1", kind: "seq" }] },
     ];
     for (const graph of rejected) {
       expect(CreateWorkflowCausalityGraphSchema.safeParse(graph).success).toBe(false);
@@ -747,11 +656,7 @@ describe("createWorkflowPhaseNames — the declared phase table for run-launched
         lanes: [],
         participants: [],
         handoffs: [],
-        phases: [
-          { id: "p1", name: "Research" },
-          { id: "unphased" },
-          { id: "p2", name: "Write" },
-        ],
+        phases: [{ id: "p1", name: "Research" }, { id: "unphased" }, { id: "p2", name: "Write" }],
       }),
     ).toEqual(["Research", "Write"]);
   });

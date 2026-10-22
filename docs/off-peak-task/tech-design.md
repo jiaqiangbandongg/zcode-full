@@ -1,5 +1,7 @@
 # 闲时任务（Off-Peak Task）技术设计
 
+> **生命周期实现：** [后台执行与生命周期计划](./background-lifecycle-plan.md) 定义 owner、时序、接口及验证进度。历史设计中的单轮收口由 CLI 整项执行收口取代。
+
 > **状态：已实现；2026-08-24 已同步 Provider Refactor M4 执行事实。** 当前仓库已包含 `offPeak`
 > 领域类型、SQLite Repo、Service、scheduler/main/host 派发、标准 Provider/Model 执行链、UI 和 mock。
 > Scheduled Automation 仍是独立领域，边界见 [Scheduled Tasks Main View](../ui/scheduled-tasks-main-view.md)。
@@ -26,10 +28,10 @@
 | **任务本质**（D28，取代 D5/D23）          | Automations 体系下的**一次性后台任务**：表单创建、列表管理、派发时新建 session；UI 一切以 Figma 定稿为准，composer 月亮开关/锁定范式作废                                                                        |
 | **排队与并发归服务端**（D18/D20）         | 全局 FIFO、每用户并发额度全在服务端；客户端不承载任何调度策略                                                                                                                                                   |
 | **任务生命周期五接口**（D39）             | availability → 取号 `POST /ticket`(→ticket_id) → 批量 `POST /ticket/status` → `POST /messages` → settle；服务端 ready 写成本地 schedulable；本地 running 在 sendPrompt ACK 后写入，不能与 active 按时间严格等同 |
-| **3h 分段 + 自动续跑**（D26 修正 D3/D15） | 每张 active ticket 最多 3h；到期 `3102` 后换票并 resume 同一 session，每个续跑 turn 重新注入 idle plan                                                                                                          |
+| **3h 分段 + 自动续跑**（D26 修正 D3/D15） | 每张 active ticket 最多 3h；到期 `3102` 后交接新票给驻留 CLI，保留原请求与后台结果，不提交续跑 prompt                                                                                                          |
 | **每请求可重排队**（D19）                 | 排队协议收敛在 idle plan provider 适配层；等待不计失败、不设上限，agent loop 无感                                                                                                                               |
 | **idle plan**（D11/D16/D33/D44）          | 自动派发 turn 精确选择隐藏 Built-in `builtin:offpeak-idle-plan`，通过标准 Registry/ModelFactory 创建 Active Model；permission 在普通 session 内处理且聚合态保持 running，不做批准后中途切 provider              |
-| **计费边界**（D23/D33）                   | idle Model Selection 与 Request Auth 只属于本次执行，不修改 Session Selection，也不落 Config/Registry View/session/queue；插话与终态后聊天按用户 Session Selection 创建模型                                     |
+| **计费边界**（D23/D33）                   | 运行时 Session Selection 维护续跑归属；临时闲时选择与凭据不落普通 session entry，接纳用户消息后续跑用用户选择                                     |
 | **终态核销**（D22）                       | settle 幂等上报 + outbox 补报，服务端静默超时回收兜底                                                                                                                                                           |
 | **灰度开关**（D31）                       | 入口曝光由共用 `GET /api/v1/client/configs` 的 `offPeak.enable_offpeak_task` 下发；模型列表来自 Built-in `builtin:offpeak-idle-plan`。有效开启 = 开关 true 且 Built-in 模型列表非空；准入仍以服务端为准         |
 | **额度快照**（D39）                       | 专用 `GET /ticket/availability` 返回 `can_take_number` 与 `next_take_at`；UI 提前置灰并到点重查，实际 `POST /ticket` 仍是竞态下最终权威                                                                         |
@@ -48,9 +50,7 @@
 | 任意非终态「取消」后接管      | 自动化终止、文件保留，手动继续全在用户 key                                                                                                                                          |
 | 终态之后继续对话              | 创建新的普通 Loop Model，使用 Session Selection 指向的用户 provider                                                                                                                 |
 
-Session Selection 从未被闲时执行修改，因此不存在模型恢复顺序。当前 idle Loop terminal 后先结束其
-Active Model/Request Auth 生命周期，再进入 ready/queue drain。D11/D27 中“批准后显式切用户 provider”
-的设计已由 D44 明确砍掉。~~queued「立即执行」~~ v1 已砍掉（D32）。
+Session Selection 是运行时续跑选择，闲时执行驻留期间临时指向闲时模型。用户消息接纳后立即改为该消息的普通选择，旧排队消息不得倒写。普通持久化 entry 保留用户选择。票据寿命由 CLI `OffPeakLifecycle` 与 `OffPeakTicketAuthority` 管理，Host 通过严格 schema 的 `v4/offPeak/lifecycle` 和 `v4/conversation/offPeakControl` 交接票据，终态写回不依赖单轮 terminal。
 
 **当前服务端契约基线**：`zcode-server/main@ec2b18daa01b8e1b801f0691ac22153c2e56c6db`
 已确认五个端点都要求客户端携带 `X-Coding-Plan-Api-Key`；BigModel Team 连接还必须从同一次
@@ -317,7 +317,7 @@ sequenceDiagram
   end
 ```
 
-关键取舍（D30-8，修订 D25 旧取舍）：**创建只落表单数据 + 取号，不预建任何对话**。派发时 `createTask` 新建 session（automation 的 CronRun 同款路径）并回填 sessionId；中断恢复/续跑 resume 同一 session。侧栏 Group 分组条目在无 session 时点击进任务详情页，有 session 后直接进对话。
+关键取舍（D30-8，修订 D25 旧取舍）：**创建只落表单数据 + 取号，不预建任何对话**。派发时 `createTask` 新建 session（automation 的 CronRun 同款路径）并回填 sessionId；已有任务行的中断恢复仍可 resume 同一 session；本次运行中换票通过现存 CLI 的控制接口续跑，不重发 prompt。侧栏 Group 分组条目在无 session 时点击进任务详情页，有 session 后直接进对话。
 
 ### 4.2 调度 + 准入流（授权后）
 
@@ -339,11 +339,12 @@ sequenceDiagram
   end
   S->>M: offpeak-dispatch-request {offPeakTaskId, conversationId, sessionId?, prompt, permissionMode, ...}
   M->>H: HostMessageTypes.OffPeakRun
-  Note over H: 首次 createTask(user Session Selection)，续段 resume 同 session<br/>sendPrompt 带 idle Model Selection + modelExecution.requestAuth
+  Note over H: 首次 createTask 并注册驻留执行，再提交 idle Selection 与票据上下文<br/>换票只调用现存 session 的 offPeakControl，不再 sendPrompt
   H->>H: sendPrompt(taskId, prompt, modelSelection, modelExecution)
-  H->>M: OffPeakRunResult {ok, sessionId}（sendPrompt ACK）
+  H->>DB: 首次接纳成功后 markRunning，启用生命周期事件消费
+  H->>M: OffPeakRunResult {ok, sessionId, lifecycleManaged: true}
   M->>S: offpeak-dispatch-result
-  S->>DB: markRunning（早于 messages 真正准入）
+  Note over S: lifecycleManaged 时不再覆盖 Host 已写入的生命周期状态
   H->>A: agent loop 首次模型请求
   A->>G: POST /api/v1/off-peak/anthropic/v1/messages（ticket + 双凭证）
   alt 限流（细阀 D19）
@@ -382,7 +383,7 @@ generate/stream runner 调用；只对 `providerId=builtin:offpeak-idle-plan` �
 - **豁免重试预算**：HTTP 429 或业务码 3105 归入 `ModelRetryReason.OffpeakQueued`，
   runner 保持/回退 attempt，使容量等待不消耗普通重试预算；其他 provider 不走该分支。
 - **stream 安全边界**：仅在尚未产生 provider-visible 输出时重试，跨越可见边界后不重放。
-- **首派弃派（规则 1，实现定案改由票据 TTL 兜底）**：不在适配层单独实现弃派逻辑——queued 态首个请求挂网关时，ready 5min TTL 到期自然触发 `400/3102` → 续跑回队（§4.6），等待上界 ≈ TTL + 一次 5min 钳制探测 ≤ 10min，满足规则意图（不空挂 agent loop）且少一套状态机；重派发复用中断恢复的 resume 语义。
+- **首派弃派（规则 1，实现定案改由票据 TTL 兜底）**：不在适配层单独实现弃派逻辑——queued 态首个请求挂网关时，ready 5min TTL 到期自然触发 `400/3102` → 续跑回队（§4.6），等待上界 ≈ TTL + 一次 5min 钳制探测 ≤ 10min，满足规则意图（不空挂 agent loop）且少一套状态机；新票派发到原驻留执行，继续原请求，不重放初始指令或已执行工具。
 - 用户取消任务 → abort 等待中的定时器与在途请求。
 - 请求头注入随 run 作用域 provider 配置带上：`X-Off-Peak-Ticket-ID` / 双凭证（JWT + `X-Coding-Plan-Api-Key`，D23/D26 注入点顺手做）。
 
@@ -405,12 +406,7 @@ D11/D27 曾设计“敏感操作暂停 → 专用等待态 → 批准后切用�
   └─ 结束 idle Active Model/Request Auth → ready / drain 用户排队消息
 ```
 
-run session 是普通对话，running 中用户补 prompt 走现有 busy queue。每次自动派发提交精确的 idle
-Model Selection，并在 `modelExecution` 中附带本次 Request Auth 与 Child 策略：静态事实由 Built-in
-Config/Rules 进入常驻 Registry，ModelFactory 为当前 Loop 创建 Active Model；Session Selection 从不
-改变，动态材料不落 app 缓存、CLI record、workspace catalog、Session snapshot 或普通 Queue。turn
-terminal 后结束 idle Active Model/Request Auth 生命周期，再进入 ready/queue drain，因此排队用户消息
-和终态后聊天使用用户 provider。
+run session 的用户输入仍由 CLI CommandInbox 唯一接纳。`modelExecution.offPeak` 只携带内存执行身份；凭据通过当前执行依赖解析，换票控制不进入 transcript。用户接管不等同于取消：已启动子轮跑完，后续恢复和通知唤起采用用户模型。
 
 ### 4.5 中断恢复（app 重启 / 机器睡醒）
 
@@ -424,10 +420,10 @@ terminal 后结束 idle Active Model/Request Auth 生命周期，再进入 ready
 flowchart TD
   A["active 运行中（本段 ticket，3h 窗口）"] --> N{"下一次 /messages"}
   N -->|admitted| A
-  N -->|"agent loop 自然完成"| Done["settle 本 ticket → completed"]
+  N -->|"整项无剩余工作"| Done["settle 本 ticket → completed"]
   N -->|"400/3102 ticket 不可用（active 3h 到期）"| Re["同 task_id 重新取号 POST /ticket<br/>拿新 ticket_id，本地状态回 queued"]
   Re --> W["批量轮询等 ready（下一个低峰窗口 + 排到）"]
-  W -->|ready| Dispatch["resume 同一 session → 发首个 /messages → active"]
+  W -->|ready| Dispatch["交接新票 → 原请求继续 → active"]
   Dispatch --> A
   Re -.->|"用户取消 / 达全局约束"| Cancel["cancelled / failed"]
 ```
@@ -436,9 +432,9 @@ flowchart TD
 
 - 触发点是 message 收到 `400/3102`（active 到期，服务端已把 ticket 置 expired），不是客户端本地计时——以服务端为准，避免时钟漂移误判。
 - 重新取号用**同一 `task_id`**（服务端允许多次），换新 `ticket_id`；`server_ticket_id` 列更新，旧 ticket 作废。
-- 续跑段仍走完整"等 ready → resume → 首个 message 抢 5min 窗口"，与首段同路径（复用 §4.2 派发链路）。
+- 续票等待 ready 后交给现有 runtime，不 resume、不 sendPrompt；首次派发仍按 §4.2。
 - 客户端用户可见状态在续跑间隙回落到"等待闲时算力"（running→queued 显示），跑起来再回 running；对用户是一个慢慢跑完的任务。
-- 每段之间 session 不丢：`session/resume` + 续跑提示词（spec 待验证项 2）。
+- 跨票 session 与本地后台进程保持驻留；不提供跨重启后台恢复。
 
 ### 4.7 会话内创建流（D49）
 
@@ -523,16 +519,15 @@ sequenceDiagram
                             显式 offPeakTaskId（主）∥ queryId "offpeak-" 前缀（resume 兜底）
                             ∥ denylist 已含 OffPeakCreate（busy 合并路径）
   L2 handler 执行边界    assertNotOffPeakTurn(context.offPeakTurn) → PermissionDenied
-                         同一 offPeakTurn 还关闭 Bash 后台面（D51）：run_in_background → recoverable
-                         ToolExecutionFailed；超时自动转后台禁用；Agent 后台由 runner BACKGROUND_UNAVAILABLE 拒
+                         Agent/Bash 显式和自动后台、SendMessage 走普通执行器；独立工作流执行仍禁止
   L3 协议端口边界        offpeak-port 读 record.activeOffPeakTaskId → 拒绝，不发协议请求
   （D50 绑定守卫三级：端口读 offPeak/list top-20 快速拒绝 → service createTask 取号前
     repo.hasActiveBoundTask 精确预检 → 部分唯一索引 idx_off_peak_bound_active 在 INSERT 关闭 TOCTOU，
     后两级均回 session_bound，机审 CR-02）
 
-⚠ OFF_PEAK_MUTATION_TOOL_NAMES 必须独立于 AUTOMATION_MUTATION_TOOL_NAMES（共 4 份副本：
-  services/automationToolPolicy、core/turn-loop-state、bootstrap/prompt-turn、adapter 内联）。
-  混入任何一份都会让 cron automation 轮误 deny OffPeakCreate，违反 D49-3。
+⚠ 闲时专属限制独立于 AUTOMATION_MUTATION_TOOL_NAMES。Core 与 Bootstrap 统一消费
+  shared 的 OFF_PEAK_EXECUTION_TOOL_DENYLIST；services 的调度入口另外限制 CronCreate。
+  不把闲时专属项混入普通 cron automation 轮。
 ```
 
 **工具注册与创建准入分离（3.12.2）**：
@@ -631,7 +626,7 @@ stateDiagram-v2
 | `packages/services/src/session/offPeakTaskService.ts` | 创建取号、取消、Pause/Continue、编辑、History tombstone、批量 ticket 同步、重取号、scheduler wake 与 settle outbox                                                                                                                                | `automationService.ts`                                         |
 | `packages/desktop/src/scheduler/`                     | `index.ts` 增加 offPeak tick 分支（认领 schedulable 任务 + 派发消息）；`schedulerProtocol.ts` 新消息对                                                                                                                                            | 现有 cron tick                                                 |
 | `packages/desktop/src/main/desktopCronScheduler.ts`   | 已并入现有路由：转发 OffPeakRun/Result 与 scheduler wake                                                                                                                                                                                          | CronRun 路由                                                   |
-| `packages/desktop/src/host/index.ts`                  | 懒装配 Off-Peak runtime；首次按任务保存的精确选择 createTask（绑定会话则 resume），续段 resume；提交 idle Model Selection + `modelExecution.requestAuth`，订阅 terminal outcome，识别 3102 marker                                                                 | CronRun 处理块                                                 |
+| `packages/desktop/src/host/index.ts`                  | 懒装配 Off-Peak runtime；首次按任务保存的精确选择 createTask（绑定会话则 resume），续段 resume；提交闲时执行身份与 Request Auth，订阅显式 lifecycle，向现存 CLI 交接换票/取消控制                                                                 | CronRun 处理块                                                 |
 | idle plan provider                                    | 隐藏 Built-in Config 保存 Endpoint/models/access；派发只构造 JWT + Coding Plan Key + Ticket header 的 Request Auth，随当前 execution-scoped Model 绑定，不落 Config/Registry View/session/workspace catalog；适配层实现 429/3105 重试协议（§4.3） | Provider Config + `offpeak-retry.ts` + generate/stream runner  |
 | `packages/ui`                                         | AutomationsSection 扩展：Idle-time tab/创建表单/列表卡片/History；New task 页引导条+模板卡；侧栏 Group 系统分组；保持唤醒开关（三入口镜像）；`offPeakStore`                                                                                       | `AutomationsSection` / `automationManagementStore`（直接扩展） |
 | 通知                                                  | `useOffPeakTaskNotifications.ts` 轮询任务并对 completed/failed/awaiting 边沿发桌面通知；awaiting variant 因生产状态不可达而暂不触发                                                                                                               | —                                                              |
@@ -721,7 +716,7 @@ flowchart TD
 | 提交                | 先查 availability（仅成功返回 true 放行）→ `POST /ticket`；取号成功才落库           | 生成 ticket 并返回 state/position；服务端额度是权威 | 查询失败/加载中禁入；`429/3103 + next_take_at` → 不落 task，刷新 availability |
 | 批量同步            | 有非终态 ticket 才 `POST /ticket/status`；共享 timer 按 nextPollAfter               | 返回 ticket state + position                        | 失败 10 秒起指数退避；`not_found` 当前不自动 retake                           |
 | 发起执行            | `schedulable=1` 的 task 被 scheduler 认领；host `sendPrompt` ACK 后本地 markRunning | ready ticket 的首个 messages 请求激活为 active      | messages 若 `429/3105`，适配层等待；UI 此时仍显示 running                     |
-| 运行中              | 每次请求携带 ticket id；容量排队不消耗普通重试预算                                  | active 3h 到期后 messages 返回 `400/3102`           | host 识别稳定 marker，同 task 换票并 resume 同 session                        |
+| 运行中              | 每次请求携带 ticket id；容量排队不消耗普通重试预算                                  | active 3h 到期后 messages 返回 `400/3102`           | CLI 报 ticket_needed，Host 同 task 换票，控制通道交给驻留执行                        |
 | 终态                | 本地落终态（核销见 7.7/D22）                                                        | 从活跃集合移除、释放额度（显式核销或静默超时回收）  | 客户端崩溃：服务端靠超时回收额度；客户端靠 `recoverInterrupted` 重新排队      |
 | Permission approval | 无 Off-Peak 专用状态/切换逻辑；批准后同一自动 turn 继续                             | 无额外 ticket 动作                                  | 仍使用同一个 idle Active Model；配额提示未实现                                |
 
@@ -743,7 +738,7 @@ flowchart TD
   D --> G{"POST /anthropic/v1/messages"}
   G -->|"HTTP 429/3105 + Retry-After"| G0["abort-aware 等待；单次 ≤5min<br/>豁免普通 retry budget；本地仍 running"] --> G
   G -->|"2xx/SSE"| R["loop 继续"]
-  G -->|"400/3102"| X["同 task_id 重取号；resume 同 session"] --> Q
+  G -->|"400/3102"| X["同 task_id 重取号；交接驻留执行"] --> Q
   R -->|"自然完成"| E["终态 → settle outbox"]
 ```
 
@@ -900,16 +895,16 @@ permission approval 的 v1 语义已由 D44 收敛：普通 session 负责确认
 
 以下保留开工前调查的约束，但“需新增/今天不存在”类措辞已按最终代码改写；它们不是待实施清单。
 
-**① `session/resume` 跨 ticket 续跑 + 中途切 provider 的底层机制 —— ✅ 成立。**
-冷恢复和 resume 机制可用，Off-Peak 续段已用它复用同一 session；单写由派发 single-flight 保证。
-通用 runtime 具备 turn 间切 provider 的底层能力，但 D44 不在 permission 等待中切换当前 turn；
-未来若重开必须先证明 mid-turn handoff 的事件顺序与凭证清理安全。
+**① 跨 ticket 续跑使用现存执行控制。**
+生命周期与请求鉴权包装器保留等待中的请求，新票按 executionId 与 renewalId 安装。
+用户消息被接纳后改变整项归属；已启动的子 agent 当前轮继续原模型，后续唤起与恢复读取用户 Selection。
+permission approval 本身仍只批准工具，不视为用户消息接管。跨进程重启不恢复这些后台工作。
 
 **② run 作用域 Provider/Model 执行 —— ✅ D33 不变量已由 Provider Refactor M4 收口。**
 V4 `sendText` 提交标准 Model Selection 与最小 `modelExecution`；CLI 通过常驻 Registry/ModelFactory
-创建 idle Active Model，动态 Request Auth 只绑定当前执行。Session Selection 从未改变，因此没有
-workspace/turn overlay、模型恢复或临时 Registry 热更新顺序；动态材料不写 CLI record、Session snapshot、
-普通 Queue 或 workspace catalog。
+创建 idle Active Model，动态 Request Auth 只绑定当前执行。运行时 Session Selection 暂时承载闲时续跑选择；
+用户消息接纳后更新为用户选择，未接管的整项完成后还原普通选择。闲时选择不持久化，
+动态材料不写 CLI record、Session snapshot、普通 Queue 或 workspace catalog。
 
 **③ 解析当前选中的 Coding Plan credential —— ✅ 已按 D40 落地。**
 host/services 先读取当前 family 与 selected connection，再通过 Account Request Auth Service 按标准

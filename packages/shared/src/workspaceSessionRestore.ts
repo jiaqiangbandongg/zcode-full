@@ -32,7 +32,7 @@ export function resolveStartupLocalWorkspaceSessionIndex(
     return nextLocalIndex;
   }
 
-  // 启动时远程 workspace 只恢复为断连 tab，本地 host 不能把它当作可预热目标。
-  // 从上次 active 位置找不到本地项时回绕到前面的本地项，保持 renderer active tab 和 main 预热目标一致。
+  // Bugfix: 启动时远程 workspace 只恢复为断连 tab，本地 host 不能把它当作可预热目标。
+  // 从上次 active 位置找不到本地项时回绕；这里只选 Main 本地预热目标，Renderer 另按持久化索引恢复导航。
   return findLocalWorkspaceSessionIndex(persistedSessions, 0, startIndex);
 }

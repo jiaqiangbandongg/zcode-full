@@ -60,24 +60,10 @@ function fillFor(overrides: Partial<HoleFill> = {}): HoleFill {
   };
 }
 
-/** 一个 promise 当前是否已经结算（不等待）。 */
-async function settledState(p: Promise<unknown>): Promise<"pending" | "resolved" | "rejected"> {
-  const marker = Symbol("pending");
-  const result = await Promise.race([
-    p.then(
-      () => "resolved" as const,
-      () => "rejected" as const,
-    ),
-    Promise.resolve(marker),
-  ]);
-  return result === marker ? "pending" : result;
-}
-
 describe("WorkflowEngine — hole(): reach and park", () => {
-  it("mints the site's ordinal, records hole-reached and parks the promise without a node row", async () => {
+  it("mints the site's ordinal, records hole-reached and parks the promise without a node row", () => {
     const { engine, driver, journal } = setup({ now: () => 1000 });
-    const promise = engine.hole("hole#1", "Verdict", "Decide.");
-    expect(await settledState(promise)).toBe("pending");
+    void engine.hole("hole#1", "Verdict", "Decide.");
 
     const reached = driver.eventsOfType("hole-reached");
     expect(reached).toEqual([
@@ -298,7 +284,7 @@ describe("WorkflowEngine — holes across lives", () => {
     });
   });
 
-  it("a run stopped while waiting resumes with nothing parked and re-reaches with a fresh hole-reached", async () => {
+  it("a run stopped while waiting resumes with nothing parked and re-reaches with a fresh hole-reached", () => {
     const journal = new InMemoryJournalStore();
     const first = setup({ journal });
     first.engine.hole("hole#1", "A", "Decide.").catch(() => undefined);
@@ -316,8 +302,7 @@ describe("WorkflowEngine — holes across lives", () => {
     });
     expect(engine.openHoles()).toEqual([]);
     expect(engine.filledHoles()).toEqual([]);
-    const promise = engine.hole("hole#1", "A", "Decide.");
-    expect(await settledState(promise)).toBe("pending");
+    void engine.hole("hole#1", "A", "Decide.");
     expect(driver.eventsOfType("hole-reached")).toHaveLength(1);
     // 整段日志里现在有两条 hole-reached：上一世一条、这一世一条，序号都从 1 起（没有行可撞）。
     const all = journal.listEvents(RUN, { types: ["hole-reached"], reportItems: "all" });

@@ -1,5 +1,13 @@
 # Provider 设置本批浏览器用例
 
+## MiMo 模板拆分（2026-10-14）
+
+MIMO-03（accepted，pending）：390px 中文浅色 / 1200px 英文深色，真实模板选择器分别显示 Xiaomi MiMo API 和 Xiaomi MiMo Token Plan，tooltip 和图标一致；分别点击后仅发送对应 templateId 的创建动作，详情 Base URL 分别为按量与中国 Token Plan 地址；无横向溢出、页面错误或额外写入。规格及官方核验见 [MiMo 模板](../provider-mimo-templates.md)。复用现有浏览器 fixture，不宣称原生 Electron、手机 shared-host 或真实付费请求已验证。
+
+运行：`node --test --test-name-pattern='mimo templates' packages/ui/test/browser/manual-review/pending/provider-settings-batch.test.mjs`。
+
+本轮两例通过，截图已复查：两张模板、图标、两种地址、中文浅色与英文深色正常。配置相关定向 18 项及最终 affected 17 项通过；保持 pending 身份。
+
 ## Todo148 Dock 应用图标纠正（2026-09-15）
 
 Todo150 名称补充：现有 `zai app icon` 双尺寸／语言用例同时断言两张模板卡片及 tooltip 分别为 `Z.ai Coding Plan`、`Z.ai API`，图标与协议不变。

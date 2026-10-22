@@ -96,39 +96,46 @@ export async function checkManaged(
     },
   );
   await check(
-    "all anchors unmounted plus expired retention keeps running tool and resource feed until completion",
+    "all anchors unmounted plus expired retention keeps MCP guest and resource feed after completion",
     async () => {
+      const step = (stage: string) => env.events.emit({ type: "retention-step", stage });
       const guest = env.guests.get(win.webContents.id)!;
       const result = page("window.callTool('managed-background', true)");
       await env.agent.respond(await approval("managed-background"), "allow");
       await env.agent.events.wait((e) => e.type === "executed" && e.key === "managed-background");
+      step("tool-running");
       await ui("window.setAnchors(false, false)");
+      step("anchors-unmounted");
       await notification();
+      step("background-notification");
       await ui("window.expireOffscreen()");
       assert.equal(guest.isDestroyed(), false);
       assert.equal(env.countGuests(), 1);
-      const stopped = new Promise<void>((resolve) => guest.once("destroyed", resolve));
       env.agent.release("managed", "managed-background");
       assert.ok((await result).result);
-      await stopped;
-      await env.agent.events.wait((e) => e.type === "resources/unsubscribe");
-      assert.equal(env.countGuests(), 0);
+      step("tool-completed");
+      assert.equal(await ui("window.suspendManaged()"), false);
+      assert.equal(guest.isDestroyed(), false);
+      await notification();
+      step("idle-notification");
+      assert.equal(env.countGuests(), 1);
       assert.equal(executed("managed-background"), 1);
     },
   );
   await check(
-    "production owner restores snapshot after recycle and retry clears only widgetState",
+    "production owner retains snapshot and guest after idle and retry clears only widgetState",
     async () => {
-      const after = env.events.history.length;
+      const retained = env.guests.get(win.webContents.id)!;
       await ui("window.setAnchors(true, false)");
       assert.notEqual(
         (await ui("window.managedState()")).actual?.phase,
         "error",
         JSON.stringify(await ui("window.managedState()")),
       );
-      await env.events.wait((e) => e.type === "phase" && e.phase === "running", after);
+      assert.equal(env.guests.get(win.webContents.id), retained);
       await page("window.fixtureReady");
-      assert.deepEqual(await page("window.readWidget()"), { managed: 7 });
+      // guest 没有重建，初始化 hostContext 不会重发；保存快照仍由宿主内存 store 持有。
+      assert.deepEqual((await ui("window.managedState()")).widget, { managed: 7 });
       await page("window.storageRoundTrip(true)");
       const old = env.guests.get(win.webContents.id)!;
       const offset = env.events.history.length;

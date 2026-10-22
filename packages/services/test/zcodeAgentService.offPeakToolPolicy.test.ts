@@ -93,14 +93,6 @@ describe("workspace/updateOffPeakToolPolicy 同步（D49-8）", () => {
     service.disposeAll();
   });
 
-  it("灰度关闭仍注册本地工具，不读取远端灰度", async () => {
-    const { service, request, resolveConfig } = await setup({ offPeakEnabled: false });
-    await service.initialize({ workspacePath: "/workspace/app" });
-    expect(policyCalls(request)).toHaveLength(1);
-    expect(resolveConfig).not.toHaveBeenCalled();
-    service.disposeAll();
-  });
-
   it("灰度开启时在客户端就绪阶段下发 enabled:true", async () => {
     const { service, request } = await setup({ offPeakEnabled: true });
     await service.initialize({ workspacePath: "/workspace/app" });

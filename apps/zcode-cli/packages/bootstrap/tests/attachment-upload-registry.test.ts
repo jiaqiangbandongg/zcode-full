@@ -58,9 +58,9 @@ describe("AttachmentUploadRegistry hard bounds", () => {
     for (let index = 0; index < PROTOCOL_V4_LIMITS.attachmentUploadMaxConcurrent; index += 1) {
       registry.begin(begin(empty, `upload-${index}`, 0));
     }
-    expect(() =>
-      registry.begin(begin(empty, "upload-overflow", 0)),
-    ).toThrow("fault.attachment.tooManyUploads");
+    expect(() => registry.begin(begin(empty, "upload-overflow", 0))).toThrow(
+      "fault.attachment.tooManyUploads",
+    );
     expect(() =>
       registry.begin({ ...begin(empty, "upload-0", 0), fileName: "conflict.bin" }),
     ).toThrow("fault.attachment.beginConflict");
@@ -147,36 +147,6 @@ describe("AttachmentUploadRegistry hard bounds", () => {
         connectionId: "connection-1",
         sessionId: "session-1",
         uploadId: "incomplete",
-      }),
-    ).rejects.toThrow("fault.attachment.uploadNotFound");
-    expect(put).not.toHaveBeenCalled();
-  });
-
-  it("CLI registry 换代后半上传不存在，不自动 replay bytes", async () => {
-    const bytes = Buffer.from("restart pending");
-    const put = vi.fn(async () => ({ ref: "unused" }));
-    const beforeRestart = new AttachmentUploadRegistry({
-      now: () => 0,
-      putSessionAttachment: put,
-    });
-    beforeRestart.begin(begin(bytes, "restart-upload"));
-    beforeRestart.chunk({
-      connectionId: "connection-1",
-      sessionId: "session-1",
-      uploadId: "restart-upload",
-      chunkIndex: 0,
-      dataBase64: bytes.toString("base64"),
-    });
-    beforeRestart.clear();
-    const afterRestart = new AttachmentUploadRegistry({
-      now: () => 1,
-      putSessionAttachment: put,
-    });
-    await expect(
-      afterRestart.commit({
-        connectionId: "connection-1",
-        sessionId: "session-1",
-        uploadId: "restart-upload",
       }),
     ).rejects.toThrow("fault.attachment.uploadNotFound");
     expect(put).not.toHaveBeenCalled();

@@ -18,7 +18,7 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
   let root: string;
   let path: string;
   let db: DatabaseSync;
-  let store: ReturnType<typeof createSqliteSessionStore> | undefined;
+  let store: Awaited<ReturnType<typeof createSqliteSessionStore>> | undefined;
 
   function applyBefore(id: string) {
     for (const migration of SQLITE_MIGRATIONS.filter((item) => item.id < id)) {
@@ -100,7 +100,7 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
     "首次升级 %s/%s：同一启动完成补值，正式 Reader 读到档位",
     async (provider, model, targetProvider, targetModel) => {
       seed(provider, model);
-      store = createSqliteSessionStore({ dbPath: path });
+      store = await createSqliteSessionStore({ dbPath: path });
       expect(store.debugMigrationIds()).toContain(REPAIR_ID);
       expect(readEntry().modelSelection).toEqual({
         providerId: targetProvider,
@@ -116,17 +116,21 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
     },
   );
 
-  it("已执行 0020：仅补新档位，历史字段/时间/消息/旧账本均不动，重启不重跑", () => {
+  it("已执行 0020：仅补新档位，历史字段/时间/消息/旧账本均不动，重启不重跑", async () => {
     seed();
     applyBefore(REPAIR_ID);
     const messages = db.prepare("SELECT * FROM message").all();
     const session = db.prepare("SELECT * FROM session").get();
     const entry = db.prepare("SELECT * FROM session_entry").get();
     const ledger = db.prepare("SELECT * FROM schema_migration ORDER BY id").all();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(readEntry().modelSelection.options).toEqual({ reasoningLevel: "max" });
     expect(db.prepare("SELECT * FROM message").all()).toEqual(messages);
-    expect(db.prepare("SELECT * FROM session").get()).toEqual(session);
+    expect(db.prepare("SELECT * FROM session").get()).toEqual({
+      ...session,
+      time_deleted: null,
+      last_outcome: null,
+    });
     expect(db.prepare("SELECT * FROM session_entry").get()).toEqual({
       ...entry,
       data: JSON.stringify(readEntry()),
@@ -137,7 +141,7 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
     store.close();
     store = undefined;
     db.prepare("UPDATE session_entry SET data=json_remove(data,'$.modelSelection.options')").run();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(readEntry().modelSelection).not.toHaveProperty("options");
   });
 
@@ -156,7 +160,7 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
     "bad-json",
     "invalid-identity",
     "wrong-entry-id",
-  ])("不修复不确定或用户改过的记录：%s", (scenario) => {
+  ])("不修复不确定或用户改过的记录：%s", async (scenario) => {
     seed();
     applyBefore(REPAIR_ID);
     const data = readEntry();
@@ -205,23 +209,23 @@ describe("Todo121：只补 0020 回填后未动过的会话档位", () => {
         break;
     }
     const before = db.prepare("SELECT * FROM session_entry").all();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(store.debugMigrationIds()).toContain(REPAIR_ID);
     expect(db.prepare("SELECT * FROM session_entry").all()).toEqual(before);
   });
 
-  it("迁移失败整笔回滚，重试可成功", () => {
+  it("迁移失败整笔回滚，重试可成功", async () => {
     seed();
     applyBefore(REPAIR_ID);
     const before = db.prepare("SELECT * FROM session_entry").all();
     db.exec(
       "CREATE TRIGGER reject_repair BEFORE UPDATE ON session_entry BEGIN SELECT RAISE(ABORT, 'test write failure'); END;",
     );
-    expect(() => createSqliteSessionStore({ dbPath: path })).toThrow();
+    await expect(createSqliteSessionStore({ dbPath: path })).rejects.toThrow();
     expect(db.prepare("SELECT * FROM session_entry").all()).toEqual(before);
     expect(db.prepare("SELECT 1 FROM schema_migration WHERE id=?").get(REPAIR_ID)).toBeUndefined();
     db.exec("DROP TRIGGER reject_repair");
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(readEntry().modelSelection.options).toEqual({ reasoningLevel: "max" });
   });
 });

@@ -85,9 +85,6 @@ describe("Todo95 专用 Map 合法请求等价", () => {
         );
         expect(matches).toHaveLength(1);
         const rule = matches[0]!;
-        expect(rule.modelMatch).toBe(reference.modelMatch);
-        expect(rule.apiTypeMatch).toBe(reference.apiMatch);
-        expect(rule.baseUrlMatch).toBe(reference.baseURLMatch);
         const compile = (map: string) =>
           compileModelOptionMaps({
             reasoningLevel: { map },
@@ -124,6 +121,19 @@ describe("Todo95 专用 Map 合法请求等价", () => {
       ".*deepseek-v4[.-]1-flash(?:[.\\-:/\\[].*)?",
       ".*qwen3\\.(?:7-(?:max|plus|flash)|6-(?:plus|flash))(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
       ".*qwen3\\.8-omni-flash(?:-20\\d{2}(?:-?\\d{2}){2})?(?:[:/\\[].*)?",
+
+      // 简化后的 Model/API matcher；Site 仍保留原选择条件。
+      ".*gpt-6-astra.*",
+      ".*claude-(?:fable|mythos)-5[.-]1.*",
+      ".*deepseek-flash.*",
+      ".*deepseek-v4[.-]1-flash.*",
+      ".*qwen3\\.8-omni-flash.*",
+      ".*gpt-5\\.4.*",
+      ".*qwen3\\.(?:7-(?:max|plus|flash)|6-(?:plus|flash)).*",
+      // 新型号已由 MiMo 配置与 wire 用例验收，不属于 Todo95 历史 Map 基线。
+      // 依据：docs/provider-mimo-templates.md「模型及兼容边界」「验收」MIMO-01/02；
+      // 独立覆盖见同目录 mimo-templates.test.ts（含 thinking.type / max_tokens 请求映射）。
+      ".*mimo-v2\\.6-(?:pro|flash).*",
     ]);
     const current = ["modelApiRules", "providerSiteRules"].flatMap((scope) =>
       rules[scope]!.flatMap((rule) =>

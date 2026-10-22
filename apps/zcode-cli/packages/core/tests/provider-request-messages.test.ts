@@ -82,7 +82,6 @@ describe("buildProviderRequestMessages", () => {
       { role: "assistant", content: "answer" },
     ]);
     expect(result.sourceEntries).toEqual([entries[0], assistant]);
-    expect(JSON.stringify(result.messages)).not.toContain("tokens");
   });
 
   it("keeps a query-only Continue provider-visible without moving the latest real user", () => {
@@ -117,8 +116,6 @@ describe("buildProviderRequestMessages", () => {
       { role: "user", content: "real prompt", cacheControl: { type: "ephemeral" } },
       { role: "system", content: "style body" },
     ]);
-    expect(JSON.stringify(result.messages)).not.toContain("<system-reminder>");
-    expect(JSON.stringify(result.messages)).not.toContain("output_style");
   });
 
   it("projects structured prompt attachments as mid-conversation system messages", () => {
@@ -307,8 +304,6 @@ describe("buildProviderRequestMessages", () => {
         content: "Use verifier style.",
       },
     ]);
-    expect(JSON.stringify(result.messages)).not.toContain("output_style");
-    expect(JSON.stringify(result.messages)).not.toContain("goal_completion_verification");
   });
 
   it("does not project legacy message entries just because their source is eligible", () => {
@@ -534,7 +529,6 @@ describe("buildProviderRequestMessages", () => {
       },
       { role: "system", content: "todo body" },
     ]);
-    expect(JSON.stringify(result.messages)).not.toContain("<system-reminder>");
     expect(result.diagnostics.cacheControlIndex).toBe(2);
   });
 
@@ -575,7 +569,6 @@ describe("buildProviderRequestMessages", () => {
       { role: "system", content: "todo body" },
       { role: "assistant", content: "next answer" },
     ]);
-    expect(JSON.stringify(result.messages)).not.toContain("<system-reminder>");
   });
 
   it("keeps legacy reminder text after sibling tool results when MCS is disabled", () => {

@@ -166,7 +166,7 @@ export function buildHighspeedTurnExecution(params: {
       // 账号权益未解析的窗口内，持久化选择校验失败不绑定；之后只发加速轮也不会再绑定，卡过期（3402）
       // 时降级静默跳过，整轮按 "highspeed card is invalid" 失败弹错。发起方在这里明确知道原模型，
       // 必须把它作为退回目标随声明下发（spec §2.2），不再押注 runtime 状态。
-      target: params.sessionSelection,
+      target: structuredClone(params.sessionSelection),
     },
   };
 }
@@ -265,6 +265,15 @@ export class HighspeedCardService implements IHighspeedCardService {
       nextDrawAt: this.nextDrawAt,
       drawing: this.inFlightDraw !== null,
     };
+  }
+
+  async invalidateCard(cardId: string): Promise<boolean> {
+    this.expireCard(this.now());
+    if (this.card?.cardId !== cardId) return false;
+    // Bug 根因：创建期发现加速 Provider 已从 Registry 下架时，卡仍留在服务里，Renderer 会继续
+    // 锁定模型选择器。按事件携带的 cardId 作废当前卡，旧事件不能误删随后抽到的新卡；冷却时间不变。
+    this.card = null;
+    return true;
   }
 
   healthy(cardId: string): Promise<HighspeedCardUsage> {

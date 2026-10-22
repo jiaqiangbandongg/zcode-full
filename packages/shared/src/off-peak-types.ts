@@ -31,8 +31,8 @@ export function isOffPeakTerminalStatus(
 /**
  * 票据不可用（服务端 400/3102：active 3h 到期 / ready 5min 废票 / settled / 非本人）的
  * 稳定错误标记。zcode-cli 适配层把该业务码分类为不可重试失败并在错误消息里嵌入本标记；
- * host 终态回写据此改走"同 task_id 重新取号 → resume 续跑"而非落 failed。
- * 跨进程只能靠错误文本传递，标记必须全链路唯一且稳定，勿改；与
+ * 旧 Host 终态兼容分支据此重新取号；驻留执行通过严格生命周期通知申请新票，
+ * 不依赖错误文本控制续跑。兼容标记保持稳定；与
  * apps/zcode-cli/packages/adapters/src/model/offpeak-retry.ts 的同名常量跨包同值。
  */
 export const OFF_PEAK_TICKET_EXPIRED_MARKER = "off-peak-ticket-expired";
@@ -100,7 +100,11 @@ export function isOffPeakTicketExpiredError(message: string | undefined): boolea
 
 /** 一条闲时任务：表单创建即取号排队，派发时 createTask 新建 session。 */
 export interface ZCodeOffPeakTask {
-  /** 本地主键，同时用作服务端 task_id（稳定，跨多个 ticket）。 */
+  projectId?: string | null;
+  hostId?: string;
+  /** 创建定义时固化，之后不跟随虚拟项目 roots 编辑。 */
+  additionalDirectories?: string[];
+  /** 本地主键，同时用作服务端 task_id（稳定，跨多个 ticket，D26）。 */
   offPeakTaskId: string;
   /** 服务端取号返回的 Snowflake ticket_id；每次重新取号（3h 到期续跑/Continue 重取）更新。 */
   serverTicketId?: string;
@@ -166,6 +170,10 @@ export interface ZCodeOffPeakTask {
 
 /** 创建闲时任务的入参（workspace 由调用方从上下文注入；取号在 service 层先行，成功才落库）。 */
 export interface ZCodeOffPeakTaskCreateParams {
+  projectId?: string | null;
+  hostId?: string;
+  /** 创建定义时固化，之后不跟随虚拟项目 roots 编辑。 */
+  additionalDirectories?: string[];
   title: string;
   prompt: string;
   permissionMode: ZCodeTaskMode;

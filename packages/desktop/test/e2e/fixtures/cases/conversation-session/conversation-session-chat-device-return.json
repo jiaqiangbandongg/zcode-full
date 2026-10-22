@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-chat-device-return",
+  "spec": "./test/e2e/conversation-session/conversation-session-chat-device-return.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-chat-device-return.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "RDUX21 本地项目聊天连接后目录选择与取消返回验收，不发送模型请求。",
+  "requests": []
+}

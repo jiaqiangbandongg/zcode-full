@@ -1,5 +1,5 @@
 // BG34：active goal 仅剩 background Agent 时输入直发；notification verifier 完成后自动消费 future queue。
-import { TID_V4_COMPOSER } from "@zcode/shared";
+import { TID_V4_COMPOSER } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   countUpstreamRequests,

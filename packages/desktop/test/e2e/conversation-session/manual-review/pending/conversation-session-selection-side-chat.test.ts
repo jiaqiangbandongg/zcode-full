@@ -4,7 +4,7 @@ import {
   TID_V4_COMPOSER_SEND,
   TID_V4_SESSION_PANE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   prepareV4ConversationE2E,
@@ -114,14 +114,9 @@ describe("框选文字副屏会话 manual review", () => {
     await closeSelectionSideTab(sideToClose.tabId);
     const remainingSides = await waitForSelectionSidePanes(2);
     expect(
-      remainingSides.some(
-        (candidate) => candidate.childSessionId === sideToClose.childSessionId,
-      ),
+      remainingSides.some((candidate) => candidate.childSessionId === sideToClose.childSessionId),
     ).toBe(false);
-    await expectComposerText(
-      survivingSibling.paneTestId,
-      "E2E_SSC_SIBLING_DRAFT",
-    );
+    await expectComposerText(survivingSibling.paneTestId, "E2E_SSC_SIBLING_DRAFT");
     await expectNoSelectionReferences(survivingSibling.paneTestId);
 
     await clickAddSidePaneItem("terminal");
@@ -129,9 +124,7 @@ describe("框选文字副屏会话 manual review", () => {
     await selectMainTimelineText(PARENT_MARKER);
     await clickSelectionAction("ask-in-side-chat");
     const afterNoActiveAuxiliary = await waitForSelectionSidePanes(3);
-    const remainingChildIds = new Set(
-      remainingSides.map((side) => side.childSessionId),
-    );
+    const remainingChildIds = new Set(remainingSides.map((side) => side.childSessionId));
     const createdForSelection = afterNoActiveAuxiliary.find(
       (side) => !remainingChildIds.has(side.childSessionId),
     );
@@ -226,15 +219,16 @@ async function selectMainTimelineText(text: string): Promise<void> {
   // 直到 pane 外壳 data-focused="true" 稳定为止。
   await browser.waitUntil(
     async () =>
-      browser.execute((paneTestId) => {
-        const pane = document.querySelector<HTMLElement>(`[data-testid="${paneTestId}"]`);
-        if (!pane) return false;
-        pane.dispatchEvent(
-          new PointerEvent("pointerdown", { bubbles: true, cancelable: true }),
-        );
-        const shell = pane.closest<HTMLElement>("[data-pane-id]");
-        return shell?.dataset.focused === "true";
-      }, testId(TID_V4_SESSION_PANE, "workspace-main")),
+      browser.execute(
+        (paneTestId) => {
+          const pane = document.querySelector<HTMLElement>(`[data-testid="${paneTestId}"]`);
+          if (!pane) return false;
+          pane.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+          const shell = pane.closest<HTMLElement>("[data-pane-id]");
+          return shell?.dataset.focused === "true";
+        },
+        testId(TID_V4_SESSION_PANE, "workspace-main"),
+      ),
     { timeout: 15000, timeoutMsg: "主 pane 无法重新聚焦" },
   );
   await browser.pause(100);
@@ -299,22 +293,14 @@ async function selectMainTimelineText(text: string): Promise<void> {
   }
 }
 
-async function waitForSelectableMainTimelineText(
-  text: string,
-  timeout: number,
-): Promise<void> {
+async function waitForSelectableMainTimelineText(text: string, timeout: number): Promise<void> {
   await browser.waitUntil(
     async () =>
       browser.execute(
         (paneTestId, targetText) => {
-          const pane = document.querySelector<HTMLElement>(
-            `[data-testid="${paneTestId}"]`,
-          );
+          const pane = document.querySelector<HTMLElement>(`[data-testid="${paneTestId}"]`);
           if (!pane) return false;
-          const walker = document.createTreeWalker(
-            pane,
-            NodeFilter.SHOW_TEXT,
-          );
+          const walker = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
           let node = walker.nextNode();
           while (node) {
             if (
@@ -462,13 +448,10 @@ async function clickAddSidePaneItem(
     async () => browser.execute(dispatchActivationScript, "[data-side-pane-add-trigger]"),
     { timeout: 15000, timeoutMsg: "Side Pane 新增标签按钮不存在" },
   );
-  const itemSelector = `[data-side-pane-add-item="${itemId}"]`;
+  const itemSelector = `[data-state="active"] [data-side-pane-open-tab-item="${itemId}"]`;
   await browser.waitUntil(
     async () =>
-      browser.execute(
-        (selector) => Boolean(document.querySelector(selector)),
-        itemSelector,
-      ),
+      browser.execute((selector) => Boolean(document.querySelector(selector)), itemSelector),
     { timeout: 15000, timeoutMsg: `${itemId} 新增菜单没有打开` },
   );
   const clicked = await browser.execute(dispatchActivationScript, itemSelector);
@@ -585,27 +568,22 @@ async function expectNoSelectionReferences(paneTestId: string): Promise<void> {
   );
 }
 
-async function expectComposerText(
-  paneTestId: string,
-  text: string,
-): Promise<void> {
+async function expectComposerText(paneTestId: string, text: string): Promise<void> {
   await browser.waitUntil(
     async () =>
       browser.execute(
         (nextPaneTestId, inputTestId, expectedText) => {
-          const pane = document.querySelector<HTMLElement>(
-            `[data-testid="${nextPaneTestId}"]`,
-          );
-          const input = pane?.querySelector<HTMLElement>(
-            `[data-testid="${inputTestId}"]`,
-          );
+          const pane = document.querySelector<HTMLElement>(`[data-testid="${nextPaneTestId}"]`);
+          const input = pane?.querySelector<HTMLElement>(`[data-testid="${inputTestId}"]`);
           return (
-            input as
-              | (HTMLElement & {
-                  __zcodeLexicalInputE2E?: { getText: () => string };
-                })
-              | undefined
-          )?.__zcodeLexicalInputE2E?.getText() === expectedText;
+            (
+              input as
+                | (HTMLElement & {
+                    __zcodeLexicalInputE2E?: { getText: () => string };
+                  })
+                | undefined
+            )?.__zcodeLexicalInputE2E?.getText() === expectedText
+          );
         },
         paneTestId,
         TID_V4_COMPOSER_INPUT,
@@ -648,9 +626,8 @@ async function waitForActiveSelectionSidePane(): Promise<{
         const tabId = tab?.dataset.sidePaneTabId;
         if (!tabId) return null;
         const paneTestId = `${panePrefix}-${tabId}`;
-        const childSessionId = document.querySelector<HTMLElement>(
-          `[data-testid="${paneTestId}"]`,
-        )?.dataset.sessionId;
+        const childSessionId = document.querySelector<HTMLElement>(`[data-testid="${paneTestId}"]`)
+          ?.dataset.sessionId;
         return childSessionId ? { childSessionId, paneTestId, tabId } : null;
       }, TID_V4_SESSION_PANE);
       return result !== null;
@@ -709,9 +686,7 @@ async function typeIntoComposerByKeyboard(paneTestId: string, text: string): Pro
     await browser.keys(text.split(""));
     const typed = await browser.execute(
       (selector, expectedText) =>
-        (document.querySelector<HTMLElement>(selector)?.textContent ?? "").includes(
-          expectedText,
-        ),
+        (document.querySelector<HTMLElement>(selector)?.textContent ?? "").includes(expectedText),
       inputSelector,
       text,
     );

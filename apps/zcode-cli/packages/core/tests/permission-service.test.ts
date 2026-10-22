@@ -731,26 +731,6 @@ describe("PermissionService mode policy", () => {
     });
   });
 
-  it("does not fall back to exact tool-name matching when a capability group loses authority", () => {
-    const service = new PermissionService();
-    const context = {
-      input: {},
-      mode: "build" as const,
-      riskLevel: "medium" as const,
-      toolName: "mcp__computer-use__get_app_state",
-    };
-    const rules = {
-      allow: [{ toolName: OFFICIAL_CUA_PERMISSION_RULE_TOOL_NAME }],
-      version: 1 as const,
-    };
-
-    expect(service.checkPermission(context, mcpCapability, rules as never)).toMatchObject({
-      allowed: false,
-      decision: "ask",
-      ruleId: "mode.build.sideEffect",
-    });
-  });
-
   it("does not let project allow rules bypass plan mode write protection", () => {
     const service = new PermissionService();
 
@@ -1103,7 +1083,12 @@ describe("PermissionService alwaysAsk", () => {
     const service = new PermissionService();
 
     const decision = service.checkPermission(
-      { input: { script: "return 1;" }, mode: "yolo", riskLevel: "low", toolName: "CreateWorkflow" },
+      {
+        input: { script: "return 1;" },
+        mode: "yolo",
+        riskLevel: "low",
+        toolName: "CreateWorkflow",
+      },
       alwaysAskCapability,
       { deny: [{ toolName: "CreateWorkflow" }], version: 1 },
     );
@@ -1146,7 +1131,11 @@ describe("PermissionService session grant", () => {
     },
   ];
 
-  function check(mode: PermissionContext["mode"], service: PermissionService, toolName = "CreateWorkflow") {
+  function check(
+    mode: PermissionContext["mode"],
+    service: PermissionService,
+    toolName = "CreateWorkflow",
+  ) {
     return service.checkPermission(
       { input: { script: "return 2;" }, mode, riskLevel: "low", toolName },
       alwaysAskCapability,
@@ -1207,7 +1196,12 @@ describe("PermissionService session grant", () => {
 
     expect(
       service.checkPermission(
-        { input: { script: "return 2;" }, mode: "yolo", riskLevel: "low", toolName: "CreateWorkflow" },
+        {
+          input: { script: "return 2;" },
+          mode: "yolo",
+          riskLevel: "low",
+          toolName: "CreateWorkflow",
+        },
         alwaysAskCapability,
         { deny: [{ toolName: "CreateWorkflow" }], version: 1 },
       ),

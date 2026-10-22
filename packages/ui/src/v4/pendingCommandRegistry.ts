@@ -7,12 +7,31 @@ import type {
   CommandsQueryResult,
   ConversationSnapshot,
 } from "@zcode/shared/zcode-protocol-v4";
-import type { PendingCommandClientContext } from "@/v4/pendingCommandWorkspace.js";
 import {
-  pendingCommandReplayFor,
-  type PendingCommandReplay,
-} from "@/v4/pendingCommandReplay.js";
+  resolvePendingCommandWorkspaceKey,
+  type PendingCommandClientContext,
+} from "@/v4/pendingCommandWorkspace.js";
+import { pendingCommandReplayFor, type PendingCommandReplay } from "@/v4/pendingCommandReplay.js";
+import { acceptComposerRecentReceipt } from "@/lib/composerRecent.js";
+import {
+  completePendingTaskDraft,
+  markPendingTaskDraftCommand,
+  releasePendingTaskDraftCommand,
+  readPendingTaskDraft,
+  readV4ComposerDraft,
+  persistV4ComposerDraft,
+  clearV4ComposerDraft,
+  V4_DRAFT_SCOPE_ROOT,
+} from "@/v4/composer/composerDraftStore.js";
 export type { PendingCommandReplay } from "@/v4/pendingCommandReplay.js";
+
+export type PendingCommandResolution =
+  | "accepted"
+  | "duplicate"
+  | "authoritative"
+  | "unknown"
+  | "failed"
+  | "discarded";
 
 export const PENDING_COMMAND_TTL_MS = 24 * 60 * 60 * 1_000;
 const STORAGE_KEY = "zcode-v4-pending-commands:v1";
@@ -100,6 +119,10 @@ export class PendingCommandRegistry {
   private readonly now: () => number;
   private readonly entries = new Map<string, PendingCommandEntry>();
   private readonly listeners = new Set<() => void>();
+  private readonly resolutionListeners = new Map<
+    string,
+    Set<(resolution: PendingCommandResolution) => void>
+  >();
   private readonly reconcileInFlight = new Map<string, Promise<void>>();
 
   constructor(options: PendingCommandRegistryOptions = {}) {
@@ -111,6 +134,20 @@ export class PendingCommandRegistry {
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  subscribeResolution(
+    commandId: string,
+    listener: (resolution: PendingCommandResolution) => void,
+  ): () => void {
+    const listeners = this.resolutionListeners.get(commandId) ?? new Set();
+    listeners.add(listener);
+    this.resolutionListeners.set(commandId, listeners);
+    return () => {
+      const current = this.resolutionListeners.get(commandId);
+      current?.delete(listener);
+      if (current?.size === 0) this.resolutionListeners.delete(commandId);
+    };
   }
 
   record(
@@ -134,7 +171,25 @@ export class PendingCommandRegistry {
       ...(clientContext ? { clientContext } : {}),
     };
     this.entries.set(key, entry);
-    this.commit();
+    const composer = clientContext?.composer;
+    // 首发恢复线索必须先持久化；失败时拒绝上行，不能留下无法查询的待发送身份。
+    if (!this.commit() && composer?.draftId) {
+      this.entries.delete(key);
+      throw new Error("composer.draft-storage-unavailable");
+    }
+    try {
+      if (composer?.draftId)
+        markPendingTaskDraftCommand(
+          composer.scope,
+          composer.draftId,
+          envelope.commandId,
+          envelope.sessionId,
+        );
+    } catch (error) {
+      this.entries.delete(key);
+      this.commit();
+      throw error;
+    }
     return entry;
   }
 
@@ -143,6 +198,10 @@ export class PendingCommandRegistry {
     return [...this.entries.values()]
       .filter((entry) => entry.sessionId === sessionId)
       .sort((left, right) => left.issuedAt - right.issuedAt);
+  }
+
+  findCommand(commandId: string): PendingCommandEntry | undefined {
+    return [...this.entries.values()].find((entry) => entry.commandId === commandId);
   }
 
   listRecoverable(sessionId: string | null): readonly PendingCommandEntry[] {
@@ -155,6 +214,12 @@ export class PendingCommandRegistry {
   settle(sessionId: string | null, commandId: string): void {
     if (!this.entries.delete(keyOf(sessionId, commandId))) return;
     this.commit();
+  }
+
+  rejectCommand(sessionId: string | null, commandId: string): void {
+    const entry = this.entries.get(keyOf(sessionId, commandId));
+    if (entry) this.rejectComposer(entry);
+    this.settle(sessionId, commandId);
   }
 
   dismissRecovery(sessionId: string | null, commandId: string): void {
@@ -175,17 +240,24 @@ export class PendingCommandRegistry {
     }
     entry = this.remapCreatedSession(entry, ack);
     if (ack.status === "accepted" || ack.status === "duplicate") {
+      if (!this.acceptComposer(entry)) return;
       this.clearRecovery(entry);
+      this.notifyResolution(entry.commandId, ack.status);
       return;
     }
     if (ack.status === "failed" && ack.reasonCode === "fault.command.inputDiscardedOnRestart") {
+      this.rejectComposer(entry);
       if (isRuntimeLocalDiscard(ack)) {
+        this.notifyResolution(entry.commandId, "discarded");
         this.settle(entry.sessionId, entry.commandId);
         return;
       }
+      this.notifyResolution(entry.commandId, "failed");
       this.markRecovery(entry, "discarded");
       return;
     }
+    this.rejectComposer(entry);
+    this.notifyResolution(entry.commandId, "failed");
     this.settle(entry.sessionId, entry.commandId);
   }
 
@@ -194,8 +266,11 @@ export class PendingCommandRegistry {
       let entry = this.entries.get(keyOf(item.key.sessionId, item.key.commandId));
       if (!entry) continue;
       if (item.result === "unknown") {
+        // 首发结果未知不能释放目录或删除唯一的查询线索。
+        if (this.ownsPendingDraft(entry)) continue;
         // V4 初版把“权威事实未命中”提升成需要用户处理的错误横幅，导致正常的
         // App/CLI 生命周期切换也频繁打扰用户。unknown 没有可操作结论，renderer 静默清账。
+        this.notifyResolution(item.key.commandId, "unknown");
         this.settle(entry.sessionId, entry.commandId);
         continue;
       }
@@ -209,10 +284,13 @@ export class PendingCommandRegistry {
         item.result.status === "failed" &&
         item.result.reasonCode === "fault.command.inputDiscardedOnRestart"
       ) {
+        this.rejectComposer(entry);
         if (isRuntimeLocalDiscard(item.result)) {
+          this.notifyResolution(entry.commandId, "discarded");
           this.settle(entry.sessionId, entry.commandId);
           continue;
         }
+        this.notifyResolution(entry.commandId, "failed");
         this.markRecovery(entry, "discarded");
         continue;
       }
@@ -222,8 +300,12 @@ export class PendingCommandRegistry {
         continue;
       }
       if (item.result.status === "accepted" || item.result.status === "duplicate") {
+        if (!this.acceptComposer(entry)) continue;
         this.clearRecovery(entry);
+        this.notifyResolution(entry.commandId, item.result.status);
       } else {
+        this.rejectComposer(entry);
+        this.notifyResolution(entry.commandId, "failed");
         this.settle(entry.sessionId, entry.commandId);
       }
     }
@@ -251,16 +333,85 @@ export class PendingCommandRegistry {
     if (settled.size === 0) return;
     let changed = false;
     for (const commandId of settled) {
+      const entry = this.entries.get(keyOf(snapshot.sessionId, commandId));
+      if (entry && !this.acceptComposer(entry)) continue;
+      this.notifyResolution(commandId, "authoritative");
       changed = this.entries.delete(keyOf(snapshot.sessionId, commandId)) || changed;
     }
     if (changed) this.commit();
   }
 
-  reconcileSession(sessionId: string | null, query: QueryCommands): Promise<void> {
-    const inFlightKey = sessionId ?? "<global>";
+  private acceptComposer(entry: PendingCommandEntry): boolean {
+    const composer = entry.clientContext?.composer;
+    if (!composer) return true;
+    if (!acceptComposerRecentReceipt(composer, this.storage)) return false;
+    try {
+      if (composer.draftId && this.ownsPendingDraft(entry)) {
+        const workspace = entry.clientContext?.workspace;
+        if (!workspace || !entry.sessionId) return false;
+        const draft = readV4ComposerDraft(
+          workspace.workspacePath,
+          workspace.workspaceIdentity,
+          V4_DRAFT_SCOPE_ROOT,
+          composer.scope,
+        );
+        // 首发期间可能已经切走；下一条输入仍归该 session，不能遗留给下一份任务目录。
+        // 传输失败恢复的原文已被权威接纳，应清除而不是再次放入正式会话输入框。
+        if (draft && entry.replay.kind === "input") {
+          const payload = entry.replay.payload;
+          const sentText =
+            composer.submittedText ??
+            (entry.replay.type === "createSession"
+              ? (payload.firstInput as { text?: string } | undefined)?.text
+              : (payload.displayText ?? payload.text));
+          if (
+            draft.text !== sentText &&
+            !readV4ComposerDraft(
+              workspace.workspacePath,
+              workspace.workspaceIdentity,
+              entry.sessionId,
+            ) &&
+            !persistV4ComposerDraft(
+              workspace.workspacePath,
+              workspace.workspaceIdentity,
+              entry.sessionId,
+              draft,
+            )
+          )
+            return false;
+        }
+        if (
+          !clearV4ComposerDraft(
+            workspace.workspacePath,
+            workspace.workspaceIdentity,
+            V4_DRAFT_SCOPE_ROOT,
+            composer.scope,
+          )
+        )
+          return false;
+        completePendingTaskDraft(composer.scope, composer.draftId);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private rejectComposer(entry: PendingCommandEntry): void {
+    const composer = entry.clientContext?.composer;
+    if (composer?.draftId)
+      releasePendingTaskDraftCommand(composer.scope, composer.draftId, entry.commandId);
+  }
+
+  reconcileSession(
+    sessionId: string | null,
+    query: QueryCommands,
+    workspaceKey?: string,
+  ): Promise<void> {
+    const inFlightKey = JSON.stringify([workspaceKey, sessionId]);
     const existing = this.reconcileInFlight.get(inFlightKey);
     if (existing) return existing;
-    const pending = this.runReconcile(sessionId, query).finally(() => {
+    const pending = this.runReconcile(sessionId, query, workspaceKey).finally(() => {
       if (this.reconcileInFlight.get(inFlightKey) === pending) {
         this.reconcileInFlight.delete(inFlightKey);
       }
@@ -285,12 +436,23 @@ export class PendingCommandRegistry {
       ...(entry.clientContext ? { clientContext: entry.clientContext } : {}),
     };
     // 用户已确认以新 commandId 重发，旧 discarded 线索在本地完成收口。
+    this.rejectComposer(entry);
     this.settle(entry.sessionId, entry.commandId);
     return request;
   }
 
-  private async runReconcile(sessionId: string | null, query: QueryCommands): Promise<void> {
-    const entries = this.list(sessionId);
+  private async runReconcile(
+    sessionId: string | null,
+    query: QueryCommands,
+    workspaceKey?: string,
+  ): Promise<void> {
+    // null bucket 会收集各 workspace 的创建；只能向命令原属 Agent 查询。
+    const entries = this.list(sessionId).filter(
+      (entry) =>
+        workspaceKey === undefined ||
+        resolvePendingCommandWorkspaceKey(entry) === workspaceKey ||
+        (sessionId !== null && resolvePendingCommandWorkspaceKey(entry) === null),
+    );
     for (let offset = 0; offset < entries.length; offset += 64) {
       const batch = entries.slice(offset, offset + 64);
       const result = await query({
@@ -356,11 +518,18 @@ export class PendingCommandRegistry {
     }
   }
 
+  private ownsPendingDraft(entry: PendingCommandEntry): boolean {
+    const composer = entry.clientContext?.composer;
+    return Boolean(
+      composer?.draftId && readPendingTaskDraft(composer.scope)?.draftId === composer.draftId,
+    );
+  }
+
   private pruneExpired(): void {
     const now = this.now();
     let changed = false;
     for (const [key, entry] of this.entries) {
-      if (entry.expiresAt <= now) {
+      if (entry.expiresAt <= now && !this.ownsPendingDraft(entry)) {
         this.entries.delete(key);
         changed = true;
       }
@@ -368,7 +537,8 @@ export class PendingCommandRegistry {
     if (changed) this.commit();
   }
 
-  private commit(): void {
+  private commit(): boolean {
+    let written = Boolean(this.storage);
     if (this.storage) {
       try {
         if (this.entries.size === 0) {
@@ -377,10 +547,19 @@ export class PendingCommandRegistry {
           this.storage.setItem(STORAGE_KEY, JSON.stringify([...this.entries.values()]));
         }
       } catch {
-        // quota/incognito：退化为当前 renderer 内存账本。
+        // 普通命令保持原有内存降级；首发目录交接由 record 检查写入结果。
+        written = false;
       }
     }
     for (const listener of this.listeners) listener();
+    return written;
+  }
+
+  private notifyResolution(commandId: string, resolution: PendingCommandResolution): void {
+    const listeners = this.resolutionListeners.get(commandId);
+    if (!listeners) return;
+    this.resolutionListeners.delete(commandId);
+    for (const listener of listeners) listener(resolution);
   }
 }
 

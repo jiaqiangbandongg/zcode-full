@@ -62,10 +62,9 @@ describe("runMemoryAgentLoop", () => {
       abortSignal: new AbortController().signal,
       executeTool,
       maxTurns: 5,
-      messages: initialMessages,
+      request: { messages: initialMessages, tools, toolSearchEnabled: false },
       model,
       rootDir: memoryRoot,
-      tools,
       workingDirectory: "/workspace",
       workspaceRoot: "/workspace",
     });
@@ -78,6 +77,7 @@ describe("runMemoryAgentLoop", () => {
     );
     expect(requests[0]?.messages).toEqual(initialMessages);
     expect(requests.every((request) => request.tools === tools)).toBe(true);
+    expect(requests.every((request) => request.toolSearchEnabled === false)).toBe(true);
     expect(requests.every((request) => request.options?.reasoningLevel === "low")).toBe(true);
     expect(requests.every((request) => request.options?.maxOutputTokens === 5_000)).toBe(true);
     expect(requests[1]?.messages.slice(-2)).toEqual([
@@ -99,7 +99,6 @@ describe("runMemoryAgentLoop", () => {
       expect.objectContaining({ role: "assistant", content: "last turn" }),
       expect.objectContaining({ role: "tool", toolCallId: "write-last", isError: false }),
     ]);
-    expect(initialMessages).toHaveLength(3);
   });
 
   it("applies media capability and budget projection on every model turn", async () => {
@@ -140,20 +139,23 @@ describe("runMemoryAgentLoop", () => {
     await runMemoryAgentLoop({
       executeTool,
       maxTurns: 2,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "historical media" },
-            unsupportedVideo,
-            ...Array.from({ length: retainedImageCount + 2 }, () => historicalImage),
-          ],
-        },
-        { role: "user", content: "extract memory" },
-      ],
+      request: {
+        tools: [tool("Read", true, "none")],
+        toolSearchEnabled: false,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "historical media" },
+              unsupportedVideo,
+              ...Array.from({ length: retainedImageCount + 2 }, () => historicalImage),
+            ],
+          },
+          { role: "user", content: "extract memory" },
+        ],
+      },
       model,
       rootDir: memoryRoot,
-      tools: [tool("Read", true, "none")],
       workingDirectory: "/workspace",
       workspaceRoot: "/workspace",
     });
@@ -193,10 +195,13 @@ describe("runMemoryAgentLoop", () => {
     const result = await runMemoryAgentLoop({
       executeTool,
       maxTurns: 2,
-      messages: [{ role: "user", content: "extract" }],
+      request: {
+        messages: [{ role: "user", content: "extract" }],
+        tools: [tool("WebFetch", true, "network"), tool("Bash", false, "workspace")],
+        toolSearchEnabled: false,
+      },
       model,
       rootDir: memoryRoot,
-      tools: [tool("WebFetch", true, "network"), tool("Bash", false, "workspace")],
       workingDirectory: "/workspace",
       workspaceRoot: "/workspace",
     });
@@ -244,10 +249,13 @@ describe("runMemoryAgentLoop", () => {
     await runMemoryAgentLoop({
       executeTool,
       maxTurns: 2,
-      messages: [{ role: "user", content: "extract" }],
+      request: {
+        messages: [{ role: "user", content: "extract" }],
+        tools: [tool("Read", true, "none")],
+        toolSearchEnabled: false,
+      },
       model,
       rootDir: memoryRoot,
-      tools: [tool("Read", true, "none")],
       workingDirectory: "/workspace",
       workspaceRoot: "/workspace",
     });
@@ -293,10 +301,13 @@ describe("runMemoryAgentLoop", () => {
     const result = await runMemoryAgentLoop({
       executeTool,
       maxTurns: 50,
-      messages: [{ role: "user", content: "dream" }],
+      request: {
+        messages: [{ role: "user", content: "dream" }],
+        tools: [tool("Read", true, "none"), tool("Write", false, "workspace")],
+        toolSearchEnabled: false,
+      },
       model,
       rootDir: memoryRoot,
-      tools: [tool("Read", true, "none"), tool("Write", false, "workspace")],
       workingDirectory: "/workspace",
       workspaceRoot: "/workspace",
     });

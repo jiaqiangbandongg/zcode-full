@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { useProjectFileTree } from "@/project-sidebar/useProjectFileTree.js";
+import type { ProjectSidebarProps, ProjectTask } from "@/project-sidebar/contract.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IServiceAccessor } from "@zcode/services";
 import { useRemoteWorkspaceSessionStore } from "@zcode/ui/remote-workspace-session-store";
-import { registerWebRemoteControlWorkspaceBridgeServices } from "@web/webRemoteControlWorkspaceBridgeSession.js";
+import { registerWebRemoteControlWorkspaceBridgeServices } from "#src/web-remote-control/index.js";
 
 describe("registerWebRemoteControlWorkspaceBridgeServices", () => {
   beforeEach(() => {
@@ -13,6 +17,49 @@ describe("registerWebRemoteControlWorkspaceBridgeServices", () => {
     });
   });
 
+  it("opens files after the actual mobile bridge registration without session identity metadata", async () => {
+    const registration = registerWebRemoteControlWorkspaceBridgeServices({
+      bridge: {
+        bridgeSessionId: "bridge-files",
+        kind: "remote",
+        workspaceKey: "remote:task",
+        workspacePath: "/task",
+        workspaceIdentity: "remote:task",
+        remoteSessionId: "mobile-files",
+      },
+      services: {} as IServiceAccessor,
+    });
+    expect(
+      useRemoteWorkspaceSessionStore.getState().sessionsById["mobile-files"].workspaceIdentity,
+    ).toBeUndefined();
+    const onOpenFileManager = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useProjectFileTree(
+        {
+          workspacePath: "/task",
+          workspaceIdentity: "remote:task",
+          onOpenFileManager,
+        } as unknown as ProjectSidebarProps,
+        { hosts: [], entries: [] },
+      ),
+    );
+    await act(async () => {
+      await result.current.openTaskFiles({
+        taskId: "files",
+        hostId: "remote-host",
+        workspacePath: "/task",
+        workspaceIdentity: "remote:task",
+      } as ProjectTask);
+    });
+    expect(onOpenFileManager).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        workspaceRemoteSessionId: "mobile-files",
+        workspaceIdentity: "remote:task",
+      }),
+    );
+    unmount();
+    registration.dispose();
+  });
   it("registers and binds remote bridge services by remote session, identity, and path", () => {
     const services = { __testId: "remote" } as unknown as IServiceAccessor;
 
@@ -30,9 +77,9 @@ describe("registerWebRemoteControlWorkspaceBridgeServices", () => {
 
     const state = useRemoteWorkspaceSessionStore.getState();
     expect(state.sessionsById["remote-session-1"]?.services).toBe(services);
-    expect(
-      state.sessionIdByWorkspaceIdentity["remote:docker:container:/root"],
-    ).toBe("remote-session-1");
+    expect(state.sessionIdByWorkspaceIdentity["remote:docker:container:/root"]).toBe(
+      "remote-session-1",
+    );
     expect(state.sessionIdByWorkspacePath["/root"]).toBe("remote-session-1");
 
     registration.dispose();
@@ -100,9 +147,9 @@ describe("registerWebRemoteControlWorkspaceBridgeServices", () => {
     const state = useRemoteWorkspaceSessionStore.getState();
     expect(state.sessionsById["remote-session-1"]).toBeUndefined();
     expect(state.sessionsById["remote-session-2"]?.services).toBe(secondServices);
-    expect(
-      state.sessionIdByWorkspaceIdentity["remote:docker:container:/root"],
-    ).toBe("remote-session-2");
+    expect(state.sessionIdByWorkspaceIdentity["remote:docker:container:/root"]).toBe(
+      "remote-session-2",
+    );
     expect(state.sessionIdByWorkspacePath["/root"]).toBe("remote-session-2");
   });
 
@@ -137,9 +184,7 @@ describe("registerWebRemoteControlWorkspaceBridgeServices", () => {
 
     const state = useRemoteWorkspaceSessionStore.getState();
     expect(state.sessionsById["remote-session-1"]?.services).toBe(secondServices);
-    expect(state.sessionIdByWorkspaceIdentity["remote:ssh:host:/root"]).toBe(
-      "remote-session-1",
-    );
+    expect(state.sessionIdByWorkspaceIdentity["remote:ssh:host:/root"]).toBe("remote-session-1");
     expect(state.sessionIdByWorkspacePath["/root"]).toBe("remote-session-1");
   });
 });

@@ -25,6 +25,7 @@ import {
   type InputId,
   type SessionCreateSource,
 } from "@zcode/shared";
+import type { SessionConfigState, SubmissionMode } from "@zcode/shared/zcode-protocol-v4";
 import type { ZCodeUiError } from "@/lib/zcodeUiError.js";
 import type {
   AutomationsNavigationTab,
@@ -41,16 +42,6 @@ export interface WorkspaceInitState {
   status: ZCodeWorkspaceInitStatus;
   error: string | null;
   attempts: number;
-}
-
-export type GroupedDraftTaskPlacement = { type: "top" } | { type: "group"; groupId: string };
-
-export interface GroupedDraftTaskState {
-  draftId: string;
-  workspacePath: string;
-  workspaceIdentity?: string;
-  placement: GroupedDraftTaskPlacement;
-  createdAt: number;
 }
 
 export interface TaskRuntimeState {
@@ -145,7 +136,18 @@ export interface TimelineBottomRequest {
   taskId: string;
 }
 
+export type ComposerInitialConfig = Pick<
+  Partial<SessionConfigState>,
+  "planEnabled" | "modelSelection"
+> & { mode?: SubmissionMode };
+export interface ComposerInitialization {
+  taskId: string;
+  config: ComposerInitialConfig;
+}
+
 export interface WorkspaceZCodeUIState {
+  /** 首次分享导入的导航参数；接收、换任务或新建后结束，不持久化。 */
+  composerInitialization?: ComposerInitialization;
   /** 当前 workspace 激活中的 task */
   activeTaskId: string | null;
   /**
@@ -158,11 +160,13 @@ export interface WorkspaceZCodeUIState {
   workspaceInit: WorkspaceInitState;
   /** 草稿态尚未创建 taskId 前的短期运行状态；已有 task 的状态从 taskRuntimeByTaskId 派生。 */
   draftRuntime: DraftRuntimeState;
-  /** 未发送草稿对应的 agent draft session；不进入 task 列表，首发时提升为真实 task。 */
-  draftSessionId: string | null;
+  /** 未提交草稿的项目选择；已提交归属只在 Host。 */
+  draftProjectId?: string | null;
+  /** 未提交任务的分组意图；无文字时仅保留在当前 Renderer 内存。 */
+  draftTaskGroupId?: string | null;
   /**
    * 草稿运行时能力失效版本；插件、Skill 等能力变化时递增。
-   * legacy 草稿通过 draftSessionId 关闭，protocol-v4 草稿用该版本重建 pane 内预热会话。
+   * V4 pane 独占预热会话，配置界面只发布失效版本。
    */
   draftRuntimeInvalidationVersion: number;
   composerTextInsertVersion: number;
@@ -187,12 +191,7 @@ export interface WorkspaceZCodeUIState {
   taskUnreadByTaskId: Record<string, boolean>;
   /** 任务列表的乐观元数据，解决新 task 落盘前左侧列表显示慢半拍的问题 */
   optimisticTaskListByTaskId: Record<string, ZCodeTaskMeta>;
-  /** grouped mode 下点击 New task 后的 UI-only 草稿锚点，不进入真实 task index。 */
-  groupedDraftTask: GroupedDraftTaskState | null;
-  /** 用户发起当前草稿的入口；预热不改变来源。 */
   draftCreateSource: SessionCreateSource;
-  /** 首发创建后、grouped sqlite order 落地前，真实 task 继承草稿锚点的本地定位。 */
-  promotedGroupedDraftTaskByTaskId: Record<string, GroupedDraftTaskState>;
   /** 当前 workspace 选中的 ZCode Agent provider */
   selectedProvider: ZCodeProvider;
   /** 当前模型供应商选中键（native/custom/ghost） */
@@ -220,21 +219,15 @@ export interface ZCodeSessionStoreState {
   workspaces: Record<string, WorkspaceZCodeUIState>;
   getWorkspaceState: (workspacePath: string, workspaceIdentity?: string) => WorkspaceZCodeUIState;
 
-  setActiveTaskId: (workspacePath: string, id: string | null, workspaceIdentity?: string) => void;
-  promoteGroupedDraftTask: (
+  setActiveTaskId: (
     workspacePath: string,
-    taskId: string,
-    draft: GroupedDraftTaskState,
+    id: string | null,
     workspaceIdentity?: string,
+    composerConfig?: ComposerInitialConfig,
   ) => void;
-  clearPromotedGroupedDraftTask: (
+  consumeComposerInitialization: (
     workspacePath: string,
-    taskId: string,
-    workspaceIdentity?: string,
-  ) => void;
-  setDraftSessionId: (
-    workspacePath: string,
-    sessionId: string | null,
+    initialization: ComposerInitialization,
     workspaceIdentity?: string,
   ) => void;
   invalidateDraftRuntime: (workspacePath: string, workspaceIdentity?: string) => void;
@@ -260,16 +253,17 @@ export interface ZCodeSessionStoreState {
     requestId: number,
     workspaceIdentity?: string,
   ) => void;
+  clearDraftTaskGroup: (workspacePath: string, workspaceIdentity?: string) => void;
   startDraft: (
     workspacePath: string,
     provider?: ZCodeProvider,
     workspaceIdentity?: string,
     options?: {
-      groupedDraftPlacement?: GroupedDraftTaskPlacement;
+      projectId?: string | null;
+      taskGroupId?: string | null;
       createSource?: SessionCreateSource;
     },
   ) => void;
-  clearGroupedDraftTask: (workspacePath: string, workspaceIdentity?: string) => void;
   bindRuntimeProvider: (
     workspacePath: string,
     provider: ZCodeProvider,
@@ -517,7 +511,6 @@ export function createDefaultWorkspaceState(
     activeTaskId: null,
     workspaceInit: { ...DEFAULT_WORKSPACE_INIT_STATE },
     draftRuntime: { status: "idle", error: null },
-    draftSessionId: null,
     draftRuntimeInvalidationVersion: 0,
     composerTextInsertVersion: 0,
     composerTextInsertRequest: null,
@@ -533,9 +526,7 @@ export function createDefaultWorkspaceState(
     taskConfigOptionsStatusByTaskId: {},
     taskUnreadByTaskId: {},
     optimisticTaskListByTaskId: {},
-    groupedDraftTask: null,
     draftCreateSource: "session",
-    promotedGroupedDraftTaskByTaskId: {},
     selectedProvider,
     selectedSupplierKey: buildNativeSupplierKey(selectedProvider),
     isGhostSupplier: false,

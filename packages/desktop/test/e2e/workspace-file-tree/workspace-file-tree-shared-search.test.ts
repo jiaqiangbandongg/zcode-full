@@ -2,20 +2,18 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   TID_PREVIEW_PANE,
-  TID_WORKSPACE_FILE_TREE_BUTTON,
   TID_WORKSPACE_FILE_TREE_PANEL,
   TID_WORKSPACE_FILE_TREE_ROW,
-  TID_WORKSPACE_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
-  clickTestIdByDom,
-  hoverTestIdByWebDriver,
   waitForDefaultWorkspaceReady,
   waitForTestIdByDom,
 } from "../helpers/desktop-app.js";
+import { openProjectFileTree } from "../helpers/project-sidebar.js";
+import { reloadElectronSessionPreservingBrowserProfile } from "../helpers/e2e-electron-reload.js";
 
 const CASE_ROOT = join(DEFAULT_WORKSPACE, "E2E_FILE_TREE_SHARED_SEARCH");
 const JAVA_DIRECTORY = join(CASE_ROOT, "src", "main", "java", "com", "example", "user");
@@ -69,7 +67,87 @@ describe("工作区文件树共享搜索 E2E", () => {
     await waitForWorkspaceFileTreeRow(JAVA_DIRECTORY);
     await waitForWorkspaceFileTreeRow(JAVA_FILE);
   });
+
+  it("显式收起目录后，其他文件与 App 重启沿用同一 workspace 偏好", async function () {
+    this.timeout(240000);
+
+    const secondFile = join(CASE_ROOT, "src", "main", "java", "NavigationPreference.java");
+    await mkdir(JAVA_DIRECTORY, { recursive: true });
+    await writeFile(JAVA_FILE, "public final class UserProfileService {}\n", "utf-8");
+    await writeFile(secondFile, "public final class NavigationPreference {}\n", "utf-8");
+
+    await waitForDefaultWorkspaceReady();
+    await openFileFromCommandCenter("UserProfileService.java");
+    await toggleFileNavigation(false);
+    await openFileFromCommandCenter("NavigationPreference.java");
+    await waitForFileNavigationExpanded(false);
+
+    await reloadElectronSessionPreservingBrowserProfile(browser);
+    await waitForDefaultWorkspaceReady(30000);
+    await openFileFromCommandCenter("UserProfileService.java");
+    await waitForFileNavigationExpanded(false);
+  });
 });
+
+async function openFileFromCommandCenter(fileName: string) {
+  await $('[data-testid="sidebar-search-open"]').click();
+  const input = $('[role="dialog"] [cmdk-input]');
+  await input.waitForDisplayed({ timeout: 10000 });
+  await input.setValue(fileName);
+  await browser.waitUntil(
+    async () =>
+      browser.execute((targetFileName) => {
+        const item = Array.from(
+          document.querySelectorAll<HTMLElement>('[role="dialog"] [cmdk-item]'),
+        ).find((candidate) => candidate.textContent?.includes(targetFileName));
+        item?.click();
+        return Boolean(item);
+      }, fileName),
+    {
+      timeout: 15000,
+      timeoutMsg: `命令中心没有找到文件: ${fileName}`,
+    },
+  );
+  await waitForTestIdByDom(TID_PREVIEW_PANE, {
+    timeoutMsg: `命令中心打开文件后没有显示 PreviewPane: ${fileName}`,
+  });
+}
+
+async function readFileNavigationExpanded(): Promise<boolean | null> {
+  return browser.execute(() => {
+    const button = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(
+        "[data-file-manager-pane] button[aria-expanded]",
+      ),
+    ).find((candidate) => candidate.getClientRects().length > 0);
+    if (!button) return null;
+    return button.getAttribute("aria-expanded") === "true";
+  });
+}
+
+async function waitForFileNavigationExpanded(expected: boolean) {
+  await browser.waitUntil(async () => (await readFileNavigationExpanded()) === expected, {
+    timeout: 10000,
+    timeoutMsg: `文件导航显隐状态没有变为: ${String(expected)}`,
+  });
+}
+
+async function toggleFileNavigation(expanded: boolean) {
+  const changed = await browser.execute((nextExpanded) => {
+    const button = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(
+        "[data-file-manager-pane] button[aria-expanded]",
+      ),
+    ).find((candidate) => candidate.getClientRects().length > 0);
+    if (!button) return false;
+    if ((button.getAttribute("aria-expanded") === "true") !== nextExpanded) {
+      button.click();
+    }
+    return true;
+  }, expanded);
+  expect(changed).toBe(true);
+  await waitForFileNavigationExpanded(expanded);
+}
 
 async function openWorkspaceFileTree() {
   const alreadyOpen = await browser.execute(
@@ -80,8 +158,7 @@ async function openWorkspaceFileTree() {
   // 被面板挤出视口，继续 moveTo 会报 out-of-bounds，且没有必要重复点击入口。
   if (alreadyOpen) return;
   // 修复原因：workspace action 只在整行 hover/focus 后挂载。
-  await hoverTestIdByWebDriver(testId(TID_WORKSPACE_ITEM, DEFAULT_WORKSPACE));
-  await clickTestIdByDom(testId(TID_WORKSPACE_FILE_TREE_BUTTON, DEFAULT_WORKSPACE), {
+  await openProjectFileTree(DEFAULT_WORKSPACE, {
     timeoutMsg: "没有找到工作区文件树入口",
   });
   await waitForTestIdByDom(TID_WORKSPACE_FILE_TREE_PANEL, {

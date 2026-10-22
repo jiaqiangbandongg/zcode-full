@@ -224,14 +224,14 @@
     },
     {
       "id": "assistant-preview-cards-office-pptx",
-      "description": "APC06/APC07 输出预置 stale source、Office/PDF 及一个缺失 PDF；本轮包含 PPTX 自动打开。",
+      "description": "APC06/APC07 与 APC14 分别输出预置 stale source、Office/PDF 及一个缺失 PDF；本轮包含 PPTX 自动打开。",
       "metadata": {
         "kind": "main",
         "timingPolicy": "fast-text",
         "source": "synthetic",
         "syntheticReason": "稳定给出 Unicode/空格文件引用和出现顺序，文件存在性与 renderer 仍走真实产品链路。"
       },
-      "maxMatches": 1,
+      "maxMatches": 2,
       "match": {
         "method": "POST",
         "pathIncludes": "/messages",

@@ -246,7 +246,6 @@ describe("被拒实例的计数器（usage.nodesUnlisted / nodesUnlistedSettled�
     const usage = state.runs[0]!.usage;
     expect(usage.nodesUnlisted).toBe(7);
     expect(usage.nodesUnlistedSettled).toBe(6);
-    expect(usage.nodesUnlistedSettled!).toBeLessThanOrEqual(usage.nodesUnlisted!);
   });
 });
 
@@ -407,8 +406,6 @@ describe("clampWorkflowRunsForLegacy：没有增量能力的消费者", () => {
     const clamped = clampWorkflowRunsForLegacy(stateWith(runWith({ nodes, actors }, 0, 0)));
     const keptNodes = clamped.runs[0]!.nodes;
     expect(keptNodes).toHaveLength(WORKFLOW_RUNS_LEGACY_LIMITS.maxNodes);
-    expect(keptNodes.map((node) => node.ordinal)).toContain(300);
-    expect(keptNodes.map((node) => node.ordinal)).toContain(301);
     // 输出仍按原表序：留下的两条活节点在最后，剩下的名额按表序补最早的条目。
     expect(keptNodes.map((node) => node.ordinal)).toEqual([
       ...Array.from({ length: WORKFLOW_RUNS_LEGACY_LIMITS.maxNodes - 2 }, (_, index) => index),

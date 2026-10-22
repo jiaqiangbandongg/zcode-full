@@ -1,4 +1,9 @@
-import { TID_OFFPEAK_CREATE_BUTTON, TID_AUTOMATIONS_OPEN } from "@zcode/shared";
+import {
+  restartIntoWorkspace,
+  seedBigModelConnectionSelection,
+  seedBigModelOAuthCredential,
+} from "./helpers/model-provider-restart.js";
+import { TID_OFFPEAK_CREATE_BUTTON, TID_AUTOMATIONS_OPEN } from "@zcode/shared/test-ids";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,8 +25,7 @@ import { loginWithApiKey } from "./helpers/conversation-session.js";
  * 全程带 pause 并在关键态截图（ZCODE_OFFPEAK_SHOT_DIR）供录屏 review。
  */
 // Bugfix：硬编码系统临时目录在 Windows 不可用，默认截图目录必须跟随运行平台。
-const SHOT_DIR =
-  process.env.ZCODE_OFFPEAK_SHOT_DIR ?? join(tmpdir(), "zc-offpeak-verify-shots");
+const SHOT_DIR = process.env.ZCODE_OFFPEAK_SHOT_DIR ?? join(tmpdir(), "zc-offpeak-verify-shots");
 let shotSeq = 0;
 async function shot(label: string): Promise<void> {
   shotSeq += 1;
@@ -59,6 +63,13 @@ describe("闲时任务服务端额度快照置灰 E2E（D39）", () => {
       await waitForDefaultWorkspaceReady(30000);
     }
 
+    // 网关只替代曝光和取票；Registry 模型需要真实的隔离账号与连接前置。
+    await restartIntoWorkspace({
+      afterElectronProcessExit: async () => {
+        await seedBigModelConnectionSelection({ kind: "individual-coding-plan" });
+        await seedBigModelOAuthCredential();
+      },
+    });
     // 1) 打开 Automations 主视图。
     await clickTestIdByDom(TID_AUTOMATIONS_OPEN, {
       timeoutMsg: "侧栏没有出现 Automations 入口",
@@ -127,9 +138,9 @@ async function offPeakCreateButtonState(): Promise<{
   await browser.waitUntil(
     () =>
       browser.execute(() =>
-        Array.from(
-          document.querySelectorAll<HTMLElement>("[data-slot='tooltip-content']"),
-        ).some((item) => item.dataset.state !== "closed"),
+        Array.from(document.querySelectorAll<HTMLElement>("[data-slot='tooltip-content']")).some(
+          (item) => item.dataset.state !== "closed",
+        ),
       ),
     { timeout: 5_000, timeoutMsg: "额度 Tooltip 没有在真实悬停后打开" },
   );

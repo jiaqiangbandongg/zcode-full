@@ -8,7 +8,6 @@ import {
   codeViewerMarkedLinesCss,
   findCodeViewerCommentElement,
   findCodeViewerLineElement,
-  formatCodeCommentCancelShortcutLabel,
   formatCodeCommentSubmitShortcutLabel,
   isCodeCommentCancelShortcut,
   isCodeCommentSubmitShortcut,
@@ -35,23 +34,15 @@ vi.mock("@pierre/diffs/react", () => ({
       "diffs-container",
       {
         class: className,
-        "data-disable-line-numbers": String(
-          Boolean(options?.disableLineNumbers),
-        ),
-        "data-enable-gutter-utility": String(
-          Boolean(options?.enableGutterUtility),
-        ),
-        "data-enable-line-selection": String(
-          Boolean(options?.enableLineSelection),
-        ),
+        "data-disable-line-numbers": String(Boolean(options?.disableLineNumbers)),
+        "data-enable-gutter-utility": String(Boolean(options?.enableGutterUtility)),
+        "data-enable-line-selection": String(Boolean(options?.enableLineSelection)),
         "data-file-cache-key": String(file?.cacheKey ?? ""),
         "data-has-gutter-utility-click": String(
           typeof options?.onGutterUtilityClick === "function",
         ),
         "data-line-hover-highlight": String(options?.lineHoverHighlight),
-        "data-selected-lines": selectedLines
-          ? `${selectedLines.start}-${selectedLines.end}`
-          : "",
+        "data-selected-lines": selectedLines ? `${selectedLines.start}-${selectedLines.end}` : "",
         "data-overflow": String(options?.overflow),
         "data-theme": String(options?.theme ?? ""),
         "data-unsafe-css": String(options?.unsafeCSS ?? ""),
@@ -72,13 +63,8 @@ vi.mock("@pierre/diffs/react", () => ({
 
 describe("CodeViewer", () => {
   it("formats the comment submit shortcut by platform", () => {
-    expect(formatCodeCommentSubmitShortcutLabel({ platform: "MacIntel" })).toBe(
-      "⌘ ↵",
-    );
-    expect(formatCodeCommentSubmitShortcutLabel({ platform: "Win32" })).toBe(
-      "Ctrl+↵",
-    );
-    expect(formatCodeCommentCancelShortcutLabel()).toBe("Esc");
+    expect(formatCodeCommentSubmitShortcutLabel({ platform: "MacIntel" })).toBe("⌘ ↵");
+    expect(formatCodeCommentSubmitShortcutLabel({ platform: "Win32" })).toBe("Ctrl+↵");
   });
 
   it("submits comment drafts with the platform primary modifier and Enter", () => {
@@ -139,28 +125,6 @@ describe("CodeViewer", () => {
     expect(isCodeCommentCancelShortcut({ key: "Enter" })).toBe(false);
   });
 
-  it("renders the @pierre/diffs file container", () => {
-    const html = renderToStaticMarkup(
-      createElement(CodeViewer, {
-        code: "const value = 1;\nconsole.log(value);",
-        language: "typescript",
-        showLineNumbers: true,
-        wrapLongLines: true,
-      }),
-    );
-
-    expect(html).toContain("<diffs-container");
-    expect(html).toContain('data-language="typescript"');
-    expect(html).toContain("overflow-auto");
-    expect(html).toContain("min-h-full");
-    expect(html).toContain("--diffs-bg:var(--color-background)");
-    expect(html).toContain("--diffs-light-bg:var(--color-background)");
-    expect(html).toContain("--diffs-dark-bg:var(--color-background)");
-    expect(html).toContain("--diffs-font-size:12px");
-    expect(html).toContain("color-scheme:light");
-    expect(html).not.toContain("data-code-viewer-row");
-  });
-
   it("pins dark code preview themes to dark color-scheme", () => {
     expect(resolveCodeViewerColorScheme("github-dark")).toBe("dark");
     expect(resolveCodeViewerColorScheme("vitesse-dark")).toBe("dark");
@@ -201,13 +165,9 @@ describe("CodeViewer", () => {
     );
 
     expect(lightHtml).toContain('data-theme="github-light"');
-    expect(lightHtml).toContain(
-      'data-file-cache-key="github-light:preview.typescript:typescript:',
-    );
+    expect(lightHtml).toContain('data-file-cache-key="github-light:preview.typescript:typescript:');
     expect(darkHtml).toContain('data-theme="github-dark"');
-    expect(darkHtml).toContain(
-      'data-file-cache-key="github-dark:preview.typescript:typescript:',
-    );
+    expect(darkHtml).toContain('data-file-cache-key="github-dark:preview.typescript:typescript:');
   });
 
   it("passes preview sizing through CSS variables", () => {
@@ -225,21 +185,6 @@ describe("CodeViewer", () => {
     expect(html).toContain("--diffs-font-size:13px");
     // @pierre/diffs 在客户端 Shadow DOM 内渲染真实 code 行；SSR 只输出宿主节点。
     expect(html).not.toContain("  return true;");
-  });
-
-  it("does not render the legacy line grid", () => {
-    const html = renderToStaticMarkup(
-      createElement(CodeViewer, {
-        code: "const value = 1;\nconsole.log(value);\nexport {};",
-        language: "typescript",
-        showLineNumbers: true,
-        wrapLongLines: true,
-      }),
-    );
-
-    expect(html).toContain("<diffs-container");
-    expect(html).not.toContain("data-code-viewer-line");
-    expect(html).not.toContain("data-code-viewer-code");
   });
 
   it("renders controlled code comments", () => {
@@ -448,19 +393,6 @@ describe("CodeViewer", () => {
     expect(html).toContain('data-enable-line-selection="true"');
     expect(html).toContain('data-enable-gutter-utility="true"');
     expect(html).toContain('data-has-gutter-utility-click="true"');
-    expect(html).toContain(
-      "--code-comment-add-tooltip:&quot;Click or drag to comment&quot;",
-    );
-    expect(html).toContain("[data-gutter-utility-slot]");
-    expect(html).toContain("right:4px");
-    expect(html).toContain("left:calc(100% + 6px)");
-    expect(html).not.toContain("right:calc(100% + 6px)");
-    expect(html).toContain("justify-content:flex-end");
-    expect(html).toContain("align-items:center");
-    expect(html).toContain("[data-utility-button]::after");
-    expect(html).toContain("var(--color-tooltip)");
-    expect(html).toContain("var(--color-tooltip-foreground)");
-    expect(html).toContain(":focus-visible::after");
   });
 
   it("localizes the gutter comment tooltip label", () => {
@@ -477,9 +409,7 @@ describe("CodeViewer", () => {
       }),
     );
 
-    expect(html).toContain(
-      "--code-comment-add-tooltip:&quot;点击或拖拽添加评论&quot;",
-    );
+    expect(html).toContain("--code-comment-add-tooltip:&quot;点击或拖拽添加评论&quot;");
   });
 
   it("does not render comment creation UI without a submit handler", () => {

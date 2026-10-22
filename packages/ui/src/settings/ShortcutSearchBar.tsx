@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { Keyboard, Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input.js";
+import { Keyboard } from "lucide-react";
+import { Button } from "@/components/ui/button.js";
+import { SettingsSearchInput } from "@/settings/SettingsSearchInput.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { formatShortcutBindingLabel } from "@/shortcuts/label.js";
-import type { ShortcutKeySearch } from "./useShortcutKeySearch.js";
+import type { ShortcutKeySearch } from "@/settings/useShortcutKeySearch.js";
 
 interface ShortcutSearchBarProps {
   query: string;
@@ -30,53 +31,54 @@ export function ShortcutSearchBar({
     keySearch.binding !== null ? formatShortcutBindingLabel(keySearch.binding) : null;
 
   return (
-    <div className="flex gap-2">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle" />
-        <Input
-          className={`pl-9 font-mono ${keyLabel !== null ? "pr-16 text-brand" : "pr-9"}`}
-          placeholder={
-            keySearch.armed
-              ? intl.formatMessage({ id: "settings.shortcuts.keySearchPlaceholder" })
-              : intl.formatMessage({ id: "settings.shortcuts.searchPlaceholder" })
-          }
-          value={keyLabel ?? query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          // 武装态键盘事件被 window capture 独占；捕获后展示的是组合 label 而非可编辑文本，
-          // 两者都 readOnly，防止 IME/焦点残留造成的视觉歧义
-          readOnly={keySearch.armed || keyLabel !== null}
-          data-testid="settings-shortcut-search-input"
-        />
-        {keyLabel !== null ? (
-          <button
-            type="button"
-            aria-label={intl.formatMessage({ id: "settings.shortcuts.keySearchClearAria" })}
-            data-testid="settings-shortcut-key-search-clear"
-            className="absolute right-9 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-foreground-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
-            onClick={keySearch.clear}
-          >
-            <X className="size-3.5" />
-          </button>
-        ) : null}
-        <button
-          type="button"
-          aria-label={intl.formatMessage({ id: "settings.shortcuts.keySearchAria" })}
-          aria-pressed={keySearch.armed}
-          data-testid="settings-shortcut-key-search"
-          className={`absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm p-1 focus-visible:outline-2 focus-visible:outline-offset-2 ${
-            keySearch.armed ? "text-brand" : "text-foreground-subtle hover:text-foreground"
-          }`}
-          onClick={() => {
-            if (!keySearch.armed) {
-              onArmKeySearch();
-            }
-            keySearch.toggle();
-          }}
-        >
-          <Keyboard className="size-4" />
-        </button>
-      </div>
+    <div className="flex min-w-0 flex-wrap items-center gap-3">
       {actions}
+      <SettingsSearchInput
+        containerClassName="w-full min-w-0 sm:ml-auto sm:w-64"
+        className={keyLabel !== null ? "font-mono text-brand" : undefined}
+        placeholder={intl.formatMessage({
+          id: keySearch.armed
+            ? "settings.shortcuts.keySearchPlaceholder"
+            : "settings.shortcuts.searchPlaceholder",
+        })}
+        value={keyLabel ?? query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        // 按键过滤继续与原文本条件 AND；展示组合键时保持只读，避免改变搜索语义。
+        readOnly={keySearch.armed || keyLabel !== null}
+        data-testid="settings-shortcut-search-input"
+        clearLabel={intl.formatMessage({
+          id: keyLabel !== null ? "settings.shortcuts.keySearchClearAria" : "settings.search.clear",
+        })}
+        clearTestId={
+          keyLabel !== null
+            ? "settings-shortcut-key-search-clear"
+            : "settings-shortcut-search-clear"
+        }
+        onClear={
+          keySearch.armed
+            ? undefined
+            : keyLabel !== null
+              ? keySearch.clear
+              : () => onQueryChange("")
+        }
+        trailingAction={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={intl.formatMessage({ id: "settings.shortcuts.keySearchAria" })}
+            aria-pressed={keySearch.armed}
+            data-testid="settings-shortcut-key-search"
+            className={`rounded-full ${keySearch.armed ? "text-brand" : "text-foreground-subtle"}`}
+            onClick={() => {
+              if (!keySearch.armed) onArmKeySearch();
+              keySearch.toggle();
+            }}
+          >
+            <Keyboard className="size-4" aria-hidden="true" />
+          </Button>
+        }
+      />
     </div>
   );
 }

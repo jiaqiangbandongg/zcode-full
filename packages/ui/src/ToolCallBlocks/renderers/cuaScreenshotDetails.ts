@@ -64,7 +64,11 @@ export function buildCuaScreenshotDetails(
   const text = `${collectText(toolCall.output)}\n${collectText(rawOutput)}`;
   const dimensions = /(?:(?:Full-screen\s+)?screenshot|Zoom image)\s+(\d+)x(\d+)px/iu.exec(text);
   const attachedMime = /\[Attached\s+(image\/[a-z0-9.+-]+):/iu.exec(text)?.[1] ?? null;
-  const dataUrl = findImageDataUrl(toolCall.output) ?? findImageDataUrl(toolCall.raw);
+  const sharedImageSrc = asRecord(toolCall.raw)?.sharedImageSrc;
+  const dataUrl =
+    (typeof sharedImageSrc === "string" ? sharedImageSrc : null) ??
+    findImageDataUrl(toolCall.output) ??
+    findImageDataUrl(toolCall.raw);
   const dataMime = /^data:(image\/[a-z0-9.+-]+);base64,/iu.exec(dataUrl ?? "")?.[1] ?? null;
 
   const input = asRecord(toolCall.input);

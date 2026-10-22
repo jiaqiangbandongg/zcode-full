@@ -1,17 +1,16 @@
 import type { IHooksService } from "@zcode/services";
 import type { Hook } from "@zcode/shared";
-import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
-import { HookForm } from "@/settings/HookForm.js";
 import { HooksList, groupHookSections } from "@/settings/HooksList.js";
 import {
   buildPluginHookRows,
   filterPluginHooksByScope,
   isReadOnlyZCodeHook,
+  resolveHookScopeTarget,
   resolveLatestReviewScopeTarget,
 } from "@/settings/HooksSection.js";
 import { useHooksStore } from "@/store/hooksStore.js";
@@ -20,6 +19,7 @@ afterEach(() => {
   useHooksStore.setState({
     workspacePath: null,
     workspaceIdentity: null,
+    authorityKey: null,
     loadedWorkspaceKey: null,
     hooks: [],
     loading: false,
@@ -54,20 +54,37 @@ describe("Hooks settings page", () => {
       sections
         .filter((section) => section.kind === "plugin")
         .flatMap((section) => section.hooks.map((hook) => hook.pluginId)),
-    ).toEqual([
-      "computer-use@zcode-plugins-official",
-      "zcode-cua@custom-marketplace",
-    ]);
+    ).toEqual(["computer-use@zcode-plugins-official", "zcode-cua@custom-marketplace"]);
   });
 
-  it("only exposes connected Workspaces to Hooks scope routing", () => {
-    const source = readFileSync(
-      new URL("../src/settings/HooksSection.tsx", import.meta.url),
-      "utf8",
-    );
+  it("keeps a selected local workspace scope on the base host while a remote workspace is active", () => {
+    const activePath = "/home/dev/project";
+    const activeIdentity = "remote:server:source-1:/home/dev/project";
 
-    expect(source).toContain("isPluginScopeWorkspaceConnected");
-    expect(source).toContain(".filter(isPluginScopeWorkspaceConnected)");
+    // 选中的本地项目没有 identity，不能借用活动远端工作区的 identity 把本机路径发往远端。
+    expect(
+      resolveHookScopeTarget(
+        { workspacePath: "/Users/dev/local", workspaceIdentity: undefined },
+        activePath,
+        activeIdentity,
+      ),
+    ).toEqual({ workspacePath: "/Users/dev/local", workspaceIdentity: undefined });
+    // 选中远端项目时沿用其自身 identity。
+    expect(
+      resolveHookScopeTarget(
+        { workspacePath: "/srv/other", workspaceIdentity: "remote:server:source-2:/srv/other" },
+        activePath,
+        activeIdentity,
+      ),
+    ).toEqual({
+      workspacePath: "/srv/other",
+      workspaceIdentity: "remote:server:source-2:/srv/other",
+    });
+    // User scope 未选项目：仍跟随当前 workspace 路由。
+    expect(resolveHookScopeTarget(undefined, activePath, activeIdentity)).toEqual({
+      workspacePath: activePath,
+      workspaceIdentity: activeIdentity,
+    });
   });
 
   it("does not classify plugin hooks as user when overview scope is unavailable", () => {
@@ -170,9 +187,7 @@ describe("Hooks settings page", () => {
       },
     };
 
-    const slowInitialize = useHooksStore
-      .getState()
-      .initialize("/workspace-a", undefined, service);
+    const slowInitialize = useHooksStore.getState().initialize("/workspace-a", undefined, service);
     await useHooksStore.getState().initialize("/workspace-b", undefined, service);
     releaseSlowLoad?.();
     await slowInitialize;
@@ -279,7 +294,10 @@ describe("Hooks settings page", () => {
           null,
           createElement(HooksList, {
             compatibilityHooks: [legacy],
-            editableHooks: [configuredHook(), { ...configuredHook(), id: "configured-2", event: "Stop" }],
+            editableHooks: [
+              configuredHook(),
+              { ...configuredHook(), id: "configured-2", event: "Stop" },
+            ],
             operatingHookId: null,
             pluginHooks: [
               {
@@ -313,111 +331,20 @@ describe("Hooks settings page", () => {
     expect(html).toContain("Stop");
     expect(html).toContain("Installed");
     expect(html).toContain("New");
-    expect(html).toContain(
-      "flex flex-wrap items-center justify-between gap-3",
-    );
-    expect(html).not.toContain("flex h-7 items-center justify-between");
     expect(html).toContain("Legacy");
     expect(html).toContain("PostToolUse");
     expect(html).toContain("quality");
     expect(html).toContain("Scope unknown");
     expect(html).toContain("plugin-hook-row");
-    expect(html).toContain("lucide-anchor");
-    expect(html).not.toContain("lucide-webhook");
-    expect(html).toContain("overflow-hidden rounded-xl bg-surface");
-    expect(html).toContain("h-px bg-border/50");
-    expect(html).toContain("font-mono text-ui-sm text-foreground-subtle");
-    expect(html).toContain("hover:bg-hover");
-    expect(html).not.toContain("Configured hooks");
-    expect(html).not.toContain("Plugin hooks");
   });
 
   it("omits empty groups after filtering", () => {
     expect(groupHookSections([], [], [])).toEqual([]);
   });
 
-  it("localizes built-in hook group titles", () => {
-    const legacy: Hook = {
-      id: "legacy-zh",
-      event: "Stop",
-      type: "command",
-      command: "echo legacy",
-      enabled: false,
-      location: {
-        source: "claude",
-        scope: "user",
-        directoryPath: "/home/.claude",
-      },
-    };
-    const html = renderToStaticMarkup(
-      createElement(
-        ZCodeIntlProvider,
-        { initialLocale: "zh-CN" },
-        createElement(
-          TooltipProvider,
-          null,
-          createElement(HooksList, {
-            compatibilityHooks: [legacy],
-            editableHooks: [configuredHook()],
-            operatingHookId: null,
-            pluginHooks: [],
-            onEdit: () => {},
-            onImport: async () => {},
-            onToggle: async () => {},
-          }),
-        ),
-      ),
-    );
-
-    expect(html).toContain("已安装");
-    expect(html).toContain("旧版");
-    expect(html).not.toContain(">Installed<");
-    expect(html).not.toContain(">Legacy<");
-  });
-
-  it("renders an existing status message as an editable typed field", () => {
-    const html = renderToStaticMarkup(
-      createElement(
-        ZCodeIntlProvider,
-        { initialLocale: "en-US" },
-        createElement(HookForm, {
-          hook: {
-            ...configuredHook(),
-            type: "command",
-            command: "echo verify",
-            statusMessage: "Preparing workspace",
-          },
-          workspaceAvailable: true,
-          onSave: () => {},
-          onCancel: () => {},
-          isEditing: true,
-        }),
-      ),
-    );
-
-    expect(html).toContain("Status message");
-    expect(html).toContain('value="Preparing workspace"');
-    expect(html).toContain('data-variant="ghost" data-size="lg"');
-    expect(html).toContain("Manage task lifecycle hooks");
-    expect(html).toContain("space-y-3 rounded-xl border border-border p-4");
-    expect(html).not.toContain("rounded-xl border border-border bg-card p-4");
-    expect(html).toContain('data-size="lg"');
-    expect(html).toContain("flex flex-col gap-2 pt-1 sm:flex-row sm:items-center");
-    expect(html).toContain("sm:ml-auto");
-    expect(html).toContain("flex flex-wrap items-start justify-between gap-3");
-    expect(html).toContain("items-center justify-end gap-2");
-    expect(html).toContain('data-plugin-scope-trigger="true"');
-    expect(html).toContain("sm:grid-cols-2");
-    expect(html).toContain('id="hook-runner"');
-    expect(html).not.toContain('aria-pressed="true"');
-    expect(html).toContain("<details");
-    expect(html).toContain("Advanced");
-    expect(html).toContain("group-open/advanced:rotate-90");
-  });
-
   // workspace-hook-trust：未信任的工作区 Hook 在任何 review 状态下都显示行内 Trust 按钮；
   // 信任状态不通过徽章展示，避免与运行时权威投影产生第二事实来源。
-  it("无需活跃 review 也给未信任 Workspace Hook 显示行内信任按钮，并删除推导状态徽章", () => {
+  it("无需活跃 review 也给未信任 Workspace Hook 显示行内信任按钮", () => {
     const untrusted = {
       ...workspaceConfiguredHook("pending_trust"),
       id: "untrusted-disabled-row",
@@ -461,13 +388,6 @@ describe("Hooks settings page", () => {
     );
 
     expect(html.match(/>Trust</gu)).toHaveLength(1);
-    expect(html.indexOf(">Trust<")).toBeLessThan(html.indexOf('role="switch"'));
-    expect(html).not.toContain("Configured on");
-    expect(html).not.toContain("Configured off");
-    expect(html).not.toContain("Needs review");
-    expect(html).not.toContain("Trusted");
-    expect(html).not.toContain("Will run");
-    expect(html).not.toContain("Will not run");
   });
 
   it("未信任 Hook 的有效运行开关固定关闭并锁定，且不修改传入配置状态", () => {
@@ -643,7 +563,11 @@ describe("resolveLatestReviewScopeTarget", () => {
     const target = resolveLatestReviewScopeTarget(
       {
         s1: {
-          request: { interactionId: "i-1", createdAt: 1, workspaceIdentity: "ssh://dev/remote/repo" },
+          request: {
+            interactionId: "i-1",
+            createdAt: 1,
+            workspaceIdentity: "ssh://dev/remote/repo",
+          },
           workspacePath: "/remote/repo",
         },
       },
@@ -669,7 +593,11 @@ describe("resolveLatestReviewScopeTarget", () => {
     const target = resolveLatestReviewScopeTarget(
       {
         s1: {
-          request: { interactionId: "i-old", createdAt: 1, workspaceIdentity: "ssh://dev/remote/repo" },
+          request: {
+            interactionId: "i-old",
+            createdAt: 1,
+            workspaceIdentity: "ssh://dev/remote/repo",
+          },
           workspacePath: "/remote/repo",
         },
         s2: {

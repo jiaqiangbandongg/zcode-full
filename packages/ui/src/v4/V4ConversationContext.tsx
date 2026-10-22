@@ -4,6 +4,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import type {
@@ -33,7 +34,11 @@ import type {
 import type { IServiceAccessor } from "@zcode/services";
 import { ServiceProvider } from "@/hooks/useServices.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
-import { useWorkspaceServicesResolution } from "@/hooks/useWorkspaceServices.js";
+import {
+  useWorkspaceServicesResolution,
+  type WorkspaceServicesResolution,
+} from "@/hooks/useWorkspaceServices.js";
+import { RemoteConversationAvailability } from "@/v4/RemoteConversationAvailability.js";
 import { createAgentConversationTransport } from "@/v4/agentConversationTransport.js";
 import type { ConversationAttachmentReadParams, ConversationTransport } from "@/v4/transport.js";
 import type { PaneWorkspaceScope } from "@/v4/paneLayoutStore.js";
@@ -44,7 +49,10 @@ import { ConversationTelemetryPaneAttachment } from "@/v4/telemetry/Conversation
 
 export interface V4ConversationContextValue {
   layer: SessionDataLayer;
-  sendCommand(envelope: CommandEnvelope): Promise<CommandAck>;
+  sendCommand(
+    envelope: CommandEnvelope,
+    context?: { projectId?: string | null },
+  ): Promise<CommandAck>;
   fileChanges(params: V4ConversationFileChangesParams): Promise<V4ConversationFileChangesResult>;
   fileRewindPreview(
     params: V4ConversationFileRewindPreviewParams,
@@ -105,6 +113,40 @@ export interface V4ConversationProviderProps {
   workspacePath: string;
   workspaceIdentity?: string;
   children: ReactNode;
+  /** 显式传入才保留当前会话；未传的侧面板仍在断线时卸载。null 表示草稿。 */
+  sessionId?: string | null;
+  unavailableFallback?: ReactNode;
+  disconnectedBanner?: ReactNode;
+}
+
+function useRetainedReadyResolution(
+  workspaceKey: string,
+  resolution: WorkspaceServicesResolution,
+  retain: boolean,
+) {
+  const [retained, setRetained] = useState<{
+    key: string;
+    resolution: WorkspaceServicesResolution;
+  } | null>(null);
+  // 已挂载的数据层本身就是内容 owner。只保留其服务引用，不复制 snapshot；换项目或首次
+  // 挂回前没有 ready 引用，仍由原 rpcReady 门禁阻止远端订阅和本地 fallback。
+  // 未声明会话身份的侧面板不留存，避免其 debounce 查询在断线后继续调用旧服务。
+  if (
+    retain &&
+    resolution.rpcReady &&
+    (retained?.key !== workspaceKey ||
+      retained.resolution.services !== resolution.services ||
+      retained.resolution.remoteSessionId !== resolution.remoteSessionId)
+  ) {
+    setRetained({ key: workspaceKey, resolution });
+  } else if (retained && (!retain || (!resolution.rpcReady && retained.key !== workspaceKey))) {
+    setRetained(null);
+  }
+  return resolution.rpcReady
+    ? resolution
+    : retain && retained?.key === workspaceKey
+      ? retained.resolution
+      : null;
 }
 
 function ReadyV4ConversationProvider({
@@ -132,7 +174,8 @@ function ReadyV4ConversationProvider({
     const layer = new SessionDataLayer({ transport });
     return {
       layer,
-      sendCommand: (envelope: CommandEnvelope) => transport.sendCommand(envelope),
+      sendCommand: (envelope: CommandEnvelope, context?: { projectId?: string | null }) =>
+        transport.sendCommand(envelope, context),
       fileChanges: (params: V4ConversationFileChangesParams) => transport.fileChanges(params),
       fileRewindPreview: (params: V4ConversationFileRewindPreviewParams) =>
         transport.fileRewindPreview(params),
@@ -187,20 +230,30 @@ export function V4ConversationProvider({
   workspacePath,
   workspaceIdentity,
   children,
+  sessionId,
+  unavailableFallback,
+  disconnectedBanner,
 }: V4ConversationProviderProps) {
   const resolution = useWorkspaceServicesResolution(workspacePath, undefined, workspaceIdentity);
-  if (!resolution.rpcReady) {
-    return null;
+  const ready = useRetainedReadyResolution(
+    `${workspaceIdentity?.trim() || workspacePath}\0${sessionId ?? "__draft__"}`,
+    resolution,
+    sessionId !== undefined,
+  );
+  if (!ready) {
+    return unavailableFallback ?? null;
   }
 
   return (
     <ReadyV4ConversationProvider
       workspacePath={workspacePath}
       workspaceIdentity={workspaceIdentity}
-      services={resolution.services}
-      remoteSessionId={resolution.remoteSessionId}
+      services={ready.services}
+      remoteSessionId={ready.remoteSessionId}
     >
+      <RemoteConversationAvailability available={resolution.rpcReady} banner={disconnectedBanner}>
       {children}
+      </RemoteConversationAvailability>
     </ReadyV4ConversationProvider>
   );
 }
@@ -225,6 +278,10 @@ export interface V4PaneConversationProviderProps {
   /** pane 绑定的 primary workspace（连接路由键，docs/v4-split-pane-workbench.md）。 */
   scope: PaneWorkspaceScope;
   children: ReactNode;
+  /** 显式传入才保留当前会话；未传的侧面板仍在断线时卸载。null 表示草稿。 */
+  sessionId?: string | null;
+  unavailableFallback?: ReactNode;
+  disconnectedBanner?: ReactNode;
 }
 
 /**
@@ -238,32 +295,46 @@ export interface V4PaneConversationProviderProps {
  * 另起独立 runtime（远控保护约束）。重连 ready 后 services 换新引用 → 注册表保持
  * 原 layer/transport 身份，并在 commit 阶段单向激活最新 proxy。
  */
-export function V4PaneConversationProvider({ scope, children }: V4PaneConversationProviderProps) {
+export function V4PaneConversationProvider({
+  scope,
+  children,
+  sessionId,
+  unavailableFallback,
+  disconnectedBanner,
+}: V4PaneConversationProviderProps) {
   const targetResolution = useWorkspaceServicesResolution(
     scope.workspacePath,
     scope.remoteSessionId ?? null,
     scope.workspaceIdentity ?? null,
   );
+  const ready = useRetainedReadyResolution(
+    `${scope.workspaceIdentity?.trim() || scope.workspacePath}\0${sessionId ?? "__draft__"}`,
+    targetResolution,
+    sessionId !== undefined,
+  );
   const resolvedScope = useMemo<PaneWorkspaceScope>(
     () => ({
       workspacePath: scope.workspacePath,
       ...(scope.workspaceIdentity ? { workspaceIdentity: scope.workspaceIdentity } : {}),
-      ...(targetResolution.remoteSessionId
-        ? { remoteSessionId: targetResolution.remoteSessionId }
-        : {}),
+      ...(ready?.remoteSessionId ? { remoteSessionId: ready.remoteSessionId } : {}),
     }),
-    [scope.workspaceIdentity, scope.workspacePath, targetResolution.remoteSessionId],
+    [scope.workspaceIdentity, scope.workspacePath, ready?.remoteSessionId],
   );
-  if (!targetResolution.rpcReady) {
-    return null;
+  if (!ready) {
+    return unavailableFallback ?? null;
   }
 
   // 恢复中的远端 pane 可能只有 workspaceIdentity。resolver 已解析出真实
   // remoteSessionId 后若仍把原 scope 传给 registry，会以 __base__ 和远端 endpoint
   // 各建一份数据层，终态可能落到非可见 store。ready 后统一使用解析后的 scope。
   return (
-    <ReadyV4PaneConversationProvider scope={resolvedScope} services={targetResolution.services}>
+    <ReadyV4PaneConversationProvider scope={resolvedScope} services={ready.services}>
+      <RemoteConversationAvailability
+        available={targetResolution.rpcReady}
+        banner={disconnectedBanner}
+      >
       {children}
+      </RemoteConversationAvailability>
     </ReadyV4PaneConversationProvider>
   );
 }
@@ -295,7 +366,8 @@ function ReadyV4PaneConversationProvider({
       lease,
       value: {
         layer: lease.layer,
-        sendCommand: (envelope: CommandEnvelope) => lease.transport.sendCommand(envelope),
+        sendCommand: (envelope: CommandEnvelope, context?: { projectId?: string | null }) =>
+          lease.transport.sendCommand(envelope, context),
         fileChanges: (params: V4ConversationFileChangesParams) =>
           lease.transport.fileChanges(params),
         fileRewindPreview: (params: V4ConversationFileRewindPreviewParams) =>

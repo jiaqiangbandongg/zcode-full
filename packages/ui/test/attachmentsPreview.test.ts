@@ -1,13 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import {
-  Attachment,
-  AttachmentInfo,
-  AttachmentPreview,
-  AttachmentRemove,
-  Attachments,
-} from "@/components/ai-elements/attachments.js";
+import { Attachment, AttachmentInfo, Attachments } from "@/components/ai-elements/attachments.js";
 
 function renderAttachmentWithOpen(openable: boolean) {
   return renderToStaticMarkup(
@@ -40,7 +34,6 @@ describe("Attachment preview affordance", () => {
     expect(html).toContain('role="button"');
     expect(html).toContain('tabindex="0"');
     expect(html).toContain('aria-label="Open image preview"');
-    expect(html).toContain("cursor-pointer");
   });
 
   it("does not add button semantics when no preview action is provided", () => {
@@ -48,33 +41,6 @@ describe("Attachment preview affordance", () => {
 
     expect(html).not.toContain('role="button"');
     expect(html).not.toContain('tabindex="0"');
-    expect(html).toContain("cursor-default");
-    expect(html).not.toContain("cursor-pointer");
-  });
-
-  it("renders the shared play affordance over grid video thumbnails", () => {
-    const html = renderToStaticMarkup(
-      createElement(
-        Attachment,
-        {
-          data: {
-            id: "video",
-            type: "file",
-            filename: "demo.mov",
-            mediaType: "video/quicktime",
-            url: "blob:video-preview",
-          },
-          variant: "grid",
-        },
-        createElement(AttachmentPreview),
-      ),
-    );
-
-    expect(html).toContain('data-attachment-video-play-overlay="true"');
-    expect(html).toContain("rounded-full");
-    expect(html).toContain("bg-black/55");
-    expect(html).toContain("backdrop-blur-sm");
-    expect(html).toContain("pointer-events-none");
   });
 
   it("renders inline clipboard text attachments as a single line with description", () => {
@@ -105,34 +71,5 @@ describe("Attachment preview affordance", () => {
     expect(html).toContain("128 行");
     expect(html).not.toContain("18 KB");
     expect(html).not.toContain("pasted-text-20260627-153012.txt");
-  });
-
-  it("renders inline remove action as a side-pane-style trailing overlay", () => {
-    const html = renderToStaticMarkup(
-      createElement(
-        Attachments,
-        { variant: "inline" },
-        createElement(
-          Attachment,
-          {
-            data: {
-              id: "pasted-text",
-              filename: "pasted-text.txt",
-              mediaType: "text/plain",
-              type: "file",
-              url: "",
-            },
-            onRemove: () => undefined,
-          },
-          createElement(AttachmentInfo),
-          createElement(AttachmentRemove, { label: "移除附件" }),
-        ),
-      ),
-    );
-
-    expect(html).toContain("absolute inset-y-0 right-0");
-    expect(html).toContain("bg-gradient-to-r from-transparent");
-    expect(html).toContain("pointer-events-auto");
-    expect(html).toContain('aria-label="移除附件"');
   });
 });

@@ -15,8 +15,9 @@ const ZAI_ACCESS_TOKEN_KEY = "oauth:zai:access_token";
 const ZAI_USER_INFO_KEY = "oauth:zai:user_info";
 const BIGMODEL_ACCESS_TOKEN_KEY = "oauth:bigmodel:access_token";
 const BIGMODEL_USER_INFO_KEY = "oauth:bigmodel:user_info";
-const OAUTH_PENDING_NONCE_KEY = "oauth_pending_nonce";
-const OAUTH_PENDING_PROVIDER_KEY = "oauth_pending_provider";
+const OAUTH_PENDING_LOGINS_KEY = "oauth_pending_logins";
+// 同一浏览器多个标签页可以同时发起登录；只留最近几条，放弃的登录不会无限累积。
+const MAX_PENDING_LOGINS = 5;
 
 /** 本仓支持的登录 provider。private 分享的 owner 身份是 provider 特定的，两边都要能登。 */
 export type WebOAuthProviderId = typeof ZAI_PROVIDER_ID | typeof BIGMODEL_PROVIDER_ID;
@@ -39,7 +40,25 @@ function providerKeys(provider: WebOAuthProviderId): { accessToken: string; user
 
 interface BrowserOAuthCredentialRepoStorage {
   localStorage: Storage;
-  sessionStorage: Storage;
+}
+
+/** 一次跳出去的登录：回调页靠它校验 state，并用同一 provider 与回调地址换 token。 */
+export interface PendingOAuthLogin {
+  nonce: string;
+  provider: WebOAuthProviderId;
+  redirectUri: string;
+}
+
+function isPendingOAuthLogin(value: unknown): value is PendingOAuthLogin {
+  if (!value || typeof value !== "object") return false;
+  const login = value as Partial<Record<keyof PendingOAuthLogin, unknown>>;
+  return (
+    typeof login.nonce === "string" &&
+    hasText(login.nonce) &&
+    isWebOAuthProviderId(login.provider) &&
+    typeof login.redirectUri === "string" &&
+    hasText(login.redirectUri)
+  );
 }
 
 interface BrowserOAuthCredentialRepoOptions {
@@ -53,20 +72,16 @@ interface WebZaiTokenSet {
 }
 
 function getBrowserStorage(): BrowserOAuthCredentialRepoStorage {
-  return {
-    localStorage: window.localStorage,
-    sessionStorage: window.sessionStorage,
-  };
+  return { localStorage: window.localStorage };
 }
 
 function hasText(value: string | null): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-/** 浏览器 OAuth 凭据仓储：统一收敛 localStorage/sessionStorage 读写，避免业务层散落认证状态判断。 */
+/** 浏览器 OAuth 凭据仓储：统一收敛 localStorage 读写，避免业务层散落认证状态判断。 */
 export class BrowserOAuthCredentialRepo {
   private readonly localStorage: Storage;
-  private readonly sessionStorage: Storage;
   private readonly now: () => number;
 
   constructor(
@@ -74,7 +89,6 @@ export class BrowserOAuthCredentialRepo {
     options: BrowserOAuthCredentialRepoOptions = {},
   ) {
     this.localStorage = storage.localStorage;
-    this.sessionStorage = storage.sessionStorage;
     this.now = options.now ?? Date.now;
   }
 
@@ -112,6 +126,23 @@ export class BrowserOAuthCredentialRepo {
   loadCachedSession(): UserInfo | null {
     const result = this.loadCachedSessionState();
     return result.status === "authenticated" ? result.userInfo : null;
+  }
+
+  /**
+   * 只读的账号展示资料（设备页账号行）。不是登录门禁：不校验 JWT、不清理残缺凭据，
+   * 否则渲染一次列表就可能提前登出；登录事实仍由 loadCachedSessionState / JWT 决定。
+   */
+  loadActiveAccount(): { provider: WebOAuthProviderId; userInfo: UserInfo } | null {
+    try {
+      const provider = this.localStorage.getItem(ACTIVE_PROVIDER_KEY);
+      if (!isWebOAuthProviderId(provider)) return null;
+      const rawUserInfo = this.localStorage.getItem(providerKeys(provider).userInfo);
+      if (!hasText(rawUserInfo)) return null;
+      const userInfo = toUserInfo(JSON.parse(rawUserInfo));
+      return userInfo ? { provider, userInfo } : null;
+    } catch {
+      return null;
+    }
   }
 
   loadCachedSessionState(): OAuthCachedSessionRestoreResult {
@@ -177,34 +208,45 @@ export class BrowserOAuthCredentialRepo {
     this.localStorage.removeItem(BIGMODEL_USER_INFO_KEY);
   }
 
-  savePendingNonce(nonce: string): void {
-    this.sessionStorage.setItem(OAUTH_PENDING_NONCE_KEY, nonce);
-  }
-
-  loadPendingNonce(): string | null {
-    return this.sessionStorage.getItem(OAUTH_PENDING_NONCE_KEY);
-  }
-
-  clearPendingNonce(): void {
-    this.sessionStorage.removeItem(OAUTH_PENDING_NONCE_KEY);
-  }
-
   /**
-   * 记住这次跳出去登录用的是哪个 provider。
+   * 记住这次跳出去的登录，按 nonce 区分。
    *
-   * 回调页必须知道用哪个 provider 换 token（authorize 参数名、token 响应里 access_token
-   * 的位置都不同）。跟 nonce 放同一个 sessionStorage：两者本来就要一起校验、一起清。
+   * 修复：原先 nonce/provider/回调地址存在发起页的 sessionStorage。部分手机浏览器的 OAuth
+   * 回调不在发起登录的标签页里，或标签页被系统回收后重建，回调页读不到 nonce，换 token 前
+   * 就报 “OAuth CSRF 检测失败”，重新登录也一样失败。改存同源 localStorage 后，同一浏览器的
+   * 任意标签页都能完成回调；nonce 仍随机且只用一次，CSRF 校验强度不变。
    */
-  savePendingProvider(provider: WebOAuthProviderId): void {
-    this.sessionStorage.setItem(OAUTH_PENDING_PROVIDER_KEY, provider);
+  savePendingLogin(login: PendingOAuthLogin): void {
+    const logins = this.readPendingLogins().filter((pending) => pending.nonce !== login.nonce);
+    this.writePendingLogins([...logins, login].slice(-MAX_PENDING_LOGINS));
   }
 
-  loadPendingProvider(): WebOAuthProviderId | null {
-    const stored = this.sessionStorage.getItem(OAUTH_PENDING_PROVIDER_KEY);
-    return isWebOAuthProviderId(stored) ? stored : null;
+  /** 取出并删除 nonce 对应的登录记录；找不到时不改动其他标签页的记录。 */
+  takePendingLogin(nonce: string): PendingOAuthLogin | null {
+    const logins = this.readPendingLogins();
+    const login = logins.find((pending) => pending.nonce === nonce);
+    if (!login) return null;
+    this.writePendingLogins(logins.filter((pending) => pending !== login));
+    return login;
   }
 
-  clearPendingProvider(): void {
-    this.sessionStorage.removeItem(OAUTH_PENDING_PROVIDER_KEY);
+  private readPendingLogins(): PendingOAuthLogin[] {
+    const raw = this.localStorage.getItem(OAUTH_PENDING_LOGINS_KEY);
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter(isPendingOAuthLogin) : [];
+    } catch {
+      // 损坏的记录不能当成本次登录；下一次发起登录会整体覆盖。
+      return [];
+    }
+  }
+
+  private writePendingLogins(logins: PendingOAuthLogin[]): void {
+    if (logins.length > 0) {
+      this.localStorage.setItem(OAUTH_PENDING_LOGINS_KEY, JSON.stringify(logins));
+    } else {
+      this.localStorage.removeItem(OAUTH_PENDING_LOGINS_KEY);
+    }
   }
 }

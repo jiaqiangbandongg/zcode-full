@@ -30,7 +30,83 @@ E2E 落地回答“怎么稳定测”：
 9. MR 与 GitLab Web pipeline 通过手动 optional job 跑正式目录下的 default replay：共享 macOS 与专用 macOS runner job 都是单实例执行，只有 Windows job 使用四个 GitLab/WDIO 原生 shard。三条入口都复用 `ZCODE_E2E_SPEC=./test/e2e/conversation-session/*.test.ts` 等 direct-root glob；这些 glob 是非递归的，只收已经转正到正式目录的 spec，不收 `manual-review/pending`。
 10. Docker CI 只收已经自动化稳定的 suite。
 
+默认 Desktop 全量入口按任意层级的 `manual-review` 目录统一排除候选，不能只枚举已知领域，
+否则新增 bots/settings/feedback 目录会被单进程全量误收。显式 spec 或 manual-review 模式仍可
+运行候选；默认单进程与分片的正式集合必须一致，不把缺少 capture 环境的候选记为正式回归失败。
+
 ## 共享初始化合同
+
+### 正式回放契约维护（2026-10-15）
+
+TUI 的输入与 Enter 分开执行：使用终端粘贴协议并等待本次输入内容绘制，不能把动画产生的新帧当成输入已完成。命令完成等待其明确回执；终端增量绘制可能只输出占位文字的变化后缀，不要求完整占位文字重复出现。
+
+Provider 允许合并相邻 system 消息；incoming reminder 在 wire 中校验全文、角色和唯一性，不要求独占 system text block。user 的 system-reminder 包装仍要求完整独立 block 和成对标签。
+
+项目新建 helper 仅等待主 pane 的唯一空草稿；辅助对话的输入框可以共存，不计入主 pane 的切换判定。
+
+营销触达属于全局应用界面，隔离 fixture 预置已完成职业引导的账号，防止启动弹窗抢占引导焦点；冷启动后等待应用设置入口就绪，不要求激活固定项目。窗口恢复到未选项目草稿时，固定 cwd 的等待会错误终止 beforeEach，令整份营销用例无法继续。
+
+- Coding Plan 数据面代理按当前 worker 的 spec 启动，位于上游回放网络配置之后、HOME 播种之前。混合批次包含 ToolSearch 时，只让 ToolSearch worker 使用自己的 capture proxy，不能关闭其他 worker 的账号模型回放。
+
+- 团队 Provider 共用 Provider ID，模型菜单项按完整团队连接身份分组；专项 helper 由夹具传入连接 key，不能仍用 `registry-provider:<id>` 定位团队行。空白 Composer 不保存未提交改选；跨任务或重启验证未提交选择时，保留非空文字草稿。
+
+- Plugin mention 图标改由 CSS 装饰变量渲染后，读取 `--mention-image` 的实际 URL；不再查找已移除的子 `img`。商店试用会创建独立草稿，后续固定 cwd 用例须重新准备夹具项目。
+
+- 测试应用产物必须独立于共享 `out`：使用写时复制（文件系统不支持时正常复制），不能硬链接。源构建被 `tsc -b` 原地覆盖或单个隔离副本被测试写入时，其他回放副本必须保持不变。类型检查后须重新执行 E2E 构建，不能复用被 TypeScript emit 覆盖的 Host 入口。
+
+I68 专项必须显式提供四档 reasoning Option Spec 及请求协议映射；不再依赖退役的 Agent catalog 补全。模型编辑器的继承测试需移除通用 replay 的 `disabled` 精确覆盖，保留当前推荐配置，并在每次重新打开时显式展开高级区。
+
+推理 Option Spec 的 `values` 按低到高排列，末项是主动切换模型时的默认最高档；I20 夹具显式提供其断言的 `off/low/high/max`，不能沿用旧的默认值置首规则。官方插件只读 profile 的覆盖测试使用当前 `documents:visual-judge`，不再查找已退役的 `document-skills:judge`。
+
+Subagent 保存后先关闭表单，再异步刷新列表。再次编辑须等行恢复 `role="button"`，不能只等行存在就点击仍在刷新、未绑定编辑事件的行。
+
+正式设置用例以稳定身份匹配入口：I23/I24 从 BigModel Template 新建 Personal Provider，并按新实例 ID 核对 API Key 与模型水合，不查询已退役的 Family API Key 连接项。Subagent 作用域按 `data-plugin-scope-key` 选择 `user` 或目标 workspace key；显示名包含设备信息，不能用裸项目名判断身份。MCP 正式用例复用 V4 初始化，保留真实 Agent 协商和 wire 断言。
+
+后台任务的 telemetry 采集按 case 重置 HTTP mock 与 ARMS 缓冲；不能复用跨 case 游标，否则未做 telemetry 断言的中间用例也会计入下一条的精确数量断言。
+
+后台任务行的可见性使用浏览器原生 `checkVisibility`。V4 的 `display: contents` 祖先没有自己的布局盒，但不会隐藏子节点；不能逐层要求祖先拥有非零矩形，否则会把可见的 running/stop 控件误判为消失。
+
+正式用例的准备数据必须满足当前产品契约，不能用降低断言、跳过用例或修改业务逻辑消除失败：
+
+- 固定目录的文件、Hook 和冷恢复场景，通过项目的新建任务入口保持 cwd；全局新建任务仍验证独立目录，不把两种入口混用。
+- 模型偏好必须声明在 fixture 的 `reasoningLevel.values` 中；验证请求思考参数的专项同时提供非空 Option Map，普通回放保持空映射。
+- `/plan` 是 `app-slash:plan` 本地动作；正式 session 身份只要求非空且非 draft，不依赖 `sess_` 前缀。
+- Markdown 选区通过结构化引用进入请求，验证 `<conversation_quote>` 中的来源路径和正文以及历史引用，不再要求旧 `# userselect` 包装。
+- Bot 集成夹具使用项目仓库的 session 创建预留合同；ToolSearch 在真实请求事件到达时采集完整正文，并继续归档 Adapter 的原始 Model IO，不能把事后精简的内存事件统计当成消息正文。
+- 设置页配置 Provider 时先让输入框失焦并核对连接字段落盘，再操作 API 格式菜单。格式是否已选中以菜单的 `data-state=checked` 为准；Personal overlay 缺省可能继承 Template 的协议格式，不能用旧 snapshot 默认值跳过切换。
+- Fork 后 session 身份先切换，模型能力投影随后到达；先等目标能力集合就绪，再断言档位和真实请求，不能把切换瞬间的空集合当作最终能力。
+- 批次失败、单场景通过时，先检查准备、清理和导航 owner 的稳定边界，不增加固定等待时间。权限等真实产品异常保留原断言并列为阻塞。
+
+```text
+case 的目录与模型要求 → 项目入口 / Provider fixture → 当前草稿就绪
+                                                   ↓
+                               真实用户操作 → wire / 持久化 / UI 断言
+```
+
+默认 `env` 回放 Provider 的准备步骤选择 `high`，其 Personal Config 必须同时声明
+`high` / `max` 思考档位；Composer 工具栏专项在其他预设下也必须声明这两个档位。
+不能只播种 `disabled` 后让工具栏选择不存在的选项；普通回放仍使用空参数映射，
+不向请求额外注入真实模型的思考参数。
+
+Coding Plan mock 必须在 launcher 的 `onPrepare` 阶段启动，再通过 `runnerEnv` 向 worker
+传递地址。除具体 spec 名称外，选择器也识别两个已支持的批次入口：
+`test/e2e/**/*.test.ts` 和 `test/e2e/conversation-session/*.test.ts`；比较前统一路径
+分隔符和可选的 `./` 前缀。正式 CI 的目录通配符尚未展开，不能仅依赖其中出现工具名。
+worker 仍按具体 spec 使用或清理 mock 环境，无关 spec 不因本次修复启用 mock。
+
+```text
+launcher 收到批次 glob → onPrepare 启动 mock → runnerEnv 传递地址
+                                                ↓
+worker 收到具体 spec → 按需使用 / 清理 mock 环境 → 执行用例
+```
+
+入口回归必须使用正式目录 glob，并通过 exclude 缩小用例范围；仅跑功能名称 glob
+不能证明 CI 的初始化路径。此合同只涉及 E2E 启动层，不修改生产实现。
+
+`automations-create-manage` 的项目操作使用当前 `automation-project-select` 和
+`role=option`。按 [虚拟项目规格 B18](../superpowers/specs/2026-09-09-virtual-project-design.md)，
+候选来自本地虚拟项目，不再使用会话草稿菜单；隔离 fixture 只应列出 `ZCodeProject`。
+保留创建、编辑、暂停、恢复与删除断言，不把旧「不在项目中工作」入口作为当前表单前置条件。
 
 正式目录下的 spec 使用 `prepareV4ConversationE2E` 把测试带到“可发送的空草稿”；`manual-review/pending` 迁移期候选仍可使用 `prepareConversationE2E`。已转正 spec 不得导入 legacy `helpers/conversation-session.js`：V4 pane/composer/timeline 操作来自 `v4-conversation.ts`，tool block 断言来自 `conversation-session-tool.ts`，provider request 断言来自 `conversation-session-network.ts`。这条边界只收敛 formal 证据实现，不改变 catalog 的产品状态组合。
 
@@ -47,15 +123,28 @@ admission 规则让 legacy helper 或 ledger mismatch 进入 direct-root suite�
 composer 可见，provider 配置完成后直接复用该草稿；只有当前仍绑定已有 session、处于非 draft
 页面或 composer 不存在时，才点击新建任务。
 
+固定文件夹具的准备还必须确认导航 owner 的 cwd 为 `ZCodeProject` 主要目录，并先于 Provider
+初始化完成。该目录上的初始空草稿即使没有项目标签也可复用；不能为补标签重复新建，触发预热
+owner 换代。全局新建按虚拟项目规格 D3 创建独立目录，不能用它初始化固定目录夹具；已有会话、
+其他 cwd 或非空草稿应通过现有项目行的新建入口返回夹具目录。`skipShellReady` 保留调用方
+自备工作区的语义，不强制选择本地夹具。显式 `startNewV4Draft` 仍点击全局新建入口。
+
+工具用例的完全访问准备复用 `switchV4Mode("yolo")`，从当前 V4 composer 的 `data-mode`
+确认命令回流；不得查询旧 Select option 或聚合其他 workspace 的配置来判断当前权限。
+
+窗口尺寸准备复用 `setCurrentElectronRendererContentSize`，按当前 WebDriver URL 选择窗口，
+设置内容区尺寸并按实际 zoom factor 校验 renderer viewport。不得用外框尺寸减固定误差估算内容区。
+后台输出与后台任务响应式用例采用 800px 内容高度，保持原有宽窄断点及滚动断言；
+不依赖宿主显示器能容纳 900/1000px 高窗口。
+
 ```text
-workspace shell ready -> provider setup -> inspect draft
-                                         | ready
-                                         v
-                                  reuse current draft
-                                         |
-                                         | active session / missing composer
-                                         v
-                                  click New Task -> wait draft ready
+workspace shell ready -> inspect fixture project draft
+                              | empty and idle -> reuse
+                              | otherwise -> project New Task
+                              v
+                         provider setup
+                              v
+                         recheck draft -> select model and thought level
 ```
 
 `startNewTask` 仍表示测试步骤中的显式用户动作，必须真实点击新建入口并等待同一组 draft 条件，不能
@@ -134,12 +223,12 @@ conversation-session/<case>.test.ts   canonical formal target 成为当前文件
 
 录制时可以全量 capture；转成 fixture 时只把必要请求纳入合同。
 
-| 分类 | 含义 | 处理 |
-| --- | --- | --- |
-| `main` | case 核心断言依赖的请求，例如 edit rerun、compact summary、goal verifier | 放入 case-local fixture |
-| `common` | 多个 case 稳定需要的辅助请求，例如标题生成 | 放入 common fixture |
-| `ignore` | capture 中出现但不属于测试合同的请求 | 不进入 case-local fixture，必要时在 manifest 说明 |
-| `synthetic` | 真实 capture 不稳定或不能构造的时序/故障，例如慢流、断流、429 | 放入 case-local fixture，并写 `syntheticReason` |
+| 分类        | 含义                                                                     | 处理                                              |
+| ----------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
+| `main`      | case 核心断言依赖的请求，例如 edit rerun、compact summary、goal verifier | 放入 case-local fixture                           |
+| `common`    | 多个 case 稳定需要的辅助请求，例如标题生成                               | 放入 common fixture                               |
+| `ignore`    | capture 中出现但不属于测试合同的请求                                     | 不进入 case-local fixture，必要时在 manifest 说明 |
+| `synthetic` | 真实 capture 不稳定或不能构造的时序/故障，例如慢流、断流、429            | 放入 case-local fixture，并写 `syntheticReason`   |
 
 工具可以基于 marker、path、prompt 内容和请求顺序自动建议分类，但产品语义由开发者 review。
 
@@ -147,12 +236,12 @@ conversation-session/<case>.test.ts   canonical formal target 成为当前文件
 
 不同 case 使用不同回放策略，避免所有测试都被慢流拖慢，也避免性能 case 被一次性 body 回放冲掉价值。
 
-| 策略 | 适用场景 |
-| --- | --- |
-| `fast-text` | 普通功能断言，快速返回即可 |
-| `controlled-stream` | stop、queue、interrupted 等需要稳定 streaming 窗口的 case |
-| `recorded-stream` | 性能、Markdown 渲染、流式节奏相关 case，需要保留真实 `responseEvents` / `responseChunkTimeline` |
-| `fault-stream` | 断流、半包、socket destroy 等故障注入 |
+| 策略                | 适用场景                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `fast-text`         | 普通功能断言，快速返回即可                                                                      |
+| `controlled-stream` | stop、queue、interrupted 等需要稳定 streaming 窗口的 case                                       |
+| `recorded-stream`   | 性能、Markdown 渲染、流式节奏相关 case，需要保留真实 `responseEvents` / `responseChunkTimeline` |
+| `fault-stream`      | 断流、半包、socket destroy 等故障注入                                                           |
 
 synthetic 的 controlled/fault stream 必须说明原因。典型例子：真实模型太快，无法稳定覆盖 stop window。
 
@@ -289,3 +378,16 @@ fault-stream、性能/时序敏感、会污染全局配置或依赖特殊网络/
 6. 提供 `e2e:docker:admit` Docker 准入脚手架，减少维护 preset 和准入文档的重复操作。
 
 后续再补 capture-to-fixture，把 capture artifact 自动转换成待 review 的 main/common/ignore/synthetic 草稿。
+
+### 正式用例当前界面与构建约束
+
+- I68 主输入框使用合并模型菜单及思考滑杆；Subagent 设置继续使用独立档位控件。两处均校验实际档位集合与请求参数。
+- CTP-02B 在头像菜单内验证 Team 标签；设置页批次在每条准备前关闭上一条遗留的设置层。
+- MP-UI-06 遵循 Todo141：默认显示 ID、上下文和最大输出，高级配置默认折叠，经点击展开后验证能力勾选框、推理编辑和保存。
+- I24 的模型控件使用共享 custom: 编解码；不把协议 provider/model 值当成界面值，也不通过手动选模绕过自动水合断言。
+- CLH-02 对目标 Host 的 setting.json 写入全程注入失败，避免默认单次故障被初始化写入消耗。
+- 分片共享父构建不包含子进程动态网页 mock origin。配置网页 mock 的 child 必须在分配端口后重建；从构建到复制隔离产物全程持有共享构建锁。普通无 mock 的 child 可复用父构建。
+
+```text
+child 分配 mock 端口 → 获得构建锁 → 编译对应 origin → 复制隔离产物 → 释放锁 → 回放
+```

@@ -7,7 +7,7 @@
 
 这样可以保证之后两端互不影响：手机端切主题只改手机浏览器本地存储，桌面端切主题只改桌面 renderer 的本地存储。
 
-手机端任务列表页和聊天页顶部 header 右侧都渲染 `WebRemoteControlThemeMenu`。菜单只暴露 `system`、`zai-dark`、`zai-light`，其中 `zai-dark` / `zai-light` 分别显示为 Dark Theme / Light Theme。
+手机端任务首页与桌面共用项目侧栏，主题入口在侧栏底部设置菜单的主题子菜单中；聊天页顶栏右侧渲染 `WebRemoteControlThemeMenu`。两者使用同一组选项：只暴露 `system`、`zai-dark`、`zai-light`，其中 `zai-dark` / `zai-light` 分别显示为 Dark Theme / Light Theme。
 
 ## 浏览器表面同步
 

@@ -34,6 +34,26 @@ function fixture(options: { keys?: unknown[]; created?: unknown; organizations?:
 }
 
 describe("专用 Key 管理兼容契约", () => {
+  it.each(["bigmodel", "zai"] as const)(
+    "%s 身份读取使用裸 token，Key 管理和签发保留各自格式",
+    async (family) => {
+      for (const isTeam of [false, true]) {
+        const f = fixture({ created: isTeam ? teamKey : personalKey });
+        await expect(
+          f.client.resolve({ ...scope, family, ...(isTeam ? { team } : {}) }),
+        ).resolves.toMatchObject({ token: "short-token" });
+        const customer = f.request.mock.calls.find(([url]) => url.endsWith("/getCustomerInfo"))!;
+        expect(new Headers(customer[1].headers).get("authorization")).toBe("login");
+        for (const [, init] of f.request.mock.calls.filter(([url]) => url.endsWith("/api_keys")))
+          expect(new Headers(init.headers).get("authorization")).toBe(
+            !isTeam && family === "zai" ? "Bearer login" : "login",
+          );
+        const issue = f.request.mock.calls.find(([url]) => url.endsWith("/access_tokens"))!;
+        expect(new Headers(issue[1].headers).get("authorization")).toBe("Bearer login");
+      }
+    },
+  );
+
   it.each([
     { ...teamKey, name: "other" },
     { ...teamKey, keyType: 1 },

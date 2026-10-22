@@ -4,7 +4,7 @@ import {
   TID_V4_BACKGROUND_WORK_CANCEL,
   TID_V4_BACKGROUND_WORK_ITEM,
   TID_V4_SUBAGENT_OPEN_SIDE_PANE,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData } from "../helpers/desktop-app.js";
 import { waitForToolCallBlockByToolName } from "../helpers/conversation-session-tool.js";
 import {

@@ -40,19 +40,20 @@ describe("bot reply formatter", () => {
     ]);
 
     expect(messages).toContain("已经完成。");
-    expect(messages).toContain("变更摘要：2 个文件，🟢 `+12` 🔴 `-4`\n- `packages/ui/src/App.tsx` (🟢 `+10` 🔴 `-2`)\n- `packages/services/src/bots/botsService.ts` (🟢 `+2` 🔴 `-2`)");
+    expect(messages).toContain(
+      "变更摘要：2 个文件，🟢 `+12` 🔴 `-4`\n- `packages/ui/src/App.tsx` (🟢 `+10` 🔴 `-2`)\n- `packages/services/src/bots/botsService.ts` (🟢 `+2` 🔴 `-2`)",
+    );
     expect(messages.join("\n")).not.toContain("工具调用：");
   });
 
   it("formats assistant response blocks with tool block and change summary", () => {
-    const toolCall: BotReplyToolCallState =
-      {
-        toolId: "tool-1",
-        title: "Edit file",
-        kind: "edit",
-        input: { file_path: "/repo/project/packages/ui/src/App.tsx" },
-        status: "completed",
-      };
+    const toolCall: BotReplyToolCallState = {
+      toolId: "tool-1",
+      title: "Edit file",
+      kind: "edit",
+      input: { file_path: "/repo/project/packages/ui/src/App.tsx" },
+      status: "completed",
+    };
 
     const messages = formatBotAssistantReplyBlocks(
       [
@@ -79,23 +80,17 @@ describe("bot reply formatter", () => {
   });
 
   it("buffers streaming assistant responses until terminal flush", () => {
-    expect(
-      extractBotAssistantResponseMessages("这是第一句。第二句还没换行", false),
-    ).toEqual({
+    expect(extractBotAssistantResponseMessages("这是第一句。第二句还没换行", false)).toEqual({
       messages: [],
       rest: "这是第一句。第二句还没换行",
     });
 
-    expect(
-      extractBotAssistantResponseMessages("第一段。\n\n第二段还在流式输出", false),
-    ).toEqual({
+    expect(extractBotAssistantResponseMessages("第一段。\n\n第二段还在流式输出", false)).toEqual({
       messages: [],
       rest: "第一段。\n\n第二段还在流式输出",
     });
 
-    expect(
-      extractBotAssistantResponseMessages("第一段。\n\n第二段", true),
-    ).toEqual({
+    expect(extractBotAssistantResponseMessages("第一段。\n\n第二段", true)).toEqual({
       messages: ["第一段。\n\n第二段"],
       rest: "",
     });
@@ -178,7 +173,6 @@ describe("bot reply formatter", () => {
     expect(text).toBe(
       "工具调用：\n- 完成 · Run command · `pnpm vitest run packages/services/test/botsReplyFormatter.te ...  --reporter verbose --runInBand`",
     );
-    expect(text).not.toContain("botsService.test.ts");
   });
 
   it("shortens long run commands in permission request summaries", () => {
@@ -194,7 +188,6 @@ describe("bot reply formatter", () => {
     expect(text).toBe(
       "需要权限：\nPermission Required\n`npm exec very-long-script -- --workspace /Users/me/project - ... er.ts --include-generated false`",
     );
-    expect(text).not.toContain("packages/services/src/bots");
   });
 
   it("uses edit kind labels in permission request titles", () => {

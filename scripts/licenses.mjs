@@ -13,6 +13,11 @@
 // - 商用/半开放检查作用于全量实装包（prod+dev）
 import { generateThirdPartyNotices } from "./generate-third-party-notices.mjs";
 import { readVerifiedNotices } from "./third-party-notices.mjs";
+import {
+  isReviewedLegacyLicense,
+  isReviewedBundledFontLicense,
+  legacyLicenseIdentifier,
+} from "./license-identifiers.mjs";
 import { readFile } from "node:fs/promises";
 import {
   readWorkspaceProductionGraph,
@@ -52,7 +57,9 @@ for (const [key, { pkg }] of scanned) {
   installed.set(key, {
     name: pkg.name,
     version: pkg.version,
-    license: normLicense(pkg.license ?? pkg.licenses ?? MANUAL_LICENSE[pkg.name]),
+    license: normLicense(
+      pkg.license ?? pkg.licenses ?? legacyLicenseIdentifier(pkg) ?? MANUAL_LICENSE[pkg.name],
+    ),
     isProd: required.has(key),
   });
 }
@@ -113,7 +120,8 @@ function weakAllowReason(r) {
 if (command === "check") {
   const bad = [];
   for (const r of installed.values()) {
-    if (r.bucket === "green") continue;
+    if (r.bucket === "green" || isReviewedLegacyLicense(r) || isReviewedBundledFontLicense(r))
+      continue;
     if (r.bucket.startsWith("yellow") && weakAllowReason(r)) continue;
     bad.push(r);
   }

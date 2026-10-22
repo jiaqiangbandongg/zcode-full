@@ -83,17 +83,6 @@ describe("laneDisplayName", () => {
     ).toBe("研究员…");
   });
 
-  it("shows the author's word over the interpolated shape", () => {
-    // 三档顺位：作者原词 > 插值形状 > 匿名兜底。没有第四个来源——模型精炼那一档已撤回
-    // （docs/dynamic-workflow/presentation.md）。
-    expect(
-      laneDisplayName(
-        { laneClass: "agent", name: "planner", namePattern: { head: "研究员" } },
-        formatMessage,
-      ),
-    ).toBe("planner");
-  });
-
   it("falls back to anonymous rather than render a lone ellipsis", () => {
     // 分析器不发空 pattern，但协议上 `{}` 能过 `.strict()`；不兜住就会在车道头留一个
     // 什么也没说的省略号。

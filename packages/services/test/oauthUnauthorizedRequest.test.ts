@@ -2,8 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   isCurrentOAuthCredentialRequest,
   isOAuthBusinessRequest,
+  resolveOAuthBusinessCredentialValidationRequest,
 } from "#src/oauth/oauthUnauthorizedRequest.js";
 import { createNodeApiClient } from "#src/providers/api/nodeApiClient.js";
+import {
+  createBigModelLoginAuthHeaders,
+  createZaiLoginAuthHeaders,
+} from "#src/coding-plan-subscription/bigmodelCodingPlanSubscriptionProvider.js";
 
 function createFixture(provider = "zai", env: NodeJS.ProcessEnv = { ZCODE_ENV: "production" }) {
   const credentials = new Map([
@@ -23,12 +28,77 @@ function createFixture(provider = "zai", env: NodeJS.ProcessEnv = { ZCODE_ENV: "
     fetchImpl,
     isZcodeJwtRequest: observe,
     isBusinessUnauthorizedRequest: observeBusiness,
+    resolveBusinessCredentialValidationRequest: (input, headers) =>
+      resolveOAuthBusinessCredentialValidationRequest({ input, headers, credentialService, env }),
     onZcodeJwtInvalid: notified,
   });
   return { credentials, credentialService, observe, notified, fetchImpl, client };
 }
 
 describe("当前 App 登录凭据的 HTTP 401 识别", () => {
+  it.each(["bigmodel", "zai"])("%s 身份核验与既有裸 token helper 保持一致", async (provider) => {
+    const f = createFixture(provider);
+    const token = `${provider}-business-token`;
+    const origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
+    const expected =
+      provider === "bigmodel"
+        ? createBigModelLoginAuthHeaders(token)
+        : createZaiLoginAuthHeaders(token);
+    for (const prefix of ["", "Bearer "]) {
+      const check = await resolveOAuthBusinessCredentialValidationRequest({
+        input: origin + "/api/biz/subscription/enterprise/v2/pricing",
+        headers: new Headers({ Authorization: prefix + token }),
+        credentialService: f.credentialService,
+      });
+      expect(check?.authorization).toBe(expected.Authorization);
+    }
+  });
+  it.each(["bigmodel", "zai"])(
+    "%s PAT/支付使用当前业务 token 的明确401均识别",
+    async (provider) => {
+      const f = createFixture(provider),
+        origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
+      for (const path of [
+        "/api/biz/v1/organization/org/projects/project/api_keys/key/access_tokens",
+        "/api/biz/pay/preview",
+        "/api/pay/stripe/pay",
+      ]) {
+        await f.client.request(origin + path, {
+          headers: { Authorization: `Bearer ${provider}-business-token` },
+        });
+      }
+      expect(f.notified).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it("BigModel 身份空200确认失效，ZAI 空200不作同样推断", async () => {
+    for (const provider of ["bigmodel", "zai"]) {
+      const f = createFixture(provider),
+        origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
+      f.fetchImpl.mockResolvedValueOnce(new Response(""));
+      await f.client.request(origin + "/api/biz/customer/getCustomerInfo", {
+        headers: { Authorization: provider + "-business-token" },
+      });
+      expect(f.notified.mock.calls.length).toBe(provider === "bigmodel" ? 1 : 0);
+      expect(f.fetchImpl).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("核验材料构造期间切换平台，不把旧 token 发往新平台", async () => {
+    const f = createFixture("bigmodel");
+    let reads = 0;
+    f.credentialService.load.mockImplementation(async (key) => {
+      const value = f.credentials.get(key) ?? null;
+      if (key === "oauth:active_provider" && ++reads === 3) f.credentials.set(key, "zai");
+      return value;
+    });
+    const request = await resolveOAuthBusinessCredentialValidationRequest({
+      input: "https://bigmodel.cn/api/biz/subscription/enterprise/v2/pricing",
+      headers: new Headers({ Authorization: "bigmodel-business-token" }),
+      credentialService: f.credentialService,
+    });
+    expect(request).toBeNull();
+  });
   it.each([
     ["bigmodel", "https://bigmodel.cn/api/biz/customer/getCustomerInfo"],
     ["zai", "https://api.z.ai/api/biz/customer/getCustomerInfo"],
@@ -49,16 +119,10 @@ describe("当前 App 登录凭据的 HTTP 401 识别", () => {
   });
 
   it.each([
-    "https://api.z.ai/api/biz/pay/preview",
-    "https://api.z.ai/api/pay/stripe/pay",
-    "https://api.z.ai/api/biz/subscription/enterprise/v2/order/calculate",
-    "https://api.z.ai/api/biz/v1/organization/org/projects/project/api_keys",
-    "https://api.z.ai/api/biz/v1/organization/org/projects/project/api_keys/copy/key",
     "https://api.z.ai/api/anthropic/v1/messages",
     "https://untrusted.example/api/biz/customer/getCustomerInfo",
     "https://api.z.ai.evil.example/api/biz/customer/getCustomerInfo",
-    "https://api.z.ai/api/biz/customer/getCustomerInfo/other",
-  ])("不扩散至支付、API key、错误域名/环境或其它路径：%s", async (url) => {
+  ])("不扩散至模型接口、错误域名/环境或非业务路径：%s", async (url) => {
     const fixture = createFixture();
     await fixture.client.request(url, { headers: { Authorization: "Bearer zai-business-token" } });
     expect(fixture.notified).not.toHaveBeenCalled();
@@ -116,10 +180,10 @@ describe("当前 App 登录凭据的 HTTP 401 识别", () => {
     expect(fixture.notified).not.toHaveBeenCalled();
   });
 
-  it.each([403, 500])("HTTP %i 不因业务正文提示过期而登出", async (status) => {
+  it("HTTP 500 不因业务正文提示过期而登出", async () => {
     const fixture = createFixture();
     fixture.fetchImpl.mockResolvedValueOnce(
-      new Response('{"code":401,"msg":"token expired"}', { status }),
+      new Response('{"code":401,"msg":"token expired"}', { status: 500 }),
     );
     await fixture.client.request("https://api.z.ai/api/biz/customer/getCustomerInfo", {
       headers: { Authorization: "zai-business-token" },
@@ -127,33 +191,33 @@ describe("当前 App 登录凭据的 HTTP 401 识别", () => {
     expect(fixture.notified).not.toHaveBeenCalled();
   });
 
-  it.each(["bigmodel", "zai"] as const)(
-    "%s 当前业务 token 的三个接口业务 401 均通知失效",
-    async (provider) => {
-      const fixture = createFixture(provider);
-      const origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
-      for (const path of [
-        "/api/biz/customer/getCustomerInfo",
-        "/api/biz/subscription/enterprise/v2/pricing",
-        "/api/biz/team/subscribe/product/querySubscribeDetail",
-      ]) {
-        fixture.fetchImpl.mockResolvedValueOnce(
-          Response.json({ code: 401, msg: "登录状态已过期", success: false }),
-        );
-        const response = await fixture.client.request(`${origin}${path}`, {
-          headers: { Authorization: `${provider}-business-token` },
-        });
-        expect(await response.json()).toMatchObject({ code: 401 });
-      }
-      expect(fixture.notified).toHaveBeenCalledTimes(3);
-    },
-  );
+  it.each([
+    ["bigmodel", 200],
+    ["bigmodel", 403],
+    ["zai", 200],
+    ["zai", 403],
+  ] as const)("%s HTTP %i 的三个接口业务 401 均通知失效", async (provider, status) => {
+    const fixture = createFixture(provider);
+    const origin = provider === "bigmodel" ? "https://bigmodel.cn" : "https://api.z.ai";
+    for (const path of [
+      "/api/biz/customer/getCustomerInfo",
+      "/api/biz/subscription/enterprise/v2/pricing",
+      "/api/biz/team/subscribe/product/querySubscribeDetail",
+    ]) {
+      fixture.fetchImpl.mockResolvedValueOnce(
+        Response.json({ code: 401, msg: "登录状态已过期", success: false }, { status }),
+      );
+      const response = await fixture.client.request(`${origin}${path}`, {
+        headers: { Authorization: `${provider}-business-token` },
+      });
+      expect(await response.json()).toMatchObject({ code: 401 });
+    }
+    expect(fixture.notified).toHaveBeenCalledTimes(3);
+  });
 
   it.each([
     ["https://api.z.ai/api/biz/customer/getCustomerInfo", "old-token"],
     ["https://api.z.ai/api/biz/subscription/enterprise/v2/pricing", "model-api-key"],
-    ["https://api.z.ai/api/biz/pay/preview", "zai-business-token"],
-    ["https://api.z.ai/api/biz/subscription/enterprise/v2/order/calculate", "zai-business-token"],
     [
       "https://untrusted.example/api/biz/team/subscribe/product/querySubscribeDetail",
       "zai-business-token",

@@ -1,4 +1,4 @@
-import { TID_V4_SUBAGENT_OPEN_SIDE_PANE } from "@zcode/shared";
+import { TID_V4_SUBAGENT_OPEN_SIDE_PANE } from "@zcode/shared/test-ids";
 import { clearAppData } from "../helpers/desktop-app.js";
 import { waitForUpstreamRequest } from "../helpers/conversation-session-network.js";
 import {
@@ -91,7 +91,9 @@ describe("会话区 background subagent 429 错误展示 E2E", () => {
           agent_role: "background subagent",
           tool_name: "Agent",
           status: "fail",
-          error_msg: expect.stringContaining(PROVIDER_ERROR),
+          // 上报按隐私契约移除错误正文；下方 UI/restore 仍验证同一 provider 原文。
+          error_msg: "[redacted]",
+          error_type: "TOOL_EXEC_ERROR",
           model_request_count: "0",
           token_usage_scope: "",
           total_tokens: "0",

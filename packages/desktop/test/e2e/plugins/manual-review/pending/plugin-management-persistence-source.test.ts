@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared";
+import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -85,8 +85,8 @@ describe("PLM-LC-004/005 插件持久化、跨本地 workspace 与来源孤立 E
     ).toBe(true);
 
     await openManageView();
-    await waitForPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_LIFECYCLE_ID });
-    await clickPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_LIFECYCLE_ID });
+    await waitForPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_LIFECYCLE_ID });
+    await clickPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_LIFECYCLE_ID });
     await waitForPluginControl("plugin-store-source-degraded", {
       pluginId: PLUGIN_LIFECYCLE_ID,
     });

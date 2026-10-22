@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ZCodeTaskMeta } from "@zcode/shared";
-import { GroupedTaskRow } from "@/workspace-grouped-tasks/task-row.js";
+import type { ProjectTask as ZCodeTaskMeta } from "@/project-sidebar/contract.js";
+import { SidebarTooltipProvider } from "@/ControlHintTooltip.js";
+import { GroupedTaskRow } from "@/project-sidebar/grouped/task-row.js";
 import { attachTaskListRowActivity } from "@/v4/taskListRowActivity.js";
 
 vi.mock("@/i18n/IntlProvider.js", () => ({
@@ -56,6 +57,8 @@ vi.mock("@/useTaskListItemContextActions.js", () => ({
 
 function createTaskMeta(overrides: Partial<ZCodeTaskMeta> = {}): ZCodeTaskMeta {
   return {
+    hostId: "local",
+    projectId: null,
     taskId: "grouped-task-permission",
     traceId: "trace-grouped-task-permission",
     title: "Grouped 等待确认",
@@ -94,21 +97,25 @@ function renderGroupedTaskRow(
   );
 
   return renderToStaticMarkup(
-    createElement(GroupedTaskRow, {
-      task,
-      groups: [],
-      activeWorkspacePath: task.workspacePath,
-      activeWorkspaceIdentity: task.workspaceIdentity,
-      activeTaskId: null,
-      workspaceLabel: "workspace",
-      onSelectTask: () => {},
-      onCloseTask: () => {},
-      onMoveTaskToGroup: () => {},
-      onMoveTaskToTop: () => {},
-      onStartRenameTask: () => {},
-      onArchiveTask: () => {},
-      onMarkTaskAsUnread: () => {},
-    }),
+    createElement(
+      SidebarTooltipProvider,
+      null,
+      createElement(GroupedTaskRow, {
+        task,
+        groups: [],
+        activeWorkspacePath: task.workspacePath,
+        activeWorkspaceIdentity: task.workspaceIdentity,
+        activeTaskId: null,
+        workspaceLabel: "workspace",
+        onSelectTask: () => {},
+        onCloseTask: () => {},
+        onMoveTaskToGroup: () => {},
+        onMoveTaskToTop: () => {},
+        onStartRenameTask: () => {},
+        onArchiveTask: () => {},
+        onMarkTaskAsUnread: () => {},
+      }),
+    ),
   );
 }
 

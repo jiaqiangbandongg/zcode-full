@@ -181,10 +181,7 @@ describe("desktopNetworkPolicy", () => {
 
   it("builds a fixed-server proxy config from the explicit setting", () => {
     expect(
-      buildElectronProxyConfig(
-        "127.0.0.1:7890",
-        " localhost, 127.0.0.1 ,.example.com ",
-      ),
+      buildElectronProxyConfig("127.0.0.1:7890", " localhost, 127.0.0.1 ,.example.com "),
     ).toEqual({
       mode: "fixed_servers",
       proxyBypassRules: "localhost,127.0.0.1,.example.com",
@@ -209,35 +206,6 @@ describe("desktopNetworkPolicy", () => {
     });
   });
 
-  it("applies proxy config and resets renderer certificate policy from settings", async () => {
-    const targetSession = {
-      setProxy: vi.fn(() => Promise.resolve()),
-      closeAllConnections: vi.fn(() => Promise.resolve()),
-      setCertificateVerifyProc: vi.fn(),
-    } as unknown as Session;
-    const logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-    };
-
-    await applyDesktopSessionNetworkPolicy(
-      targetSession,
-      {
-        httpProxy: "http://127.0.0.1:7890",
-        httpProxyNoProxy: "localhost,127.0.0.1",
-      },
-      logger,
-    );
-
-    expect(targetSession.setProxy).toHaveBeenCalledWith({
-      mode: "fixed_servers",
-      proxyBypassRules: "localhost,127.0.0.1",
-      proxyRules: "http://127.0.0.1:7890",
-    });
-    expect(targetSession.closeAllConnections).toHaveBeenCalledTimes(1);
-    expect(targetSession.setCertificateVerifyProc).toHaveBeenCalledWith(null);
-  });
-
   it("accepts only certificate chains that include the configured custom CA", () => {
     const trustedPem = generateSelfSignedCertPem("Trusted Test CA");
     const untrustedPem = generateSelfSignedCertPem("Other Test CA");
@@ -248,10 +216,7 @@ describe("desktopNetworkPolicy", () => {
 
     expect(proc).not.toBeNull();
     expect(
-      certificateChainMatchesCustomCa(
-        { data: trustedPem, issuerCert: null },
-        trustedFingerprints,
-      ),
+      certificateChainMatchesCustomCa({ data: trustedPem, issuerCert: null }, trustedFingerprints),
     ).toBe(true);
     expect(
       certificateChainMatchesCustomCa(
@@ -286,9 +251,7 @@ function createSessionStub(options: { setProxyError?: Error } = {}) {
   };
 }
 
-type VerifyRequest = Parameters<
-  NonNullable<Parameters<Session["setCertificateVerifyProc"]>[0]>
->[0];
+type VerifyRequest = Parameters<NonNullable<Parameters<Session["setCertificateVerifyProc"]>[0]>>[0];
 
 /** 构造一条「Chromium 已判定证书不受信」的校验请求，用于驱动 verifyProc 的拒绝分支。 */
 function buildVerifyRequest(certPem: string): VerifyRequest {

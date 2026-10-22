@@ -353,7 +353,9 @@ describe("windowControllerTaskListRegistry", () => {
       },
     });
     await Promise.resolve();
-    expect(registry.getRevision()).toBe(pinnedRevision);
+    // 来源快照需要通知观察恢复，但不直接失效普通列表查询。
+    expect(registry.getRevision()).toBe(pinnedRevision + 1);
+    expect(registry.getSourceRevision()).toBe(2);
     await registry.list(
       "timeline:/work/demo",
       { controllerRevision: pinnedRevision, taskListVersionSignature: "1" },
@@ -372,4 +374,45 @@ describe("windowControllerTaskListRegistry", () => {
     expect(listTaskList).not.toHaveBeenCalled();
     dispose();
   });
+});
+
+it("项目活动读取复用 Controller 快照，过滤离线来源且不输出任务事实", async () => {
+  const frames = new Emitter<WindowHostControllerFrame>();
+  const controller = {
+    onDynamicControllerFrame: () => frames.event,
+    subscribeControllerV4: async ({ topic }: { topic: string }) => ({
+      ack: { subscriptionId: topic, mode: "snapshot", logEpoch: "e" },
+    }),
+    unsubscribeControllerV4: async () => undefined,
+  } as unknown as IWindowControllerService;
+  const registry = getWindowControllerTaskListRegistry(controller);
+  const stop = registry.subscribe(() => {});
+  const live = {
+    ...taskRow(),
+    activity: { phase: "running" as const, lastActivityAt: 12, hasBackgroundWork: false },
+  };
+  const offline = {
+    ...live,
+    address: {
+      taskId: "task-1",
+      workspacePath: "/work/demo",
+      workspaceIdentity: "remote:server:other:/work/demo",
+    },
+    sourceAvailability: "offline" as const,
+  };
+  frames.fire({
+    topic: CONTROLLER_TASKS_INDEX_TOPIC,
+    subscriptionId: CONTROLLER_TASKS_INDEX_TOPIC,
+    logEpoch: "e",
+    fromSeq: 0,
+    toSeq: 0,
+    sentAt: 1,
+    payload: {
+      kind: "snapshot",
+      snapshot: { protocolVersion: 1, logEpoch: "e", tasks: [live, offline] },
+    },
+  });
+  expect(registry.readActivities()).toEqual([{ address: live.address, activity: live.activity }]);
+  stop();
+  expect(registry.readActivities()).toEqual([]);
 });

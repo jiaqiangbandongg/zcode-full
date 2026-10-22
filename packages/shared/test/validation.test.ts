@@ -4,10 +4,46 @@ import {
   appSettingsSchema,
   appSettingsPatchSchema,
   hostIncomingMessageSchema,
+  webRemoteControlAppPayloadSchema,
   hostResponseMessageSchema,
   wslConnectOptionsSchema,
   zcodePersistedMessageSchema,
 } from "../src/validation.js";
+
+it("PD01 手机任务草稿身份通过两层协议，且不能注入路径或混用项目", () => {
+  const intent = {
+    projectId: null,
+    draftId: "12345678-1234-4234-8234-123456789012",
+    reuseDraft: true,
+  };
+  const bridge = {
+    zcode_type: "workspace-bridge-open",
+    requestId: "draft",
+    bridgeSessionId: "bridge",
+    workspaceKey: "draft",
+    project: intent,
+  };
+  const host = {
+    type: "prepare-project-workspace",
+    requestId: "draft",
+    clientMode: "web-remote-replayable",
+    ...intent,
+  };
+  expect(webRemoteControlAppPayloadSchema.safeParse(bridge).success).toBe(true);
+  expect(hostIncomingMessageSchema.safeParse(host).success).toBe(true);
+  for (const invalid of [
+    { draftId: "../escape" },
+    { projectId: "project" },
+    { draftId: undefined },
+    { workspacePath: "/injected" },
+  ]) {
+    expect(
+      webRemoteControlAppPayloadSchema.safeParse({ ...bridge, project: { ...intent, ...invalid } })
+        .success,
+    ).toBe(false);
+    expect(hostIncomingMessageSchema.safeParse({ ...host, ...invalid }).success).toBe(false);
+  }
+});
 
 it("资源查询取消必须指定 requestId 且不接受附加字段", () => {
   const cancel = { type: "resource-usage-snapshot-cancel", requestId: "sample-1" };
@@ -337,10 +373,16 @@ describe("hostResponseMessageSchema", () => {
         remoteCdnBaseUrl: "",
         remoteCdnBaseUrls: ["https://cdn.codegeex.cn/zcode/electron/releases/0.0.0-test"],
         remoteCacheDir: "/tmp/remote-cache",
+        sourceServerArtifactPolicy: "development-content-addressed",
       },
     });
 
     expect(parsed.success).toBe(true);
+    if (parsed.success && parsed.data.type === "connect-remote-workspace") {
+      expect(parsed.data.remoteAssets.sourceServerArtifactPolicy).toBe(
+        "development-content-addressed",
+      );
+    }
   });
 
   it("accepts encrypted SSH private key passphrase in window Host connect payload", () => {
@@ -752,6 +794,7 @@ describe("hostResponseMessageSchema", () => {
       {
         kind: "remote",
         workspacePath: "/workspace/demo",
+        workspacePurpose: "project",
         target: {
           kind: "docker",
           container: "demo",
@@ -812,20 +855,45 @@ describe("hostResponseMessageSchema", () => {
     }
     expect(sessionEntry.target).not.toHaveProperty("resourcePackages");
   });
+});
 
-  it("drops retired ZCode Agent proxy settings from legacy settings files", () => {
-    const parsed = appSettingsSchema.safeParse({
-      recentProjects: [],
-      locale: "zh-CN",
-      retiredProxyUrl: "127.0.0.1:7890",
-      retiredProxyUseSystemCa: true,
-      retiredProxyCaCertPath: "C:\\Users\\test\\proxy-ca.pem",
-    });
-
-    expect(parsed.success).toBe(true);
-    if (!parsed.success) return;
-    expect(parsed.data).not.toHaveProperty("retiredProxyUrl");
-    expect(parsed.data).not.toHaveProperty("retiredProxyUseSystemCa");
-    expect(parsed.data).not.toHaveProperty("retiredProxyCaCertPath");
-  });
+it("项目导航 IPC 只接受项目意图与可信手机模式，不接受客户端目录/scope", () => {
+  const request = {
+    type: "prepare-project-workspace",
+    requestId: "navigation",
+    projectId: "p",
+    hostId: "remote:server:s",
+    clientMode: "web-remote-replayable",
+  };
+  expect(hostIncomingMessageSchema.safeParse(request).success).toBe(true);
+  expect(
+    hostIncomingMessageSchema.safeParse({ ...request, workspacePath: "/injected" }).success,
+  ).toBe(false);
+  expect(
+    hostIncomingMessageSchema.safeParse({ ...request, clientMode: "desktop-continuous" }).success,
+  ).toBe(false);
+  expect(
+    hostResponseMessageSchema.safeParse({
+      type: "project-workspace-prepared",
+      requestId: "navigation",
+      result: {
+        ok: true,
+        value: {
+          hostId: "remote:server:s",
+          projectId: "p",
+          workspacePath: "/root",
+          workspaceIdentity: "remote:server:s:/root",
+          additionalDirectories: [],
+          remote: {
+            sourceServerId: "s",
+            remoteSessionId: "scope",
+            generation: 1,
+            target: { kind: "server", serverId: "s", url: "http://source" },
+            workspacePath: "/root",
+            workspaceIdentity: "remote:server:s:/root",
+          },
+        },
+      },
+    }).success,
+  ).toBe(true);
 });

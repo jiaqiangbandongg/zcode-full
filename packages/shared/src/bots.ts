@@ -81,6 +81,10 @@ export interface BotWorkspaceRef {
   label: string;
   workspacePath: string;
   workspaceIdentity?: string;
+  /** 新版选择虚拟项目；旧协议字段名保留。空 roots 在提交时才分配 cwd。 */
+  projectId?: string;
+  hostId?: string;
+  rootPaths?: string[];
 }
 
 export interface BotAllowedCommands {
@@ -185,6 +189,10 @@ export interface BotState {
   workspacePath: string;
   workspaceIdentity?: string;
   workspaceId?: string;
+  /** hostId 缺席表示旧状态待交接；明确 NULL 项目不会再次按目录归入。 */
+  projectId?: string | null;
+  hostId?: string;
+  additionalDirectories?: string[];
   mode: BotContextMode;
   activeTaskId: string | null;
   draftOptions?: BotDraftOptions;
@@ -865,6 +873,9 @@ export const botsStateFileSchema = z
         workspacePath: z.string().min(1),
         workspaceIdentity: z.string().min(1).optional(),
         workspaceId: z.string().min(1).optional(),
+        projectId: z.string().min(1).nullable().optional(),
+        hostId: z.string().min(1).optional(),
+        additionalDirectories: z.array(z.string().min(1)).max(256).optional(),
         mode: z.enum(["draft", "task"]),
         activeTaskId: z.string().min(1).nullable(),
         draftOptions: botDraftOptionsSchema.optional(),

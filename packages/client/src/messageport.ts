@@ -24,6 +24,7 @@ export interface MessagePortServiceConnection {
  */
 export function createMessagePortServiceConnection(
   port: MessagePort,
+  options: { sourceServerManagementService?: boolean } = {},
 ): MessagePortServiceConnection {
   logMessagePortDebug("[messageport] creating protocol and client...");
   const protocol = new MessagePortProtocol(port);
@@ -33,7 +34,7 @@ export function createMessagePortServiceConnection(
   });
   logMessagePortDebug("[messageport] client created, waiting for Initialize...");
 
-  const services = new RemoteServiceAccess(client);
+  const services = new RemoteServiceAccess(client, options);
   let disposed = false;
   return {
     services,
@@ -54,6 +55,9 @@ export function createMessagePortServiceConnection(
  * Desktop 模式下，utilityProcess（或 main 进程的远程代理）通过 MessagePort
  * 暴露 ChannelServer，renderer 用此函数建立 ChannelClient 连接。
  */
-export function connectViaMessagePort(port: MessagePort): IServiceAccessor {
-  return createMessagePortServiceConnection(port).services;
+export function connectViaMessagePort(
+  port: MessagePort,
+  options: { sourceServerManagementService?: boolean } = {},
+): IServiceAccessor {
+  return createMessagePortServiceConnection(port, options).services;
 }

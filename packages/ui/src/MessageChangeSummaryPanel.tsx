@@ -4,7 +4,7 @@ import type {
   ZCodeTaskChangeSummary,
   ZCodeTurnFileState,
 } from "@zcode/shared";
-import { TID_CHAT_CHANGE_SUMMARY_TOGGLE_FILES_BUTTON, testId } from "@zcode/shared";
+import { TID_CHAT_CHANGE_SUMMARY_TOGGLE_FILES_BUTTON, testId } from "@zcode/shared/test-ids";
 import { ChevronRightIcon, Undo2 } from "lucide-react";
 import {
   Collapsible,

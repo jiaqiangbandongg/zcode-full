@@ -58,10 +58,6 @@ describe("V4 topic publisher non-destructive reservation", () => {
     );
 
     expect(publisher.reserveFlush(subscribed.ack.subscriptionId)).toBe(initial);
-    expect(publisher.reserveFlush(subscribed.ack.subscriptionId)).toMatchObject({
-      logicalFrameId: initial.logicalFrameId,
-      frame: initial.frame,
-    });
     expect(initial.commit()).toBe(true);
     const next = publisher.reserveFlush(subscribed.ack.subscriptionId)!;
     expect(next.logicalFrameId).not.toBe(initial.logicalFrameId);

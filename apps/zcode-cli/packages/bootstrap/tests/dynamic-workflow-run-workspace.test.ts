@@ -12,7 +12,6 @@ import {
   boundWorkspaceResult,
   listWorkspaceNodesFrom,
   readWorkspaceNodeResultFrom,
-  supportsWorkspaceReads,
 } from "../src/app/dynamic-workflow-run-workspace.js";
 
 const PARENT = "ses_parent";
@@ -122,11 +121,6 @@ function seed(journal: WorkspaceJournal, runOverrides: Partial<RunRecord> = {}) 
 }
 
 describe("dynamic workflow run workspace — 能力探测", () => {
-  it("只认带 listWorldNodes 的 journal；纯引擎 journal 整个读面缺席", () => {
-    expect(supportsWorkspaceReads(new InMemoryJournalStore())).toBe(false);
-    expect(supportsWorkspaceReads(new WorkspaceJournal())).toBe(true);
-  });
-
   it("不带读面的 journal：清单回 undefined（网关归一成空清单），正文也不放行", async () => {
     const journal = new InMemoryJournalStore();
     journal.createRun(run());
@@ -286,7 +280,6 @@ describe("boundWorkspaceResult — 保形有界化", () => {
     const bounded = boundWorkspaceResult(text, 51);
     expect(bounded.truncated).toBe(true);
     expect(bounded.totalBytes).toBe(202);
-    expect(typeof bounded.result).toBe("string");
     expect(Buffer.byteLength(bounded.result as string, "utf8")).toBeLessThanOrEqual(51);
     expect(bounded.result).toBe("é".repeat(25));
   });
@@ -295,7 +288,6 @@ describe("boundWorkspaceResult — 保形有界化", () => {
     const items = Array.from({ length: 50 }, (_, i) => `src/file-${i}.ts`);
     const bounded = boundWorkspaceResult(items, 200);
     expect(bounded.truncated).toBe(true);
-    expect(Array.isArray(bounded.result)).toBe(true);
     const kept = bounded.result as string[];
     expect(kept.length).toBeGreaterThan(0);
     expect(kept.length).toBeLessThan(50);

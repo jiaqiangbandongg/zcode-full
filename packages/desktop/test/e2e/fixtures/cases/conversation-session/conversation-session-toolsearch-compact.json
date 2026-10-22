@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-compact",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-compact.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-toolsearch-compact.json"
+  ],
+  "fileFixtures": [],
+  "providerHarness": "./test/e2e/helpers/toolsearch-cli-process.ts",
+  "requests": [
+    {
+      "id": "conversation-session-toolsearch-compact-auxiliary",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-search",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-todo",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-summary",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-partial-auto",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-partial-reactive",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-compact-done",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-context-error",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-summary-error",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "fault-stream",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    },
+    {
+      "id": "conversation-session-toolsearch-compact-summary-partial",
+      "kind": "synthetic",
+      "source": "synthetic",
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+    }
+  ],
+  "notes": "Case-local responses are consumed by the controlled HTTP harness. Stage selection and cancellation remain in the spec; tools, persistence and provider projection use production paths. Not admitted to Docker."
+}

@@ -39,10 +39,10 @@ Use this reference after `zcode-feature-graph.yaml` when scanning or planning an
 | Session messages and active turn | ZCode Agent runtime/session store | UI projection, task snapshot, replay mirror | protocol event, session snapshot, UI message tree |
 | Task list metadata | Host task sqlite index | UI task list cache, optimistic overlay | `tasks-index.sqlite` row, service list result, UI list |
 | Runtime recovery fields | Host runtime response-time snapshot | Mobile replayable UI store | `getTaskSnapshot.runtime`, stream watermark, pending permission/command UI |
-| Desktop queued prompt | Renderer local store | none durable by default | UI queue item, send/drain logs |
-| Mobile accepted queued prompt | Host runtime command queue | `pendingCommands` snapshot | enqueue ack, owner command, runtime snapshot |
-| Model selected for request | Agent runtime `defaultModelRef` | toolbar value, task config, task meta, workspace default, provider registry | `session/setModel` response, protocol snapshot settings, request/model trace |
-| Provider registry for remote workspace | Local desktop app-global provider service, explicitly synced to remote runtime | remote runtime overlay/cache | registry revision, remote session id, runtime model config |
+| Desktop/mobile accepted queued prompt | One CLI/runtime CommandInbox with serialized admission | client projection and pending optimistic overlay | original command ID, queue/guided/transcript/explicit terminal result, ACK/query and snapshot |
+| Unsubmitted prompt draft | Renderer draft owner | local draft persistence | draft payload and workspace/pane identity; not an accepted queue |
+| Model selected for request | Target Environment ModelFactory creates a Model from the admitted selection and current Registry | toolbar value, session selection, configured default | actual request/model trace; existing Model static facts remain frozen, subsequent ordinary turn creates a new Model |
+| Provider registry for remote workspace | Remote Environment Config, Account Source and Registry | remote Host/Worker Registry instances | target store/Registry revision, remote session id, Model creation; Local-to-Remote Provisioning writes formal stores rather than injecting Registry snapshots |
 | Workspace isolation key | `workspaceIdentity?.trim() || workspacePath` | tab/task/plugin/skill/cache keys | state bucket key, remote identity, path execution target |
 | Theme and locale | Renderer local preference plus broadcast for app windows | DOM classes, settings UI, mobile localStorage | settings value, DOM class, i18n text |
 | Telemetry | Declared event channel owner | transport queue/backend | event payload shape, sampling/aggregation rule, privacy filter |
@@ -55,7 +55,7 @@ Use these as prompts for pairwise coverage. Do not explode every axis; prune wit
 | --- | --- |
 | model switch x active task send x provider registry | Should send wait for pending `session/setModel`, fail fast, or continue with the old runtime model? |
 | model switch x mobile replayable restore | Is restored mobile model display read-only history, active runtime config, or a new switch target? |
-| model/provider x remote workspace reconnect | After remote runtime restarts, which local provider registry revision must be reapplied before send? |
+| model/provider x remote workspace reconnect | Has the new remoteSessionId registered the latest Local-to-Remote provisioning, and which target Registry facts does the next Model read? Keep initial-ready failure and reconnect warning semantics separate. |
 | queue x stop/interrupted x autoDrain | After stop, should queued prompts remain held, auto-drain, or require explicit send-now? |
 | queue x edit/fork/compact | Does the action preserve, discard, copy, or reorder future queued intent? |
 | mobile remote x permission/elicitation | If a phone reconnects after a gap, should pending blockers render from snapshot, stream replay, or both? |

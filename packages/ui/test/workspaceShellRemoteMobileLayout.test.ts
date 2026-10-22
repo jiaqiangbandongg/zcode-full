@@ -40,6 +40,10 @@ vi.mock("@/settings/AutomationsSection.js", () => ({
   AutomationsSection: () => createElement("div", { "data-testid": "automations-section" }),
 }));
 
+vi.mock("@/settings/PluginStorePage.js", () => ({
+  PluginStorePage: () => createElement("div", { "data-testid": "plugin-store-page" }),
+}));
+
 const capturedChatPaneProps: V4ChatPaneProps[] = [];
 
 vi.mock("@/v4/V4ChatPane.js", () => ({
@@ -160,18 +164,28 @@ vi.mock("@/feedback/feedbackStore.js", () => ({
     }),
 }));
 
-vi.mock("@/hooks/usePlatform.js", () => ({
+vi.mock("@/hooks/usePlatform.js", async (importOriginal) => ({
+  // 布局 SSR 没有 PlatformProvider；保留可选读取的真实空边界，避免整模块 mock 漏掉新增 hook。
+  ...(await importOriginal<typeof import("@/hooks/usePlatform.js")>()),
   usePlatform: () => ({
     openCommunity: vi.fn(async () => {}),
     openExternal: vi.fn(),
   }),
+  // DirectoryOwner 的角标同步走 optional 平台；布局测试无 Provider，返回 null 即跳过。
+  useOptionalPlatform: () => null,
 }));
 
 vi.mock("@/hooks/useWorkspaceServices.js", () => ({
   useBaseWorkspaceServices: () => ({}),
+  // 布局断言不启动远端挂回；保留 services resolver 的本地 ready 合同。
+  useWorkspaceServicesResolution: () => ({ services: {}, connectionKind: "local-ready" }),
 }));
 
 vi.mock("@/store/TabStoreProvider.js", () => ({
+  // 项目树（useProjectTree / useProjectTaskNavigation）直接订阅 tab store；
+  // 这里给出最小状态，避免真实侧栏在窄屏分支挂载时缺少 useTabStore。
+  useTabStore: (select: (state: any) => unknown) =>
+    select({ tabs: [], activeWorkspaceIdentity: undefined }),
   useTabStoreApi: () => ({
     getState: () => ({
       activateTabByPath: vi.fn(() => true),
@@ -198,37 +212,51 @@ vi.mock("@/WindowsCaptionMenuButton.js", () => ({
 
 vi.mock("@/WebRemoteControlMobileShell.js", () => ({
   WebRemoteControlMobileShell: ({
+    children,
+    isMobileViewport = true,
     chatContent,
+    renderTaskHome,
     chatOverlay,
     isSidePaneOpen,
     renderChatHeader,
     sidePaneContent,
   }: {
+    children?: ReactNode;
+    isMobileViewport?: boolean;
     chatContent?: ReactNode;
+    renderTaskHome?: (options: {
+      navigateToChat(): void;
+      setSwitching(switching: boolean): void;
+    }) => ReactNode;
     chatOverlay?: ReactNode;
     isSidePaneOpen?: boolean;
     renderChatHeader?: () => ReactNode;
     sidePaneContent?: ReactNode;
   }) =>
-    createElement(
-      "div",
-      {
-        "data-mobile-side-pane-open": isSidePaneOpen ? "true" : "false",
-        "data-testid": "web-remote-mobile-shell",
-      },
-      renderChatHeader?.(),
-      createElement("div", { "data-testid": "mobile-chat-content" }, chatContent),
-      chatOverlay
-        ? createElement("div", { "data-testid": "mobile-chat-overlay-prop" }, chatOverlay)
-        : null,
-      sidePaneContent
-        ? createElement("div", { "data-testid": "mobile-side-pane-overlay" }, sidePaneContent)
-        : null,
-    ),
+    !isMobileViewport
+      ? children
+      : createElement(
+          "div",
+          {
+            "data-mobile-side-pane-open": isSidePaneOpen ? "true" : "false",
+            "data-testid": "web-remote-mobile-shell",
+          },
+          renderChatHeader?.(),
+          renderTaskHome?.({ navigateToChat: vi.fn(), setSwitching: vi.fn() }),
+          createElement("div", { "data-testid": "mobile-chat-content" }, chatContent),
+          chatOverlay
+            ? createElement("div", { "data-testid": "mobile-chat-overlay-prop" }, chatOverlay)
+            : null,
+          sidePaneContent
+            ? createElement("div", { "data-testid": "mobile-side-pane-overlay" }, sidePaneContent)
+            : null,
+        ),
 }));
 
 const capturedWorkspaceSidebarProps = vi.hoisted(() => ({
   props: [] as Array<{
+    workspaceIdentity?: string;
+    workspaceRemoteSessionId?: string;
     onSelectTask: (
       targetWorkspacePath: string,
       taskId: string,
@@ -307,6 +335,7 @@ function createWorkspaceShellProps() {
     isMacDesktop: false,
     isMacFullscreen: false,
     isSidePaneOpen: false,
+    isWorkspaceVisible: true,
     isSidebarVisible: true,
     isTerminalOpen: false,
     isWindowsDesktop: false,
@@ -388,6 +417,47 @@ async function renderWorkspaceShell(
 }
 
 describe("WorkspaceShellLayout Web remote control mobile layout", () => {
+  it.each([
+    { mobile: false, sidePaneOpen: false, workspaceVisible: true, expected: true },
+    { mobile: false, sidePaneOpen: true, workspaceVisible: true, expected: false },
+    { mobile: false, sidePaneOpen: false, workspaceVisible: false, expected: false },
+    { mobile: true, sidePaneOpen: false, workspaceVisible: true, expected: true },
+    { mobile: true, sidePaneOpen: true, workspaceVisible: true, expected: false },
+    { mobile: true, sidePaneOpen: false, workspaceVisible: false, expected: false },
+  ])(
+    "limits default Esc stop to the visible main chat without a side pane: %j",
+    async (scenario) => {
+      capturedChatPaneProps.length = 0;
+      vi.stubGlobal("window", {
+        innerHeight: 800,
+        matchMedia: vi.fn(() => ({
+          addEventListener: vi.fn(),
+          addListener: vi.fn(),
+          matches: scenario.mobile,
+          removeEventListener: vi.fn(),
+          removeListener: vi.fn(),
+        })),
+        sessionStorage: { getItem: vi.fn(() => null), removeItem: vi.fn(), setItem: vi.fn() },
+      });
+      try {
+        await renderWorkspaceShell({
+          isSidePaneOpen: scenario.sidePaneOpen,
+          isWorkspaceVisible: scenario.workspaceVisible,
+          webRemoteControlWorkspaceSwitcher: scenario.mobile
+            ? {
+                listWorkspaces: vi.fn(async () => ({ workspaces: [] })),
+                switchWorkspace: vi.fn(async () => {}),
+              }
+            : undefined,
+        });
+        expect(capturedChatPaneProps).toHaveLength(1);
+        expect(capturedChatPaneProps[0]?.allowEscapeStopOutsidePane).toBe(scenario.expected);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
   // Bugfix: 这些断言只覆盖远控导航纯计算逻辑，直接导入小模块，避免全量并发单测时拉起整页组件。
   it("resolves draggable navigation heights and collapse thresholds", async () => {
     const {
@@ -467,8 +537,11 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     ]);
   });
 
-  // Bugfix: 该断言需要 SSR 整个 WorkspaceShellLayout，full suite 并发时首次组件导入可能超过 5s。
-  // 纯计算逻辑已拆到 webRemoteNavigationLayout，这里只给剩余整页渲染用例留局部余量。
+  // Bugfix: 该断言需要 SSR 整个 WorkspaceShellLayout，renderWorkspaceShell 内的动态 import
+  // 会一次性 transform 整张页面模块图，成本全记在本文件第一个整页用例上（实测冷启动 5s 量级）。
+  // 纯计算逻辑已拆到 webRemoteNavigationLayout。这里曾写死 `}, 15_000)`，但 vitest.config.ts
+  // 全局 testTimeout 已是 30s，per-test 参数是覆盖而非取大，局部值反而把预算砍到 15s 并在
+  // 全量并发时被打穿；故删除局部值，回落到全局 30s。
   it("keeps the hidden sidebar mounted without an outer resizable panel target", async () => {
     const html = await renderWorkspaceShell({ isSidebarVisible: false });
 
@@ -476,7 +549,7 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     expect(html).toContain("--workspace-sidebar-panel-width:0px");
     expect(html).not.toContain('data-panel-id="sidebar"');
     expect(html).not.toContain('data-layout-id="workspace-shell-layout"');
-  }, 15_000);
+  });
 
   it("keeps the desktop Browser Guest host mounted and collapsed on the Automations main view", async () => {
     const html = await renderWorkspaceShell({
@@ -510,7 +583,31 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     });
     expect(chatHtml.match(/data-testid="side-pane-panel"/gu)).toHaveLength(1);
     expect(chatHtml).toContain('data-panel-visible="true"');
-  }, 15_000);
+  });
+
+  it.each([true, false])(
+    "hides retained side panes with an inactive workspace (desktop=%s)",
+    async (isDesktop) => {
+      const html = await renderWorkspaceShell({
+        isDesktop,
+        isSidePaneOpen: true,
+        isWorkspaceVisible: false,
+        workspaceMainView: "chat",
+      });
+      expect(html).toContain('data-panel-visible="false"');
+      expect(html).not.toContain('data-panel-visible="true"');
+    },
+  );
+
+  it("hides the retained side pane on the plugin marketplace main page", async () => {
+    const html = await renderWorkspaceShell({
+      isDesktop: true,
+      isSidePaneOpen: true,
+      workspaceMainView: "plugin-store",
+    });
+    expect(html).toContain('data-panel-visible="false"');
+    expect(html).not.toContain('data-panel-visible="true"');
+  });
 
   it("adds mobile stacking classes only for Web remote control mode", async () => {
     const html = await renderWorkspaceShell({
@@ -520,15 +617,11 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
       },
     });
 
-    expect(html).toContain("max-md:!flex-col");
-    expect(html).toContain("max-md:!flex-1");
     expect(html).not.toContain("max-md:data-[state=collapsed]");
     expect(html).not.toContain('data-layout-id="workspace-shell-layout"');
-    expect(html).toContain("max-md:!w-full");
     expect(html).not.toContain('data-web-remote-navigation-toggle="true"');
     expect(html).toContain('data-web-remote-navigation-resize-handle="true"');
     expect(html).toContain("--web-remote-navigation-height:352px");
-    expect(html).toContain("max-md:!h-[var(--web-remote-navigation-height)]");
     expect(html).toContain('aria-controls="web-remote-control-navigation-panel"');
     expect(html).toContain("webRemoteControl.collapseNavigation");
     expect(html).not.toContain("webRemoteControl.navigationPanel");
@@ -597,43 +690,7 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     });
 
     expect(html).toContain('data-testid="web-remote-mobile-shell"');
-    expect(html).not.toContain('data-testid="workspace-sidebar"');
-
-    vi.unstubAllGlobals();
-  });
-
-  it("keeps mobile remote chat content in a flex height chain", async () => {
-    vi.stubGlobal("window", {
-      innerHeight: 800,
-      matchMedia: vi.fn(() => ({
-        addEventListener: vi.fn(),
-        addListener: vi.fn(),
-        matches: true,
-        removeEventListener: vi.fn(),
-        removeListener: vi.fn(),
-      })),
-      sessionStorage: {
-        getItem: vi.fn(() => null),
-        removeItem: vi.fn(),
-        setItem: vi.fn(),
-      },
-    });
-
-    const html = await renderWorkspaceShell({
-      activeTaskId: null,
-      initialWebRemoteControlMobileNavigationIntent: "chat",
-      webRemoteControlWorkspaceSwitcher: {
-        listWorkspaces: vi.fn(async () => ({ workspaces: [] })),
-        switchWorkspace: vi.fn(async () => {}),
-      },
-      workspaceShellZCodeState: {
-        ...createWorkspaceShellProps().workspaceShellZCodeState,
-        activeTaskId: null,
-      },
-    });
-
-    expect(html).toContain("relative flex h-full min-h-0 min-w-0 flex-1 flex-col");
-    expect(html).not.toContain('class="relative h-full min-h-0"');
+    expect(html).toContain('data-testid="workspace-sidebar"');
 
     vi.unstubAllGlobals();
   });
@@ -741,6 +798,18 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     expect(html).toContain('data-mobile-overlay="true"');
     expect(html).toContain('data-panel-visible="true"');
 
+    const hiddenHtml = await renderWorkspaceShell({
+      isWorkspaceVisible: false,
+      isSidePaneOpen: true,
+      webRemoteControlWorkspaceSwitcher: {
+        listWorkspaces: vi.fn(async () => ({ workspaces: [] })),
+        switchWorkspace: vi.fn(async () => {}),
+      },
+    });
+    expect(hiddenHtml).toContain('data-mobile-overlay="true"');
+    expect(hiddenHtml).toContain('data-panel-visible="false"');
+    expect(hiddenHtml).not.toContain('data-panel-visible="true"');
+
     vi.unstubAllGlobals();
   });
 
@@ -798,11 +867,9 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps the default desktop shell layout classes unchanged", async () => {
+  it("keeps mobile stacking disabled for the default shell", async () => {
     const html = await renderWorkspaceShell();
 
-    expect(html).not.toContain("max-md:!flex-col");
-    expect(html).not.toContain("max-md:[&amp;&gt;[data-panel][id=sidebar]]:!h-[min(42dvh,22rem)]");
     expect(html).toContain('data-mobile-stacked="false"');
   });
 
@@ -920,28 +987,65 @@ describe("WorkspaceShellLayout Web remote control mobile layout", () => {
 
     vi.unstubAllGlobals();
   });
-
-  it("removes the legacy Linux floating chrome", async () => {
-    const html = await renderWorkspaceShell({ isDesktop: true, isMacDesktop: false, isWindowsDesktop: false });
-    expect(html).not.toContain('data-testid="linux-window-controls"');
-    expect(html).not.toContain("w-[120px]");
-    expect(html).toContain("rounded-xl");
-  });
-});
-
-it.each([
-  { isDesktop: true, isMacDesktop: true },
-  { isDesktop: true, isWindowsDesktop: true },
-  { isDesktop: true, isMacDesktop: false, isWindowsDesktop: false },
-])("keeps desktop panel outer padding consistent: %j", async (platform) => {
-  const html = await renderWorkspaceShell(platform);
-  expect(html).toMatch(/id="content"[^>]*p-1 pl-0 pt-0/);
-  expect(html).toContain('class="h-1 w-full [app-region:drag]"');
 });
 
 it("places the workspace header inside the independent conversation frame", async () => {
   const html = await renderWorkspaceShell({ isDesktop: true, isMacDesktop: true });
   expect(html).toContain('data-workspace-conversation-frame="true"');
-  expect(html.indexOf('data-panel-id="conversation-column"')).toBeLessThan(html.indexOf('data-testid="workspace-header"'));
-  expect(html.indexOf('data-workspace-conversation-frame="true"')).toBeLessThan(html.indexOf('data-testid="workspace-header"'));
+  expect(html.indexOf('data-panel-id="conversation-column"')).toBeLessThan(
+    html.indexOf('data-testid="workspace-header"'),
+  );
+  expect(html.indexOf('data-workspace-conversation-frame="true"')).toBeLessThan(
+    html.indexOf('data-testid="workspace-header"'),
+  );
+});
+
+it("项目侧栏保留当前远端 identity 与 attachment，不按相同 cwd 合并", async () => {
+  capturedWorkspaceSidebarProps.props = [];
+  await renderWorkspaceShell({
+    workspaceAbsPath: "/same",
+    workspaceIdentity: "remote:server:one:/same",
+    workspaceRemoteSessionId: "attachment-one",
+  });
+  await renderWorkspaceShell({
+    workspaceAbsPath: "/same",
+    workspaceIdentity: "remote:server:two:/same",
+    workspaceRemoteSessionId: "attachment-two",
+  });
+  expect(
+    capturedWorkspaceSidebarProps.props.map((props) => [
+      props.workspaceIdentity,
+      props.workspaceRemoteSessionId,
+    ]),
+  ).toEqual([
+    ["remote:server:one:/same", "attachment-one"],
+    ["remote:server:two:/same", "attachment-two"],
+  ]);
+});
+
+it("mounts the same project sidebar in the real narrow mobile branch", async () => {
+  vi.stubGlobal("window", {
+    innerHeight: 844,
+    innerWidth: 390,
+    matchMedia: vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    })),
+    sessionStorage: { getItem: vi.fn(() => null), removeItem: vi.fn(), setItem: vi.fn() },
+  });
+  try {
+    const html = await renderWorkspaceShell({
+      webRemoteControlWorkspaceSwitcher: {
+        listWorkspaces: vi.fn(async () => ({ workspaces: [] })),
+        switchWorkspace: vi.fn(async () => {}),
+      },
+    });
+    expect(html).toContain('data-testid="web-remote-mobile-shell"');
+    expect(html).toContain('data-testid="workspace-sidebar"');
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

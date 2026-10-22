@@ -39,9 +39,12 @@ describe("reasoning replay provider identity", () => {
     expectStripped(history(target), identity(source));
   });
 
-  it.each(compatiblePairs)("still strips across model IDs: %s -> %s", (source, target) => {
-    expectStripped(history(source), { ...identity(target), modelId: createModelId("GLM-5.2") });
-  });
+  it.each([["builtin:zai-coding-plan", "builtin:zai-coding-plan"]] as const)(
+    "still strips across model IDs: %s -> %s",
+    (source, target) => {
+      expectStripped(history(source), { ...identity(target), modelId: createModelId("GLM-5.2") });
+    },
+  );
 
   it("keeps identical custom provider identities compatible", () => {
     const messages = history("custom-a");

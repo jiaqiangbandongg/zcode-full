@@ -29,7 +29,7 @@ function resetStore(overrides: Record<string, unknown> = {}): void {
     error: null,
     lastFailedPluginId: null,
     togglingPluginId: null,
-    operationId: null,
+    activeOperations: [],
     ...overrides,
   });
 }

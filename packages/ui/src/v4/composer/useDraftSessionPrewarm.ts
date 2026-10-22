@@ -11,7 +11,7 @@
 //
 // 结构：生命周期收敛在纯控制器 startDraftSessionPrewarm（可单测，无 React 依赖），
 // useDraftSessionPrewarm 只做 effect 接线与 owner-scoped binding 暴露。
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { CommandAck, CommandType, SessionConfigState } from "@zcode/shared/zcode-protocol-v4";
 import { logger } from "@/logger.js";
 
@@ -45,13 +45,7 @@ export function startDraftSessionPrewarm(params: {
   /** 预热会话初始 config（全局「上次选择」，同步解析）；让投影首帧即全局、不闪。 */
   resolveInitialConfig?: () => Partial<SessionConfigState> | undefined;
 }): DraftPrewarmController {
-  const {
-    workspaceKey,
-    dispatchCommand,
-    onReady,
-    onSettled,
-    resolveInitialConfig,
-  } = params;
+  const { workspaceKey, dispatchCommand, onReady, onSettled, resolveInitialConfig } = params;
   let disposed = false;
   let promotionState: "draft" | "pending" | "promoted" | "discarded" = "draft";
   let createdSessionId: string | null = null;
@@ -95,7 +89,7 @@ export function startDraftSessionPrewarm(params: {
         return;
       }
       if (ack.status !== "accepted" || ack.result?.type !== "createSession") {
-        logger.warn("[v4-draft-prewarm] createSession 被拒，回落无预热路径", {
+        logger.warn("[v4-draft-prewarm] createSession 被拒", {
           status: ack.status,
           reasonCode: ack.reasonCode ?? null,
           workspaceKey,
@@ -115,7 +109,7 @@ export function startDraftSessionPrewarm(params: {
       onReady(createdSessionId);
     })
     .catch((error) => {
-      logger.warn("[v4-draft-prewarm] createSession 失败，回落无预热路径", {
+      logger.warn("[v4-draft-prewarm] createSession 失败", {
         error: error instanceof Error ? error.message : String(error),
         workspaceKey,
       });
@@ -154,6 +148,8 @@ export function startDraftSessionPrewarm(params: {
 export interface DraftSessionPrewarm {
   /** 当前 workspace/transport generation 已就绪的预热 binding。 */
   binding: DraftPrewarmBinding | null;
+  /** 首发等待本 owner 当前创建任务；失败或换代即拒绝，不在发送路径另建会话。 */
+  waitForSession(): Promise<DraftPrewarmBinding>;
 }
 
 export interface DraftPrewarmBinding {
@@ -168,6 +164,7 @@ export interface DraftPrewarmBinding {
 }
 
 interface DraftPrewarmSubscriber {
+  generation: object;
   invalidationVersion: number;
   onBinding: (binding: DraftPrewarmBinding | null) => void;
 }
@@ -177,6 +174,7 @@ interface DraftPrewarmCurrent {
   controller: DraftPrewarmController;
   binding: DraftPrewarmBinding | null;
   settled: boolean;
+  completion: Promise<void>;
   retiring: boolean;
   /** 本代是第几次退避重试的产物；0 表示首发。 */
   retryAttempt: number;
@@ -226,7 +224,53 @@ class DraftSessionPrewarmCoordinator {
     this.resolveInitialConfig = resolveInitialConfig;
   }
 
+  async waitForSession(
+    invalidationVersion: number,
+    generation: object,
+  ): Promise<DraftPrewarmBinding> {
+    const assertCurrentSubscriber = () => {
+      if (
+        this.requestedInvalidationVersion() !== invalidationVersion ||
+        !Array.from(this.subscribers.values()).some(
+          (subscriber) => subscriber.generation === generation,
+        )
+      )
+        throw new Error("草稿会话已切换，请重新发送");
+    };
+    assertCurrentSubscriber();
+    // 新草稿已接管时，旧创建仍可能在回收；这是等待窗口，不是用户再次切换。
+    // 资格绑定本次订阅，防止相同版本的离开/重进让旧提交借新草稿继续发送。
+    if (this.current?.retiring) {
+      await this.current.completion;
+      assertCurrentSubscriber();
+    }
+    // 已确定失败/失效后，用户再次点击可以重试；仍由 owner 创建并合并并发等待者，
+    // 不能因后台重试耗尽就让当前草稿永久无法发送。
+    if (this.current?.settled && !this.current.binding) {
+      this.clearRetryTimer();
+      this.blockedInvalidationVersion = null;
+      this.current = null;
+      this.startCurrent(invalidationVersion);
+    }
+    const current = this.current;
+    if (!current) throw new Error("草稿会话尚未开始创建");
+    // Bug 根因：binding=null 同时表示创建在途和失败，首发据此另建会话会与预热并发。
+    // 创建只归此 owner；等待捕获的一代，不能在 await 后悄悄换成另一个会话发送。
+    await current.completion;
+    assertCurrentSubscriber();
+    if (
+      this.current !== current ||
+      current.retiring ||
+      current.invalidationVersion !== invalidationVersion ||
+      this.requestedInvalidationVersion() !== invalidationVersion
+    )
+      throw new Error("草稿会话已切换，请重新发送");
+    if (!current.binding) throw new Error("草稿会话创建失败，请重试");
+    return current.binding;
+  }
+
   acquire(params: {
+    generation: object;
     invalidationVersion: number;
     onBinding: (binding: DraftPrewarmBinding | null) => void;
   }): () => void {
@@ -304,7 +348,7 @@ class DraftSessionPrewarmCoordinator {
 
   /**
    * createSession 收口却没拿到 binding = 失败（被拒或异常）。回收导致的 client disposed 是
-   * 瞬态的，按退避重排一次创建；用尽则维持既有的「回落无预热路径」行为。
+   * 瞬态的，按退避重排一次创建；用尽后保留失败态，由下一次生命周期失效重新创建。
    */
   private scheduleRetryAfterFailure(failed: DraftPrewarmCurrent): void {
     const delay = PREWARM_RETRY_DELAYS_MS[failed.retryAttempt];
@@ -324,6 +368,10 @@ class DraftSessionPrewarmCoordinator {
 
   private startCurrent(invalidationVersion: number, retryAttempt = 0): void {
     let current!: DraftPrewarmCurrent;
+    let complete!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
     const controller = startDraftSessionPrewarm({
       workspaceKey: this.workspaceKey,
       dispatchCommand: (type, payload, targetSessionId) =>
@@ -365,6 +413,7 @@ class DraftSessionPrewarmCoordinator {
       },
       onSettled: () => {
         current.settled = true;
+        complete();
         if (this.current !== current || !current.retiring) {
           // 未被 retire 却没拿到 binding = createSession 失败；瞬态回收可退避重试。
           if (this.current === current && !current.retiring && current.binding === null) {
@@ -385,6 +434,7 @@ class DraftSessionPrewarmCoordinator {
       controller,
       binding: null,
       settled: false,
+      completion,
       retiring: false,
       retryAttempt,
     };
@@ -517,6 +567,7 @@ export function useDraftSessionPrewarm(params: {
   useEffect(() => {
     if (!enabled) return;
     return coordinator.acquire({
+      generation,
       invalidationVersion,
       onBinding: (binding) => {
         setReady((current) => {
@@ -529,5 +580,10 @@ export function useDraftSessionPrewarm(params: {
     });
   }, [coordinator, enabled, generation, invalidationVersion]);
 
-  return { binding: ready?.generation === generation ? ready.binding : null };
+  const waitForSession = useCallback(async () => {
+    if (!enabled) throw new Error("草稿会话尚未启用");
+    return coordinator.waitForSession(invalidationVersion, generation);
+  }, [coordinator, enabled, generation, invalidationVersion]);
+
+  return { binding: ready?.generation === generation ? ready.binding : null, waitForSession };
 }

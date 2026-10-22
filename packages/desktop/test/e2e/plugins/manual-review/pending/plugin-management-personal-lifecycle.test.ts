@@ -1,8 +1,5 @@
-import {
-  TID_SETTINGS_BACK_BUTTON,
-  TID_V4_COMPOSER_INPUT,
-  type ZCodePluginComponentKind,
-} from "@zcode/shared";
+import { type ZCodePluginComponentKind } from "@zcode/shared";
+import { TID_SETTINGS_BACK_BUTTON, TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
@@ -167,7 +164,7 @@ describe("PLM-LC-003 Personal Source 插件主生命周期 E2E", () => {
     // 此前更新入口只藏在「…」菜单和详情页高级区，用户刷新后看不出哪个插件可更新。
     await waitForPluginControl("plugin-store-update-badge", { pluginId: PLUGIN_LIFECYCLE_ID });
     await waitForPluginControl("plugin-store-card-update", { pluginId: PLUGIN_LIFECYCLE_ID });
-    await clickPluginControl("plugin-store-installed-row", { pluginId: PLUGIN_LIFECYCLE_ID });
+    await clickPluginControl("plugin-settings-plugin-row", { pluginId: PLUGIN_LIFECYCLE_ID });
     await clickPluginControl("plugin-store-item-menu", { pluginId: PLUGIN_LIFECYCLE_ID });
     await clickPluginControl("plugin-store-menu-update", { pluginId: PLUGIN_LIFECYCLE_ID });
     await waitUntilPluginOverview(

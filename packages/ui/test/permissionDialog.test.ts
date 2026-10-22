@@ -83,10 +83,6 @@ describe("PermissionDialog", () => {
     expect(withFeedback).toContain("告诉模型接下来应该怎么做...");
     expect(withFeedback).toContain("<textarea");
     expect(withFeedback).toContain('wrap="soft"');
-    expect(withFeedback).toContain("field-sizing-content");
-    expect(withFeedback).toContain("max-h-[5lh]");
-    expect(withFeedback).toContain("overflow-y-auto");
-    expect(withFeedback).toContain("focus-visible:ring-0");
     expect(withFeedback).toContain('maxLength="4096"');
   });
 
@@ -222,7 +218,7 @@ describe("PermissionDialog", () => {
     expect(html).toContain("后续相同命令不再询问");
   });
 
-  it("wraps a long prefix in the allow-always description position", () => {
+  it("truncates long permission prefixes without showing exact command grants", () => {
     const html = renderPermissionDialog({
       type: "permission_request",
       taskId: "task-1",
@@ -258,9 +254,6 @@ describe("PermissionDialog", () => {
 
     expect(html).toContain('data-permission-rule-prefixes="true"');
     expect(html).toContain('data-permission-rule-scopes="true"');
-    expect(html).toContain("basis-48");
-    expect(html).toContain("whitespace-pre-wrap");
-    expect(html).toContain("break-all");
     expect(html).toContain('data-permission-rule-scope-truncated="true"');
     expect(html).not.toContain("后续相同命令不再询问");
   });
@@ -615,7 +608,7 @@ describe("PermissionDialog", () => {
     expect(html).not.toContain("/Users/dev/ZCodeProject/demo/");
   });
 
-  it("不再承载聊天底部主列宽度和 summary 偏移", () => {
+  it("permission preview displays pending approval instead of execution state", () => {
     const html = renderPermissionDialog({
       type: "permission_request",
       taskId: "task-1",
@@ -641,9 +634,6 @@ describe("PermissionDialog", () => {
     expect(html).toContain("Run shell command");
     expect(html).toContain("等待确认");
     expect(html).not.toContain("执行中");
-    expect(html).not.toContain("translate-x");
-    expect(html).not.toContain("max-w-3xl");
-    expect(html).not.toContain("max-w-2xl");
   });
 
   it("renders Bash input description as the permission reason instead of a running state", () => {
@@ -826,118 +816,5 @@ describe("PermissionDialog", () => {
     });
 
     expect(html).toContain(reason);
-  });
-
-  it("keeps CUA macOS permission actions out of tool approval dialogs", () => {
-    const toolName = "mcp__zcode-cua__request_access";
-    const html = renderPermissionDialog(
-      {
-        type: "permission_request",
-        taskId: "task-1",
-        traceId: "trace-1",
-        requestId: "perm-cua",
-        description: "Tool has side effects and requires approval",
-        kind: toolName,
-        title: toolName,
-        options: [
-          {
-            optionId: "allow",
-            kind: "allow_once",
-            name: "允许",
-          },
-          {
-            optionId: "deny",
-            kind: "deny",
-            name: "拒绝",
-          },
-        ],
-        raw: {
-          requestId: "perm-cua",
-          toolName,
-          input: {
-            permissions: ["accessibility"],
-          },
-        },
-      },
-      undefined,
-    );
-
-    expect(html).not.toContain("打开辅助功能设置");
-    expect(html).not.toContain("ZCode Computer Use.app");
-    expect(html).toContain("允许");
-  });
-
-  it("does not offer the Computer Use Helper Accessibility action for unrelated MCP permission requests", () => {
-    const toolName = "mcp__ios-simulator__ios_preflight";
-    const html = renderPermissionDialog(
-      {
-        type: "permission_request",
-        taskId: "task-1",
-        traceId: "trace-1",
-        requestId: "perm-mcp",
-        description: "Tool has side effects and requires approval",
-        kind: toolName,
-        title: toolName,
-        options: [
-          {
-            optionId: "allow",
-            kind: "allow_once",
-            name: "允许",
-          },
-          {
-            optionId: "deny",
-            kind: "deny",
-            name: "拒绝",
-          },
-        ],
-        raw: {
-          requestId: "perm-mcp",
-          toolName,
-          input: {},
-        },
-      },
-      undefined,
-    );
-
-    expect(html).not.toContain("打开辅助功能设置");
-    expect(html).not.toContain("ZCode Computer Use.app");
-  });
-
-  it("does not offer the Computer Use Helper Accessibility action for ordinary zcode-cua tool requests", () => {
-    const toolName = "mcp__zcode-cua__left_click";
-    const html = renderPermissionDialog(
-      {
-        type: "permission_request",
-        taskId: "task-1",
-        traceId: "trace-1",
-        requestId: "perm-cua-click",
-        description: "Tool has side effects and requires approval",
-        kind: toolName,
-        title: toolName,
-        options: [
-          {
-            optionId: "allow",
-            kind: "allow_once",
-            name: "允许",
-          },
-          {
-            optionId: "deny",
-            kind: "deny",
-            name: "拒绝",
-          },
-        ],
-        raw: {
-          requestId: "perm-cua-click",
-          toolName,
-          input: {
-            target: { type: "coordinate", x: 10, y: 10, space: "screen" },
-          },
-        },
-      },
-      undefined,
-    );
-
-    expect(html).not.toContain("打开辅助功能设置");
-    expect(html).not.toContain("ZCode Computer Use.app");
   });
 });

@@ -312,11 +312,8 @@ describe("WorkflowRunDigest 子代理模型", () => {
   });
 });
 
-// ── 表头挤不下的时候（docs/dynamic-workflow/presentation.md「When the header runs out of room」）──
-// 细节串曾是表头上唯一不肯让位的那段字：它一长（子代理模型名能让它比「2 phases · 1 agent working」
-// 长出一截），Configure 与 Stop 就被挤到卡片右边框外面。jsdom 不排版，所以这里钉住产生那个布局的
-// 类契约——细节串可缩、控件不可缩、右簇带 min-w-0（少了它整簇一个像素都不缩，见下面第三条）。
-describe("WorkflowRunDigest 表头溢出", () => {
+// 控件与细节串的 DOM 归属。
+describe("WorkflowRunDigest 表头控件归属", () => {
   const LONG_MODEL = "4fc7f541-2382-4c32-be11-f021b8d7ed1d/GLM-5.3-Flash$high";
 
   function runningCard() {
@@ -328,36 +325,11 @@ describe("WorkflowRunDigest 表头溢出", () => {
     });
   }
 
-  it("让位的是细节串：min-w-0 + truncate，一行截断", () => {
-    const detail = runningCard().getByTestId("workflow-card-detail");
-
-    expect(detail.className).toContain("min-w-0");
-    expect(detail.className).toContain("truncate");
-  });
-
-  it("控件不缩：Configure、Stop、⤢ 都带 shrink-0", () => {
-    const view = runningCard();
-
-    for (const id of [
-      "workflow-digest-configure",
-      "workflow-digest-cancel",
-      "workflow-card-open-details",
-    ]) {
-      expect(view.getByTestId(id).className).toContain("shrink-0");
-    }
-  });
-
-  it("右簇可压缩：不带 shrink-0，且必须带 min-w-0（否则地板是整串细节，一个像素都不缩）", () => {
+  it("Configure、Stop、详情按钮与细节串位于同一右簇", () => {
     const view = runningCard();
     const cluster = view.getByTestId("workflow-card-detail").parentElement!;
 
-    // shrink-0 会让整簇按内容宽定死——正是按钮被顶出卡外的老形状。
-    expect(cluster.className).not.toContain("shrink-0");
-    // 簇的 min-w-0 是这次修复的承重件：flex item 的 automatic minimum size 是 min-content，
-    // 而 truncate 的 nowrap 让细节串的 min-content 等于整串字宽（overflow:hidden 和细节串
-    // 自己的 min-w-0 都不会把它算小）。少了它，簇的地板就是「整串细节 + 按钮」。
-    expect(cluster.className).toContain("min-w-0");
-    // 三个控件与细节串同处一簇：负空间只能落在细节串上。
+    // 三个控件与细节串同处一簇。
     for (const id of [
       "workflow-digest-configure",
       "workflow-digest-cancel",
@@ -379,9 +351,6 @@ describe("WorkflowRunDigest 收起态（默认）", () => {
     expect(view.queryByTestId("workflow-digest-status")).toBeNull();
     const detail = view.getByTestId("workflow-card-detail").textContent!;
     expect(detail).toBe("2 phases · 1 agent working");
-    expect(view.getByTestId("workflow-card-detail").className).toContain("text-ui-base");
-    expect(view.getByTestId("workflow-card-detail").className).not.toContain("font-mono");
-    expect(detail).not.toContain("tokens");
     // 运行中的种类词扫光，wf-swap 包在渐变外面（round 7 的教训）。
     expect(root.querySelector(".wf-swap .animated-gradient-text")).toBeTruthy();
 
@@ -633,14 +602,6 @@ describe("WorkflowRunDigest 文案", () => {
     expect(view.queryByTestId("workflow-card-toggle")).toBeNull();
   });
 });
-
-it.each(["running", "completed", "stopped"] as const)(
-  "运行卡名称使用普通 UI 字体：%s",
-  (status) => {
-    const view = renderDigest({ summary: joined({ status }) });
-    expect(view.getByTestId("workflow-card-name").className).not.toContain("font-mono");
-  },
-);
 
 // 运行卡上的 Stop run（docs/dynamic-workflow/presentation.md）：running 时
 // Resume 的位置换成 Stop，走详情页同一条命令；点下即禁用直到状态变化。

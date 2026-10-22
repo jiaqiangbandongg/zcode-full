@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-recording",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-recording.test.ts",
+  "fixtures": [
+    {
+      "id": "conversation-session-toolsearch-recording-done-json",
+      "stage": "done-json",
+      "description": "done-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"text\", \"text\": \"E2E_TOOLSEARCH_FEEDBACK_DONE\"}], \"stop_reason\": \"end_turn\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-done-stream",
+      "stage": "done-stream",
+      "description": "done-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_FEEDBACK_DONE\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-search-json",
+      "stage": "search-json",
+      "description": "search-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"tool_use\", \"id\": \"record_search\", \"name\": \"ToolSearch\", \"input\": {\"query\": \"select:mcp__catalog__lookup\", \"max_results\": 5}}], \"stop_reason\": \"tool_use\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-search-stream",
+      "stage": "search-stream",
+      "description": "search-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"tool_use\", \"id\": \"record_search\", \"name\": \"ToolSearch\", \"input\": {}}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"input_json_delta\", \"partial_json\": \"{\\\"query\\\": \\\"select:mcp__catalog__lookup\\\", \\\"max_results\\\": 5}\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"tool_use\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-partial-json",
+      "stage": "partial-json",
+      "description": "partial-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"text\", \"text\": \"E2E_TOOLSEARCH_RECORD_PARTIAL\"}], \"stop_reason\": \"max_tokens\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-partial-stream",
+      "stage": "partial-stream",
+      "description": "partial-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_RECORD_PARTIAL\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"max_tokens\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-pressure-json",
+      "stage": "pressure-json",
+      "description": "pressure-json",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [{\"type\": \"text\", \"text\": \"E2E_TOOLSEARCH_RECORD_PRESSURE\"}], \"stop_reason\": \"max_tokens\", \"stop_sequence\": null, \"usage\": {\"input_tokens\": 39995, \"output_tokens\": 30}}"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-pressure-stream",
+      "stage": "pressure-stream",
+      "description": "pressure-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "controlled-stream",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 39995, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"E2E_TOOLSEARCH_RECORD_PRESSURE\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"max_tokens\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-summary-stream",
+      "stage": "summary-stream",
+      "description": "summary-stream",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "受控模型输出稳定触发搜索、输入校验及续写边界；真实 CLI/Runtime、HTTP adapter、MCP 与 SQLite 不替换。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        },
+        "body": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"msg_e2e_feedback\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"test-toolsearch\", \"content\": [], \"stop_reason\": null, \"stop_sequence\": null, \"usage\": {\"input_tokens\": 100, \"output_tokens\": 0}}}\n\nevent: content_block_start\ndata: {\"type\": \"content_block_start\", \"index\": 0, \"content_block\": {\"type\": \"text\", \"text\": \"\"}}\n\nevent: content_block_delta\ndata: {\"type\": \"content_block_delta\", \"index\": 0, \"delta\": {\"type\": \"text_delta\", \"text\": \"<summary>E2E_TOOLSEARCH_RECORD_SUMMARY</summary>\"}}\n\nevent: content_block_stop\ndata: {\"type\": \"content_block_stop\", \"index\": 0}\n\nevent: message_delta\ndata: {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\": null}, \"usage\": {\"output_tokens\": 30}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n"
+      }
+    },
+    {
+      "id": "conversation-session-toolsearch-recording-context-error",
+      "stage": "context-error",
+      "description": "ToolSearch context-error",
+      "metadata": {
+        "kind": "synthetic",
+        "source": "synthetic",
+        "timingPolicy": "fault-stream",
+        "syntheticReason": "固定模型响应验证 ToolSearch 请求、工具执行与历史边界；响应由 case-local fixture 实际提供，阶段选择由测试 harness 驱动。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_TOOLSEARCH_"]
+      },
+      "response": {
+        "statusCode": 400,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"prompt is too long: context window exceeded\"}}"
+      }
+    }
+  ]
+}

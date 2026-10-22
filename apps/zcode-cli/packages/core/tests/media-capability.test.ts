@@ -81,7 +81,7 @@ describe("model request media capability projection", () => {
     expect(JSON.stringify(textOnly)).not.toContain("data:image");
   });
 
-  it("appends a video source path for supported, unknown, and unsupported models", async () => {
+  it("appends a video source path for supported and unsupported models", async () => {
     const ensureMediaAttachmentPath = vi.fn(async () => ({
       status: "ready" as const,
       path: "/tmp/video-1.mp4",
@@ -123,7 +123,6 @@ describe("model request media capability projection", () => {
     expect(projectMessagesForInputFormat(withPaths, { supportsVideo: true }).messages).toBe(
       withPaths,
     );
-    expect(projectMessagesForInputFormat(withPaths, undefined).messages).toBe(withPaths);
 
     const textOnly = projectMessagesForInputFormat(withPaths, {
       supportsVideo: false,
@@ -286,7 +285,6 @@ describe("model request media capability projection", () => {
       expect(projectMessagesForInputFormat(withPaths, { supportsImage: true }).messages).toBe(
         messages,
       );
-      expect(projectMessagesForInputFormat(withPaths, undefined).messages).toBe(messages);
 
       const textOnly = projectMessagesForInputFormat(withPaths, {
         supportsImage: false,
@@ -429,7 +427,7 @@ describe("model request media capability projection", () => {
     ]);
   });
 
-  it("keeps image blocks when support is true or unknown", () => {
+  it("keeps image blocks when support is enabled", () => {
     const image = {
       type: "image" as const,
       mediaType: "image/png",
@@ -440,8 +438,6 @@ describe("model request media capability projection", () => {
     expect(projectMessagesForInputFormat(messages, { supportsImage: true }).messages).toBe(
       messages,
     );
-    expect(projectMessagesForInputFormat(messages, {}).messages).toBe(messages);
-    expect(projectMessagesForInputFormat(messages, undefined).messages).toBe(messages);
   });
 
   it("replaces PDF file data when PDF support is explicitly false", () => {

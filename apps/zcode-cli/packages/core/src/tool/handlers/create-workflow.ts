@@ -368,6 +368,7 @@ export const createWorkflowToolEntry: ToolEntry = {
   capability:
     "Typecheck a dynamic-workflow TypeScript script against the facade and, once confirmed, start the run in the background",
   metadata: {
+    shouldDefer: true,
     name: CREATE_WORKFLOW_TOOL_NAME,
     description: CREATE_WORKFLOW_TOOL_DESCRIPTION,
     // 引擎接线后这个调用会启动一个执行子进程与多个 actor 会话；只读声明随执行语义翻面

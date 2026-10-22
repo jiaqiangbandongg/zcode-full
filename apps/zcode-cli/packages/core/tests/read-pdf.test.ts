@@ -3,8 +3,6 @@ import {
   CoreErrorType,
   READ_PDF_EXTRACT_MAX_INPUT_BYTES,
   READ_PDF_NATIVE_MAX_INPUT_BYTES,
-  createModelId,
-  createModelProviderId,
   createSessionId,
   createToolCallId,
   createTurnId,
@@ -294,7 +292,7 @@ describe("Read PDF handling", () => {
     ).rejects.toBe(inspectionError);
   });
 
-  it("treats an undefined PDF capability in the current turn snapshot as unsupported", async () => {
+  it("reads PDF-disabled current turn input as text", async () => {
     const context = contextWith({});
     context.model = createTestRuntimeModel({
       generateText: async () => ({ finishReason: "stop", text: "", usage: {} }),

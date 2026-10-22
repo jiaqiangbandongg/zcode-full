@@ -50,6 +50,18 @@ function projectionFor(sessionId: string, events: SessionEvent[]): ProductProjec
 }
 
 describe("SessionsIndexProjection 黄金测试（L1）", () => {
+  it("裁剪正文不改变持久化 lastOutcome，实时 phase 也不推导历史结果", () => {
+    const snapshot = projectionFor("s1", []).getSnapshot();
+    const summary = deriveSessionSummary(snapshot, {
+      workspaceId: "/repo",
+      createdAt: 1,
+      lastActivityAt: 2,
+      lastOutcome: "error",
+    });
+    expect(summary.lastOutcome).toBe("error");
+    expect(summary.phase).toBe("draft");
+  });
+
   it("派生：title/phase/goal/hasBackgroundWork/preview 从会话快照取值", () => {
     const events = buildEvents("s1", (push) => {
       push(SessionEventType.SessionCreated, {
@@ -96,12 +108,14 @@ describe("SessionsIndexProjection 黄金测试（L1）", () => {
       workspaceId: "ws-1",
       createdAt: 1000,
       lastActivityAt: 2000,
+      lastOutcome: "completed",
     });
     expect(summary.sessionId).toBe("s1");
     expect(summary.workspaceId).toBe("ws-1");
     expect(summary.title).toBe("我的会话");
     expect(summary.titleSource).toBe("custom");
     expect(summary.phase).toBe("completedSuccess");
+    expect(summary.lastOutcome).toBe("completed");
     // control.sessionEnded 由 onTurnComplete 置为 phase!=="error"（M2 既有语义，summary 忠实透传）。
     expect(summary.sessionEnded).toBe(true);
     expect(summary.hasBackgroundWork).toBe(false);

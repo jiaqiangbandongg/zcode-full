@@ -1,12 +1,12 @@
+import { ASK_USER_QUESTION_E2E_CLOCK_SCALE_ENV } from "@zcode/shared";
 import {
-  ASK_USER_QUESTION_E2E_CLOCK_SCALE_ENV,
   TID_SETTINGS_ASK_USER_QUESTION_AUTO_RESOLUTION_SWITCH,
   TID_SETTINGS_BACK_BUTTON,
   TID_SETTINGS_PAGE,
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByDom, readSettings } from "../../../helpers/desktop-app.js";
 import {
   prepareConversationE2E,

@@ -39,7 +39,13 @@ export function resolveDynamicWorkflowConfigMockScenario(
   specs: readonly string[],
 ): DynamicWorkflowConfigMockScenario | null {
   const disabled = specs.some((spec) => spec.includes(DISABLED_SPEC_FRAGMENT));
-  const alwaysOn = specs.some((spec) => spec.includes(ALWAYS_ON_SPEC_FRAGMENT));
+  // Bug 原因：中枢用例依赖开启状态，未声明配置前置时会命中真实灰度的 disabled。
+  // 与灰度正向用例共用服务端 fixture，不用本地 override 绕过 Host 裁决。
+  const alwaysOn = specs.some(
+    (spec) =>
+      spec.includes(ALWAYS_ON_SPEC_FRAGMENT) ||
+      spec.replaceAll("\\", "/").split("/").at(-1) === "automations-workflows-hub.test.ts",
+  );
   if (disabled && alwaysOn) {
     // 两个档位靠同一个 endpoint origin 区分，同一个 worker 里无法并存；
     // 与其静默选一个让断言变成假阳性，不如在 beforeSession 就失败。

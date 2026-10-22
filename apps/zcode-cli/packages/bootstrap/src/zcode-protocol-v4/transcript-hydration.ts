@@ -40,6 +40,7 @@ import {
 import {
   conversationInputIntentSchema,
   errorAttributionSchema,
+  workflowBlockedMetaSchema,
   workflowLaunchMetaSchema,
   workflowNotificationMetaSchema,
   type ErrorAttribution,
@@ -1356,11 +1357,14 @@ function backgroundResultOriginMetaOfMessage(
   // 载荷就丢了——manifest 条目退回裸标题行。用 shared 的 zod schema 校验，畸形就**只丢载荷**
   // 保基字段，绝不抛：这是投影重建路径，一个坏载荷不该打挂整条冷恢复。
   const workflowNotification = parseWorkflowNotificationMeta(record.workflowNotification);
+  // 空闲提醒的载荷在它自己的键上（contracts 的 WorkflowBlockedMeta），同样畸形只丢载荷。
+  const workflowBlocked = workflowBlockedMetaSchema.safeParse(record.workflowBlocked);
   return {
     backgroundSource,
     title,
     workId,
     ...(workflowNotification ? { workflowNotification } : {}),
+    ...(workflowBlocked.success ? { workflowBlocked: workflowBlocked.data } : {}),
   };
 }
 

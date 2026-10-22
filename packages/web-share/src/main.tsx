@@ -13,7 +13,7 @@ import {
   isConversationSharePath,
   resolveConversationShareCodeFromPath,
 } from "../../web/src/share/conversationShareRoute.js";
-import { resolveWebRemoteControlInitialTheme } from "../../web/src/webRemoteControlThemeSeed.js";
+import { resolveWebRemoteControlInitialTheme } from "../../web/src/web-remote-control/adapters/webRemoteControlThemeSeed.js";
 import { createWebAuthService } from "../../web/src/auth/webAuthService.js";
 import {
   WEB_ZAI_OAUTH_CONFIG,

@@ -15,6 +15,7 @@ const output = await mkdtemp(join(tmpdir(), "zcode-gen-ui-e2e-"));
 await copyGenUiRuntimeAssets(output);
 const shared = JSON.parse(await readFile(join(root, "packages/shared/package.json"), "utf8"));
 const alias = {
+  "@desktop": join(desktop, "src"),
   "@": join(root, "packages/ui/src"),
   ...Object.fromEntries(
     Object.entries(shared.exports).map(([key, path]) => [

@@ -133,8 +133,8 @@ function PrewarmHarness(props: {
   transportIdentity: unknown;
   dispatchCommand: ReturnType<typeof createDispatchRecorder>["dispatch"];
   resolveInitialConfig?: () => Partial<SessionConfigState>;
-  resolveInitialRuntimeModel?: Parameters<typeof useDraftSessionPrewarm>[0]["resolveInitialRuntimeModel"];
   onRender: (binding: ReturnType<typeof useDraftSessionPrewarm>["binding"]) => void;
+  onOwner?: (owner: ReturnType<typeof useDraftSessionPrewarm>) => void;
 }) {
   const result = useDraftSessionPrewarm({
     enabled: props.enabled ?? true,
@@ -146,6 +146,7 @@ function PrewarmHarness(props: {
     resolveInitialConfig: props.resolveInitialConfig,
   });
   props.onRender(result.binding);
+  props.onOwner?.(result);
   return null;
 }
 
@@ -347,7 +348,7 @@ describe("startDraftSessionPrewarm", () => {
     expect(create?.payload).toEqual({ workspaceId: "/w" });
   });
 
-  it("createSession 被拒/异常 → 降级无预热，不上抛不清理", async () => {
+  it("createSession 被拒 → 降级无预热，不上抛不清理", async () => {
     const rejected: CommandAck = {
       commandId: "c3",
       status: "rejected",
@@ -370,6 +371,256 @@ describe("startDraftSessionPrewarm", () => {
 });
 
 describe("useDraftSessionPrewarm workspace owner", () => {
+  it.each(["ready", "leave-and-return", "workspace", "transport", "version"] as const)(
+    "新草稿首发等待旧创建退休；%s 时保持发送归属",
+    async (outcome) => {
+      const resolvers: Array<(ack: CommandAck) => void> = [];
+      const { dispatch, calls } = createDispatchRecorder({
+        onCreate: () => new Promise((resolve) => resolvers.push(resolve)),
+      });
+      const root = createRoot(installMinimalDom());
+      mountedRoots.push(root);
+      const transport = {};
+      let owner!: ReturnType<typeof useDraftSessionPrewarm>;
+      const render = (
+        enabled: boolean,
+        workspaceKey = "/workspace",
+        transportIdentity = transport,
+        invalidationVersion = 1,
+      ) =>
+        root.render(
+          createElement(PrewarmHarness, {
+            enabled,
+            workspaceKey,
+            transportIdentity,
+            invalidationVersion,
+            dispatchCommand: dispatch,
+            onRender: () => {},
+            onOwner: (value) => {
+              owner = value;
+            },
+          }),
+        );
+      await act(async () => {
+        render(true);
+      });
+      const oldOwner = owner;
+      await act(async () => {
+        render(false);
+      });
+      await act(async () => {
+        await flushCleanupTimers();
+      });
+      await act(async () => {
+        render(true);
+      });
+      // 版本仍是 1；新的订阅有权等待退休，旧订阅即使稍后才调用也必须失效。
+      const staleCall = oldOwner.waitForSession().then(
+        () => "accepted",
+        () => "rejected",
+      );
+      let completed = false;
+      const admission = vi.fn();
+      const first = owner.waitForSession().then(
+        (binding) => {
+          completed = true;
+          admission(binding.sessionId);
+          return binding.sessionId;
+        },
+        () => {
+          completed = true;
+          return "rejected";
+        },
+      );
+      const second = owner.waitForSession().then(
+        (binding) => binding.sessionId,
+        () => "rejected",
+      );
+      await flushMicrotasks();
+      expect(calls).toEqual([{ type: "createSession", sessionId: null }]);
+      const completedBeforeAck = completed;
+      if (outcome === "leave-and-return") {
+        await act(async () => {
+          render(false);
+        });
+        await act(async () => {
+          render(true);
+        });
+      } else if (outcome !== "ready") {
+        await act(async () => {
+          render(
+            true,
+            outcome === "workspace" ? "/other" : "/workspace",
+            outcome === "transport" ? {} : transport,
+            outcome === "version" ? 2 : 1,
+          );
+        });
+      }
+      await act(async () => {
+        resolvers[0]!(acceptedCreateAck("old-draft"));
+        await flushMicrotasks();
+      });
+      expect(calls.filter((call) => call.type === "createSession")).toHaveLength(2);
+      expect(calls.filter((call) => call.type === "deleteSession")).toEqual([
+        { type: "deleteSession", sessionId: "old-draft" },
+      ]);
+      await act(async () => {
+        resolvers[1]!(acceptedCreateAck("current-draft"));
+        await flushMicrotasks();
+      });
+      expect(await staleCall).toBe("rejected");
+      expect(completedBeforeAck).toBe(false);
+      expect(await first).toBe(outcome === "ready" ? "current-draft" : "rejected");
+      expect(await second).toBe(outcome === "ready" ? "current-draft" : "rejected");
+      expect(admission).toHaveBeenCalledTimes(outcome === "ready" ? 1 : 0);
+    },
+  );
+
+  it("PD01 切回后的首发等待已退出旧代的创建收口，再使用点击时确定的新代", async () => {
+    let completeOld!: (ack: CommandAck) => void;
+    const old = new Promise<CommandAck>((resolve) => {
+      completeOld = resolve;
+    });
+    let attempt = 0;
+    const { calls, dispatch } = createDispatchRecorder({
+      onCreate: () => (++attempt === 1 ? old : acceptedCreateAck("new-draft")),
+    });
+    const root = createRoot(installMinimalDom());
+    mountedRoots.push(root);
+    const transportIdentity = {};
+    let owner!: ReturnType<typeof useDraftSessionPrewarm>;
+    const renderVersion = (invalidationVersion: number) =>
+      createElement(PrewarmHarness, {
+        workspaceKey: "/workspace",
+        transportIdentity,
+        dispatchCommand: dispatch,
+        invalidationVersion,
+        onRender: () => {},
+        onOwner: (value) => {
+          owner = value;
+        },
+      });
+    await act(async () => {
+      root.render(renderVersion(0));
+    });
+    await act(async () => {
+      root.render(renderVersion(1));
+    });
+    const sent = owner.waitForSession().then(
+      (binding) => binding.sessionId,
+      (error) => String(error),
+    );
+    expect(calls.filter((call) => call.type === "createSession")).toHaveLength(1);
+    await act(async () => {
+      completeOld(acceptedCreateAck("old-draft"));
+      await flushMicrotasks();
+    });
+    expect(await sent).toBe("new-draft");
+    expect(calls.filter((call) => call.type === "createSession")).toHaveLength(2);
+  });
+  it.each(["failed", "discarded"] as const)(
+    "%s 后显式重试仍由同一个 owner 单飞创建",
+    async (outcome) => {
+      let attempt = 0;
+      const { calls, dispatch } = createDispatchRecorder({
+        onCreate: () => {
+          attempt += 1;
+          return outcome === "failed" && attempt === 1
+            ? { ...NOOP_ACK, status: "failed", reasonCode: "test.createFailed" }
+            : acceptedCreateAck(`draft-${attempt}`);
+        },
+      });
+      const root = createRoot(installMinimalDom());
+      mountedRoots.push(root);
+      let owner!: ReturnType<typeof useDraftSessionPrewarm>;
+      await act(async () => {
+        root.render(
+          createElement(PrewarmHarness, {
+            workspaceKey: "/workspace",
+            transportIdentity: {},
+            dispatchCommand: dispatch,
+            onRender: () => {},
+            onOwner: (value) => {
+              owner = value;
+            },
+          }),
+        );
+      });
+      if (outcome === "discarded")
+        await act(async () => {
+          owner.binding!.discard();
+        });
+      await act(async () => {
+        const [first, second] = await Promise.all([owner.waitForSession(), owner.waitForSession()]);
+        expect(first).toBe(second);
+        expect(first.sessionId).toBe("draft-2");
+      });
+      expect(calls.filter((call) => call.type === "createSession")).toHaveLength(2);
+    },
+  );
+
+  it.each(["ready", "failed", "invalidated", "unmounted"] as const)(
+    "首发等待原创建任务，%s 时不另建或跨代发送",
+    async (outcome) => {
+      let resolveCreate!: (ack: CommandAck) => void;
+      const pending = new Promise<CommandAck>((resolve) => {
+        resolveCreate = resolve;
+      });
+      const { calls, dispatch } = createDispatchRecorder({ onCreate: () => pending });
+      const root = createRoot(installMinimalDom());
+      mountedRoots.push(root);
+      const transportIdentity = {};
+      let owner!: ReturnType<typeof useDraftSessionPrewarm>;
+      const renderVersion = (invalidationVersion: number) =>
+        createElement(PrewarmHarness, {
+          workspaceKey: "ssh://device/workspace",
+          transportIdentity,
+          dispatchCommand: dispatch,
+          invalidationVersion,
+          onRender: () => {},
+          onOwner: (value) => {
+            owner = value;
+          },
+        });
+      await act(async () => {
+        root.render(renderVersion(0));
+      });
+      const result = owner.waitForSession().then(
+        (binding) => ({ binding, error: null }),
+        (error: Error) => ({ binding: null, error }),
+      );
+      await flushMicrotasks();
+      expect(calls).toEqual([{ type: "createSession", sessionId: null }]);
+      if (outcome === "invalidated") {
+        await act(async () => {
+          root.render(renderVersion(1));
+        });
+      } else if (outcome === "unmounted") {
+        await act(async () => {
+          root.render(null);
+        });
+        await flushCleanupTimers();
+      }
+      await act(async () => {
+        resolveCreate(
+          outcome === "failed"
+            ? { ...NOOP_ACK, status: "failed", reasonCode: "test.createFailed" }
+            : acceptedCreateAck("original-session"),
+        );
+        await flushMicrotasks();
+      });
+      const settled = await result;
+      if (outcome === "ready") {
+        expect(settled.binding).toBe(owner.binding);
+        expect(settled.binding?.sessionId).toBe("original-session");
+        expect(settled.binding?.beginPromotion()).toBe(true);
+      } else {
+        expect(settled.binding).toBeNull();
+        expect(settled.error).toBeInstanceOf(Error);
+      }
+    },
+  );
+
   it("切换 workspace 时旧 binding 立即失效，并通过原 workspace dispatcher 清理", async () => {
     const observations: Array<{ workspaceKey: string; sessionId: string | null }> = [];
     const dispatchA = createDispatchRecorder({

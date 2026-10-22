@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-wsl-required-update",
+  "spec": "./test/e2e/conversation-session/conversation-session-wsl-required-update.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-wsl-required-update.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "requests": []
+}

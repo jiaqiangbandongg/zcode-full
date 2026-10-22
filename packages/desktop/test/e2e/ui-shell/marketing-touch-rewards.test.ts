@@ -1,12 +1,12 @@
 import { join } from "node:path";
+import { marketingDeliverySchema } from "@zcode/shared";
 import {
   TID_LOGIN_TRIGGER,
   TID_LOGOUT_BUTTON,
   TID_CONFIRM_DIALOG_CONFIRM,
   TID_LOGIN_USE_API_KEY_BUTTON,
   TID_LOGIN_API_KEY_SKIP_BUTTON,
-  marketingDeliverySchema,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { waitForDefaultWorkspaceReady } from "../helpers/desktop-app.js";
 import { assertOverlayWindowControls } from "../helpers/overlay-window-controls.js";
 

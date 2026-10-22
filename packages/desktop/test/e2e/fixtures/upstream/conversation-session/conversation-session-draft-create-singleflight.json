@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-draft-create-singleflight",
+  "spec": "./test/e2e/conversation-session/conversation-session-draft-create-singleflight.test.ts",
+  "fixtures": [
+    {
+      "id": "draft-singleflight",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证预热创建在途的首发竞态；模型只用于完成真实发送与详情绑定。"
+      },
+      "maxMatches": 2,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_DRAFT_SINGLEFLIGHT_"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "draft-singleflight",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "draft-singleflight-ok"
+        }
+      }
+    }
+  ]
+}

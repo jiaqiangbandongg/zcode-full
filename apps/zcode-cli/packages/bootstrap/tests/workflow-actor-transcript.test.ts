@@ -122,9 +122,9 @@ async function createSessionRow(store: Store, sessionId: SessionId): Promise<voi
 
 async function withStore(body: (store: Store) => Promise<void>): Promise<void> {
   const tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-seed-"));
-  const store = createSqliteSessionStore({
+  const store = (await createSqliteSessionStore({
     dbPath: join(tempRoot, "session.sqlite"),
-  }) as unknown as Store;
+  })) as unknown as Store;
   try {
     await createSessionRow(store, SOURCE);
     await createSessionRow(store, TARGET);

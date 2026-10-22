@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { clearAppData } from "../../../helpers/desktop-app.js";
-import { prepareV4ConversationE2E } from "../../../helpers/v4-conversation.js";
+import { TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_ITEM } from "@zcode/shared";
+import { testId } from "@zcode/shared/test-ids";
+import { clearAppData, readSettings, waitForTestIdByDom } from "../../../helpers/desktop-app.js";
+import { prepareV4ConversationE2E, startNewV4Draft } from "../../../helpers/v4-conversation.js";
 import {
   AUTOMATIONS_CONTENT_SELECTOR,
   PLUS_GOAL_OPTION_ID,
@@ -13,17 +15,21 @@ import {
   expectTestIdAbsentThroughout,
   hasTestIdInDom,
   openAutomationsPage,
+  openDynamicWorkflowModeSelect,
   openGeneralSettings,
   openPlusMenu,
   openSlashPanelWithCatalogReady,
   readDynamicWorkflowGrayMockStatus,
+  readDynamicWorkflowModeTriggerText,
   readPlusMenuAddOptionIds,
+  selectDynamicWorkflowMode,
   setComposerDraft,
 } from "../../../helpers/dynamic-workflow-gray.js";
-import { TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER } from "@zcode/shared";
+import { sel } from "../../../helpers/selectors.js";
 
 // DWG-08（disabled 档）：服务端 /client/configs 不下发 dynamicWorkflow key，
 // 三个入口必须同时消失——`+` 菜单的「工作流」、`/` 面板的 workflow、自动化页的「工作流」标签。
+// DWG-23（disabled 档）：服务端只给默认值，设置 › 常规的模式行照样出现，用户选「始终开启」后入口回来。
 // 服务端形状由 dynamic-workflow-config-mock-server.ts 按本文件名选档；
 // 契约见 docs/dynamic-workflow/launch.md「Gray release: the `dynamicWorkflow` feature key」。
 // E2E_DWF_GRAY：只读入口，不发送 prompt；空 provider fixture 是有意的合同。
@@ -76,9 +82,50 @@ describe("动态工作流灰度未命中（disabled）", () => {
     expect(await hasTestIdInDom(automationsPageTabTestId("workflow"))).toBe(false);
     expect(await hasTestIdInDom(automationsPageTabTestId("automation"))).toBe(false);
     await expectTestIdAbsentThroughout(automationsPageTabTestId("workflow"));
+  });
 
-    // 4) DWG-23：服务端未提供时，设置 › 常规里没有动态工作流模式行，灰度对用户不可见。
+  it("DWG-23 默认关闭时设置行照样出现，选「始终开启」后工作流入口回来", async function () {
+    this.timeout(240000);
+
+    // 1) 设置 › 常规：服务端没下发 key，行仍在，显示「关闭」，「默认」标签只在「关闭」上。
     await openGeneralSettings();
-    await expectTestIdAbsentThroughout(TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER);
+    await browser.waitUntil(
+      async () => (await readDynamicWorkflowModeTriggerText()).includes("关闭"),
+      { timeout: 30000, timeoutMsg: "服务端默认关闭时动态工作流模式行没有出现或没有显示「关闭」" },
+    );
+    await openDynamicWorkflowModeSelect();
+    const itemText = (mode: string) =>
+      $(sel(testId(TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_ITEM, mode))).getText();
+    expect(await itemText("disabled")).toContain("默认");
+    expect(await itemText("onDemand")).not.toContain("默认");
+    expect(await itemText("alwaysOn")).not.toContain("默认");
+    await browser.keys("Escape");
+
+    // 2) 选「始终开启」：不等于默认值，所以原样写进设置文件。
+    await selectDynamicWorkflowMode("alwaysOn");
+    await browser.waitUntil(async () => (await readSettings()).dynamicWorkflowMode === "alwaysOn", {
+      timeout: 15000,
+      timeoutMsg: "选择「始终开启」没有写进设置文件",
+    });
+
+    // 3) 自动化页恢复「工作流」切换：renderer 快照已按用户选择重读。
+    await openAutomationsPage();
+    await waitForTestIdByDom(automationsPageTabTestId("workflow"), {
+      timeout: 30000,
+      timeoutMsg: "选「始终开启」后自动化页没有出现「工作流」切换",
+    });
+
+    // 4) 新草稿的 + 菜单出现「工作流」：Host 已按用户选择给 CLI 重发 enabled:true 的策略。
+    await startNewV4Draft();
+    await setComposerDraft("");
+    await browser.waitUntil(
+      async () => {
+        await openPlusMenu();
+        const ids = await readPlusMenuAddOptionIds();
+        await closePlusMenu();
+        return ids.includes(PLUS_GOAL_OPTION_ID) && ids.includes(PLUS_WORKFLOW_OPTION_ID);
+      },
+      { timeout: 30000, timeoutMsg: "选「始终开启」后新草稿的 + 菜单仍没有工作流" },
+    );
   });
 });

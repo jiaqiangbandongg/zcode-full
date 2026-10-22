@@ -2518,6 +2518,8 @@ Electron/Chromium target-specific notices are shipped separately under Resources
 
 ## Modified npm packages
 
+- @radix-ui/react-collapsible@1.1.12: modified by ZCode; the changes are recorded in patches/@radix-ui__react-collapsible@1.1.12.patch in the source repository.
+
 - vitest@4.1.7: modified by ZCode; the changes are recorded in patches/vitest@4.1.7.patch in the source repository.
 
 - wdio-electron-service@9.2.1: modified by ZCode; the changes are recorded in patches/wdio-electron-service@9.2.1.patch in the source repository.

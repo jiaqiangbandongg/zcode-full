@@ -135,6 +135,39 @@ describe("CodingPlanProductCards", () => {
     ).toBe(50);
   });
 
+  it("isolates product snapshots for the same provider across service instances", async () => {
+    const createService = (payAmount: number) => ({
+      batchPreview: vi.fn(async () => ({
+        productList: [
+          {
+            productId: "product-e68d08",
+            productName: "GLM Coding Lite",
+            payAmount,
+            priceCurrency: "USD",
+          },
+        ],
+        isSubscribed: false,
+        isAuthenticated: true,
+      })),
+    });
+    const serviceA = createService(10);
+    const serviceB = createService(20);
+    const first = await loadCodingPlanProductsForTest(
+      BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
+      serviceA as never,
+      false,
+    );
+    const second = await loadCodingPlanProductsForTest(
+      BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan,
+      serviceB as never,
+      false,
+    );
+    expect(serviceA.batchPreview).toHaveBeenCalledOnce();
+    expect(serviceB.batchPreview).toHaveBeenCalledOnce();
+    expect(first.productList[0]?.payAmount).toBe(10);
+    expect(second.productList[0]?.payAmount).toBe(20);
+  });
+
   it("prevents stale in-flight previews from replacing a forced refresh cache", async () => {
     type PreviewSnapshot = {
       productList: Array<{

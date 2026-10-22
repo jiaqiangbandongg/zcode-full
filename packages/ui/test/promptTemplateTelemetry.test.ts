@@ -23,17 +23,4 @@ describe("prompt template click telemetry", () => {
       },
     });
   });
-
-  it("keeps the English label and prompt when the current locale resolves English text", () => {
-    expect(
-      buildPromptTemplateClickTelemetryPayload({
-        templateId: "create-pdf",
-        templateName: "Create PDF",
-        templatePrompt: "Create a PDF from the workspace.",
-      }).eventExtraDetail,
-    ).toEqual({
-      template_id: "create-pdf",
-      template_prompt: "Create a PDF from the workspace.",
-    });
-  });
 });

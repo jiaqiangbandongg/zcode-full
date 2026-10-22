@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-attachment-resume",
+  "spec": "./test/e2e/conversation-session/conversation-session-attachment-resume.test.ts",
+  "fixtures": [
+    {
+      "id": "attachment-resume-first",
+      "description": "AR01 first: 附件冷恢复请求",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_RESUME_FIRST"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_ATTACHMENT_RESUME_HOT",
+          "E2E_ATTACHMENT_RESUME_COLD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "attachment-resume-first",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "ATTACHMENT_RESUME_FIRST_OK"
+        }
+      }
+    },
+    {
+      "id": "attachment-resume-hot",
+      "description": "AR01 hot: 附件冷恢复请求",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_RESUME_HOT"],
+        "bodyExcludes": [
+          "Generate a concise title",
+          "CRITICAL: Respond with TEXT ONLY",
+          "E2E_ATTACHMENT_RESUME_COLD"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "attachment-resume-hot",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "ATTACHMENT_RESUME_HOT_OK"
+        }
+      }
+    },
+    {
+      "id": "attachment-resume-cold",
+      "description": "AR01 cold: 附件冷恢复请求",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "固定回复使重启前后历史内容可比，spec 直接断言捕获的首轮 user content。"
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": ["E2E_ATTACHMENT_RESUME_COLD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "attachment-resume-cold",
+          "inputTokens": 80,
+          "outputTokens": 8,
+          "text": "ATTACHMENT_RESUME_COLD_OK"
+        }
+      }
+    }
+  ]
+}

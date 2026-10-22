@@ -737,6 +737,7 @@ test("includes bundled official plugin assets", async () => {
     assert.equal(browserUsePaths.has("docs/computer-use.md"), false);
     assert.equal(documentPaths.has(".zcode-plugin/plugin.json"), true);
     assert.equal(documentPaths.has("skills/docx/SKILL.md"), true);
+    assert.equal(documentPaths.has("skills/docx-viewer/SKILL.md"), true);
     assert.equal(documentPaths.has("skills/pdf/SKILL.md"), true);
     assert.equal(documentPaths.has("skills/pdf/scripts/pdf.py"), true);
     assert.equal(documentPaths.has("skills/pptx/SKILL.md"), true);
@@ -835,6 +836,7 @@ test("allows skill-only official plugins when SEA runtime assets are required", 
   const stagingDirectory = join(directory, "staging");
 
   try {
+    await writeVisualizePluginFixture(root);
     await writeTestFile(root, "packages/android-emulator-plugin/.zcode-plugin/plugin.json", "{}");
     await writeTestFile(root, "packages/android-emulator-plugin/dist/mcp/server.js", "");
     await writeTestFile(root, "packages/node-repl-host/.zcode-plugin/plugin.json", "{}");
@@ -954,6 +956,7 @@ test("requires SEA runtime assets for runtime-backed official plugins", async ()
   const stagingDirectory = join(directory, "staging");
 
   try {
+    await writeVisualizePluginFixture(root);
     await writeTestFile(root, "packages/android-emulator-plugin/.zcode-plugin/plugin.json", "{}");
     // 宿主要先齐备，这条测试隔离的是 android-emulator 缺 runtime 这一种情况。
     await writeTestFile(root, "packages/node-repl-host/.zcode-plugin/plugin.json", "{}");
@@ -992,6 +995,7 @@ test("requires the Browser Use client alongside the SEA MCP runtime", async () =
   const stagingDirectory = join(directory, "staging");
 
   try {
+    await writeVisualizePluginFixture(root);
     for (const pluginName of [
       "android-emulator-plugin",
       "browser-use-plugin",
@@ -1231,17 +1235,6 @@ test("matches host targets using Node.js platform names", () => {
   );
 });
 
-test("rebuilds workspace dependencies without caching SEA outputs before packaging", async () => {
-  const packageJson = JSON.parse(
-    await readFile(new URL("../package.json", import.meta.url), "utf8"),
-  );
-
-  assert.equal(
-    packageJson.scripts?.["build:sea"],
-    "pnpm --dir ../../../.. exec turbo --skip-infer --cwd apps/zcode-cli run build --filter=!@zcode/cli --force && pnpm build && node scripts/build-sea.mjs --all",
-  );
-});
-
 test("resolves Turbo from the repository while retaining the CLI workspace graph", () => {
   const cliPackageRoot = new URL("..", import.meta.url);
 
@@ -1301,7 +1294,22 @@ async function writeDocumentPluginFixtures(root) {
     await writeTestFile(root, `packages/${name}-plugin/.zcode-plugin/plugin.json`, "{}");
     await writeTestFile(root, `packages/${name}-plugin/agents/visual-judge.md`, "");
     await writeTestFile(root, `packages/${name}-plugin/skills/${skill}/SKILL.md`, "");
+    // 0.2.0 起文档插件带查看面板：viewer skill 与 office-runtime 构建产物都是必需资产。
+    await writeTestFile(root, `packages/${name}-plugin/skills/${skill}-viewer/SKILL.md`, "");
+    for (const runtimePath of ["dist/server.mjs", "dist/ui/assets.json", "dist/ui/panel.html"]) {
+      await writeTestFile(root, `packages/${name}-plugin/${runtimePath}`, "");
+    }
   }
   await writeTestFile(root, "packages/image-search-plugin/.zcode-plugin/plugin.json", "{}");
   await writeTestFile(root, "packages/image-search-plugin/.mcp.json", "{}");
+}
+
+async function writeVisualizePluginFixture(root) {
+  // 官方清单新增静态插件后，运行时缺失用例也必须先准备其内容，避免提前失败。
+  const plugin = officialSeaPlugins.find((item) => item.name === "visualize");
+  assert.ok(plugin);
+  await writeTestFile(root, "packages/visualize-plugin/.zcode-plugin/plugin.json", "{}");
+  for (const path of plugin.requiredSeedPaths) {
+    await writeTestFile(root, `packages/visualize-plugin/${path}`, "");
+  }
 }

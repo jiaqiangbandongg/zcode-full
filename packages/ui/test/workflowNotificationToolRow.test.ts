@@ -98,6 +98,50 @@ describe("WorkflowNotificationToolRow — terminal", () => {
     expect(html).toContain("workflow-notification-stall");
   });
 
+  it("blocked 提醒：kindLabel「等待主代理」+ run 名，展开体一行计数与等待时长，再加 run 链接", () => {
+    const html = render({
+      notification: { kind: "blocked", questions: 2, holes: 1, sinceMs: 17 * 60_000 },
+      forceOpen: true,
+      onOpenRun: () => {},
+    });
+    expect(html).toContain("Workflow waiting on the agent");
+    expect(html).toContain("flaky-test-triage");
+    expect(html).toContain("workflow-notification-blocked");
+    expect(html).toContain("2 questions · 1 hole · open for 17 min");
+    expect(html).toContain(OPEN_RUN_LABEL);
+    // 不是失败、也不是在干活：没有失败装置。
+    expect(html).not.toContain("border-destructive");
+  });
+
+  it("blocked 提醒：零的那一种不出现；不足一分钟按 1 分钟；中文走同一组词", () => {
+    const onlyHoles = render({
+      notification: { kind: "blocked", questions: 0, holes: 2, sinceMs: 20_000 },
+      forceOpen: true,
+    });
+    expect(onlyHoles).toContain("2 holes · open for 1 min");
+    expect(onlyHoles).not.toContain("question");
+
+    const zh = render(
+      {
+        notification: { kind: "blocked", questions: 1, holes: 0, sinceMs: 45 * 60_000 },
+        forceOpen: true,
+      },
+      "zh-CN",
+    );
+    expect(zh).toContain("工作流等待主代理");
+    expect(zh).toContain("1 个待答问题 · 已等待 45 分钟");
+    expect(zh).not.toContain("留白");
+  });
+
+  it("blocked 提醒折叠时只有头部：计数在展开体里", () => {
+    const html = render({
+      notification: { kind: "blocked", questions: 2, holes: 1, sinceMs: 17 * 60_000 },
+    });
+    expect(html).toContain("Workflow waiting on the agent");
+    expect(html).toContain(EXPAND_TOGGLE_LABEL);
+    expect(html).not.toContain("open for 17 min");
+  });
+
   it("primaryText = 分隔符与普通字体 run 名", () => {
     const html = render({
       notification: { kind: "terminal", status: "completed", summary: "s", result: "r" },

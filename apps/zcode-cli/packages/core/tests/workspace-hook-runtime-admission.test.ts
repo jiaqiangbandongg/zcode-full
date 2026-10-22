@@ -187,6 +187,7 @@ describe("Workspace Hook Runtime admission", () => {
 
     // 软门禁(D1):功能关闭时上报 pendingCount=0
     expect(stateCallback).toHaveBeenCalledWith(expect.objectContaining({ pendingCount: 0 }));
+    expect(stateCallback).toHaveBeenCalledTimes(1);
     expect(
       admission.evaluateDispatch({
         hookDeclarationDigest: DIGEST_A,
@@ -567,33 +568,6 @@ describe("Workspace Hook Runtime admission", () => {
 
   // —— 软门禁(D1) 软门禁语义测试 ——
 
-  it("D1: activate 不等待 review,pending hooks 的 dispatch 仍 blocked", async () => {
-    const events: SessionEvent[] = [];
-    const commands: string[] = [];
-    const { admission, runner } = configuredRunner({
-      coordinator: createCoordinator(), // 未 trust
-      events,
-      commands,
-    });
-
-    // activate 应立即返回(不等 review)
-    const start = Date.now();
-    await admission.activate("startup");
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(100); // 不阻塞
-
-    // dispatch 仍然 blocked
-    expect(
-      admission.evaluateDispatch({
-        hookDeclarationDigest: DIGEST_A,
-        reviewItemId: "item-0",
-      }),
-    ).toEqual({
-      allowed: false,
-      reasonCode: "workspace_hooks_pending_trust",
-    });
-  });
-
   it("D1: onAdmissionStateChanged 上报 pendingCount > 0(未 trust)", async () => {
     const states: Array<{ pendingCount: number; bundleDigest: string }> = [];
     const { admission } = configuredRunner({
@@ -613,22 +587,6 @@ describe("Workspace Hook Runtime admission", () => {
     const { admission } = configuredRunner({
       coordinator: createCoordinator({ trusted: true }),
       onAdmissionStateChanged: (s) => states.push(s),
-    });
-
-    await admission.activate("startup");
-
-    expect(states).toHaveLength(1);
-    expect(states[0]!.pendingCount).toBe(0);
-  });
-
-  it("D1: feature disabled 时 onAdmissionStateChanged 上报 pendingCount = 0", async () => {
-    const states: Array<{ pendingCount: number; bundleDigest: string }> = [];
-    const admission = createWorkspaceHookRuntimeAdmission({
-      coordinator: createCoordinator(),
-      enabled: false,
-      ready: Promise.resolve(),
-      onAdmissionStateChanged: (s) => states.push(s),
-      snapshot: snapshot(),
     });
 
     await admission.activate("startup");

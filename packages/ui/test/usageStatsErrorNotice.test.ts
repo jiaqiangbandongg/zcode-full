@@ -2,7 +2,7 @@
 // 修复原因：团队套餐业务错误（如"仅企业主账号可查询企业汇总数据"、
 // "您当前暂无有效的团队套餐授权记录，无法创建API Key"）原先被 generic 文案
 // 掩盖，且后者含"授权"会被误判为 credential 错误走翻译文案。本文件锁定
-// 报错条参考 Plan Card teamUnavailable 样式原文展示业务错误的行为。
+// 报错条原文展示业务错误，不将其误分类为凭据错误。
 
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -36,20 +36,15 @@ function renderNotice(error: string): string {
 }
 
 describe("UsageStatsErrorNotice 团队套餐业务错误", () => {
-  it("原文展示企业主账号权限错误，参考 teamUnavailable 内联样式（InfoIcon + warning，无容器）", () => {
+  it("原文展示企业主账号权限错误并保留业务状态提示", () => {
     const html = renderNotice("仅企业主账号可查询企业汇总数据");
 
     expect(html).toContain("仅企业主账号可查询企业汇总数据");
     expect(html).not.toContain("usage.error.stats.generic");
     expect(html).toContain("lucide-info");
     expect(html).toContain("text-warning");
-    // 参考 Plan Card teamUnavailable：内联展示，无边框无背景容器
-    expect(html).not.toContain("rounded-lg");
-    expect(html).not.toContain("border-warning/30");
-    expect(html).not.toContain("bg-warning/10");
     // 业务错误不是凭据问题：不出现检查 API Key 入口
     expect(html).not.toContain("settings.usage.checkApiKey");
-    expect(html).not.toContain("border-destructive");
   });
 
   it("原文展示团队 API Key 创建失败 msg，即使包含授权字样也不走 credential 翻译", () => {
@@ -59,7 +54,6 @@ describe("UsageStatsErrorNotice 团队套餐业务错误", () => {
     expect(html).not.toContain("usage.error.stats.credential");
     expect(html).not.toContain("settings.usage.checkApiKey");
     expect(html).toContain("lucide-info");
-    expect(html).not.toContain("rounded-lg");
   });
 
   it("凭据错误保持翻译文案与检查 API Key 入口", () => {

@@ -199,6 +199,27 @@ Windows 执行 adapter 的最低兼容规则：
 
 ## ExecutionPort v1 契约
 
+### Bash 输出路径准备
+
+产品装配入口向 adapter 注入可选 `bashOutputTempDir`，先在系统临时目录的私有
+`zcode-bash-<随机标识>/<session>/<tool>-stdout.log` 创建并打开具名文件。
+目录不可用时复用原 `outputRootDir`，包括自定义 storageRoot；未注入该选项的 adapter 保持原行为。
+具体降级错误集合和保留规则见根目录 `docs/tmpdir-storage-paths-spec.md`。
+
+```mermaid
+flowchart LR
+    A[准备 Bash 输出] --> B{tmp 文件打开成功}
+    B -->|成功| D[实际路径、文件对象和编码]
+    B -->|目录不可用| C[原 storageRoot 文件准备]
+    C --> D
+    D --> E[记录后台路径并启动一次命令]
+    E --> F[stdout/stderr 直写同一 fd]
+```
+
+实际路径在准备后确定，再传入执行链路；移交后台不再次打开文件。准备期间取消或关闭须释放
+本次文件，不能启动子进程。初始化快照和启动脚本仍使用原根目录；不改搜索外壳与 watchdog。
+临时输出不随 adapter 关闭归档或批量删除，接受系统清理；App 存储占用暂不统计 tmp。
+
 `Bash` 不直接调用 `child_process`。所有子进程副作用必须收敛到 `ExecutionPort`，由 adapter 负责平台差异、进程生命周期和输出预算。
 
 输入语义：

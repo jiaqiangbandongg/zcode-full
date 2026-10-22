@@ -1,9 +1,7 @@
-name: Sync upstream
+name: Sync upstream (manual)
 
 on:
-  schedule:
-    # 每天北京时间 09:17 检查上游更新
-    - cron: "17 1 * * *"
+  # 已完成最后一次同步；保留手动入口，停止每日自动拉取和建 PR。
   workflow_dispatch:
 
 permissions:

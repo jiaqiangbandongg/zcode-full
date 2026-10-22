@@ -23,11 +23,11 @@ async function withApp(
   run: (input: {
     app: Awaited<ReturnType<typeof createZCodeApp>>;
     requests: ModelRequest[];
-    sessionStore: ReturnType<typeof createSqliteSessionStore>;
+    sessionStore: Awaited<ReturnType<typeof createSqliteSessionStore>>;
   }) => Promise<void>,
 ): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "zcode-dwf-on-demand-"));
-  const sessionStore = createSqliteSessionStore({ dbPath: ":memory:" });
+  const sessionStore = await createSqliteSessionStore({ dbPath: ":memory:" });
   const requests: ModelRequest[] = [];
   try {
     const app = await createZCodeApp({

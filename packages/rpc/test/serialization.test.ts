@@ -77,19 +77,3 @@ describe("serialization", () => {
     expect(deserialize(reader)).toEqual([1, 2]);
   });
 });
-
-describe("BufferReader / BufferWriter", () => {
-  it("should read sequentially", () => {
-    const buf = VSBuffer.fromString("abcdef");
-    const reader = new BufferReader(buf);
-    expect(reader.read(3).toString()).toBe("abc");
-    expect(reader.read(3).toString()).toBe("def");
-  });
-
-  it("BufferWriter should concat all writes", () => {
-    const writer = new BufferWriter();
-    writer.write(VSBuffer.fromString("hello"));
-    writer.write(VSBuffer.fromString(" world"));
-    expect(writer.buffer.toString()).toBe("hello world");
-  });
-});

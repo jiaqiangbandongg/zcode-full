@@ -9,7 +9,7 @@ import {
 import {
   openWorkspaceDraftFromSidebar,
   waitForActiveWorkspacePath,
-  waitForRestoredWorkspaceItems,
+  waitForRestoredProjects,
 } from "./helpers/workspace-agent-warmup.js";
 import {
   openFirstBrowserTab,
@@ -48,7 +48,7 @@ describe("Browser tab 跨 workspace 关闭通知 E2E", () => {
 
     await waitForWorkspaceApp(workspaceA, 30_000);
     await waitForActiveWorkspacePath(workspaceA);
-    await waitForRestoredWorkspaceItems(workspacePaths);
+    await waitForRestoredProjects(workspacePaths);
 
     await openFirstBrowserTab();
     const [tabIdA] = await readBrowserTabIds();

@@ -9,6 +9,6 @@
   "fileFixtures": [],
   "providerRequestPolicy": "none",
   "noProviderRequests": true,
-  "providerRequestReason": "CWP13 仅验证连接类型卡片的单击、双击、下一步与返回，不连接远端或发送模型请求。",
+  "providerRequestReason": "CWP20 仅验证聊天入口分类表单的单击、双击、选中态与匹配字段，以及取消回聊天后重新打开；断言零表单提交，不连接远端或发送模型请求。",
   "requests": []
 }

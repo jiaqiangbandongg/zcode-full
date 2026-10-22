@@ -76,7 +76,6 @@ test("the CreateWorkflow bypass persists no permission rule", async () => {
   assert.equal(result.decision, "allow");
   // 硬断言 2：没有任何权限规则被写回——gate 旁路 ≠ 权限旁路。
   assert.equal(result.permissionUpdates, undefined);
-  assert.equal("permissionUpdates" in result && result.permissionUpdates !== undefined, false);
 });
 
 test("other tools still raise an approval panel and stay pending", async () => {

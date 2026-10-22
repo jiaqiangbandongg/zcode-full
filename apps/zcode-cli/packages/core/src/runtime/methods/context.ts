@@ -82,7 +82,11 @@ export async function ensureContextInitialized(
     memoryIndexContent: this.memoryIndexContent,
     model,
   });
+  // Bug 根因：模型创建失败轮会在 Context 首次可初始化前接纳并持久化用户输入。
+  // init 会替换全部内存历史，因此先保留这些权威运行条目，再接到新建的 Context 前缀之后。
+  const preContextEntries = [...this.messageHistory.borrowReadOnlyRuntimeEntries()];
   this.initializeMessageHistoryFromContext(this.contextBuilder, traceContext);
+  this.messageHistory.addEntries(preContextEntries);
   this.contextInitialized = true;
 }
 
@@ -134,6 +138,7 @@ export function createContextBuilderFromSnapshot(
 
   const contextConfig: ContextBuilderConfig = {
     workingDirectory: snapshot.workingDirectory,
+    additionalDirectories: this.config.additionalDirectories,
     envInfo,
     model: options.model,
     presentationSurface: this.config.presentationSurface,

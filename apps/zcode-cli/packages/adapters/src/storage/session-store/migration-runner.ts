@@ -1,3 +1,6 @@
+import { dirname, join, basename } from "node:path";
+import { sqliteMigrations, MigrationChecksumError } from "@zcode/shared/sqlite-migrations";
+import type { MigrationResult } from "@zcode/shared/sqlite-migrations";
 import {
   classifyDatabaseStartupError,
   databaseMigrationIdSchema,
@@ -6,16 +9,19 @@ import {
 } from "@zcode/shared";
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import {
+  ensureSqliteSchemaMigrationTable,
+  SqliteSchemaMigrationChecksumError,
+} from "@zcode/shared/sqlite-migrations";
 import { SqliteSessionMigrationError } from "./errors.js";
 import { SQLITE_MIGRATIONS } from "./migrations.js";
-import type { SchemaMigrationRow } from "./rows.js";
+type SchemaMigrationRow = { id: string; checksum: string };
 
 export const DEFAULT_SQLITE_STARTUP_LOCK_TIMEOUT_MS = 5_000;
 
 const SQLITE_BUSY = 5;
 const WAL_RETRY_INITIAL_DELAY_MS = 10;
 const WAL_RETRY_MAX_DELAY_MS = 200;
-const waitBuffer = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 
 export type SqliteMigrationPhase =
   | "checking"
@@ -44,190 +50,77 @@ export interface AsyncSqliteMigrationOptions {
 
 export const DEFAULT_SQLITE_MIGRATION_WAIT_MS = 60 * 60_000;
 const ASYNC_NATIVE_BUSY_TIMEOUT_MS = 25;
-type MigrationStep = SqliteMigrationProgress | { delayMs: number };
 
-export function runSqliteSessionMigrations(
-  db: DatabaseSync,
-  dbPath: string,
-  lockTimeoutMs = DEFAULT_SQLITE_STARTUP_LOCK_TIMEOUT_MS,
-): void {
-  for (const step of migrationSteps(db, dbPath, lockTimeoutMs)) {
-    if ("delayMs" in step) waitSync(step.delayMs);
-  }
+export async function runSqliteSessionMigrations(
+  db: DatabaseSync, dbPath: string, lockTimeoutMs = DEFAULT_SQLITE_STARTUP_LOCK_TIMEOUT_MS,
+): Promise<MigrationResult> {
+  return runSqliteSessionMigrationsAsync(db, dbPath, { lockWaitTimeoutMs: lockTimeoutMs });
 }
 
 export async function runSqliteSessionMigrationsAsync(
-  db: DatabaseSync,
-  dbPath: string,
-  options: AsyncSqliteMigrationOptions = {},
-): Promise<void> {
-  // 同步 SQLite 仅短暂等待一次；真正的启动等待让出事件循环，通知可以先 flush。
-  // 业务连接不能继承升级的一小时等待预算。迁移结束（含失败）恢复原有 5 秒策略。
-  db.exec(`pragma busy_timeout = ${ASYNC_NATIVE_BUSY_TIMEOUT_MS}`);
-  const steps = migrationSteps(
-    db,
-    dbPath,
-    options.lockWaitTimeoutMs ?? DEFAULT_SQLITE_MIGRATION_WAIT_MS,
-  );
-  let failed = false;
-  try {
-    for (const step of steps) {
-      if ("delayMs" in step)
-        await new Promise<void>((resolve) => setTimeout(resolve, step.delayMs));
-      else if (step.phase === "failed") {
-        try {
-          await options.onProgress?.(step);
-        } catch {
-          /* 错误通知失败不能覆盖原数据库异常。 */
-        }
-      } else await options.onProgress?.(step);
-    }
-  } catch (error) {
-    failed = true;
-    throw error;
-  } finally {
-    // 通知传输失败也会关闭 generator 的事务，不能将半迁移连接交给业务。
-    try {
-      steps.return();
-      db.exec(`pragma busy_timeout = ${DEFAULT_SQLITE_STARTUP_LOCK_TIMEOUT_MS}`);
-    } catch (error) {
-      if (!failed) throw error;
-    }
-  }
-}
-
-function* migrationSteps(
-  db: DatabaseSync,
-  dbPath: string,
-  lockTimeoutMs: number,
-): Generator<MigrationStep, void> {
+  db: DatabaseSync, dbPath: string, options: AsyncSqliteMigrationOptions = {},
+): Promise<MigrationResult> {
   const startedAt = Date.now();
-  const deadline = startedAt + Math.max(0, lockTimeoutMs);
-  let migrationFacts: DatabaseMigrationFacts | undefined;
-  const progress = (phase: SqliteMigrationPhase): SqliteMigrationProgress => ({
-    phase,
-    elapsedMs: Date.now() - startedAt,
-    ...(migrationFacts ? { migration: { ...migrationFacts } } : {}),
-  });
-  let transactionStarted = false;
-  function* acquire(operation: () => void): Generator<MigrationStep, void> {
-    // 每个拿锁阶段独立报告：预检前的未知等待不能吞掉确认迁移后的等待。
-    let waitingReported = false;
-    let retryDelayMs = WAL_RETRY_INITIAL_DELAY_MS;
-    while (true) {
-      try {
-        operation();
-        return;
-      } catch (error) {
-        // SQLITE_LOCKED 常指同连接/共享缓存冲突；只重试外部写者竞争的 SQLITE_BUSY。
+  const deadline = startedAt + (options.lockWaitTimeoutMs ?? DEFAULT_SQLITE_MIGRATION_WAIT_MS);
+  let migration: DatabaseMigrationFacts | undefined;
+  let migrationId: string | undefined;
+  let progressError: unknown;
+  const progress = async (phase: SqliteMigrationPhase, extra: Partial<SqliteMigrationProgress> = {}) => {
+    try { await options.onProgress?.({ phase, elapsedMs: Date.now() - startedAt, ...(migration ? { migration: { ...migration } } : {}), ...extra }); }
+    catch (error) { progressError = error; throw error; }
+  };
+  const acquire = async (operation: () => void) => {
+    let waiting = false;
+    let delay = WAL_RETRY_INITIAL_DELAY_MS;
+    for (;;) {
+      try { operation(); return; } catch (error) {
         if (!isSqliteBusyError(error)) throw error;
-        const remainingMs = deadline - Date.now();
-        if (remainingMs <= 0) throw lockTimeoutError(error, dbPath);
-        if (!waitingReported) {
-          waitingReported = true;
-          yield progress("waiting_for_lock");
-        }
-        yield { delayMs: Math.min(remainingMs, retryDelayMs) };
-        retryDelayMs = Math.min(WAL_RETRY_MAX_DELAY_MS, retryDelayMs * 2);
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw lockTimeoutError(error, dbPath);
+        if (!waiting) { waiting = true; await progress("waiting_for_lock"); }
+        await new Promise<void>((resolve) => setTimeout(resolve, Math.min(delay, remaining)));
+        delay = Math.min(WAL_RETRY_MAX_DELAY_MS, delay * 2);
       }
     }
-  }
+  };
+  db.exec(`pragma busy_timeout = ${ASYNC_NATIVE_BUSY_TIMEOUT_MS}`);
   try {
-    yield progress("checking");
+    await progress("checking");
     db.exec("pragma foreign_keys = on");
-    yield* acquire(() => {
+    await acquire(() => {
       const current = readJournalMode(db);
       if (current === "wal" || isMemoryJournalMode(dbPath, current)) return;
       const mode = readJournalMode(db, true);
-      if (mode !== "wal" && !isMemoryJournalMode(dbPath, mode)) {
-        throw new SqliteSessionMigrationError(
-          `SQLite refused WAL journal mode for ${dbPath}; received ${mode}`,
-          { dbPath, kind: "sql_failed" },
-        );
-      }
+      if (mode !== "wal" && !isMemoryJournalMode(dbPath, mode))
+        throw new SqliteSessionMigrationError(`SQLite refused WAL journal mode for ${dbPath}; received ${mode}`, { dbPath, kind: "sql_failed" });
     });
-    // 预检只决定展示；真正执行仍在拿锁后逐项核对，其他窗口完成后不会重复迁移。
-    yield* acquire(() => {
-      migrationFacts = {
-        kind: inspectMigrationKind(db, dbPath),
-        executedCount: 0,
-        committedCount: 0,
-      };
-    });
-    yield progress("checking");
-    // SQLite 是唯一协调者；拿锁后读取真实账本，等待者不会重复迁移已提交项。
-    yield* acquire(() => db.exec("begin immediate"));
-    transactionStarted = true;
-    db.exec(`create table if not exists schema_migration (
-      id text primary key, checksum text not null, app_version text, time_applied integer not null
-    )`);
-    // 拿锁后记录起点，避免预检时其他写者尚未提交；后续迁移不得覆盖它。
+    await acquire(() => { migration = { kind: inspectMigrationKind(db, dbPath), executedCount: 0, committedCount: 0 }; });
+    await progress("checking");
+    await acquire(() => db.exec("begin immediate"));
+    ensureSqliteSchemaMigrationTable(db);
     const baseline = db.prepare("SELECT id FROM schema_migration ORDER BY id DESC LIMIT 1").get();
-    if (migrationFacts)
-      migrationFacts.lastAppliedMigrationId = baseline
-        ? databaseMigrationIdSchema.safeParse(baseline.id).data
-        : null;
-    let completed = 0;
-    for (const migration of SQLITE_MIGRATIONS) {
-      try {
-        const checksum = migrationChecksum(migration.sql);
-        const applied = readAppliedMigration(db, migration.id);
-        if (applied) {
-          ensureMigrationChecksum(migration.id, applied.checksum, checksum, dbPath);
-          completed++;
-          continue;
-        }
-        // 预检后出现新待执行项时，以锁内账本为准提升种类，不能带 none 执行 SQL。
-        if (migrationFacts?.kind === "none") migrationFacts.kind = "upgrade";
-        yield {
-          ...progress("migrating"),
-          migrationId: migration.id,
-          completed,
-          total: SQLITE_MIGRATIONS.length,
-        };
-        // 本 hotfix 只调整启动等待；执行与账本校验共用冻结原 SQL，避免维护两套转换语义。
-        db.exec(migration.sql);
-        if (migrationFacts) migrationFacts.executedCount++;
-        db.prepare(
-          "insert into schema_migration (id, checksum, app_version, time_applied) values (?, ?, ?, ?)",
-        ).run(migration.id, checksum, migration.appVersion, Date.now());
-        completed++;
-      } catch (error) {
-        throw normalizeMigrationError(error, dbPath, migration.id);
-      }
-    }
-    yield progress("committing");
-    db.exec("commit");
-    transactionStarted = false;
-    if (migrationFacts) migrationFacts.committedCount = migrationFacts.executedCount;
-    yield progress("ready");
+    migration!.lastAppliedMigrationId = baseline ? databaseMigrationIdSchema.safeParse(baseline.id).data : null;
+    const directory = dirname(dbPath);
+    const dataRoot = basename(directory) === "db" && basename(dirname(directory)) === "cli" ? dirname(dirname(directory)) : directory;
+    const result = await sqliteMigrations.migrate(db, SQLITE_MIGRATIONS, {
+      database: "cli", transactionOpen: true, appliedAtColumn: "time_applied", backupDirectories: [join(dataRoot, "backup")],
+      onBeforeApply: async (id) => { migrationId = id; if (migration!.kind === "none") migration!.kind = "upgrade"; await progress("migrating", { migrationId: id, completed: migration!.executedCount, total: SQLITE_MIGRATIONS.length }); },
+      onApplied: () => { migration!.executedCount++; },
+      onCommitting: () => progress("committing"),
+      onBackupSkipped: () => process.emitWarning(`SQLite migration backup skipped: ${dbPath}`, { code: "ZCODE_MIGRATION_BACKUP_SKIPPED" }),
+    });
+    migration!.committedCount = migration!.executedCount;
+    await progress("ready");
+    return result;
   } catch (error) {
-    // 先回滚，再通知失败；通知不能让业务看到仍在事务内的 failed。
-    if (transactionStarted && db.isTransaction) {
-      try {
-        db.exec("rollback");
-      } catch {
-        /* 关闭连接时恢复，保留原始异常。 */
-      }
-    }
-    transactionStarted = false;
-    const normalized = normalizeMigrationError(error, dbPath);
-    yield {
-      ...progress("failed"),
-      errorCode: normalized.kind,
-      ...databaseStartupErrorDetails(normalized),
-      migrationId: normalized.migrationId,
-    };
-    throw normalized;
-  } finally {
-    if (transactionStarted && db.isTransaction) {
-      try {
-        db.exec("rollback");
-      } catch {
-        /* 调用方关闭连接，保留原始异常。 */
-      }
-    }
-  }
+    if (db.isTransaction) { try { db.exec("rollback"); } catch { /* 保留首个错误。 */ } }
+    const normalized = error instanceof MigrationChecksumError
+      ? new SqliteSessionMigrationError(error.message, { cause: error, dbPath, kind: "checksum_mismatch", migrationId: error.migrationId })
+      : normalizeMigrationError(error, dbPath, migrationId);
+    try { await progress("failed", { errorCode: normalized.kind, ...databaseStartupErrorDetails(normalized), migrationId: normalized.migrationId }); } catch { /* 通知失败不覆盖数据库错误。 */ }
+    // 通知端口的异常保留原始对象，不能被数据库错误包装或 close 掩盖。
+    throw error === progressError ? error : normalized;
+  } finally { if (db.isOpen) db.exec(`pragma busy_timeout = ${DEFAULT_SQLITE_STARTUP_LOCK_TIMEOUT_MS}`); }
 }
 
 function isSqliteBusyError(error: unknown): boolean {
@@ -252,9 +145,6 @@ function readJournalMode(db: DatabaseSync, enableWal = false): string {
   return typeof mode === "string" ? mode.toLowerCase() : "unknown";
 }
 
-function waitSync(delayMs: number): void {
-  Atomics.wait(waitBuffer, 0, 0, Math.max(1, Math.ceil(delayMs)));
-}
 
 function normalizeMigrationError(
   error: unknown,
@@ -262,6 +152,13 @@ function normalizeMigrationError(
   migrationId?: string,
 ): SqliteSessionMigrationError {
   if (error instanceof SqliteSessionMigrationError) return error;
+  if (error instanceof SqliteSchemaMigrationChecksumError) {
+    return new SqliteSessionMigrationError(error.message, {
+      dbPath,
+      kind: "checksum_mismatch",
+      migrationId: error.migrationId,
+    });
+  }
   if (isSqliteBusyError(error)) return lockTimeoutError(error, dbPath, migrationId);
   return new SqliteSessionMigrationError(
     migrationId

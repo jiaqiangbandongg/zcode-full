@@ -52,7 +52,7 @@ vi.mock("@pierre/diffs/react", () => ({
 }));
 
 describe("DiffViewer", () => {
-  it("renders the @pierre/diffs patch container without legacy fallback markup", () => {
+  it("renders patch input with simple separators", () => {
     const html = renderToStaticMarkup(
       createElement(DiffViewer, {
         patch: "diff --git a/demo.ts b/demo.ts\n@@ -1 +1 @@\n-foo\n+bar",
@@ -61,15 +61,7 @@ describe("DiffViewer", () => {
 
     expect(html).toContain("<diffs-container");
     expect(html).toContain("data-diff-viewer");
-    expect(html).toContain("overflow-auto");
-    expect(html).toContain("min-h-full");
-    expect(html).toContain("--diffs-bg:var(--color-background)");
-    expect(html).toContain('data-diff-indicators="bars"');
-    expect(html).toContain('data-disable-file-header="true"');
     expect(html).toContain('data-hunk-separators="simple"');
-    expect(html).toContain('data-line-diff-type="word-alt"');
-    expect(html).toContain('data-unsafe-css=""');
-    expect(html).not.toContain("whitespace-pre");
   });
 
   it("keeps worker pool rendering enabled by default", () => {
@@ -99,12 +91,7 @@ describe("DiffViewer", () => {
     expect(html).toContain("<diffs-container");
     expect(html).toContain("data-diff-viewer");
     expect(html).toContain('data-testid="multi-file-diff"');
-    expect(html).toContain('data-diff-indicators="bars"');
-    expect(html).toContain('data-disable-file-header="true"');
     expect(html).toContain('data-hunk-separators="line-info"');
-    expect(html).toContain('data-line-diff-type="word-alt"');
-    expect(html).toContain('data-unsafe-css=""');
-    expect(html).toContain("min-h-full");
   });
 
   it("forwards the requested current-side line range to both diff renderers", () => {

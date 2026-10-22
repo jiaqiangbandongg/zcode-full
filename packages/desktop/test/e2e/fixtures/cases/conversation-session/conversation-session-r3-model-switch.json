@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-model-switch",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-model-switch.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-model-switch.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-switch-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-switch-slow",
+      "description": "Model A 慢回合",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "切换需要 running 窗口"
+    },
+    {
+      "id": "r3-switch-model-b",
+      "description": "请求体为 Model B 的回合",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "观察请求体 model 字段"
+    },
+    {
+      "id": "r3-switch-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/fork/edit"
+    }
+  ]
+}

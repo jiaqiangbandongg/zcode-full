@@ -160,21 +160,11 @@ describe("TaskList change summary", () => {
     expect(html).toContain("-3");
   });
 
-  it("timeline variant 在闲置状态显示灰点", () => {
+  it("无状态时 timeline 与默认任务行都不显示圆点", () => {
     const html = renderTaskItem(undefined, { variant: "timeline" });
     const defaultHtml = renderTaskItem();
 
-    expect(html).toContain('data-idle-indicator="true"');
+    expect(html).not.toContain('data-idle-indicator="true"');
     expect(defaultHtml).not.toContain('data-idle-indicator="true"');
-  });
-
-  it("workspace 和 timeline 标题交给运行时溢出测量，不默认挂载渐隐", () => {
-    const defaultHtml = renderTaskItem();
-    const timelineHtml = renderTaskItem(undefined, { variant: "timeline" });
-
-    expect(defaultHtml).not.toContain("mask-image:linear-gradient");
-    expect(timelineHtml).not.toContain("mask-image:linear-gradient");
-    expect(defaultHtml).not.toContain("truncate text-ui-base text-foreground");
-    expect(timelineHtml).not.toContain("truncate text-ui-base text-foreground");
   });
 });

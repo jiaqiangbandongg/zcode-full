@@ -12,6 +12,57 @@ function view(revision: number, providerId: string): ModelSelectionView {
 }
 
 describe("useModelSelectionServiceView", () => {
+  it("同 Host 调档或切模型保留纯目录，待解析状态不能冒充 ready，迟到结果不得覆盖", async () => {
+    const reads: Array<(value: ModelSelectionView) => void> = [];
+    const service: IModelSelectionService = {
+      getView: () => new Promise((resolve) => reads.push(resolve)),
+      onDidChange: () => ({ dispose: vi.fn() }),
+    };
+    const first = { providerId: "p", modelId: "m1", options: { reasoningLevel: "low" } };
+    const hook = renderHook(
+      ({ selection }) =>
+        useModelSelectionServiceView(service, true, "remote-waiting", { selection }),
+      { initialProps: { selection: first } },
+    );
+    const initial = { ...view(1, "p"), effectiveSelection: first, preferredSelection: first };
+    await act(async () => reads[0]!(initial));
+    hook.rerender({ selection: { ...first, options: { reasoningLevel: "high" } } });
+    const expected = { status: "loading", catalog: { revision: 1, providers: initial.providers } };
+    expect(hook.result.current.state).toEqual(expected);
+    const next = { ...first, modelId: "m2" };
+    hook.rerender({ selection: next });
+    expect(hook.result.current.state).toEqual(expected);
+    const otherProvider = { ...next, providerId: "other" };
+    hook.rerender({ selection: otherProvider });
+    expect(hook.result.current.state).toEqual(expected);
+    await act(async () => reads[3]!({ ...view(2, "other"), effectiveSelection: otherProvider }));
+    await act(async () => reads[2]!({ ...view(1, "p"), effectiveSelection: next }));
+    await act(async () => reads[1]!(initial));
+    expect(hook.result.current.state).toMatchObject({
+      status: "ready",
+      view: { effectiveSelection: otherProvider },
+    });
+  });
+
+  it("已显示的目录不能跨 Host 或禁用边界保留", async () => {
+    const first: IModelSelectionService = {
+      getView: async () => view(1, "local"),
+      onDidChange: () => ({ dispose: vi.fn() }),
+    };
+    const next: IModelSelectionService = {
+      getView: () => new Promise(() => {}),
+      onDidChange: () => ({ dispose: vi.fn() }),
+    };
+    const hook = renderHook(
+      ({ service, enabled }) => useModelSelectionServiceView(service, enabled),
+      { initialProps: { service: first, enabled: true } },
+    );
+    await waitFor(() => expect(hook.result.current.state.status).toBe("ready"));
+    hook.rerender({ service: next, enabled: true });
+    expect(hook.result.current.state).toEqual({ status: "loading" });
+    hook.rerender({ service: next, enabled: false });
+    expect(hook.result.current.state).toEqual({ status: "unavailable", reason: "remote-waiting" });
+  });
   it("重新进入设置读取当前连接；已挂载时通过同一订阅更新，不需额外 Provider 强刷", async () => {
     let latest = view(1, "account:bigmodel-start-plan");
     const listeners = new Set<(value: ModelSelectionView) => void>();
@@ -257,14 +308,51 @@ describe("useModelSelectionServiceView", () => {
     await waitFor(() => expect(hook.result.current.state.status).toBe("ready"));
     act(() => hook.result.current.reload());
     await waitFor(() => expect(getView).toHaveBeenCalledTimes(2));
-    expect(hook.result.current.state).toMatchObject({
-      status: "ready",
-      view: { revision: 5 },
-    });
+    await waitFor(() =>
+      expect(hook.result.current.state).toMatchObject({
+        status: "ready",
+        view: { revision: 5 },
+        refreshError: { revision: 5, error: new Error("refresh failed") },
+      }),
+    );
     act(() => listener?.(view(6, "recovered-by-event")));
     expect(hook.result.current.state).toMatchObject({
       status: "ready",
       view: { revision: 6 },
     });
+    expect(hook.result.current.state).not.toHaveProperty("refreshError");
   });
+});
+
+it("显式展示重读共享请求归属：旧请求迟到失败不覆盖新重试的同 revision 成功", async () => {
+  let rejectOld!: (error: Error) => void;
+  const getView = vi
+    .fn()
+    .mockResolvedValueOnce(view(1, "p"))
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectOld = reject;
+        }),
+    )
+    .mockResolvedValueOnce(view(2, "p"));
+  const service = { getView, onDidChange: () => ({ dispose: vi.fn() }) } as IModelSelectionService;
+  const hook = renderHook(() =>
+    useModelSelectionServiceView(service, true, "remote-waiting", {
+      selection: { providerId: "p", modelId: "m" },
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.state.status).toBe("ready"));
+  let old!: ReturnType<typeof hook.result.current.refresh>;
+  act(() => {
+    old = hook.result.current.refresh();
+  });
+  await act(async () => {
+    await hook.result.current.refresh();
+  });
+  await act(async () => {
+    rejectOld(new Error("old operation failed"));
+    await expect(old).resolves.toEqual({ kind: "superseded" });
+  });
+  expect(hook.result.current.state).toEqual({ status: "ready", view: view(2, "p") });
 });

@@ -36,9 +36,6 @@ import {
   V4_NOTIFICATIONS,
 } from "@zcode/shared/zcode-protocol-v4";
 import {
-  DEFAULT_SESSION_RESIDENT_HIGH_WATER_COUNT,
-  DEFAULT_SESSION_RESIDENT_IDLE_TIMEOUT_MS,
-  DEFAULT_SESSION_RESIDENT_TARGET_COUNT,
   SessionResidentPool,
   type SessionDeactivationDecision,
   type SessionResidencyFacts,
@@ -150,12 +147,6 @@ async function waitForAll(pool: SessionResidentPool, sessionIds: string[]): Prom
 }
 
 describe("SessionResidentPool", () => {
-  it("默认混合策略为 idle 10 分钟、highWater 16、target 8", () => {
-    expect(DEFAULT_SESSION_RESIDENT_TARGET_COUNT).toBe(8);
-    expect(DEFAULT_SESSION_RESIDENT_HIGH_WATER_COUNT).toBe(16);
-    expect(DEFAULT_SESSION_RESIDENT_IDLE_TIMEOUT_MS).toBe(10 * 60 * 1_000);
-  });
-
   it.each([
     [{ targetCount: -1 }, "targetCount"],
     [{ targetCount: 3, highWaterCount: 2 }, "highWaterCount"],
@@ -646,7 +637,7 @@ describe("deactivateSessionRecord（执行面）", () => {
 
 const WORKSPACE_PATH = "/workspace/idle-deactivation";
 const SESSION_ID = "sess_idle_deactivate" as SessionId;
-type TestSessionStore = ReturnType<typeof createSqliteSessionStore>;
+type TestSessionStore = Awaited<ReturnType<typeof createSqliteSessionStore>>;
 
 async function requestResult(server: ZCodeProtocolAgentServer, message: ZCodeProtocolMessage) {
   const response = await server.handleMessage(message);
@@ -700,7 +691,7 @@ async function saveTextMessage(
 }
 
 async function seedPersistedSession(dbPath: string): Promise<void> {
-  const store = createSqliteSessionStore({ dbPath });
+  const store = await createSqliteSessionStore({ dbPath });
   try {
     await store.createSession({
       id: SESSION_ID,
@@ -734,14 +725,14 @@ interface IntegrationHarness {
   sessions: Map<string, ZCodeProtocolSessionRecord>;
 }
 
-function bootServer(
+async function bootServer(
   dbPath: string,
   options: {
     appOverrides?: Partial<ZCodeApp>;
     poolOptions?: SessionResidentPoolOptions;
   } = {},
-): IntegrationHarness {
-  const store = createSqliteSessionStore({ dbPath });
+): Promise<IntegrationHarness> {
+  const store = await createSqliteSessionStore({ dbPath });
   const createdApps: ZCodeApp[] = [];
   const server = new ZCodeProtocolAgentServer({
     createZCodeApp: (appOptions) => {
@@ -804,7 +795,7 @@ describe("session resident pool（集成：真 sqlite + server + binder）", () 
     const dbPath = join(tempRoot, "sessions.db");
     await seedPersistedSession(dbPath);
     const clock = createTestClock(1_000);
-    const { server, store, createdApps, sessions } = bootServer(dbPath, {
+    const { server, store, createdApps, sessions } = await bootServer(dbPath, {
       poolOptions: {
         highWaterCount: 16,
         idleTimeoutMs: 100,
@@ -919,7 +910,7 @@ describe("session resident pool（集成：真 sqlite + server + binder）", () 
       releaseClose = resolve;
     });
     let closeCount = 0;
-    const { server, store, createdApps, sessions } = bootServer(dbPath, {
+    const { server, store, createdApps, sessions } = await bootServer(dbPath, {
       appOverrides: {
         close: async () => {
           closeCount += 1;

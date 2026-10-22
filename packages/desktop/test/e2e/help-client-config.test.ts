@@ -102,11 +102,13 @@ describe("帮助配置 client/configs", () => {
     });
     await command("openCommunity");
     await expectExternal(fixture.remote.community_urls!["zh-CN"]!);
-    expect(server.requests).toHaveLength(1);
-    const query = new URL(server.requests[0]!.url, server.origin).searchParams;
+    // 同一端点也被 Host Provider Config 拉取（带 x-request-id）；缓存断言只统计 Main 的帮助请求。
+    const helpRequests = server.requests.filter((request) => !request.headers["x-request-id"]);
+    expect(helpRequests).toHaveLength(1);
+    const query = new URL(helpRequests[0]!.url, server.origin).searchParams;
     expect(query.get("app_version")).toBeTruthy();
     expect(query.get("platform")).toBe(`${process.platform}-${process.arch}`);
-    expect(server.requests[0]!.headers.authorization).toBeUndefined();
+    expect(helpRequests[0]!.headers.authorization).toBeUndefined();
   });
 
   it("HC-02: 英文缺失只回退英文内置值", async () => {

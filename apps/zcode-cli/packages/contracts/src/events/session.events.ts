@@ -315,6 +315,20 @@ export type WorkflowNotificationMeta =
       cap?: number;
     };
 
+/**
+ * 主代理闲着、run 还欠着决定时的提醒：每个 run 一条，带发出那一刻开着的问题数、等着的留白数与
+ * 其中最久的等待。不是 run 事件——由父会话的空闲钟发出。
+ *
+ * 它是 originMeta 上独立的键，不是 WorkflowNotificationMeta 的成员：那个 union 在线上是闭集，多一个
+ * kind 会让不认识它的客户端拒掉整帧、打不开会话；不认识的键只是被剥掉
+ * （docs/dynamic-workflow/transcript-and-notifications.md「The payload」）。
+ */
+export interface WorkflowBlockedMeta {
+  questions: number;
+  holes: number;
+  sinceMs: number;
+}
+
 /** 独立后台结果轮的展示元信息；批量轮可复用代表任务身份并合成 title，不从通知文本反向解析。 */
 export interface BackgroundResultOriginMeta {
   /** `workflow` 是 dynamic-workflow run（workId ≡ runId），复用整条后台通知管线。 */
@@ -323,6 +337,8 @@ export interface BackgroundResultOriginMeta {
   title: string;
   /** 只在 backgroundSource === "workflow" 的单条通知轮上在场；manifest 渲染的唯一数据源。 */
   workflowNotification?: WorkflowNotificationMeta;
+  /** 空闲提醒的载荷；与 workflowNotification 至多在场一个。 */
+  workflowBlocked?: WorkflowBlockedMeta;
 }
 
 /**
@@ -732,7 +748,10 @@ export interface ModelSelectedPayload {
  * 执行 Selection 退回会话 Selection 的原因，与 @zcode/shared 的 selectionFallback 规则同值域：
  * 卡过期由声明的 provider 错误码命中，其余任何加速请求失败归为 request_failed。
  */
-export type TurnExecutionModelFallbackReason = "highspeed_card_expired" | "highspeed_request_failed";
+export type TurnExecutionModelFallbackReason =
+  | "highspeed_card_expired"
+  | "highspeed_request_failed"
+  | "highspeed_selection_unavailable";
 
 export interface TurnExecutionModelFallbackPayload {
   inputId?: string;
@@ -920,6 +939,8 @@ export interface ToolCallResultPayload {
   duration: number;
   /** Skill metadata 仅用于 telemetry，不进入模型可见的 result.content。 */
   skillMetadata?: SkillTelemetryMetadata;
+  /** 执行时 ToolEntry 的插件归属，不从工具名称推断。 */
+  pluginId?: string;
 }
 
 export interface ToolCallErrorPayload {
@@ -927,6 +948,8 @@ export interface ToolCallErrorPayload {
   error: ErrorPayload;
   /** Skill metadata 仅用于 telemetry，不进入模型可见的错误正文。 */
   skillMetadata?: SkillTelemetryMetadata;
+  /** 执行时 ToolEntry 的插件归属，不从工具名称推断。 */
+  pluginId?: string;
 }
 
 export interface ToolBatchCompletePayload {
@@ -1212,6 +1235,13 @@ export interface ErrorAttribution {
   statusCode?: number;
   providerErrorCode?: string;
   retryable?: boolean;
+  /** string=使用该 Highspeed 卡，null=明确未使用，undefined=旧 Agent 未发布。 */
+  highspeedCardId?: string | null;
+  /**
+   * true=本轮 Highspeed 创建期或请求期失败已命中退回声明，但所有退回目标都无法创建，整轮按真实错误
+   * 结束。Renderer 据此作废匹配卡；不再按错误码推断，请求期 3402/网络失败的 code 是 provider 错误码。
+   */
+  highspeedFallbackUnavailable?: boolean;
 }
 
 // CollaborationMode and RiskLevel are re-exported from ports
@@ -1248,6 +1278,11 @@ export function createModelUsageSummaryFromEvents(
   const usages: ModelUsage[] = [];
 
   for (const event of events) {
+    if (event.type === SessionEventType.ModelNetworkStatus) {
+      const payload = event.payload as ModelNetworkStatusEvent;
+      // 成功请求由 ModelComplete 计入；只补充失败请求的已报告用量，避免双计。
+      if (payload.type === "model_request_failed" && payload.usage) usages.push(payload.usage);
+    }
     if (event.type !== SessionEventType.ModelComplete) continue;
     const payload = event.payload as Partial<ModelCompletePayload>;
     if (payload.usage) {

@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-toolsearch-local-feedback",
+  "spec": "./test/e2e/conversation-session/conversation-session-toolsearch-local-feedback.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-toolsearch-local-feedback.json"
+  ],
+  "fileFixtures": [],
+  "providerHarness": "./test/e2e/helpers/toolsearch-cli-process.ts",
+  "requests": [
+    {
+      "id": "conversation-session-toolsearch-local-feedback-first-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-first-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-mixed-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-mixed-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-repeat-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-repeat-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-resident-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-resident-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-parallel-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-parallel-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-cold-repeat-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-cold-repeat-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-wrapper-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-wrapper-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-direct-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-direct-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-select-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-promoted-select-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-search-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-search-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-wrapper-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-new-wrapper-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-done-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-done-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-summary-json",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    },
+    {
+      "id": "conversation-session-toolsearch-local-feedback-summary-stream",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "受控模型响应触发逐项反馈和 compact 提升；真实工具、HTTP、SQLite 和模型日志走产品链路。"
+    }
+  ],
+  "notes": "Pending; controlled provider responses, actual process and HTTP model-io evidence. No real model cache/bench claim; not admitted to Docker."
+}

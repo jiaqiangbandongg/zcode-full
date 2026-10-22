@@ -1,5 +1,7 @@
 # Multi-Workspace / `--add-dir` 设计草案 v2
 
+> 历史草案：2026-09 虚拟项目重构没有采用本文的多工作区模型。现行方案是 Host 解析项目 roots 后经协议只传目录列表（`additionalDirectories`），CLI 不感知项目，附加目录仅供 skills / commands / subagents 与可写范围消费；见 `docs/superpowers/specs/2026-09-09-virtual-project-design.md` 第 4.3 节。下文只作历史记录。
+
 ## 目标
 
 给 ZCode CLI 增加显式多工作区能力，让一次 session 可以同时面向一个主工作区和多个额外工作区。
@@ -63,9 +65,9 @@
 type WorkspaceRootRole = "primary" | "additional";
 
 interface WorkspaceRoot {
-  path: string;          // canonical absolute path
+  path: string; // canonical absolute path
   role: WorkspaceRootRole;
-  label?: string;        // basename by default
+  label?: string; // basename by default
 }
 
 interface WorkspaceScope {

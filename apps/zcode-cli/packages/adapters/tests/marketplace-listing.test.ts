@@ -115,6 +115,15 @@ describe("marketplace store listing", () => {
     expect(parseEntryStoreListing({ name: "x", author: "Acme" })).toEqual({ author: "Acme" });
   });
 
+  it("preserves publisher classification independently of usage category", () => {
+    expect(parseEntryStoreListing({ publisherType: "community", category: "productivity" }))
+      .toEqual({ publisherType: "community", category: "productivity" });
+    expect(parseEntryStoreListing({ publisherType: "official" }))
+      .toEqual({ publisherType: "official" });
+    expect(parseEntryStoreListing({ publisherType: "personal" })).toBeUndefined();
+    expect(parseEntryStoreListing({ publisherType: true })).toBeUndefined();
+  });
+
   it("returns manifest display metadata from describeMarketplacePlugin for installed plugins", async () => {
     const storageRoot = await makeStorageRoot("zcode-describe-metadata-");
     const pluginRoot = join(storageRoot, "cache", "hello-market", "hello", "1.2.3");

@@ -5,6 +5,9 @@ import {
   type WebRemoteControlRpcTransportPayload,
 } from "@zcode/shared";
 
+const REMOTE_WORKSPACE_IDENTITY = "remote:ssh:test-host:/workspace/demo";
+const REMOTE_SESSION_ID = "remote-session-1";
+
 const testState = vi.hoisted(() => ({
   relayProtocolOptions: [] as Array<{
     bridgeSessionId: string;
@@ -15,6 +18,7 @@ const testState = vi.hoisted(() => ({
     flushPendingFrames: ReturnType<typeof vi.fn>;
     markDegraded(reasonCode?: string): void;
     replayUnacknowledged: ReturnType<typeof vi.fn>;
+    dispose: ReturnType<typeof vi.fn>;
   }>,
   transportOptions: [] as Array<{
     onPayload(payload: WebRemoteControlAppPayload): void;
@@ -22,7 +26,10 @@ const testState = vi.hoisted(() => ({
     onSendReady?(event: { kind: "same-socket" | "reconnected-socket" }): void;
     onStateChange(state: string): void;
   }>,
+  failBridgeOpen: false,
+  useRemoteWorkspace: false,
   recoverConnectionCalls: 0,
+  transportDisposeCalls: 0,
   desktopAppVersion: undefined as string | undefined,
   deferBootstrap: false,
   bootstrapReplies: [] as Array<() => void>,
@@ -32,10 +39,11 @@ const testState = vi.hoisted(() => ({
 }));
 
 const renderMock = vi.fn();
+const reloadMock = vi.fn();
 const navigateMock = vi.fn();
 const noticeMock = vi.fn();
 
-vi.mock("../src/webRemoteControlVersionNotice.js", () => ({
+vi.mock("#src/web-remote-control/ui/webRemoteControlVersionNotice.js", () => ({
   showWebRemoteControlVersionNotice: (...args: unknown[]) => {
     noticeMock(...args);
     return () => {};
@@ -91,8 +99,11 @@ vi.mock("@zcode/client", () => ({
   }),
 }));
 
-vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/webRemoteControlTransport.js")>();
+vi.mock("#src/web-remote-control/adapters/webRemoteControlTransport.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("#src/web-remote-control/adapters/webRemoteControlTransport.js")
+    >();
 
   return {
     ...actual,
@@ -115,6 +126,19 @@ vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
       sendPayload(payload: WebRemoteControlAppPayload): boolean {
         testState.sentPayloads.push(payload);
         if (payload.zcode_type === "bootstrap-request") {
+          const workspace = testState.useRemoteWorkspace
+            ? {
+                workspacePath: "/workspace/demo",
+                workspaceIdentity: REMOTE_WORKSPACE_IDENTITY,
+                remoteSessionId: REMOTE_SESSION_ID,
+                label: "demo",
+                kind: "remote" as const,
+              }
+            : {
+                workspacePath: "/workspace/demo",
+                label: "demo",
+                kind: "local" as const,
+              };
           const reply = () => {
             this.options.onPayload({
               zcode_type: "bootstrap-response",
@@ -123,26 +147,11 @@ vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
               result: {
                 desktopAppVersion: testState.desktopAppVersion,
                 windowControlSessionId: "sid-1",
-                workspaces: [
-                  {
-                    workspacePath: "/workspace/demo",
-                    label: "demo",
-                    kind: "local",
-                  },
-                ],
-                tasks: [
-                  {
-                    taskId: "task-1",
-                    title: "Task",
-                    workspacePath: "/workspace/demo",
-                    workspaceLabel: "demo",
-                    workspaceKind: "local",
-                    createdAt: 1,
-                    updatedAt: 1,
-                  },
-                ],
+                workspaces: [workspace],
                 initialViewState: {
-                  activeWorkspaceKey: "/workspace/demo",
+                  activeWorkspaceKey: testState.useRemoteWorkspace
+                    ? REMOTE_WORKSPACE_IDENTITY
+                    : "/workspace/demo",
                   activeTaskId: "task-1",
                   updatedAt: 1,
                 },
@@ -153,6 +162,22 @@ vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
           else queueMicrotask(reply);
         }
         if (payload.zcode_type === "workspace-bridge-open") {
+          if (testState.failBridgeOpen) {
+            queueMicrotask(() => {
+              this.options.onPayload({
+                zcode_type: "workspace-bridge-error",
+                requestId: payload.requestId,
+                bridgeSessionId: payload.bridgeSessionId,
+                ...(payload.bridgeGeneration !== undefined
+                  ? { bridgeGeneration: payload.bridgeGeneration }
+                  : {}),
+                ...(payload.recoveryId ? { recoveryId: payload.recoveryId } : {}),
+                reason: "desktop-bootstrap-timeout",
+                error: "Desktop rejected the bridge rebuild in the test harness.",
+              });
+            });
+            return true;
+          }
           const reply = () => {
             this.options.onPayload({
               zcode_type: "workspace-bridge-ready",
@@ -162,17 +187,31 @@ vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
                 ? { bridgeGeneration: payload.bridgeGeneration }
                 : {}),
               ...(payload.recoveryId ? { recoveryId: payload.recoveryId } : {}),
-              bridge: {
-                bridgeSessionId: payload.bridgeSessionId,
-                ...(payload.bridgeGeneration !== undefined
-                  ? { bridgeGeneration: payload.bridgeGeneration }
-                  : {}),
-                ...(payload.recoveryId ? { recoveryId: payload.recoveryId } : {}),
-                kind: "local",
-                workspaceKey: payload.workspaceKey,
-                workspacePath: "/workspace/demo",
-                initialTaskId: payload.taskId,
-              },
+              bridge: testState.useRemoteWorkspace
+                ? {
+                    bridgeSessionId: payload.bridgeSessionId,
+                    ...(payload.bridgeGeneration !== undefined
+                      ? { bridgeGeneration: payload.bridgeGeneration }
+                      : {}),
+                    ...(payload.recoveryId ? { recoveryId: payload.recoveryId } : {}),
+                    kind: "remote",
+                    workspaceKey: payload.workspaceKey,
+                    workspacePath: "/workspace/demo",
+                    workspaceIdentity: REMOTE_WORKSPACE_IDENTITY,
+                    remoteSessionId: REMOTE_SESSION_ID,
+                    initialTaskId: payload.taskId,
+                  }
+                : {
+                    bridgeSessionId: payload.bridgeSessionId,
+                    ...(payload.bridgeGeneration !== undefined
+                      ? { bridgeGeneration: payload.bridgeGeneration }
+                      : {}),
+                    ...(payload.recoveryId ? { recoveryId: payload.recoveryId } : {}),
+                    kind: "local",
+                    workspaceKey: payload.workspaceKey,
+                    workspacePath: "/workspace/demo",
+                    initialTaskId: payload.taskId,
+                  },
             });
           };
           if (testState.deferBridge) testState.bridgeReplies.push(reply);
@@ -196,7 +235,9 @@ vi.mock("../src/webRemoteControlTransport.js", async (importOriginal) => {
 
       recoverInBackground() {}
       suspend() {}
-      dispose() {}
+      dispose() {
+        testState.transportDisposeCalls += 1;
+      }
     },
   };
 });
@@ -236,12 +277,26 @@ function setupExternalRelayGlobals(pathname = "/remote") {
       removeListener(documentListeners, type, listener),
     ),
   };
-  vi.stubGlobal("localStorage", {
-    getItem: () => null,
-    setItem: vi.fn(),
-  });
+  const credentials = new Map([
+    ["zcodejwttoken", "test-jwt"],
+    ["oauth:active_provider", "zai"],
+    ["oauth:zai:access_token", "access"],
+    ["oauth:zai:user_info", JSON.stringify({ user_id: "user", name: "Test" })],
+  ]);
+  const storage = {
+    getItem: (key: string) => credentials.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      credentials.set(key, value);
+    },
+    removeItem: (key: string) => {
+      credentials.delete(key);
+    },
+  };
+  vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("document", documentStub);
   vi.stubGlobal("window", {
+    localStorage: storage,
+    sessionStorage: storage,
     addEventListener: vi.fn((type: string, listener: unknown) =>
       addListener(windowListeners, type, listener),
     ),
@@ -250,10 +305,12 @@ function setupExternalRelayGlobals(pathname = "/remote") {
     ),
     matchMedia: () => ({ matches: false }),
     location: {
+      origin: "https://zcode.z.ai",
       pathname,
-      href: `https://zcode.z.ai${pathname}?sid=sid-1&hash=hash-1&t=1&mid=mid-1&app_version=1.0.0`,
+      href: `https://zcode.z.ai${pathname}?sid=sid-1&mid=mid-1&app_version=1.0.0`,
       replace: navigateMock,
-      search: "?sid=sid-1&hash=hash-1&t=1&mid=mid-1&app_version=1.0.0",
+      search: "?sid=sid-1&mid=mid-1&app_version=1.0.0",
+      reload: reloadMock,
     },
   });
   vi.stubGlobal("navigator", {
@@ -295,7 +352,11 @@ describe("external relay frame gap recovery", () => {
     testState.relayProtocolAdapters.length = 0;
     testState.transportOptions.length = 0;
     testState.sentPayloads.length = 0;
+    testState.failBridgeOpen = false;
+    testState.useRemoteWorkspace = false;
     testState.recoverConnectionCalls = 0;
+    testState.transportDisposeCalls = 0;
+    reloadMock.mockClear();
     testState.desktopAppVersion = undefined;
     testState.deferBootstrap = false;
     testState.bootstrapReplies.length = 0;
@@ -463,6 +524,66 @@ describe("external relay frame gap recovery", () => {
       zcode_type: "workspace-bridge-open",
       recoveryId: expect.stringMatching(/^recovery-/),
     });
+  });
+
+  it("leaves the degraded bridge in a retryable terminal state after rebuild retries are exhausted", async () => {
+    testState.useRemoteWorkspace = true;
+    setupExternalRelayGlobals();
+
+    await import("../src/main.js");
+    const { useRemoteWorkspaceSessionStore } =
+      await import("@zcode/ui/remote-workspace-session-store");
+
+    await vi.waitFor(() => {
+      expect(testState.relayProtocolOptions).toHaveLength(1);
+      expect(
+        useRemoteWorkspaceSessionStore.getState().sessionsById[REMOTE_SESSION_ID],
+      ).toBeDefined();
+    });
+    const initialBridgeOpenCount = testState.sentPayloads.filter(
+      (payload) => payload.zcode_type === "workspace-bridge-open",
+    ).length;
+    testState.failBridgeOpen = true;
+    vi.useFakeTimers();
+
+    testState.relayProtocolAdapters[0]!.markDegraded("remote.rpcFrame.physicalGap");
+    await vi.waitFor(() => {
+      expect(
+        testState.sentPayloads.filter((payload) => payload.zcode_type === "workspace-bridge-open"),
+      ).toHaveLength(initialBridgeOpenCount + 1);
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    const rebuildRequests = testState.sentPayloads
+      .filter((payload) => payload.zcode_type === "workspace-bridge-open")
+      .slice(initialBridgeOpenCount);
+    expect(rebuildRequests).toHaveLength(4);
+    expect(new Set(rebuildRequests.map((request) => request.recoveryId)).size).toBe(1);
+    expect(rebuildRequests.map((request) => request.bridgeGeneration)).toEqual([2, 3, 4, 5]);
+
+    const terminalRender = renderMock.mock.calls.at(-1)?.[0] as {
+      props?: {
+        failure?: { reason?: string };
+        onReload?: () => void;
+      };
+    };
+    expect(terminalRender.props?.failure?.reason).toBe("connection-recovery-timeout");
+    expect(
+      useRemoteWorkspaceSessionStore.getState().sessionsById[REMOTE_SESSION_ID],
+    ).toBeUndefined();
+    expect(testState.relayProtocolAdapters[0]!.dispose).toHaveBeenCalledOnce();
+    expect(testState.transportDisposeCalls).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(
+      testState.sentPayloads.filter((payload) => payload.zcode_type === "workspace-bridge-open"),
+    ).toHaveLength(initialBridgeOpenCount + 4);
+
+    terminalRender.props?.onReload?.();
+    expect(reloadMock).toHaveBeenCalledOnce();
   });
 
   it("routes raw ACKs before app requesters and replays whenever the same bridge is send-ready", async () => {

@@ -17,6 +17,39 @@ function createTask(overrides: Partial<WebRemoteControlTaskTarget>): WebRemoteCo
 }
 
 describe("openWebRemoteControlTask", () => {
+  it("MRO01：结构化 bridge 失败展示 message，保留原任务并解除等待", async () => {
+    const failure = { reason: "unexpected-error", message: "project.task-directory-mismatch" };
+    const setError = vi.fn();
+    const onSelectTask = vi.fn();
+    const onSwitchingChange = vi.fn();
+    await openWebRemoteControlTask({
+      activeWorkspacePath: "/workspace/local",
+      activeTaskId: "local-task",
+      task: createTask({
+        taskId: "remote-task",
+        workspacePath: "/workspace/remote",
+        workspaceIdentity: "remote:server:source:/workspace/remote",
+        workspaceKind: "remote",
+      }),
+      onSelectTask,
+      onSwitchingChange,
+      setError,
+      switcher: {
+        listWorkspaces: vi.fn(async () => ({ workspaces: [] })),
+        switchWorkspace: vi.fn(async () => {
+          throw failure;
+        }),
+      },
+    });
+    expect(setError).toHaveBeenLastCalledWith(failure.message);
+    expect(onSelectTask).not.toHaveBeenCalled();
+    expect(onSwitchingChange.mock.calls).toEqual([[true], [false]]);
+    expect(failure).toEqual({
+      reason: "unexpected-error",
+      message: "project.task-directory-mismatch",
+    });
+  });
+
   it("marks a same-workspace unread task as read before selecting it", async () => {
     const task = createTask({ taskId: "task-unread", unreadAt: 123 });
     const events: string[] = [];
@@ -202,7 +235,9 @@ describe("openWebRemoteControlTask", () => {
     });
 
     expect(onNavigateHome).toHaveBeenCalledTimes(1);
-    expect(setError).not.toHaveBeenCalledWith("目标远程工作区尚未连接，无法创建 bridge，请先重连。");
+    expect(setError).not.toHaveBeenCalledWith(
+      "目标远程工作区尚未连接，无法创建 bridge，请先重连。",
+    );
   });
 
   it("clears switching state and stores the error when cross-workspace switching fails", async () => {

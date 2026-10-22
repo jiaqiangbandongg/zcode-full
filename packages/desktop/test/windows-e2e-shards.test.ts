@@ -3,7 +3,6 @@ import { EventEmitter } from "node:events";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
-  createWindowsE2ERunId,
   createWindowsE2EShardPlan,
   executeWindowsE2EShardPlan,
   listDefaultFormalE2ESpecs,
@@ -26,24 +25,6 @@ function createPlan(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Windows E2E shard runner", () => {
-  it("uses entropy to distinguish automatic run IDs from the same timestamp and PID", () => {
-    const timestamp = new Date("2026-07-11T00:30:00.123Z");
-    const firstRunId = createWindowsE2ERunId({
-      entropy: "entropy-a",
-      processId: 4242,
-      timestamp,
-    });
-    const secondRunId = createWindowsE2ERunId({
-      entropy: "entropy-b",
-      processId: 4242,
-      timestamp,
-    });
-
-    expect(firstRunId).not.toBe(secondRunId);
-    expect(firstRunId).toContain("20260711003000123-p4242-entropy-a");
-    expect(secondRunId).toContain("20260711003000123-p4242-entropy-b");
-  });
-
   it("derives disjoint paths from automatic run IDs while preserving an explicit run ID", () => {
     const timestamp = new Date("2026-07-11T00:30:00.123Z");
     vi.useFakeTimers();
@@ -87,35 +68,7 @@ describe("Windows E2E shard runner", () => {
     }
   });
 
-  it("keeps a default full Windows run single-sharded regardless of machine resources", () => {
-    expect(
-      resolveWindowsE2EShardTotal({
-        args: [],
-        env: {},
-        platform: "win32",
-        logicalCpuCount: 8,
-        totalMemoryBytes: 32 * 1024 ** 3,
-      }),
-    ).toBe(1);
-    expect(
-      resolveWindowsE2EShardTotal({
-        args: [],
-        env: {},
-        platform: "win32",
-        logicalCpuCount: 6,
-        totalMemoryBytes: 16 * 1024 ** 3,
-      }),
-    ).toBe(1);
-    expect(
-      resolveWindowsE2EShardTotal({
-        args: [],
-        env: {},
-        platform: "win32",
-        logicalCpuCount: 4,
-        totalMemoryBytes: 8 * 1024 ** 3,
-      }),
-    ).toBe(1);
-
+  it("plans a default full Windows run as a single shard", () => {
     const plan = createPlan({
       env: { ZCODE_E2E_RUN_ID: "default-single" },
     });

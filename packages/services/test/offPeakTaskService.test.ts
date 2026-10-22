@@ -68,10 +68,15 @@ describe("OffPeakTaskService 编排", () => {
   let wakes: number;
   let stops: Array<{ conversationId: string }>;
 
-  const makeService = () =>
+  const makeService = (
+    prepareProjectExecution?: (
+      projectId: string,
+    ) => Promise<import("@zcode/shared").ProjectExecutionSnapshot>,
+  ) =>
     new OffPeakTaskService({
       repo,
       client,
+      prepareProjectExecution,
       logger,
       resolveCodingPlanSupport: async () => ({
         supported: true,
@@ -131,12 +136,97 @@ describe("OffPeakTaskService 编排", () => {
     workspacePath: "/tmp/ws",
   };
 
+  it("freezes project directories before requesting a ticket", async () => {
+    const prepare = vi.fn(async () => {
+      expect(client.takeCalls).toEqual([]);
+      return {
+        projectId: "p",
+        hostId: "local",
+        workspacePath: "/primary",
+        additionalDirectories: ["/extra"],
+      };
+    });
+    service = makeService(prepare);
+    const result = await service.createTask({
+      ...createParams,
+      workspacePath: "",
+      projectId: "p",
+      additionalDirectories: ["/stale"],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("creation failed");
+    expect(result.task).toMatchObject({
+      projectId: "p",
+      hostId: "local",
+      workspacePath: "/primary",
+      additionalDirectories: ["/extra"],
+    });
+    expect(prepare).toHaveBeenCalledExactlyOnceWith("p");
+  });
+
+  it("does not spend a ticket when the selected project cannot be resolved", async () => {
+    service = makeService(async () => {
+      throw new Error("project.missing");
+    });
+    expect(await service.createTask({ ...createParams, projectId: "p" })).toMatchObject({
+      ok: false,
+      failureStage: "client_validation",
+    });
+    expect(client.takeCalls).toEqual([]);
+    expect(await repo.list()).toEqual([]);
+  });
+
   const createTask = async () => {
     const result = await service.createTask(createParams);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected successful test fixture creation");
     return result.task;
   };
+
+  it("换票确认连续失败由同步周期重试同一张票，active 轮询期间保持 running", async () => {
+    vi.useFakeTimers();
+    client.nextTicketState = "ready";
+    const task = await createTask();
+    await repo.markRunning(task.offPeakTaskId, { startedAt: NOW });
+    const control = vi.fn(async () => ({ accepted: true }));
+    service.residentExecutions
+      .register({
+        offPeakTaskId: task.offPeakTaskId,
+        executionId: "execution",
+        sessionId: "session",
+        ticketId: task.serverTicketId!,
+        control,
+        complete: async () => {},
+      })
+      .admitted();
+    await service.residentExecutions.handle({
+      offPeakTaskId: task.offPeakTaskId,
+      executionId: "execution",
+      sessionId: "session",
+      type: "ticket_needed",
+      renewalId: 1,
+      expiredTicketId: task.serverTicketId!,
+    });
+    const next = (await repo.get(task.offPeakTaskId))!;
+    const stillNeedsTicket = service.residentExecutions.retakeGuard(task.offPeakTaskId);
+    await repo.markRunning(task.offPeakTaskId, { startedAt: NOW });
+    control
+      .mockRejectedValueOnce(new Error("lost ACK"))
+      .mockRejectedValueOnce(new Error("lost retry ACK"));
+    await expect(
+      service.residentExecutions.deliverTicket(task.offPeakTaskId, next.serverTicketId!, {}),
+    ).rejects.toThrow("lost ACK");
+    expect(stillNeedsTicket()).toBe(false);
+    client.statusResponse = { tickets: [{ ticketId: next.serverTicketId!, state: "active" }] };
+    await service.runSyncCycle();
+    expect((await repo.get(task.offPeakTaskId))?.status).toBe("running");
+    await service.runSyncCycle();
+    expect(control).toHaveBeenCalledTimes(3);
+    expect((await repo.get(task.offPeakTaskId))?.status).toBe("running");
+    expect(client.takeCalls).toHaveLength(2);
+    await service.runSyncCycle();
+    expect(control).toHaveBeenCalledTimes(3);
+  });
 
   const makeLegacySelectionRow = async (offPeakTaskId: string) => {
     repo.close();
@@ -180,36 +270,6 @@ describe("OffPeakTaskService 编排", () => {
     const [task] = await service.list();
     expect(task?.modelSelection).toBeUndefined();
     expect(task?.prompt).toBe(created.prompt);
-  });
-
-  it("list：无法可靠恢复时保留任务为待修复，不影响列表", async () => {
-    const created = await createTask();
-    await makeLegacySelectionRow(created.offPeakTaskId);
-    service = new OffPeakTaskService({
-      repo,
-      client,
-      logger,
-      resolveCodingPlanSupport: async () => ({ supported: false, reason: "no-active-plan" }),
-      resolveTelemetryProviderName: async () => "",
-      resolveModelSelection: async () => ({
-        ok: false as const,
-        validation: {
-          ok: false as const,
-          code: "model-not-found" as const,
-          providerId: "account:zai-offpeak-idle-plan",
-          modelId: "GLM-5.2",
-        },
-      }),
-      now: () => NOW,
-    });
-
-    const listed = await service.list();
-    expect(listed).toHaveLength(1);
-    expect(listed[0]).toMatchObject({
-      modelSelectionIssue: {
-        code: "repair-required",
-      },
-    });
   });
 
   it("list：暂时失效只返回诊断，保留原 Selection/Ticket，派发校验仍阻断且可恢复", async () => {
@@ -353,7 +413,7 @@ describe("OffPeakTaskService 编排", () => {
     });
   });
 
-  it("稳定失败枚举覆盖 eligibility/quota/network/invalid_response/unknown", () => {
+  it("稳定失败枚举覆盖 eligibility/network/invalid_response/unknown", () => {
     const invalidResponse = (() => {
       try {
         z.string().parse(1);
@@ -369,9 +429,6 @@ describe("OffPeakTaskService 编排", () => {
       errorCategory: "eligibility_3101",
       errorCode: "3101",
     });
-    expect(
-      classifyOffPeakCreateFailure(new OffPeakServerError("private", 429, 3103), "ticket_request"),
-    ).toMatchObject({ errorCategory: "quota_3103", errorCode: "3103" });
     expect(
       classifyOffPeakCreateFailure(new TypeError("private URL"), "ticket_request"),
     ).toMatchObject({ errorCategory: "network", errorCode: "" });
@@ -500,6 +557,68 @@ describe("OffPeakTaskService 编排", () => {
     await service.cancelTask(created.offPeakTaskId);
     await service.handleTicketExpiredDuringRun(created.offPeakTaskId);
     expect((await repo.get(created.offPeakTaskId))?.status).toBe("cancelled");
+  });
+
+  it("驻留任务换票在途被用户接管时，不写回迟到新票也不把任务完成", async () => {
+    const created = await createTask();
+    await repo.markRunning(created.offPeakTaskId, { startedAt: NOW, conversationId: "session" });
+    let resolveTicket!: (ticket: OffPeakTakeTicketResult) => void;
+    const take = vi.spyOn(client, "takeTicket").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTicket = resolve;
+        }),
+    );
+    const complete = vi.fn(async () => {});
+    const handle = service.residentExecutions.register({
+      offPeakTaskId: created.offPeakTaskId,
+      executionId: "run",
+      sessionId: "session",
+      ticketId: "t-1",
+      control: async () => ({ accepted: true }),
+      complete,
+    });
+    handle.admitted();
+    const base = { offPeakTaskId: created.offPeakTaskId, executionId: "run", sessionId: "session" };
+    const renewing = service.residentExecutions.handle({
+      ...base,
+      type: "ticket_needed",
+      renewalId: 1,
+      expiredTicketId: "t-1",
+    });
+    await expect.poll(() => take.mock.calls.length).toBe(1);
+    await service.residentExecutions.handle({ ...base, type: "user_takeover" });
+    resolveTicket({ ticketId: "late", state: "ready", registeredAt: NOW });
+    await renewing;
+    expect((await repo.get(created.offPeakTaskId))?.status).toBe("running");
+    expect((await repo.get(created.offPeakTaskId))?.serverTicketId).toBe("t-1");
+    expect(client.settleCalls).toContain("late");
+    await service.residentExecutions.handle({ ...base, type: "ticket_released", ticketId: "t-1" });
+    expect((await repo.get(created.offPeakTaskId))?.status).toBe("running");
+    expect(complete).not.toHaveBeenCalled();
+    handle.dispose();
+  });
+
+  it("等待新票时取消任务也通知驻留生命周期，不退化成只停主轮", async () => {
+    const created = await createTask();
+    const control = vi.fn(async () => ({ accepted: true }));
+    const handle = service.residentExecutions.register({
+      offPeakTaskId: created.offPeakTaskId,
+      executionId: "run",
+      sessionId: "session",
+      ticketId: "t-1",
+      control,
+      complete: async () => {},
+    });
+    handle.admitted();
+    await service.cancelTask(created.offPeakTaskId);
+    expect(control).toHaveBeenCalledWith({
+      sessionId: "session",
+      executionId: "run",
+      action: "cancel",
+    });
+    expect(stops).toEqual([]);
+    handle.dispose();
   });
 
   it("updateTask：queued/paused 可编辑；running 拒绝（D30-7）", async () => {

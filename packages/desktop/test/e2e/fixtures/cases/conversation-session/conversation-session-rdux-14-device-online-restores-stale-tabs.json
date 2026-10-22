@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-rdux-14-device-online-restores-stale-tabs",
+  "spec": "./test/e2e/conversation-session/conversation-session-rdux-14-device-online-restores-stale-tabs.test.ts",
+  "providerRequestPolicy": "none",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-rdux-14-device-online-restores-stale-tabs.json"
+  ],
+  "fileFixtures": [],
+  "requests": []
+}

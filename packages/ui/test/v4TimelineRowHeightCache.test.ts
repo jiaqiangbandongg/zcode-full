@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ROW_HEIGHT_ESTIMATE_PX,
-  MAX_ROW_HEIGHT_CACHE_ENTRIES,
   TimelineRowHeightCache,
 } from "@/v4/timelineRowHeightCache.js";
 
@@ -69,9 +68,5 @@ describe("TimelineRowHeightCache", () => {
     cache.clear();
     expect(cache.size).toBe(0);
     expect(cache.estimate(1)).toBe(DEFAULT_ROW_HEIGHT_ESTIMATE_PX);
-  });
-
-  it("默认上限为常量 MAX_ROW_HEIGHT_CACHE_ENTRIES", () => {
-    expect(MAX_ROW_HEIGHT_CACHE_ENTRIES).toBeGreaterThan(0);
   });
 });

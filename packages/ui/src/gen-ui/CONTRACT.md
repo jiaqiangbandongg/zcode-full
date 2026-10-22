@@ -11,3 +11,5 @@ The conversation parent owns inline width. Normal and wide cards fill its conten
 Reference projection accepts the Unicode JSON marker, `::visualize{path="..." title="..." mode="wide"}`, and `::visualize{"path":"...","title":"..."}`. The existing assistant directive parser locates boundaries; JSON decoding belongs only to Gen UI projection. All forms use the same strict reference schema, Markdown code exclusions, completion gate and original message offsets. Messages need no migration.
 
 `collectGenUiSourcePaths` and `matchesGenUiSourcePath` expose the same validated references for conversation presentation. Complete references suppress duplicate HTML preview cards and file-summary entries by full path, including Windows separator normalization. They do not authorize file reads or change page admission, stored file changes, or whole-turn rewind. See `docs/specs/gen-ui-file-summary.md`.
+
+Gen UI control styling projects dedicated host tokens independently of standard MCP accent variables. Typography and visible container radius nesting follow DESIGN.md; the shared visualize stylesheet provides standalone defaults. See `docs/specs/gen-ui-styles.md`.

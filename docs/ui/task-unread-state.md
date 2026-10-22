@@ -19,17 +19,23 @@
 
 ### 被动标记未读
 
-- 入口：后台 task 的 `task_complete` / `task_error` / `task_warning`
-- 动作：先把当前 task 的 query row membership overlay 标记为 `unreadAt`
-- 然后异步调用 `zcodeTaskService.setTaskUnread(..., true)` 持久化到 task/session 索引
+- 入口：Host 明确携带 `background_terminal` 的实时完成信号；普通 status、历史读取和 replay 不制造未读。
+- 动作：desktop base 的唯一目录 writer 判断查看状态，再经原 mutation 路由写 tasks-index；持久成功后刷新树，不先制造 UI 独有的未读。
 - v4 sessions-index 重构后，后台运行态不再由旧 renderer monitor 持有；host
   `taskIndexSyncer` 只负责把 phase 终态收敛成 `task_status_changed`，不判断某个 renderer
   当前是否正在查看该 task。
-- 因此 renderer 在收到 `workspace_task_list_changed(reason="task_status_changed")` 时补回旧语义：
-  如果该 task 不是当前 workspace 的 `activeTaskId`，先本地标蓝点，再调用
-  `setTaskUnread(..., true)` 落盘；如果正是 active task，则不产生未读。
+- 查看状态认可桌面完整导航地址，或已连接 Web 前台实际显示的同一任务。Home、后台、草稿、遮盖的聊天和断线不算查看；不能仅看 activeTaskId 或最后导航位置。
+- Main 的瞬时 `mobileTaskView` 经连接代际、序号和 bridge 身份验证后逐事件推送；宽窄屏共用上报，Web 不成为第二个自动写者。保留 `mobileViewState` 用于导航恢复。
+- 同一任务的完成写入和新查看读/CAS 在唯一 writer 内串行：在途写使用自身返回 marker，写已结束则从所属 owner 精确读 marker 后 CAS。慢读取不能清除离开后的新完成；重复有效查看状态不擦除手动未读。详细时序与 owner 换代合同见 [任务列表刷新语义](../task-list-refresh-semantics.md)。
 - `task_status_changed` 本身仍不触发 membership 重拉；只有随后 `setTaskUnread` 发出的
   `task_meta_changed` 才驱动 task-index membership join 重新拉取 `unreadAt`。
+- 前台完成的离开补记与自动清除：完成信号到达时用户正在查看（桌面完整导航地址或有效 Web 前台）
+  则不立即写未读，只记录该「前台完成」；窗口失焦、最小化或页面隐藏时补写未读，让任务栏气泡、
+  托盘红点、蓝点在用户离开后亮起（覆盖「看着任务完成 → 直接最小化走人」的场景）。用户回到窗口
+  （重新聚焦/恢复可见）且该任务仍在面前时，按补写返回的精确 marker 自动清除——不得让蓝点卡在
+  正打开的任务上、逼用户点走再点回；用户离开期间去看了别的任务则保留未读作为回来处理的提醒。
+  聚焦期间永不补写；补写后打开任务按既有已读合同清除。已知边界：补写前重新打开同一任务再离开，
+  离开时仍会补写；关闭整个应用前的在途补写尽力而为，不保证落库。实现见 `useProjectUnreadSignals`。
 
 ### 查看任务后清已读
 

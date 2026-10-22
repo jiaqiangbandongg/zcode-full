@@ -4,6 +4,7 @@ import type { PromptRuntimeCommand } from "../command-queue.js";
 import { createRuntimeCommandId } from "../command-queue.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import { enqueueCancellableRuntimeCommand } from "./runtime-command-submit.js";
+import { acceptSubmissionModelSelection, captureHighspeedFallbackSelection } from "./turn-model.js";
 import type {
   ActiveTurnStartReservation,
   ExecuteTurnOptions,
@@ -33,6 +34,8 @@ export async function admitPrompt(
       input,
       inputId: options.inputId,
       intent: admissionIntent(options.intent, "queue"),
+      modelSelectionScope: options.modelExecution?.selectionScope,
+      highspeedFallbackSelection: options.modelExecution?.selectionFallback?.target,
       queryId: options.queryId,
       toolDisallowlist: options.toolDisallowlist,
       traceContext: options.traceContext,
@@ -112,11 +115,26 @@ export async function admitPrompt(
     turnId,
   };
   this.reserveTurnStart(turnId, turnTraceContext, "regular");
+  let selectionAccepted = Promise.resolve();
 
+  if (options?.modelExecution) {
+    options = {
+      ...options,
+      modelExecution: captureHighspeedFallbackSelection(this, options.modelExecution),
+    };
+  }
   const executeOptions = options as ExecuteTurnOptions | undefined;
   const completion = enqueueCancellableRuntimeCommand<TurnResult, PromptRuntimeCommand>(this, {
     abortSignal: options?.abortSignal,
     onCommandCancelled: () => this.releaseTurnStart(turnId),
+    onCommandAccepted: () => {
+      selectionAccepted = acceptSubmissionModelSelection(
+        this,
+        options?.intent,
+        turnTraceContext,
+        options?.modelExecution,
+      );
+    },
     createCommand: ({ reject, resolve }) => ({
       attachments,
       createdAt: new Date(),
@@ -137,6 +155,7 @@ export async function admitPrompt(
   });
   // admission 已经完成；执行失败由现有 turn 事件/调用方消费，不制造 unhandled rejection。
   void completion.catch(() => undefined);
+  await selectionAccepted;
   return { completion, kind: "started", turnId };
 }
 

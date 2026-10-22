@@ -2,6 +2,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, rm } from "node:fs/promises";
 import {
+  CONTROL_CLOSE_TIMEOUT_MS,
   controlRequestSchema,
   controlResponseSchema,
   type ControlRequest,
@@ -9,8 +10,6 @@ import {
 } from "../contracts.js";
 import { encodeJsonLine, JsonLineDecoder } from "./framing.js";
 import { ControlRequestError } from "./controlError.js";
-
-const CONTROL_CLOSE_TIMEOUT_MS = 2_000;
 
 export interface ControlHandler {
   (request: ControlRequest): Promise<unknown>;

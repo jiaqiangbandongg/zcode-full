@@ -12,7 +12,7 @@ import {
 } from "../../../helpers/plugin-management-lifecycle.js";
 
 // 内置插件默认已安装，只需在 Workspace 配置里显式启用即可得到 enabledSource=workspace，
-// 让已安装列表行内「…」菜单出现「恢复 User 默认」项，不依赖额外 Marketplace fixture。
+// 让详情页出现「恢复 User 默认」操作，不依赖额外 Marketplace fixture。
 const BUILTIN_ID = "skill-creator@zcode-plugins-official";
 const MENU_LAYOUT_TIMEOUT_MS = 240000;
 const RESTORE_USER_DEFAULT_PATTERN = /恢复 User 默认|Restore User default/u;
@@ -29,7 +29,7 @@ describe("PLM-LC-017 已安装列表行内菜单布局 E2E", () => {
     await clearAppData();
   });
 
-  it("Workspace 覆盖下「恢复 User 默认」与其他菜单项都保持单行", async function () {
+  it("Workspace 覆盖下菜单只含启停与卸载且保持单行", async function () {
     this.timeout(MENU_LAYOUT_TIMEOUT_MS);
     requirePluginManualReview();
 
@@ -101,9 +101,8 @@ describe("PLM-LC-017 已安装列表行内菜单布局 E2E", () => {
     await capturePluginManualReview("PLM-LC-017", "installed-row-menu-workspace-override");
 
     const restoreItem = items.find((item) => RESTORE_USER_DEFAULT_PATTERN.test(item.text));
-    if (!restoreItem) {
-      throw new Error(`菜单里没有「恢复 User 默认」项：${JSON.stringify(items)}`);
-    }
+    expect(restoreItem).toBeUndefined();
+    expect(items).toHaveLength(2);
     const wrapped = items.filter((item) => item.textLineCount !== 1);
     if (wrapped.length > 0) {
       throw new Error(`菜单项折行：${JSON.stringify(wrapped)}`);

@@ -1,8 +1,8 @@
 import {
   WEB_REMOTE_CONTROL_RPC_TRANSPORT_LIMITS,
   type WebRemoteControlAppPayload,
-  type WebRemoteControlRelayDataMessage,
 } from "@zcode/shared";
+import { type WebRemoteControlRelayV2OutgoingData } from "@zcode/shared/web-remote-relay";
 
 export type WebRemoteControlPayloadSendResult =
   | { kind: "sent"; bytes: number }
@@ -10,7 +10,9 @@ export type WebRemoteControlPayloadSendResult =
   | { kind: "oversize"; bytes: number; maxBytes: number };
 
 export interface SerializedWebRemoteControlRelayPayload {
-  readonly message: WebRemoteControlRelayDataMessage<WebRemoteControlAppPayload>;
+  readonly message: Omit<WebRemoteControlRelayV2OutgoingData, "payload"> & {
+    payload: WebRemoteControlAppPayload;
+  };
   readonly json: string;
   readonly bytes: number;
 }
@@ -27,11 +29,13 @@ export class WebRemoteControlRelayPayloadSerializer {
 
   prepare(
     payload: WebRemoteControlAppPayload,
-    clientTimestamp = Date.now(),
+    clientTimestamp = Math.floor(Date.now() / 1000),
   ): SerializedWebRemoteControlRelayPayload {
     const cached = this.cache.get(payload);
     if (cached) return cached;
-    const message: WebRemoteControlRelayDataMessage<WebRemoteControlAppPayload> = {
+    const message: Omit<WebRemoteControlRelayV2OutgoingData, "payload"> & {
+      payload: WebRemoteControlAppPayload;
+    } = {
       type: "data",
       payload,
       client_ts: clientTimestamp,

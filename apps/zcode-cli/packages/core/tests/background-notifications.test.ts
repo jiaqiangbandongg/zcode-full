@@ -44,7 +44,6 @@ describe("resolveBackgroundTaskNotificationOriginMeta", () => {
   it("单条：originMeta 整体透传，manifest 载荷保留", () => {
     const resolved = resolveBackgroundTaskNotificationOriginMeta([makeCommand(workflowOriginMeta)]);
     expect(resolved).toEqual(workflowOriginMeta);
-    expect(resolved?.workflowNotification).toBeDefined();
   });
 
   it("批量轮：合成 title，刻意丢弃 workflowNotification（退回三基字段）", () => {

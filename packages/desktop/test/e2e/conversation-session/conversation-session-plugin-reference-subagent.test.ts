@@ -41,9 +41,7 @@ describe("PLG16 Plugin 引用 reminder 包含对应 Subagent", () => {
     await sendV4Prompt(prompt);
     await waitForV4TimelineContaining(REPLY_MARKER, 60_000);
     await waitForV4Pane(
-      (state) =>
-        !state.canStop &&
-        Boolean(state.sessionId && state.sessionId !== "draft"),
+      (state) => !state.canStop && Boolean(state.sessionId && state.sessionId !== "draft"),
       "Plugin Subagent 引用回合没有回到 idle",
       60_000,
     );
@@ -51,11 +49,9 @@ describe("PLG16 Plugin 引用 reminder 包含对应 Subagent", () => {
     const capture = await waitForUpstreamNetworkCapture(PROMPT_MARKER);
     const reminderMessages = readPluginReminderMessages(capture.requestJson);
     expect(reminderMessages).toHaveLength(1);
-    const reminder = JSON.stringify(reminderMessages[0]);
+    const reminder = reminderMessages[0]!;
     expect(reminder).toContain(PLUGIN_INLINE_ID);
-    expect(reminder).toContain(
-      `subagents: [\\"${PLUGIN_INLINE_SUBAGENT_NAME}\\"]`,
-    );
+    expect(reminder).toContain(`subagents: ["${PLUGIN_INLINE_SUBAGENT_NAME}"]`);
     expect(reminder).not.toContain("E2E inline Plugin reviewer profile");
     expect(reminder).not.toContain("Review the requested files");
     expect(reminder).not.toContain("inline-reviewer.md");
@@ -68,19 +64,30 @@ describe("PLG16 Plugin 引用 reminder 包含对应 Subagent", () => {
   });
 });
 
-function readPluginReminderMessages(requestJson: unknown): unknown[] {
-  if (
-    !requestJson ||
-    typeof requestJson !== "object" ||
-    Array.isArray(requestJson)
-  ) {
+function readPluginReminderMessages(requestJson: unknown): string[] {
+  if (!requestJson || typeof requestJson !== "object" || Array.isArray(requestJson)) {
     throw new Error("Plugin Subagent provider request 不是 JSON object");
   }
   const messages = (requestJson as { messages?: unknown }).messages;
   if (!Array.isArray(messages)) {
     throw new Error("Plugin Subagent provider request 缺少 messages 数组");
   }
-  return messages.filter((message) =>
-    JSON.stringify(message).includes(PLUGIN_REFERENCE_TAG),
-  );
+  // Provider 会合并相邻 user 文本；其他 reminder 的合法 Subagent catalog 描述
+  // 不属于 plugin_reference。只检查该块，仍禁止 profile 内容进入插件引用元数据。
+  return messages.flatMap((message) => {
+    const content = message?.content;
+    const texts =
+      typeof content === "string"
+        ? [content]
+        : Array.isArray(content)
+          ? content.flatMap((block: { type?: string; text?: string }) =>
+              block.type === "text" && typeof block.text === "string" ? [block.text] : [],
+            )
+          : [];
+    return texts.flatMap((text: string) =>
+      [...text.matchAll(/<plugin_reference>[\s\S]*?<\/plugin_reference>/g)].map(
+        (match) => match[0],
+      ),
+    );
+  });
 }

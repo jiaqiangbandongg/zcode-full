@@ -6,7 +6,7 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -32,7 +32,7 @@ import {
   assertStableAgentSelection,
   pickWorkspacePaths,
   waitForActiveWorkspacePath,
-  waitForRestoredWorkspaceItems,
+  waitForRestoredProjects,
 } from "./helpers/workspace-agent-warmup.js";
 
 describe("provider 保存不启动 dormant workspace Agent", () => {
@@ -56,7 +56,7 @@ describe("provider 保存不启动 dormant workspace Agent", () => {
 
     await waitForWorkspaceApp(activeWorkspacePath, 30_000);
     await waitForActiveWorkspacePath(activeWorkspacePath);
-    await waitForRestoredWorkspaceItems(workspacePaths);
+    await waitForRestoredProjects(workspacePaths);
 
     await openResourceManager();
     await switchToElectronRendererTarget(isResourceManagerUrl);

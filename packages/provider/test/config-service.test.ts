@@ -871,39 +871,6 @@ describe("ProviderConfigService", () => {
     ).rejects.toThrow();
   });
 
-  it("并发创建同一 Template 时仍生成唯一名称", async () => {
-    const template = new ProviderTemplate({
-      templateId: "deepseek",
-      templateNameMap: { "zh-CN": "深度求索", "en-US": "DeepSeek" },
-      config: createApiKeyProviderConfig({
-        label: "DeepSeek",
-        apiFormat: "anthropic-messages",
-        baseURL: "https://api.example.com",
-        models: ["model-a"],
-      }),
-    });
-    const personal = new MemoryPersonalRepository(layerSnapshot("personal-1"));
-    const service = new ProviderConfigService({
-      zcodeBuiltinSource: new MutableSource({
-        ...layerSnapshot("zcodeBuiltin-1"),
-        providerTemplates: new ProviderTemplateMap([["deepseek", template]]),
-      }),
-      personalRepository: personal,
-    });
-
-    await Promise.all([
-      service.createPersonalProvider({ templateId: "deepseek", locale: "zh-CN" }),
-      service.createPersonalProvider({ templateId: "deepseek", locale: "zh-CN" }),
-    ]);
-
-    expect(
-      personal.current.providers
-        .rules()
-        .map((rule) => rule.providerName)
-        .sort(),
-    ).toEqual(["深度求索", "深度求索 2"]);
-  });
-
   it("写入 Provider 顺序使用未排序 Built-in、请求顺序、未排序 Personal 三段语义", async () => {
     const zcodeBuiltin = new MutableSource(
       layerSnapshot(
@@ -1190,27 +1157,6 @@ describe("ProviderConfigService", () => {
     await expect(service.renamePersonalModel("personal", "model-a", "model-b")).rejects.toThrow(
       "Model 已存在: personal/model-b",
     );
-  });
-
-  it("迁移边界可以原子替换完整 Personal Overlay", async () => {
-    const personal = new MemoryPersonalRepository(layerSnapshot("personal-1"));
-    const service = new ProviderConfigService({
-      zcodeBuiltinSource: new MutableSource(layerSnapshot("zcodeBuiltin-1")),
-      personalRepository: personal,
-    });
-    const providers = new ProviderConfigMap([["personal", personalProvider(["model-a"])]]);
-    const models = new ModelConfigRules([
-      {
-        type: "model",
-        modelMatch: "model-a",
-        config: completeModelConfig(),
-      },
-    ]);
-
-    await service.replacePersonalConfig({ providers, models });
-
-    expect(personal.current.providers).toBe(providers);
-    expect(personal.current.models).toBe(models);
   });
 
   it("删除 Personal Model 时原子删除成员和精确规则", async () => {

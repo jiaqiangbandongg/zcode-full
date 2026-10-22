@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import { build } from "esbuild";
 import {
@@ -200,75 +201,47 @@ test("CLI bundle externalizes native koffi so esbuild does not parse platform .n
   assert.ok(resolveBuildExternal().includes("koffi"));
 });
 
-test("Desktop agent build keeps Node-only shared subpaths ahead of the generic alias", () => {
-  const rootDirectory = resolve("/repo/apps/zcode-cli");
-  const cliDirectory = resolve(rootDirectory, "packages/cli");
-  const aliases = resolveBuildAliases({ cliDirectory, rootDirectory });
-
-  assert.equal(
-    aliases["@zcode/shared/workspace-hook-discovery"],
-    resolve(rootDirectory, "../../packages/shared/src/workspace-hook-discovery.ts"),
+test("every shared package export has an exact build alias, including SQLite migrations", async () => {
+  const shared = JSON.parse(
+    await readFile(new URL("../../../../../packages/shared/package.json", import.meta.url), "utf8"),
   );
-  assert.equal(
-    aliases["@zcode/shared"],
-    resolve(rootDirectory, "../../packages/shared/src/index.ts"),
-  );
-  assert.ok(
-    Object.keys(aliases).indexOf("@zcode/shared/workspace-hook-discovery") <
-      Object.keys(aliases).indexOf("@zcode/shared"),
-  );
-});
-
-test("monotonicity subpath resolves ahead of the generic shared alias", () => {
   const rootDirectory = resolve("/repo/apps/zcode-cli");
   const aliases = resolveBuildAliases({ rootDirectory });
-
-  assert.equal(
-    aliases["@zcode/shared/workspace-hook-review-monotonicity"],
-    resolve(rootDirectory, "../../packages/shared/src/workspace-hook-review-monotonicity.ts"),
-  );
-  assert.ok(
-    Object.keys(aliases).indexOf("@zcode/shared/workspace-hook-review-monotonicity") <
-      Object.keys(aliases).indexOf("@zcode/shared"),
-  );
-});
-
-test("mutation subpath resolves ahead of the generic shared alias", () => {
-  const rootDirectory = resolve("/repo/apps/zcode-cli");
-  const aliases = resolveBuildAliases({ rootDirectory });
-
-  assert.equal(
-    aliases["@zcode/shared/workspace-hook-mutation"],
-    resolve(rootDirectory, "../../packages/shared/src/workspace-hook-mutation.ts"),
-  );
-  assert.ok(
-    Object.keys(aliases).indexOf("@zcode/shared/workspace-hook-mutation") <
-      Object.keys(aliases).indexOf("@zcode/shared"),
-  );
-});
-
-test("model-selection subpath resolves ahead of the generic shared alias", () => {
-  const rootDirectory = resolve("/repo/apps/zcode-cli");
-  const aliases = resolveBuildAliases({ rootDirectory });
-
-  assert.equal(
-    aliases["@zcode/shared/model-selection"],
-    resolve(rootDirectory, "../../packages/shared/src/model-selection.ts"),
-  );
-  assert.ok(
-    Object.keys(aliases).indexOf("@zcode/shared/model-selection") <
-      Object.keys(aliases).indexOf("@zcode/shared"),
-  );
-});
-
-test("model configuration schema subpaths resolve before the generic shared alias", () => {
-  const rootDirectory = resolve("/repo/apps/zcode-cli");
-  const aliases = resolveBuildAliases({ rootDirectory });
-  for (const subpath of ["model-config", "config-schema", "process-diagnostic"]) {
-    const name = `@zcode/shared/${subpath}`;
-    assert.equal(aliases[name], resolve(rootDirectory, `../../packages/shared/src/${subpath}.ts`));
-    assert.ok(Object.keys(aliases).indexOf(name) < Object.keys(aliases).indexOf("@zcode/shared"));
+  for (const [subpath, target] of Object.entries(shared.exports)) {
+    const name = subpath === "." ? "@zcode/shared" : `@zcode/shared/${subpath.slice(2)}`;
+    assert.equal(aliases[name], resolve(rootDirectory, "../../packages/shared", target));
+    if (subpath !== ".")
+      assert.ok(Object.keys(aliases).indexOf(name) < Object.keys(aliases).indexOf("@zcode/shared"));
   }
+});
+
+test("CLI bundles session migrations through the shared sqlite subpath", async () => {
+  const result = await build({
+    entryPoints: [
+      fileURLToPath(
+        new URL("../../adapters/src/storage/session-store/migration-runner.ts", import.meta.url),
+      ),
+    ],
+    alias: resolveBuildAliases(),
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    write: false,
+    metafile: true,
+    logLevel: "silent",
+  });
+
+  assert.equal(
+    Object.keys(result.metafile.inputs).filter((path) =>
+      path.endsWith("/shared/src/sqlite-migrations/index.ts"),
+    ).length,
+    1,
+  );
+  assert.ok(
+    Object.values(result.metafile.outputs).every((output) =>
+      output.imports.every((entry) => entry.path !== "@zcode/shared/sqlite-migrations"),
+    ),
+  );
 });
 
 test("built CLI embeds the compact registry without a runtime Fig dependency", async (t) => {

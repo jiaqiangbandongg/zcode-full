@@ -1,8 +1,8 @@
 // dwf run 详情页的自适应并发观察面（docs/dynamic-workflow/concurrency.md「Protocol and UI」）：
-// run 头的并发/冷却读数、事件日志的三条行、以及相位到图上四值的映射。
+// run 头的并发/冷却读数与事件日志。
 // 全部无 jsdom：这些是纯规则，时钟由参数注入。
 import { describe, expect, it } from "vitest";
-import type { WorkflowRunNode, WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
+import type { WorkflowRunState } from "@zcode/shared/zcode-protocol-v4";
 import enUS from "@/i18n/locales/en-US.js";
 import zhCN from "@/i18n/locales/zh-CN.js";
 import { workflowRunEventLines } from "@/app-shell/workflowRunPanel.js";
@@ -11,24 +11,11 @@ import {
   workflowRunConcurrencyChip,
   workflowRunConcurrencyView,
 } from "@/app-shell/workflowRunThrottle.js";
-import { statusOfRunNode } from "@/components/workflow-graph/run-status.js";
 
 const format = (descriptor: { id: string }, values?: Record<string, string>) =>
   values ? `${descriptor.id}:${Object.values(values).join("/")}` : descriptor.id;
 
 const T0 = 1_700_000_000_000;
-
-function node(overrides: Partial<WorkflowRunNode> = {}): WorkflowRunNode {
-  return {
-    siteId: "ask#1",
-    ordinal: 1,
-    kind: "ask",
-    phase: "executing",
-    actorSiteId: "actor#1",
-    actorOrdinal: 1,
-    ...overrides,
-  };
-}
 
 describe("原因标签（事件日志用）", () => {
   it("已知原因映射到短标签键，陌生原因原样显示", () => {
@@ -159,20 +146,6 @@ describe("workflowRunConcurrencyChip：与 Configure 同进同退", () => {
     const key = "chat.toolCall.workflow.run.concurrency.label";
     expect((zhCN as Record<string, string>)[key]).toBe("最大并发数 {cap}");
     expect((enUS as Record<string, string>)[key]).toBe("Max concurrency {cap}");
-  });
-});
-
-describe("相位 → 图上四值（决策 39）", () => {
-  it("executing / repairing / nudged 是 running", () => {
-    for (const phase of ["executing", "repairing", "nudged"] as const) {
-      expect(statusOfRunNode(node({ phase }))).toBe("running");
-    }
-  });
-
-  it("queued / dispatched / waiting 都是 pending：还没有请求在 provider 那里跑", () => {
-    for (const phase of ["queued", "dispatched", "waiting"] as const) {
-      expect(statusOfRunNode(node({ phase }))).toBe("pending");
-    }
   });
 });
 

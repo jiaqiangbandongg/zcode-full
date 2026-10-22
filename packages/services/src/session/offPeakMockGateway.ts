@@ -161,6 +161,11 @@ export async function startOffPeakMockGateway(
   const latestByTask = new Map<string, string>();
   const capturedRequests: OffPeakMockCapturedRequest[] = [];
   let invalidTicketRequests = 0;
+  let expireNextWake = false;
+  let releaseBackground!: () => void;
+  const backgroundBarrier = new Promise<void>((resolve) => {
+    releaseBackground = resolve;
+  });
   let seqCounter = 0;
 
   /** 懒惰推进时间驱动的状态（轮询/messages 时评估，无后台计时器）。 */
@@ -386,11 +391,23 @@ export async function startOffPeakMockGateway(
           ? { project: req.headers["bigmodel-project"] }
           : {}),
       });
+      if (expireNextWake && stage === "parent-wakeup") {
+        expireNextWake = false;
+        ticket.state = "expired";
+        invalidTicketRequests++;
+        capturedRequests[capturedRequests.length - 1]!.stage = "parent-wakeup-expired";
+        json(res, 400, { code: 3102, msg: "wrong off-peak ticket" });
+        return;
+      }
       const scripted =
         config.scenario === "foreground-subagents"
-          ? buildForegroundSubagentScenarioResponse(stage)
+          ? buildForegroundSubagentScenarioResponse(
+              stage,
+              (server.address() as { port: number }).port,
+            )
           : null;
       if (scripted) {
+        if (stage.startsWith("background-")) await backgroundBarrier;
         respondWithAnthropicMock(res, scripted, readRequestBoolean(requestJson, "stream"));
         return;
       }
@@ -458,6 +475,35 @@ export async function startOffPeakMockGateway(
   const server: Server = createServer((req, res) => {
     const url = req.url ?? "";
     void (async () => {
+      if (
+        req.method === "GET" &&
+        url === "/__e2e/off-peak/background-bash" &&
+        config.scenario === "foreground-subagents"
+      ) {
+        capturedRequests.push({
+          stage: "bash-started",
+          requestJson: {},
+          ticketId: "",
+          hasApiKey: false,
+          hasAuthorization: false,
+          hasCodingPlanApiKey: false,
+        });
+        await backgroundBarrier;
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end("E2E_OFFPEAK_BACKGROUND_BASH_OK");
+        return;
+      }
+      if (
+        req.method === "POST" &&
+        url === "/__e2e/off-peak/release-background" &&
+        config.scenario === "foreground-subagents"
+      ) {
+        const input = (await readBody(req)) as { expireOnWake?: boolean };
+        expireNextWake = input.expireOnWake === true;
+        releaseBackground();
+        json(res, 200, { released: true });
+        return;
+      }
       if (
         req.method === "GET" &&
         url === "/__e2e/off-peak/requests" &&
@@ -552,8 +598,6 @@ export async function startOffPeakMockGateway(
 const FOREGROUND_SUBAGENT_SCENARIO = {
   parentMarker: "E2E_OFFPEAK_SUBAGENTS_PARENT",
   parentFinal: "E2E_OFFPEAK_SUBAGENTS_PARENT_OK",
-  backgroundError:
-    "Idle-time tasks do not support background agents. Run this agent in the foreground.",
   children: [
     {
       stage: "child-explore",
@@ -606,25 +650,23 @@ const FOREGROUND_SUBAGENT_SCENARIO = {
   ],
   backgrounds: [
     {
-      stage: "unexpected-background-explicit",
+      stage: "background-explicit",
       marker: "E2E_OFFPEAK_SUBAGENT_BACKGROUND_EXPLICIT",
       toolId: "toolu_e2e_offpeak_background_explicit",
       input: {
-        description: "Verify explicit background rejection",
-        prompt:
-          "E2E_OFFPEAK_SUBAGENT_BACKGROUND_EXPLICIT: this child must never reach the provider.",
+        description: "Verify explicit background inheritance",
+        prompt: "E2E_OFFPEAK_SUBAGENT_BACKGROUND_EXPLICIT: reply when released.",
         run_in_background: true,
         subagent_type: "general-purpose",
       },
     },
     {
-      stage: "unexpected-background-profile",
+      stage: "background-profile",
       marker: "E2E_OFFPEAK_SUBAGENT_BACKGROUND_PROFILE",
       toolId: "toolu_e2e_offpeak_background_profile",
       input: {
-        description: "Verify profile background rejection",
-        prompt:
-          "E2E_OFFPEAK_SUBAGENT_BACKGROUND_PROFILE: this child must never reach the provider.",
+        description: "Verify profile background inheritance",
+        prompt: "E2E_OFFPEAK_SUBAGENT_BACKGROUND_PROFILE: reply when released.",
         subagent_type: "E2E OffPeak Background Reviewer",
       },
     },
@@ -658,11 +700,14 @@ function readRequestBoolean(value: unknown, key: string): boolean {
 
 function classifyForegroundSubagentScenarioRequest(requestJson: unknown): string {
   const serialized = JSON.stringify(requestJson);
-  if (
-    FOREGROUND_SUBAGENT_SCENARIO.children.every((child) => serialized.includes(child.reply)) &&
-    serialized.includes(FOREGROUND_SUBAGENT_SCENARIO.backgroundError)
-  ) {
-    return "parent-continuation";
+  // 标题包含相同用户素材，必须先按 system 任务区分，否则会误触发整套 Agent 脚本。
+  if (serialized.includes("Generate a concise title for this coding session."))
+    return "session-title";
+  if (serialized.includes(FOREGROUND_SUBAGENT_SCENARIO.parentMarker)) {
+    if (serialized.includes(FOREGROUND_SUBAGENT_SCENARIO.parentFinal)) return "parent-wakeup";
+    if (serialized.includes(FOREGROUND_SUBAGENT_SCENARIO.children[0].toolId))
+      return "parent-continuation";
+    return "parent-initial";
   }
   for (const child of FOREGROUND_SUBAGENT_SCENARIO.children) {
     if (serialized.includes(child.marker)) return child.stage;
@@ -676,10 +721,28 @@ function classifyForegroundSubagentScenarioRequest(requestJson: unknown): string
   return "unknown";
 }
 
-function buildForegroundSubagentScenarioResponse(stage: string): AnthropicMockResponse | undefined {
+function buildForegroundSubagentScenarioResponse(
+  stage: string,
+  port: number,
+): AnthropicMockResponse | undefined {
+  if (stage === "session-title") {
+    return anthropicMockResponse({
+      content: [{ type: "text", text: '{"title":"E2E 闲时后台验证"}' }],
+      stopReason: "end_turn",
+    });
+  }
   if (stage === "parent-initial") {
     return anthropicMockResponse({
       content: [
+        {
+          type: "tool_use",
+          id: "toolu_e2e_offpeak_bash",
+          name: "Bash",
+          input: {
+            run_in_background: true,
+            command: `node -e 'fetch("http://127.0.0.1:${port}/__e2e/off-peak/background-bash").then(r=>r.text()).then(console.log)'`,
+          },
+        },
         ...FOREGROUND_SUBAGENT_SCENARIO.children.map((child) => ({
           type: "tool_use" as const,
           id: child.toolId,
@@ -710,11 +773,11 @@ function buildForegroundSubagentScenarioResponse(stage: string): AnthropicMockRe
   );
   if (background) {
     return anthropicMockResponse({
-      content: [{ type: "text", text: `${background.marker}_UNEXPECTED` }],
+      content: [{ type: "text", text: `${background.marker}_OK` }],
       stopReason: "end_turn",
     });
   }
-  if (stage === "parent-continuation") {
+  if (stage === "parent-continuation" || stage === "parent-wakeup") {
     return anthropicMockResponse({
       content: [{ type: "text", text: FOREGROUND_SUBAGENT_SCENARIO.parentFinal }],
       stopReason: "end_turn",

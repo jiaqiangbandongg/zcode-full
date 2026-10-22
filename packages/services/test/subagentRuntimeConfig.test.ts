@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
@@ -237,7 +237,9 @@ describe("Host incremental subagent snapshots", () => {
     f.emit(path);
     await until(() => expect(vi.mocked(fs.readFile).mock.results.at(-1)?.value).toBe(gate.promise));
     const obsolete = initialWatcherFor(f.userRoot);
-    await rm(f.userRoot, { recursive: true });
+    // 删除后立即 mkdir 可能复用 inode，未必构成该用例要验证的目录身份替换。
+    // 保留旧目录再建立新目录，确定性地产生不同身份，不依赖文件系统分配时序。
+    await rename(f.userRoot, `${f.userRoot}-obsolete`);
     await mkdir(f.userRoot);
     await writeFile(path, markdown("aaa", "replacement"));
     // 快速替换时可能只有原生事件；路径仍存在，也必须关闭旧目录对象的监听。

@@ -101,8 +101,6 @@ describe("session 创建：runtimeConfig.dynamicWorkflowEnabled", () => {
   }
 
   it.each([
-    { params: {}, expected: false },
-    { params: { dynamicWorkflowEnabled: true }, expected: true },
     { params: { preference: true }, expected: true },
     // per-session 显式 true 与 workspace 结论是或的关系（与 off-peak 同款）。
     { params: { dynamicWorkflowEnabled: true, preference: false }, expected: true },

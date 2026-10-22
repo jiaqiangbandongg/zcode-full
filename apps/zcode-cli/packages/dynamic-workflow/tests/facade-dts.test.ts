@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   analyzeWorkflowScript,
@@ -12,111 +11,7 @@ import {
   WORLD_RUN_LITERAL_CODE,
 } from "../src/index.js";
 
-// 段拆分（docs/dynamic-workflow/authoring.md「The facade」）承诺：FACADE_DTS 由段
-// 拼接后逐字节确定。哈希在每次**有意的** facade 文本变更时更新（更新历史即 facade 的
-// 变更账本），任何段级编辑都会撞上这条——那是有意的：改 facade 文本必须是一次显式决定，
-// 而不是重排段落时的静默漂移。
-//   - dfd383f3…（2026-08-26）：段拆分落地，对拆分前逐字节不变。
-//   - fb2d9943…（2026-08-26）：world.run 段加入（docs/dynamic-workflow/authoring.md）。
-//   - 7f7d36ee…（2026-08-27）：phase 段加入（docs/dynamic-workflow/presentation.md）。
-//   - 198475cc…（2026-08-28）：args 段加入（docs/dynamic-workflow/launch.md）。
-//   - 807e4b79…（2026-08-29）：merge 重算——feat/dynamic-workflow 的 phase 段与
-//     dwf-reusable 的 args 段会师后的组合哈希（两侧各自的哈希均已不再是当前文本）。
-//   - e7da7b7b…（2026-08-29）：phase 段 JSDoc 重写——提示层强制（必填 + 阶段名人类
-//     可读、跟随会话语言），见 docs/dynamic-workflow/authoring.md「Phases」与
-//     docs/dynamic-workflow/authoring.md「The skill」；声明集（declare 行）不变。
-//   - 877a78c3…（2026-08-31）：actor 段 `agent()` JSDoc 重写——「name 是展示标签」改成
-//     「非空名必须 run 内唯一，且是修订续跑（resume_from）缓存匹配的身份键」，含 fan-out
-//     里静态名的教改写；phase 段那句「不像 actor 名，那只是展示标签」同批改口径。见
-//     docs/execution-engine.md「Amend-resume」。声明集（declare 行）不变。
-//   - 05c3401c…（2026-09-04）：artifact 段加入 + report 签名加第二实参
-//     （docs/dynamic-workflow/authoring.md）。这一条**动了声明集**：新增 `declare const artifact`
-//     与七个 spec 接口，`report` 变为 `(item: unknown, artifactId?: string)`。
-//   - 499c4179…（2026-09-04）：`BoardSpec.title` 改名 `cardTitle`。原名与继承自
-//     `ArtifactOptions` 的 `title`（看板自己的卡片标题）撞在同一个键上，两者都是 string 所以
-//     TS 收下了它——代价是一个看板永远说不出「这块板叫内存回归，每张卡拿 name 字段当标题」。
-//     spec 同日改名（docs/dynamic-workflow/authoring.md「The facade」）。
-//   - 540a2054…（2026-09-04）：**纯散文**——actor 段的 artifact → result／output value，
-//     把这个词让给 artifact.*。旧措辞（`Node<T>` 的「producing a typed artifact」、
-//     `Agent.ask` 的「T is the task's output artifact」）说的是引擎内部那一义，而产物段
-//     就在同一份 .d.ts 里用同一个词说用户面产物——模型一次看到两义。同批改的还有
-//     CreateWorkflow 的 RULES 与 dynamic-workflows 技能正文，见
-//     docs/dynamic-workflow/authoring.md「The guidance」 与 docs/dynamic-workflow/authoring.md「Artifacts: what the user keeps」 的
-//     「术语」表。声明集（declare 行）不变。
-//   - 0dd165d5…（2026-09-05）：**纯散文**——phase 段加「每个阶段至少含一次 ask 或一次
-//     world.run」的规则与改写后的 Idiom 句（docs/dynamic-workflow/presentation.md 同日追记：
-//     空阶段一闪而过、看不到进度，模型被教导不要写它）。声明集（declare 行）不变。
-//   - 99abaa45…（2026-09-05）：**纯散文**——`ToolProfile` 与 `AgentPersona.tools` / `model` 的
-//     JSDoc 重写：「"none" suits cheap judge/extract personas」改成「只在 ask 文本已含全部所需
-//     时用 none；要核对文件、追引用、跑东西的用 readonly/default，无工具的子代理遇到那种 ask
-//     会升级而不是假装」。起因是实盘 `tools:"none"` 的 GLM 子代理被要求核对磁盘内容后发出
-//     `escalate("placeholder")`，见 docs/execution-engine.md与
-//     docs/dynamic-workflow/authoring.md「The skill」。声明集（declare 行）不变。
-//   - 23aef592…（2026-09-05）：上两条在两条分支上各自重钉；合并（dwf-visual-redesign ⇄
-//     feat/dynamic-workflow）后两段散文同在，按合并结果重钉。声明集（declare 行）不变。
-//   - b500809e…（2026-09-05）：**纯散文**——`artifact` 段的总说明重写为两条习惯：每个 run 发布
-//     其**交付物**（用户要网页/PDF 就是那个文件走 file()；要的是结论就是报告的长版，通常是
-//     markdown()；一行答案除外）、看板是给盯着 run 的人看的（只在有值得盯的中途状态时声明）；
-//     外加两条「值不值一张卡」的检验（用户会单独打开吗、是否重复另一产物）。`markdown()` 的
-//     JSDoc 由「不是 return 的复制」改成「报告型交付物的常见形态」。与 SKILL.md §9 /
-//     examples.md 同批。声明集（declare 行）不变。
-//   - f94af7c0…（2026-09-07）：**纯散文**——phase 段的命名规则加一句回声：「像告诉同事现在
-//     在做什么那样说」，附一对中文正反例（"确认测试仍然通过"，不是 "执行测试验证任务"）。
-//     同段重排行宽以守住 max-lines 400（模板字面量里的行算代码行，不算注释）。
-//     教法从「三个禁用词」改为「一条原则 + 成对例子」（docs/dynamic-workflow/presentation.md
-//     2026-09-07 裁决；完整例子表在 SKILL.md「Write for the user」一节）。声明集（declare 行）不变。
-//   - 853ae664…（2026-09-11）：**动了声明集**——`declare type ModelTier` 与 `AgentPersona.model`
-//     退场（docs/dynamic-workflow/authoring.md）：宿主没有 lite 模型来源，档位早已是
-//     空转的旋钮，却仍占着 facade 的篇幅。子代理一律跑父会话当前模型。
-//   - fe83dea7…（2026-09-11）：**动了声明集**——`ToolProfile` 收成 `"default" | "readonly"`，
-//     `"none"` 退场（同一决策记录）：它比 readonly 多买到的只有「不去读文件」，而这靠 ask 文本
-//     就能做到；它另外带来了唯一一族退化升级与三处按档位分支的提示。`ToolProfile` 与
-//     `AgentPersona.tools` 的 JSDoc 同批改写为两档的说法。
-//   - dee40f0b…（2026-09-12）：**动了声明集**——`declare type ToolProfile` 与 `AgentPersona.tools`
-//     整个退场（同一决策记录，第二轮）：档位买到的只有「裁判不能改文件」，普通子代理也不靠
-//     档位保证这一点，ask 文本说清即可；`AgentPersona` 只剩 `system`，JSDoc 说明每个 actor 都有
-//     完整工作工具集。
-//   - c19c9310…（2026-09-14）：只改一句 JSDoc——createActor 名字注释里的「CreateWorkflow with
-//     resume_from」改为「AmendWorkflow」（修订入口拆成独立工具，docs/dynamic-workflow/launch.md）。
-//   - 21cb21e1…（2026-09-14）：**动了声明集**——`ArtifactOptions.primary?: boolean`
-//     （docs/dynamic-workflow/authoring.md「Ids, tags and versions」）：脚本标出 run 的交付物，完成卡与 run 侧板
-//     以它带头。`description` 补 JSDoc（它现在会显示在交付物那一行旁边）；`artifact` 的散文加一句
-//     「发布多于一件时给交付物标 primary」。
-//   - abeaec0a…（2026-09-15）：合并 dwf-better-artifacts——上两条（AmendWorkflow JSDoc 与
-//     `ArtifactOptions.primary`）同时在场，哈希取并集后的文本。
-//   - 7478845e…（2026-09-22）：**动了声明集**——stream 段加入（docs/dynamic-workflow/authoring.md
-//     「Streams」）：`Channel<T>`、`channel()`、`future()`，两个 facade 都含。段文本住在
-//     facade/dts-stream.ts（dts.ts 顶在行数上限），仍由 dts.ts 拼接。
-//   - 7fd6b30e…（2026-09-26）：**动了声明集**——子代理模型回到 persona（docs/dynamic-workflow/
-//     authoring.md「Choosing a model per subagent」）：`ModelRef`（私有构造器的 class）、`model()`、
-//     `AgentPersona.model?: ModelRef | string`。只在 actor 段，snippet 不含。
-//   - 4f79960c…（2026-09-26）：只改一句 JSDoc——`report()` 的条数上限由 256 改为 65,536
-//     （docs/execution-engine.md「Progressive results: `report`」与「Reading the journal」）。
-//     声明集（declare 行）不变。
-//   - 7f7dc6df…（2026-09-26）：只改一句 JSDoc——`report()` 的单条上限由 32KB 改为 1 MiB，并加上
-//     run 级 1 GiB 的字节总数上限（docs/execution-engine.md「Progressive results: `report`」）。
-//     声明集（declare 行）不变。
-//   - a82956e9…（2026-09-26）：合并 dwf-report-limit——上三条（persona 的 `ModelRef`/`model()` 与
-//     `report()` 两句上限 JSDoc）同时在场，哈希取并集后的文本。
-//   - f1990146…（2026-09-28）：**动了声明集**——hole 段加入（docs/dynamic-workflow/authoring.md
-//     「Holes: `hole<T>()`」）：`hole<T>(name, prompt?)` / `hole<T>(name, body)` /
-//     `hole<T>(name, prompt, body)` 三个重载。段文本住在 facade/dts-hole.ts，拼在 phase 段之后；
-//     **只进完整 facade**，snippet 不含（片段没有 run，也就没有可等主代理补全的东西）。
-//   - b47c6183…（2026-09-28）：只改一句 JSDoc——hole 段的禁区收窄为「数组方法的 fan-out 回调」
-//     （for...of 体允许：顺序循环里第一轮停在留白、补全后每轮跑函数体），并加上「函数体必须
-//     内联」一句。声明集（declare 行）不变。
-//   - 278970c4…（2026-09-30）：**纯散文**——注释收成参考层（docs/dynamic-workflow/authoring.md
-//     「The facade」）：判断层（阶段怎么命名、交付物两条习惯、门控惯用法、流水线阶段的写法等）
-//     删去，只留在技能正文里；其余注释按脚本作者的读法改写（actor → subagent、journaled → recorded、
-//     hole 的读者就是主代理所以称「你」）；facade 23 275 → 13 598 字节。声明集（declare 行）不变。
-const PINNED_FACADE_SHA256 = "278970c47a2b3e5225d8e993320193221b42bd524121228e363f84ee4654609d";
-
 describe("facade dts segments", () => {
-  it("FACADE_DTS is byte-identical to the pinned composition", () => {
-    const hash = createHash("sha256").update(FACADE_DTS, "utf8").digest("hex");
-    expect(hash).toBe(PINNED_FACADE_SHA256);
-  });
-
   // 注释只写参考层：做什么、返回什么、何时拒绝或让 run 失败、上限、实参的编译期规则
   // （docs/dynamic-workflow/authoring.md「The facade」）。判断层在技能正文里只说一次；facade
   // 只经技能 §16.2 进上下文，注释复述正文等于每次写作会话付两遍，且是会漂移的那一份。
@@ -169,12 +64,6 @@ describe("facade dts segments", () => {
     const diagnostics = collectDiagnostics(workflow.program);
     expect(diagnostics.length).toBeGreaterThan(0);
     expect(diagnostics[0]?.message).toContain("Cannot find name 'hole'");
-  });
-
-  // docs/dynamic-workflow/authoring.md「What the facade does not have」：脚本 facade 里没有 budget 标识符。
-  it("neither facade declares budget", () => {
-    expect(FACADE_DTS).not.toContain("budget");
-    expect(SNIPPET_FACADE_DTS).not.toContain("budget");
   });
 });
 

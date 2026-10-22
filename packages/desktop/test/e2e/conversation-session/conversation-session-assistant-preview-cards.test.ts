@@ -1,10 +1,23 @@
 /* eslint-disable max-lines -- APC01-APC12 共用真实 Host stat、Browser/Preview Pane 与 cold-resume fixture。 */
-import { copyFile, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TID_BROWSER_ADDRESS_INPUT, TID_BROWSER_WEBVIEW, TID_PREVIEW_PANE } from "@zcode/shared";
+import {
+  TID_BROWSER_ADDRESS_INPUT,
+  TID_BROWSER_WEBVIEW,
+  TID_PREVIEW_PANE,
+} from "@zcode/shared/test-ids";
 import { clearAppData, DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
 import { restartIntoWorkspacePreservingProfile } from "../helpers/model-provider-restart.js";
 import {
@@ -133,6 +146,80 @@ describe("Assistant Preview Cards E2E", () => {
     await expectPreviewCardMissing("旧 说明.md");
     await expectPreviewCardMissing("不存在.pdf");
     await waitForPreviewRenderer("产品 路线.pptx", "pptx");
+    for (const file of OFFICE_FILES) {
+      await assertFileOpenApps(file.name);
+    }
+  }).timeout(240_000);
+
+  it("APC14: card context actions preserve the original Open dropdown", async () => {
+    // 隔离 profile 的首次引导可能尚在异步加载；通过已有 Escape 退出路径准备场景。
+    await browser.waitUntil(
+      async () =>
+        (await browser.$('[data-testid="onboarding-page"]').isExisting()) ||
+        (await browser.$('[data-testid="task-settings-button"]').isExisting()),
+      { timeout: 30_000 },
+    );
+    await browser.keys("Escape");
+    await prepareCase();
+    await materializeOfficeFixtures();
+    const marker = `${CASE_MARKER}_OFFICE`;
+    await sendV4Prompt(`${marker}_PPTX: report the prepared Office files and one missing PDF.`);
+    await waitForCompleted(`${marker}_PPTX_DONE`);
+    await waitForPreviewCards([...OFFICE_FILES].reverse().map((item) => item.name));
+    await closeSidePanes();
+    const row = await browser.$('[data-preview-card-title="产品 路线.pptx"]');
+    await row.click({ button: "right" });
+    await browser.$('[data-slot="context-menu-content"][data-state="open"]').waitForDisplayed();
+    const screenshotDir = process.env.ZCODE_E2E_RUNTIME_LOG_DIR;
+    if (screenshotDir) await browser.saveScreenshot(join(screenshotDir, "preview-card-menu.png"));
+    // 关闭动画中的旧菜单仍在 DOM，断言只读取当前打开的菜单。
+    const labels = await browser
+      .$$('[role="menu"][data-state="open"] [role="menuitem"]')
+      .map((item) => item.getText());
+    expect(labels.slice(0, 2)).toEqual(
+      [/^(Preview|预览)$/, /^(Open|打开)$/].map((label) => expect.stringMatching(label)),
+    );
+    expect(labels.some((label) => /Open containing folder|打开所在目录/.test(label))).toBe(false);
+    await browser.keys("Escape");
+    await row.$('button[aria-label="Choose app"], button[aria-label="选择打开方式"]').click();
+    const dropdown = await browser.$('[data-slot="dropdown-menu-content"][data-state="open"]');
+    await dropdown.waitForDisplayed();
+    const dropdownText = await dropdown.getText();
+    expect(dropdownText).toMatch(/Copy absolute path|复制绝对路径/);
+    expect(dropdownText).not.toMatch(
+      /Preview in side pane|在侧边栏预览|Open containing folder|打开所在目录/,
+    );
+    expect(await dropdown.$('[data-slot="dropdown-menu-sub-trigger"]').isExisting()).toBe(false);
+    await browser.keys("Escape");
+    const openPath = await browser.electron.mock("shell", "openPath");
+    await openPath.mockResolvedValue("");
+    try {
+      await row.click({ button: "right" });
+      await browser.$('[role="menu"][data-state="open"] [role="menuitem"]').click();
+      await waitForPreviewRenderer("产品 路线.pptx", "pptx");
+      await row.click({ button: "right" });
+      const items = await browser.$$('[role="menu"][data-state="open"] [role="menuitem"]');
+      const expectedPath = join(CASE_ROOT, "office", "产品 路线.pptx");
+      for (const item of items) {
+        if (/^(Open|打开)$/.test(await item.getText())) {
+          await item.click();
+          break;
+        }
+      }
+      await browser.waitUntil(
+        async () => {
+          try {
+            await expect(openPath).toHaveBeenCalledWith(await realpath(expectedPath));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 10_000, timeoutMsg: `Menu action did not open ${expectedPath}` },
+      );
+    } finally {
+      await browser.electron.restoreAllMocks();
+    }
   }).timeout(240_000);
 
   it("APC12: 独立音频消息打开原生 audio 播放器", async () => {
@@ -155,6 +242,7 @@ describe("Assistant Preview Cards E2E", () => {
     await sendV4Prompt(`${marker}: report the prepared video file only.`);
     await waitForCompleted(`${marker}_DONE`);
     await waitForPreviewCards(["生成 视频.mp4"]);
+    await assertFileOpenApps("生成 视频.mp4");
     const logSnapshot = await snapshotDesktopRuntimeLogs();
     await clickPreviewCard("生成 视频.mp4");
     await waitForPreviewRenderer("生成 视频.mp4", "video");
@@ -289,7 +377,7 @@ async function readPreviewCards(
 ): Promise<PreviewCardSnapshot[]> {
   return browser.execute(
     (titles) => {
-      const openLabels = new Set(["Open", "打开"]);
+      const openLabels = new Set(["Open", "打开", "Preview", "预览"]);
       return Array.from(
         document.querySelectorAll<HTMLElement>('[data-zcode-stream-animate="true"]'),
       )
@@ -332,7 +420,7 @@ async function expectPreviewCardMissing(title: string) {
 
 async function clickPreviewCard(title: string) {
   const result = await browser.execute((expectedTitle) => {
-    const openLabels = new Set(["Open", "打开"]);
+    const openLabels = new Set(["Open", "打开", "Preview", "预览"]);
     const row = Array.from(
       document.querySelectorAll<HTMLElement>('[data-zcode-stream-animate="true"]'),
     ).find((candidate) => candidate.innerText.includes(expectedTitle));
@@ -346,18 +434,63 @@ async function clickPreviewCard(title: string) {
   expect(result.disabled).toBe(false);
 }
 
+async function assertFileOpenApps(filename: string) {
+  const path = join(CASE_ROOT, filename);
+  const expected = await browser.execute(async (filePath) => {
+    const platform = (
+      window as unknown as Window & {
+        zcode: { getInstalledEditors(path?: string): Promise<Array<{ name: string }>> };
+      }
+    ).zcode;
+    const apps = await platform.getInstalledEditors(filePath);
+    const base = await platform.getInstalledEditors();
+    return { apps: apps.map((app) => app.name), base: base.map((app) => app.name) };
+  }, path);
+  const rows = await browser.$$('[data-zcode-stream-animate="true"]');
+  const row = (
+    await rows.map(async (candidate) => ({ candidate, text: await candidate.getText() }))
+  ).find((item) => item.text.includes(filename))?.candidate;
+  expect(row).toBeDefined();
+  await row?.$('button[aria-label="Choose app"], button[aria-label="选择打开方式"]').click();
+  await browser.waitUntil(
+    async () => {
+      const names = await browser
+        .$$('[role="menuitem"] img')
+        .map((item) => item.getAttribute("alt"));
+      return (
+        expected.apps.every((name) => names.includes(name)) && names.length === expected.apps.length
+      );
+    },
+    { timeout: 10_000, timeoutMsg: `${filename} 打开方式没有匹配平台应用清单` },
+  );
+  const text = await browser.$('[role="menu"]').getText();
+  expect(text).toMatch(/Copy absolute path|复制绝对路径/);
+  expect(text).toMatch(/Copy relative path|复制相对路径/);
+  expect(text).not.toMatch(/选择其他应用|Choose another app|系统默认应用/);
+  expect(expected.apps).toEqual(expect.arrayContaining(expected.base));
+  if (process.platform === "darwin" && filename.endsWith(".pdf")) {
+    expect(expected.apps).toContain("Preview");
+    expect(expected.base).not.toContain("Preview");
+  }
+  await browser.keys("Escape");
+}
+
 async function assertLocalHtmlExternalOpen() {
   const openPath = await browser.electron.mock("shell", "openPath");
   await openPath.mockResolvedValue("");
   try {
     const expectedTitle = basename(SOURCE_HTML_RELATIVE_PATH);
     const rows = await browser.$$('[data-zcode-stream-animate="true"]');
-    const row = (await rows.map(async (candidate) => ({
-      candidate,
-      text: await candidate.getText(),
-    }))).find(({ text }) => text.includes(expectedTitle))?.candidate;
+    const row = (
+      await rows.map(async (candidate) => ({
+        candidate,
+        text: await candidate.getText(),
+      }))
+    ).find(({ text }) => text.includes(expectedTitle))?.candidate;
     expect(row).toBeDefined();
-    const trigger = await row?.$('button[aria-label="Choose app"], button[aria-label="选择打开方式"]');
+    const trigger = await row?.$(
+      'button[aria-label="Choose app"], button[aria-label="选择打开方式"]',
+    );
     expect(trigger).toBeDefined();
     await trigger?.click();
 
@@ -365,10 +498,12 @@ async function assertLocalHtmlExternalOpen() {
       async () => {
         const labels = new Set(["Open in browser", "在浏览器中打开"]);
         const items = await browser.$$('[role="menuitem"]');
-        const item = (await items.map(async (candidate) => ({
-          candidate,
-          text: await candidate.getText(),
-        }))).find(({ text }) => labels.has(text.trim()))?.candidate;
+        const item = (
+          await items.map(async (candidate) => ({
+            candidate,
+            text: await candidate.getText(),
+          }))
+        ).find(({ text }) => labels.has(text.trim()))?.candidate;
         if (!item) return false;
         await item.click();
         return true;

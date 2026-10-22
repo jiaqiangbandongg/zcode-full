@@ -1,7 +1,7 @@
 // PV4-11：stable compact 覆盖 latest user query 后，edit 仍在原 session 做 branch cut。
 // compact summary 与旧回复退出 active branch，模型只收到编辑后的 intent，不创建 child，
 // 不注入 rewind reminder；UI 与 cold transcript 都以 branch cut 为第一层权威。
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { clearAppData, setInputValueByTestIdDom } from "../helpers/desktop-app.js";
 import {
   clickV4Send,

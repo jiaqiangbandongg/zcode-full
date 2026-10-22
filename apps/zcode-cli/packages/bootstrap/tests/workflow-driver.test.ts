@@ -243,7 +243,6 @@ describe("workflow driver — lenient stringified submit", () => {
     expect(node?.status).toBe("completed");
     // 落库的是解析后的对象，而非原始字符串。
     expect(node?.result).toEqual(artifact);
-    expect(typeof node?.result).toBe("object");
   });
 });
 
@@ -267,7 +266,6 @@ describe("workflow driver — actor tool surface", () => {
     // 先确认 ask 真的跑通了：工具面若把 submit_result 滤掉，run 会失败而不是给出空列表。
     expect(settlement).toEqual({ status: "completed", artifact: { approved: true } });
     const names = modelCalls["actor#1@1"]?.toolNames[0];
-    expect(names).toBeDefined();
     return names ?? [];
   }
 
@@ -397,8 +395,6 @@ describe("workflow driver — actor session ids", () => {
     const [underscore] = await sessionIdsFor("a_b");
     const [hash] = await sessionIdsFor("a#b");
 
-    expect(underscore).toBeDefined();
-    expect(hash).toBeDefined();
     // 朴素白名单方案下这两个会相等；转义先行使它们保持可区分。
     expect(underscore).not.toBe(hash);
     expect(underscore).toContain("a__b");
@@ -542,7 +538,7 @@ describe("workflow driver — resume 会话身份互证", () => {
 /** 一次性 sqlite session store（真实持久层），用完即删。 */
 async function withSessionStore(run: (store: SessionStorePort) => Promise<void>): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "zcode-dwf-transcript-"));
-  const store = createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
+  const store = await createSqliteSessionStore({ dbPath: join(root, "session.sqlite") });
   try {
     await run(store as unknown as SessionStorePort);
   } finally {

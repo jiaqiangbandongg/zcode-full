@@ -86,7 +86,7 @@ describe("useTypewriter", () => {
     expect(view.result.current).toEqual({ idle: false, shown: [], visible: 0 });
   });
 
-  it("两站一起到：第二站等第一站写完；空站名的站也要揭示", () => {
+  it("两站一起到：第二站等第一站写完再揭示", () => {
     const view = renderHook(() => useTypewriter(["a", "b"]));
     tick(PEN_MS);
     expect(view.result.current).toMatchObject({ shown: [1], visible: 1 });

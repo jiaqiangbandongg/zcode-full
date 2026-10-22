@@ -77,9 +77,6 @@ describe("Hook runner lifecycle", () => {
     expect(new Set(events.map((event) => lifecyclePayload(event)?.hookInvocationId)).size).toBe(1);
     expect(events.map((event) => lifecyclePayload(event)?.hookCount)).toEqual([2, 2, 2, 2]);
     expect(events.map((event) => lifecyclePayload(event)?.hookIndex)).toEqual([0, 0, 1, 1]);
-    expect(events.filter((event) => event.type === SessionEventType.HookRunBlocked)).toHaveLength(
-      1,
-    );
     expect(
       lifecyclePayload(events.find((event) => event.type === SessionEventType.HookRunBlocked))
         ?.blockReason,

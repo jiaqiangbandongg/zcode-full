@@ -63,12 +63,8 @@ describe("WorkflowAgentPill", () => {
       status: "running",
     });
     const pill = view.getByTestId("workflow-agent-pill");
-    expect(view.getByTestId("workflow-pill-status").className).toContain("text-foreground-subtle");
-    expect(view.getByTestId("workflow-pill-status").className).not.toContain("text-warning");
     expect(pill.querySelector(":scope > svg[data-subagent-avatar]")).not.toBeNull();
     expect(pill.querySelector("img")).toBeNull();
-    expect(pill.querySelector(".wf-pill-avatar")).toBeNull();
-    expect(pill.className).toContain("rounded-full");
     expect(pill.tagName).toBe("BUTTON");
     expect(pill.getAttribute("type")).toBe("button");
     expect(pill.getAttribute("aria-label")).toBe("Open the transcript of Ada");
@@ -111,14 +107,10 @@ describe("WorkflowAgentPill", () => {
     expect(pill.getAttribute("title")).toBe("Transcript starts when the subagent does");
   });
 
-  it("到场与弹入：药丸带 wf-arrive，状态标记带 wf-mark 且带可读文字", () => {
+  it("完成状态标记带可读文字", () => {
     const view = renderPill({ laneClass: "agent", name: "Ada", status: "done" });
-    expect(view.getByTestId("workflow-agent-pill").className).toContain("wf-arrive");
     const mark = view.getByTestId("workflow-pill-status");
-    expect(mark.className).toContain("wf-mark");
     expect(mark.getAttribute("aria-label")).toBe("done");
-    expect(mark.className).toContain("text-foreground-subtle");
-    expect(mark.className).not.toContain("text-success");
   });
 
   it("脚本药丸没有头像色相；子代理悬停色相与脸同源：编号优先，无编号退回名字散列", () => {

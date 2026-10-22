@@ -221,6 +221,7 @@ export interface ValidateZCodePluginOptions extends ResolveZCodePluginsOptions {
 export interface DescribeZCodePluginOptions extends ResolveZCodePluginsOptions {
   marketplace: string;
   pluginName: string;
+  withWriteLock?: <T>(write: () => Promise<T>) => Promise<T>;
 }
 
 export interface ZCodePluginInstallData {
@@ -355,6 +356,8 @@ export function getZCodePluginsOverview(
       marketplace: ZCODE_OFFICIAL_PLUGIN_MARKETPLACE,
       version: def.version,
       installed: false,
+      // Bugfix：可恢复条目只带 listing 时丢了 "ui"，卸载后的文档插件从「UI 插件」掉进分类分组。
+      ...(def.componentTypes ? { componentTypes: [...def.componentTypes] } : {}),
       ...(listing ? { listing } : {}),
     };
   });
@@ -1017,11 +1020,12 @@ export async function describeZCodePlugin(
   options: DescribeZCodePluginOptions,
 ): Promise<DescribeMarketplacePluginResult> {
   const { pluginStorageRoot } = resolvePluginContext(options);
-  ensureDefaultPluginMarketplaces(pluginStorageRoot);
+  // 默认市场登记由 ensureMarketplaceManifestAvailable 在写锁内完成；这里不再无锁写 known 列表。
   return describeMarketplacePlugin({
     marketplace: options.marketplace,
     name: options.pluginName,
     storageRoot: pluginStorageRoot,
+    ...(options.withWriteLock ? { withWriteLock: options.withWriteLock } : {}),
   });
 }
 
@@ -1252,6 +1256,7 @@ function inferComponentTypes(raw: Record<string, unknown>): string[] {
   if ("hooks" in raw) types.push("hook");
   if ("mcpServers" in raw) types.push("mcp");
   if ("lspServers" in raw) types.push("lsp");
+  if (Array.isArray(raw.componentTypes) && raw.componentTypes.includes("ui")) types.push("ui");
   return types;
 }
 
@@ -1267,6 +1272,7 @@ function inferComponentTypesFromMetadata(plugin: PluginMetadata): string[] {
     types.push("mcp");
   }
   if (plugin.hookDetails.length > 0) types.push("hook");
+  if (plugin.uiSurfaces?.length) types.push("ui");
   return types;
 }
 

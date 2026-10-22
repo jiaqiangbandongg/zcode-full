@@ -1,5 +1,7 @@
 # Server Remote Workspace Connection
 
+> **状态（2026-09-13）**：`kind:"server"` 直连仍是 dev-only 入口并接入 ingress token（主规格 §6.1、§15 第 5 条），本文的 Server 接口、服务归属与 Realtime 边界描述继续适用。文中「SSH、WSL 在 Host 内池化连接，Docker/Server 使用 dedicated connection」的进程模型属于 R3 之前的旧主链；当前 SSH/WSL/Docker 统一走 Source Server 主链，见 `docs/architecture/r3-source-server-remote-architecture.md` §4。
+
 ## 背景
 
 当前 Desktop App 已支持通过 SSH / WSL / Docker / Server 创建 remote workspace。每个 BrowserWindow 有一个独立

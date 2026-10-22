@@ -1,3 +1,4 @@
+import { ToolCallBlock } from "@/ToolCallBlocks.js";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -27,65 +28,69 @@ function renderChangesGroup(options: {
         raw: { v4Status: "inputStreaming", inputPreviewComplete: false },
       }))
     : [
-    {
-      toolId: "write-1",
-      toolName: "Write",
-      kind: "Write",
-      title: "Write",
-      input: { file_path: "/workspace/src/a.ts", content: "a" },
-      status: "completed",
-    },
-    ...(!options.singleFile ? [{
-      toolId: "edit-2",
-      toolName: "Edit",
-      kind: "Edit",
-      title: "Edit",
-      input: {
-        file_path: "/workspace/src/b.css",
-        old_string: "b",
-        new_string: "c",
-      },
-      status: options.running ? "in_progress" : "completed",
-    }] : []),
-    {
-      toolId: "edit-3",
-      toolName: "Edit",
-      kind: "Edit",
-      title: "Edit",
-      input: {
-        file_path: "src/a.ts",
-        old_string: "a",
-        new_string: "aa",
-      },
-      raw: {
-        display: {
-          kind: "file_diff",
-          filePath: "/workspace/src/a.ts",
-          additions: 2,
-          deletions: 1,
+        {
+          toolId: "write-1",
+          toolName: "Write",
+          kind: "Write",
+          title: "Write",
+          input: { file_path: "/workspace/src/a.ts", content: "a" },
+          status: "completed",
         },
-      },
-      status: "completed",
-    },
-    ...(options.multiFile
-      ? [
-          {
-            toolId: "edit-multi",
-            toolName: "Edit",
-            kind: "Edit",
-            title: "Edit",
-            input: {},
-            raw: {
-              changes: {
-                "/workspace/src/a.ts": { type: "update" },
-                "/workspace/src/e.tsx": { type: "update" },
+        ...(!options.singleFile
+          ? [
+              {
+                toolId: "edit-2",
+                toolName: "Edit",
+                kind: "Edit",
+                title: "Edit",
+                input: {
+                  file_path: "/workspace/src/b.css",
+                  old_string: "b",
+                  new_string: "c",
+                },
+                status: options.running ? "in_progress" : "completed",
               },
-            },
-            status: "completed",
+            ]
+          : []),
+        {
+          toolId: "edit-3",
+          toolName: "Edit",
+          kind: "Edit",
+          title: "Edit",
+          input: {
+            file_path: "src/a.ts",
+            old_string: "a",
+            new_string: "aa",
           },
-        ]
-      : []),
-  ];
+          raw: {
+            display: {
+              kind: "file_diff",
+              filePath: "/workspace/src/a.ts",
+              additions: 2,
+              deletions: 1,
+            },
+          },
+          status: "completed",
+        },
+        ...(options.multiFile
+          ? [
+              {
+                toolId: "edit-multi",
+                toolName: "Edit",
+                kind: "Edit",
+                title: "Edit",
+                input: {},
+                raw: {
+                  changes: {
+                    "/workspace/src/a.ts": { type: "update" },
+                    "/workspace/src/e.tsx": { type: "update" },
+                  },
+                },
+                status: "completed",
+              },
+            ]
+          : []),
+      ];
   if (options.overflow) {
     children.push(
       {
@@ -111,6 +116,7 @@ function renderChangesGroup(options: {
       ZCodeIntlProvider,
       { initialLocale: "en-US" },
       createElement(ChangesGroupToolCallBlock, {
+        nestedToolRenderer: ToolCallBlock,
         toolCallNode: {
           toolCall: {
             toolId: "changes:1",
@@ -155,12 +161,6 @@ function parentSummary(html: string) {
 }
 
 describe("ChangesGroupToolCallBlock", () => {
-  it("uses a pencil icon for the Changes group", () => {
-    const html = renderChangesGroup({ running: false });
-    expect(html).toContain("lucide-pencil");
-    expect(html).not.toContain("lucide-files");
-  });
-
   it("rolls the latest editing file while running and collapsed", () => {
     const summary = parentSummary(renderChangesGroup({ running: true }));
     expect(summary).toContain("Editing");
@@ -169,34 +169,24 @@ describe("ChangesGroupToolCallBlock", () => {
     expect(summary).toContain("2 files");
     expect(summary).toContain('aria-label="+2"');
     expect(summary).toContain('aria-label="-1"');
-    expect(summary).toContain('data-animate-initial="true"');
-    expect(summary.indexOf("2 files")).toBeLessThan(summary.indexOf("Editing"));
-    expect(summary).toContain(
-      "relative inline-flex min-w-0 items-center gap-2 overflow-hidden",
-    );
   });
 
-  it("keeps initial diff animation enabled for expanded child edits", () => {
+  it("keeps child diff counts visible while expanded", () => {
     const html = renderChangesGroup({ running: true, forceOpen: true });
     const content = html.slice(html.indexOf('data-slot="collapsible-content"'));
 
     expect(content).toContain('aria-label="+2"');
-    expect(content).toContain('data-animate-initial="true"');
   });
 
   it("uses the latest child operation when rolling a Write", () => {
-    const summary = parentSummary(
-      renderChangesGroup({ running: true, overflow: true }),
-    );
+    const summary = parentSummary(renderChangesGroup({ running: true, overflow: true }));
     expect(summary).toContain("Writing");
     expect(summary).toContain("d.md");
     expect(summary).not.toContain("Editing");
   });
 
   it("shows the tool count before paths arrive", () => {
-    const summary = parentSummary(
-      renderChangesGroup({ running: true, unresolvedCount: 3 }),
-    );
+    const summary = parentSummary(renderChangesGroup({ running: true, unresolvedCount: 3 }));
 
     expect(summary).toContain("3 tools");
     expect(summary).not.toContain("0 files");
@@ -217,9 +207,7 @@ describe("ChangesGroupToolCallBlock", () => {
   it.each([true, false])(
     "shows only the unique file count while expanded (running=%s)",
     (running) => {
-      const summary = parentSummary(
-        renderChangesGroup({ running, forceOpen: true }),
-      );
+      const summary = parentSummary(renderChangesGroup({ running, forceOpen: true }));
       expect(summary).toContain("2 files");
       expect(summary).not.toContain("Editing");
       expect(summary).not.toContain("a.ts");
@@ -235,26 +223,20 @@ describe("ChangesGroupToolCallBlock", () => {
   });
 
   it("shows the file directly without a one-file count when completed and collapsed", () => {
-    const summary = parentSummary(
-      renderChangesGroup({ running: false, singleFile: true }),
-    );
+    const summary = parentSummary(renderChangesGroup({ running: false, singleFile: true }));
     expect(summary).toContain(">a.ts</span>");
     expect(summary).not.toContain("1 file");
   });
 
   it("renders every completed file before client width measurement", () => {
-    const summary = parentSummary(
-      renderChangesGroup({ running: false, overflow: true }),
-    );
+    const summary = parentSummary(renderChangesGroup({ running: false, overflow: true }));
     expect(summary).toContain("4 files");
     expect(summary).not.toContain("+1");
     expect(summary).toContain(">d.md</span>");
   });
 
   it("flattens a multi-file Edit before deduplicating across children", () => {
-    const summary = parentSummary(
-      renderChangesGroup({ running: false, multiFile: true }),
-    );
+    const summary = parentSummary(renderChangesGroup({ running: false, multiFile: true }));
     expect(summary).toContain("3 files");
     expect(summary.match(/>a\.ts<\/span>/gu)).toHaveLength(1);
     expect(summary.match(/>e\.tsx<\/span>/gu)).toHaveLength(1);

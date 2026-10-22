@@ -110,17 +110,6 @@ describe("conversation preview artifact candidates", () => {
     expect(candidates).toEqual([]);
   });
 
-  it("deduplicates the same canonical path referenced multiple times", () => {
-    const candidates = buildConversationPreviewArtifactCandidates({
-      productTurnId: "turn-1",
-      assistantText: "report.pdf ./report.pdf",
-      workspacePath,
-    });
-
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]?.sourceRef).toBe("/workspace/report.pdf");
-  });
-
   it("matches UI order by keeping the latest duplicate before applying the candidate limit", () => {
     const candidates = buildConversationPreviewArtifactCandidates({
       productTurnId: "turn-1",

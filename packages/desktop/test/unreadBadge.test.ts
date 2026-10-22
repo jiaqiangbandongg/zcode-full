@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  maxWindowUnreadCounts,
   parseWindowUnreadCount,
-  sumWindowUnreadCounts,
+  resolveBadgeOverlayLabel,
   supportsAppUnreadBadge,
-  syncAppUnreadBadge,
+  syncUnreadBadgeForPlatform,
 } from "../src/main/unreadBadge.js";
 
 describe("unread badge", () => {
@@ -15,16 +16,17 @@ describe("unread badge", () => {
     expect(parseWindowUnreadCount("2")).toBeNull();
   });
 
-  it("会把所有窗口的未读数聚合成应用级总数", () => {
+  it("多窗口上报同一全局计数，聚合取 max 防止多主窗口翻倍", () => {
     expect(
-      sumWindowUnreadCounts(
+      maxWindowUnreadCounts(
         new Map([
-          [1, 2],
+          [1, 3],
           [2, 3],
           [3, 0],
         ]),
       ),
-    ).toBe(5);
+    ).toBe(3);
+    expect(maxWindowUnreadCounts(new Map())).toBe(0);
   });
 
   it("只在 macOS / Linux 启用应用级 badge", () => {
@@ -33,27 +35,55 @@ describe("unread badge", () => {
     expect(supportsAppUnreadBadge("win32")).toBe(false);
   });
 
-  it("支持的平台会把聚合结果写回宿主 badge", () => {
-    const setBadgeCount = vi.fn();
+  it("角标 overlay 文案：0 清除、1~9 原样、10 以上折叠为 9+", () => {
+    expect(resolveBadgeOverlayLabel(0)).toBeNull();
+    expect(resolveBadgeOverlayLabel(7)).toBe("7");
+    expect(resolveBadgeOverlayLabel(9)).toBe("9");
+    expect(resolveBadgeOverlayLabel(10)).toBe("9+");
+    expect(resolveBadgeOverlayLabel(999)).toBe("9+");
+    expect(resolveBadgeOverlayLabel(-3)).toBeNull();
+  });
 
-    syncAppUnreadBadge({
+  it("平台分叉：macOS/Linux 写 app badge，不碰 overlay", () => {
+    const setBadgeCount = vi.fn();
+    const applyOverlay = vi.fn();
+
+    syncUnreadBadgeForPlatform({
       platform: "darwin",
       totalUnreadCount: 4,
       setBadgeCount,
+      applyOverlay,
     });
 
     expect(setBadgeCount).toHaveBeenCalledWith(4);
+    expect(applyOverlay).not.toHaveBeenCalled();
   });
 
-  it("Windows 一期保持 no-op，不提前引入窗口级 overlay 语义", () => {
+  it("平台分叉：Windows 写 overlay 文案，不碰 app badge", () => {
     const setBadgeCount = vi.fn();
+    const applyOverlay = vi.fn();
 
-    syncAppUnreadBadge({
+    syncUnreadBadgeForPlatform({
       platform: "win32",
-      totalUnreadCount: 4,
+      totalUnreadCount: 3,
       setBadgeCount,
+      applyOverlay,
     });
 
+    expect(applyOverlay).toHaveBeenCalledWith("3");
     expect(setBadgeCount).not.toHaveBeenCalled();
+  });
+
+  it("Windows 未读归零时下发 null 以移除 overlay", () => {
+    const applyOverlay = vi.fn();
+
+    syncUnreadBadgeForPlatform({
+      platform: "win32",
+      totalUnreadCount: 0,
+      setBadgeCount: vi.fn(),
+      applyOverlay,
+    });
+
+    expect(applyOverlay).toHaveBeenCalledWith(null);
   });
 });

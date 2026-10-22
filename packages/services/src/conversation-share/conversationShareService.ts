@@ -15,7 +15,9 @@ import type {
   Locale,
 } from "@zcode/shared";
 import {
+  projectShareToolDisplay,
   decodeConversationShareRows,
+  supportsConversationShareContent,
   buildConversationPreviewArtifactCandidates,
   CONVERSATION_PREVIEW_CARD_VISIBLE_LIMIT,
   extractConversationPreviewFileReferences,
@@ -68,6 +70,12 @@ import { materializeConversationShareInlineImages } from "./conversationShareInl
 import { buildConversationSharePublicProjection } from "./conversationSharePublicProjection.js";
 import type { ConversationShareArtifactSource } from "./conversationShareArtifactSource.js";
 import { formatSharedContextV1 } from "./sharedContextFormatter.js";
+
+import {
+  collectConversationShareWorkflowSnapshot,
+  isWorkflowShareFallbackRow,
+  type ShareWorkflowReader,
+} from "./conversationShareWorkflowSnapshot.js";
 
 const DEFAULT_CONFIRM_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_CONFIRM_POLL_TIMEOUT_MS = 120_000;
@@ -178,13 +186,14 @@ export interface ConversationShareServiceOptions {
   logger?: ServiceLogger;
 }
 
-type ConversationShareAgentService = Pick<
-  IZCodeAgentService,
-  | "conversationRowsRangeV4"
-  | "conversationFileChangesV4"
-  | "conversationAttachmentReadV4"
-  | "conversationAttachmentStatV4"
->;
+type ConversationShareAgentService = ShareWorkflowReader &
+  Pick<
+    IZCodeAgentService,
+    | "conversationRowsRangeV4"
+    | "conversationFileChangesV4"
+    | "conversationAttachmentReadV4"
+    | "conversationAttachmentStatV4"
+  >;
 
 /** Symbol method 不可由 string-command ProxyChannel 调用，仅供 Desktop Host attachment 装配。 */
 export const conversationShareConnectionScopeFactory = Symbol(
@@ -268,6 +277,7 @@ const importedConversationShareFileSchema = z
     contextId: z.string().trim().min(1),
     title: z.string(),
     rows: z.array(z.unknown()),
+    content_blocks: z.array(z.unknown()).optional(),
     artifacts: z.array(
       z.object({
         artifactId: z.string().trim().min(1),
@@ -815,8 +825,50 @@ export class ConversationShareService implements IConversationShareService {
       capabilities,
       conversation.rows,
     );
-    const selectedRows = artifactSanitized.rows;
-    skippableWarnings.push(...inlineImages.warnings, ...artifactSanitized.warnings);
+    const workflowSnapshot = await collectConversationShareWorkflowSnapshot({
+      agent: agentService,
+      input,
+      rows: artifactSanitized.rows,
+      allRows: conversation.rows,
+      capabilities,
+      capturedAt: this.now(),
+      preflight: true,
+    });
+    if (!supportsConversationShareContent(capabilities, "tool-presentation")) {
+      for (const row of selected.rows) {
+        if (
+          row.kind === "toolCall" &&
+          (projectShareToolDisplay(row.output?.display) || row.display?.kind === "node_repl_images")
+        )
+          inlineImages.warnings.push({
+            code: "content_unavailable",
+            scope: "turn",
+            productTurnId: row.productTurnId,
+            rowId: row.rowId,
+          });
+      }
+    }
+    const selectedRows = workflowSnapshot.rows;
+    const contentWarnings: ConversationShareFailureIssue[] = workflowSnapshot.drafts.flatMap(
+      (draft) =>
+        draft.payload.unavailable ||
+        draft.payload.artifacts.some((artifact) => artifact.unavailable) ||
+        !supportsConversationShareContent(capabilities)
+          ? [
+              {
+                code: "content_unavailable",
+                scope: "turn",
+                productTurnId: draft.productTurnId,
+                turnOrdinal: turnOrdinalByProductTurn(conversation.rows).get(draft.productTurnId),
+              },
+            ]
+          : [],
+    );
+    skippableWarnings.push(
+      ...inlineImages.warnings,
+      ...artifactSanitized.warnings,
+      ...contentWarnings,
+    );
     blockingIssues.push(...collectShareStructureIssues(selectedRows, conversation.rows));
     let hasShareableContent = selectedRows.some((row) => {
       if (row.kind === "turnHeader" || row.kind === "timelineMarker") return false;
@@ -1004,6 +1056,9 @@ export class ConversationShareService implements IConversationShareService {
     const registeredProjection = buildConversationSharePublicProjection({
       rows: selectedRows,
       selectedProductTurnIds: selected.productTurnIds,
+      toolPresentation: supportsConversationShareContent(capabilities, "tool-presentation"),
+      toolImages: inlineImages.toolImages,
+      sourceRows: conversation.rows,
     });
     if (registeredProjection.rows.length > capabilities.max_rows) {
       blockingIssues.push({
@@ -1047,7 +1102,7 @@ export class ConversationShareService implements IConversationShareService {
       if (row.kind === "turnHeader" && row.productTurnId) {
         headersByProductTurnId.set(row.productTurnId, row);
       }
-      if (row.kind === "assistantText" && row.productTurnId) {
+      if (row.kind === "assistantText" && row.productTurnId && !isWorkflowShareFallbackRow(row)) {
         const texts = assistantTextByProductTurnId.get(row.productTurnId) ?? [];
         texts.push(row.text);
         assistantTextByProductTurnId.set(row.productTurnId, texts);
@@ -1626,6 +1681,7 @@ export class ConversationShareService implements IConversationShareService {
           contextId,
           title: continuation.share.title,
           rows: continuation.rawRows,
+          ...(continuation.content_blocks ? { content_blocks: continuation.content_blocks } : {}),
           artifacts: continuation.artifacts.map((artifact) => ({
             artifactId: artifact.artifact_id,
             displayName: artifact.display_name,
@@ -1787,6 +1843,7 @@ export class ConversationShareService implements IConversationShareService {
         contextId: validated.data.contextId,
         title: validated.data.title,
         rows: decoded.rows,
+        contentBlocks: validated.data.content_blocks,
         artifacts: validated.data.artifacts,
         unsupportedRowCount,
       };
@@ -1982,10 +2039,48 @@ export class ConversationShareService implements IConversationShareService {
       capabilities,
       conversation.rows,
     );
-    const selectedRows = artifactSanitized.rows;
+    const workflowSnapshot = await collectConversationShareWorkflowSnapshot({
+      agent: agentService,
+      input,
+      rows: artifactSanitized.rows,
+      allRows: conversation.rows,
+      capabilities,
+      capturedAt: this.now(),
+    });
+    if (!supportsConversationShareContent(capabilities, "tool-presentation")) {
+      for (const row of selected.rows) {
+        if (
+          row.kind === "toolCall" &&
+          (projectShareToolDisplay(row.output?.display) || row.display?.kind === "node_repl_images")
+        )
+          inlineImages.warnings.push({
+            code: "content_unavailable",
+            scope: "turn",
+            productTurnId: row.productTurnId,
+            rowId: row.rowId,
+          });
+      }
+    }
+    const selectedRows = workflowSnapshot.rows;
+    const contentWarnings: ConversationShareFailureIssue[] = workflowSnapshot.drafts.flatMap(
+      (draft) =>
+        draft.payload.unavailable ||
+        draft.payload.artifacts.some((artifact) => artifact.unavailable) ||
+        !supportsConversationShareContent(capabilities)
+          ? [
+              {
+                code: "content_unavailable",
+                scope: "turn",
+                productTurnId: draft.productTurnId,
+                turnOrdinal: turnOrdinalByProductTurn(conversation.rows).get(draft.productTurnId),
+              },
+            ]
+          : [],
+    );
     const publishWarnings: ConversationShareFailureIssue[] = [
       ...inlineImages.warnings,
       ...artifactSanitized.warnings,
+      ...contentWarnings,
     ];
     // 修复原因：此前公开投影遇到第一个不支持结构就直接退出，用户无法知道还有哪些轮次需要取消；
     // 现在先完成整组选中内容的结构预检，返回脱敏 issues 让 UI 给出逐项可操作建议。
@@ -2009,6 +2104,9 @@ export class ConversationShareService implements IConversationShareService {
     const registeredProjection = buildConversationSharePublicProjection({
       rows: selectedRows,
       selectedProductTurnIds: selected.productTurnIds,
+      toolPresentation: supportsConversationShareContent(capabilities, "tool-presentation"),
+      toolImages: inlineImages.toolImages,
+      sourceRows: conversation.rows,
     });
     this.validateArtifactManifest(capabilities, registeredProjection.artifacts);
     const preflightPreviewSnapshots = new Map<string, ConversationSharePreviewPreflightSnapshot>();
@@ -2024,7 +2122,10 @@ export class ConversationShareService implements IConversationShareService {
       input,
       selectedRows,
       registeredArtifacts: registeredProjection.artifacts,
-      inlineBytesBySourceRef: inlineImages.bytesBySourceRef,
+      inlineBytesBySourceRef: new Map([
+        ...inlineImages.bytesBySourceRef,
+        ...workflowSnapshot.bytes,
+      ]),
       capabilities,
       revision: conversation.revision,
       logEpoch: conversation.logEpoch,
@@ -2051,6 +2152,12 @@ export class ConversationShareService implements IConversationShareService {
       rows: artifactSnapshot.rows,
       selectedProductTurnIds: selected.productTurnIds,
       additionalArtifacts: artifactSnapshot.additionalArtifacts,
+      toolPresentation: supportsConversationShareContent(capabilities, "tool-presentation"),
+      toolImages: inlineImages.toolImages,
+      sourceRows: conversation.rows,
+      ...(supportsConversationShareContent(capabilities)
+        ? { contentDrafts: workflowSnapshot.drafts }
+        : {}),
     });
     this.validateArtifactManifest(capabilities, publicProjection.artifacts);
     if (publicProjection.rows.length > capabilities.max_rows) {
@@ -2072,7 +2179,12 @@ export class ConversationShareService implements IConversationShareService {
 
     const confirmRequest = buildConversationShareConfirmRequest({
       selected_product_turn_ids: publicProjection.selectedProductTurnIds,
-      projection: { rows: publicProjection.rows },
+      projection: {
+        rows: publicProjection.rows,
+        ...(publicProjection.contentBlocks
+          ? { content_blocks: publicProjection.contentBlocks }
+          : {}),
+      },
       artifacts: publicProjection.artifacts.map((artifact) => artifact.descriptor),
       disclosure_confirmation: {
         version: 1,

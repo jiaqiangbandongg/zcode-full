@@ -2,11 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { McpSource, CliMcpSource } from "../src/mcp.js";
-import {
-  MCP_SOURCE_DESCRIPTORS,
-  getSourceDescriptor,
-} from "../src/main/mcpUserDirectory/types.js";
+import type { CliMcpSource } from "../src/mcp.js";
+import { MCP_SOURCE_DESCRIPTORS, getSourceDescriptor } from "../src/main/mcpUserDirectory/types.js";
 import {
   loadCliMcpFromUserDirectory,
   saveCliMcpToUserDirectory,
@@ -31,22 +28,11 @@ afterEach(() => {
   }
 });
 
-describe("MCP Source Types", () => {
-  it("应包含 zcodeagentmcp 类型", () => {
-    const sources: McpSource[] = ["mcp", "zcodeagentmcp"];
-
-    expect(sources).toContain("zcodeagentmcp");
-  });
-
-  it("zcodeagentmcp 应该是 CliMcpSource 类型", () => {
-    const cliSource: CliMcpSource = "zcodeagentmcp";
-    expect(cliSource).toBe("zcodeagentmcp");
-  });
-});
-
 describe("MCP Source Descriptors", () => {
   it("只为 ZCode Agent 提供描述符", () => {
-    expect(MCP_SOURCE_DESCRIPTORS.map((descriptor) => descriptor.source)).toEqual(["zcodeagentmcp"]);
+    expect(MCP_SOURCE_DESCRIPTORS.map((descriptor) => descriptor.source)).toEqual([
+      "zcodeagentmcp",
+    ]);
   });
 
   it("应能通过 getSourceDescriptor 获取 zcodeagentmcp 描述符", () => {
@@ -61,32 +47,24 @@ describe("MCP Source Descriptors", () => {
   });
 
   it("应为其他旧 provider source 抛出错误", () => {
-    expect(() => getSourceDescriptor("claudeclimcp" as CliMcpSource)).toThrow("Unsupported MCP source");
-    expect(() => getSourceDescriptor("geminiclimcp" as CliMcpSource)).toThrow("Unsupported MCP source");
-    expect(() => getSourceDescriptor("codexclimcp" as CliMcpSource)).toThrow("Unsupported MCP source");
-    expect(() => getSourceDescriptor("opencodemcp" as CliMcpSource)).toThrow("Unsupported MCP source");
+    expect(() => getSourceDescriptor("claudeclimcp" as CliMcpSource)).toThrow(
+      "Unsupported MCP source",
+    );
+    expect(() => getSourceDescriptor("geminiclimcp" as CliMcpSource)).toThrow(
+      "Unsupported MCP source",
+    );
+    expect(() => getSourceDescriptor("codexclimcp" as CliMcpSource)).toThrow(
+      "Unsupported MCP source",
+    );
+    expect(() => getSourceDescriptor("opencodemcp" as CliMcpSource)).toThrow(
+      "Unsupported MCP source",
+    );
   });
 
   it("应为无效 source 抛出错误", () => {
-    expect(() =>
-      getSourceDescriptor("invalid_source" as CliMcpSource)
-    ).toThrow("Unsupported MCP source");
-  });
-});
-
-describe("MCP 配置文件路径", () => {
-  it("zcodeagentmcp 主配置文件应在 ~/.zcode/cli/config.json", () => {
-    const descriptor = getSourceDescriptor("zcodeagentmcp");
-
-    expect(descriptor.configDirSegments).toEqual([".zcode", "cli"]);
-    expect(descriptor.fileName).toBe("config.json");
-  });
-
-  it("zcodeagentmcp 应使用 JSON 格式和 mcp.servers 键名", () => {
-    const descriptor = getSourceDescriptor("zcodeagentmcp");
-
-    expect(descriptor.format).toBe("json");
-    expect(descriptor.configKeyName).toBe("mcp.servers");
+    expect(() => getSourceDescriptor("invalid_source" as CliMcpSource)).toThrow(
+      "Unsupported MCP source",
+    );
   });
 });
 

@@ -13,7 +13,7 @@ import {
   TID_V4_QUEUE_ITEM_DELETE,
   TID_V4_QUEUE_ITEM_EDIT,
   TID_V4_QUEUE_ITEM_SEND_NOW,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clickTestIdByDom, setInputValueByTestIdDom } from "./desktop-app.js";
 
 export interface QueueItemSnapshot {

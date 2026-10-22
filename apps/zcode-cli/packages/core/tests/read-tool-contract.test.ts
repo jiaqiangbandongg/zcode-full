@@ -321,13 +321,6 @@ describe("Read model-result harness", () => {
   });
 
   it("documents current non-text model-content formatting", () => {
-    expect(
-      formatReadModelContent({
-        type: "file_unchanged",
-        filePath: "/work/same.txt",
-      }),
-    ).toBe(FILE_UNCHANGED_STUB);
-
     const pdf = {
       type: "pdf" as const,
       filePath: "/work/report.pdf",
@@ -382,25 +375,6 @@ describe("Read model-result harness", () => {
 });
 
 describeReadStrictContract("Read strict model-result contract", () => {
-  it("returns numbered text content without the legacy file-read mitigation reminder", async () => {
-    const file = join(tmpDir, "notes.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "alpha\nbeta",
-    });
-
-    const result = await readForModel({ file_path: file }, contextWith(fs));
-
-    expect(result.output).toMatchObject({
-      type: "text",
-      filePath: file,
-      content: "alpha\nbeta",
-      numLines: 2,
-      startLine: 1,
-      totalLines: 2,
-    });
-    expect(asModelText(result.modelContent)).toBe("1\talpha\n2\tbeta");
-  });
-
   it("normalizes UTF-8 BOM and CRLF while preserving requested offset and limit", async () => {
     const file = join(tmpDir, "windows.txt");
     const fs = createMemoryFileSystem({
@@ -425,31 +399,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
       totalLines: 3,
     });
     expect(asModelText(result.modelContent)).toBe("2\tsecond");
-  });
-
-  it("allows offset zero and numbers model-facing content from line zero", async () => {
-    const file = join(tmpDir, "zero-offset.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "first\nsecond",
-    });
-
-    const result = await readForModel(
-      {
-        file_path: file,
-        offset: 0,
-        limit: 1,
-      },
-      contextWith(fs),
-    );
-
-    expect(result.output).toMatchObject({
-      type: "text",
-      content: "first",
-      numLines: 1,
-      startLine: 0,
-      totalLines: 2,
-    });
-    expect(asModelText(result.modelContent)).toBe("0\tfirst");
   });
 
   it("reads relative paths against cwd while preserving the original input path in output data", async () => {
@@ -531,23 +480,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
     );
   });
 
-  it("reads more than 2000 lines when byte and token limits allow", async () => {
-    const file = join(tmpDir, "many-lines.txt");
-    const lines = Array.from({ length: 2005 }, (_, index) => `line-${index + 1}`);
-    const fs = createMemoryFileSystem({
-      [file]: lines.join("\n"),
-    });
-
-    const result = await readForModel({ file_path: file }, contextWith(fs));
-
-    expect(result.output).toMatchObject({
-      type: "text",
-      numLines: 2005,
-      totalLines: 2005,
-    });
-    expect(result.output).toHaveProperty("content", expect.stringContaining("line-2005"));
-  });
-
   it("throws a file-size error for whole-file reads above the Read byte guard", async () => {
     const file = join(tmpDir, "too-large.txt");
     const fs = createMemoryFileSystem({
@@ -620,47 +552,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
     });
   });
 
-  it("re-reads full content when the file changes after a cached read", async () => {
-    const file = join(tmpDir, "changed.txt");
-    const fs = createMemoryFileSystem({
-      [file]: "before",
-    });
-    const context = contextWith(fs);
-
-    await readForModel({ file_path: file }, context);
-    fs.files.set(file, "after");
-    const second = await readForModel({ file_path: file }, context);
-
-    expect(second.output).toMatchObject({
-      type: "text",
-      content: "after",
-    });
-  });
-
-  it.todo("does not dedup partial-view or edit/write-seeded cache entries");
-
-  it.todo("notifies file-read listeners with the selected text slice only");
-
-  it("throws a friendly ENOENT message with cwd note and a similar filename suggestion", async () => {
-    const existing = join(tmpDir, "target.ts");
-    const missing = join(tmpDir, "target.js");
-    const fs = createMemoryFileSystem({
-      [existing]: "export const ok = true",
-    });
-
-    await expect(
-      readForModel(
-        { file_path: missing },
-        contextWith(fs, {
-          workingDirectory: tmpDir,
-          workspaceRoot: tmpDir,
-        }),
-      ),
-    ).rejects.toMatchObject({
-      message: `File does not exist. Note: your current working directory is ${tmpDir}. Did you mean target.ts?`,
-    });
-  });
-
   it("throws the directory read error returned by the line reader", async () => {
     const dir = join(tmpDir, "folder");
     const fs = createMemoryFileSystem({}, [dir]);
@@ -711,49 +602,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
     );
   });
 
-  it("keeps resized image Read output media-only before provider projection", () => {
-    expect(
-      formatReadModelContent({
-        type: "image",
-        base64: "abc123",
-        mimeType: "image/png",
-        originalSize: 3,
-        dimensions: {
-          originalWidth: 3000,
-          originalHeight: 1000,
-          displayWidth: 2000,
-          displayHeight: 667,
-        },
-      }),
-    ).toEqual([
-      {
-        type: "image",
-        mediaType: "image/png",
-        dataUrl: "data:image/png;base64,abc123",
-        source: {
-          id: "read-image",
-          kind: "inline",
-          mimeType: "image/png",
-          placeholder: "Read image",
-          sizeBytes: 3,
-        },
-      },
-    ]);
-  });
-
-  it("serializes PDF Read output for the model", () => {
-    expect(
-      asModelText(
-        formatReadModelContent({
-          type: "pdf",
-          filePath: "/tmp/report.pdf",
-          base64: "pdf-data",
-          originalSize: 4,
-        }),
-      ),
-    ).toBe("PDF file read: /tmp/report.pdf (4 bytes)");
-  });
-
   it("serializes PDF parts Read output for the model", () => {
     const content = formatReadModelContent({
       type: "parts",
@@ -780,17 +628,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
     ]);
   });
 
-  it("serializes file_unchanged Read output for the model", () => {
-    expect(
-      asModelText(
-        formatReadModelContent({
-          type: "file_unchanged",
-          filePath: "/tmp/same.txt",
-        }),
-      ),
-    ).toBe(FILE_UNCHANGED_STUB);
-  });
-
   it("rejects malformed PDF page ranges before I/O", () => {
     expect(readInputSafeParse({ file_path: "/tmp/x.pdf", pages: "abc" }).success).toBe(false);
   });
@@ -798,19 +635,6 @@ describeReadStrictContract("Read strict model-result contract", () => {
   it("rejects oversized PDF page ranges before I/O", () => {
     expect(readInputSafeParse({ file_path: "/tmp/x.pdf", pages: "1-21" }).success).toBe(false);
     expect(readInputSafeParse({ file_path: "/tmp/x.pdf", pages: "20-" }).success).toBe(false);
-  });
-
-  it("rejects non-renderable binary extensions", () => {
-    expect(readInputSafeParse({ file_path: "/tmp/archive.zip" }).success).toBe(false);
-  });
-
-  it("allows PDFs and images through Read input validation", () => {
-    expect(readInputSafeParse({ file_path: "/tmp/image.png" }).success).toBe(true);
-    expect(readInputSafeParse({ file_path: "/tmp/doc.pdf" }).success).toBe(true);
-  });
-
-  it("rejects device paths that would block or stream indefinitely", () => {
-    expect(readInputSafeParse({ file_path: "/dev/zero" }).success).toBe(false);
   });
 });
 

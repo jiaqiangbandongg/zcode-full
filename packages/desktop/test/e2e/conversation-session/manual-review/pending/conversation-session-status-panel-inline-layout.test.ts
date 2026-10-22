@@ -1,7 +1,4 @@
-import {
-  TID_CHAT_MESSAGES,
-  TID_CHAT_SUMMARY_PANEL,
-} from "@zcode/shared";
+import { TID_CHAT_MESSAGES, TID_CHAT_SUMMARY_PANEL } from "@zcode/shared/test-ids";
 import { clearAppData } from "../../../helpers/desktop-app.js";
 import {
   E2E_REPLY_TOKEN,

@@ -1,4 +1,4 @@
-import { TID_CHAT_INPUT } from "@zcode/shared";
+import { TID_CHAT_INPUT } from "@zcode/shared/test-ids";
 import { clearAppData, readSettings } from "../../../helpers/desktop-app.js";
 import { waitForUpstreamNetworkRequestStarted } from "../../../helpers/upstream-capture.js";
 import {

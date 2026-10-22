@@ -62,6 +62,10 @@ ZCode protocol client 通过协议原生能力承载 session/config 操作，因
 - `goal`: 对应 `/goal [pause|resume|clear|replace <objective>|<objective>]`，由 bootstrap 本地读写 session goal；已有目标时 `/goal <objective>` 与 `/goal replace <objective>` 都按替换处理，并继续通过兼容 `target_changed` / `_meta.zcode.target` 投影状态；`/target` 只作为输入兼容别名，不广播给新客户端。
 - `skill`: 对应 `/skill <name> [task]`，由 bootstrap 改写成显式 `Skill` tool 调用要求；ZCode app-server 侧 skill discovery 仍由协议原生 skill UI 承载，不把 `/skill` 裸命令解释成列表。
 
+App 的「计划模式」是 Composer 本地列表操作，选中复用标准 Plan 开关；协议目录不再广播
+`/plan [task]`，CLI 不提供对应的 prompt 展开。`plan` 保持保留名，避免自定义命令接管该入口。
+App 的具体交互见 [计划模式快捷入口](../../../../../docs/plan-slash-command.md)。
+
 ZCode app-server `/help` 只展示 ZCode app-server 已广播的命令，不能把 local-only 的 `/mode`、`/model`、`/resume`、`/mcp` 等命令混入，避免 client 看到不可执行的本地 TUI 操作。
 
 `/btw` 暂不进入 ZCode app-server `available_commands_update`。ZCode app-server 客户端需要 side-result UI 后，应通过 `zcode.dev/session/sideQuestion` 扩展方法请求旁路回答，而不是把 `/btw` 作为普通 prompt command 广播或注入主会话。

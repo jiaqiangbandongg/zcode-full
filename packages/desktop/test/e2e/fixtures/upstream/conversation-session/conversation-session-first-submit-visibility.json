@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-first-submit-visibility",
+  "spec": "./test/e2e/conversation-session/conversation-session-first-submit-visibility.test.ts",
+  "fixtures": [
+    {
+      "id": "first-submit-visibility-title",
+      "description": "首发可见性用例的后台标题请求",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "后台标题不参与首发时序，只提供稳定回复，避免未匹配请求重试干扰后续用例。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "bodyIncludes": [
+          "Generate a concise title",
+          "E2E_FIRST_SUBMIT_VISIBILITY"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "statusMessage": "OK",
+        "headers": {
+          "content-type": "application/json; charset=utf-8"
+        },
+        "body": "{\"id\":\"deepseek-e2e-model-provider-list-filtering-title\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"deepseek-v4-flash\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"title\\\":\\\"First submit visibility\\\"}\"}],\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":125,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":24,\"service_tier\":\"standard\"}}"
+      }
+    },
+    {
+      "id": "first-submit-visibility",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "验证首发 UI 提交顺序，模型回复只用于完成真实发送路径。"
+      },
+      "match": {
+        "method": "POST",
+        "pathIncludes": "/messages",
+        "lastUserMessageIncludes": [
+          "E2E_FIRST_SUBMIT_VISIBILITY"
+        ],
+        "bodyExcludes": [
+          "Generate a concise title"
+        ]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "first-submit-visibility",
+          "inputTokens": 128,
+          "outputTokens": 12,
+          "text": "deepseek-e2e-ok"
+        }
+      }
+    }
+  ]
+}

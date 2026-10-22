@@ -10,9 +10,12 @@ import {
   conversationShareContinuationDataSchema,
   conversationShareContinuationRequestSchema,
   conversationShareErrorEnvelopeSchema,
+  classifyConversationShareError,
   conversationSharePreparationDataSchema,
   conversationSharePreparationRequestSchema,
   conversationSharePreviewDataSchema,
+  conversationSharePreviewArtifactSchema,
+  conversationShareContinuationArtifactSchema,
   createConversationShareSuccessEnvelopeSchema,
   decodeConversationShareRows,
   isConversationShareSchemaVersionSupported,
@@ -451,13 +454,6 @@ describe("conversation share API revision 23 contract", () => {
     expect(decodedBrokenRow.unsupportedCount).toBe(1);
     expect(decodedBrokenRow.unsupportedKinds).toEqual(["artifact"]);
   });
-
-  it.each([
-    3001, 3002, 3200, 3201, 3203, 3204, 3205, 3206, 3207, 3208, 3209, 3210, 3211, 3212, 3213, 3214,
-    3215,
-  ])("parses documented business error code %i", (code) => {
-    expect(conversationShareErrorEnvelopeSchema.parse({ code, msg: "error" }).code).toBe(code);
-  });
 });
 
 /**
@@ -642,4 +638,90 @@ describe("conversation share cross-version forward compatibility", () => {
       }),
     ).toThrow();
   });
+});
+
+describe("share error contract", () => {
+  it.each([
+    [3200, "feature_disabled"],
+    [3201, "authentication_required"],
+    [3203, "unsupported_schema_version"],
+    [3204, "invalid_contract"],
+    [3205, "invalid_conversation"],
+    [3206, "disclosure_required"],
+    [3207, "unsafe_structure"],
+    [3208, "artifact_not_allowed"],
+    [3209, "limit_exceeded"],
+    [3210, "upload_incomplete"],
+    [3211, "not_found"],
+    [3212, "expired"],
+    [3213, "authentication_required"],
+    [3214, "import_not_allowed"],
+    [3215, "safety_check_pending"],
+    [3216, "safety_check_rejected"],
+    [3217, "safety_check_unavailable"],
+  ])("shares code %s semantics across clients", (code, kind) => {
+    expect(classifyConversationShareError(400, code as number)).toBe(kind);
+  });
+  it("keeps a failure even when its optional diagnostic fields are invalid", () => {
+    const error = conversationShareErrorEnvelopeSchema.parse({
+      code: 3205,
+      msg: "invalid",
+      logid: "https://secret",
+      data: {
+        rule: "field_type",
+        row_index: -1,
+        field: "a".repeat(1000),
+        path: "/private/file",
+        row_kind: "assistantText",
+        contents: "secret",
+      },
+    });
+    expect(error).toMatchObject({
+      code: 3205,
+      data: { rule: "field_type", row_kind: "assistantText" },
+    });
+    expect(error.data?.path).toBeUndefined();
+    expect(error.data?.field).toBeUndefined();
+    expect(error.data?.row_index).toBeUndefined();
+    expect(error.logid).toBeUndefined();
+    expect(JSON.stringify(error)).not.toContain("secret");
+  });
+});
+
+it.each([
+  "javascript:alert(1)",
+  "data:text/html,test",
+  "file:///workspace/report.pdf",
+  "custom://host/file",
+])("公开产物拒绝非 HTTP(S) URL %s", (url) => {
+  expect(
+    conversationSharePreviewArtifactSchema.safeParse({
+      ...artifactDescriptor,
+      url,
+      url_expires_at: 2000,
+    }).success,
+  ).toBe(false);
+});
+it.each(["https://files.example.com/report.pdf", "http://localhost:8080/report.pdf"])(
+  "公开产物保留 HTTP(S) URL %s",
+  (url) => {
+    expect(
+      conversationSharePreviewArtifactSchema.safeParse({
+        ...artifactDescriptor,
+        url,
+        url_expires_at: 2000,
+      }).success,
+    ).toBe(true);
+  },
+);
+
+it("导入附件复用公开 URL 协议边界，非法 URL 返回校验失败而不抛出", () => {
+  for (const download_url of ["javascript:alert(1)", "file:///workspace/report.pdf", "not a url"])
+    expect(
+      conversationShareContinuationArtifactSchema.safeParse({
+        ...artifactDescriptor,
+        download_url,
+        download_url_expires_at: 2000,
+      }).success,
+    ).toBe(false);
 });

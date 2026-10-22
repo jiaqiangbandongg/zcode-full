@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-mixed-entries",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-mixed-entries.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-mixed-entries.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-mixed-reconnect-title",
+      "description": "R3 mixed entries task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "r3-mixed-reconnect-follow",
+      "description": "冷恢复后的原任务续发返回独立标记，不能命中首发旧回复。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "续发以独立回复和当前请求历史证明恢复后的实际路由，无需固定流延迟。"
+    },
+    {
+      "id": "r3-mixed-reconnect-main",
+      "description": "R3 mixed entries 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "slow-stream",
+      "source": "synthetic",
+      "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+    }
+  ]
+}

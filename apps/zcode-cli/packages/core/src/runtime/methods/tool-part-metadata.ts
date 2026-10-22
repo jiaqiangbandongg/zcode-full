@@ -1,3 +1,4 @@
+import { PersistedToolSearchContentSchema } from "@zcode/contracts";
 import {
   COMPLETED_TOOL_PART_METADATA_SCHEMA_VERSION,
   type CompletedToolPartMetadata,
@@ -6,9 +7,7 @@ import {
 import { createMcpToolDisplay } from "../../tool/executor/result-display.js";
 
 export function mcpToolPartMetadata(
-  presentation:
-    | { serverName: string; toolName: string; description?: string }
-    | undefined,
+  presentation: { serverName: string; toolName: string; description?: string } | undefined,
 ): CompletedToolPartMetadata | undefined {
   const display = createMcpToolDisplay(presentation);
   return display
@@ -16,9 +15,8 @@ export function mcpToolPartMetadata(
     : undefined;
 }
 
-export function completedToolPartMetadata(
-  result: ToolExecutionResult,
-): CompletedToolPartMetadata {
+export function completedToolPartMetadata(result: ToolExecutionResult): CompletedToolPartMetadata {
+  const modelContent = PersistedToolSearchContentSchema.safeParse(result.modelContent);
   const serialization = result.serialization
     ? {
         truncated: result.serialization.truncated,
@@ -32,6 +30,7 @@ export function completedToolPartMetadata(
     : undefined;
   return {
     schemaVersion: COMPLETED_TOOL_PART_METADATA_SCHEMA_VERSION,
+    ...(modelContent.success ? { modelContent: modelContent.data } : {}),
     ...(result.display ? { display: result.display } : {}),
     ...(serialization ? { serialization } : {}),
     // resume 需要恢复模型当时真实读到的文件快照；只依赖 tool_result 文本

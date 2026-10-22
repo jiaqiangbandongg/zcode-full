@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
+import { encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_GROUP,
   TID_CHAT_MODEL_SELECT_ITEM,
   TID_CHAT_MODEL_SELECT_TRIGGER,
   TID_V4_STOP,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, clickTestIdByDom } from "../../../helpers/desktop-app.js";
 import {
   getV4PaneSnapshot,

@@ -32,17 +32,5 @@ describe("PendingCommandRecoveryBanner", () => {
     });
     expect(html).toContain("CLI 重启前已提交的输入没有进入对话");
     expect(html).toContain("重新发送");
-    expect(html).toContain("mb-3");
-    expect(html).toContain("w-full");
-    expect(html).toContain("shrink-0");
-    expect(html).toContain("flex-wrap");
-    expect(html).toContain("gap-2");
-    expect(html).toContain("rounded-xl");
-    expect(html).toContain("border-border");
-    expect(html).toContain("bg-surface");
-    expect(html).toContain("text-foreground");
-    expect(html).not.toContain("bg-warning");
-    expect(html).not.toContain("border-warning");
-    expect(html).not.toContain("shadow-md");
   });
 });

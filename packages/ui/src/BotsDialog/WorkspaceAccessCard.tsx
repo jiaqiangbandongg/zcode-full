@@ -16,20 +16,15 @@ import { isAllWorkspacesAllowed } from "./shared.js";
 export function WorkspaceAccessCard({
   bot,
   workspaceRefs,
-  currentWorkspace,
   loading,
   onPatchAllowedWorkspaces,
   onToggleWorkspaceAccess,
 }: {
   bot: BotConfig;
   workspaceRefs: BotWorkspaceRef[];
-  currentWorkspace: BotWorkspaceRef;
   loading: boolean;
   onPatchAllowedWorkspaces: (allowedWorkspaces: string[]) => Promise<void>;
-  onToggleWorkspaceAccess: (
-    workspaceId: string,
-    checked: boolean,
-  ) => Promise<void>;
+  onToggleWorkspaceAccess: (workspaceId: string, checked: boolean) => Promise<void>;
 }) {
   const { intl } = useZCodeIntl();
   const allAllowed = isAllWorkspacesAllowed(bot.allowedWorkspaces);
@@ -52,19 +47,21 @@ export function WorkspaceAccessCard({
       )}
       control={
         <div className="flex items-center justify-end gap-2">
-          {loading ? (
-            <LoaderCircle className="size-4 animate-spin text-foreground-subtle" />
-          ) : null}
+          {loading ? <LoaderCircle className="size-4 animate-spin text-foreground-subtle" /> : null}
           <Select
             value={allAllowed ? "all" : "selected"}
             onValueChange={(value) => {
               void onPatchAllowedWorkspaces(
-                value === "all" ? [ALL_BOT_WORKSPACES] : [currentWorkspace.id],
+                value === "all" ? [ALL_BOT_WORKSPACES] : [workspaceRefs[0]!.id],
               );
             }}
-            disabled={loading}
+            disabled={loading || workspaceRefs.length === 0}
           >
-            <SelectTrigger size="lg" className="w-48 justify-between">
+            <SelectTrigger
+              data-testid="bots-project-access-trigger"
+              size="lg"
+              className="w-48 justify-between"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -93,9 +90,7 @@ export function WorkspaceAccessCard({
                     key={workspace.id}
                     type="button"
                     className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                    onClick={() =>
-                      void onToggleWorkspaceAccess(workspace.id, !checked)
-                    }
+                    onClick={() => void onToggleWorkspaceAccess(workspace.id, !checked)}
                     disabled={loading}
                     title={workspace.label}
                   >

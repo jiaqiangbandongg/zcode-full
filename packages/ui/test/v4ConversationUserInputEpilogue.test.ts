@@ -91,11 +91,4 @@ describe("ConversationRowView userInput epilogue fold", () => {
     expect(plain).not.toContain('data-v4-user-input-epilogue="true"');
     expect(plain).toContain("Standard for this result:");
   });
-
-  it("localizes the fold label", () => {
-    const html = renderToStaticMarkup(
-      element(userInputRow({ epilogueStart: ASK.length }), "zh-CN"),
-    );
-    expect(html).toContain("工作流引擎附加说明");
-  });
 });

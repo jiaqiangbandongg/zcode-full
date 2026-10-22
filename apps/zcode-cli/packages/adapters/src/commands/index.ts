@@ -90,7 +90,12 @@ export class NodeCustomCommandAdapter implements CustomCommandPort {
   }
 
   async loadCommand(
-    request: { maxBytes?: number; name: string; roots?: CustomCommandRoot[]; workingDirectory: string },
+    request: {
+      maxBytes?: number;
+      name: string;
+      roots?: CustomCommandRoot[];
+      workingDirectory: string;
+    },
     options?: CustomCommandOperationOptions,
   ): Promise<CustomCommandContent> {
     throwIfAborted(options);
@@ -209,7 +214,7 @@ export class NodeCustomCommandAdapter implements CustomCommandPort {
       disableNonInteractive: parseBoolean(parsed.values["disable-noninteractive"]),
       frontmatterKeys: parsed.keys,
       model: parseScalar(parsed.values.model),
-      name,
+      name: root.namespace ? `${root.namespace.toLowerCase()}/${name}` : name,
       path,
       plugin: root.plugin,
       rootPath: root.path,
@@ -259,7 +264,8 @@ async function scanMarkdownFiles(
   } catch (error) {
     diagnostics.push({
       code: "custom_command_scan_failed",
-      message: error instanceof Error ? error.message : `Failed to scan command directory: ${directory}`,
+      message:
+        error instanceof Error ? error.message : `Failed to scan command directory: ${directory}`,
       path: directory,
       severity: "warning",
     });
@@ -362,7 +368,12 @@ function parseList(value: string | undefined): string[] {
 function extractDescription(body: string): string | undefined {
   const line = body
     .split(/\r?\n/)
-    .map((candidate) => candidate.replace(/^#+\s*/, "").replace(/^[-*]\s*/, "").trim())
+    .map((candidate) =>
+      candidate
+        .replace(/^#+\s*/, "")
+        .replace(/^[-*]\s*/, "")
+        .trim(),
+    )
     .find(Boolean);
   return line ? truncate(line, MAX_DESCRIPTION_LENGTH) : undefined;
 }

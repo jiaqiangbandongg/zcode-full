@@ -1,4 +1,5 @@
-import { TID_SETTINGS_BACK_BUTTON, encodeCustomModelValue } from "@zcode/shared";
+import { encodeCustomModelValue } from "@zcode/shared";
+import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -12,6 +13,7 @@ import {
 import {
   getSelectedUpstreamModelLabel,
   selectUpstreamProviderModelById,
+  selectUpstreamThoughtLevelValue,
 } from "../../../helpers/upstream-provider.js";
 import { createCustomOpenAIChatCompletionsProvider } from "../../../helpers/custom-openai-provider.js";
 import { startConversationModelProviderReplayServer } from "../../../helpers/model-provider-replay.js";
@@ -25,6 +27,7 @@ import {
 } from "../../../helpers/v4-conversation.js";
 
 const OPENROUTER_MODEL_ID = "nvidia/nemotron-3-ultra-550b-a55b:free";
+const FALLBACK_THOUGHT_LEVEL = "disabled";
 const PROVIDER_NAME_PREFIX = "OpenRouter Colon E2E";
 let modelProviderReplayServer: Awaited<
   ReturnType<typeof startConversationModelProviderReplayServer>
@@ -67,6 +70,9 @@ describe("OpenRouter 含冒号 modelId E2E", () => {
       providerId: provider.id,
       providerName,
     });
+    // 修复原因：产品要求切换到新模型后由用户显式选择思考档位，未选时发送键保持禁用；
+    // 未知自定义模型只继承 Built-in 兜底的 disabled 档位。
+    await selectUpstreamThoughtLevelValue(FALLBACK_THOUGHT_LEVEL);
     const expectedValue = encodeCustomModelValue(provider.id, OPENROUTER_MODEL_ID);
     const toolbar = await getSelectedUpstreamModelLabel();
     expect(toolbar.currentValue).toBe(expectedValue);

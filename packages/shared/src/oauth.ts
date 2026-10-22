@@ -149,6 +149,9 @@ export type OAuthCachedSessionRestoreResult =
   | { status: "signed-out" }
   | { status: "reauthentication-required"; reason: "jwt-expired" };
 
+/** OAuth owner 已完成会话凭据变更；不携带用户资料或 token。 */
+export type OAuthSessionState = "signed-in" | "signed-out";
+
 /** Host 在检测到 ZCode JWT 失效后通知 Renderer 展示确认并重启。 */
 export const ZCODE_JWT_INVALID_BROADCAST_CHANNEL = "auth:zcode-jwt-invalid";
 

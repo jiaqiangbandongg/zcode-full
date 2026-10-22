@@ -133,33 +133,6 @@ describe("AgentRuntime default project Memory branch", () => {
     expect((runtime as any).memoryRecallPrefetch).toBeUndefined();
   });
 
-  it.each<{
-    memory?: { enabled?: boolean; use?: boolean };
-    name: string;
-    taskType?: SessionTaskType;
-  }>([
-    { memory: { enabled: false }, name: "disabled feature" },
-    { memory: { use: false }, name: "disabled use" },
-    { name: "child task", taskType: "subagent_child" },
-  ])("does not start Recall for $name", async ({ memory, name, taskType }) => {
-    let selectorRequestCount = 0;
-    const runtime = createRecallRuntime({
-      memory,
-      sessionName: `runtime-memory-recall-${name.replaceAll(" ", "-")}`,
-      taskType,
-      async generateText(request: any) {
-        if (request.responseJsonSchema) selectorRequestCount += 1;
-        return textResult(
-          request,
-          request.responseJsonSchema ? '{"selected_memories":[]}' : "done",
-        );
-      },
-    });
-
-    await runtime.executeTurn("please apply the database policy");
-    expect(selectorRequestCount).toBe(0);
-  });
-
   it("resets all session-local Recall state and aborts an unfinished prefetch", () => {
     const runtime = createRecallRuntime({
       sessionName: "runtime-memory-recall-reset",

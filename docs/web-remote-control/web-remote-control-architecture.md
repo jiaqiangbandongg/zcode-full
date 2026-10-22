@@ -11,9 +11,9 @@
 ### 使用流程与页面
 
 1. 在桌面打开 Web 远控对话框，启动远控并取得二维码或连接链接；手机浏览器打开链接后完成配对。
-2. 窄屏首次扫码默认进入任务首页，可按工作区分组或跨工作区时间线浏览任务。
-   二维码携带的初始任务用于选中和定位，不直接跳进聊天页。
-3. 点击任务进入聊天；工作区的新建任务入口进入该工作区的草稿页。跨工作区操作先切换 bridge，
+2. 窄屏首次扫码默认进入任务首页：首页与桌面共用项目侧栏，可按项目或跨项目时间线浏览任务；
+   Relay V2 连接时侧栏最顶部（“新建任务”之上）显示当前电脑行，整行点击即“切换设备”。二维码携带的初始任务用于选中和定位，不直接跳进聊天页。
+3. 点击任务进入聊天；项目或全局的新建任务入口进入对应草稿页。跨工作区操作先切换 bridge，
    再访问目标工作区服务。返回首页保留任务选中态；聊天页刷新可以根据浏览器 history state 恢复聊天页。
 4. 手机选中的工作区和任务独立于桌面选中态，不会使桌面切换 tab/task。
 5. 网络恢复或页面回到前台时恢复连接，并按 replayable 协议重新同步任务状态；
@@ -61,184 +61,46 @@
 
 ## 入口
 
-Desktop 和 mobile web 只在标准 test endpoint 上切换到测试 relay，production 与其他自定义
-endpoint 继续使用生产 relay：
+Desktop 和 mobile web 使用当前 endpoint origin 的 Relay V2 入口；HTTPS 对应 WSS，HTTP 对应 WS：
 
 ```bash
-production/default: wss://zcode.z.ai/ws
-test endpoint:       wss://zcode.z.ai/ws
+production/default: wss://zcode.z.ai/api/v1/remote/ws2
+test endpoint:       wss://zcode.z.ai/api/v1/remote/ws2
+local/custom:        ws://localhost:3030/api/v1/remote/ws2
 ```
 
-`ZCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL` 仍是最高优先级的显式调试覆盖。没有覆盖时，仅当规范化后的
-endpoint origin 为 `https://zcode.z.ai` 才使用测试 relay；production 与 localhost/custom
-endpoint 保持生产 relay，避免扩大自定义 endpoint 的既有语义。二维码页面 URL 仍由 App 版本在
-`/remote/v3` 与 `/remote/v4` 之间派生；`ZCODE_WEB_REMOTE_CONTROL_URL` 只用于显式调试覆盖。
+`ZCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL` 仍是桌面 relay 的最高优先级显式调试覆盖，必须指向 V2
+入口。没有覆盖时，localhost/custom endpoint 同样从各自 origin 推导 relay。当前桌面版本生成
+`/remote/v4` 二维码；`ZCODE_WEB_REMOTE_CONTROL_URL` 用于显式调试覆盖。
 
 开发时可以把手机页指向本地 web：
 
 ```bash
-ZCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL=wss://zcode.z.ai/ws \
-ZCODE_WEB_REMOTE_CONTROL_URL=http://localhost:5173/remote \
-pnpm dev:desktop
+ZCODE_WEB_REMOTE_CONTROL_URL=http://localhost:5173/remote/v4 \
+pnpm dev:web-remote-control
 ```
 
 ## 静态部署
 
-手机远控页是 `packages/web` 的 Vite SPA，不使用 Next.js 静态导出，也不存在
-`remote.html` 这类页面文件。生产部署只需要把 `packages/web/dist` 交给 nginx 托管，并把入口路径
-映射回 `index.html`。
-
-当前保留四条静态部署链路：
+手机 V2 页面只通过 OSS 多版本流水线发布，无需入口变量。在主流水线手动运行 `upload:remote:test`、`upload:remote:prod`，或各自的 `:latest` job；环境、版本选源与生产限制见 [OSS 多版本部署](./remote-v4-static-deployment.md#gitlab-ci-测试与生产-oss-多版本产物)。
 
 ```text
-v2:
-  -> pnpm run build:web-remote-control
-  -> packages/web/dist
-  -> Dockerfile.web-remote-control
-  -> uhub.service.ucloud.cn/tianqi/zcode-remote-mobile-v2
-  -> zcode/frontend/deployment-remote.yaml
-  -> /remote
-
-v3:
-  -> pnpm run build:web-remote-control:v3
-  -> packages/web/dist
-  -> Dockerfile.web-remote-control-v3
-  -> uhub.service.ucloud.cn/tianqi/zcode-remote-mobile-v3
-  -> zcode/frontend/deployment-remote-v3.yaml
-  -> /remote/v3
-
-v4:
-  -> pnpm run build:web-remote-control:v4
-  -> packages/web/dist
-  -> Dockerfile.web-remote-control-v4
-  -> uhub.service.ucloud.cn/tianqi/zcode-remote-mobile-v4
-  -> 外部基础设施的 zcode/frontend/deployment-remote-v4.yaml
-  -> /remote/v4
-
-test:
-  -> pnpm run build:web-remote-control:test
-  -> packages/web/dist
-  -> Dockerfile.web-remote-control-test
-  -> uhub.service.ucloud.cn/tianqi/zcode-remote-mobile-test
-  -> zcode/frontend/deployment-remote-test.yaml
-  -> /remote/__test__
+选定 commit/tag → 按 app 版本构建 /remote/v4/<version>/ 资源
+              → prepare 校验环境与清单 → OSS 版本目录
+              → 网关按 app_version 选择 index、按目录选择静态资源
 ```
 
-v4 的 test 与 production 线上部署共用同一个 Dockerfile 和 `/remote/v4` 资源基址，但由独立 Jenkins
-Job、镜像和 Deployment 隔离。两个 Job 必须分别显式传入 `ZCODE_ENV=test` 与
-`ZCODE_ENV=production`；Dockerfile 在 builder stage 校验后交给 Vite 注入 endpoint。域名本身不会在
-浏览器运行时改写已经编译进 JS 的产品环境：
+页面路由固定为 `/remote/v4`。旧 `/remote`、`/remote/v3`、`/remote/v4` Docker 单版本部署冻结在最后一次 V1 镜像；仓库已删除相应构建、推送、验证入口，不得覆盖旧部署。`/remote/__test__` 的独立测试链继续保留，使用方式见[静态部署文档](./remote-v4-static-deployment.md)。
 
-```text
-test:       zcode.z.ai/remote/v4 -> wss://zcode.z.ai/ws
-production: zcode.z.ai/remote/v4         -> wss://zcode.z.ai/ws
-```
-
-`/remote/__test__` 仍是独立的静态资源验证入口，不代替标准 test 产品环境的 `/remote/v4`。
-
-`/remote` 是旧资源入口，发布脚本仍更新 `deployment-remote.yaml`。
-`/remote/v3` 是旧版本 App 资源入口，发布脚本只更新 `deployment-remote-v3.yaml`。
-`/remote/v4` 是 `3.4.0` 及以上正式版本 App 的资源入口，发布脚本只更新
-`deployment-remote-v4.yaml`。
-`/remote/__test__` 是测试资源入口，发布脚本只更新 `deployment-remote-test.yaml`。
-四条链路使用独立 Dockerfile、nginx 配置、镜像名和 k8s deployment 文件，避免新资源发布覆盖旧版本 App 仍在使用的资源。
-
-四份 nginx 配置都必须把各自构建基址下的 `assets/`、`material-icons/` 和
-`pdfjs/cmaps/` 显式映射到 `/usr/share/nginx/html` 内对应的构建产物。PDF.js CMap 实际位于
-`/usr/share/nginx/html/pdfjs/cmaps/`；带 `/remote`、`/remote/v3`、`/remote/v4` 或
-`/remote/__test__` 前缀的请求不能进入 SPA fallback，否则 nginx 会用 `index.html` 的 200 响应
-伪装成静态资源成功。Docker smoke 必须比较代表性 `.bcmap` 的实际响应体，不能只断言 HTTP 200。
-
-本地验证：
-
-```bash
-pnpm run typecheck
-pnpm run lint
-pnpm run build:web-remote-control
-bash scripts/test-web-remote-control-docker-build.sh
-pnpm run build:web-remote-control:v3
-bash scripts/test-web-remote-control-v3-docker-build.sh
-pnpm run build:web-remote-control:v4
-bash scripts/test-web-remote-control-v4-docker-build.sh
-pnpm run build:web-remote-control:test
-bash scripts/test-web-remote-control-test-docker-build.sh
-```
-
-构建并推送：
-
-```bash
-export DOCKER_REGISTRY_PASSWORD='***'
-bash scripts/docker-build-and-push-web-remote-control.sh --tag 202604291800
-bash scripts/docker-build-and-push-web-remote-control-v3.sh --tag 202604291800
-bash scripts/docker-build-and-push-web-remote-control-v4.sh --tag 202604291800
-bash scripts/docker-build-and-push-web-remote-control-test.sh --tag 202604291800
-```
-
-`zcode/frontend/deployment-remote-v4.yaml` 和 `zcode/frontend/deployment-remote-test.yaml` 都是外部基础设施
-仓库内的约定路径，不在当前仓库，也不由本功能创建。发布脚本默认使用
-`K8S_REPO_DIR=~/workspace/cgx-dev-k8s` 更新对应 deployment 文件并创建 MR；如果传入 `--skip-mr`，
-脚本只构建并推送镜像，不更新外部仓库。
-
-Desktop 默认二维码 URL 不指向 `/remote/__test__`。需要验证测试资源时，通过环境变量覆盖：
-
-```bash
-ZCODE_WEB_REMOTE_CONTROL_URL=https://zcode.z.ai/remote/__test__ pnpm dev:desktop
-```
-
-nginx 只负责静态资源和 SPA fallback，不代理 relay。浏览器端根据构建时 endpoint 直接连接对应 relay：
-production 使用 `wss://zcode.z.ai/ws`，test 使用 `wss://zcode.z.ai/ws`。Desktop App 正式版本大于等于 `3.4.0` 时，二维码 URL 使用
-`https://zcode.z.ai/remote/v4?...`；低于 `3.4.0`、`3.4.0` 自身的预发布版本或无法解析的版本继续使用
-`https://zcode.z.ai/remote/v3?...`。高于该门槛的预发布版本（例如 `3.5.0-beta.1`）使用 v4；显式
-`ZCODE_WEB_REMOTE_CONTROL_URL` 覆盖值不会被版本逻辑改写。
-
-四份 `Dockerfile.web-remote-control*` 都使用 Node builder 在容器内执行过滤安装和 Vite 构建：
-`pnpm install --frozen-lockfile --filter @zcode/web... --ignore-scripts`。runtime stage 只保留
-`nginx:alpine` 和静态 `dist`，不包含 Node runtime。发布脚本不在宿主机重复构建，保证最终镜像资源
-只来自 Docker builder。
+OSS 的版本选择、环境隔离、latest 规则、网关路由及验收见[多版本部署](./remote-v4-static-deployment.md)。发布前必须完成 [Relay V2 外部依赖与真机验收](./relay-v2-pairing.md#外部依赖与发布顺序07)。
 
 ## Transport
 
-外部 relay 只负责传输层：
+桌面 device 使用 [Relay V2 配对与状态机](./relay-v2-pairing.md#桌面-device-生命周期03)：main 用当前账号 JWT 懒注册设备，每次建连前申请一次性 role=device token，再连接当前 endpoint 的 `/api/v1/remote/ws2?token&mid`。不发送 X-Device-ID；`auth_init` 只携带 SID、meta 和秒级 client_ts。
 
-1. desktop 以 `device` 角色连接当前 endpoint 对应的外部 relay，可通过 `X-Device-ID` 传 `device_mid`
-2. mobile web 以 `terminal` 角色连接同一 endpoint，浏览器通过 query `mid=<device_mid>` 传 routing hint
-3. relay 完成 `device_register_init`、`auth_init`、`auth_challenge`、`auth_response`、`auth_ack`
-4. 双端用 `pair_status_query` / `pair_status_ack` 做平均 10 秒、有界 8~12 秒 jitter 心跳；最近一次 ACK 超过 30 秒未更新时由本地 watchdog 触发重连，watchdog 触发的重连再增加小幅随机延迟以避免重连尖峰
-5. ZCode 业务消息全部放在 relay `data.payload`，relay 不解析 payload
+V2 心跳为每轮重新抽样的4~6秒 pair_status_query（不带 SID），独立15秒 ACK watchdog 判定失联。网络/5xx 指数退避，401 停止并报 auth-required，KICKED 在60秒内仅允许一次2~5秒延迟恢复。二维码为 `/remote/v4?app_version=<ver>&sid=<sid>&mid=<mid>&name=<hostname>`，不含 hash/t 或 JWT/token。手机 terminal 同样使用 V2 token/auth_init，共享层只导出 V2 relay 契约。
 
-Task 实时同步也遵守这个边界：relay 只转发 mobile 与 desktop main 之间的 `rpc-frame`，不解析 task、session、workspace 或 ZCode realtime 事件。手机远控页面不拥有独立 Host，也不会启动独立 Agent runtime。desktop main 在收到 `workspace-bridge-open` 后，为手机 bridge 创建新的 `MessagePort` attachment，并挂到目标桌面窗口唯一 Window Host 中对应 local/remote workspaceKey 的 service/CLI scope。relay 只透传 `rpc-frame`，不解析 ZCode task、stream 或 workspace 业务语义。
-
-### 心跳调度与失联恢复
-
-心跳只属于 desktop device transport 与 mobile terminal transport 的本地传输状态，relay 不保存或广播客户端的调度时间：
-
-```text
-auth_ack / matched
-        │
-        ▼
-本地随机等待 8~12 秒
-        │
-        ▼
-发送 pair_status_query ─────────────┐
-        │                           │
-        └─ 再随机等待 8~12 秒         │
-                                    ▼
-                         收到 pair_status_ack
-                                    │
-                         重置 30 秒 ACK watchdog
-                                    │
-                         30 秒无 ACK → 本地重连
-```
-
-心跳使用递归 `setTimeout`，每轮重新抽样，平均周期仍为 10 秒；不得补发页面后台或系统休眠期间错过的历史心跳。30 秒是时间型 ACK deadline，不按固定次数推断失败；watchdog 触发的重连增加小幅随机延迟，明确错误、用户停止和前台恢复等路径保持原有立即恢复语义。心跳 payload 与 relay 协议 schema 不变。
-
-配对身份是 `device_sid`。QR URL 是：
-
-```text
-/remote/v4?sid=<device_sid>&hash=<pass_hash>&t=<timestamp>&mid=<device_mid>&name=<device_name>&app_version=<app_version>
-```
-
-`hash` 是 HMAC key material，只出现在 QR URL 和 credential 存储中，不写入日志、OAuth state 或 setting.json。
+Relay 只负责认证、配对、心跳和 data.payload 透传，不解析 task、session、workspace 或 rpc-frame 内部业务。main 按 workspaceKey 把手机 bridge attachment 挂到已有 Window Host，桌面 continuous 与手机 replayable 的 owner 和恢复边界保持不变。
 
 ## App Payload
 
@@ -287,12 +149,22 @@ Desktop 和 mobile 收到 relay `data.payload` 后必须先走 `parseWebRemoteCo
 推给已连接的手机端。它不改变 relay 和 desktop main 的职责：relay 仍只透传 `data.payload`，desktop main
 仍只组合并转发 renderer 已同步的 workspace/task 索引，不持有 ZCode task、stream、queue 或 snapshot 业务状态。
 
+`bridge-degraded` 不属于普通可丢 app response。Desktop main 为当前 bridge generation 保留一个不含业务
+snapshot 的 invalidation latch：Source logical session 换代或 raw transport fault 后立即释放旧手机
+attachment，并在 relay 再次 paired/send-ready 时补发，直到新 `workspace-bridge-ready` 成功后清除。
+这只是连接级可靠通知，不把 task/session/queue/snapshot 事实下沉到 main。Mobile 收到后用新
+`bridgeSessionId + bridgeGeneration + recoveryId` 重建；首次重建失败后只允许按 1s/2s/5s 有界退避继续
+尝试，同一 recovery flight 保持 `recoveryId`、每次使用新的 bridge generation。任一次成功后清空预算；
+预算耗尽后必须先销毁旧 bridge protocol 与 service registration，再进入明确的
+`connection-recovery-timeout` 非 active 终态，并提供由用户触发的整页重试。不能继续把已 degraded 的旧
+bridge 显示为 active，也不能由 relay/main 保存业务状态来掩盖恢复失败。
+
 ## Desktop Main
 
 `packages/desktop/src/main/webRemoteControlManager.ts` 负责：
 
-1. 通过 `WebRemoteControlDeviceTransport` 连接外部 relay
-2. 通过 `WebRemoteControlRelayAuthStorageProvider` 把非敏感 `deviceSid` 存 AppSettings，把 `passHash` 存 credentialService
+1. 通过独立 `WebRemoteControlDeviceTransport` 连接 V2 relay，握手、重连与心跳见 [桌面生命周期](./relay-v2-pairing.md#桌面-device-生命周期03)
+2. main 直接用 Node fetch 调用注册/token 接口；`webRemoteControlRelayV2Device` 保存非敏感 `{deviceSid, userId, endpointOrigin}`，V1 sid/passHash 首次迁移时清除，不写新 credential
 3. 根据 `workspaceKey = workspaceIdentity?.trim() || workspacePath` 匹配 workspace
 4. 为当前 mobile bridge 创建新的 `MessagePort` attachment
 5. 用 shared acknowledged adapter 把 host `MessagePortProtocol` 的 RPC message 编码成有界
@@ -311,16 +183,20 @@ endpoint 切换等配置变化可以暂停当前 runtime，但同样不代表用
 `remoteSessionId` 属于本次进程内的远程连接身份，禁止跨应用重启持久化。新进程必须等待
 renderer 把当前窗口已恢复的 workspace 上下文同步到 main，再按
 `workspaceKey = workspaceIdentity?.trim() || workspacePath` 匹配最后目标，并使用当前进程的
-`remoteSessionId` 启动 device relay。目标尚未恢复到任一窗口时保持 `idle`，不得为自动恢复
+`remoteSessionId` 启动 device relay；启动前还必须读取有效登录 JWT。无 JWT 时保持
+`auth-required`，保留启用目标，等待 renderer 登录通知后重读凭据并重试。登出立即停止
+所有远控 runtime，但不清除启用目标。JWT 已就绪而目标尚未恢复到任一窗口时保持 `idle`，不得为自动恢复
 另起 local host、远程 session 或 Agent runtime。
 
 ```text
 上次启动成功 ──> 保存 enabled target ──┐
                                          v
-新 desktop main -> 等待窗口 workspace sync -> workspaceKey 匹配 -> 启动 device relay
+新 desktop main -> 等待窗口 workspace sync -> workspaceKey 匹配 -> 等待 JWT -> 启动 device relay
                                          |
                                          +-> 不匹配：保持 idle，继续等待后续窗口同步
 
+登录通知 ──> 重读 JWT + 已同步 workspace ──> 重试恢复
+登出通知 ──> abort 启动 / 停止 runtime ──> auth-required（保留 enabled target）
 用户明确停止 ──> 清除 enabled target ──> 下次启动保持 idle
 ```
 
@@ -441,24 +317,30 @@ CLI runtime restart 会改变 `logEpoch` 并触发 snapshot。上一进程已 ad
 
 ## Web
 
-`/remote`、`/remote/v3` 和 `/remote/v4` 是 QR 直连入口，先于 `/web-remote` OAuth 逻辑处理。
+`/remote/v4` 是 V2 登录与 QR 直连入口，回调模式先于登录门禁。开发/构建别名沿用路由配置，全部使用 V2。
 
 Mobile web 连接流程：
 
-1. 解析 `sid/hash/t/mid/name/app_version`
-2. 通过 `WebRemoteControlTerminalTransport` 认证为 `terminal`
+1. 识别 code/state 回调并保存登录态回跳；否则先过 JWT 登录门禁，再解析 sid/mid/name/app_version。无 SID 时读取当前账号设备列表，最近设备仍在线则直连，否则展示可刷新的设备列表；选择在线设备后回写 URL。
+2. 通过 `WebRemoteControlTerminalTransport` 申请 role=terminal token，连接 ws2?token&mid，再发送 V2 auth_init(device_sid)；401 回登录，AUTH_FAILED 显示账号归属失败与切换账号动作。
 3. paired 后发送 `bootstrap-request`；v4 使用响应中的可选 `desktopAppVersion` 校验 URL。
    首次不一致时校正并导航，已进入页面时保留页面并提示确认后重新加载；旧桌面缺字段时保持原行为。
    重连/回前台时即使 bridge 健康也重新校验，具体边界见 [v4 版本同步](./remote-v4-static-deployment.md#v4-url-与桌面实际版本同步)。
 4. 按 `mobileViewState -> initialViewState -> first workspace` 选择初始 workspace
 5. 若目标远程工作区尚不具备 bridge 条件，渲染 home-only `Root`，保留工作区列表与重连入口；
    此时不创建 workspace bridge，也不开放依赖工作区服务的任务操作。没有可选工作区时显示错误页。
+   工作区列表由 ProjectSidebar 在没有 projectService 时从 `listWorkspaces` 与推送读取，行为见
+   [虚拟项目 §6.0.3](../superpowers/specs/2026-09-09-virtual-project-design.md#603-手机项目新目录的-shared-host-admission)。
+   home-only 空服务沿用 `ProxyChannel` 命名契约：`onXxx` 是永不触发的 Event，`onDynamicXxx(arg)` 同步返回该 Event，
+   其他未显式实现的方法异步返回 `undefined`。home-only `Root` 挂载后与 bridge `Root` 一样标记 ready，
+   之后的配对状态变化只更新横幅，不再替换为加载页或重挂首页。
+   已打开的同一远程会话随后断线时则注销失效 services、保留当前 Root 的只读内容与草稿，并显示断线横幅；详见[工作区重连](./mobile-remote-workspace-reconnect.md)。
 6. 目标可建立 bridge 时发送 `workspace-bridge-open`，用 `createAcknowledgedWebRemoteControlRelayProtocol()`
    将 `rpc-frame` / `rpc-frame-ack` app payload 适配为 `IMessagePassingProtocol`，维护分片、ACK 与传输恢复。
 7. `connectViaProtocol()` 后渲染 `Root`；窄屏由 `WebRemoteControlMobileShell` 管理首页/聊天页，
    宽屏使用远控侧栏。初始 workspace 的选择与页面落点是两种状态，不能把选中 task 等同于自动进入聊天。
 
-`/web-remote` 仍是 ZAI OAuth 登录与等待页入口；`remoteControlToken` / `relayOrigin` 只属于旧 `/web-remote` 行为，不适用于新的 `/remote`、`/remote/v3` 或 `/remote/v4` QR route。
+手机 V1/HMAC、`/web-remote` 路由、已登录等待页和 `remoteControlToken` / `relayOrigin` 的旧 HTTP bootstrap 均移除。认证/连接 owner、错误恢复与时序见 [Relay V2](./relay-v2-pairing.md#手机首次进入与恢复05)。
 
 ## Feature Exposure
 
@@ -474,11 +356,10 @@ status 不返回有效远控连接信息。该 gate 是功能开关，不替代�
 ## 启动调用边界与 Office XSS 关系
 
 打开 `WebRemoteControlDialog` 是用户进入 Web 远控的既有入口。当前目标没有可复用 runtime 时，
-renderer 立即发送启动 IPC；刷新二维码继续使用 renderer 内原有的确认弹窗。为保持既有远控体验，
-Desktop main 不再为启动或刷新叠加原生二次确认。
+renderer 通过登录门禁后发送启动 IPC；二维码不再提供刷新配对操作。Desktop main 不叠加原生二次确认。
 
 ```text
-WebRemoteControlDialog open / confirmed QR refresh
+WebRemoteControlDialog open (signed in)
         │
         ▼
 Desktop main: window/source check
@@ -492,15 +373,14 @@ Manager: consume ticket exactly once -> start relay
 manager 仍生成绑定 `windowId + workspaceKey + remoteSessionId` 的短 TTL、一次性内部票据，其中
 `workspaceKey = workspaceIdentity?.trim() || workspacePath`；
 票据不得进入 renderer 可写的共享协议，也不得写入日志、遥测或普通设置。它用于约束
-`startAuthorized` / `resetPairingAuthorized` 的调用和目标一致性，但因为同一个 IPC 请求会立即签发
+`startAuthorized` 的调用和目标一致性，但因为同一个 IPC 请求会立即签发
 票据，所以它不是用户授权，也不能阻止已被攻陷的 renderer 调用启动 IPC。
 
-IPC handler 的 manager 依赖类型只允许暴露 `authorizeStart`、`startAuthorized`、
-`resetPairingAuthorized`、`stop` 和 `getStatus`。直接的 `start` / `resetPairing` 只属于 manager
-内部生命周期实现，不能进入 renderer 可达的 IPC 依赖接口。公共返回类型保留 `cancelled` 兼容分支，
-但当前 Desktop 启动和刷新链路不会产生该终态。
+IPC handler 的 manager 依赖类型只暴露 `authorizeStart`、`startAuthorized`、
+`notifyAuthStateChanged`、`stop` 和 `getStatus`。直接 `start` 属于 manager 内部生命周期实现，
+不能进入 renderer 可达的 IPC 依赖接口；刷新配对 IPC 已删除。认证通知只包含状态，main 重新读取凭据。公共返回类型保留 `cancelled` 兼容分支，当前 Desktop 启动不会产生该终态。
 
-启动、刷新配对、窗口关闭、用户停止和票据超时都必须使未消费票据失效。应用启动时恢复
+启动、窗口关闭、用户停止和票据超时都必须使未消费票据失效。应用启动时恢复
 “上次已启用”仍是内部生命周期操作，不得绕过 workspace/session 绑定。
 
 Office 文档 XSS 的根因边界由 `docs/ui/office-file-preview.md` 定义：不可信链接必须经过协议白名单、
@@ -541,3 +421,11 @@ Settings decision
 - Runtime restart 产生新的 run epoch；旧 interaction、Allow once 和 pending sensitive command 不能跨 epoch 复用。
 - `workspaceHookTrustEnabled=false` 时 Runtime 不读取 Trust store、不创建 review；Protocol Host 可在 trusted bootstrap 边界关闭该字段回滚到 hard block。
 - managed deny 始终高于 UI/CLI 建立的 Trust；relay/main 只路由 opaque command 和 projection，不持有 policy、Trust store 或 lease 的副本。
+
+### 2026-09 虚拟项目目录导航
+
+手机 home 复用 ProjectSidebar，经当前 base attachment 读取 Host 项目行集合；手机 shell 仅拥有 home/chat 与浏览器返回状态。`workspace-bridge-open.project` 是严格的 projectId/hostId 意图，由 main 转交窗口 Host 的 ProjectService 准备执行目录。它允许在已在线物理 Source 上创建或复用目录 logical scope，不允许隐式新建物理连接、Host 或 Agent。准备前后检查连接成员代际、项目入口与物理连接对象；main 只保留当前导航的 RPC promise，同一 bridge identity 的重试不重复分配目录，取消/关窗/后续导航使迟到结果失效。
+
+Host 返回可信 workspaceIdentity、remoteSessionId、cwd 后沿原 shared-host attachment 建立手机 replayable bridge。项目/provider/初始输入只在 Web 的 Root 交接中传递，main 不存草稿或任务业务状态。桌面 direct continuous、手机 snapshot/gap 恢复、owner/lease 和 CLI CommandInbox 的单队列规则保持不变。
+
+手机未提交项目草稿复用 Renderer 既有 composer 持久化：按 workspaceKey 的 `__draft__` scope 保存可选 projectId，与正文/模型一起恢复。Root 重建或页面 reload 在 prewarm 前恢复该选择；显式新建未归类草稿写 NULL，明确 taskId 的历史打开优先。提升为持久任务后不把 projectId 复制到 session composer scope；已提交任务的归属仍只由 Host app 库拥有。main、relay 和 shared-host transport 均不持有这份草稿。

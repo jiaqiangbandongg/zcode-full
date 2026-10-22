@@ -1,0 +1,140 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-subagent",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-subagent.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-subagent.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-sub-title",
+      "description": "标题",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于断言"
+    },
+    {
+      "id": "r3-workflow-skill",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-workflow-create",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-workflow-started",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-workflow-child",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-workflow-notification",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-side-chat",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-side-followup",
+      "description": "远端工作流及辅助对话会话归属回归",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "固定模型输出，真实执行 Skill、CreateWorkflow 与远端子会话订阅。"
+    },
+    {
+      "id": "r3-sub-parent-agent",
+      "description": "BG25: main launches a long-running background Agent.",
+      "kind": "main",
+      "timingPolicy": "fast-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "稳定启动 background child，并用文件 barrier 保持 running 窗口。"
+    },
+    {
+      "id": "r3-sub-parent-launched",
+      "description": "O19: parent finishes the background Agent launch turn.",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "先让 parent 启动 turn 回到 idle，再释放 child 输入错误，避免 completion notification 合流竞态。"
+    },
+    {
+      "id": "r3-sub-child-bash",
+      "description": "BG25: child starts a foreground Bash barrier before coordinator steer arrives.",
+      "kind": "main",
+      "timingPolicy": "controlled-tool-use",
+      "source": "synthetic",
+      "syntheticReason": "文件 barrier 稳定制造第一个 child tool call 尚未完成的 steer 窗口。"
+    },
+    {
+      "id": "r3-sub-child-final",
+      "description": "BG25: child finishes normally after continued work.",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "证明 child 回复后继续普通工具，并最终通过正常 completion 收口。"
+    },
+    {
+      "id": "r3-sub-notification",
+      "description": "BG25: parent consumes the child final completion notification.",
+      "kind": "main",
+      "timingPolicy": "task-notification",
+      "source": "synthetic",
+      "syntheticReason": "证明 child 最终仍通过标准 background completion notification 收口。"
+    },
+    {
+      "id": "r3-sub-memory-noop",
+      "description": "BG25/O18: background Main memory extraction remains non-semantic for this renderer case.",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "Memory extraction 默认在成功 Main turn 后异步运行；本 case 仅用 Nothing to save 收口，避免隐藏请求干扰严格 replay，不扩展 Memory 产品语义。"
+    },
+    {
+      "id": "r3-sub-parent2-slow",
+      "description": "Model A 慢回合",
+      "kind": "main",
+      "timingPolicy": "controlled-stream",
+      "source": "synthetic",
+      "syntheticReason": "在明确点击父会话 Stop 前保持运行窗口，停止需真实取消流，不能依赖45秒自然完成。"
+    },
+    {
+      "id": "r3-sub-main",
+      "description": "其它",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "首发/fork/edit"
+    }
+  ]
+}

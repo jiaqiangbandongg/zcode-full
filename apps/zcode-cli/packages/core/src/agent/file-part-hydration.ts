@@ -9,6 +9,11 @@ export async function filePartToContentBlock(
   part: FilePart,
   artifactStore: ToolArtifactStorePort | undefined,
 ): Promise<ModelMessageContentBlock> {
+  const pathReferenceText = part.metadata?.pathReferenceText;
+  if (part.metadata?.storageKind === "local_ref" && typeof pathReferenceText === "string") {
+    // 这是已发给模型的说明，不是文件内容；直接恢复原文，不重新读取或推测降级原因。
+    return { type: "text", text: pathReferenceText };
+  }
   const source = attachmentRefFromFilePart(part);
   const dataUrl = await filePartDataUrl(part, artifactStore);
   if (isImageMime(part.mime) && dataUrl) {

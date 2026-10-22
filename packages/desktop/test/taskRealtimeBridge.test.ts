@@ -50,19 +50,6 @@ describe("taskRealtimeBridge", () => {
     ]);
   });
 
-  it("does not include originHostId in publish envelopes", () => {
-    const parentPort = new FakeParentPort();
-    const bridge = createTaskRealtimeBridge({
-      hostId: "host-a",
-      parentPort,
-    });
-
-    bridge.publish(makeEvent());
-
-    const message = parentPort.postedMessages[0] as { event: Record<string, unknown> };
-    expect("originHostId" in message.event).toBe(false);
-  });
-
   it("fires receive listeners once for duplicate delivered events", () => {
     const parentPort = new FakeParentPort();
     const bridge = createTaskRealtimeBridge({

@@ -94,7 +94,7 @@ describe("remote prompt attachment transfer service", () => {
     await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
     await service.cancel("attachment-2");
 
-    await expect(staging).rejects.toThrow("远端附件上传失败");
+    await expect(staging).rejects.toMatchObject({ name: "AbortError" });
     expect(phases).toContain("canceled");
     expect(vi.mocked(upload).mock.calls[0]?.[2]?.signal?.aborted).toBe(true);
   });
@@ -109,4 +109,81 @@ describe("remote prompt attachment transfer service", () => {
 
     expect(exec.mock.calls.some(([command]) => String(command).startsWith("rm -f "))).toBe(true);
   });
+});
+
+it("R3 attachment 拒绝跨 workspace/session 的暂存请求", async () => {
+  const upload = vi.fn(async () => {});
+  const scope = stageParams();
+  const service = createRemotePromptAttachmentTransferService(
+    { exec: createExec(), upload },
+    { scope },
+  );
+  for (const patch of [
+    { workspaceIdentity: "remote:server:other:/workspace" },
+    { workspacePath: "/other" },
+    { remoteSessionId: "other-session" },
+  ]) {
+    await expect(service.stage({ ...scope, ...patch })).rejects.toThrow("attachment scope");
+  }
+  expect(upload).not.toHaveBeenCalled();
+  await service.dispose();
+});
+
+it("关闭 attachment 时 abort，忽略晚成功并清理暂存；已 adopt 文件保留", async () => {
+  const exec = createExec();
+  let finish!: () => void;
+  const upload = vi.fn(async (_local: string, _remote: string, _options?: RemoteUploadOptions) => {
+    if (upload.mock.calls.length === 2)
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+  });
+  const service = createRemotePromptAttachmentTransferService({ exec, upload });
+  const adopted = await service.stage(stageParams("adopted"));
+  await service.adopt("adopted");
+  const phases: string[] = [];
+  service.onDynamicProgress("pending")((event) => phases.push(event.phase));
+  const staging = service.stage(stageParams("pending"));
+  const rejected = expect(staging).rejects.toMatchObject({ name: "AbortError" });
+  await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(2));
+  await service.dispose();
+  expect(upload.mock.calls[1]?.[2]?.signal?.aborted).toBe(true);
+  finish();
+  await rejected;
+  const uploadedPath = upload.mock.calls[1]![1];
+  expect(
+    exec.mock.calls.some(
+      ([command]) => command.startsWith("rm -f ") && command.includes(uploadedPath),
+    ),
+  ).toBe(true);
+  expect(
+    exec.mock.calls.some(
+      ([command]) => command.startsWith("rm -f ") && command.includes(adopted.ref),
+    ),
+  ).toBe(false);
+  expect(phases).not.toContain("complete");
+  await expect(service.stage(stageParams("late"))).rejects.toThrow("disposed");
+});
+
+it("同 operation 重试的旧结果不能删掉新 record，晚成功文件仍清理", async () => {
+  const exec = createExec();
+  let finish!: () => void;
+  const upload = vi.fn(async () => {
+    if (upload.mock.calls.length === 1)
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+  });
+  const service = createRemotePromptAttachmentTransferService({ exec, upload });
+  const oldStage = service.stage(stageParams());
+  const oldRejected = expect(oldStage).rejects.toMatchObject({ name: "AbortError" });
+  await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+  const next = await service.stage(stageParams());
+  finish();
+  await oldRejected;
+  await service.cleanup("attachment-1");
+  expect(
+    exec.mock.calls.some(([command]) => command.startsWith("rm -f ") && command.includes(next.ref)),
+  ).toBe(true);
+  await service.dispose();
 });

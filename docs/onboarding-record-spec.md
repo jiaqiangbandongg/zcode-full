@@ -106,15 +106,44 @@ v1 文件不做启动迁移：读取时视为 `decisions: []`，下一次业务�
  entries 或 decisions 存在 userId 匹配 ? -- 是 --> 不触发
         | 否
         v
- 本机 tasks-index 存在未删除 Task ? ------- 是 --> 写 existing_local_user，不触发
+ 本机存在使用证据（任一命中即存量用户）？ -- 是 --> 写 existing_local_user，不触发
         | 否
         v
  触发引导（完成写 entry；关闭写 dismissed）
 ```
 
 - 登录用户按 `userId` 精确匹配；未登录 / apikey 按 `userId === null` 匹配。
-- Task 激活证据按设备全局 tasks-index 判断，包含归档 Task、排除已删除 Task；当前版本没有可靠的
-  Task 创建者身份归属，因此只要本设备已有真实 Task，就把当前无记录身份视为存量用户。
+- **使用证据（2026-10 修订）按"任一命中"判断，三个来源按序检查**：
+  1. 设备全局 tasks-index 存在任意 Task（`includeDeleted: true`，含已删除 tombstone——
+     清空过任务列表的存量用户不因删除行为失去资格）；
+  2. agent 会话库（默认 `~/.zcode/cli/db/db.sqlite`，按 homedir 展开、不随
+     dataBaseDir 迁移；env/配置覆盖与不可镜像跳过规则见下条；SQLite 只读查询
+     `session` 表存在至少一行）；
+  3. 旧版任务快照目录（`{dataBaseDir}/.zcode/v2/sessions/`，含 `.deleted.json`）非空。
+- **为什么不能只查 tasks-index**：索引是 session 同步器的衍生投影，同步器在 agent/provider
+  就绪后才开始回填；而判定恰好在登录完成、主界面挂载时执行，早于回填。索引为空 ≠ 没有历史
+  （2026-10 线上案例：dev 数据目录索引重建后，登录瞬间判定看到空索引，老用户被误弹引导；
+  事后取证确认全部历史任务行都在 WAL 中、判定之后才落库）。
+- **会话证据必须查会话库的行，不能用文件存在性或 cli/sessions 目录代替**（评审 CR-01）：
+  文件存在不代表有会话（空库/刚建库）；`cli/sessions` 是工作流文件输出目录
+  （`script-workflow-tool-port.ts`），拿它当证据会把用过工作流的新用户误判成存量。
+- **会话库路径只镜像 host 可确定性复制的定位来源，无法确定按"未知"跳过**（评审
+  三轮 CR-01：不在 host 复制完整 CLI 解析规则——相对路径按 agent 工作区 cwd、
+  project 级配置按 workspace 叠加，host 均无法镜像）。可镜像来源按序：
+  1. env `ZCODE_SESSION_DB_PATH` / `ZCODE_SESSION_DB`（双别名并存按 env 键序取
+     后者，与 CLI env adapter 覆盖顺序一致）；
+  2. `~/.zcode/cli/config.json` 的 `storage.sessionDbPath`（CLI `createConfig`
+     默认 user config 位置在 home，**不随 App dataBaseDir 迁移**）；
+  3. 默认 `~/.zcode/cli/db/db.sqlite`（`~/` 按 homedir 展开）。
+     值为绝对路径（含 `~/` 展开）才作为证据位置；相对路径 → 未知 → 跳过本证据源
+     （继续检查旧版快照目录），不得按 host cwd 猜测。配置读取/解析失败（非 ENOENT）
+     上抛：配置读不出来时会话库位置未知，猜测默认值会漏判自定义会话库的存量用户。
+- 会话库以只读连接查询，WAL 未 checkpoint 的行对只读连接同样可见，与回填时序
+  无关；库文件不存在（stat ENOENT）视为无证据，**其他异常（EACCES/ENOTDIR 等）
+  上抛**由 UI 保守判不弹（评审 CR-02：existsSync 会把权限错误吞成 false，违反
+  "结果未知不弹"约定）。
+- 当前版本没有可靠的 Task 创建者身份归属，因此任一来源命中即把当前无记录
+  身份视为存量用户。
 - 手动快捷键打开引导（`newUserOnboardingOpen`）不受该规则限制，保存后同样追加记录。
 
 ## 5. 服务接口（IOnboardingRecordService）
@@ -133,25 +162,30 @@ descriptor → `createLocalServices` 注册 → `RemoteServiceAccess` getter →
 ### 5.1 手机远程工作区的服务连接
 
 远程工作区的 service collection 必须暴露 `onboarding-record`，与该入口的 settings/OAuth
-保持同源：SSH/WSL/Docker 复用窗口 Local Host 已有的 `IOnboardingRecordService` 实例；
-Server remote 转接 Server 已有的记录服务。不得按项目另建记录服务或复制记录。
+保持同源。R3 下 SSH/WSL/Docker 与 Server 统一走 Source Server 全转发
+（[R3 主规格 §8.1](./architecture/r3-source-server-remote-architecture.md#81-权威表)），
+settings/OAuth 都由 Source 持有，因此四种 transport 都转接 Source 自己的记录服务；
+不得借用窗口 Local Host 的记录，也不得按项目另建记录服务或复制记录。
 
 ```text
-手机新建远程任务 -> 新 workspace attachment -> onboarding-record RPC
-  SSH/WSL/Docker -> 窗口 Local Host 原有服务 -> 本机身份、记录和全局任务索引
-  Server        -> Server 原有服务         -> Server 身份、记录和全局任务索引
+手机新建远程任务 -> 新 workspace attachment -> 手机 allowlist -> onboarding-record RPC
+  SSH/WSL/Docker/Server -> Source 原有服务 -> Source 身份（Provisioning 下发的 OAuth）、记录和任务索引
 ```
+
+`onboarding-record` 属于 `RemoteWorkspaceRpcContract v1` 必有 channel，并在
+`web-remote-replayable` attachment allowlist 内；漏放行时手机调用会超时，效果与漏注册相同。
 
 故障原因是远程 service collection 漏注册此通道，手机重挂载 Root 后调用失败，回退到
 settings 判定而误弹引导。修复只补服务装配；引导触发规则、settings 失败兜底、Root 重挂载
 以及 desktop-continuous/web-remote-replayable 的任务传输语义均沿用既有实现。
 
 回归覆盖：已有记录但 settings 无职业字段时，手机进入远程草稿不展示引导；首次用户仍展示，
-关闭后重建连接仍保持已关闭；Server 使用自己的记录服务，不能误读桌面记录。服务装配测试
-通过真实 RPC 验证读写路由和错误传播；浏览器回归使用真实引导组件和服务装配，任务入口与
-传输环境使用隔离夹具，不代替真机配对及 SSH/WSL/Docker 传输端到端验收。
+关闭后重建连接仍保持已关闭；远程集合使用 Source 的记录服务，不能误读桌面记录。服务装配测试
+通过真实 RPC 验证读写路由和错误传播；浏览器回归使用真实引导组件、服务装配和手机 allowlist，
+任务入口与传输环境使用隔离夹具，不代替真机配对及 SSH/WSL/Docker 传输端到端验收。
 
-- RPC 回归：`packages/desktop/test/hostRemoteWorkspaceServices.test.ts`。
+- RPC 回归：`packages/desktop/test/hostRemoteWorkspaceServices.test.ts`、
+  `packages/desktop/test/windowHostAttachmentRpcPolicy.test.ts`。
 - 浏览器候选用例（待人工审阅）：
   `packages/desktop/test/e2e/manual-review/pending/mobile-remote-onboarding.mjs`，
   从仓库根目录执行 `pnpm exec tsx <用例路径>`。
@@ -190,8 +224,38 @@ settings 判定而误弹引导。修复只补服务装配；引导触发规则�
 - 显示 gating：`requested || (needsOnboarding === true && !dismissed)`；
   `needsOnboarding` 为异步判定结果。**判定不得无限期拦截主界面**：存量用户
   （settings 已有 `onboardingOccupation`）不等判定直接进主界面；疑似首跑用户最多等
-  3 秒（RPC 超时退回 settings 判定）。`appendRecord` 同样带 5 秒超时，channel 缺失时
-  不会让保存按钮永久转圈。
+  3 秒。`appendRecord` 同样带 5 秒超时，channel 缺失时不会让保存按钮永久转圈。
+- 兜底判定语义（2026-10 修订）：
+  - **3 秒超时 → 保守判"不需要引导"**。原实现超时退回 settings 判定，但兜底闭包在
+    effect 首跑时求值，而首跑时 settings 必未加载（`useSettings` 初始为 null），兜底值
+    恒为"需要引导"——冷启动判定 RPC 超 3 秒（启动拥塞、tasks-index SQLite 首开慢、
+    ws/relay 链路慢）的老用户被误弹，真实结果到达后引导闪现消失并已计入曝光埋点。
+    超时只代表"结果未知"，不得据此打扰用户；真实结果到达后照常覆盖（真新用户的
+    引导只是晚几秒出现，主界面先行）。
+  - **3 秒放行预算与判定轮次分离**：settings 加载完成或身份变化触发的
+    判定重跑只刷新判定上下文，不重新授予主界面阻塞时间。截止时刻在首个未决判定轮
+    建立并跨轮共享，重跑只使用剩余预算，预算耗尽立即保守放行——主界面总等待不超过
+    首轮建立的 3 秒上限。产生判定结果（真实结果 / 保守放行 / 失败兜底 / 用户完成
+    引导）后预算结束；已有判定结果时，后续轮次的超时兜底不再生效，不得把已放行的
+    主界面或正在进行的引导翻掉。
+- **判定失败（rejection）、服务不可用 → 一律保守判"不需要引导"（2026-10 第二次修订）**。
+  原实现退回 settings 判定（`!onboardingOccupation`），但该兜底会把"没填过引导的存量
+  老用户"判成需要引导——与"老用户一定不弹"冲突，且 settings 快照在 effect 首跑时必未
+  加载，历史上有过按陈旧快照误弹的缺陷。失败只代表"结果未知"，不得据此打扰用户；
+  真新用户在故障场景最坏晚一次启动再弹（与超时语义同代价）。
+- **settings 不再参与兜底判定**：`settingsLoaded` / `onboardingOccupation` 从触发 hook
+  移除，hook 依赖收窄为 record 服务、userId、deviceMid。settings 侧的
+  `onboardingOccupation` 仍只用于"存量用户不等判定直接进主界面"的 UI 放行（§6 显示
+  gating）与推荐区内容，不再是引导资格的事实源。
+- **3 秒放行预算与判定轮次分离**：身份变化（userId / record 服务实例）触发的判定重跑
+  只刷新判定上下文，不重新授予主界面阻塞时间。截止时刻在首个未决判定轮建立并跨轮
+  共享，重跑只使用剩余预算，预算耗尽立即保守放行——主界面总等待不超过首轮建立的
+  3 秒上限。产生判定结果（真实结果 / 保守放行 / 用户完成引导）后预算结束；已有判定
+  结果时，后续轮次的超时兜底不再生效，不得把已放行的主界面或正在进行的引导翻掉。
+- 已知限制：无记录服务的宿主（home-only web 视图、纯渲染测试 double）自动引导恒不弹
+  （保守语义的直接结果）；该端属于服务装配缺口（与 §5.1 手机远程工作区漏注册同类），
+  修复方向是接入与桌面同源的记录服务，不在触发规则层兜底；缺口修复前用户仍可从设置
+  页手动打开引导。
 - `save()`：现有 settings update 成功后调 `appendRecord()`；追加失败仅 warn 日志，
   不阻塞引导主流程、不向用户报错。
 - `onboardingOccupation` 等 settings 字段照旧写入（推荐 prompt 池仍依赖它），

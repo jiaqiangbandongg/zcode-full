@@ -1,6 +1,11 @@
-# Builtin Provider 维护清单
+# Builtin Provider 历史维护清单
 
-> 状态：Todo 76/79 已实施的 Builtin 维护基线（持续维护）
+> 本文保留原调查时点的目标清单与裁决，不代表当前配置或上游实时状态。
+> 2026-10-14 起，日常维护见[维护入口](../../../builtin-provider-maintenance/README.md)，
+> 已配置成员和默认启停见[当前状态](../../../builtin-provider-maintenance/current-state.md)。
+> 本文表格与删除段本身也有历史差异；不要直接据此恢复或删除模型。
+
+> 历史状态：Todo 76/79 当时的 Builtin 维护基线；后续库存已移到新维护目录。
 >
 > 日期：2026-09-10（Todo105/111/112/113 更新）
 

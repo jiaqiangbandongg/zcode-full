@@ -18,8 +18,12 @@ describe("桌面主窗口尺寸持久化 E2E", () => {
     await waitForDefaultWorkspaceReady(30_000);
     const paths = getE2EAppDataPaths();
     const targetSize = await browser.electron.execute((electron) => {
-      const win = electron.BrowserWindow.getFocusedWindow();
+      // 后台 E2E 不保证 OS 焦点；按主 renderer 定位，避免 getFocusedWindow 返回空。
+      const win = electron.BrowserWindow.getAllWindows().find((window) =>
+        /\/renderer\/index\.html(?:[?#]|$)/u.test(window.webContents.getURL()),
+      );
       if (!win || win.isDestroyed()) throw new Error("没有找到 Electron 主窗口");
+      win.blur();
       const current = win.getNormalBounds();
       const requested = { width: current.width + 80, height: current.height + 40 };
       // 当前 Electron 的 WebDriver window/rect 命令不支持 Browser.getWindowForTarget，

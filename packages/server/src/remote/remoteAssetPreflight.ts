@@ -8,10 +8,29 @@ export interface RemoteAssetTools {
   download: RemoteDownloadTool;
   tar: "tar";
   sha256: RemoteSha256Tool;
+  supportsProgress?: boolean;
 }
 
 interface RemoteAssetPreflightLoggers {
   log: (...args: unknown[]) => void;
+}
+
+const REMOTE_TAR_MISSING_ERROR =
+  "远端服务器缺少 tar，无法解压 ZCode Source Server。请安装 tar 后重试。";
+
+export async function detectRemoteTarTool(
+  backend: IRemoteBackend,
+  loggers: RemoteAssetPreflightLoggers,
+): Promise<"tar"> {
+  loggers.log("[remote-assets] preflight: checking remote archive tools");
+  const stream = await backend.exec(
+    "tar_tool=; if command -v tar >/dev/null 2>&1; then tar_tool=tar; fi; printf 'tar=%s\\n' \"$tar_tool\"",
+  );
+  const stdoutPromise = collectStdout(stream);
+  await waitForClose(stream);
+  const values = parseToolLines(await stdoutPromise);
+  if (values.tar !== "tar") throw new Error(REMOTE_TAR_MISSING_ERROR);
+  return "tar";
 }
 
 export async function detectRemoteAssetTools(
@@ -29,6 +48,7 @@ export async function detectRemoteAssetTools(
   const download = parseDownloadTool(values.download);
   const tar = values.tar === "tar" ? "tar" : null;
   const sha256 = parseSha256Tool(values.sha256);
+  const supportsProgress = values.progress === "full";
 
   if (!download) {
     throw new Error(
@@ -36,9 +56,7 @@ export async function detectRemoteAssetTools(
     );
   }
   if (!tar) {
-    throw new Error(
-      "远端服务器缺少 tar，无法解压 ZCode 远程资源。请安装 tar，或切回“本地下载后上传”。",
-    );
+    throw new Error(REMOTE_TAR_MISSING_ERROR);
   }
   if (!sha256) {
     throw new Error(
@@ -47,10 +65,10 @@ export async function detectRemoteAssetTools(
   }
 
   loggers.log(
-    `[remote-assets] preflight: selected tools download=${download} tar=${tar} sha256=${sha256}`,
+    `[remote-assets] preflight: selected tools download=${download} tar=${tar} sha256=${sha256} progress=${supportsProgress ? "full" : "basic"}`,
   );
 
-  return { download, tar, sha256 };
+  return { download, tar, sha256, supportsProgress };
 }
 
 function buildPreflightCommand(): string {
@@ -61,7 +79,9 @@ function buildPreflightCommand(): string {
     "if command -v tar >/dev/null 2>&1; then tar_tool=tar; fi",
     "sha_tool=",
     "if command -v sha256sum >/dev/null 2>&1; then sha_tool=sha256sum; elif command -v shasum >/dev/null 2>&1; then sha_tool=shasum; elif command -v openssl >/dev/null 2>&1; then sha_tool=openssl; fi",
-    'printf \'download=%s\ntar=%s\nsha256=%s\n\' "$download" "$tar_tool" "$sha_tool"',
+    "progress=basic",
+    "if command -v awk >/dev/null 2>&1 && command -v wc >/dev/null 2>&1 && command -v date >/dev/null 2>&1 && command -v sleep >/dev/null 2>&1; then progress=full; fi",
+    'printf \'download=%s\ntar=%s\nsha256=%s\nprogress=%s\n\' "$download" "$tar_tool" "$sha_tool" "$progress"',
   ].join("; ");
 }
 

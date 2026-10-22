@@ -18,6 +18,7 @@ const labels: SidePaneTabPresentationLabels = {
   whiteboardTitle: "Whiteboard",
   modelTrajectoryTitle: "Model trajectory",
   developerToolsTitle: "Developer tools",
+  pluginMarketTitle: "Plugins",
   terminalTitle: "Terminal",
   subagentTypeLabel: "Subagent",
   subagentDirectoryTitle: "Subagents",
@@ -78,7 +79,6 @@ describe("workflow-run tab presentation", () => {
 
   it("labels the type as a workflow run rather than falling through to code preview", () => {
     expect(getSidePaneTabTypeLabel(workflowRunTab, labels)).toBe("Workflow run");
-    expect(getSidePaneTabTypeLabel(workflowRunTab, labels)).not.toBe(labels.codeViewerTitle);
   });
 
   it("localizes the generic title but keeps a captured workflow name verbatim", () => {
@@ -101,9 +101,6 @@ describe("workflow-actor-session tab presentation", () => {
 
   it("labels the type as a workflow actor rather than falling through to code preview", () => {
     expect(getSidePaneTabTypeLabel(workflowActorTab, labels)).toBe("Workflow subagent");
-    expect(getSidePaneTabTypeLabel(workflowActorTab, labels)).not.toBe(labels.codeViewerTitle);
-    // 也不能被标成 subagent：actor 会话不是子智能体的子会话，两者的回收语义都不同。
-    expect(getSidePaneTabTypeLabel(workflowActorTab, labels)).not.toBe(labels.subagentTypeLabel);
   });
 
   it("keeps the script-authored actor name verbatim and always carries the instance ordinal", () => {
@@ -128,7 +125,6 @@ describe("workflow-artifact tab presentation", () => {
 
   it("labels the type as an artifact rather than falling through to code preview", () => {
     expect(getSidePaneTabTypeLabel(workflowArtifactTab, labels)).toBe("Artifact");
-    expect(getSidePaneTabTypeLabel(workflowArtifactTab, labels)).not.toBe(labels.codeViewerTitle);
   });
 
   it("keeps the captured title verbatim, then the artifact id, then the generic label", () => {
@@ -165,8 +161,6 @@ describe("workflow-workspace tab presentation", () => {
 
   it("labels the type as a workflow workspace rather than falling through to code preview", () => {
     expect(getSidePaneTabTypeLabel(workflowWorkspaceTab, labels)).toBe("Script steps");
-    expect(getSidePaneTabTypeLabel(workflowWorkspaceTab, labels)).not.toBe(labels.codeViewerTitle);
-    expect(getSidePaneTabTypeLabel(workflowWorkspaceTab, labels)).not.toBe(labels.workflowRunTitle);
   });
 
   it("titles the tab with the run name and falls back to the generic label", () => {

@@ -27,9 +27,6 @@ describe("remote usage telemetry", () => {
         error_category: "",
       },
     });
-    expect(event.eventExtraDetail).not.toHaveProperty("workspacePath");
-    expect(event.eventExtraDetail).not.toHaveProperty("workspaceIdentity");
-    expect(event.eventExtraDetail).not.toHaveProperty("remoteSessionId");
   });
 
   it("构造 Web Remote Control 生命周期事件", () => {

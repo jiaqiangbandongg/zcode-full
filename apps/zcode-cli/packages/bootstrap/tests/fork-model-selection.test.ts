@@ -75,10 +75,7 @@ describe("Selection 复制原语", () => {
     expect(cloneModelSelection(undefined)).toBeUndefined();
   });
 
-  it("modelSelectionWithOptionFallback 只回落推理档位，不回落模型身份", () => {
-    expect(
-      modelSelectionWithOptionFallback({ providerId: "p", modelId: "m" }, sessionSelection),
-    ).toEqual({ providerId: "p", modelId: "m", options: { reasoningLevel: "high" } });
+  it("modelSelectionWithOptionFallback 无回落值时保留请求的模型身份", () => {
     expect(modelSelectionWithOptionFallback({ providerId: "p", modelId: "m" }, undefined)).toEqual({
       providerId: "p",
       modelId: "m",

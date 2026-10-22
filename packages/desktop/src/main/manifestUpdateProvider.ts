@@ -231,8 +231,8 @@ export class ManifestUpdateProvider extends Provider<UpdateInfo> {
     }
 
     return {
-      ...(parsed as UpdateInfo),
-      // preview/stable 切换时旧 manifest 请求可能晚于新请求返回。
+      ...(parsed as unknown as UpdateInfo),
+      // Bugfix: preview/stable 切换时旧 manifest 请求可能晚于新请求返回。
       // electron-updater 的 update-available 事件默认不带请求通道，main 进程无法识别过期结果；
       // 这里把本次请求通道随 UpdateInfo 带回去，避免旧通道覆盖更新弹窗内容。
       zcodeReleaseChannel: releaseChannel,

@@ -20,6 +20,7 @@
 - 每个已展开 workspace 的普通任务首屏只显示 5 条；点击“显示更多”时只增加下一批 5 条，直到全部任务可见后隐藏入口，不提供“显示更少”。
 - 分页进度是 renderer-local 的临时状态，并按 `workspaceKey = workspaceIdentity?.trim() || workspacePath` 隔离；一个 workspace 加载更多不能改变另一个 workspace 的可见条数。
 - 单个 workspace 收起、项目区收起、全部收起、离开 workspace 视图或移除 workspace 时清除对应分页进度；再次展开从默认 5 条开始。仅切换 created/updated 排序不重置当前可见条数。
+- “Task list / 任务列表”总标题使用 `text-ui-base + font-medium + text-foreground-subtle`。
 - “已置顶”“项目”“任务”属于同一级侧栏分组标题，统一使用 `text-ui-base + font-medium + text-foreground-subtlest`；标题字号不因是否可折叠或可拖拽而变化。
 - 点击 workspace 行会作为 trigger 切换该 workspace 的 task list 展开 / 收起，并同步把它设为当前 active workspace。
 - “新建任务”按钮和快捷键都会先尝试回到 `activeWorkspacePath`，再进入草稿态。
@@ -27,6 +28,12 @@
 - 桌面端 `Cmd/Ctrl+O` 通过原生菜单 accelerator 发送 `OpenWorkspace` 平台事件，Web 端用根级 `keydown` fallback 拦截浏览器默认打开文件行为。
 - 如果当前没有任何 workspace，Root 会创建默认 workspace 兜底，避免进入空白页或打开工作区中间页。
 - `SettingsPage` 在存在最近 active workspace 时提供“返回工作区”入口。
+
+## 远程项目的设备信息与操作
+
+项目仍平铺排列，身份、排序和路径隔离沿用 `workspaceIdentity`。项目行只显示一个五态图标、项目名和限宽设备标签；离线标签替换为短状态，操作在悬停/聚焦时出现。设备标签点击或悬停 400ms 打开整行右侧详情，连接保留原目录，断开为设备级动作，编辑使用现有表单，管理操作一次性定位设置页设备卡。
+
+“项目 + → 打开远程项目”从设备管理快照列出设备（包括在线但尚无项目的设备），已选连接优先级来自统一展示模型，连接或复用后选目录；末项新建远程连接。会话及草稿头部、输入框项目菜单使用相同设备显示名，任务行共用设备标签样式。完整合同与验收见 [RDUX-12 导航合同](../remote/project-first-remote-navigation-spec.md#21a-侧栏详情与设备菜单rdux-12)。
 
 ## 排序规则
 
@@ -57,3 +64,9 @@
 | `WSDR-04` | workspace A 原本收起        | 拖拽 A 后结束              | A 始终保持收起                               | accepted |
 
 时间线、置顶、归档、分组和 Web 远控独立任务索引不复用这套分页状态，属于本次变更的 pruned 范围；本变更不修改 conversation、desktop continuous 或 mobile replayable 数据流。
+
+## 侧栏标题字号验收
+
+- `Task list`、`Pinned`、`Projects`、`Tasks` 均使用 base 字号；保留总标题和分组标题原有的颜色、间距和交互。
+- `command-center-focus.test.ts` 检查总标题、分组标题等于 `--ui-font-size`，两者字号差为 0，并验证深浅主题与窄屏。
+- 验证顺序为 `pnpm typecheck` → E2E 构建 → E2E 运行。不要并行执行前两步：`tsconfig.host.json` 会向 `out/host` 输出未打包 JS，与桌面 bundle 共用目录，可能导致 Host 直接加载 workspace TS 并因 `.js` 模块不存在退出。类型检查结束后重新构建，不修改 Host 产品逻辑来绕过产物污染。

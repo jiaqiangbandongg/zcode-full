@@ -297,6 +297,8 @@ export function SlashCommandPlugin({
       setActiveTrigger(null);
       setSelectedIndex(0);
       if (isAppCommand) {
+        // 本地操作也要保留输入焦点；在执行回调前恢复，避免抢走回调新开的辅助对话焦点。
+        editor.focus();
         appCommands
           ?.find((command) => normalizeSlashCommandValue(command.value) === suggestion.value)
           ?.run();

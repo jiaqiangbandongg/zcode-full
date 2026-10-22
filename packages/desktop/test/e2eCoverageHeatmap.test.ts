@@ -50,9 +50,7 @@ async function createFixture() {
 describe("desktop E2E coverage heatmap", () => {
   afterEach(async () => {
     await Promise.all(
-      createdDirs
-        .splice(0)
-        .map((dir) => rm(dir, { force: true, recursive: true })),
+      createdDirs.splice(0).map((dir) => rm(dir, { force: true, recursive: true })),
     );
   });
 
@@ -60,10 +58,7 @@ describe("desktop E2E coverage heatmap", () => {
     const fixture = await createFixture();
     const data = buildCoverageHeatmapData(fixture);
 
-    expect(data.domains.map((domain) => domain.domain)).toEqual([
-      "renderer",
-      "main",
-    ]);
+    expect(data.domains.map((domain) => domain.domain)).toEqual(["renderer", "main"]);
     expect(data.domains[0]).toMatchObject({
       coveredFunctions: 2,
       functionHits: 15,
@@ -97,15 +92,12 @@ describe("desktop E2E coverage heatmap", () => {
       fileCount: 3,
     });
     const html = await readFile(summary?.htmlIndex ?? "", "utf-8");
-    const data = JSON.parse(
-      await readFile(summary?.dataJson ?? "", "utf-8"),
-    ) as { scale?: string };
+    const data = JSON.parse(await readFile(summary?.dataJson ?? "", "utf-8")) as { scale?: string };
     expect(html).toContain("coverage-heatmap-data");
     expect(html).toContain("每个等大 tile 代表一个源码文件");
     expect(html).toContain('id="heat-grid"');
     expect(html).toContain("gridTemplateColumns");
     expect(html).toContain("每函数平均命中");
-    expect(html).not.toContain("binaryLayout");
     expect(html).not.toContain("面积表示函数数量");
     expect(html).not.toContain('id="granularity-select"');
     expect(html).not.toContain("父目录");

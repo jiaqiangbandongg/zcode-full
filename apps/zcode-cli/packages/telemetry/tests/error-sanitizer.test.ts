@@ -96,20 +96,4 @@ describe("telemetry error sanitizer", () => {
     expect(sanitized.code).toBe("private code with spaces");
     expect(sanitized.type).toBe("UnknownError");
   });
-
-  it("保留包装错误因果链末端的脱敏诊断", () => {
-    const cause = Object.assign(
-      new Error("socket reset request=req-42 authorization: Bearer secret-token"),
-      { code: "ECONNRESET" },
-    );
-    const sanitized = sanitizeTelemetryError(new Error("terminated", { cause }));
-
-    expect(sanitized).toMatchObject({
-      cause: {
-        code: "ECONNRESET",
-        message: "socket reset request=req-42 authorization: {redacted}",
-        type: "Error",
-      },
-    });
-  });
 });

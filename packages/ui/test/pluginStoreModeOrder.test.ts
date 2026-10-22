@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  groupItemsByCategory,
-  KNOWN_CATEGORY_LABEL_IDS,
-  type StorePluginItem,
-} from "../src/settings/pluginStoreListing.js";
+import { groupItemsByCategory, type StorePluginItem } from "../src/settings/pluginStoreListing.js";
 
 function item(name: string, category?: string): StorePluginItem {
   return {
@@ -38,7 +34,7 @@ describe("公开分类排序", () => {
           onUninstall() {},
           onSetEnabled() {},
           onUpdate() {},
-          operationId: null,
+          activeOperations: [],
           togglingPluginId: null,
         },
         onRetryDescribe() {},
@@ -57,8 +53,6 @@ describe("公开分类排序", () => {
       entries.map((entry) => entry.id).sort(),
     );
     expect(entries[0]?.listing?.category).toBe("guides");
-    expect(KNOWN_CATEGORY_LABEL_IDS.legal).toBe("settings.plugins.store.category.legal");
-    expect(KNOWN_CATEGORY_LABEL_IDS.guides).toBeUndefined();
   });
 
   it("未来法律插件可按服务端分类及插件顺序展示", () => {

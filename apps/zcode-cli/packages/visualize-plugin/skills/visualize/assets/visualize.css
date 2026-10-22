@@ -14,7 +14,8 @@
     --color-text-primary,
     light-dark(rgb(26 28 31), rgb(255 255 255))
   );
-  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card: var(--gen-ui-card, light-dark(#ffffff, #2b2b2b));
+  --card-border: var(--gen-ui-card-border, var(--border));
   --card-foreground: var(
     --color-text-primary,
     light-dark(rgb(26 28 31), rgb(255 255 255))
@@ -28,16 +29,19 @@
     light-dark(rgb(26 28 31), rgb(255 255 255))
   );
   --primary: var(
+    --gen-ui-primary, light-dark(#000000, #ffffff)
+  );
+  --content-accent: var(
     --color-text-info,
     light-dark(rgb(51 156 255), rgb(131 195 255))
   );
   --primary-foreground: var(
-    --color-text-inverse,
-    light-dark(rgb(255 255 255), rgb(13 13 13))
+    --gen-ui-primary-foreground,
+    light-dark(rgb(255 255 255), rgb(0 0 0))
   );
   --secondary: var(
-    --color-background-secondary,
-    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+    --gen-ui-secondary,
+    light-dark(rgb(230 230 230), rgb(54 54 54))
   );
   --secondary-foreground: var(
     --color-text-primary,
@@ -72,7 +76,7 @@
     )
   );
   --ring: var(
-    --color-ring-primary,
+    --gen-ui-input-border-focused,
     light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
   );
   --font-size-base: var(--font-text-md-size, 14px);
@@ -82,7 +86,7 @@
   --red: light-dark(rgb(224 46 42), rgb(255 103 100));
   --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
   --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
-  --viz-series-1: var(--primary);
+  --viz-series-1: var(--content-accent);
   --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
   --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
   --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
@@ -94,24 +98,35 @@
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
-  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-normal: var(--font-size-base);
   --font-size-tooltip: calc(var(--font-size-base) - 1px);
-  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
-  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
-  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
-  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
-  --font-weight-normal: 430;
+  --font-size-small: var(--font-text-sm-size, calc(var(--font-size-base) - 2px));
+  --font-size-h1: var(--font-heading-md-size, calc(var(--font-size-base) + 4px));
+  --font-size-h2: var(--font-heading-sm-size, calc(var(--font-size-base) + 2px));
+  --font-size-h3: var(--font-heading-xs-size, var(--font-size-base));
+  --font-weight-normal: 400;
   --font-weight-medium: 500;
   --icon-size: 16px;
   --line-height-normal: calc(var(--font-size-normal) * 1.5);
   --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
   --line-height-small: calc(var(--font-size-small) + 4px);
   --corner-shape: round;
-  --radius: var(--border-radius-lg, 10px);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-2xl: calc(var(--radius) * 1.6);
+  /* 旧比例圆角会产生非标准档位；独立 token 与 App 层级保持一致。 */
+  --radius-sm: var(--border-radius-sm, 4px);
+  --radius-md: var(--border-radius-md, 6px);
+  --radius-lg: var(--border-radius-lg, 8px);
+  --radius-xl: var(--border-radius-xl, 12px);
+  --radius-2xl: var(--radius-xl);
+  --control-radius: var(--radius-lg);
+  --input-bg: var(--gen-ui-input, light-dark(#ffffff, #2b2b2b));
+  --input-bg-focused: var(--gen-ui-input-focused, var(--input-bg));
+  --input-border: var(--gen-ui-input-border, var(--input));
+  --input-border-hover: var(--gen-ui-input-border-hover, var(--border));
+  /* 独立导出没有宿主 focused token，仍需保留可辨认的键盘焦点。 */
+  --input-border-focused: var(--gen-ui-input-border-focused, var(--ring));
+  --placeholder: var(--gen-ui-foreground-subtlest, var(--muted-foreground));
+  --hover: var(--gen-ui-hover, var(--muted));
+  --selected: var(--gen-ui-selected, var(--muted));
   --radius-full: 9999px;
   --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
   --checkmark-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 17'%3E%3Cpath d='M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z'/%3E%3C/svg%3E");
@@ -122,7 +137,7 @@
   --viz-border: var(--border);
   --viz-text: var(--foreground);
   --viz-muted: var(--muted-foreground);
-  --viz-accent: var(--primary);
+  --viz-accent: var(--content-accent);
   --viz-accent-text: var(--primary-foreground);
   --viz-accent-bg: var(--accent);
   --viz-font-size: var(--font-size-base);
@@ -228,7 +243,7 @@ code:not(pre code) {
   corner-shape: var(--corner-shape);
   background: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.92em;
+  font-size: var(--font-size-small);
   overflow-wrap: anywhere;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
@@ -314,7 +329,8 @@ code:not(pre code) {
   padding: 12px;
   overflow: hidden;
   overflow-wrap: break-word;
-  border-radius: var(--radius-2xl);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
   corner-shape: var(--corner-shape);
   color: var(--card-foreground);
   background: var(--card);
@@ -324,11 +340,27 @@ code:not(pre code) {
   min-width: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   corner-shape: var(--corner-shape);
   box-shadow: 0 0 0 0.5px var(--border-strong, var(--border));
   color: var(--foreground);
   background: var(--background);
+}
+
+/* 只计算可见圆角容器，任意布局 wrapper 不增加层级。 */
+:is(.card, .widget) {
+  --control-radius: var(--radius-lg);
+}
+:is(.card, .widget) :is(.card, .widget) {
+  border-radius: var(--radius-lg);
+  --control-radius: var(--radius-md);
+}
+:is(.card, .widget) :is(.card, .widget) :is(.card, .widget) {
+  border-radius: var(--radius-md);
+  --control-radius: var(--radius-sm);
+}
+:is(.card, .widget) :is(.card, .widget) :is(.card, .widget) :is(.card, .widget) {
+  border-radius: var(--radius-sm);
 }
 
 #widget > :not(.card, .widget, .progress) {
@@ -494,7 +526,10 @@ small,
 .form-control,
 .form-range,
 .form-select {
-  font: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
 }
 
 .btn,
@@ -510,11 +545,11 @@ small,
   margin: 0;
   padding: 0 8px;
   -webkit-app-region: no-drag;
-  border: 1px solid var(--input);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--gen-ui-border, var(--input));
+  border-radius: var(--control-radius);
   corner-shape: var(--corner-shape);
-  color: var(--secondary-foreground);
-  background: var(--secondary);
+  color: var(--foreground);
+  background: transparent;
   cursor: var(--cursor-interaction, pointer);
   text-align: center;
   text-decoration: none;
@@ -540,13 +575,14 @@ a.btn {
 
 .btn:not(:disabled):hover,
 .nav-link:not(:disabled):not([aria-disabled="true"]):hover {
-  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+  border-color: var(--gen-ui-border-hover, var(--border));
+  background: color-mix(in srgb, var(--input-bg) 50%, transparent);
 }
 
 .btn-primary {
   border-color: transparent;
   color: var(--primary-foreground);
-  background: var(--foreground);
+  background: var(--primary);
   background-clip: padding-box;
 }
 
@@ -555,19 +591,21 @@ a.btn {
 }
 
 .btn-primary:not(:disabled):hover {
-  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--primary) 80%, transparent);
   background-clip: padding-box;
 }
 
 .btn-ghost {
   border-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--foreground);
   background: transparent;
 }
 
 .btn-ghost:not(:disabled):hover {
+  border-color: transparent;
   color: var(--foreground);
-  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+  background: var(--hover);
 }
 
 .nav-pills .nav-link {
@@ -586,6 +624,42 @@ a.btn {
 .nav-pills .nav-link.active {
   color: var(--foreground);
   background: var(--muted);
+}
+
+.btn-secondary {
+  border-color: transparent;
+  background: var(--secondary);
+}
+.btn-secondary:not(:disabled):hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--secondary) 80%, transparent);
+}
+/* 固定高度叠加正文行高会让放大字号溢出；变体仅约束最小高度，保留内容增长。 */
+.btn:is(.btn-xs, .btn-sm, .btn-lg) {
+  line-height: 1;
+  padding-block: 2px;
+}
+.btn-xs {
+  min-height: 20px;
+}
+.btn-sm {
+  min-height: 24px;
+}
+.btn-lg {
+  min-height: 32px;
+  padding-inline: 10px;
+}
+.btn svg.lucide {
+  --icon-size: 14px;
+}
+.btn-xs svg.lucide {
+  --icon-size: 10px;
+}
+.btn-sm svg.lucide {
+  --icon-size: 12px;
+}
+.btn-lg svg.lucide {
+  --icon-size: 16px;
 }
 
 /* Shared preview chrome; product styles stay inside each variant. */
@@ -777,7 +851,7 @@ a.btn {
 .nav-link:disabled,
 .nav-link[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 [data-lucide] {
@@ -793,18 +867,18 @@ a.btn {
 .form-control {
   display: block;
   width: 100%;
-  min-height: 28px;
+  min-height: 36px;
   padding: 0 8px;
   outline: none;
-  border: 1px solid var(--input);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--control-radius);
   corner-shape: var(--corner-shape);
   color: var(--foreground);
-  background: var(--secondary);
+  background: var(--input-bg);
 }
 
 .form-control::placeholder {
-  color: var(--muted-foreground);
+  color: var(--placeholder);
 }
 
 .form-control[type="file"] {
@@ -820,7 +894,7 @@ a.btn {
   border: 0;
   border-right: 1px solid var(--input);
   color: var(--secondary-foreground);
-  background: var(--secondary);
+  background: var(--input-bg);
   cursor: inherit;
   font: inherit;
 }
@@ -848,35 +922,35 @@ a.btn {
 
 textarea.form-control {
   height: auto;
-  min-height: 72px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 8px;
   resize: vertical;
 }
 
 .form-control:focus-visible {
-  border-color: var(--ring);
-  box-shadow: inset 0 0 0 1px var(--ring);
+  border-color: var(--input-border-focused);
+  background-color: var(--input-bg-focused);
 }
 
 .form-control:disabled,
 .form-select:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .form-select {
   appearance: none;
   display: block;
   width: 100%;
-  min-height: 28px;
+  min-height: 36px;
   margin: 0;
   padding: 0 32px 0 8px;
   outline: none;
-  border: 1px solid var(--input);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--control-radius);
   corner-shape: var(--corner-shape);
   color: var(--foreground);
-  background-color: var(--secondary);
+  background-color: var(--input-bg);
   background-image:
     linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
     linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
@@ -888,13 +962,23 @@ textarea.form-control {
   cursor: var(--cursor-interaction, default);
 }
 
-.form-select:not(:disabled):hover {
-  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+.form-select:not(:disabled):not(:focus-visible):hover {
+  border-color: var(--input-border-hover);
 }
 
 .form-select:focus-visible {
-  border-color: var(--ring);
-  box-shadow: inset 0 0 0 1px var(--ring);
+  border-color: var(--input-border-focused);
+  background-color: var(--input-bg-focused);
+}
+
+.form-control:not(:disabled):not(:focus-visible):hover {
+  border-color: var(--input-border-hover);
+}
+.form-control.form-control-sm, .form-select.form-select-sm {
+  min-height: 28px;
+}
+.form-control.form-control-xs, .form-select.form-select-xs {
+  min-height: 24px;
 }
 
 .form-check {
@@ -906,11 +990,11 @@ textarea.form-control {
 
 .form-check-input {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
   margin: 0;
-  border: 1px solid var(--input);
+  border: 1px solid var(--input-border);
   color: var(--primary-foreground);
   background-color: transparent;
   cursor: var(--cursor-interaction, default);
@@ -921,15 +1005,16 @@ textarea.form-control {
 }
 
 .form-check:not(.form-switch) .form-check-input[type="checkbox"] {
-  border-color: var(--input);
+  border-color: var(--input-border);
   border-radius: var(--radius-sm);
   corner-shape: var(--corner-shape);
-  background-color: var(--secondary);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--input-bg);
+  box-shadow: none;
 }
 
 .form-check:not(.form-switch)
-  .form-check-input:not(:disabled):not(:checked):hover {
+  .form-check-input:not(:disabled):not(:checked):not(:indeterminate):hover {
+  /* 半选不是未选中；避免 hover 覆盖 primary 背景导致横线失去对比。 */
   background-color: var(--card);
 }
 
@@ -949,8 +1034,8 @@ textarea.form-control {
 }
 
 .form-check-input[type="radio"] {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: var(--radius-full);
 }
 
@@ -978,7 +1063,7 @@ textarea.form-control {
 .form-switch .form-check-input:disabled,
 .form-switch .form-check-input:disabled + .form-check-label {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .form-check-label {
@@ -989,10 +1074,10 @@ textarea.form-control {
 .form-switch .form-check-input {
   position: relative;
   width: 32px;
-  height: 20px;
+  height: 18px;
   border: 0;
   border-radius: var(--radius-full);
-  background: var(--muted);
+  background: color-mix(in srgb, var(--primary) 30%, transparent);
   box-shadow: none;
   transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
 }
@@ -1004,12 +1089,12 @@ textarea.form-control {
   width: 16px;
   height: 16px;
   box-sizing: border-box;
-  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border: 1px solid var(--primary-foreground);
   border-radius: var(--radius-full);
-  background: light-dark(var(--primary-foreground), var(--foreground));
-  box-shadow: var(--shadow-sm);
+  background: var(--primary-foreground);
+  box-shadow: none;
   content: "";
-  transform: translate(2px, -50%);
+  transform: translate(1px, -50%);
   transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
 }
 
@@ -1018,11 +1103,27 @@ textarea.form-control {
 }
 
 .form-switch .form-check-input:checked::before {
-  transform: translate(14px, -50%);
+  transform: translate(15px, -50%);
 }
 
 .form-switch .form-check-input:focus-visible {
   box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-check:not(.form-switch) .form-check-input[type="checkbox"]:indeterminate {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.form-check:not(.form-switch) .form-check-input[type="checkbox"]:indeterminate::before {
+  display: block;
+  width: 8px;
+  height: 2px;
+  margin: 6px 3px;
+  background: var(--primary-foreground);
+  content: "";
+}
+.form-check-input:disabled {
+  opacity: 0.5;
 }
 
 .form-range {
@@ -1055,7 +1156,7 @@ textarea.form-control {
   margin-top: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: light-dark(var(--primary-foreground), var(--foreground));
+  background: var(--primary-foreground);
 }
 
 .form-range:focus-visible::-webkit-slider-thumb {
@@ -1073,7 +1174,7 @@ textarea.form-control {
   height: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: light-dark(var(--primary-foreground), var(--foreground));
+  background: var(--primary-foreground);
 }
 
 .form-range:focus-visible::-moz-range-thumb {
@@ -1083,7 +1184,7 @@ textarea.form-control {
 
 .form-range:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.5;
 }
 
 .btn:not(.btn-primary, .viz-tile):is(
@@ -1091,9 +1192,9 @@ textarea.form-control {
   [aria-selected="true"],
   .is-selected
 ) {
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-  background: var(--primary);
+  border-color: var(--gen-ui-border, var(--border));
+  color: var(--foreground);
+  background: var(--selected);
 }
 
 .btn.viz-tile:is([aria-pressed="true"], [aria-selected="true"], .is-selected) {
@@ -1119,7 +1220,14 @@ textarea.form-control {
   .viz-carousel-controls button,
   .viz-carousel-picker > summary,
   .form-control,
-  .form-select {
+  .form-select,
+  .form-control.form-control-sm,
+  .form-control.form-control-xs,
+  .form-select.form-select-sm,
+  .form-select.form-select-xs,
+  .btn.btn-xs,
+  .btn.btn-sm,
+  .btn.btn-lg {
     min-width: 44px;
     min-height: 44px;
   }

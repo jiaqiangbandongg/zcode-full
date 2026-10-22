@@ -10,7 +10,7 @@ interface RegisterHostServiceResourceTelemetryOptions {
   services: Pick<ServiceCollection, "getOptional">;
   postMessage(message: unknown): void;
   runtimeSurface: ProcessResourceRuntimeSurface;
-  /** 独立 Server 必须显式声明支持；本地及配套部署的远端默认支持。 */
+  /** 本地默认支持；所有远端须按 server-info 能力声明显式传入。 */
   telemetrySupported?: boolean;
   /** Host 已哈希的运行环境身份，仅透传给 main 的资源分组，不进入 ARMS。 */
   environmentKey?: string;

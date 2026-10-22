@@ -1,4 +1,3 @@
-import type { IFileService } from "@zcode/services";
 import type { IServiceAccessor } from "@/hooks/useServices.js";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
@@ -50,33 +49,5 @@ describe("WorkspaceFileSearch settings section", () => {
     expect(source).toContain("transform,");
     expect(source).not.toContain("readTextFile");
     expect(source).not.toContain("window.zcode");
-  });
-
-  it("keeps the save action gated on editable-or-dirty state in source contract", () => {
-    const source = readFileSync(
-      new URL("../src/settings/WorkspaceFileSearchSection.tsx", import.meta.url),
-      "utf8",
-    );
-
-    // 保存语义是"落盘编辑框内容"：template 态（文件未创建）即使未编辑也可保存，
-    // 用户第一次进页面不改任何内容也能创建 .zcodeignore；已落盘态才有修改才可保存。
-    expect(source).toContain(
-      'const canSave = loaded === null || loaded.source === "template" || draft !== loaded.content;',
-    );
-    expect(source).toContain("disabled={!canSave || saving || loading}");
-    // "未保存修改"提示仍只表达真实差异，template 态未编辑时不显示。
-    expect(source).toContain(
-      'const dirty = loaded !== null && loaded.source === "file" && draft !== loaded.content;',
-    );
-  });
-
-  it("matches the fileService RPC surface used by the section", () => {
-    // IFileService 契约快照：section 依赖的两个方法必须存在于服务接口，
-    // 防止未来接口重命名悄悄断开设置页。
-    const fileServiceKeys: Array<keyof IFileService> = [
-      "readWorkspaceFileSearchIgnore",
-      "writeWorkspaceFileSearchIgnore",
-    ];
-    expect(fileServiceKeys.every((key) => typeof key === "string")).toBe(true);
   });
 });

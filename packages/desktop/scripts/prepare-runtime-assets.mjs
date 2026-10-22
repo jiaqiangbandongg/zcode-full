@@ -27,10 +27,8 @@ const shouldPrepareWindowsCuaHelper =
 // 到屏幕底部，仍可用），所以无条件挂在 darwin 上不会让构建变脆。
 const shouldPrepareMacosWindowBounds = target.os === "darwin";
 
-// 本机桌面包内置 agent 的 JS bundle（prepare:agent-bundle），运行时由 app 的 Electron Node runtime 执行。
-// 远端跨平台原生二进制仍由上面的 prepare:remote-assets 提供。
-// native-search 由 prepare-native-search-tools.mjs 统一准备：内网依赖源已配置时下载固定摘要的归档，
-// 未配置时解包仓库内置的同名归档，两种情况都不需要额外开关。
+// 本机桌面包不再内置 glm 原生二进制（prepare:glm），改为内置 agent 的 JS bundle（prepare:agent-bundle），
+// 运行时由 app 的 Electron Node runtime 执行。Source Server 资源由独立 stage:remote-assets 入口负责。
 const localRuntimeScripts = [
   "prepare:agent-bundle",
   ...(shouldPrepareWindowsCuaHelper ? ["prepare:windows-cua-helper"] : []),
@@ -52,17 +50,6 @@ function runTimedPnpmScript(scriptName) {
       `[ci][timer] prepare-runtime-assets:${scriptName} end duration_ms=${Date.now() - startMs}`,
     );
   }
-}
-
-const shouldSkipRemoteAssets = process.env.ZCODE_SKIP_REMOTE_ASSETS === "1";
-
-if (!shouldSkipRemoteAssets) {
-  runTimedPnpmScript("prepare:remote-assets");
-} else {
-  // Windows build job 的桌面安装包不依赖 mock-cdn remote 资产。
-  // 之前这里无条件执行 prepare:remote-assets，会在同一个 job 里串行下载/打包跨平台资源，
-  // 导致 CI 时间被白白拉长并逼近 1 小时上限。增加显式开关，只在需要时才准备 remote 资产。
-  console.log("[prepare:runtime-assets] skip prepare:remote-assets (ZCODE_SKIP_REMOTE_ASSETS=1)");
 }
 
 for (const scriptName of localRuntimeScripts) {

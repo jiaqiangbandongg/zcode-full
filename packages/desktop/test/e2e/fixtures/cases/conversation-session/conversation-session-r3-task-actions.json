@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-task-actions",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-task-actions.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-task-actions.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-tact-local-title",
+      "description": "本机对照使用默认 Anthropic-compatible Provider；真实创建本机 task 后验证远端置顶/归档不会污染它。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "本机对照使用默认 Anthropic-compatible Provider；真实创建本机 task 后验证远端置顶/归档不会污染它。"
+    },
+    {
+      "id": "r3-tact-local-reply",
+      "description": "本机对照使用默认 Anthropic-compatible Provider；真实创建本机 task 后验证远端置顶/归档不会污染它。",
+      "kind": "main",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "本机对照使用默认 Anthropic-compatible Provider；真实创建本机 task 后验证远端置顶/归档不会污染它。"
+    },
+    {
+      "id": "r3-tact-reconnect-title",
+      "description": "R3 task actions task 标题辅助响应。",
+      "kind": "common",
+      "timingPolicy": "fast-text",
+      "source": "synthetic",
+      "syntheticReason": "标题不属于冷恢复断言。"
+    },
+    {
+      "id": "r3-tact-reconnect-main",
+      "description": "R3 task actions 首发和续发的通用响应。",
+      "kind": "main",
+      "timingPolicy": "slow-stream",
+      "source": "synthetic",
+      "syntheticReason": "首发与冷恢复续发都只需要稳定完成，用 task history 断言路由。"
+    }
+  ]
+}

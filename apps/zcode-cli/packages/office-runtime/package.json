@@ -1,0 +1,44 @@
+{
+  "name": "@zcode/office-runtime",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Shared document viewer behind the built-in documents, spreadsheets, presentations and pdf plugins; each plugin chooses its formats in package.json under \"office\".",
+  "license": "MIT",
+  "type": "module",
+  "imports": {
+    "#office/*": "./src/*",
+    "#ui/*": "./ui/*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint src ui scripts module.ts index.ts contract.ts contract.example.ts contract.test.ts --no-ignore"
+  },
+  "devDependencies": {
+    "@aiden0z/pptx-renderer": "1.2.4",
+    "@extend-ai/react-xlsx": "0.16.0",
+    "@fontsource/noto-sans-sc": "5.3.1",
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/ext-apps": "2.0.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "docx-preview": "0.4.0",
+    "esbuild": "^0.25.0",
+    "exceljs": "4.4.0",
+    "fast-xml-parser": "5.11.2",
+    "jszip": "3.10.1",
+    "pdfjs-dist": "5.4.296",
+    "playwright-core": "1.59.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.5",
+    "zod": "4.6.5"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

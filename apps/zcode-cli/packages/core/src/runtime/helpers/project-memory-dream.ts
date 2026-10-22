@@ -17,7 +17,7 @@ import { runMemoryAgentLoop } from "../../memory/memory-agent-loop.js";
 import { findLatestReadFileState } from "../../tool/read-file-state.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import {
-  buildProjectMemoryAgentProviderMessages,
+  prepareProjectMemoryAgentRequest,
   captureProjectMemoryAgentContext,
   createProjectMemoryAgentToolExecutor,
   type ProjectMemoryAgentContext,
@@ -140,7 +140,7 @@ async function executeProjectMemoryDream(
         sessionIds: transcriptSessionIds,
         transcriptRoot: runtime.modelIoDir!,
       });
-      const providerMessages = buildProjectMemoryAgentProviderMessages(runtime, context, prompt);
+      const request = prepareProjectMemoryAgentRequest(context, prompt);
       const executor = createProjectMemoryAgentToolExecutor(runtime, context);
       const touchedPaths = new Set<string>();
 
@@ -158,10 +158,9 @@ async function executeProjectMemoryDream(
           });
         },
         maxTurns: DREAM_MAX_TURNS,
-        messages: providerMessages,
+        request,
         model: context.model,
         rootDir: context.memoryRoot,
-        tools: context.tools,
         workingDirectory: context.workingDirectory,
         workspaceRoot: context.workspaceRoot,
       });

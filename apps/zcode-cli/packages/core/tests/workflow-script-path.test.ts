@@ -28,8 +28,6 @@ describe("describeWorkflowScriptPath", () => {
 
   it("同级的兄弟目录也算目录外：`..` 开头的结果一律退回绝对路径", () => {
     const sibling = path.resolve(CWD, "..", "other-repo", "audit.dwf.ts");
-    const relative = path.relative(CWD, sibling);
-    expect(relative.startsWith("..")).toBe(true);
     expect(describeWorkflowScriptPath(sibling, CWD)).toBe(sibling);
   });
 

@@ -94,6 +94,8 @@ export interface ComposerAttachmentsApi {
   retryAttachment: (id: string) => void;
   /** 发送成功只清冻结的附件 id；不传表示用户主动清空整个附件区。 */
   clearAttachments: (attachmentIds?: readonly string[]) => void;
+  /** 草稿跨工作区时重新准备附件，不能继承旧 session 的上传引用。 */
+  restoreDraftAttachments: (attachments: readonly ChatComposerAttachment[]) => void;
   /** 把已由 session 接管的 queue refs 原样恢复为 ready chips；不触发 upload/adopt。 */
   restoreSessionOwnedAttachments: (attachments: readonly AttachmentRef[]) => boolean;
   /** 只返回已 ready ref；任一附件未就绪时返回 null 作 submit 二次门禁。 */
@@ -1002,6 +1004,24 @@ export function useComposerAttachments(
     [commitScope, scopeKey],
   );
 
+  const restoreDraftAttachments = useCallback(
+    (source: readonly ChatComposerAttachment[]) => {
+      // 新项目可能使用另一 Host/session；保留原始 File/路径，重新生成预览和上传归属。
+      const restored = source.map((item) => ({
+        sourceKind: item.sourceKind,
+        messageCount: item.messageCount,
+        lineCount: item.lineCount,
+        charCount: item.charCount,
+        ...(item.file
+          ? createChatComposerAttachment(item.file, item.localPath)
+          : createChatComposerPathAttachment(item.localPath!)),
+      }));
+      clearAttachments();
+      addPreparedAttachments(restored);
+    },
+    [addPreparedAttachments, clearAttachments],
+  );
+
   const restoreSessionOwnedAttachments = useCallback(
     (attachmentRefs: readonly AttachmentRef[]): boolean => {
       if (attachmentRefs.length === 0) return true;
@@ -1090,6 +1110,7 @@ export function useComposerAttachments(
       removeAttachment,
       retryAttachment,
       clearAttachments,
+      restoreDraftAttachments,
       restoreSessionOwnedAttachments,
       prepareForSend,
       adoptSentAttachments,
@@ -1102,6 +1123,7 @@ export function useComposerAttachments(
       attachments,
       composerDragKind,
       clearAttachments,
+      restoreDraftAttachments,
       restoreSessionOwnedAttachments,
       handleAttachmentInputChange,
       handleDragLeaveComposer,

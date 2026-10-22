@@ -1093,10 +1093,9 @@ describe("autoUpdater ready state sync", () => {
 
     autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
 
-    expect(getAutoUpdaterState()).toMatchObject({
-      kind: "update-downloaded",
-      version: "0.1.25",
-    });
+    await vi.waitFor(() =>
+      expect(getAutoUpdaterState()).toMatchObject({ kind: "update-downloaded", version: "0.1.25" }),
+    );
     expect(win.webContents.send).toHaveBeenCalledWith(
       PlatformChannels.UpdateStateChanged,
       expect.objectContaining({
@@ -1810,7 +1809,7 @@ describe("autoUpdater ready state sync", () => {
     await Promise.resolve();
     quitHandler?.();
 
-    expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1));
     expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(0);
 
     resolveQuitPreparation?.();
@@ -1820,7 +1819,7 @@ describe("autoUpdater ready state sync", () => {
     expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1);
   });
 
-  it("安装前退出准备失败时不会继续启动安装器或开发态重启", async () => {
+  it("安装前退出准备失败时不启动安装器，受控重启恢复服务", async () => {
     mockProcessPlatform("win32");
     const prepareError = new Error("host process still locked resources");
     const onBeforeQuitAndInstall = vi.fn(async () => {
@@ -1843,12 +1842,362 @@ describe("autoUpdater ready state sync", () => {
     // 如果准备失败还继续启动安装器，会再次形成 bundled runtime 半更新。
     expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1);
     expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
-    expect(appMock.relaunch).not.toHaveBeenCalled();
-    expect(appMock.exit).not.toHaveBeenCalled();
+    expect(appMock.relaunch).toHaveBeenCalledOnce();
+    expect(appMock.exit).toHaveBeenCalledWith(0);
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "[auto-update] prepare quit and install failed:",
       prepareError,
     );
+  });
+
+  it.each(["darwin", "linux"] as const)(
+    "%s 安装调用返回后原生退出直接放行，重复安装命令不重入",
+    async (platform) => {
+      mockProcessPlatform(platform);
+      const onBeforeQuitAndInstall = vi.fn(async () => {});
+      const { initAutoUpdater } = await importAutoUpdaterWithLocale();
+      await initAutoUpdater({ onBeforeQuitAndInstall });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      const install = ipcMainHandle.mock.calls.find(
+        ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+      )![1] as () => Promise<void>;
+
+      await install();
+      // 原生 staging 在安装入口返回后才触发退出，不能被当作新的安装请求。
+      const event = { preventDefault: vi.fn() };
+      for (const listener of appListeners.get("before-quit") ?? []) {
+        listener(event);
+      }
+      await install();
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(onBeforeQuitAndInstall).toHaveBeenCalledOnce();
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["同步抛错", "异步错误事件"] as const)(
+    "安装%s后受控重启，新进程重新就绪可重试",
+    async (failureKind) => {
+      mockProcessPlatform("darwin");
+      const services = { hostAlive: true, remoteAlive: true };
+      const onBeforeQuitAndInstall = vi.fn(() => {
+        services.hostAlive = false;
+        services.remoteAlive = false;
+      });
+      const module = await importAutoUpdaterWithLocale();
+      await module.initAutoUpdater({ onBeforeQuitAndInstall });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      const install = ipcMainHandle.mock.calls.find(
+        ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+      )![1] as () => Promise<void>;
+      const error = new Error("native installer failed");
+      if (failureKind === "同步抛错") {
+        autoUpdaterMock.quitAndInstall.mockImplementationOnce(() => {
+          throw error;
+        });
+        await expect(install()).rejects.toBe(error);
+      } else {
+        await install();
+        autoUpdaterMock.emit("error", error);
+      }
+      expect(services).toEqual({ hostAlive: false, remoteAlive: false });
+      expect(appMock.relaunch).toHaveBeenCalledOnce();
+      expect(appMock.exit).toHaveBeenCalledWith(0);
+      autoUpdaterMock.emit("error", error);
+      expect(appMock.relaunch).toHaveBeenCalledOnce();
+      // 模拟退出后新 main 进程重新装配，旧进程的 recovering 不接收重试。
+      vi.resetModules();
+      autoUpdaterMock.removeAllListeners();
+      ipcMainHandle.mockClear();
+      const restarted = await importAutoUpdaterWithLocale();
+      await restarted.initAutoUpdater();
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      await (
+        ipcMainHandle.mock.calls.find(
+          ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+        )![1] as () => Promise<void>
+      )();
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each(["darwin", "linux", "win32"] as const)(
+    "%s 服务清理后锁定目标，迟到新版本事件与重复入口不会放弃或重入安装",
+    async (platform) => {
+      mockProcessPlatform(platform);
+      let finishPreparation!: () => void;
+      const preparation = new Promise<void>((resolve) => {
+        finishPreparation = resolve;
+      });
+      const services = { hostAlive: true, remoteAlive: true };
+      const onBeforeQuitAndInstall = vi.fn(() => {
+        services.hostAlive = false;
+        services.remoteAlive = false;
+        return preparation;
+      });
+      const module = await importAutoUpdaterWithLocale();
+      await module.initAutoUpdater({ onBeforeQuitAndInstall });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      const install = ipcMainHandle.mock.calls.find(
+        ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+      )![1] as () => Promise<void>;
+      const firstInstall = install();
+      await vi.waitFor(() => expect(onBeforeQuitAndInstall).toHaveBeenCalledOnce());
+      expect(services).toEqual({ hostAlive: false, remoteAlive: false });
+      const checkCalls = autoUpdaterMock.checkForUpdates.mock.calls.length;
+      autoUpdaterMock.emit("update-available", { version: "0.1.26" });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.26" });
+      module.downloadAvailableUpdate();
+      module.refreshAutoUpdaterReleaseChannel(true);
+      module.requestAutoUpdateCheckWithoutWindow();
+      const event = { preventDefault: vi.fn() };
+      for (const listener of appListeners.get("before-quit") ?? []) listener(event);
+      await install();
+      finishPreparation();
+      await firstInstall;
+      expect(module.getAutoUpdaterState()).toMatchObject({
+        kind: "update-downloaded",
+        version: "0.1.25",
+      });
+      expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(checkCalls);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(["darwin", "linux", "win32"] as const)(
+    "%s 后台检查永不完成也不阻塞已有 ready，迟到结果不替换安装目标",
+    async (platform) => {
+      mockProcessPlatform(platform);
+      let finishCheck!: () => void;
+      autoUpdaterMock.checkForUpdates.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          finishCheck = resolve;
+        }),
+      );
+      const onBeforeQuitAndInstall = vi.fn();
+      const module = await importAutoUpdaterWithLocale();
+      await module.initAutoUpdater({ onBeforeQuitAndInstall });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      const install = ipcMainHandle.mock.calls.find(
+        ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+      )![1] as () => Promise<void>;
+      let completed = false;
+      const installation = install().then(() => {
+        completed = true;
+      });
+      await vi.waitFor(() => expect(completed).toBe(true));
+      expect(onBeforeQuitAndInstall).toHaveBeenCalledOnce();
+      autoUpdaterMock.emit("update-available", { version: "0.1.26" });
+      finishCheck();
+      await installation;
+      expect(module.getAutoUpdaterState()).toMatchObject({
+        kind: "update-downloaded",
+        version: "0.1.25",
+      });
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("检查结果已进入异步设置读取，确认安装后也不能改写锁定包", async () => {
+    let finishSettings!: (value: { recentProjects: never[]; locale: "en-US" }) => void;
+    const settings = new Promise<{ recentProjects: never[]; locale: "en-US" }>((resolve) => {
+      finishSettings = resolve;
+    });
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater({ settingService: settingServiceMock });
+    autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+    settingServiceMock.get.mockReturnValueOnce(settings);
+    autoUpdaterMock.emit("update-available", { version: "0.1.26" });
+    const install = ipcMainHandle.mock.calls.find(
+      ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+    )![1] as () => Promise<void>;
+    await install();
+    finishSettings({ recentProjects: [], locale: "en-US" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(module.getAutoUpdaterState()).toMatchObject({
+      kind: "update-downloaded",
+      version: "0.1.25",
+    });
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  it("下载 ready 事件先于下载 Promise 返回时，不提前发布可安装状态", async () => {
+    let finishDownload!: () => void;
+    autoUpdaterMock.downloadUpdate.mockReturnValueOnce(
+      new Promise<string[]>((resolve) => {
+        finishDownload = () => resolve([]);
+      }),
+    );
+    const onBeforeQuitAndInstall = vi.fn();
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater({ onBeforeQuitAndInstall });
+    autoUpdaterMock.emit("update-available", { version: "0.1.25" });
+    await vi.waitFor(() => expect(module.getAutoUpdaterState().kind).toBe("update-available"));
+    module.downloadAvailableUpdate();
+    autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+    const install = ipcMainHandle.mock.calls.find(
+      ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+    )![1] as () => Promise<void>;
+    await expect(install()).rejects.toThrow("Update is not ready to install");
+    expect(onBeforeQuitAndInstall).not.toHaveBeenCalled();
+    finishDownload();
+    await vi.waitFor(() => expect(module.getAutoUpdaterState().kind).toBe("update-downloaded"));
+    await install();
+    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  it.each(["失败", "取消"] as const)("下载%s后不发布提前到达的 ready", async (kind) => {
+    let rejectDownload!: (error: Error) => void;
+    autoUpdaterMock.downloadUpdate.mockReturnValueOnce(
+      new Promise<string[]>((_resolve, reject) => {
+        rejectDownload = reject;
+      }),
+    );
+    const onBeforeQuitAndInstall = vi.fn();
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater({ onBeforeQuitAndInstall });
+    autoUpdaterMock.emit("update-available", { version: "0.1.25" });
+    await vi.waitFor(() => expect(module.getAutoUpdaterState().kind).toBe("update-available"));
+    module.downloadAvailableUpdate("test");
+    autoUpdaterMock.emit("download-progress", {
+      percent: 50,
+      bytesPerSecond: 1,
+      transferred: 1,
+      total: 2,
+    });
+    autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+    if (kind === "取消") module.cancelDownloadingUpdate("test");
+    const error = new Error(kind === "取消" ? "cancelled" : "download failed after ready event");
+    rejectDownload(error);
+    await vi.waitFor(() => {
+      if (kind === "取消")
+        expect(loggerInfoMock).toHaveBeenCalledWith("[auto-update] test download cancelled");
+      else
+        expect(loggerErrorMock).toHaveBeenCalledWith(
+          "[auto-update] download update failed:",
+          error,
+        );
+    });
+    await Promise.resolve();
+    expect(module.getAutoUpdaterState().kind).not.toBe("update-downloaded");
+    expect(onBeforeQuitAndInstall).not.toHaveBeenCalled();
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
+  });
+
+  it("挂起检查的迟到错误不触发安装恢复，真实原生错误仍受控重启", async () => {
+    let failCheck!: (error: Error) => void;
+    autoUpdaterMock.checkForUpdates.mockReturnValueOnce(
+      new Promise<void>((_resolve, reject) => {
+        failCheck = reject;
+      }),
+    );
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater();
+    autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+    const install = ipcMainHandle.mock.calls.find(
+      ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+    )![1] as () => Promise<void>;
+    await install();
+    const checkError = new Error("background check failed");
+    autoUpdaterMock.emit("error", checkError, "Cannot check for updates: background check failed");
+    failCheck(checkError);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(module.getAutoUpdaterState()).toMatchObject({
+      kind: "update-downloaded",
+      version: "0.1.25",
+    });
+    expect(appMock.relaunch).not.toHaveBeenCalled();
+    autoUpdaterMock.emit("error", new Error("native staging failed"));
+    expect(appMock.relaunch).toHaveBeenCalledOnce();
+    expect(appMock.exit).toHaveBeenCalledWith(0);
+  });
+
+  it.each(["先可用后失败", "先失败后可用", "重复错误"] as const)(
+    "交接后%s的原生错误受控重启一次，不能留下服务已清理的旧窗口",
+    async (order) => {
+      const services = { hostAlive: true, remoteAlive: true };
+      const onBeforeQuitAndInstall = vi.fn(() => {
+        services.hostAlive = false;
+        services.remoteAlive = false;
+      });
+      const module = await importAutoUpdaterWithLocale();
+      await module.initAutoUpdater({ onBeforeQuitAndInstall });
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      const install = ipcMainHandle.mock.calls.find(
+        ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+      )![1] as () => Promise<void>;
+      await install();
+      const newer = () => {
+        autoUpdaterMock.emit("update-available", { version: "0.1.26" });
+        module.downloadAvailableUpdate();
+      };
+      const fail = () => autoUpdaterMock.emit("error", new Error("native installer failed"));
+      if (order === "先可用后失败") {
+        newer();
+        fail();
+      } else {
+        fail();
+        if (order === "重复错误") fail();
+        else newer();
+      }
+      expect(services).toEqual({ hostAlive: false, remoteAlive: false });
+      expect(appMock.relaunch).toHaveBeenCalledOnce();
+      expect(appMock.exit).toHaveBeenCalledWith(0);
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.26" });
+      await install();
+      expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+      expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("强更缓存同步 ready 仍等待下载 Promise 收口后才清理服务", async () => {
+    let finishDownload!: () => void;
+    const download = new Promise<string[]>((resolve) => {
+      finishDownload = () => resolve([]);
+    });
+    autoUpdaterMock.downloadUpdate.mockImplementationOnce(() => {
+      autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+      return download;
+    });
+    const onBeforeQuitAndInstall = vi.fn();
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater({ onBeforeQuitAndInstall });
+    autoUpdaterMock.emit("update-available", { version: "0.1.25" });
+    await vi.waitFor(() => expect(module.getAutoUpdaterState().kind).toBe("update-available"));
+    module.requestForceAutoUpdate(vi.fn());
+    await Promise.resolve();
+    expect(onBeforeQuitAndInstall).not.toHaveBeenCalled();
+    finishDownload();
+    await vi.waitFor(() => expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce());
+    expect(onBeforeQuitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  it("准备期间原生 staging 失败，清理完成后重启恢复服务而不留下失效窗口", async () => {
+    let finishPreparation!: () => void;
+    const preparation = new Promise<void>((resolve) => {
+      finishPreparation = resolve;
+    });
+    const onBeforeQuitAndInstall = vi.fn(() => preparation);
+    const module = await importAutoUpdaterWithLocale();
+    await module.initAutoUpdater({ onBeforeQuitAndInstall });
+    autoUpdaterMock.emit("update-downloaded", { version: "0.1.25" });
+    const install = ipcMainHandle.mock.calls.find(
+      ([channel]) => channel === PlatformChannels.QuitAndInstallUpdate,
+    )![1] as () => Promise<void>;
+    const firstInstall = install();
+    await vi.waitFor(() => expect(onBeforeQuitAndInstall).toHaveBeenCalledOnce());
+    autoUpdaterMock.emit("error", new Error("native staging failed"));
+    finishPreparation();
+    await firstInstall;
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
+    expect(appMock.relaunch).toHaveBeenCalledOnce();
+    expect(appMock.exit).toHaveBeenCalledWith(0);
   });
 
   it("没有已下载更新时安装请求不会执行退出准备", async () => {
@@ -1891,12 +2240,12 @@ describe("autoUpdater ready state sync", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1));
     // Bugfix: 3.3.0 的 detached hidden PowerShell launcher 只证明 powershell.exe
     // 创建成功，不能证明安装器脚本实际执行。Windows 也必须回到 electron-updater 原生入口。
     expect(spawnMock).not.toHaveBeenCalled();
     expect(appMock.exit).not.toHaveBeenCalled();
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1));
   });
 
   it("更新已下载后点击菜单会直接重启安装", async () => {
@@ -1923,7 +2272,7 @@ describe("autoUpdater ready state sync", () => {
 
     // Bugfix: 菜单文案是“重启以更新”时，点击应和更新按钮一样真的安装；
     // 旧逻辑只给 renderer 发 ready toast，用户看到的是“重启”但实际没有重启。
-    expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onBeforeQuitAndInstall).toHaveBeenCalledTimes(1));
     expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledTimes(1);
     expect(win.webContents.send).not.toHaveBeenCalledWith(PlatformChannels.UpdateCheckResult, {
       kind: "ready",
@@ -2139,7 +2488,9 @@ describe("autoUpdater ready state sync", () => {
       expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(1);
       autoUpdaterMock.emit("update-downloaded", { version: "0.1.26" });
 
-      expect(win.webContents.send).toHaveBeenCalledWith(PlatformChannels.UpdateReady, "0.1.26");
+      await vi.waitFor(() =>
+        expect(win.webContents.send).toHaveBeenCalledWith(PlatformChannels.UpdateReady, "0.1.26"),
+      );
       expect(menuItem.label).toBe(
         formatDesktopMenuMessage(TEST_LOCALE, desktopMenuMessageIds.helpRestartToUpdate, {
           version: "0.1.26",
@@ -2234,7 +2585,7 @@ describe("autoUpdater ready state sync", () => {
 
     expect(onStateChange).toHaveBeenCalledWith({ kind: "checking" });
     expect(onStateChange).toHaveBeenCalledWith({ kind: "installing" });
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce());
     expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
   });
 

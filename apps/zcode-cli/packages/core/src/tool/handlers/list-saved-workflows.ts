@@ -109,6 +109,7 @@ function escapeAttribute(value: string): string {
 export const listSavedWorkflowsToolEntry: ToolEntry = {
   capability: "List the reusable dynamic-workflow definitions saved in this project",
   metadata: {
+    shouldDefer: true,
     name: LIST_SAVED_WORKFLOWS_TOOL_NAME,
     description: LIST_SAVED_WORKFLOWS_DESCRIPTION,
     readOnly: true,

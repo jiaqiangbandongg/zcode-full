@@ -73,13 +73,6 @@ describe("StartPlanStatusMeta", () => {
     const refreshButton = screen.getByRole("button", {
       name: "settings.modelProvider.startPlan.refreshEntitlement",
     });
-    expect(refreshButton.className).toContain("rounded-full");
-    expect(refreshButton.dataset.variant).toBe("outline");
-    expect(refreshButton.className).toContain("border-success/30");
-    expect(refreshButton.className).toContain("bg-success/14");
-    expect(refreshButton.className).toContain("text-success");
-    expect(refreshButton.className).toContain("hover:bg-success/20");
-    expect(refreshButton.querySelector(".lucide-refresh-cw")).not.toBeNull();
     fireEvent.click(refreshButton);
 
     expect(onRefresh).toHaveBeenCalledTimes(1);

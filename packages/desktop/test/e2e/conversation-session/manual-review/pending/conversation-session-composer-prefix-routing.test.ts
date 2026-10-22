@@ -1,9 +1,7 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  TID_V4_COMPOSER_INPUT,
-  ZCODE_AGENT_PROVIDER,
-} from "@zcode/shared";
+import { ZCODE_AGENT_PROVIDER } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { DEFAULT_WORKSPACE } from "../../../helpers/desktop-app.js";
 import {
   prepareConversationE2E,

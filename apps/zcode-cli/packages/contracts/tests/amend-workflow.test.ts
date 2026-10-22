@@ -3,6 +3,7 @@ import {
   AMEND_WORKFLOW_TOOL_NAME,
   AmendWorkflowInputJsonSchema,
   AmendWorkflowInputSchema,
+  isAmendWorkflowOwnedPredecessor,
 } from "../src/tools/amend-workflow.js";
 
 // docs/dynamic-workflow/launch.md「The `AmendWorkflow` tool」：模型面只有 run_id 必填，其余字段省略
@@ -56,18 +57,37 @@ describe("AmendWorkflowInputSchema", () => {
     ).toBe(false);
   });
 
+  // 「这次修订引入了前驱没用过的 provider」：非空的 provider id 列表，只在有新的时在场；
+  // 在场即退出本会话 run 的免确认（权限服务与 not_live 落回读同一条谓词）。
+  it("accepts introduces_providers on the resolved predecessor and lets it end the exemption", () => {
+    const owned = { status: "completed" as const, owned_by_this_session: true };
+    const resolved = {
+      run_id: "dwfrun-prev",
+      script: SCRIPT,
+      predecessor: { ...owned, introduces_providers: ["openai"] },
+    };
+    expect(AmendWorkflowInputSchema.parse(resolved)).toEqual(resolved);
+    expect(
+      AmendWorkflowInputSchema.safeParse({
+        ...resolved,
+        predecessor: { ...owned, introduces_providers: [] },
+      }).success,
+    ).toBe(false);
+    expect(isAmendWorkflowOwnedPredecessor(owned)).toBe(true);
+    expect(isAmendWorkflowOwnedPredecessor(resolved.predecessor)).toBe(false);
+  });
+
   // 子代理选型的三态（docs/dynamic-workflow/launch.md）：省略 = 沿用前驱、null = 回到会话模型、
   // 字符串 = 设定。运行时 schema 三种都认——归一成一个规范形字符串是 resolveInput 的事。
   it("accepts the three states of subagent_model and rejects a blank string", () => {
     const input = { run_id: "dwfrun-prev", script: SCRIPT };
-    expect(AmendWorkflowInputSchema.parse(input)).toEqual(input);
     expect(AmendWorkflowInputSchema.parse({ ...input, subagent_model: null })).toEqual({
       ...input,
       subagent_model: null,
     });
-    expect(AmendWorkflowInputSchema.parse({ ...input, subagent_model: "  zhipu/glm-5.3  " })).toEqual(
-      { ...input, subagent_model: "zhipu/glm-5.3" },
-    );
+    expect(
+      AmendWorkflowInputSchema.parse({ ...input, subagent_model: "  zhipu/glm-5.3  " }),
+    ).toEqual({ ...input, subagent_model: "zhipu/glm-5.3" });
     expect(AmendWorkflowInputSchema.safeParse({ ...input, subagent_model: "   " }).success).toBe(
       false,
     );
@@ -103,13 +123,11 @@ describe("AmendWorkflowInputSchema", () => {
   it("takes the revision either inline or as a file, and carries the resolved line offset", () => {
     const byPath = { run_id: "dwfrun-prev", path: ".zcode/workflow-drafts/x.dwf.ts" };
     expect(AmendWorkflowInputSchema.parse(byPath)).toEqual(byPath);
-    // 「两个都不给」是合法的：沿用前驱的脚本（Keeping the predecessor's script）。
-    expect(AmendWorkflowInputSchema.safeParse({ run_id: "dwfrun-prev" }).success).toBe(true);
     const resolved = { ...byPath, script: SCRIPT, script_line_offset: 4 };
     expect(AmendWorkflowInputSchema.parse(resolved)).toEqual(resolved);
-    expect(
-      AmendWorkflowInputSchema.safeParse({ ...byPath, script_line_offset: -1 }).success,
-    ).toBe(false);
+    expect(AmendWorkflowInputSchema.safeParse({ ...byPath, script_line_offset: -1 }).success).toBe(
+      false,
+    );
   });
 
   it("keeps predecessor out of the model-facing JSON schema", () => {
@@ -131,9 +149,6 @@ describe("AmendWorkflowInputSchema", () => {
     ]);
     // `run_id` 是唯一必填：来源至多一个由 validateInput 强制，schema 表达不了 refinement。
     expect(schema.required).toEqual(["run_id"]);
-    expect(schema.required).not.toContain("name");
-    // 回填的行偏移与 `predecessor` 同一姿态：运行时认它，模型面不列它。
-    expect(Object.keys(schema.properties ?? {})).not.toContain("script_line_offset");
     expect(schema.additionalProperties).toBe(false);
   });
 });

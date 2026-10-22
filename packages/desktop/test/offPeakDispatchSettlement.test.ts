@@ -31,6 +31,17 @@ function makeDeps() {
 }
 
 describe("settleOffPeakDispatchResult", () => {
+  it("生命周期已由 Host 接纳时，迟到派发确认不能覆写等待新票状态", async () => {
+    const state = makeDeps();
+    await settleOffPeakDispatchResult(state.deps, {
+      type: "offpeak-dispatch-result",
+      offPeakTaskId: "task",
+      ok: true,
+      lifecycleManaged: true,
+    });
+    expect(state.repo.markRunning).not.toHaveBeenCalled();
+    expect(state.repo.releaseClaim).not.toHaveBeenCalled();
+  });
   it("permanent 错误直接转 failed 并清除退避", async () => {
     const state = makeDeps();
     state.retryAt.set("task-1", NOW + 10_000);

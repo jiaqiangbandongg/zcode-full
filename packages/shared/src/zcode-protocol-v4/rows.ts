@@ -43,10 +43,12 @@ export type RowActions = NonNullable<z.infer<typeof rowActionsSchema>>;
 // workflow 轮的行级元数据拆到了 workflow-row-meta.ts（max-lines）；名字在此原样再导出。
 export {
   backgroundResultOriginMetaSchema,
+  workflowBlockedMetaSchema,
   workflowLaunchMetaSchema,
   workflowNotificationMetaSchema,
   workflowSettingsAmendMetaSchema,
   type BackgroundResultOriginMeta,
+  type WorkflowBlockedMeta,
   type WorkflowLaunchMeta,
   type WorkflowNotificationMeta,
   type WorkflowSettingsAmendMeta,

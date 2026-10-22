@@ -18,6 +18,10 @@ process.stdin.on("data", (chunk) => {
     const message = JSON.parse(line);
     if (message.method !== "session/list" || message.id === undefined) continue;
     send({ id: message.id, result: { sessions: [] } });
+    const uiResult = { sessionId: "background", toolCallId: "open", serverName: "plugin:editor:editor", ui: { pluginId: "editor@example", resourceUri: "ui://editor" } };
+    send({ method: "v4/plugin-ui/tool-result", params: { ...uiResult, extra: true } });
+    send({ method: "v4/plugin-ui/tool-result", params: { ...uiResult, ui: { ...uiResult.ui, isError: true } } });
+    send({ method: "v4/plugin-ui/tool-result", params: uiResult });
     const event = {
       kind: "memory",
       arch: "x64",
@@ -59,6 +63,8 @@ describe("ZCodeAgentService MCP telemetry", () => {
     const service = createZCodeAgentService({
       commandResolver: () => ({ command: process.execPath, args: [scriptPath] }),
     });
+    const uiResults: unknown[] = [];
+    const uiSubscription = service.onDynamicPluginUiToolResult()((value) => uiResults.push(value));
     const events: ZCodeMcpTelemetryEvent[] = [];
     const subscription = service.onDynamicMcpTelemetry()((event) => events.push(event));
 
@@ -66,6 +72,16 @@ describe("ZCodeAgentService MCP telemetry", () => {
       await service.listSessions({ workspacePath });
       await new Promise((resolve) => setTimeout(resolve, 20));
 
+      await expect.poll(() => uiResults.length).toBe(1);
+      expect(uiResults).toEqual([
+        {
+          workspacePath,
+          sessionId: "background",
+          toolCallId: "open",
+          serverName: "plugin:editor:editor",
+          ui: { pluginId: "editor@example", resourceUri: "ui://editor" },
+        },
+      ]);
       expect(events).toEqual([
         {
           arch: "x64",
@@ -85,6 +101,7 @@ describe("ZCodeAgentService MCP telemetry", () => {
       ]);
     } finally {
       subscription.dispose();
+      uiSubscription.dispose();
       await service.disposeAllAndWait();
     }
   });

@@ -4,7 +4,7 @@ import {
   prepareIncomingMessageCapability,
   switchIncomingMessageCapability,
 } from "../helpers/incoming-message-capability.js";
-import { TID_CHAT_ASSISTANT_HISTORY_TRIGGER, TID_V4_TIMELINE } from "@zcode/shared";
+import { TID_CHAT_ASSISTANT_HISTORY_TRIGGER, TID_V4_TIMELINE } from "@zcode/shared/test-ids";
 import {
   clearAppData,
   readSettings,

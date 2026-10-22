@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld("__ZCODE_DEVICE_ID__", parseDeviceIdFromArgs());
 import type {
   AppSettings,
   ApplicationIconRequest,
+  BindRemoteWorkspaceSessionContextResult,
+  BindRemoteWorkspaceSessionContextIpcResult,
   BrowserViewOperationPayload,
   BrowserGuestAttachResult,
   BrowserViewScreenshotSurfacePreparePayload,
@@ -56,6 +58,7 @@ import type {
   EmbeddedBrowserSitePermissionsSnapshot,
   Locale,
   OAuthStateRegistration,
+  WebRemoteControlAuthStateChange,
   OpenInEditorOptions,
   RemoteTarget,
   TaskNotificationPayload,
@@ -65,7 +68,7 @@ import type {
   RendererHeapSample,
   PostUpdateReleaseNotesPayload,
   RemoteSessionClosedEvent,
-  BotRemoteWorkspaceReconnectedEvent,
+  RemoteSessionReconnectedEvent,
   UpdateCheckResultPayload,
   UpdateStatePayload,
   ZCodeStdioTapDevState,
@@ -80,7 +83,6 @@ import type {
   WebRemoteControlReconnectWorkspaceRequest,
   WebRemoteControlReconnectWorkspaceResult,
   WebRemoteControlStatus,
-  WebRemoteControlTaskTarget,
   WebRemoteControlWorkspaceTarget,
   RemoteConnectionRuntimeLog,
   WindowControlsOverlayMetrics,
@@ -91,10 +93,12 @@ import type {
   ConfigureFinalArmsCustomEventE2ERequest,
   FinalArmsCustomEventE2EEntry,
 } from "@zcode/shared";
+import { unwrapRemoteWorkspaceBindResult } from "./remoteWorkspaceBindBridge.js";
 import {
   InternalChannels,
   PlatformChannels,
   formatZCodeRendererProcessName,
+  scopedServicePortPayloadSchema,
   shouldEnableE2ETestBridge,
 } from "@zcode/shared";
 import { createOAuthCallbackHandler } from "./oauthCallbackBridge.js";
@@ -262,15 +266,20 @@ contextBridge.exposeInMainWorld("zcode", {
     options: RemoteTarget,
     requestId?: string,
     context?: {
-      workspacePath: string;
+      workspacePath?: string;
       workspaceIdentity?: string;
       connectTrigger?: import("@zcode/shared").RemoteWorkspaceConnectTrigger;
+      confirmSourceServerInstall?: boolean;
     },
   ) =>
     ipcRenderer.invoke(PlatformChannels.ConnectRemote, {
       target: options,
       requestId,
       ...(context ? context : {}),
+    }),
+  requestSourceSettingsAttachment: (sourceServerId: string) =>
+    ipcRenderer.invoke(PlatformChannels.RequestSourceSettingsAttachment, {
+      sourceServerId,
     }),
   cancelPendingRemoteConnection: (requestId?: string): Promise<void> =>
     ipcRenderer.invoke(PlatformChannels.CancelPendingRemoteConnection, {
@@ -280,12 +289,15 @@ contextBridge.exposeInMainWorld("zcode", {
     remoteSessionId: string;
     workspacePath: string;
     workspaceIdentity?: string;
-  }): Promise<void> =>
-    ipcRenderer.invoke(PlatformChannels.BindRemoteWorkspaceSessionContext, context),
+    workspacePurpose?: import("@zcode/shared").WorkspacePurpose;
+  }): Promise<BindRemoteWorkspaceSessionContextResult> =>
+    ipcRenderer
+      .invoke(PlatformChannels.BindRemoteWorkspaceSessionContext, context)
+      .then((result: BindRemoteWorkspaceSessionContextIpcResult) =>
+        unwrapRemoteWorkspaceBindResult(result),
+      ),
   startWebRemoteControl: (context: WebRemoteControlContext) =>
     ipcRenderer.invoke(PlatformChannels.StartWebRemoteControl, context),
-  refreshWebRemoteControlPairing: (context: WebRemoteControlContext) =>
-    ipcRenderer.invoke(PlatformChannels.ResetWebRemoteControlPairing, context),
   stopWebRemoteControl: (): Promise<void> =>
     ipcRenderer.invoke(PlatformChannels.StopWebRemoteControl),
   getWebRemoteControlStatus: () => ipcRenderer.invoke(PlatformChannels.GetWebRemoteControlStatus),
@@ -316,6 +328,9 @@ contextBridge.exposeInMainWorld("zcode", {
   /** 打开系统目录选择框，返回选中路径或 null */
   selectDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke(PlatformChannels.SelectDirectory),
+  /** 打开系统多目录选择框；取消时返回空数组 */
+  selectDirectories: (): Promise<string[]> =>
+    ipcRenderer.invoke(PlatformChannels.SelectDirectories),
   /** 打开系统文件选择框，返回选中文件路径或 null */
   selectFile: (): Promise<string | null> => ipcRenderer.invoke(PlatformChannels.SelectFile),
   /** 打开系统多文件选择框，返回选中文件路径；取消时返回空数组 */
@@ -353,15 +368,12 @@ contextBridge.exposeInMainWorld("zcode", {
     ipcRenderer.on(PlatformChannels.RemoteSessionClosed, handler);
     return () => ipcRenderer.removeListener(PlatformChannels.RemoteSessionClosed, handler);
   },
-  /** 订阅 Bot 触发的远程 workspace 重连成功事件，返回 disposer */
-  onBotRemoteWorkspaceReconnected: (
-    callback: (event: BotRemoteWorkspaceReconnectedEvent) => void,
-  ) => {
+  /** 订阅 Source 自动重连后的 logical session 换代事件。 */
+  onRemoteSessionReconnected: (callback: (event: RemoteSessionReconnectedEvent) => void) => {
     const handler = (_event: unknown, payload: unknown) =>
-      callback(payload as BotRemoteWorkspaceReconnectedEvent);
-    ipcRenderer.on(PlatformChannels.BotRemoteWorkspaceReconnected, handler);
-    return () =>
-      ipcRenderer.removeListener(PlatformChannels.BotRemoteWorkspaceReconnected, handler);
+      callback(payload as RemoteSessionReconnectedEvent);
+    ipcRenderer.on(PlatformChannels.RemoteSessionReconnected, handler);
+    return () => ipcRenderer.removeListener(PlatformChannels.RemoteSessionReconnected, handler);
   },
   /** 检查目录是否已在其他窗口打开 */
   activateOrSetWorkspace: (path: string): Promise<{ activated: boolean }> =>
@@ -371,9 +383,6 @@ contextBridge.exposeInMainWorld("zcode", {
   /** 同步当前窗口里 Web 远程控制允许切换的 workspace */
   syncWebRemoteControlWorkspaces: (workspaces: WebRemoteControlWorkspaceTarget[]) =>
     ipcRenderer.send(PlatformChannels.SyncWebRemoteControlWorkspaces, workspaces),
-  /** 同步当前窗口里 Web 远程控制可展示的 task 快照 */
-  syncWebRemoteControlTasks: (tasks: WebRemoteControlTaskTarget[]) =>
-    ipcRenderer.send(PlatformChannels.SyncWebRemoteControlTasks, tasks),
   onWebRemoteControlReconnectWorkspace: (
     callback: (
       request: WebRemoteControlReconnectWorkspaceRequest,
@@ -693,6 +702,8 @@ contextBridge.exposeInMainWorld("zcode", {
   /** 从权限浮窗拖拽 Helper.app 到 macOS 权限列表。必须是 send —— invoke 的往返会错过手势。 */
   startCuaHelperPermissionDrag: () =>
     ipcRenderer.send(PlatformChannels.StartCuaHelperPermissionDrag),
+  notifyWebRemoteControlAuthStateChanged: (change: WebRemoteControlAuthStateChange) =>
+    ipcRenderer.send(PlatformChannels.WebRemoteControlAuthStateChanged, change),
   /** 上报 OAuth state 用于 deep link 路由 */
   registerOAuthState: (payload: OAuthStateRegistration) =>
     ipcRenderer.send(PlatformChannels.OAuthRegisterState, payload),
@@ -890,7 +901,8 @@ contextBridge.exposeInMainWorld("zcode", {
   /** 用户确认重启安装更新 */
   quitAndInstallUpdate: () => ipcRenderer.invoke(PlatformChannels.QuitAndInstallUpdate),
   /** 获取已安装的编辑器/终端列表（含图标） */
-  getInstalledEditors: () => ipcRenderer.invoke(PlatformChannels.GetInstalledEditors),
+  getInstalledEditors: (filePath?: string) =>
+    ipcRenderer.invoke(PlatformChannels.GetInstalledEditors, filePath),
   getApplicationIcon: (request: string | ApplicationIconRequest) =>
     ipcRenderer.invoke(PlatformChannels.GetApplicationIcon, request),
   /** 用指定编辑器打开路径 */
@@ -930,29 +942,42 @@ ipcRenderer.on(InternalChannels.ServicePort, (event, payload: unknown) => {
   else port?.close();
 });
 
+ipcRenderer.on(InternalChannels.ScopedServicePort, (event, payload: unknown) => {
+  const [port] = event.ports;
+  const parsed = scopedServicePortPayloadSchema.safeParse(payload);
+  if (!port || !parsed.success) return;
+  // Bug 根因：这里曾用手工字段白名单重建 payload；Main 新增 workspace scope 后
+  // Preload 未同步白名单，Renderer 因而把 project logical session 原地绑定成 conversation。
+  window.postMessage(
+    {
+      type: InternalChannels.ScopedServicePort,
+      ...parsed.data,
+    },
+    "*",
+    [port],
+  );
+});
+
 ipcRenderer.on(
-  InternalChannels.ScopedServicePort,
+  InternalChannels.SourceSettingsServicePort,
   (
     event,
     payload: {
       attachmentId?: string;
-      sessionId?: string;
-      target?: RemoteTarget;
+      sourceServerId?: string;
     },
   ) => {
     const [port] = event.ports;
-    if (port) {
-      window.postMessage(
-        {
-          type: InternalChannels.ScopedServicePort,
-          attachmentId: payload.attachmentId,
-          sessionId: payload.sessionId,
-          target: payload.target,
-        },
-        "*",
-        [port],
-      );
-    }
+    if (!port) return;
+    window.postMessage(
+      {
+        type: InternalChannels.SourceSettingsServicePort,
+        attachmentId: payload.attachmentId,
+        sourceServerId: payload.sourceServerId,
+      },
+      "*",
+      [port],
+    );
   },
 );
 

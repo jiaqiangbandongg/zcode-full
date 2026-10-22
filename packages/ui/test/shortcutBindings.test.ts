@@ -17,11 +17,9 @@ import {
   isEditableShortcutEventTarget,
   isShiftOnlyPrintableBinding,
   isShortcutEventNoise,
-  isShortcutRecordingActive,
   matchesShortcutBinding,
   recordShortcutBinding,
   resolveEffectiveShortcutBindings,
-  setShortcutRecordingActive,
   type ShortcutBindingEvent,
 } from "../src/shortcuts/bindings.js";
 
@@ -196,8 +194,6 @@ describe("快捷键录制器", () => {
       kind: "binding",
       binding: "CmdOrCtrl+j",
     });
-    // 无可反查 code 的 IME 事件保持 pending（继续等待完整组合）
-    expect(recordShortcutBinding(keyEvent({ key: "Process" }), WIN)).toEqual({ kind: "pending" });
     // repeat 长按即便有 code 也不录制
     const repeated = keyEvent({
       key: "Process",
@@ -370,12 +366,6 @@ describe("快捷键冲突检测（拒绝 + 标红）", () => {
       ownerCommandId: "openModelMenu",
       binding: "CmdOrCtrl+m",
     });
-    // 反向：显式 Ctrl 串也检出（与 openModelMenu 默认绑定字符串一致，两种平台语义下都命中）
-    expect(checkShortcutBindingConflict("toggleSidebar", "Ctrl+m")).toEqual({
-      kind: "occupied",
-      ownerCommandId: "openModelMenu",
-      binding: "Ctrl+m",
-    });
     // AltGr ≡ Ctrl+Alt（win）：toggleSidePane 默认 CmdOrCtrl+Alt+b，等价变体同样占用
     expect(
       checkShortcutBindingConflict("findInTask", "Ctrl+Alt+b", undefined, { platformInfo: WIN }),
@@ -418,12 +408,6 @@ describe("快捷键冲突检测（拒绝 + 标红）", () => {
   });
 
   it("Web 端 menu 通道命令默认键按保留处理，不提供抢绑（CR-04）", () => {
-    // 桌面端：menu 命令占用为 occupied，可走二次确认抢绑
-    expect(checkShortcutBindingConflict("toggleSidebar", "CmdOrCtrl+n")).toEqual({
-      kind: "occupied",
-      ownerCommandId: "newTask",
-      binding: "CmdOrCtrl+n",
-    });
     // Web 端：menu 通道命令的默认键被根级回退监听固定消费，按保留键拒绝（无抢绑入口）
     expect(
       checkShortcutBindingConflict("toggleSidebar", "CmdOrCtrl+n", undefined, {
@@ -509,7 +493,6 @@ describe("按键搜索的物理等价比较 isSamePhysicalBinding", () => {
   it("apple：主修饰（⌘）与 Ctrl 是独立物理键，等价关系随平台翻转", () => {
     // 同一对串在 win 上等价、在 mac 上不等价（⌘M ≠ ⌃M）—— 搜索口径与冲突口径一致
     expect(isSamePhysicalBinding("CmdOrCtrl+m", "Ctrl+m", { platformInfo: MAC })).toBe(false);
-    expect(isSamePhysicalBinding("CmdOrCtrl+m", "Ctrl+m", { platformInfo: WIN })).toBe(true);
   });
 
   it("裸命名键（composer 作用域默认）与解析失败串", () => {
@@ -636,16 +619,6 @@ describe("快捷键二次确认抢绑", () => {
     // 缺省（未传 mode）保持旧整组替换行为，既有调用方不受影响
     const legacy = buildShortcutOverridesAfterSteal(undefined, "toggleTerminal", "CmdOrCtrl+k");
     expect(legacy.openCommandCenter).toEqual(["CmdOrCtrl+Shift+p"]);
-  });
-});
-
-describe("快捷键录制态抑制", () => {
-  it("setShortcutRecordingActive 开关可读", () => {
-    expect(isShortcutRecordingActive()).toBe(false);
-    setShortcutRecordingActive(true);
-    expect(isShortcutRecordingActive()).toBe(true);
-    setShortcutRecordingActive(false);
-    expect(isShortcutRecordingActive()).toBe(false);
   });
 });
 

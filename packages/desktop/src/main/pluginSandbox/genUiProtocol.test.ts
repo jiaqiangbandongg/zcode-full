@@ -9,7 +9,7 @@ function fixture(kind: "gen-ui" | "mcp-app", html = fragment, missing = false) {
   const instance = { runtimeId: "a", generation: 1, token: "one", appIdentity: "a".repeat(64) };
   const handle = registry.register({
     instance,
-    contentKind: kind,
+    contentKind: kind === "gen-ui" ? kind : undefined,
     ownerWebContentsId: 1,
     workspacePath: "/repo",
     sessionId: "s",

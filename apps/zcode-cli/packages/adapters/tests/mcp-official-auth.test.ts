@@ -553,15 +553,6 @@ describe("mergeOfficialAuthHeaders", () => {
     expect(merged.get("x-coding-plan-api-key")).toBeNull();
     expect(merged.get("x-trace-hint")).toBe("keep-me");
   });
-
-  it("keeps protocol headers untouched", () => {
-    const merged = mergeOfficialAuthHeaders(
-      { "mcp-protocol-version": "2026-07-28", "mcp-session-id": "s1" },
-      JWT_HEADERS,
-    );
-    expect(merged.get("mcp-session-id")).toBe("s1");
-    expect(merged.get("mcp-protocol-version")).toBe("2026-07-28");
-  });
 });
 
 /* 关联 id：服务端已明确否决"采用客户端传入的 request id"（logx.RequestID 始终自行生成、

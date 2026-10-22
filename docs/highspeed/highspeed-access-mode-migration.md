@@ -184,7 +184,7 @@ selectionFallback: {
     reason: "highspeed_card_expired" | "highspeed_request_failed",
     providerErrorCode?: string,
   }>,
-  // 退回目标：发起方抽卡时的提交选择（会话原模型 + 档位）。缺省才退回 runtime 会话常驻选择。
+  // 退回目标：发起方抽卡时的提交选择（会话原模型 + 档位）；另保留接纳前的 Session 候选。
   target?: ModelSelection,
 }
 ```
@@ -192,15 +192,17 @@ selectionFallback: {
 加速卡声明 `[{ reason: "highspeed_card_expired", providerErrorCode: "3402" }, { reason: "highspeed_request_failed" }]`：
 卡过期按原因区分提示，其余任何失败（鉴权、限流、5xx、网络、超时、流中断）同样退回。
 
+退回目标由发送入口从该条用户消息的普通选择冻结为 `selectionFallback.target` 并显式传入；Core 在接纳该输入前复制普通 Session Selection，作为声明目标缺失或不可解析时的第二候选。这是加速卡专属回退快照；新输入可以更新 Session，错误处理不能重新读取 Session 来改变旧加速轮的回退目标。
+退回请求不再携带本次执行的 `requestDependencies`，即走用户自己的常规鉴权。
+
 CLI 侧只做纯匹配（`turn-execution-fallback.ts`，由 `turn-model-step.ts` 调用）：本轮 execution
 Selection 的 `providerId` 命中声明值，且失败归因未指向其他 provider 时，按规则顺序取首个命中项退回一次。
 **不按 provider id 前缀、模型名或错误文案硬编码**，这是 Todo142 的同一条纪律。退回原因由命中的规则
 给出，CLI 不自行解释错误码。
 
-退回目标先取声明的 `target`，再取 runtime 会话常驻 Session Selection。execution 作用域从不改写
-Session Selection，正常情况下两者相同；但会话常驻选择只存在于 runtime 内存，冷恢复落在 Registry
-刚就绪、账号权益未解析的窗口时它会校验失败而不绑定，之后只发加速轮也不会再绑定（见下方回归约束），
-所以发起方必须把抽卡时的提交选择作为 `target` 随声明下发。退回请求不再携带本次执行的
+退回目标先取声明的 `target`，再取接纳前固定的 Session Selection。接纳用户消息会将普通提交选择绑定
+到 Session，加速端点不进入 Session；后续消息不能改变当前加速轮已固定的候选。冷恢复时旧会话选择
+可能尚未绑定，所以发起方必须把抽卡时的提交选择作为 `target` 随声明下发。退回请求不再携带本次执行的
 `requestDependencies`，即走用户自己的常规鉴权。
 
 边界必须保持：

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-r3-uninstall",
+  "spec": "./test/e2e/conversation-session/conversation-session-r3-uninstall.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-r3-uninstall.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "r3-uninstall-title",
+      "metadata": {
+        "kind": "common",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "标题不属于冷恢复断言。"
+      }
+    },
+    {
+      "id": "r3-uninstall-main",
+      "metadata": {
+        "kind": "main",
+        "timingPolicy": "fast-text",
+        "source": "synthetic",
+        "syntheticReason": "创建真实任务，验证保留数据卸载重装后原设备历史可见且可续聊；独立环境替换时旧任务保留在封存环境。"
+      }
+    }
+  ]
+}

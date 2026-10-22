@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CoreErrorType,
   PdfDocumentPortError,
-  createModelId,
-  createModelProviderId,
   createRootTraceContext,
   createSessionId,
   createToolCallId,
@@ -138,7 +136,7 @@ describe("Read PDF executor schema", () => {
     },
   );
 
-  it("does not fall back to session PDF support when the current turn snapshot is unknown", () => {
+  it("projects the PDF-disabled current turn model into the Read tool schema", () => {
     const runtime = createTestAgentRuntime(
       createSessionId("read-pdf-turn-snapshot"),
       {},

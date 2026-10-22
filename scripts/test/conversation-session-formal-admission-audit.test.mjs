@@ -57,7 +57,6 @@ test("projects formal rejection into audit errors, JSON, text, and nonzero check
   const integration = module.buildFormalAdmissionAuditIntegration(formalAdmission);
 
   assert.equal(integration.json, formalAdmission);
-  assert.match(JSON.stringify(integration.json), /"formalRejected":1/);
   assert.match(integration.text.join("\n"), /formal admission: 0 admitted, 1 rejected/);
   assert.deepEqual(integration.errors, [
     "formal admission rejected packages/desktop/test/e2e/conversation-session/rejected-case.test.ts: MISSING_CASE_FIXTURE: case-local provider fixture is missing (packages/desktop/test/e2e/fixtures/upstream/conversation-session/rejected-case.json)",

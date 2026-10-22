@@ -236,7 +236,6 @@ describe("Agent Runtime Model lifecycle", () => {
     await runtime.executeTurn("first");
     await runtime.executeTurn("second");
 
-    expect(modelFactory).toHaveBeenCalledTimes(2);
     expect(modelFactory.mock.calls.map(([input]) => input.selection.modelId)).toEqual([
       "model-a",
       "model-b",

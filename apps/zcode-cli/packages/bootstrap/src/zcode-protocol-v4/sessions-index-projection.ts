@@ -15,6 +15,7 @@ export interface SessionSummaryDeriveExtra {
   workspaceId: string;
   createdAt: number;
   lastActivityAt: number;
+  lastOutcome?: SessionSummary["lastOutcome"];
   parentSessionId?: string;
 }
 
@@ -27,6 +28,7 @@ export function deriveSessionSummary(
 ): SessionSummary {
   // 最后一条 assistantText row 的文本作预览（≤120 字符）。
   let lastAssistantPreview: string | undefined;
+  const lastOutcome = extra.lastOutcome;
   const rows = snapshot.rows.window;
   for (let i = rows.length - 1; i >= 0; i -= 1) {
     const row = rows[i];
@@ -79,6 +81,7 @@ export function deriveSessionSummary(
     ...(extra.parentSessionId ? { parentSessionId: extra.parentSessionId } : {}),
     title: snapshot.meta.title,
     titleSource: snapshot.meta.titleSource,
+    ...(lastOutcome ? { lastOutcome } : {}),
     phase: snapshot.control.phase,
     // 忠实透传 control.sessionEnded（语义：成功轮收口后即 true，不代表已删除）。
     sessionEnded: snapshot.control.sessionEnded,
@@ -108,6 +111,7 @@ function summariesEqual(a: SessionSummary, b: SessionSummary): boolean {
     a.parentSessionId === b.parentSessionId &&
     a.title === b.title &&
     a.titleSource === b.titleSource &&
+    a.lastOutcome === b.lastOutcome &&
     a.phase === b.phase &&
     a.sessionEnded === b.sessionEnded &&
     a.hasBackgroundWork === b.hasBackgroundWork &&

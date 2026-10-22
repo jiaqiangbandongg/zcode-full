@@ -21,6 +21,28 @@ macOS release DMG 是用户从浏览器下载后直接交给 Gatekeeper 评估�
 5. `scripts/notarize-macos.sh` 在严格 release 中还会通过 `ZCODE_MACOS_RELEASE_APP_PATH` 或 `ZCODE_DESKTOP_DIST_DIR` 定位打包出的 `ZCode.app`，复用 `scripts/doctor-macos-release-app.sh` 验收主 app；找不到 app 路径时 fail-closed。CUA/Helper release gate 额外设置 `ZCODE_CUA_REQUIRE_HELPER=1`，并显式验收最终 app 内 `Contents/Resources/cua-helper/ZCode Computer Use.app`；缺失时 fail-closed。
 6. `scripts/upload-oss.sh` 正式发布时只接受已完成上述流程的 `*.dmg`。
 
+### 临时 keychain 搜索列表约束
+
+同一 macOS 用户下的 shell runner 共享用户级搜索列表。每个 job 的 keychain 文件独立，
+但列表的读取、净化和增删必须在现有共享锁内完成，不使用 job 启动时的快照覆盖列表。
+
+- `security list-keychains -d user` 输出带缩进和外层双引号；先去掉行首、行尾空白，再剥一层外部引号，
+  保留路径内部的空格。只保留存在的绝对文件路径，按完整路径去重并保持原顺序。
+- 若用户的 `login.keychain-db` 文件存在但列表中缺失，将其补到列表末尾，恢复被旧脚本污染的默认项。
+  这不代替证书链和私钥访问权限检查。
+- 添加必须幂等；清理只移除当前 job 的路径，保留其他 job 的有效条目；无剩余条目时明确写入空列表。读取列表失败时禁止回写，
+  释放锁并报告失败，不能将读取失败当成空列表。
+- 回归测试使用 Bash 执行实际 CI 函数，以模拟命令提供带缩进的列表及读写失败，禁止访问真实钥匙串。
+  覆盖污染恢复、空格路径、去重、交错增删和锁释放；真实 runner 还需验证 arm64/x64 并发签名。
+
+```text
+获取共享锁 → 读取当前列表 → 解析并净化 → 增删自身条目 → 回写 → 释放锁
+                         └ 读取失败 → 不回写 → 释放锁并失败
+```
+
+此约束只保护遵守同一锁协议的脚本。旧分支脚本仍可能覆盖列表，需更新脚本或隔离 runner 用户。
+不按目录年龄自动删除临时 keychain，避免误删仍在构建的 job 资源。
+
 ## Computer Use Helper 的独立签名与架构约束
 
 `ZCode Computer Use.app` 虽随主 app 打包并在运行时复制到用户目录，仍是独立的 TCC 责任主体（bundle id

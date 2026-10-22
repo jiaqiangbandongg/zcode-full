@@ -1,14 +1,8 @@
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
-  TID_AUTOMATIONS_OPEN,
   TID_AUTOMATIONS_PAGE_TAB,
-  TID_CHAT_SUMMARY_PANEL,
   TID_CHAT_WORKFLOW_RUN_DIGEST,
-  TID_CONFIRM_DIALOG_CONFIRM,
-  TID_TASK_ITEM,
-  TID_V4_COMPOSER_BACKGROUND_WORK_TRIGGER,
-  TID_V4_TIMELINE,
   TID_WORKFLOW_ACTION_DELETE,
   TID_WORKFLOW_ACTION_MOVE,
   TID_WORKFLOW_ARTIFACT_CARD,
@@ -19,10 +13,12 @@ import {
   TID_WORKFLOW_DETAIL,
   TID_WORKFLOW_DETAIL_DESCRIPTION,
   TID_WORKFLOW_DETAIL_MENU,
+  TID_WORKFLOW_DETAIL_PROJECT,
   TID_WORKFLOW_GLOBAL_GROUP,
   TID_WORKFLOW_LAUNCH_ARG,
   TID_WORKFLOW_LAUNCH_DIALOG,
   TID_WORKFLOW_LAUNCH_ERROR,
+  TID_WORKFLOW_LAUNCH_FIELDS,
   TID_WORKFLOW_LAUNCH_SUBMIT,
   TID_WORKFLOW_META_SAVE,
   TID_WORKFLOW_MOVE_DIALOG,
@@ -30,8 +26,16 @@ import {
   TID_WORKFLOW_PROJECT_GROUP,
   TID_WORKFLOWS_CREATE_VIA_CHAT,
   TID_WORKFLOWS_EMPTY,
-  testId,
 } from "@zcode/shared";
+import {
+  TID_AUTOMATIONS_OPEN,
+  TID_CHAT_SUMMARY_PANEL,
+  TID_CONFIRM_DIALOG_CONFIRM,
+  TID_TASK_ITEM,
+  TID_V4_COMPOSER_BACKGROUND_WORK_TRIGGER,
+  TID_V4_TIMELINE,
+  testId,
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -46,6 +50,8 @@ import {
   waitForUserMessageContaining,
 } from "./helpers/conversation-session.js";
 import { getV4ComposerBackgroundWorkCounts } from "./helpers/v4-conversation.js";
+import { readDynamicWorkflowGrayMockStatus } from "#e2e/helpers/dynamic-workflow-gray";
+import { startDraftFromProject } from "#e2e/helpers/project-sidebar";
 
 const WORKFLOW_NAME = "release-check";
 const WORKFLOWS_DIR = join(DEFAULT_WORKSPACE, ".zcode", "workflows");
@@ -76,6 +82,22 @@ interface GroupHeaderInfo {
   createTestId: string | null;
 }
 
+beforeEach(async () => {
+  // Bug 原因：worker 延后统一清理，前一条 case 的自动化页和编译失败弹窗仍在。
+  // 先关闭弹窗并从默认项目新建任务；全局新建入口会进入无项目草稿，无法满足准备流程。
+  const launchDialog = $(`[data-testid="${TID_WORKFLOW_LAUNCH_DIALOG}"]`);
+  if (await launchDialog.isDisplayed()) {
+    await browser.keys("Escape");
+    await launchDialog.waitForDisplayed({ reverse: true });
+  }
+  const automationsOpen = await browser.execute(() =>
+    Boolean(document.querySelector("[data-automations-content]")),
+  );
+  if (automationsOpen) {
+    await startDraftFromProject(DEFAULT_WORKSPACE);
+  }
+});
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -88,10 +110,18 @@ async function fileExists(path: string): Promise<boolean> {
 async function readTestIdText(currentTestId: string): Promise<string | null> {
   return browser.execute((tid) => {
     const element = Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
-      (item) => item.dataset.testid === tid,
+      (item) => item.dataset.testid === tid && item.checkVisibility(),
     );
     return element?.textContent?.trim() ?? null;
   }, currentTestId);
+}
+
+async function clickRunSidePaneControl(currentTestId: string): Promise<void> {
+  // Bug 原因：非活动侧栏页仍挂载；全局按 test id 取首项会操作前一条 case 的 run。
+  // 限定活动 tab，并通过真实指针点击，避免隐藏控件造成假通过或污染其他 run。
+  const control = $(`[role="tabpanel"][data-state="active"] [data-testid="${currentTestId}"]`);
+  await control.waitForClickable();
+  await control.click();
 }
 
 /**
@@ -115,8 +145,12 @@ describe("已保存工作流中枢 E2E", () => {
   it("预置的工作流可见，改说明只重写 frontmatter，删除后回到空态", async function () {
     this.timeout(150000);
 
-    // 只需要登录 + workspace 就绪即可进入自动化页，不需要配置模型 provider。
+    // 只需要 workspace 就绪即可进入自动化页，不需要账号或配置模型 provider。
     await prepareConversationE2E({ skipProvider: true });
+
+    const configStatus = await readDynamicWorkflowGrayMockStatus();
+    expect(configStatus.mode).toBe("alwaysOn");
+    expect(configStatus.configRequests).toBeGreaterThan(0);
 
     // 1) 打开自动化页，页标题切到「工作流」。
     await clickTestIdByDom(TID_AUTOMATIONS_OPEN, {
@@ -175,6 +209,34 @@ describe("已保存工作流中枢 E2E", () => {
     // 4) 点卡片进详情，改说明并保存。
     await clickTestIdByDom(cardTestId, { timeoutMsg: "无法点击工作流卡片进入详情" });
     await waitForTestIdByDom(TID_WORKFLOW_DETAIL, { timeoutMsg: "没有进入工作流详情页" });
+
+    // 4a) 面包屑只有「自动化 › 工作流名」两级：项目不是一页，不该占一级点不动的面包屑；
+    //     项目归属写在标题旁的小标上。
+    await waitForTestIdByDom(TID_WORKFLOW_DETAIL_PROJECT, {
+      timeoutMsg: "详情页标题旁没有项目归属小标",
+    });
+    expect(await readTestIdText(TID_WORKFLOW_DETAIL_PROJECT)).toBe("ZCodeProject");
+    const crumbs = (await browser.execute(() => {
+      const nav = document.querySelector('[data-testid="automations-main-drag-region"] nav');
+      return nav
+        ? Array.from(nav.querySelectorAll("li")).map((item) => ({
+            text: item.textContent?.trim() ?? "",
+            clickable: item.querySelector("button") !== null,
+          }))
+        : null;
+    })) as { text: string; clickable: boolean }[] | null;
+    expect(crumbs).toHaveLength(2);
+    expect(crumbs?.[1]?.text).toBe(WORKFLOW_NAME);
+    expect(crumbs?.map((crumb) => crumb.clickable)).toEqual([true, false]);
+
+    // 4b) 一级面包屑回到列表，卡片还在；再点卡片回到详情。
+    await clickTestIdByDom("settings-breadcrumb-section", {
+      timeoutMsg: "详情页没有可点的一级面包屑",
+    });
+    await waitForTestIdByDom(cardTestId, { timeoutMsg: "点一级面包屑后没有回到工作流列表" });
+    await clickTestIdByDom(cardTestId, { timeoutMsg: "无法再次点击工作流卡片进入详情" });
+    await waitForTestIdByDom(TID_WORKFLOW_DETAIL, { timeoutMsg: "没有再次进入工作流详情页" });
+
     await setInputValueByTestIdDom(TID_WORKFLOW_DETAIL_DESCRIPTION, EDITED_DESCRIPTION, {
       timeoutMsg: "详情页没有出现说明输入框",
     });
@@ -457,6 +519,87 @@ const LAUNCH_MODEL_SEED = [
   "",
 ].join("\n");
 
+// 实参很多的工作流（docs/dynamic-workflow/launch.md「The launch dialog」的三段式布局）：40 个声明
+// 的实参远高于视口，其中靠中间的一个是无默认值的必填项——既断言窗口不溢出、按钮够得着，也断言
+// 校验失败时那个字段被带进视野。每三个里有一个 boolean：开关在 form 里带一个绝对定位的隐藏原生
+// 控件，它曾经逃出实参滚动区、把窗口自身也撑出一条滚动条。脚本体是常量，本用例也从不真正启动它。
+const LAUNCH_MANY_NAME = "direct-launch-many-args";
+const LAUNCH_MANY_FILE = join(WORKFLOWS_DIR, `${LAUNCH_MANY_NAME}.dwf.ts`);
+const LAUNCH_MANY_COUNT = 40;
+const LAUNCH_MANY_REQUIRED = "arg20";
+const LAUNCH_MANY_SEED = [
+  "/* zcode-workflow",
+  "description: 实参很多的常量工作流（实参窗限高 E2E）",
+  "args:",
+  ...Array.from({ length: LAUNCH_MANY_COUNT }, (_, index) => {
+    const name = `arg${String(index).padStart(2, "0")}`;
+    if (name === LAUNCH_MANY_REQUIRED) {
+      return [`  ${name}:`, "    type: string", "    required: true"];
+    }
+    return index % 3 === 0
+      ? [`  ${name}:`, "    type: boolean", "    default: true"]
+      : [`  ${name}:`, "    type: string", `    default: v${index}`];
+  }).flat(),
+  "*/",
+  "return { ok: true };",
+  "",
+].join("\n");
+
+interface LaunchDialogGeometry {
+  viewportHeight: number;
+  dialogTop: number;
+  dialogBottom: number;
+  /** 提交按钮中心点上最上层的元素就是它自己（没被裁掉、没被盖住、在视口内）。 */
+  submitHit: boolean;
+  /** 窗口自身是否可滚：实参区之外不该再有第二条滚动条。 */
+  dialogScrolls: boolean;
+  fieldsClientHeight: number;
+  fieldsScrollHeight: number;
+  /** 指定实参控件是否完整落在滚动区的可视范围内。 */
+  argVisible: boolean;
+  argFocused: boolean;
+}
+
+/** 量实参窗：窗口与视口的关系、提交按钮是否点得到、滚动区的高度，以及某个实参控件的可见性。 */
+async function readLaunchDialogGeometry(argName: string): Promise<LaunchDialogGeometry | null> {
+  return browser.execute(
+    (dialogTid, fieldsTid, submitTid, argTid) => {
+      const byTestId = (tid: string) =>
+        Array.from(document.querySelectorAll<HTMLElement>("[data-testid]")).find(
+          (item) => item.dataset.testid === tid,
+        );
+      const dialog = byTestId(dialogTid);
+      const fields = byTestId(fieldsTid);
+      const submit = byTestId(submitTid);
+      const arg = byTestId(argTid);
+      if (!dialog || !fields || !submit || !arg) return null;
+      const dialogRect = dialog.getBoundingClientRect();
+      const submitRect = submit.getBoundingClientRect();
+      const fieldsRect = fields.getBoundingClientRect();
+      const argRect = arg.getBoundingClientRect();
+      const top = document.elementFromPoint(
+        submitRect.left + submitRect.width / 2,
+        submitRect.top + submitRect.height / 2,
+      );
+      return {
+        viewportHeight: window.innerHeight,
+        dialogTop: dialogRect.top,
+        dialogBottom: dialogRect.bottom,
+        submitHit: top !== null && submit.contains(top),
+        dialogScrolls: dialog.scrollHeight > dialog.clientHeight,
+        fieldsClientHeight: fields.clientHeight,
+        fieldsScrollHeight: fields.scrollHeight,
+        argVisible: argRect.top >= fieldsRect.top && argRect.bottom <= fieldsRect.bottom,
+        argFocused: document.activeElement === arg,
+      };
+    },
+    TID_WORKFLOW_LAUNCH_DIALOG,
+    TID_WORKFLOW_LAUNCH_FIELDS,
+    TID_WORKFLOW_LAUNCH_SUBMIT,
+    testId(TID_WORKFLOW_LAUNCH_ARG, argName),
+  );
+}
+
 /** 按前缀读某个 testid 元素的可见文本（启动卡 / 任务项的 testid 后缀是运行期才知道的 key）。 */
 async function readTestIdPrefixText(prefix: string): Promise<string | null> {
   return browser.execute((currentPrefix) => {
@@ -523,6 +666,7 @@ describe("直接启动 E2E", () => {
     await mkdir(WORKFLOWS_DIR, { recursive: true });
     await writeFile(LAUNCH_OK_FILE, LAUNCH_OK_SEED, "utf-8");
     await writeFile(LAUNCH_FAIL_FILE, LAUNCH_FAIL_SEED, "utf-8");
+    await writeFile(LAUNCH_MANY_FILE, LAUNCH_MANY_SEED, "utf-8");
     await writeFile(LAUNCH_MODEL_FILE, LAUNCH_MODEL_SEED, "utf-8");
     await writeFile(LAUNCH_SLEEP_FILE, LAUNCH_SLEEP_SEED, "utf-8");
     await writeFile(LAUNCH_SAVE_FILE, LAUNCH_SAVE_SEED, "utf-8");
@@ -684,6 +828,71 @@ describe("直接启动 E2E", () => {
     });
   });
 
+  it("实参很多的工作流：实参窗不溢出视口，实参区自己滚动，校验失败把出错字段带进视野", async function () {
+    this.timeout(150000);
+
+    await prepareConversationE2E({ skipProvider: true });
+
+    await clickTestIdByDom(TID_AUTOMATIONS_OPEN, { timeoutMsg: "侧栏没有出现自动化入口" });
+    await clickTestIdByDom(testId(TID_AUTOMATIONS_PAGE_TAB, "workflow"), {
+      timeoutMsg: "自动化页标题没有「工作流」切换",
+    });
+    await waitForTestIdByDom(testId(TID_WORKFLOW_CARD, LAUNCH_MANY_NAME), {
+      timeout: 20000,
+      timeoutMsg: "工作流列表没有出现实参很多的工作流卡片",
+    });
+    await clickTestIdByDom(testId(TID_WORKFLOW_CARD_RUN, LAUNCH_MANY_NAME), {
+      timeoutMsg: "实参很多的工作流卡片没有「运行」按钮",
+    });
+    await waitForTestIdByDom(TID_WORKFLOW_LAUNCH_DIALOG, {
+      timeout: 15000,
+      timeoutMsg: "点「运行」后没有弹出实参窗",
+    });
+    const tasksBefore = await countTaskItems();
+
+    // 1) 窗口整个在视口内，提交按钮点得到；实参区的内容比它的可视高度长，靠它自己滚动。
+    //    必填项在列表中段，此刻还在可视区之外。等开窗动画（缩放）结束后再量。
+    await browser.waitUntil(
+      async () => {
+        const geometry = await readLaunchDialogGeometry(LAUNCH_MANY_REQUIRED);
+        return (
+          geometry !== null &&
+          geometry.dialogTop >= 0 &&
+          geometry.dialogBottom <= geometry.viewportHeight &&
+          geometry.submitHit
+        );
+      },
+      { timeout: 15000, timeoutMsg: "实参很多时实参窗溢出了视口，或提交按钮点不到" },
+    );
+    const opened = await readLaunchDialogGeometry(LAUNCH_MANY_REQUIRED);
+    expect(opened?.fieldsScrollHeight ?? 0).toBeGreaterThan(opened?.fieldsClientHeight ?? 0);
+    expect(opened?.argVisible).toBe(false);
+    // 只有实参区这一条滚动条：窗口自身不可滚。
+    expect(opened?.dialogScrolls).toBe(false);
+
+    // 2) 必填项留空直接提交：校验失败，那个字段被滚进可视区并拿到焦点；按钮仍然点得到。
+    await clickTestIdByDom(TID_WORKFLOW_LAUNCH_SUBMIT, {
+      timeoutMsg: "实参窗没有「运行」提交按钮",
+    });
+    await browser.waitUntil(
+      async () => {
+        const geometry = await readLaunchDialogGeometry(LAUNCH_MANY_REQUIRED);
+        return geometry !== null && geometry.argVisible && geometry.argFocused;
+      },
+      { timeout: 15000, timeoutMsg: "校验失败后出错的必填字段没有被带进视野并聚焦" },
+    );
+    const revealed = await readLaunchDialogGeometry(LAUNCH_MANY_REQUIRED);
+    expect(revealed?.submitHit).toBe(true);
+    expect(revealed?.dialogScrolls).toBe(false);
+    expect(revealed?.dialogTop ?? -1).toBeGreaterThanOrEqual(0);
+
+    // 3) 校验失败不启动：实参窗留着，会话列表不新增。
+    await waitForTestIdByDom(TID_WORKFLOW_LAUNCH_DIALOG, {
+      timeoutMsg: "校验失败后实参窗被意外关闭",
+    });
+    expect(await countTaskItems()).toBe(tasksBefore);
+  });
+
   it("脚本点名的模型解不出来：实参窗行内显示 compile_failed 与那个名字的 9011，会话列表不新增", async function () {
     this.timeout(150000);
 
@@ -765,20 +974,23 @@ describe("直接启动 E2E", () => {
     //     长出一条 running 的运行行；sleep 脚本没有 phase() 标记，所以轨道是一个隐含站点。
     await browser.waitUntil(
       async () =>
-        browser.execute((prefix) => {
-          const rows = Array.from(
-            document.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`),
-          );
-          return rows.some((row) => {
-            const line = row.querySelector<HTMLElement>(
-              '[data-workflow-run-line][data-run-status="running"]',
+        browser.execute(
+          (prefix) => {
+            const rows = Array.from(
+              document.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`),
             );
-            return (
-              line !== null &&
-              line.querySelector('[data-workflow-run-rail][data-implicit="true"]') !== null
-            );
-          });
-        }, testId(TID_TASK_ITEM, "")),
+            return rows.some((row) => {
+              const line = row.querySelector<HTMLElement>(
+                '[data-workflow-run-line][data-run-status="running"]',
+              );
+              return (
+                line !== null &&
+                line.querySelector('[data-workflow-run-rail][data-implicit="true"]') !== null
+              );
+            });
+          },
+          testId(TID_TASK_ITEM, ""),
+        ),
       { timeout: 60000, timeoutMsg: "侧栏里发起工作流的会话行没有长出 running 的运行行" },
     );
 
@@ -855,9 +1067,10 @@ describe("直接启动 E2E", () => {
         browser.execute((selector) => {
           const row = document.querySelector<HTMLElement>(selector);
           return (
-            row?.querySelector('[data-workflow-island-line="name"] [data-workflow-run-elapsed]') !==
+            row !== null &&
+            row.querySelector('[data-workflow-island-line="name"] [data-workflow-run-elapsed]') !==
               null &&
-            row?.querySelector(
+            row.querySelector(
               '[data-workflow-island-line="phase"] [data-workflow-run-lamp="running"]',
             ) !== null
           );
@@ -867,15 +1080,18 @@ describe("直接启动 E2E", () => {
         timeoutMsg: "点开胶囊后「工作流」分区没有直接显示 run 行（名字 + 时长 / 灯 + 词两行）",
       },
     );
-    await $(rowSelector).moveTo();
+    // 面板展开会移动 run 行；按当前布局重新悬停，并确认真实 hover 后再检查 Stop。
     await browser.waitUntil(
-      async () =>
-        browser.execute((selector) => {
-          const stop = document.querySelector<HTMLElement>(
-            `${selector} [data-testid^="v4-background-work-cancel-"]`,
+      async () => {
+        await $(rowSelector).moveTo();
+        return browser.execute((selector) => {
+          const row = document.querySelector<HTMLElement>(selector);
+          const stop = row?.querySelector<HTMLElement>(
+            '[data-testid^="v4-background-work-cancel-"]',
           );
-          return stop !== null && getComputedStyle(stop).opacity === "1";
-        }, rowSelector),
+          return Boolean(row?.matches(":hover") && stop && getComputedStyle(stop).opacity === "1");
+        }, rowSelector);
+      },
       { timeout: 5000, timeoutMsg: "悬停 run 行时 Stop 没有出现" },
     );
   });
@@ -916,17 +1132,21 @@ describe("直接启动 E2E", () => {
     expect(await readTestIdText("workflow-run-concurrency")).toBeNull();
 
     // 3) Configure → 步进器减一 → 应用：只改界、run 在跑，就地生效（不另起 run）。
-    await clickTestIdByDom("workflow-run-configure", { timeoutMsg: "Configure 不可点击" });
+    await clickRunSidePaneControl("workflow-run-configure");
     await waitForTestIdByDom("workflow-run-settings-popover", {
       timeoutMsg: "点 Configure 后没有设置弹层",
     });
     // 步进器停在默认并发 D = max(4, min(16, 核数 − 2)) 上，减一总有可调小的余地。
-    const defaultBound = Number(await readTestIdText("workflow-run-settings-bound-value"));
+    // 控件已改成 input；textContent 恒为空，Number("") 会把默认界误读为 0。
+    const boundInput = $('[data-testid="workflow-run-settings-bound-value"]');
+    const defaultBound = Number(await boundInput.getValue());
+    expect(defaultBound).toBeGreaterThan(1);
     // 还没改：没有后果句（改动之前念哪一句都可能说错）。
     expect(await readTestIdText("workflow-run-settings-consequence")).toBe("");
     await clickTestIdByDom("workflow-run-settings-bound-decrease", {
       timeoutMsg: "设置弹层没有「降低最大并发数」",
     });
+    await expect(boundInput).toHaveValue(String(defaultBound - 1));
     // 只改界、run 在跑：后果句是「就地生效」，不是「将停止当前运行」。
     expect(await readTestIdText("workflow-run-settings-consequence")).toMatch(
       /^(立即应用到当前运行，不会新起一次运行。|Applies to this run right away; no new run is started\.)$/,
@@ -994,7 +1214,7 @@ describe("直接启动 E2E", () => {
     });
 
     // 3) 芯片直达中枢里那个工作流的详情页。
-    await clickTestIdByDom("workflow-saved-chip", { timeoutMsg: "「已保存」芯片不可点击" });
+    await clickRunSidePaneControl("workflow-saved-chip");
     await waitForTestIdByDom(TID_WORKFLOW_DETAIL, {
       timeout: 20000,
       timeoutMsg: "点芯片后没有进入工作流详情页",
@@ -1037,7 +1257,7 @@ describe("直接启动 E2E", () => {
     });
 
     // 6) 「保存」→ 弹层 → 按原样直接保存：不经模型回合，写下的是这次 run 实际执行的那一份脚本。
-    await clickTestIdByDom("workflow-save-open", { timeoutMsg: "「保存」不可点击" });
+    await clickRunSidePaneControl("workflow-save-open");
     await waitForTestIdByDom("workflow-save-popover", { timeoutMsg: "点「保存」后没有弹层" });
     await setInputValueByTestIdDom("workflow-save-name", LAUNCH_SAVE_NAME, {
       timeoutMsg: "保存弹层没有名称输入框",

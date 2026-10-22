@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   appendRemoteConnectionRuntimeLog,
+  normalizeRemoteConnectionLogMessage,
   shouldAcceptRemoteConnectionRuntimeLog,
   type RemoteConnectionLogEntry,
 } from "@/hooks/useRemoteConnectionLogs.js";
@@ -16,6 +17,30 @@ function createLogEntry(overrides: Partial<RemoteConnectionLogEntry>): RemoteCon
 }
 
 describe("remote connection log merge", () => {
+  it("preserves Source Server phases while removing generic process prefixes", () => {
+    expect(
+      normalizeRemoteConnectionLogMessage(
+        "[2026-08-19 12:00:00.000] [pid:123] [source-server:upload] upload progress (archive): 50.0%",
+      ),
+    ).toBe("[source-server:upload] upload progress (archive): 50.0%");
+  });
+
+  it("coalesces Source Server upload progress by phase and artifact", () => {
+    const current = [
+      createLogEntry({
+        id: "source-upload",
+        message: "[source-server:upload] upload progress (archive): 10.0%",
+      }),
+    ];
+    const next = appendRemoteConnectionRuntimeLog(current, {
+      id: "source-upload-next",
+      level: "info",
+      message: "[source-server:upload] upload progress (archive): 80.0%",
+      timestamp: "10:00:09",
+    });
+    expect(next).toHaveLength(1);
+    expect(next[0]?.message).toContain("80.0%");
+  });
   it("coalesces consecutive download progress lines into one row", () => {
     const currentLogs = [
       createLogEntry({
@@ -144,17 +169,11 @@ describe("remote connection log merge", () => {
   });
 
   it("filters remote connection logs by active request id", () => {
+    expect(shouldAcceptRemoteConnectionRuntimeLog({ requestId: "request-1" }, "request-1")).toBe(
+      true,
+    );
     expect(
-      shouldAcceptRemoteConnectionRuntimeLog(
-        { requestId: "request-1" },
-        "request-1",
-      ),
-    ).toBe(true);
-    expect(
-      shouldAcceptRemoteConnectionRuntimeLog(
-        { requestId: "background-request" },
-        "request-1",
-      ),
+      shouldAcceptRemoteConnectionRuntimeLog({ requestId: "background-request" }, "request-1"),
     ).toBe(false);
     expect(
       shouldAcceptRemoteConnectionRuntimeLog(
@@ -163,4 +182,17 @@ describe("remote connection log merge", () => {
       ),
     ).toBe(true);
   });
+});
+
+it("coalesces source archive progress while byte counts and speed change", () => {
+  const first = createLogEntry({
+    message: "[source-server:upload] upload progress: 10.0% (1.0/10.0 MB, 2.00 MB/s)",
+  });
+  const next = appendRemoteConnectionRuntimeLog([first], {
+    ...first,
+    id: "next",
+    message: "[source-server:upload] upload progress: 90.0% (9.0/10.0 MB, 3.00 MB/s)",
+  });
+  expect(next).toHaveLength(1);
+  expect(next[0]?.message).toContain("90.0%");
 });

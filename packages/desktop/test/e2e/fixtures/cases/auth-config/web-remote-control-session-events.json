@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "caseName": "web-remote-control-session-events",
+  "spec": "./test/e2e/web-remote-control-session-events.test.ts",
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerFixtures": [],
+  "fileFixtures": [
+    {
+      "kind": "app-config-seed",
+      "path": "~/.zcode/v2/credentials.json",
+      "purpose": "隔离 HOME 的合成 OAuth 登录与 loopback V2 配对；新设备保存和登出前分别制造 setting.json 写入故障，验证注册补偿终态、手动恢复及凭据事件关闭旧连接。"
+    }
+  ],
+  "requests": []
+}

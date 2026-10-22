@@ -21,3 +21,6 @@ packages/**/tests/**/*.d.ts.map
 .VSCodeCounter
 vendor
 !packages/visualize-plugin/skills/visualize/assets/vendor/
+
+# Lowering 的人工可审查契约快照不是 tsc 产物，干净 checkout 也必须可运行测试。
+!packages/dynamic-workflow/tests/lowering/expected/*.js

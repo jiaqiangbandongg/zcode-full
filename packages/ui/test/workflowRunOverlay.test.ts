@@ -182,7 +182,7 @@ describe("workflowRunOverlay animatedEdges", () => {
     ).toBe(true);
   });
 
-  it("终态 run 关闭边动画", () => {
+  it("只有 settled 节点时关闭边动画", () => {
     expect(
       workflowRunOverlay(
         runWith([{ siteId: "ask#1", ordinal: 1, phase: "settled", outcome: "ok" }], {

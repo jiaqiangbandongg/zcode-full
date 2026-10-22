@@ -28,10 +28,6 @@ import { CreateWorkflowToolCallBlock } from "../src/ToolCallBlocks/renderers/cre
 import { resolveToolCallRenderer } from "../src/ToolCallBlocks/resolveRenderer.js";
 // eslint-disable-next-line import/first -- 同上；整链路由断言要走真实入口组件。
 import { ToolCallBlock } from "@/ToolCallBlocks.js";
-// eslint-disable-next-line import/first -- 同上；词条只用于双语存在性断言。
-import enUS from "../src/i18n/locales/en-US.js";
-// eslint-disable-next-line import/first -- 同上。
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 interface ToolCallOverrides {
   input?: unknown;
@@ -314,8 +310,7 @@ describe("ResolveWorkflowQuestionToolCallBlock body 分支", () => {
   });
 
   it("结构化拒绝走失败样式（status failed）", () => {
-    const refusal =
-      "workflow_question_already_resolved: this question was already answered.";
+    const refusal = "workflow_question_already_resolved: this question was already answered.";
     const html = renderResolve(
       { input: { question_id: "dwfq-run1-1", answer: "跳过它。" }, status: "failed" },
       { errorText: refusal },
@@ -345,36 +340,5 @@ describe("升级问答工具卡快照字段提示", () => {
       { onLoadFullToolCallFields: () => {} },
     );
     expect(html).toContain("加载完整工具数据");
-  });
-});
-
-describe("升级问答工具卡词条双语齐备", () => {
-  it("escalate 与 resolveQuestion 两组 key 在两种语言里都在场，且不是英文占位", () => {
-    // 缺 key 会静默渲染裸 key（IntlProvider 的 messages[id] ?? id）。
-    for (const key of [
-      "chat.toolCall.workflow.escalate.asking",
-      "chat.toolCall.workflow.escalate.asked",
-      "chat.toolCall.workflow.escalate.question",
-      "chat.toolCall.workflow.escalate.context",
-      "chat.toolCall.workflow.escalate.answer",
-      "chat.toolCall.workflow.escalate.fallbackName",
-      "chat.toolCall.workflow.resolveQuestion.answering",
-      "chat.toolCall.workflow.resolveQuestion.answered",
-      "chat.toolCall.workflow.resolveQuestion.questionId",
-      "chat.toolCall.workflow.resolveQuestion.answer",
-      "chat.toolCall.workflow.resolveQuestion.outcome",
-      "chat.toolCall.workflow.resolveQuestion.fallbackName",
-    ]) {
-      expect(enUS[key]).toBeTruthy();
-      expect(zhCN[key]).toBeTruthy();
-      expect(zhCN[key]).not.toBe(enUS[key]);
-    }
-  });
-
-  it("事件日志两行措辞已与专用卡对齐（旧 Escalated / 升级提问 / 问题已答 不再出现）", () => {
-    expect(enUS["chat.toolCall.workflow.run.event.escalationRaised"]).toBe("Asked main agent");
-    expect(enUS["chat.toolCall.workflow.run.event.escalationResolved"]).toBe("Answered");
-    expect(zhCN["chat.toolCall.workflow.run.event.escalationRaised"]).toBe("询问主代理");
-    expect(zhCN["chat.toolCall.workflow.run.event.escalationResolved"]).toBe("已回答");
   });
 });

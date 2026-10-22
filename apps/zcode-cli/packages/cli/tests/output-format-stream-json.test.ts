@@ -91,6 +91,9 @@ test("stream-json writes one line per event, then a tagged result line", async (
   assert.equal(code, 0);
 
   const lines = ctx.stdout.output().trim().split("\n");
+  for (const line of lines) {
+    assert.doesNotThrow(() => JSON.parse(line), `not valid JSON on its own: ${line}`);
+  }
   // Two events plus the summary. If anything pretty-printed its JSON this count
   // would balloon — which is the bug this test exists to catch.
   assert.equal(lines.length, 3);
@@ -109,14 +112,6 @@ test("stream-json writes one line per event, then a tagged result line", async (
   assert.equal(summary.response, "the answer");
   assert.equal(summary.sessionId, "session-test");
   assert.equal(summary.eventCount, 2);
-});
-
-test("every stream-json line parses on its own", async () => {
-  const ctx = createContext(["--output-format", "stream-json", "--prompt", "hi"]);
-  await run(ctx, createDeps());
-  for (const line of ctx.stdout.output().trim().split("\n")) {
-    assert.doesNotThrow(() => JSON.parse(line), `not valid JSON on its own: ${line}`);
-  }
 });
 
 test("--output-format json prints the summary, not plain text", async () => {

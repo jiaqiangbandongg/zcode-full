@@ -12,12 +12,11 @@ import {
   TID_SETTINGS_SECTION_NAV,
   TID_TASK_SETTINGS_BUTTON,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,
   DEFAULT_WORKSPACE,
-  ensureWorkspaceItemExpanded,
   getE2EAppDataPaths,
 } from "../helpers/desktop-app.js";
 import { restartIntoWorkspacePreservingProfile } from "../helpers/model-provider-restart.js";
@@ -28,6 +27,7 @@ import {
   waitForV4Pane,
   waitForV4TimelineContaining,
 } from "../helpers/v4-conversation.js";
+import { ensureProjectExpanded } from "../helpers/project-sidebar.js";
 
 const CASE_TIMEOUT_MS = 240_000;
 const BEFORE_MARKER = "E2E_CDD01_BEFORE_MIGRATION";
@@ -107,7 +107,7 @@ describe("CDD01：修改数据存储路径后原任务仍可继续", () => {
     // CDD01 的临时产品边界是保存后不再发起任何写操作并立即完整重启；
     // 这条测试约束不能冒充 busy guard 或 pending-restart write block 已实现。
     await restartIntoWorkspacePreservingProfile();
-    await ensureWorkspaceItemExpanded(DEFAULT_WORKSPACE);
+    await ensureProjectExpanded(DEFAULT_WORKSPACE);
     await selectV4TaskById(sessionId);
     await waitForV4TimelineContaining(BEFORE_MARKER, 60_000);
     await waitForV4TimelineContaining(BEFORE_REPLY, 60_000);

@@ -21,6 +21,11 @@ import { app, nativeImage } from "electron";
 import type { EditorInfo } from "@zcode/shared";
 import { getZCodeDataRootDir } from "@zcode/services/node";
 import { logger } from "./logger.js";
+import {
+  getFileApplicationDefs,
+  matchesFileApplication,
+  resolveFileApplicationPath,
+} from "@desktop/main/fileApplications.js";
 
 const require = createRequire(import.meta.url);
 const WINDOWS_EXPLORER_PATH = pathWin32.join(process.env.WINDIR ?? "C:/Windows", "explorer.exe");
@@ -326,14 +331,14 @@ const WINDOWS_ADDITIONAL_EDITOR_DEFS: EditorDef[] = [
 
 export function getEditorDefsForCurrentPlatform(): EditorDef[] {
   if (process.platform === "darwin") {
-    return MAC_EDITOR_DEFS;
+    return [...MAC_EDITOR_DEFS, ...getFileApplicationDefs()];
   }
 
   if (process.platform === "win32") {
-    return [...WINDOWS_EDITOR_DEFS, ...WINDOWS_ADDITIONAL_EDITOR_DEFS];
+    return [...WINDOWS_EDITOR_DEFS, ...WINDOWS_ADDITIONAL_EDITOR_DEFS, ...getFileApplicationDefs()];
   }
 
-  return [];
+  return getFileApplicationDefs();
 }
 
 /** 缓存检测结果，避免重复 IO */
@@ -634,12 +639,13 @@ export function getAppIconDataUrl(editorId: string, appPath: string): Promise<st
  * 检测系统中已安装的编辑器/终端，返回带图标的列表。
  * 结果会被缓存（应用生命周期内不变）。
  */
-export async function getInstalledEditors(): Promise<EditorInfo[]> {
+async function getBaseInstalledEditors(): Promise<EditorInfo[]> {
   if (cachedEditors) {
     return cachedEditors;
   }
 
   const installed = getEditorDefsForCurrentPlatform()
+    .filter((def) => !("fileExtensions" in def))
     .map((def) => {
       const appPath = resolveEditorDefAppPath(def);
       return appPath ? { def, appPath } : null;
@@ -658,4 +664,35 @@ export async function getInstalledEditors(): Promise<EditorInfo[]> {
 
   cachedEditors = results.filter((r): r is EditorInfo => r !== null);
   return cachedEditors;
+}
+
+const cachedFileApps = new Map<string, Promise<EditorInfo | null>>();
+
+/** 可选文件路径只扩展文件菜单，工作区编辑器列表保持原有语义。 */
+export async function getInstalledEditors(filePath?: string): Promise<EditorInfo[]> {
+  const base = await getBaseInstalledEditors();
+  const matching = getFileApplicationDefs().filter((def) => matchesFileApplication(def, filePath));
+  const applications = await Promise.all(
+    matching.map((def) => {
+      let pending = cachedFileApps.get(def.id);
+      if (!pending) {
+        pending = (async () => {
+          const appPath = await resolveFileApplicationPath(def);
+          if (!appPath) return null;
+          const iconDataUrl = await getAppIconDataUrl(def.id, appPath);
+          return iconDataUrl ? { id: def.id, name: def.name, iconDataUrl } : null;
+        })();
+        cachedFileApps.set(def.id, pending);
+        // 未安装或图标暂不可用不能永久缓存；并发查询仍共享同一次探测。
+        const evict = () => {
+          if (cachedFileApps.get(def.id) === pending) cachedFileApps.delete(def.id);
+        };
+        void pending.then((editor) => {
+          if (!editor) evict();
+        }, evict);
+      }
+      return pending;
+    }),
+  );
+  return [...base, ...applications.filter((entry): entry is EditorInfo => entry !== null)];
 }

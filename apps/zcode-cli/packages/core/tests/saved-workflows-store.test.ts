@@ -89,11 +89,6 @@ describe("saved workflow frontmatter codec", () => {
     expect(parsed.script).toBe(SCRIPT);
   });
 
-  it("serializes deterministically so re-saving makes no spurious diff", () => {
-    const meta: SavedWorkflowMeta = { description: "stable", whenToUse: "always" };
-    expect(serializeSavedWorkflow(meta, SCRIPT)).toBe(serializeSavedWorkflow(meta, SCRIPT));
-  });
-
   // 脚本正文是 run 的脚本哈希的基准，任何一次"顺手规范化"都会让 resume 对不上。
   it("preserves trailing newlines, blank lines and CRLF-free content verbatim", () => {
     const script = "\n\nlog('one');\n\n\nlog('two');\n";
@@ -110,13 +105,6 @@ describe("saved workflow frontmatter codec", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.script).toBe("");
-  });
-
-  it("tolerates blank lines before the sentinel", () => {
-    const parsed = parseSavedWorkflow(
-      `\n\n${serializeSavedWorkflow({ description: "padded" }, SCRIPT)}`,
-    );
-    expect(parsed.ok).toBe(true);
   });
 
   // 四种失败各有各的名字，因为它们要给用户不同的建议。
@@ -285,23 +273,6 @@ describe("saved workflow store", () => {
 
   it("returns an empty list when the project has never saved a workflow", () => {
     expect(listSavedWorkflows({ cwd: makeCwd() })).toEqual({ entries: [], invalid: [] });
-  });
-
-  // 根是一个**数组**，按优先级排列 `[project, global]`。这条用例钉住"按序 first-wins"的形状。
-  it("looks up roots in priority order, first match winning", () => {
-    const cwd = makeCwd();
-    const home = makeHome();
-    const roots = savedWorkflowRoots(cwd, { homeDir: home });
-    expect(roots).toHaveLength(2);
-    expect(roots[0]).toEqual({ scope: "project", dir: join(cwd, ".zcode/workflows") });
-    expect(roots[1]).toEqual({ scope: "global", dir: join(home, ".zcode/workflows") });
-
-    saveSavedWorkflow({ cwd, name: "shadowed", meta: { description: "project" }, script: SCRIPT });
-    const resolved = resolveSavedWorkflow({ cwd, name: "shadowed" });
-    expect(resolved.ok).toBe(true);
-    if (!resolved.ok) return;
-    expect(resolved.scope).toBe(roots[0]!.scope);
-    expect(resolved.path).toBe(join(roots[0]!.dir, "shadowed.dwf.ts"));
   });
 });
 

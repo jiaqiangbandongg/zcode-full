@@ -1,3 +1,4 @@
+import { createBotProjectFixture } from "./helpers/bots-service-harness.js";
 import { readFile } from "node:fs/promises";
 
 import type { BotsConfigFile, BotsStateFile, ZCodeStreamEvent } from "@zcode/shared";
@@ -106,6 +107,7 @@ describe("BOT-E2E-SC-01 Feishu streaming card lifecycle", () => {
     };
 
     service = createBotsService({
+      ...createBotProjectFixture([{ workspacePath: E2E_BOT_WORKSPACE }]),
       credentialService: {
         load: async (key: string) => (key === "feishu-secret" ? "app-secret" : null),
         save: async () => undefined,
@@ -121,13 +123,23 @@ describe("BOT-E2E-SC-01 Feishu streaming card lifecycle", () => {
         }),
         update: async () => undefined,
         updateDataBaseDir: async () => undefined,
-        ensureDefaultProject: async (path: string) => ({ path, created: false }),
       },
       repo: {
         readConfig: async () => config,
         writeConfig: async (next: BotsConfigFile) => (config = next),
         readState: async () => state,
         writeState: async (next: BotsStateFile) => (state = next),
+        updateContext: async (
+          botId: string,
+          update: (
+            current: BotsStateFile["bots"][string] | undefined,
+          ) => BotsStateFile["bots"][string] | undefined,
+        ) => {
+          const next = update(state.bots[botId]);
+          if (next) state.bots[botId] = next;
+          else delete state.bots[botId];
+          return next;
+        },
       },
       modelSelectionService: {
         getView: async () => createBotModelSelectionView(),

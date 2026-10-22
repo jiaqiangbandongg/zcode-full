@@ -69,6 +69,27 @@ export interface StorePluginItem {
   installedMeta?: ZCodeInstalledPluginSummary;
 }
 
+// 市场和右侧推荐共用按插件的忙碌判定，避免安装一个插件时禁用整个推荐列表。
+export function isItemBusy(
+  item: StorePluginItem,
+  actions: { activeOperations: ReadonlyArray<{ id: string }>; togglingPluginId: string | null },
+): boolean {
+  return (
+    actions.activeOperations.some(
+      (operation) => operation.id === `plugin:install:${item.name}@${item.marketplace}`,
+    ) ||
+    actions.activeOperations.some((operation) => operation.id === `plugin:restore:${item.id}`) ||
+    actions.activeOperations.some((operation) => operation.id === `plugin:uninstall:${item.id}`) ||
+    actions.activeOperations.some((operation) => operation.id === `plugin:update:${item.id}`) ||
+    actions.activeOperations.some(
+      (operation) => operation.id === `plugin:reset-config:${item.id}`,
+    ) ||
+    // 保存配置也是同插件写操作；漏掉它时恢复默认、更新可在保存期间被点击。
+    actions.activeOperations.some((operation) => operation.id === `plugin:configure:${item.id}`) ||
+    actions.togglingPluginId === item.id
+  );
+}
+
 export type PluginUpdateStatus = NonNullable<ZCodeInstalledPluginSummary["updateStatus"]>;
 
 export function isPluginUpdatePending(
@@ -151,6 +172,21 @@ export {
 export interface StoreCategoryGroup {
   category: string;
   items: StorePluginItem[];
+}
+
+export type PluginStoreSegment = "public" | "community" | "personal";
+
+export function resolvePluginStoreSegment(item: StorePluginItem): PluginStoreSegment {
+  if (!isPublicStoreMarketplaceId(item.marketplace)) return "personal";
+  return item.listing?.publisherType === "community" ? "community" : "public";
+}
+
+export function isUiPluginItem(item: StorePluginItem): boolean {
+  // 已安装清单优先于目录宣传；禁用仍保留经过校验的 surface 元数据。
+  if (item.info) return Boolean(item.info.uiSurfaces?.length);
+  return Boolean(
+    (item.installedMeta?.componentTypes ?? item.summary?.componentTypes)?.includes("ui"),
+  );
 }
 
 /** 个人分段的市场分组：marketplace 是排序键，title 是展示名。 */

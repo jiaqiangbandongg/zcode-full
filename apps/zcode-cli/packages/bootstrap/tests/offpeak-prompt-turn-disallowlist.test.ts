@@ -11,15 +11,22 @@ import type { V4SessionRecordView } from "../src/zcode-protocol-v4/commands/type
 describe("buildTurnToolDisallowlist (off-peak, D49)", () => {
   it("automation 轮只隐藏三个 cron 写工具，不隐藏 OffPeakCreate（D49-3 反向断言）", () => {
     const tools = buildTurnToolDisallowlist({ automationId: "automation-1" });
+    expect(tools).not.toContain("SendMessage");
     expect(tools).toEqual(expect.arrayContaining(["CronCreate", "CronUpdate", "CronDelete"]));
     expect(tools).not.toContain("OffPeakCreate");
-    expect(tools).not.toContain("SendMessage");
     expect(tools).not.toContain("Workflow");
   });
 
-  it("闲时轮隐藏 OffPeakCreate、SendMessage、Workflow（D49 + D52），OffPeakList 与 cron 工具不受影响", () => {
+  it("闲时轮隐藏 OffPeakCreate 与工作流执行入口，SendMessage 可用，OffPeakList 与 cron 工具不受影响", () => {
     const tools = buildTurnToolDisallowlist({ offPeakTaskId: "offpeak-1" });
-    expect(tools).toEqual(["OffPeakCreate", "SendMessage", "Workflow"]);
+    expect(tools).toEqual([
+      "OffPeakCreate",
+      "Workflow",
+      "CreateWorkflow",
+      "AmendWorkflow",
+      "ResumeWorkflowRun",
+      "EvalWorkflowSnippet",
+    ]);
   });
 
   it("闲时轮合并调用方已有 denylist（host 派发同时带 CronCreate，D45+D49）", () => {
@@ -27,10 +34,8 @@ describe("buildTurnToolDisallowlist (off-peak, D49)", () => {
       offPeakTaskId: "offpeak-1",
       toolDisallowlist: ["CronCreate"],
     });
-    expect(tools).toEqual(
-      expect.arrayContaining(["CronCreate", "OffPeakCreate", "SendMessage", "Workflow"]),
-    );
-    expect(tools).toHaveLength(4);
+    expect(tools).toEqual(expect.arrayContaining(["CronCreate", "OffPeakCreate", "Workflow"]));
+    expect(tools).toHaveLength(7);
   });
 
   it("普通用户轮不追加任何隐藏", () => {
@@ -104,7 +109,14 @@ describe("闲时 turn 清理与当前执行约束共存", () => {
           modelExecution,
           sharedContextRefs,
           offPeakTaskId: "current-id",
-          toolDisallowlist: ["OffPeakCreate", "SendMessage", "Workflow"],
+          toolDisallowlist: [
+            "OffPeakCreate",
+            "Workflow",
+            "CreateWorkflow",
+            "AmendWorkflow",
+            "ResumeWorkflowRun",
+            "EvalWorkflowSnippet",
+          ],
         }),
       );
       expect(record.activeOffPeakTaskId).toBe("previous-id");

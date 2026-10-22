@@ -1,15 +1,56 @@
 import { isDeepStrictEqual } from "node:util";
-import type { JsonObject, OpenAiMessage } from "./types.js";
+import { toolSearchComparisonMessages } from "./tool-search-comparison.js";
+import type { JsonObject, OpenAiMessage, TrajectoryDerivationOptions } from "./types.js";
 
 export function isAppendOnly(
   previous: readonly OpenAiMessage[],
   next: readonly OpenAiMessage[],
+  options: TrajectoryDerivationOptions = {},
 ): boolean {
+  if (options.ignoreToolSearchChanges) {
+    previous = toolSearchComparisonMessages(previous);
+    next = toolSearchComparisonMessages(next);
+  }
   if (next.length < previous.length) return false;
   return previous.every(
     (message, index) =>
       isTrajectoryMessageEqual(message, next[index]) ||
       (index === previous.length - 1 && isUserContentAppend(message, next[index])),
+  );
+}
+
+export function completeAssistantMessage(
+  summary: OpenAiMessage,
+  previous: readonly OpenAiMessage[],
+  next: unknown,
+  options: TrajectoryDerivationOptions,
+): OpenAiMessage {
+  if (!Array.isArray(next) || !next.every(isMessage)) return summary;
+  const before = options.ignoreToolSearchChanges
+    ? toolSearchComparisonMessages(previous)
+    : previous;
+  const after = options.ignoreToolSearchChanges ? toolSearchComparisonMessages(next) : next;
+  if (!isAppendOnly(before, after)) return summary;
+  const recorded = after[before.length];
+  if (recorded?.role !== "assistant" || !Array.isArray(recorded.content)) return summary;
+  // response 摘要没有 thinking/签名；公告过滤可能改变索引，必须在同一比较视图中定位回复。
+  const comparable = {
+    ...recorded,
+    content: recorded.content.filter((block: unknown) => {
+      if (!block || typeof block !== "object") return true;
+      const { type } = block as JsonObject;
+      return type !== "thinking" && type !== "redacted_thinking";
+    }),
+  };
+  return isTrajectoryMessageEqual(summary, comparable) ? structuredClone(recorded) : summary;
+}
+
+function isMessage(value: unknown): value is OpenAiMessage {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as JsonObject).role === "string"
   );
 }
 

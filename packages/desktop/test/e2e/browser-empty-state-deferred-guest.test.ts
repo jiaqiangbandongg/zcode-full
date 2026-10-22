@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { TID_BROWSER_ADDRESS_INPUT, TID_BROWSER_WEBVIEW } from "@zcode/shared";
+import { TID_BROWSER_ADDRESS_INPUT, TID_BROWSER_WEBVIEW } from "@zcode/shared/test-ids";
 import { clearAppData } from "./helpers/desktop-app.js";
 import { openFirstBrowserTab } from "./helpers/browser-side-pane.js";
 import { prepareConversationE2E } from "./helpers/conversation-session.js";

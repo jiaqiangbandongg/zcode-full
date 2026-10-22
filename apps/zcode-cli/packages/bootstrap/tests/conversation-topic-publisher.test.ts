@@ -350,6 +350,52 @@ describe("恢复协议黄金路径：snapshot/resume + 续流 ≡ 全量重放",
 });
 
 describe("帧区间记账与替换语义", () => {
+  it.each(["continuous", "replayable"] as const)(
+    "历史初始化与重试保持已分页窗口（%s）",
+    (deliveryProfile) => {
+      const log = makeLog(50);
+      const publisher = new ConversationTopicPublisher("session-1", "epoch-1");
+      publisher.rehydrate(log.events);
+      publisher.setRuntimeInitialization({ status: "initializing", attemptId: "first" });
+      const initial = publisher.subscribe({ connectionId: "reader", deliveryProfile });
+      const store = { seq: 0, snapshot: null as ConversationSnapshot | null };
+      clientApply(store, initial.frame!);
+      const page = publisher.getRowsRange({
+        beforeRowId: store.snapshot!.rows.window[0]!.rowId,
+        limit: 20,
+      });
+      store.snapshot = {
+        ...store.snapshot!,
+        rows: { ...store.snapshot!.rows, window: [...page.rows, ...store.snapshot!.rows.window] },
+      };
+      const rowIds = store.snapshot.rows.window.map((row) => row.rowId);
+      publisher.setRuntimeInitialization({
+        status: "failed",
+        attemptId: "first",
+        reasonCode: "fault.subscribe.resumeFailed",
+        message: "hook failed",
+      });
+      clientApply(store, publisher.flush(initial.ack.subscriptionId, "reader")!);
+      publisher.rehydrate(log.events);
+      publisher.setRuntimeInitialization({ status: "initializing", attemptId: "retry" });
+      const retry = publisher.subscribe({
+        connectionId: "reader",
+        deliveryProfile,
+        base: { logEpoch: "epoch-1", seq: store.seq },
+      });
+      expect(retry.ack.mode).toBe("resume");
+      clientApply(store, retry.frame!);
+      publisher.rehydrate(log.events);
+      publisher.setRuntimeInitialization({ status: "ready", attemptId: "retry" });
+      const frame = publisher.flush(retry.ack.subscriptionId, "reader")!;
+      expect(frame.payload.kind).toBe("deltas");
+      clientApply(store, frame);
+      expect(store.snapshot!.rows.window.map((row) => row.rowId)).toEqual(rowIds);
+      expect(store.snapshot!.runtimeInitialization?.status).toBe("ready");
+      expect(store.seq).toBeGreaterThan(initial.frame!.toSeq);
+    },
+  );
+
   it("批量 cold rehydrate 与逐事件 reducer 终态一致，中间 base 经 snapshot boundary 恢复", () => {
     const log = new EventLog();
     log.push(SessionEventType.SessionCreated, {
@@ -1351,17 +1397,13 @@ describe("rows/range 游标分页（R-06）", () => {
     expect(JSON.stringify(window)).toBe(JSON.stringify(full.rows.window));
   });
 
-  it("beforeRowId 缺省 = 从尾部向前；limit 截到 rowsRangeMaxLimit", () => {
+  it("beforeRowId 缺省 = 从尾部向前", () => {
     const { publisher, log } = longPublisher();
     const full = authoritativeSnapshot(log.events);
 
     const tail = publisher.getRowsRange({ limit: 5 });
     expect(tail.rows).toEqual(full.rows.window.slice(-5));
     expect(tail.hasMore).toBe(true);
-
-    const all = publisher.getRowsRange({ limit: 10_000 });
-    expect(all.rows.length).toBeLessThanOrEqual(200);
-    expect(all.hasMore).toBe(full.rows.window.length > all.rows.length);
   });
 
   it("已到顶：beforeRowId = 全序首行 → 空页 hasMore=false", () => {

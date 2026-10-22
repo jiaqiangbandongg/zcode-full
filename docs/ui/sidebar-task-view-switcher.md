@@ -1,5 +1,15 @@
 # Sidebar Task View Switcher
 
+## 当前行为（2026-10-13）
+
+侧栏筛选为“按项目 / 按分组 / 最近更新”，各项保留图标，不恢复旧两级切换。
+分组与项目互相独立，具体契约见[分组视图](task-grouped-view.md)。
+客户端有有效新 `view` 时沿用；否则迁移旧 `organizeBy`：`grouped` → `grouped`、
+`chronological` → `timeline`、`project` → `projects`。无有效历史偏好默认按项目。
+后续显式切换以新偏好为准；切换不改任务、项目顺序或执行目录。
+
+## 历史两级切换（不再使用）
+
 侧栏任务区的视图入口分为两级：
 
 1. 一级滑块：`Group` / `Project`
@@ -107,3 +117,17 @@ section 顺序是 renderer-local 偏好：当前窗口立即更新，其他已�
 - 继续复用 `readSidebarTaskPreferences()` / `persistSidebarTaskPreferences()`。
 - 继续兼容桌面端、Web 端、macOS、Windows、Linux，以及 Zai Light / Zai Dark。
 - 文案走现有 i18n key；新增文案必须同时补 `en-US` 和 `zh-CN`。
+
+## 手机远控任务列表手势（2026-10-14）
+
+手机 `/remote` 复用项目侧栏组件，由入口的 `isWebRemoteControl` 决定交互能力，不按窗口宽度推断桌面能力。
+
+- 项目标题不注册排序拖动（包括键盘排序），允许纵向触摸滚动；点击仍展开或收起。置顶区项目同样适用。
+- 所有会话视图（项目、置顶、分组、时间线）不响应 hover，也不因触摸产生的 focus 切换操作区或隐藏元信息。一次点击打开会话。
+- 手机保留已有常驻操作和键盘打开能力；桌面继续支持项目排序、会话 hover 与 focus 操作。
+- 不改变任务身份、排序持久化、共享 Host 或 replayable 链路。
+
+```text
+手机入口 → 共享侧栏展示配置 → 项目禁用排序 / 会话固定展示 → 点击 → 既有打开链路
+桌面入口 → 默认交互配置 → 项目排序 / 会话 hover + focus → 点击 → 既有打开链路
+```

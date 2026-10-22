@@ -1,5 +1,7 @@
 # 闲时任务（Off-Peak Task）v1 实现 Spec
 
+> **后台生命周期修订：** 本次实现边界与验证进度见 [实施计划](./background-lifecycle-plan.md)。D51/D52 的后台与 SendMessage 限制由下述生命周期取代；历史决定保留在 decisions.md。
+
 > **状态：已实现，持续按 Figma 收口。** 当前仓库已包含 `offPeak` 领域类型、repo、service、
 > scheduler、UI 与进程内 mock；本文记录当前产品语义与实现约束。
 >
@@ -17,7 +19,7 @@
 
 ## 1. 一句话定义
 
-闲时任务 = **Automations 体系下的一次性后台任务**（D28，Figma 定稿范式）：用户在 Automations 主视图/模板卡创建（title + instructions + 项目 + 权限 + 模型），提交即 `POST /ticket` 取号排队。**排队由服务端承载**（全局 ticket FIFO、按资源空余控并发准入）；客户端用批量 `POST /ticket/status` 观察 ticket，`ready` 时写 `schedulable=true` 并派发。无人值守执行按 3h active ticket 分段，收到 `400/3102` 后用同 task_id 重取号并 resume 同一 session，直到自然完成；每个自动派发 turn 使用用户不可见的 idle plan provider。
+闲时任务 = **Automations 体系下的一次性后台任务**（D28，Figma 定稿范式）：用户在 Automations 主视图/模板卡创建（title + instructions + 项目 + 权限 + 模型），提交即 `POST /ticket` 取号排队。**排队由服务端承载**（全局 ticket FIFO、按资源空余控并发准入）；客户端用批量 `POST /ticket/status` 观察 ticket，`ready` 时写 `schedulable=true` 并派发。无人值守执行按 3h active ticket 分段，收到 `400/3102` 后用同 task_id 重取号，向驻留 CLI 交接新票并继续原请求，直到整项完成；每个自动派发 turn 使用用户不可见的 idle plan provider。
 
 命名按层级固定：英文 UI 的单项概念使用 `Idle-time task`，侧栏系统分组使用复数
 `Idle-time tasks`；中文 UI 统一使用「闲时任务」。TypeScript 类型/变量/常量分别使用
@@ -132,7 +134,7 @@ queued ──服务端 ready 且被派发──▶ running ───────
 
 - 终态不可逆出；文件修改任何情况不回滚。
 - 任务可多个并发执行，并发额度由服务端调度决定（D20）；单任务派发 single-flight 防重复。同 workspace 并发的文件冲突风险与手动并发对话一致，不新增隔离。
-- ~~composer 锁定~~（D28/D30 作废）：run session 是普通对话，running 中补发 prompt 走现有 busy queue；自动 turn terminal 后再 drain，排队消息按 Session Selection 创建用户模型。任务操作收敛在卡片菜单：queued「Pause / Delete」、paused「Continue / Delete」、running「取消」。
+- ~~composer 锁定~~（D28/D30 作废）：run session 是普通对话，补发 prompt 仍走现有 CommandInbox；消息被接纳即接管整项任务，执行顺序仍按既有队列规则。任务操作收敛在卡片菜单：queued「Pause / Delete」、paused「Continue / Delete」、running「取消」。
 - `build` 权限模式 / elicitation 复用普通 session 的交互链路：Agent 在会话内等待用户响应，但 Off-Peak 聚合状态保持 `running`，卡片不提供独立 Review 状态或专用通知。批准/拒绝都在同一个自动 turn 内继续，仍使用该 turn 的 idle Active Model；不承诺 D11/D27 历史方案中的批准后切用户 provider。
 - failed 不自动重试；用户可手动重新入队 = 重新提交尝试。
 
@@ -148,8 +150,10 @@ queued ──服务端 ready 且被派发──▶ running ───────
 - running 中途每次模型请求**皆可能被重新排队**（D19）：仅 idle plan provider 把 HTTP 429/3105 分类为 `OffpeakQueued`，单次等待 `min(Retry-After 或 60s, 5min)`，abort-aware、无限幂等探测且不消耗普通 retry budget。stream 仅在可见输出边界前重试。客户端不新增持久态；由于 running 在 `sendPrompt` ACK 后写入，首个 messages 请求等待 429 时 UI 也保持 running。ready 票等待到 TTL 过期后由 3102 统一换票，不另设“首派超阈值弃派”状态机。
 - 派发执行：新对话 = createTask + sendPrompt；续已有对话 = resume sessionId + sendPrompt。permissionMode 随派发下发。
 - 中断恢复：app 重启发现 running 残留（进程已死）→ 置回 queued 队首，授权后重新发起尝试并 resume 同一 session 续跑（"重启后自动续跑"文案的实现口径）。
-- provider：闲时执行 → idle plan（3h ticket 分段 + 自动续跑，D26）。隐藏的 Built-in `builtin:offpeak-idle-plan` 提供静态 Provider/Model 事实；每次派发提交标准 Model Selection，并在 `modelExecution` 中只携带本次 Request Auth、前台 Child override 与后台拒绝策略。它通过同一 Registry/ModelFactory 创建 idle Active Model，不修改 Session Selection，也不构造完整 Runtime Model 快照。首次派发创建 session 时，通过 `workspace/readState(preferWorkspaceDefaults=true)` 按完整 `providerId/modelId` 选择 `defaultModel → lastUsed → settings.model.current`，不得按 `available[0]` 或 provider registry 顺序猜测；多 provider 时模型栏因此稳定显示 workspace 用户模型。OffPeak 表单模型只决定 idle 自动 turn，不覆盖 Session Selection。permission approval 发生在同一自动 turn 时继续使用 idle Active Model，不切用户 provider，也没有套餐配额提示；用户补发 prompt 在当前 turn terminal 后 drain，并按自己的普通 Submission 与 Session Selection 创建用户模型。D11/D27 的批准切换属于未采纳的历史意图；~~立即执行~~ v1 已砍掉（D32）。
+- provider：闲时任务启动后，运行时 `sessionModelSelection` 维护闲时续跑选择，后台 Agent、SendMessage 恢复及 Bash 完成唤起继承同一执行归属和动态票据；临时闲时选择不写入普通 `runtime/model_selection`。用户消息被 CLI 接纳时立即接管整项任务，按 admission 顺序更新 Session Selection；只改模型菜单不接管。正在执行的子 agent 保留本轮模型，后续唤起与恢复用用户模型。permission/elicitation 响应不属于新用户消息，不改变套餐归属。
 - 派发失败分类：网络、Agent 启动等未知或可自愈错误为 `transient`，保持 queued 并按 30s 起、15min 封顶退避；用户 workspace 无可用模型、idle plan 无可用模型或双凭证缺失属于确定性 `permanent`，必须直接转 `failed`、记录原因并停止重试/重取号，由用户修复配置后重新提交。禁止把确定性配置错误伪装成长期“等待闲时算力”。
+
+正式 UI 回放的主页布局与额度置灰场景也必须准备账号控制面、有效登录和当前连接。取号网关 mock 不提供 Registry 模型事实；未准备账号时不应假定创建入口可见。
 
 ## 4. 当前服务端契约（D26/D39；客户端同时提供进程内 mock）
 
@@ -496,7 +500,7 @@ off-peak session 投影去重（`off-peak-session-projection`）随之整体退�
 ```text
 普通用户 turn ──────────── OffPeakCreate ✅  OffPeakList ✅
 cron automation 自动 turn ─ OffPeakCreate ✅（D49-3 组合玩法） OffPeakList ✅
-闲时自动派发 turn ───────── OffPeakCreate ❌ SendMessage ❌ Workflow ❌（D52，denylist ["CronCreate","OffPeakCreate","SendMessage","Workflow"]） OffPeakList ✅
+闲时自动派发 turn ───────── OffPeakCreate ❌ Workflow/动态工作流执行入口 ❌ CronCreate ❌；SendMessage ✅ Agent 后台 ✅ Bash 后台 ✅ OffPeakList ✅
 subagent_child ──────────── 均不注册
 ```
 
@@ -515,11 +519,37 @@ running/终态沿用 readOnly 只读，D30-7）；任务已删除时 toast targe
 
 **绑定会话运行（D50）**：任务在创建它的会话里执行。派发前先探测会话是否正在跑用户 turn，忙则
 transient 退避重试且不改任何会话配置；派发写入的权限模式（缺省 yolo）任务结束后不回滚；用户在任务轮
-点 Stop = 取消任务（票作废）；绑定会话被删除 = permanent 失败。Automations 卡片脚注与编辑页展示绑定
-会话标题（`sessionTitle`，list 时联查 tasks-index），编辑页附 Stop 即取消提示。表单创建仍新建独立 session。
+点聊天 Stop 沿用普通 Agent 的停止行为；任务卡「取消」才终止整项闲时任务并抑制迟到唤起；绑定会话被删除 = permanent 失败。Automations 卡片脚注与编辑页展示绑定
+会话标题（`sessionTitle`，list 时联查 tasks-index），编辑页区分聊天停止与任务卡取消。表单创建仍新建独立 session。
 
 **不做**：会话内 update/cancel 工具；会话标题冻结（不照抄 CronCreate 的
 setCustomSessionTitle）；卡片活状态订阅；本地额度计数；绑定/独立会话开关；任务结束后权限模式回滚。
+
+## 后台工作与票据收口
+
+主轮自然结束后，只要后台工作、未消费通知、已接纳输入或换票等待尚在，就保持整项任务未完成。CLI 根据既有任务登记表和命令队列判定，Host 只消费显式生命周期事件。票据释放与任务完成独立：用户接管后闲时子轮全部结束即可释放旧票，任务仍可能继续走用户套餐。
+
+```mermaid
+stateDiagram-v2
+  闲时执行 --> 等待后台: 主轮结束且后台未完成
+  等待后台 --> 闲时执行: 回复或完成通知
+  闲时执行 --> 等待新票: 请求返回3102
+  等待后台 --> 等待新票: 唤起需要新票
+  等待新票 --> 闲时执行: 新票交接
+  闲时执行 --> 用户执行: 用户消息被接纳
+  等待后台 --> 用户执行: 用户消息被接纳
+  等待新票 --> 用户执行: 用户消息被接纳
+  闲时执行 --> 整项完成: 无剩余工作
+  用户执行 --> 整项完成: 无剩余工作
+```
+
+换票期间允许已启动的本地 Bash 跑完并保存输出；模型请求等待新票，禁止重发原始 prompt 或重跑工具。并发票据错误合并为一次续票；接管、取消后的迟到票据只释放。后台登记、通知队列、票据凭据与临时闲时选择均不做跨 App/CLI 重启恢复；已有任务行的冷启动回收仍按原规则处理，不还原已消失的后台进程。
+
+取消与换票的迟到控制必须幂等：已完成或已取消执行的 cancel 不得停止同会话后续用户轮。有效取消只停止发起取消时捕获的前台执行。换票 RPC 回执失败表示交接结果未知，Host 保留同一 `executionId + renewalId + ticketId` 及内存凭据，通过既有同步周期重试确认；不将未知交接写回 queued、不重取票、不重放任务。新一轮 ticket_needed 废弃旧交接的回执写入；接管或完成后仍可确认已安装的票，未安装的候选票只释放。交接重试不新增持久化、计时器或对话恢复队列，desktop continuous 与 mobile replayable 边界不变。
+
+CLI/TUI 的输入默认值命名为 `cliDefaultSelection`，复用 `provider_config.json` 的 `config.defaultModelSelection` 与现有普通 session entry。`/model`、`/effort` 只改变输入默认值及原有记忆位置，发送才更新运行时 Session Selection。无配置或数据库迁移。加速卡通过 `selectionFallback.target` 传入该条用户消息的普通选择；Core 的 `highspeedFallbackSelection` 固定本轮接纳前的 Session 候选，用于加速卡过期或请求失败回退，与闲时续票无关。
+
+自动 Project Memory 提取仍跳过：具体是成功结束后的后台项目记忆提取，不修改会话 Memory 开关。child runtime 内嵌 Bash 的结束清理与普通 Agent 一致。
 
 ## 6. 复用点速查（feat/cron 基建）
 

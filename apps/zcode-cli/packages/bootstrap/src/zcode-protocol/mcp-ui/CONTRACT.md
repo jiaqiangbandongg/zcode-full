@@ -3,6 +3,7 @@
 Agent 侧 MCP Apps 身份、授权、调用和通知入口；通过 McpUiSessionAccess 窄接口使用 session。
 
 - server 必须存在于当前会话的可信 MCP 配置，不猜测名称。连接 port 提供规范化来源身份与现有连接 generation；资源读取前后、请求执行前和审批后均验证。
+- 首次 open 等待目标 server 已有连接任务，再核对原 session、lease 和连接身份；不等待全部 MCP、不主动重连。同步凭证校验仍立即拒绝失效来源，等待完成不能复活已释放 owner。
 - McpUiInstances 是运行凭证唯一 owner：Agent runtimeId、单调 generation、不可猜 token、稳定 appIdentity。绑定 workspace identity/session/plugin/server/resource/scope/owner 和 Host 提供的已知账号上下文。同逻辑页面同连接的并发 open 幂等。
 - 页面只能选择工具名称与参数，不能选择连接、会话或实例。callTool 检查 app visibility，并复用已有 ToolExecutor 的校验、hooks、拒绝规则、会话授权与审批；app-only 工具可直接建立授权 entry，不要求暴露给模型。原始 MCP 结果直接返回，不产生自动对话或 transcript row。
 - 执行固定已验证的连接代际，不触发连接重建、OAuth 自动恢复或工具重放。取消到达底层 signal；取消不回滚外部已发生操作。

@@ -1,5 +1,3 @@
-import type { PaneSplitSide } from "@/v4/paneLayoutTree.js";
-
 export const WORKBENCH_SESSION_DRAG_MIME = "application/x-zcode-session";
 
 export interface WorkbenchSessionDragPayload {
@@ -15,13 +13,6 @@ let activeWorkbenchSessionDragPayload: WorkbenchSessionDragPayload | null = null
 interface DataTransferLike {
   readonly types?: Iterable<string> | ArrayLike<string>;
   getData(type: string): string;
-}
-
-interface RectLike {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
 }
 
 export function serializeWorkbenchSessionDragPayload(payload: WorkbenchSessionDragPayload): string {
@@ -76,32 +67,4 @@ export function parseWorkbenchSessionDragPayload(
   } catch {
     return null;
   }
-}
-
-export function resolveWorkbenchDropSide(
-  rect: RectLike,
-  clientX: number,
-  clientY: number,
-): PaneSplitSide | null {
-  if (rect.width <= 0 || rect.height <= 0) {
-    return null;
-  }
-
-  const x = (clientX - rect.left) / rect.width;
-  const y = (clientY - rect.top) / rect.height;
-  if (x < 0 || x > 1 || y < 0 || y > 1) {
-    return null;
-  }
-
-  const distances: Array<readonly [PaneSplitSide, number]> = [
-    ["left", x],
-    ["right", 1 - x],
-    ["up", y],
-    ["down", 1 - y],
-  ];
-  const [side, distance] = distances.reduce((best, candidate) =>
-    candidate[1] < best[1] ? candidate : best,
-  );
-
-  return distance <= 0.32 ? side : null;
 }

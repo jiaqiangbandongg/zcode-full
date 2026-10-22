@@ -38,6 +38,33 @@ describe("Bot v3 单向导入与回滚文件隔离", () => {
   });
   const makeRepo = () => new BotsRepo();
 
+  it("两个 Repo 共享锁保存不同 Bot 的目录快照与 cursor，后续读取保留字段", async () => {
+    const one = makeRepo();
+    const two = makeRepo();
+    const state = (botId: string) => ({
+      botId,
+      hostId: "local",
+      projectId: "project",
+      workspacePath: "/bound",
+      additionalDirectories: ["/extra"],
+      mode: "draft" as const,
+      activeTaskId: null,
+      updatedAt: 1,
+    });
+    await Promise.all([
+      one.updateContext("one", () => state("one")),
+      two.updateContext("two", () => state("two")),
+    ]);
+    await Promise.all([
+      one.updateContext("one", (current) => ({ ...current!, telegramOffset: 7 })),
+      two.updateContext("two", (current) => ({ ...current!, weixinGetUpdatesBuf: "cursor" })),
+    ]);
+    expect((await makeRepo().readState()).bots).toEqual({
+      one: { ...state("one"), telegramOffset: 7 },
+      two: { ...state("two"), weixinGetUpdatesBuf: "cursor" },
+    });
+  });
+
   it("远端旧状态不使用本地账号转换，失联时不主动重连", async () => {
     const raw = legacyState({ provider: "glm", model: "builtin:bigmodel-coding-plan/GLM" });
     await writeFile(

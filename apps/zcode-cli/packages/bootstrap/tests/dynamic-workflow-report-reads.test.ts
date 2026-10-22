@@ -46,12 +46,12 @@ type SqliteJournal = JournalStorePort & {
 };
 
 let tempRoot: string;
-let store: ReturnType<typeof createSqliteSessionStore>;
+let store: Awaited<ReturnType<typeof createSqliteSessionStore>>;
 let journal: SqliteJournal;
 
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), "zcode-dwf-report-reads-"));
-  store = createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
+  store = await createSqliteSessionStore({ dbPath: join(tempRoot, "session.sqlite") });
   const resolved = resolveDynamicWorkflowJournalStore(store as never);
   if (resolved === undefined) throw new Error("sqlite store must expose the dwf journal");
   journal = resolved as SqliteJournal;

@@ -1,7 +1,8 @@
 import { summarizeRequestVerificationHeaders } from "@zcode/shared";
 import type { LanguageModelUsage } from "ai";
 import type { Logger, ModelUsage } from "@zcode/contracts";
-import { ModelFailureReason as ModelFailureReasonValue } from "@zcode/contracts";
+import { ModelErrorCode, ModelFailureReason as ModelFailureReasonValue } from "@zcode/contracts";
+import { AiSdkModelAdapterError } from "./errors.js";
 import type { ClassifiedModelFailure } from "./failure-classifier.js";
 import { detectProviderBusinessFinishError } from "./provider-finish-business-error.js";
 import type { AiSdkGenerateTextResult } from "./runner-runtime.js";
@@ -31,6 +32,7 @@ interface StreamDiagnostics {
   lastFinishChunk?: unknown;
   rawFinishReason?: unknown;
   reasoningDeltaChars: number;
+  hasReasoningContent: boolean;
   textDeltaChars: number;
   toolCallCount: number;
   usage?: ModelUsage;
@@ -41,6 +43,7 @@ export function createStreamDiagnostics(): StreamDiagnostics {
     chunkCounts: {},
     errorChunkCount: 0,
     reasoningDeltaChars: 0,
+    hasReasoningContent: false,
     textDeltaChars: 0,
     toolCallCount: 0,
   };
@@ -57,8 +60,14 @@ export function recordStreamChunkDiagnostic(diagnostics: StreamDiagnostics, chun
     return;
   }
 
+  if (chunkType.startsWith("reasoning-")) {
+    // 空文本可能携带有效的 reasoning 签名，不能当作空超窗丢弃。
+    diagnostics.hasReasoningContent ||= Object.keys(asRecord(record.providerMetadata)).length > 0;
+  }
   if (chunkType === "reasoning-delta") {
     diagnostics.reasoningDeltaChars += stringProperty(record, "text")?.length ?? 0;
+    diagnostics.hasReasoningContent ||=
+      (stringProperty(record, "delta") ?? stringProperty(record, "text") ?? "").length > 0;
     return;
   }
 
@@ -69,7 +78,8 @@ export function recordStreamChunkDiagnostic(diagnostics: StreamDiagnostics, chun
 
   if (chunkType === "finish") {
     diagnostics.finishReason = stringProperty(record, "finishReason") ?? diagnostics.finishReason;
-    diagnostics.rawFinishReason = record.rawFinishReason;
+    diagnostics.rawFinishReason =
+      record.rawFinishReason ?? asRecord(record.providerMetadata).rawFinishReason;
     diagnostics.lastFinishChunk = chunk;
     diagnostics.usage = normalizeUsage(
       (record.totalUsage ?? record.usage) as Partial<LanguageModelUsage> | undefined,
@@ -413,13 +423,71 @@ export function isSuspiciousStreamDiagnostics(diagnostics: StreamDiagnostics): b
   });
 }
 
+const CONTEXT_LIMIT_FINISH_REASONS = new Set([
+  "context_exceeded",
+  "context_length_exceeded",
+  "context_window_exceeded",
+  "model_context_exceeded",
+  "model_context_window_exceeded",
+  "prompt_too_long",
+]);
+
+const EMPTY_COMPLETION_RETRY_EXCLUSIONS = new Set([
+  ...CONTEXT_LIMIT_FINISH_REASONS,
+  "refusal",
+  "content-filter",
+  "content_filter",
+]);
+
+export function createEmptyContextExceededError(input: {
+  finishReason?: string;
+  rawFinishReason?: unknown;
+  hasAssistantContent: boolean;
+  toolCallCount: number;
+  usage?: ModelUsage;
+}): AiSdkModelAdapterError | undefined {
+  // 只转换无有效输出的明确超窗；任何 partial 都保留给原调用方，不能迁移 Core 的续写策略。
+  if (input.hasAssistantContent || input.toolCallCount > 0) return undefined;
+  if (
+    ![input.finishReason, input.rawFinishReason].some(
+      (reason) =>
+        typeof reason === "string" && CONTEXT_LIMIT_FINISH_REASONS.has(reason.trim().toLowerCase()),
+    )
+  )
+    return undefined;
+  // 在成功终态前走既有失败链，避免无效 Continue 和遗留的成功请求身份；已报告用量随失败结算。
+  return new AiSdkModelAdapterError(
+    ModelErrorCode.ModelContextExceeded,
+    "Model request exceeded the provider context window.",
+    {
+      usage: input.usage,
+      context: { finishReason: input.finishReason, rawFinishReason: input.rawFinishReason },
+    },
+  );
+}
+
+function excludesEmptyCompletionRetry(value: unknown): boolean {
+  return (
+    typeof value === "string" && EMPTY_COMPLETION_RETRY_EXCLUSIONS.has(value.trim().toLowerCase())
+  );
+}
+
 export function isZeroOutputModelCompletion(input: {
   finishReason?: string;
+  rawFinishReason?: unknown;
   reasoningLength: number;
   textLength: number;
   toolCallCount: number;
   usage?: ModelUsage;
 }): boolean {
+  // 上下文超限、拒绝和内容过滤已有明确原因；此前零输出会先被原样重试。
+  // 这三类结果直接交给 core；普通输出额度和其他原因保持现有空响应重试边界。
+  if (
+    excludesEmptyCompletionRetry(input.finishReason) ||
+    excludesEmptyCompletionRetry(input.rawFinishReason)
+  ) {
+    return false;
+  }
   return (
     input.finishReason !== undefined &&
     input.reasoningLength === 0 &&

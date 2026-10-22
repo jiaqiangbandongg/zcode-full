@@ -1,5 +1,6 @@
 import { InternalChannels, PlatformChannels } from "@zcode/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { parseRemoteWorkspaceServicePortMessage } from "../src/renderer/src/remoteWorkspaceServicePortBridge.js";
 
 /**
  * 验证 preload bridge 中 onFocusTab / onNewTab / onOpenBrowserUrl / onNewTask / onOpenWorkspace
@@ -83,20 +84,6 @@ describe("preload IPC disposer", () => {
     return exposedApi;
   }
 
-  it("onFocusTab 返回 disposer，调用后移除 ipcRenderer 监听", async () => {
-    const api = await loadPreload();
-    const callback = vi.fn();
-    const dispose = api.onFocusTab(callback) as () => void;
-    expect(typeof dispose).toBe("function");
-
-    // 验证注册了监听
-    expect(mockIpcRenderer.on).toHaveBeenCalled();
-
-    // 调用 dispose
-    dispose();
-    expect(mockIpcRenderer.removeListener).toHaveBeenCalled();
-  });
-
   it("preload 初始化时会上报当前窗口控制区 zoom 信息", async () => {
     stubProcessPlatform("darwin");
     mockWebFrame.getZoomFactor.mockReturnValue(1.21);
@@ -142,6 +129,55 @@ describe("preload IPC disposer", () => {
       attachmentId: "attachment-b",
     });
   });
+
+  it("把 Main 的完整 remote workspace scope 转发给 Renderer", async () => {
+    await loadPreload();
+    const scopedPortHandler = Array.from(
+      listeners.get(InternalChannels.ScopedServicePort) ?? [],
+    ).at(-1);
+    expect(scopedPortHandler).toBeDefined();
+
+    const port = {} as MessagePort;
+    const payload = {
+      attachmentId: "attachment-project",
+      sessionId: "project-session",
+      target: { kind: "docker", container: "dev" } as const,
+      sourceServerId: "source-1",
+      workspacePath: "/remote/project",
+      workspaceIdentity: "remote:server:source-1:/remote/project",
+      workspacePurpose: "project" as const,
+    };
+
+    scopedPortHandler?.({ ports: [port] }, payload);
+
+    expect(window.postMessage).toHaveBeenCalledWith(
+      {
+        type: InternalChannels.ScopedServicePort,
+        ...payload,
+      },
+      "*",
+      [port],
+    );
+    const forwardedMessage = vi
+      .mocked(window.postMessage)
+      .mock.calls.find(
+        ([message]) =>
+          typeof message === "object" &&
+          message !== null &&
+          "type" in message &&
+          message.type === InternalChannels.ScopedServicePort,
+      )?.[0];
+    expect(
+      parseRemoteWorkspaceServicePortMessage({
+        data: forwardedMessage,
+        ports: [port],
+      } as unknown as MessageEvent),
+    ).toEqual({
+      ...payload,
+      port,
+    });
+  });
+
   it("onNewTab 返回 disposer，调用后移除 ipcRenderer 监听", async () => {
     const api = await loadPreload();
     const callback = vi.fn();
@@ -222,10 +258,12 @@ describe("preload IPC disposer", () => {
       releaseHandler,
     );
 
-    for (const handler of listeners.get(PlatformChannels.BrowserViewScreenshotSurfacePrepare) ?? []) {
+    for (const handler of listeners.get(PlatformChannels.BrowserViewScreenshotSurfacePrepare) ??
+      []) {
       handler({}, payload);
     }
-    for (const handler of listeners.get(PlatformChannels.BrowserViewScreenshotSurfaceRelease) ?? []) {
+    for (const handler of listeners.get(PlatformChannels.BrowserViewScreenshotSurfaceRelease) ??
+      []) {
       handler({}, releasePayload);
     }
     expect(prepare).toHaveBeenCalledTimes(1);
@@ -300,21 +338,6 @@ describe("preload IPC disposer", () => {
       handler({}, "0.1.26");
     }
     expect(callback).not.toHaveBeenCalled();
-  });
-
-  it("onUpdateReady 晚注册时会立即回放最近一次版本", async () => {
-    const api = await loadPreload();
-    const handlers = Array.from(listeners.get(PlatformChannels.UpdateReady) ?? []);
-    expect(handlers.length).toBeGreaterThan(0);
-
-    for (const handler of handlers) {
-      handler({}, "0.1.25");
-    }
-
-    const callback = vi.fn();
-    const dispose = api.onUpdateReady(callback) as () => void;
-    expect(callback).toHaveBeenCalledWith("0.1.25");
-    dispose();
   });
 
   it("onUpdateReady 缓存会在更新状态变回 idle 后清除", async () => {

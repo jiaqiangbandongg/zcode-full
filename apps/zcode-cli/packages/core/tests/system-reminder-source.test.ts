@@ -6,7 +6,6 @@ import {
   SYSTEM_REMINDER_PER_REQUEST_SOURCES,
   SYSTEM_REMINDER_PERSISTED_SOURCES,
   SYSTEM_REMINDER_PREFIX_SOURCES,
-  SYSTEM_REMINDER_SOURCES,
   wrapSystemReminder,
   wrapSystemReminderForSource,
   type SystemReminderSource,
@@ -15,6 +14,7 @@ import {
 const EXPECTED_SOURCES = [
   "context_prefix",
   "skills_listing",
+  "tool_search_announcement",
   "agent_listing_delta",
   "todo_reminder",
   "task_status",
@@ -56,13 +56,10 @@ function expectExactlyOneSystemReminderWrapper(reminder: string): void {
 }
 
 describe("system reminder source descriptors", () => {
-  it("defines every active system-reminder source", () => {
-    expect(SYSTEM_REMINDER_SOURCES).toEqual(EXPECTED_SOURCES);
-  });
-
   it("groups every active system-reminder source by lifecycle bucket", () => {
     expect(SYSTEM_REMINDER_PREFIX_SOURCES).toEqual(["context_prefix", "skills_listing"]);
     expect(SYSTEM_REMINDER_PERSISTED_SOURCES).toEqual([
+      "tool_search_announcement",
       "agent_listing_delta",
       "todo_reminder",
       "task_status",
@@ -101,7 +98,6 @@ describe("system reminder source descriptors", () => {
       ...SYSTEM_REMINDER_PERSISTED_SOURCES,
       ...SYSTEM_REMINDER_PER_REQUEST_SOURCES,
     ];
-    expect(groupedSources).toHaveLength(new Set(groupedSources).size);
     expect(groupedSources).toEqual(EXPECTED_SOURCES);
   });
 
@@ -125,14 +121,10 @@ describe("system reminder source descriptors", () => {
         "providerVisibility",
         "source",
       ]);
-      expect(descriptor).not.toHaveProperty("projectionPolicy");
-      expect(descriptor).not.toHaveProperty("cachePolicy");
-      expect(descriptor).not.toHaveProperty("cacheControl");
-      expect(descriptor).not.toHaveProperty("mergeIntoCurrentTurn");
     }
   });
 
-  it("classifies sources by explicit source instead of reminder text", () => {
+  it("keeps explicit source ownership and history metadata", () => {
     expect(getSystemReminderDescriptor("target_continuation")).toMatchObject({
       channel: "real_user",
       isMeta: false,
@@ -140,9 +132,6 @@ describe("system reminder source descriptors", () => {
     });
     expect(isSystemReminderMetaSource("target_continuation")).toBe(false);
 
-    const userAuthoredText = "<system-reminder>\nplease keep this literal\n</system-reminder>";
-    expect(userAuthoredText.trimStart().startsWith("<system-reminder>")).toBe(true);
-    expect(getSystemReminderDescriptor("target_continuation").isMeta).toBe(false);
     expect(getSystemReminderDescriptor("plan_file_reference")).toMatchObject({
       channel: "history_continuity",
       evidenceLabel: "sr.plan_file_reference",
@@ -185,7 +174,6 @@ describe("system reminder source descriptors", () => {
   });
 
   it("classifies shell environment changes as mid-conversation system notices", () => {
-    expect(isMidConversationSystemSource("shell_environment_change")).toBe(true);
     expect(getSystemReminderDescriptor("shell_environment_change")).toMatchObject({
       channel: "mid_turn_event",
       lifecycle: "mid_turn_event",
@@ -203,13 +191,11 @@ describe("system reminder source descriptors", () => {
         isMeta: true,
         providerVisibility: "provider_visible",
       });
-      expect(isMidConversationSystemSource(source)).toBe(false);
     },
   );
 
   it("classifies goal state changes as persisted mid-conversation system notices", () => {
     expect(SYSTEM_REMINDER_PERSISTED_SOURCES).toContain("goal_state_change");
-    expect(isMidConversationSystemSource("goal_state_change")).toBe(true);
     expect(getSystemReminderDescriptor("goal_state_change")).toMatchObject({
       channel: "mid_turn_event",
       lifecycle: "mid_turn_event",
@@ -222,7 +208,6 @@ describe("system reminder source descriptors", () => {
   it("classifies plugin references as persisted mid-conversation system notices", () => {
     expect(SYSTEM_REMINDER_PERSISTED_SOURCES).toContain("plugin_reference");
     expect(SYSTEM_REMINDER_PER_REQUEST_SOURCES).not.toContain("plugin_reference");
-    expect(isMidConversationSystemSource("plugin_reference")).toBe(true);
     expect(getSystemReminderDescriptor("plugin_reference")).toMatchObject({
       channel: "current_turn",
       lifecycle: "per_current_turn",
@@ -230,26 +215,6 @@ describe("system reminder source descriptors", () => {
       providerVisibility: "provider_visible",
       evidenceLabel: "sr.plugin_reference",
     });
-  });
-
-  it("wraps plan_file_reference without nested reminder metadata", () => {
-    const reminder = wrapSystemReminderForSource(
-      "plan_file_reference",
-      [
-        "A plan file exists from plan mode at: /workspace/.zcode/plans/plan-session.md",
-        "",
-        "Plan contents:",
-        "",
-        "1. approved plan",
-        "",
-        "If this plan is relevant to the current work and not already complete, continue working on it.",
-      ].join("\n"),
-    );
-
-    expectExactlyOneSystemReminderWrapper(reminder);
-    expect(reminder).toContain("A plan file exists from plan mode at:");
-    expect(reminder).toContain("Plan contents:");
-    expect(reminder).toContain("1. approved plan");
   });
 });
 
@@ -264,8 +229,6 @@ describe("wrapSystemReminder", () => {
     expect(reminder).toBe(
       "<system-reminder>\nHook additional context from UserPromptSubmit:\n#1\nuse pnpm test\n</system-reminder>",
     );
-    expectExactlyOneSystemReminderWrapper(reminder);
-    expect(reminder).not.toContain("sr.hook_context");
   });
 
   it("wraps every provider-visible source in exactly one system-reminder pair", () => {

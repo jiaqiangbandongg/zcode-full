@@ -210,6 +210,7 @@ export const getWorkflowRunToolEntry: ToolEntry = {
   capability: "Read one dynamic-workflow run's progress, final result, or failure",
   maxModelChars: GET_WORKFLOW_RUN_PERSIST_THRESHOLD_CHARS,
   metadata: {
+    shouldDefer: true,
     name: GET_WORKFLOW_RUN_TOOL_NAME,
     description: GET_WORKFLOW_RUN_DESCRIPTION,
     readOnly: true,

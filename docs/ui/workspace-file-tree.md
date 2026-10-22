@@ -1,10 +1,14 @@
 # Workspace File Tree
 
-Workspace 文件树入口位于每个 workspace 行右侧操作区，放在更多菜单和新建任务按钮之间。Grouped task row 和全局 Pinned task row 的 hover 操作区也提供同一个文件树入口；task 入口打开的是该 task 所属 workspace，而不是当前 active workspace。点击入口后，任务侧栏整体向左滑出，`WorkspaceFileTree` 从右侧进入；返回按钮会恢复任务列表。文件树打开时，桌面顶部浮层 `@container/topoverlayer` 的 New Task 图标按钮必须显示，即使左侧侧栏仍处于展开态；关闭文件树后恢复原本“侧栏收起才显示”的浮层规则。
+Workspace 文件树入口位于项目和任务行的操作区，也可从右侧内置应用中的“文件”打开。入口在右侧创建独立文件标签页，左侧任务列表保持可用。文件预览在左、目录在右；目录宽度可拖拽调整，分割线与边框重合。收起目录后预览填满区域，展开恢复目录宽度，并保留目录搜索、展开状态和滚动位置。用户通过目录开关选择的显隐状态按 `workspaceIdentity?.trim() || workspacePath` 持久化：同一 workspace 的所有文件标签与 session 共用最后状态，关闭并重启 App 后仍恢复；不同 workspace 互不影响。面包屑、文件操作和目录开关共用一行，不再重复显示项目绝对路径。
+
+窄面板及手机视图中，目录和预览交替显示；选择文件后只临时收起当前紧凑布局中的目录，不改写 workspace 的显式显隐偏好，恢复宽屏后继续使用该偏好。标签页导航只更新对应实例，不改变任务归属或激活其他标签。内置应用按文件、浏览器、终端、审查、辅助对话排列；不支持的入口仍按现有能力条件隐藏。
+
+跨工作区文件入口先激活目标工作区，再由目标工作区恢复后的 side-pane owner 消费一次性请求；不得用来源工作区或来源任务给标签补归属。请求只保存在窗口导航 store，不写入持久化设置。临时外部目录继续属于发起入口的工作区。手机 Home 的同工作区入口同时进入 Chat；跨工作区入口将 Chat 与文件打开意图交给新 Root，旧页面不再重复创建标签。
 
 实现约束：
 
-- 文件树实现集中在 `packages/ui/src/workspace-file-tree/`，根部 `packages/ui/src/WorkspaceFileTree.tsx` 只保留兼容导出，避免入口组件继续膨胀。
+- 文件树实现集中在 `packages/ui/src/workspace-file-tree/`，根部 `packages/ui/src/WorkspaceFileTree.tsx` 保留兼容导出，并提供文件目录与预览的组合容器 `FileManagerPane`。
 - 文件树节点不使用 `Collapsible`，目录展开状态由 `expandedPaths` 控制。
 - 入口按 workspace 绑定，打开时会传递该 workspace 的 `workspacePath`、`workspaceIdentity` 和 `remoteSessionId`，避免多 workspace 或远程 workspace 串用当前服务。
 - task row 入口统一按 `workspaceIdentity?.trim() || workspacePath` 查找对应 workspace tab。本地 task 可以直接打开；远端 task 只有在对应 tab 已取得 `remoteSessionId` 后才显示可执行入口，禁止缺少远端 session 时降级到本地文件服务。

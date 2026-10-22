@@ -1,21 +1,36 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import type { RemoteWorkspaceSessionEntry } from "@zcode/shared";
-import type { WindowTabState } from "@/store/tabStore.js";
-import type { ReconnectRemoteWorkspaceOptions } from "@/root/reconnectRemoteWorkspaceHistoryEntry.js";
+import { createTabStore, type WindowTabState } from "@/store/tabStore.js";
+import {
+  loadConnectionProfileCredentials,
+  type ReconnectRemoteWorkspaceOptions,
+} from "@/root/reconnectRemoteWorkspaceHistoryEntry.js";
 import {
   bindRemoteWorkspaceContextAndGetSession,
   cancelPendingRemoteReconnectsForWorkspaceKeys,
+  collectStartupRemoteWorkspaceReconnectGroups,
   collectSshReconnectGroup,
   openRemoteWorkspaceFromHistoryEntry,
+  openRemoteConversationWorkspace,
   reconnectRemoteWorkspaceByKey,
   reconnectRemoteWorkspaceHistoryEntry,
   reconnectRemoteWorkspaceGroup,
-  resolveBotRemoteWorkspaceReconnectedIdentity,
+  resolveRemoteWorkspaceClosedFallback,
+  resolveSourceRemoteConversationWorkspaceProjection,
+  restoreSourceRemoteWorkspaceGroup,
+  shouldAttemptStartupReconnectForSourceState,
+  shouldAttemptStartupReconnectForTabChange,
   shouldPersistRemoteWorkspaceFailure,
   selectRemoteWorkspaceProjectFromDialog,
+  updateStartupRemoteWorkspaceReconnectAttemptsForSourceState,
+  updateRemoteWorkspaceRecoveringKeys,
 } from "@/root/useRemoteWorkspaceHistory.js";
 import {
+  clearRemoteWorkspaceConnectionState,
+  getRemoteWorkspaceConnectionState,
   registerRemoteWorkspaceSession,
+  setRemoteWorkspaceConnectionState,
   unregisterRemoteWorkspaceSession,
 } from "@/store/remoteWorkspaceSessionStore.js";
 import {
@@ -58,6 +73,15 @@ function createWorkspaceTab(
   };
 }
 
+function createBindRemoteWorkspaceScopeMock(
+  fallbackWorkspaceIdentity = "remote:docker:demo:/workspace/demo",
+) {
+  return vi.fn(async (_sessionId: string, workspacePath: string, workspaceIdentity?: string) => ({
+    workspacePath,
+    workspaceIdentity: workspaceIdentity ?? fallbackWorkspaceIdentity,
+  }));
+}
+
 describe("bindRemoteWorkspaceContextAndGetSession", () => {
   it("bind 完成后重新读取同一 session 的新 attachment services", async () => {
     const firstServices = { zcodeSessionService: { attachment: "A" } } as never;
@@ -71,6 +95,13 @@ describe("bindRemoteWorkspaceContextAndGetSession", () => {
         sessionId: "remote-session-1",
         services: secondServices,
       });
+      return {
+        sourceServerId: "source-1",
+        remoteSessionId: "remote-session-1",
+        workspacePath: "/workspace/demo",
+        workspaceIdentity: "remote:server:source-1:/workspace/demo",
+        previousWorkspaceIdentity: "remote:ssh:dev.internal:22:developer:/workspace/demo",
+      };
     });
 
     try {
@@ -84,6 +115,9 @@ describe("bindRemoteWorkspaceContextAndGetSession", () => {
       expect(bindRemoteWorkspaceSessionContext).toHaveBeenCalledOnce();
       expect(session.services).toBe(secondServices);
       expect(session.services).not.toBe(firstServices);
+      expect(session.previousWorkspaceIdentity).toBe(
+        "remote:ssh:dev.internal:22:developer:/workspace/demo",
+      );
     } finally {
       unregisterRemoteWorkspaceSession("remote-session-1");
     }
@@ -123,8 +157,10 @@ function createOpenRemoteWorkspaceContext(options?: {
     loadCredential: vi.fn(async () => null),
     connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
     resolveRemoteWorkspaceCanonicalPath: vi.fn(async (_sessionId, workspacePath) => workspacePath),
+    bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(
+      sessionEntry.workspaceIdentity ?? workspaceKey,
+    ),
     disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
-    bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
     addTab: vi.fn(),
     commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
     resetLogsForWorkspaceKey,
@@ -179,46 +215,117 @@ describe("shouldPersistRemoteWorkspaceFailure", () => {
   });
 });
 
-describe("reconnectRemoteWorkspaceHistoryEntry", () => {
-  describe("resolveBotRemoteWorkspaceReconnectedIdentity", () => {
-    it("keeps the bot event workspace identity when canonical path differs", () => {
-      const eventWorkspaceIdentity = "remote:docker:demo:/workspace/link";
-      const canonicalIdentity = buildRemoteWorkspaceIdentity("/workspace/real", {
-        kind: "docker",
-        container: "demo",
-      });
-
-      const resolvedIdentity = resolveBotRemoteWorkspaceReconnectedIdentity({
-        event: {
-          workspaceIdentity: eventWorkspaceIdentity,
-        },
-        resolvedWorkspacePath: "/workspace/real",
-        target: {
-          kind: "docker",
-          container: "demo",
-        },
-      });
-
-      expect(resolvedIdentity).toBe(eventWorkspaceIdentity);
-      expect(resolvedIdentity).not.toBe(canonicalIdentity);
+describe("updateRemoteWorkspaceRecoveringKeys", () => {
+  it("tracks recoverable close and clears the same workspace after replacement", () => {
+    const tab = createWorkspaceTab({
+      workspaceIdentity: "remote:server:source-1:/workspace/demo",
+      remoteSessionId: "remote-session-1",
     });
 
-    it("falls back to canonical identity when the bot event identity is blank", () => {
-      const target = {
-        kind: "docker" as const,
-        container: "demo",
-      };
-      const expectedIdentity = buildRemoteWorkspaceIdentity("/workspace/real", target);
+    const recovering = updateRemoteWorkspaceRecoveringKeys(["other"], [tab], true);
+    expect(recovering).toEqual(["other", "remote:server:source-1:/workspace/demo"]);
+    expect(updateRemoteWorkspaceRecoveringKeys(recovering, [tab], false)).toEqual(["other"]);
+  });
+});
 
-      const resolvedIdentity = resolveBotRemoteWorkspaceReconnectedIdentity({
+describe("resolveRemoteWorkspaceClosedFallback", () => {
+  it("uses the localized exhausted-budget message instead of a Host error string", () => {
+    expect(
+      resolveRemoteWorkspaceClosedFallback({
         event: {
-          workspaceIdentity: "  ",
+          recoveryBudgetExhausted: true,
+          recoveryAttempt: 3,
+          recoveryLimit: 3,
+          error: "远程连接恢复预算已耗尽",
         },
-        resolvedWorkspacePath: "/workspace/real",
-        target,
-      });
+        formatMessage: ({ id }, values) =>
+          `${id}:${String(values?.attempt)}/${String(values?.limit)}`,
+      }),
+    ).toBe("remote.error.recoveryBudgetExhausted:3/3");
+  });
+});
 
-      expect(resolvedIdentity).toBe(expectedIdentity);
+describe("reconnectRemoteWorkspaceHistoryEntry", () => {
+  it.each([
+    [
+      "source-server-install-required",
+      "Source Server installation requires explicit user confirmation",
+    ],
+    ["source-server-upgrade-required", "must upgrade"],
+  ])("keeps automatic recovery silent and only persists failure for %s", async (code, message) => {
+    const sessionEntry = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/missing-server",
+      workspaceIdentity: "remote:ssh:dev.example.com:22:dev:/repo/missing-server",
+      workspacePurpose: "project",
+      localWorkspacePath: "/local/repo",
+      target: { kind: "ssh", host: "dev.example.com", username: "dev" },
+    });
+    const toast = vi.fn();
+    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
+    const connectRemoteWorkspaceTarget = vi.fn(async () => {
+      throw Object.assign(new Error(message), { code });
+    });
+
+    // 侧栏组头已统一走设备级连接弹窗，安装/升级都在弹窗内处理；
+    // 原地重连只剩自动恢复与工作区行级入口，不再交接到弹窗。
+    await expect(
+      reconnectRemoteWorkspaceHistoryEntry({
+        sessionEntry,
+        activateTabByPath: vi.fn(() => false),
+        setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
+        loadCredential: vi.fn(async () => null),
+        connectRemoteWorkspaceTarget,
+        resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => sessionEntry.workspacePath),
+        bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(
+          sessionEntry.workspaceIdentity!,
+        ),
+        disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
+        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspaceIdentity: vi.fn(),
+        upsertWorkspaceTab: vi.fn(),
+        commitRemoteWorkspaceSessionMutation,
+        getRemoteSessions: () => [sessionEntry],
+        logger: { warn: vi.fn() },
+        toast,
+        options: { recoveryMode: "automatic", showErrorToast: false },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(connectRemoteWorkspaceTarget).toHaveBeenCalledOnce();
+    expect(commitRemoteWorkspaceSessionMutation).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entry: expect.objectContaining({
+          lastConnectionStatus: "failed",
+          lastConnectionError: message,
+        }),
+      }),
+    );
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("loads credentials directly from a saved Source connection profile", async () => {
+    const loadCredential = vi.fn(async (key: string) =>
+      key.endsWith(":password") ? "profile-password" : "profile-passphrase",
+    );
+    await expect(
+      loadConnectionProfileCredentials({
+        profile: {
+          profileId: "17ef20b3-622d-4a53-98c1-0cdff29f3e6d",
+          transport: "ssh",
+          target: {
+            kind: "ssh",
+            host: "demo.internal",
+            username: "root",
+            passwordCredentialKey: "connection-profile:p:password",
+            privateKeyPassphraseCredentialKey: "connection-profile:p:private-key-passphrase",
+          },
+          createdAt: 1,
+        },
+        loadCredential,
+      }),
+    ).resolves.toEqual({
+      password: "profile-password",
+      privateKeyPassphrase: "profile-passphrase",
     });
   });
 
@@ -235,6 +342,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     });
     const connectRemoteWorkspaceTarget = vi.fn(() => pendingConnect);
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock();
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -261,8 +369,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -305,6 +413,12 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       "session-1",
       "/workspace/demo",
     );
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledWith(
+      "session-1",
+      "/workspace/demo",
+      undefined,
+      "project",
+    );
     expect(bindWorkspacePath).toHaveBeenCalledWith("/workspace/demo", "session-1");
     expect(bindWorkspaceIdentity).toHaveBeenCalledWith(expectedWorkspaceIdentity, "session-1");
     expect(upsertWorkspaceTab).toHaveBeenCalledWith("/workspace/demo", {
@@ -318,6 +432,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     expect(onWorkspaceActivated).toHaveBeenCalledWith({
       workspacePath: "/workspace/demo",
       workspaceIdentity: expectedWorkspaceIdentity,
+      restoreSelection: true,
     });
     expect(upsertWorkspaceTab.mock.invocationCallOrder[0]).toBeLessThan(
       activateTabByPath.mock.invocationCallOrder[0]!,
@@ -329,170 +444,6 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     expect(disposeRemoteWorkspaceSession).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalled();
-  });
-
-  it("canonical path 与历史记录一致时不再重复绑定 main context", async () => {
-    // connect 已携带历史记录的 path/identity，descriptor 与 tab 一致，不应再触发一次 attachment 换代。
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => undefined);
-    const sessionEntry = createRemoteWorkspaceSessionEntry();
-
-    await reconnectRemoteWorkspaceHistoryEntry({
-      sessionEntry,
-      activateTabByPath: vi.fn(() => true),
-      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
-      loadCredential: vi.fn(async () => null),
-      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
-      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => sessionEntry.workspacePath),
-      disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
-      bindRemoteWorkspaceSessionContext,
-      bindRemoteWorkspacePath: vi.fn(),
-      bindRemoteWorkspaceIdentity: vi.fn(),
-      upsertWorkspaceTab: vi.fn(),
-      commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
-      getRemoteSessions: () => [sessionEntry],
-      logger: { warn: vi.fn() },
-      toast: vi.fn(),
-    });
-
-    expect(bindRemoteWorkspaceSessionContext).not.toHaveBeenCalled();
-  });
-
-  it("canonical path 与历史记录不一致时，先重新绑定 main context 再回填 tab", async () => {
-    // Bugfix 回归：手机桥接用 tab 上的 canonical path/identity 比对 main descriptor，
-    // 重连时 descriptor 只有历史记录里的旧路径，realpath 归一化后不同就必须 bind，否则桥接被拒。
-    const target = { kind: "docker" as const, container: "demo" };
-    const sessionEntry = createRemoteWorkspaceSessionEntry({
-      workspacePath: "/dev",
-      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
-      target,
-    });
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => undefined);
-    const upsertWorkspaceTab = vi.fn();
-    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
-
-    await reconnectRemoteWorkspaceHistoryEntry({
-      sessionEntry,
-      activateTabByPath: vi.fn(() => true),
-      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
-      loadCredential: vi.fn(async () => null),
-      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
-      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
-      disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext,
-      bindRemoteWorkspacePath: vi.fn(),
-      bindRemoteWorkspaceIdentity: vi.fn(),
-      upsertWorkspaceTab,
-      commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
-      getRemoteSessions: () => [sessionEntry],
-      logger: { warn: vi.fn() },
-      toast: vi.fn(),
-    });
-
-    const expectedWorkspaceIdentity = buildRemoteWorkspaceIdentity("/home/dev", target);
-    expect(bindRemoteWorkspaceSessionContext).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      workspacePath: "/home/dev",
-      workspaceIdentity: expectedWorkspaceIdentity,
-    });
-    expect(bindRemoteWorkspaceSessionContext.mock.invocationCallOrder[0]).toBeLessThan(
-      upsertWorkspaceTab.mock.invocationCallOrder[0]!,
-    );
-    expect(upsertWorkspaceTab).toHaveBeenCalledWith("/home/dev", {
-      remoteSessionId: "session-1",
-      remoteTarget: target,
-      workspaceIdentity: expectedWorkspaceIdentity,
-      localWorkspacePath: undefined,
-    });
-    expect(disposeRemoteWorkspaceSession).not.toHaveBeenCalled();
-  });
-
-  it("重连时 main 绑定失败会回收 session 并按失败落库，不回填 tab", async () => {
-    const target = { kind: "docker" as const, container: "demo" };
-    const sessionEntry = createRemoteWorkspaceSessionEntry({
-      workspacePath: "/dev",
-      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
-      target,
-    });
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => {
-      throw new Error("bind failed");
-    });
-    const upsertWorkspaceTab = vi.fn();
-    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
-    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
-    const toast = vi.fn();
-
-    await reconnectRemoteWorkspaceHistoryEntry({
-      sessionEntry,
-      activateTabByPath: vi.fn(() => true),
-      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
-      loadCredential: vi.fn(async () => null),
-      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
-      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
-      disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext,
-      bindRemoteWorkspacePath: vi.fn(),
-      bindRemoteWorkspaceIdentity: vi.fn(),
-      upsertWorkspaceTab,
-      commitRemoteWorkspaceSessionMutation,
-      getRemoteSessions: () => [sessionEntry],
-      logger: { warn: vi.fn() },
-      toast,
-    });
-
-    expect(disposeRemoteWorkspaceSession).toHaveBeenCalledWith("session-1");
-    expect(upsertWorkspaceTab).not.toHaveBeenCalled();
-    expect(commitRemoteWorkspaceSessionMutation).toHaveBeenCalledTimes(1);
-    expect(commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0]?.entry).toMatchObject({
-      lastConnectionStatus: "failed",
-      lastConnectionError: "bind failed",
-    });
-    expect(toast).toHaveBeenCalledWith("bind failed");
-  });
-
-  it("用户在 bind main context 等待期间移除 tab 时，不回填 tab 并回收 session", async () => {
-    // 回归锁定：保留校验与 upsertWorkspaceTab 之间不能再有 await，
-    // 否则校验通过后用户在 bind 等待 ready ACK 期间移除 workspace，仍会被重新加回并落库 connected。
-    const target = { kind: "docker" as const, container: "demo" };
-    const sessionEntry = createRemoteWorkspaceSessionEntry({
-      workspacePath: "/dev",
-      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
-      target,
-    });
-    let workspaceTabPresent = true;
-    const shouldKeepReconnectedWorkspace = vi.fn(() => workspaceTabPresent);
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => {
-      workspaceTabPresent = false;
-    });
-    const upsertWorkspaceTab = vi.fn();
-    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
-    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
-
-    await reconnectRemoteWorkspaceHistoryEntry({
-      sessionEntry,
-      activateTabByPath: vi.fn(() => true),
-      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
-      loadCredential: vi.fn(async () => null),
-      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
-      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
-      disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext,
-      bindRemoteWorkspacePath: vi.fn(),
-      bindRemoteWorkspaceIdentity: vi.fn(),
-      upsertWorkspaceTab,
-      commitRemoteWorkspaceSessionMutation,
-      getRemoteSessions: () => [sessionEntry],
-      logger: { warn: vi.fn() },
-      toast: vi.fn(),
-      shouldKeepReconnectedWorkspace,
-    });
-
-    expect(bindRemoteWorkspaceSessionContext).toHaveBeenCalledTimes(1);
-    expect(shouldKeepReconnectedWorkspace.mock.invocationCallOrder[0]).toBeGreaterThan(
-      bindRemoteWorkspaceSessionContext.mock.invocationCallOrder[0]!,
-    );
-    expect(upsertWorkspaceTab).not.toHaveBeenCalled();
-    expect(disposeRemoteWorkspaceSession).toHaveBeenCalledWith("session-1");
-    expect(commitRemoteWorkspaceSessionMutation).not.toHaveBeenCalled();
   });
 
   it("reuses initiator credentials and reports Host ready before sibling initialization", async () => {
@@ -528,8 +479,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(sessionEntry.workspaceIdentity!),
       disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: vi.fn(),
       bindRemoteWorkspaceIdentity: vi.fn(),
       upsertWorkspaceTab: vi.fn(),
@@ -565,6 +516,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       throw new Error("ssh closed");
     });
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock();
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -582,8 +534,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
         loadCredential,
         connectRemoteWorkspaceTarget,
         resolveRemoteWorkspaceCanonicalPath,
+        bindRemoteWorkspaceScope,
         disposeRemoteWorkspaceSession,
-        bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
         bindRemoteWorkspacePath: bindWorkspacePath,
         bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
         upsertWorkspaceTab,
@@ -611,6 +563,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     const loadCredential = vi.fn(async () => null);
     const connectRemoteWorkspaceTarget = vi.fn(async () => "session-1");
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock();
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -627,8 +580,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -672,6 +625,9 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     });
     const connectRemoteWorkspaceTarget = vi.fn(async () => "session-1");
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock(
+      "remote:ssh:demo.internal:22:root:/workspace/demo",
+    );
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -703,8 +659,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -754,6 +710,9 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     );
     const connectRemoteWorkspaceTarget = vi.fn(async () => "session-1");
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock(
+      "remote:server:studio:/workspace/demo",
+    );
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -782,8 +741,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -818,6 +777,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     const loadCredential = vi.fn(async () => null);
     const connectRemoteWorkspaceTarget = vi.fn(async () => "session-1");
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock();
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -843,8 +803,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -869,6 +829,163 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     );
   });
 
+  it("Host bind 先于 tab 回填，tab 与落库只消费 bind 返回的权威 scope", async () => {
+    // Bugfix 回归（3.12.0 手机远控连不上远程项目，staging 4659329b6b）：手机桥接按 tab 的 path/identity
+    // 三元比对 main 的 logical session descriptor，缺少 Host bind 或 bind 落后于 tab 回填都会被
+    // REMOTE_WORKSPACE_IDENTITY_MISMATCH 拒绝。R3 里 bind 统一走 bindRemoteWorkspaceScope，且无条件执行。
+    const target = { kind: "docker" as const, container: "demo" };
+    const sessionEntry = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/dev",
+      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
+      target,
+    });
+    const boundWorkspaceIdentity = buildRemoteWorkspaceIdentity("/home/dev", target);
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock(boundWorkspaceIdentity);
+    const upsertWorkspaceTab = vi.fn();
+    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
+    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
+
+    await reconnectRemoteWorkspaceHistoryEntry({
+      sessionEntry,
+      activateTabByPath: vi.fn(() => true),
+      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
+      loadCredential: vi.fn(async () => null),
+      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
+      bindRemoteWorkspaceScope,
+      disposeRemoteWorkspaceSession,
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      upsertWorkspaceTab,
+      commitRemoteWorkspaceSessionMutation,
+      getRemoteSessions: () => [sessionEntry],
+      logger: { warn: vi.fn() },
+      toast: vi.fn(),
+    });
+
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledWith(
+      "session-1",
+      "/home/dev",
+      undefined,
+      "project",
+    );
+    expect(bindRemoteWorkspaceScope.mock.invocationCallOrder[0]).toBeLessThan(
+      upsertWorkspaceTab.mock.invocationCallOrder[0]!,
+    );
+    expect(upsertWorkspaceTab).toHaveBeenCalledWith("/home/dev", {
+      remoteSessionId: "session-1",
+      remoteTarget: target,
+      workspaceIdentity: boundWorkspaceIdentity,
+      previousWorkspaceIdentity: sessionEntry.workspaceIdentity,
+      localWorkspacePath: undefined,
+      workspacePurpose: undefined,
+    });
+    expect(commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0]?.entry).toMatchObject({
+      workspacePath: "/home/dev",
+      workspaceIdentity: boundWorkspaceIdentity,
+      lastConnectionStatus: "connected",
+    });
+    expect(disposeRemoteWorkspaceSession).not.toHaveBeenCalled();
+  });
+
+  it("Host bind 失败时不回填 tab，并按失败落库", async () => {
+    // bind 失败意味着 descriptor 与 tab 无法对齐（正是手机桥接被拒的根源），必须 fail-closed。
+    // session 回收由 hook 侧 bindRemoteWorkspaceScope 在抛错前完成，这里锁定纯函数不产生半连接 workspace。
+    const target = { kind: "docker" as const, container: "demo" };
+    const sessionEntry = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/dev",
+      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
+      target,
+    });
+    const bindRemoteWorkspaceScope = vi.fn(async () => {
+      throw new Error("bind failed");
+    });
+    const bindWorkspacePath = vi.fn();
+    const upsertWorkspaceTab = vi.fn();
+    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
+    const toast = vi.fn();
+
+    await reconnectRemoteWorkspaceHistoryEntry({
+      sessionEntry,
+      activateTabByPath: vi.fn(() => true),
+      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
+      loadCredential: vi.fn(async () => null),
+      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
+      bindRemoteWorkspaceScope,
+      disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
+      bindRemoteWorkspacePath: bindWorkspacePath,
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      upsertWorkspaceTab,
+      commitRemoteWorkspaceSessionMutation,
+      getRemoteSessions: () => [sessionEntry],
+      logger: { warn: vi.fn() },
+      toast,
+    });
+
+    expect(upsertWorkspaceTab).not.toHaveBeenCalled();
+    expect(bindWorkspacePath).not.toHaveBeenCalled();
+    expect(commitRemoteWorkspaceSessionMutation).toHaveBeenCalledTimes(1);
+    expect(commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0]?.entry).toMatchObject({
+      lastConnectionStatus: "failed",
+      lastConnectionError: "bind failed",
+    });
+    expect(toast).toHaveBeenCalledWith("bind failed");
+  });
+
+  it("用户在 Host bind 等待期间移除 tab 时，不回填 tab 并回收 session", async () => {
+    // 回归锁定（staging 8c25a15aa8）：保留校验必须在 bind 之后，且与 upsertWorkspaceTab 之间不能再有 await，
+    // 否则校验通过后用户在 bind 等待 ready ACK 期间移除 workspace，仍会被重新加回并落库 connected。
+    const target = { kind: "docker" as const, container: "demo" };
+    const sessionEntry = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/dev",
+      workspaceIdentity: buildRemoteWorkspaceIdentity("/dev", target),
+      target,
+    });
+    let workspaceTabPresent = true;
+    const shouldKeepReconnectedWorkspace = vi.fn(() => workspaceTabPresent);
+    const bindRemoteWorkspaceScope = vi.fn(
+      async (_sessionId: string, workspacePath: string, workspaceIdentity?: string) => {
+        workspaceTabPresent = false;
+        return {
+          workspacePath,
+          workspaceIdentity:
+            workspaceIdentity ?? buildRemoteWorkspaceIdentity(workspacePath, target),
+        };
+      },
+    );
+    const upsertWorkspaceTab = vi.fn();
+    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
+    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
+
+    await reconnectRemoteWorkspaceHistoryEntry({
+      sessionEntry,
+      activateTabByPath: vi.fn(() => true),
+      setReconnectingRemoteWorkspaceKeys: vi.fn((updater) => updater([])),
+      loadCredential: vi.fn(async () => null),
+      connectRemoteWorkspaceTarget: vi.fn(async () => "session-1"),
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => "/home/dev"),
+      bindRemoteWorkspaceScope,
+      disposeRemoteWorkspaceSession,
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      upsertWorkspaceTab,
+      commitRemoteWorkspaceSessionMutation,
+      getRemoteSessions: () => [sessionEntry],
+      logger: { warn: vi.fn() },
+      toast: vi.fn(),
+      shouldKeepReconnectedWorkspace,
+    });
+
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledTimes(1);
+    expect(shouldKeepReconnectedWorkspace.mock.invocationCallOrder[0]).toBeGreaterThan(
+      bindRemoteWorkspaceScope.mock.invocationCallOrder[0]!,
+    );
+    expect(upsertWorkspaceTab).not.toHaveBeenCalled();
+    expect(disposeRemoteWorkspaceSession).toHaveBeenCalledWith("session-1");
+    expect(commitRemoteWorkspaceSessionMutation).not.toHaveBeenCalled();
+  });
+
   it("skips workspace activation for background reconnect while still updating tab metadata", async () => {
     const activateTabByPath = vi.fn(() => true);
     const setReconnectingRemoteWorkspaceKeys = vi.fn((updater) => {
@@ -878,6 +995,7 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
     const loadCredential = vi.fn(async () => null);
     const connectRemoteWorkspaceTarget = vi.fn(async () => "session-1");
     const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/workspace/demo");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock();
     const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
@@ -903,8 +1021,8 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
       loadCredential,
       connectRemoteWorkspaceTarget,
       resolveRemoteWorkspaceCanonicalPath,
+      bindRemoteWorkspaceScope,
       disposeRemoteWorkspaceSession,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       upsertWorkspaceTab,
@@ -935,18 +1053,317 @@ describe("reconnectRemoteWorkspaceHistoryEntry", () => {
   });
 });
 
+describe("openRemoteConversationWorkspace", () => {
+  it("未绑定 session 直接绑定 conversation，不按根路径查找 project Profile", async () => {
+    const selectRemoteWorkspace = vi.fn(async () => undefined);
+    const connectRemoteWorkspaceTarget = vi.fn(async () => "unexpected-session");
+    const unboundSession = {
+      sessionId: "unbound-session",
+      sourceServerId: "source-1",
+      workspacePath: "/",
+      workspaceIdentity: "remote:server:source-1:/",
+      target: { kind: "docker", container: "dev" },
+      services: {},
+    } as never;
+
+    await openRemoteConversationWorkspace({
+      sessionId: "unbound-session",
+      sourceServerId: "source-1",
+      getRemoteWorkspaceSession: (sessionId) =>
+        sessionId === "unbound-session" ? unboundSession : null,
+      getSettings: async () => ({
+        sourceServerWorkspaceHistory: [],
+        connectionProfiles: [],
+      }),
+      loadCredential: vi.fn(async () => null),
+      connectRemoteWorkspaceTarget,
+      waitForRemoteWorkspaceSessionReady: vi.fn(async () => undefined),
+      ensureConversationWorkspace: vi.fn(async () => ({
+        path: "/remote/conversation",
+      })),
+      selectRemoteWorkspace,
+      disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
+    });
+
+    expect(connectRemoteWorkspaceTarget).not.toHaveBeenCalled();
+    expect(selectRemoteWorkspace).toHaveBeenCalledWith(
+      "unbound-session",
+      "/remote/conversation",
+      "conversation",
+    );
+  });
+
+  it.each(["project", "conversation"])(
+    "从 %s 新建 conversation 时使用独立 logical session",
+    async (workspacePurpose) => {
+      const selectRemoteWorkspace = vi.fn(async () => undefined);
+      const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
+      const connectRemoteWorkspaceTarget = vi.fn(async () => "conversation-session");
+      const projectSession = {
+        sessionId: "project-session",
+        sourceServerId: "source-1",
+        workspacePath: "/remote/project",
+        workspaceIdentity: "remote:server:source-1:/remote/project",
+        workspacePurpose,
+        target: { kind: "docker", container: "dev" },
+        services: {},
+      } as never;
+      const conversationSession = {
+        sessionId: "conversation-session",
+        sourceServerId: "source-1",
+        target: { kind: "docker", container: "dev" },
+        services: {},
+      } as never;
+
+      await openRemoteConversationWorkspace({
+        sessionId: "project-session",
+        sourceServerId: "source-1",
+        getRemoteWorkspaceSession: (sessionId) =>
+          sessionId === "project-session"
+            ? projectSession
+            : sessionId === "conversation-session"
+              ? conversationSession
+              : null,
+        getSettings: async () => ({
+          sourceServerWorkspaceHistory: [
+            {
+              workspacePath: "/remote/project",
+              workspaceIdentity: "remote:server:source-1:/remote/project",
+              sourceServerId: "source-1",
+              profileId: "profile-1",
+              lastOpenedAt: 1,
+            },
+          ],
+          connectionProfiles: [
+            {
+              profileId: "profile-1",
+              sourceServerId: "source-1",
+              transport: "docker",
+              target: { kind: "docker", container: "dev" },
+              createdAt: 1,
+            },
+          ],
+        }),
+        loadCredential: vi.fn(async () => null),
+        connectRemoteWorkspaceTarget,
+        waitForRemoteWorkspaceSessionReady: vi.fn(async () => undefined),
+        ensureConversationWorkspace: vi.fn(async () => ({
+          path: "/remote/conversation",
+        })),
+        selectRemoteWorkspace,
+        disposeRemoteWorkspaceSession,
+      });
+
+      expect(connectRemoteWorkspaceTarget).toHaveBeenCalledWith({
+        kind: "docker",
+        container: "dev",
+      });
+      expect(selectRemoteWorkspace).toHaveBeenCalledWith(
+        "conversation-session",
+        "/remote/conversation",
+        "conversation",
+      );
+      expect(selectRemoteWorkspace).not.toHaveBeenCalledWith(
+        "project-session",
+        expect.any(String),
+        "conversation",
+      );
+      expect(disposeRemoteWorkspaceSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("ensure 失败时只释放本次新建的 conversation session", async () => {
+    const disposeRemoteWorkspaceSession = vi.fn(async () => undefined);
+    const selectRemoteWorkspace = vi.fn(async () => undefined);
+    const connectRemoteWorkspaceTarget = vi.fn(async () => "conversation-session");
+    const projectSession = {
+      sessionId: "project-session",
+      sourceServerId: "source-1",
+      workspacePath: "/remote/project",
+      workspaceIdentity: "remote:server:source-1:/remote/project",
+      workspacePurpose: "project",
+      target: { kind: "docker", container: "dev" },
+      services: {},
+    } as never;
+
+    await expect(
+      openRemoteConversationWorkspace({
+        sessionId: "project-session",
+        sourceServerId: "source-1",
+        getRemoteWorkspaceSession: (sessionId) =>
+          sessionId === "project-session" ? projectSession : null,
+        getSettings: async () => ({
+          sourceServerWorkspaceHistory: [
+            {
+              workspacePath: "/remote/project",
+              workspaceIdentity: "remote:server:source-1:/remote/project",
+              sourceServerId: "source-1",
+              profileId: "profile-1",
+              lastOpenedAt: 1,
+            },
+          ],
+          connectionProfiles: [
+            {
+              profileId: "profile-1",
+              sourceServerId: "source-1",
+              transport: "docker",
+              target: { kind: "docker", container: "dev" },
+              createdAt: 1,
+            },
+          ],
+        }),
+        loadCredential: vi.fn(async () => null),
+        connectRemoteWorkspaceTarget,
+        waitForRemoteWorkspaceSessionReady: vi.fn(async () => undefined),
+        ensureConversationWorkspace: vi.fn(async () => {
+          throw new Error("ensure failed");
+        }),
+        selectRemoteWorkspace,
+        disposeRemoteWorkspaceSession,
+      }),
+    ).rejects.toThrow("ensure failed");
+
+    expect(connectRemoteWorkspaceTarget).toHaveBeenCalledOnce();
+    expect(disposeRemoteWorkspaceSession).toHaveBeenCalledWith("conversation-session");
+    expect(disposeRemoteWorkspaceSession).not.toHaveBeenCalledWith("project-session");
+    expect(selectRemoteWorkspace).not.toHaveBeenCalled();
+  });
+});
+
 describe("selectRemoteWorkspaceProjectFromDialog", () => {
-  it("commits the remote draft before task-list refresh settles", async () => {
+  it.each(["entry-removed", "retained"])("绑定返回后等待异步成员校验：%s", async (scenario) => {
+    const workspacePath = "/workspace/project";
+    const workspaceIdentity = "remote:server:source:/workspace/project";
+    const binding = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    let retained = true;
+    const persisted = vi.fn(async (mutation) => mutation.entry);
+    const addTab = vi.fn();
+    const onWorkspaceActivated = vi.fn();
+    const selection = selectRemoteWorkspaceProjectFromDialog({
+      canUseRemoteWorkspace: true,
+      sessionId: "new-session",
+      path: workspacePath,
+      preparedWorkspaceIdentity: workspaceIdentity,
+      loadingMessage: "loading",
+      getRemoteWorkspaceSession: () => ({
+        sessionId: "new-session",
+        target: { kind: "docker", container: "source" },
+        services: {} as never,
+      }),
+      getWorkspaceTabs: () => [],
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+      activateTabByPath: vi.fn(() => false),
+      handleCancelRemoteProject: vi.fn(async () => {}),
+      bindRemoteWorkspaceScope: async () => {
+        entered.resolve();
+        await binding.promise;
+        return { workspacePath, workspaceIdentity };
+      },
+      isCurrent: async () => retained,
+      commitRemoteWorkspaceSessionMutation: persisted,
+      getRemoteSessions: () => [],
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      addTab,
+      onWorkspaceActivated,
+    });
+    await entered.promise;
+    retained = scenario === "retained";
+    binding.resolve();
+    if (retained) {
+      await selection;
+      expect(persisted).toHaveBeenCalledOnce();
+      expect(addTab).toHaveBeenCalledOnce();
+    } else {
+      await expect(selection).rejects.toThrow("project.navigation-cancelled");
+      expect(persisted).not.toHaveBeenCalled();
+      expect(addTab).not.toHaveBeenCalled();
+      expect(onWorkspaceActivated).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(["existing", "temporary"])(
+    "only cancels a redundant attachment when reopening through %s",
+    async (sessionId) => {
+      const workspacePath = "/workspace/project";
+      const workspaceIdentity = "remote:server:source:/workspace/project";
+      const cancel = vi.fn(async () => {});
+      await selectRemoteWorkspaceProjectFromDialog({
+        canUseRemoteWorkspace: true,
+        sessionId,
+        path: workspacePath,
+        preparedWorkspaceIdentity: workspaceIdentity,
+        loadingMessage: "loading",
+        getRemoteWorkspaceSession: () => ({
+          sessionId,
+          target: { kind: "docker", container: "source" },
+          services: {} as never,
+        }),
+        getWorkspaceTabs: () => [
+          createWorkspaceTab({ workspacePath, workspaceIdentity, remoteSessionId: "existing" }),
+        ],
+        resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+        activateTabByPath: vi.fn(() => true),
+        handleCancelRemoteProject: cancel,
+        bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(workspaceIdentity),
+        commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+        getRemoteSessions: () => [],
+        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspaceIdentity: vi.fn(),
+        addTab: vi.fn(),
+      });
+      if (sessionId === "existing") expect(cancel).not.toHaveBeenCalled();
+      else expect(cancel).toHaveBeenCalledWith("temporary");
+    },
+  );
+
+  it("preserves Host-prepared cwd and identity instead of resolving a path alias again", async () => {
+    const workspacePath = "/tmp/project";
+    const workspaceIdentity = "remote:server:source:/tmp/project";
+    const resolveRemoteWorkspaceCanonicalPath = vi.fn(async () => "/private/tmp/project");
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock(workspaceIdentity);
+    const onWorkspaceActivated = vi.fn();
+    await selectRemoteWorkspaceProjectFromDialog({
+      canUseRemoteWorkspace: true,
+      sessionId: "prepared-session",
+      path: workspacePath,
+      preparedWorkspaceIdentity: workspaceIdentity,
+      loadingMessage: "loading",
+      getRemoteWorkspaceSession: () => ({
+        sessionId: "prepared-session",
+        target: { kind: "server", url: "http://127.0.0.1:1234", serverId: "source" },
+        services: {} as never,
+      }),
+      getWorkspaceTabs: () => [],
+      resolveRemoteWorkspaceCanonicalPath,
+      activateTabByPath: vi.fn(() => false),
+      handleCancelRemoteProject: vi.fn(async () => {}),
+      bindRemoteWorkspaceScope,
+      commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+      getRemoteSessions: () => [],
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      addTab: vi.fn(),
+      onWorkspaceActivated,
+    });
+    expect(resolveRemoteWorkspaceCanonicalPath).not.toHaveBeenCalled();
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledWith(
+      "prepared-session",
+      workspacePath,
+      workspaceIdentity,
+      "project",
+    );
+    expect(onWorkspaceActivated).toHaveBeenCalledWith({ workspacePath, workspaceIdentity });
+  });
+
+  it("commits the remote draft without waiting for retired Renderer task caches", async () => {
     const target = {
       kind: "docker" as const,
       container: "demo",
     };
     const workspacePath = "/workspace/demo";
     const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, target);
-    let resolveRefresh!: () => void;
-    const pendingRefresh = new Promise<void>((resolve) => {
-      resolveRefresh = resolve;
-    });
     const onWorkspaceActivated = vi.fn();
     let selectionSettled = false;
 
@@ -964,15 +1381,13 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
       activateTabByPath: vi.fn(() => false),
       handleCancelRemoteProject: vi.fn(async () => undefined),
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
+      bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(workspaceIdentity),
       commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
       getRemoteSessions: () => [],
       bindRemoteWorkspacePath: vi.fn(),
       bindRemoteWorkspaceIdentity: vi.fn(),
       addTab: vi.fn(),
       onWorkspaceActivated,
-      refreshPinnedTasks: vi.fn(() => pendingRefresh),
-      refreshTimelineTasks: vi.fn(() => pendingRefresh),
     }).then(() => {
       selectionSettled = true;
     });
@@ -983,9 +1398,8 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
         workspaceIdentity,
       });
     });
-    expect(selectionSettled).toBe(false);
+    expect(selectionSettled).toBe(true);
 
-    resolveRefresh();
     await selection;
     expect(selectionSettled).toBe(true);
   });
@@ -1008,12 +1422,11 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
     });
     const activateTabByPath = vi.fn(() => true);
     const handleCancelRemoteProject = vi.fn(async () => undefined);
+    const bindRemoteWorkspaceScope = createBindRemoteWorkspaceScopeMock(workspaceIdentity);
     const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
     const bindWorkspacePath = vi.fn();
     const bindWorkspaceIdentity = vi.fn();
     const addTab = vi.fn();
-    const refreshPinnedTasks = vi.fn(async () => undefined);
-    const refreshTimelineTasks = vi.fn(async () => undefined);
     const localWorkspacePath = "/Users/alice/demo";
 
     await selectRemoteWorkspaceProjectFromDialog({
@@ -1027,7 +1440,7 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
       activateTabByPath,
       handleCancelRemoteProject,
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
+      bindRemoteWorkspaceScope,
       commitRemoteWorkspaceSessionMutation,
       getRemoteSessions: () => [
         createRemoteWorkspaceSessionEntry({
@@ -1040,14 +1453,18 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       bindRemoteWorkspacePath: bindWorkspacePath,
       bindRemoteWorkspaceIdentity: bindWorkspaceIdentity,
       addTab,
-      refreshPinnedTasks,
-      refreshTimelineTasks,
     } as Parameters<typeof selectRemoteWorkspaceProjectFromDialog>[0] & {
       localWorkspacePath: string;
     });
 
     expect(activateTabByPath).not.toHaveBeenCalled();
     expect(handleCancelRemoteProject).not.toHaveBeenCalled();
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledWith(
+      remoteSession.sessionId,
+      workspacePath,
+      undefined,
+      "project",
+    );
     expect(bindWorkspacePath).toHaveBeenCalledWith(workspacePath, remoteSession.sessionId);
     expect(bindWorkspaceIdentity).toHaveBeenCalledWith(workspaceIdentity, remoteSession.sessionId);
     expect(addTab).toHaveBeenCalledWith(workspacePath, {
@@ -1055,6 +1472,7 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       remoteTarget: target,
       workspaceIdentity,
       localWorkspacePath,
+      workspacePurpose: "project",
     });
     expect(commitRemoteWorkspaceSessionMutation).toHaveBeenCalledTimes(1);
     const committedMutation = commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0];
@@ -1062,26 +1480,215 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
     const committedEntry = committedMutation?.entry as { localWorkspacePath?: string } | undefined;
     expect(committedEntry).toBeDefined();
     expect(committedEntry?.localWorkspacePath).toBe(localWorkspacePath);
-    expect(refreshPinnedTasks).toHaveBeenCalledWith({
-      sessionId: remoteSession.sessionId,
+  });
+
+  it("restores the original selection when the wizard reconnects the manually opened tab", async () => {
+    const target = { kind: "docker" as const, container: "demo" };
+    const workspacePath = "/workspace/demo";
+    const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, target);
+    const disconnectedTab = createWorkspaceTab({
+      id: "tab-reconnect",
       workspacePath,
       workspaceIdentity,
     });
-    expect(refreshTimelineTasks).toHaveBeenCalledWith({
-      sessionId: remoteSession.sessionId,
+    const otherTab = createWorkspaceTab({
+      id: "tab-other",
+      workspacePath: "/workspace/other",
+      workspaceIdentity: buildRemoteWorkspaceIdentity("/workspace/other", target),
+    });
+    const select = async (restoringWorkspaceTabId: string) => {
+      const onWorkspaceActivated = vi.fn();
+      await selectRemoteWorkspaceProjectFromDialog({
+        canUseRemoteWorkspace: true,
+        sessionId: "session-1",
+        path: workspacePath,
+        loadingMessage: "loading",
+        getRemoteWorkspaceSession: () => ({
+          sessionId: "session-1",
+          target,
+          services: {} as never,
+        }),
+        getWorkspaceTabs: () => [disconnectedTab, otherTab],
+        restoringWorkspaceTabId,
+        resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+        activateTabByPath: vi.fn(() => true),
+        handleCancelRemoteProject: vi.fn(async () => undefined),
+        bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(workspaceIdentity),
+        commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+        getRemoteSessions: () => [],
+        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspaceIdentity: vi.fn(),
+        addTab: vi.fn(),
+        onWorkspaceActivated,
+      });
+      return onWorkspaceActivated;
+    };
+
+    // 原会话 tab 经向导重连：挂回后保持原选择，不得覆盖成草稿。
+    expect(await select(disconnectedTab.id)).toHaveBeenCalledWith({
       workspacePath,
       workspaceIdentity,
+      restoreSelection: true,
+    });
+    // 向导意图属于别的 tab：仍是普通打开项目，进入新任务。
+    expect(await select(otherTab.id)).toHaveBeenCalledWith({ workspacePath, workspaceIdentity });
+  });
+
+  it("clears the disconnected overlay after the dialog reattaches an existing workspace", async () => {
+    const target = {
+      kind: "docker" as const,
+      container: "demo",
+    };
+    const workspacePath = "/workspace/demo";
+    const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, target);
+    setRemoteWorkspaceConnectionState(workspaceIdentity, "disconnected");
+
+    try {
+      await selectRemoteWorkspaceProjectFromDialog({
+        canUseRemoteWorkspace: true,
+        sessionId: "session-1",
+        path: workspacePath,
+        loadingMessage: "loading",
+        getRemoteWorkspaceSession: () => ({
+          sessionId: "session-1",
+          target,
+          services: {} as never,
+        }),
+        getWorkspaceTabs: () => [createWorkspaceTab({ workspacePath, workspaceIdentity })],
+        resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+        activateTabByPath: vi.fn(() => false),
+        handleCancelRemoteProject: vi.fn(async () => undefined),
+        bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(workspaceIdentity),
+        commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+        getRemoteSessions: () => [],
+        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspaceIdentity: vi.fn(),
+        addTab: vi.fn(),
+      });
+
+      expect(getRemoteWorkspaceConnectionState(workspaceIdentity)).toBeUndefined();
+    } finally {
+      clearRemoteWorkspaceConnectionState(workspaceIdentity);
+    }
+  });
+
+  it("rekeys an existing legacy tab when the first open binds a stable Source Server identity", async () => {
+    const target = {
+      kind: "ssh" as const,
+      host: "localhost",
+      port: 2223,
+      username: "dev",
+    };
+    const workspacePath = "/home/dev";
+    const legacyWorkspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, target);
+    const workspaceIdentity = "remote:server:source-arm64:/home/dev";
+    const store = createTabStore();
+    store.getState().addTab(workspacePath, {
+      workspaceIdentity: legacyWorkspaceIdentity,
+      remoteTarget: target,
+    });
+    const remoteSession = {
+      sessionId: "session-1",
+      target,
+      services: {} as never,
+    };
+
+    await selectRemoteWorkspaceProjectFromDialog({
+      canUseRemoteWorkspace: true,
+      sessionId: remoteSession.sessionId,
+      path: workspacePath,
+      loadingMessage: "loading",
+      getRemoteWorkspaceSession: () => remoteSession,
+      getWorkspaceTabs: () => store.getState().tabs,
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+      activateTabByPath: vi.fn(() => false),
+      handleCancelRemoteProject: vi.fn(async () => undefined),
+      bindRemoteWorkspaceScope: vi.fn(async () => ({
+        workspacePath,
+        workspaceIdentity,
+        previousWorkspaceIdentity: legacyWorkspaceIdentity,
+      })),
+      commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+      getRemoteSessions: () => [],
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      addTab: store.getState().addTab,
+    });
+
+    const workspaceTabs = store
+      .getState()
+      .tabs.filter(
+        (tab): tab is Extract<WindowTabState, { kind: "workspace" }> => tab.kind === "workspace",
+      );
+    expect(workspaceTabs).toHaveLength(1);
+    expect(workspaceTabs[0]).toMatchObject({
+      workspaceIdentity,
+      remoteSessionId: remoteSession.sessionId,
     });
   });
 
-  it("提交 connected 历史与 addTab 之前，先把 canonical context 绑定到 main 的 logical session", async () => {
-    // Bugfix 回归（3.12.0 手机远控连不上 WSL 项目）：新建连接不带 context，main descriptor 停留在 "/"，
-    // 且 UI 用未解析的 {kind:"wsl"} 算出的 identity 与 Host 用解析后 target 算出的不同。
-    // 选目录后必须把 tab 将要使用的 path/identity 绑定回 main，手机桥接的三元校验才能通过。
+  it("uses the temporary SSH target for credential persistence but strips it from the tab", async () => {
+    const connectionTarget = {
+      kind: "ssh" as const,
+      host: "demo.internal",
+      username: "root",
+      password: "password-secret",
+    };
+    const sanitizedTarget = {
+      kind: "ssh" as const,
+      host: "demo.internal",
+      username: "root",
+    };
+    const workspacePath = "/workspace/demo";
+    const workspaceIdentity = "remote:server:3cd4f9da-cd79-426c-9d70-75f36e9f6a87:/workspace/demo";
+    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
+    const addTab = vi.fn();
+
+    await selectRemoteWorkspaceProjectFromDialog({
+      canUseRemoteWorkspace: true,
+      sessionId: "session-1",
+      path: workspacePath,
+      loadingMessage: "loading",
+      connectionTarget,
+      getRemoteWorkspaceSession: () => ({
+        sessionId: "session-1",
+        target: sanitizedTarget,
+        services: {} as never,
+      }),
+      getWorkspaceTabs: () => [],
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
+      activateTabByPath: vi.fn(() => false),
+      handleCancelRemoteProject: vi.fn(async () => undefined),
+      bindRemoteWorkspaceScope: vi.fn(async () => ({
+        workspacePath,
+        workspaceIdentity,
+      })),
+      commitRemoteWorkspaceSessionMutation,
+      getRemoteSessions: () => [],
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      addTab,
+    });
+
+    expect(addTab).toHaveBeenCalledWith(workspacePath, {
+      remoteSessionId: "session-1",
+      remoteTarget: sanitizedTarget,
+      workspaceIdentity,
+      localWorkspacePath: undefined,
+      workspacePurpose: "project",
+    });
+    const mutation = commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0];
+    expect(mutation?.credentialsToSave).toEqual([]);
+  });
+
+  it("提交 connected 历史与 addTab 之前先完成 Host bind，tab 只消费 bind 返回的权威 scope", async () => {
+    // Bugfix 回归（3.12.0 手机远控连不上 WSL 项目，staging 4659329b6b）：新建连接不带 context，
+    // main descriptor 停留在 "/"；手机桥接按 tab 的 path/identity 三元比对 descriptor，
+    // 所以选目录后必须先把 canonical scope bind 回 main，再落库 connected 与建 tab。
     const connectionTarget = { kind: "wsl" as const };
     const workspacePath = "/home/dev";
-    const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, connectionTarget);
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => undefined);
+    const workspaceIdentity = "remote:wsl:Ubuntu:/home/dev";
+    const bindRemoteWorkspaceScope = vi.fn(async () => ({ workspacePath, workspaceIdentity }));
     const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
     const handleCancelRemoteProject = vi.fn(async () => undefined);
     const addTab = vi.fn();
@@ -1102,7 +1709,7 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
       activateTabByPath: vi.fn(() => false),
       handleCancelRemoteProject,
-      bindRemoteWorkspaceSessionContext,
+      bindRemoteWorkspaceScope,
       commitRemoteWorkspaceSessionMutation,
       getRemoteSessions: () => [],
       bindRemoteWorkspacePath: vi.fn(),
@@ -1112,36 +1719,43 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       refreshTimelineTasks: vi.fn(async () => undefined),
     });
 
-    expect(workspaceIdentity).toBe("remote:wsl:default:/home/dev");
-    expect(bindRemoteWorkspaceSessionContext).toHaveBeenCalledWith({
-      sessionId: "session-1",
+    expect(bindRemoteWorkspaceScope).toHaveBeenCalledWith(
+      "session-1",
       workspacePath,
-      workspaceIdentity,
-    });
-    expect(bindRemoteWorkspaceSessionContext.mock.invocationCallOrder[0]).toBeLessThan(
+      undefined,
+      "project",
+    );
+    expect(bindRemoteWorkspaceScope.mock.invocationCallOrder[0]).toBeLessThan(
       commitRemoteWorkspaceSessionMutation.mock.invocationCallOrder[0]!,
     );
-    expect(bindRemoteWorkspaceSessionContext.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(bindRemoteWorkspaceScope.mock.invocationCallOrder[0]).toBeLessThan(
       addTab.mock.invocationCallOrder[0]!,
     );
+    expect(commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0]?.entry).toMatchObject({
+      workspacePath,
+      workspaceIdentity,
+      lastConnectionStatus: "connected",
+    });
     expect(addTab).toHaveBeenCalledWith(workspacePath, {
       remoteSessionId: "session-1",
       remoteTarget: connectionTarget,
       workspaceIdentity,
       localWorkspacePath: undefined,
+      workspacePurpose: "project",
     });
     expect(handleCancelRemoteProject).not.toHaveBeenCalled();
   });
 
-  it("main 绑定 canonical context 失败时回收 session，不落库也不建 tab", async () => {
-    // descriptor 与 tab 不一致的 session 正是手机桥接被拒的根源，绑定失败必须 fail-closed。
+  it("Host bind 失败时不落库也不建 tab", async () => {
+    // descriptor 与 tab 不一致的 session 正是手机桥接被拒的根源，绑定失败必须 fail-closed；
+    // session 回收由 hook 侧 bindRemoteWorkspaceScope 在抛错前完成，这里锁定纯函数不产生半连接状态。
     const target = { kind: "docker" as const, container: "demo" };
     const workspacePath = "/workspace/demo";
-    const bindRemoteWorkspaceSessionContext = vi.fn(async () => {
+    const bindRemoteWorkspaceScope = vi.fn(async () => {
       throw new Error("bind failed");
     });
     const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
-    const handleCancelRemoteProject = vi.fn(async () => undefined);
+    const bindRemoteWorkspacePath = vi.fn();
     const addTab = vi.fn();
 
     await expect(
@@ -1158,11 +1772,11 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
         getWorkspaceTabs: () => [],
         resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
         activateTabByPath: vi.fn(() => false),
-        handleCancelRemoteProject,
-        bindRemoteWorkspaceSessionContext,
+        handleCancelRemoteProject: vi.fn(async () => undefined),
+        bindRemoteWorkspaceScope,
         commitRemoteWorkspaceSessionMutation,
         getRemoteSessions: () => [],
-        bindRemoteWorkspacePath: vi.fn(),
+        bindRemoteWorkspacePath,
         bindRemoteWorkspaceIdentity: vi.fn(),
         addTab,
         refreshPinnedTasks: vi.fn(async () => undefined),
@@ -1170,63 +1784,9 @@ describe("selectRemoteWorkspaceProjectFromDialog", () => {
       }),
     ).rejects.toThrow("bind failed");
 
-    expect(handleCancelRemoteProject).toHaveBeenCalledWith("session-1");
     expect(commitRemoteWorkspaceSessionMutation).not.toHaveBeenCalled();
+    expect(bindRemoteWorkspacePath).not.toHaveBeenCalled();
     expect(addTab).not.toHaveBeenCalled();
-  });
-
-  it("uses the temporary SSH target for credential persistence but strips it from the tab", async () => {
-    const connectionTarget = {
-      kind: "ssh" as const,
-      host: "demo.internal",
-      username: "root",
-      password: "password-secret",
-    };
-    const sanitizedTarget = {
-      kind: "ssh" as const,
-      host: "demo.internal",
-      username: "root",
-    };
-    const workspacePath = "/workspace/demo";
-    const workspaceIdentity = buildRemoteWorkspaceIdentity(workspacePath, connectionTarget);
-    const commitRemoteWorkspaceSessionMutation = vi.fn(async (mutation) => mutation.entry);
-    const addTab = vi.fn();
-
-    await selectRemoteWorkspaceProjectFromDialog({
-      canUseRemoteWorkspace: true,
-      sessionId: "session-1",
-      path: workspacePath,
-      loadingMessage: "loading",
-      connectionTarget,
-      getRemoteWorkspaceSession: () => ({
-        sessionId: "session-1",
-        target: sanitizedTarget,
-        services: {} as never,
-      }),
-      getWorkspaceTabs: () => [],
-      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => workspacePath),
-      activateTabByPath: vi.fn(() => false),
-      handleCancelRemoteProject: vi.fn(async () => undefined),
-      bindRemoteWorkspaceSessionContext: vi.fn(async () => undefined),
-      commitRemoteWorkspaceSessionMutation,
-      getRemoteSessions: () => [],
-      bindRemoteWorkspacePath: vi.fn(),
-      bindRemoteWorkspaceIdentity: vi.fn(),
-      addTab,
-      refreshPinnedTasks: vi.fn(async () => undefined),
-      refreshTimelineTasks: vi.fn(async () => undefined),
-    });
-
-    expect(addTab).toHaveBeenCalledWith(workspacePath, {
-      remoteSessionId: "session-1",
-      remoteTarget: sanitizedTarget,
-      workspaceIdentity,
-      localWorkspacePath: undefined,
-    });
-    const mutation = commitRemoteWorkspaceSessionMutation.mock.calls[0]?.[0];
-    expect(mutation?.credentialsToSave).toEqual([
-      expect.objectContaining({ value: "password-secret" }),
-    ]);
   });
 });
 
@@ -1361,6 +1921,482 @@ describe("collectSshReconnectGroup", () => {
         ],
       }),
     ).toEqual([first]);
+  });
+});
+
+describe("startup reconnect event gates", () => {
+  it("only treats an online Source state as a startup recovery signal", () => {
+    expect(shouldAttemptStartupReconnectForSourceState("online")).toBe(true);
+    expect(shouldAttemptStartupReconnectForSourceState("retrying")).toBe(false);
+    expect(shouldAttemptStartupReconnectForSourceState("offline")).toBe(false);
+    expect(shouldAttemptStartupReconnectForSourceState("failed")).toBe(false);
+  });
+
+  it("ignores clearing the session on an existing tab but detects a new deferred tab", () => {
+    const previousTabs = [
+      createWorkspaceTab({
+        workspacePath: "/repo/a",
+        workspaceIdentity: "remote:server:source-a:/repo/a",
+        remoteSessionId: "session-a",
+      }),
+    ];
+    const disconnectedExistingTab = [
+      createWorkspaceTab({
+        workspacePath: "/repo/a",
+        workspaceIdentity: "remote:server:source-a:/repo/a",
+      }),
+    ];
+    expect(shouldAttemptStartupReconnectForTabChange(disconnectedExistingTab, previousTabs)).toBe(
+      false,
+    );
+
+    const withDeferredTab = [
+      ...disconnectedExistingTab,
+      createWorkspaceTab({
+        id: "tab-b",
+        workspacePath: "/repo/b",
+        workspaceIdentity: "remote:server:source-a:/repo/b",
+      }),
+    ];
+    expect(
+      shouldAttemptStartupReconnectForTabChange(withDeferredTab, disconnectedExistingTab),
+    ).toBe(true);
+
+    expect(
+      shouldAttemptStartupReconnectForTabChange(
+        [
+          ...disconnectedExistingTab,
+          createWorkspaceTab({
+            id: "local-tab",
+            workspacePath: "/repo/local",
+          }),
+        ],
+        disconnectedExistingTab,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("collectStartupRemoteWorkspaceReconnectGroups", () => {
+  it("re-evaluates candidates after active-first restores deferred workspace tabs", async () => {
+    const source = await readFile(
+      new URL("../src/root/useRemoteWorkspaceHistory.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("tabStoreApi.subscribe");
+    expect(source).toContain("shouldAttemptStartupReconnectForTabChange");
+  });
+
+  it("groups recent connected stable histories by Source Server", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const first = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const second = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/b",
+      workspaceIdentity: "remote:server:source-a:/repo/b",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 120_000,
+      lastConnectionStatus: "connected",
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [first, second],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: first.workspacePath,
+            workspaceIdentity: first.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-b",
+            workspacePath: second.workspacePath,
+            workspaceIdentity: second.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys: new Set(),
+        onlineSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [first, second] }]);
+  });
+
+  it("uses a connected entry to admit the Source flight and includes failed open siblings", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const connected = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/connected",
+      workspaceIdentity: "remote:server:source-a:/repo/connected",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const failedSibling = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/failed",
+      workspaceIdentity: "remote:server:source-a:/repo/failed",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 120_000,
+      lastConnectionStatus: "failed",
+      lastConnectionError: "upgrade required",
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [connected, failedSibling],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: connected.workspacePath,
+            workspaceIdentity: connected.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-failed",
+            workspacePath: failedSibling.workspacePath,
+            workspaceIdentity: failedSibling.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys: new Set(),
+        onlineSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([
+      {
+        sourceServerId: "source-a",
+        entries: [connected, failedSibling],
+      },
+    ]);
+  });
+
+  it("picks up a deferred sibling after another workspace from the same Source was attempted", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const first = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const second = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/b",
+      workspaceIdentity: "remote:server:source-a:/repo/b",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [first, second],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: first.workspacePath,
+            workspaceIdentity: first.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-b",
+            workspacePath: second.workspacePath,
+            workspaceIdentity: second.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys: new Set([buildWorkspaceSessionKey(first)]),
+        onlineSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [second] }]);
+  });
+
+  it("restores previously attempted open workspaces after their Source reconnects", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const disconnected = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const unrelated = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/b",
+      workspaceIdentity: "remote:server:source-b:/repo/b",
+      target: { kind: "ssh", host: "other.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const attemptedWorkspaceKeys = new Set([
+      buildWorkspaceSessionKey(disconnected),
+      buildWorkspaceSessionKey(unrelated),
+    ]);
+
+    updateStartupRemoteWorkspaceReconnectAttemptsForSourceState({
+      state: { state: "offline", sourceServerId: "source-a" },
+      onlineSourceServerIds: new Set(),
+      sessions: [disconnected, unrelated],
+      attemptedWorkspaceKeys,
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [disconnected, unrelated],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: disconnected.workspacePath,
+            workspaceIdentity: disconnected.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-b",
+            workspacePath: unrelated.workspacePath,
+            workspaceIdentity: unrelated.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys,
+        onlineSourceServerIds: new Set(["source-a", "source-b"]),
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [disconnected] }]);
+    expect(attemptedWorkspaceKeys).toContain(buildWorkspaceSessionKey(unrelated));
+  });
+
+  it("restores all failed open entries after the Source disconnected in this Renderer", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const first = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "failed",
+      lastConnectionError: "remote connection closed",
+    });
+    const second = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/b",
+      workspaceIdentity: "remote:server:source-a:/repo/b",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 120_000,
+      lastConnectionStatus: "failed",
+      lastConnectionError: "remote connection closed",
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [first, second],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: first.workspacePath,
+            workspaceIdentity: first.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-b",
+            workspacePath: second.workspacePath,
+            workspaceIdentity: second.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys: new Set([
+          buildWorkspaceSessionKey(first),
+          buildWorkspaceSessionKey(second),
+        ]),
+        onlineSourceServerIds: new Set(["source-a"]),
+        currentRendererDisconnectedSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [first, second] }]);
+  });
+
+  it("restores all failed retained workspaces on cold startup, excluding closed and pending-disconnect sources", () => {
+    const now = Date.now();
+    const make = (workspacePath: string) =>
+      createRemoteWorkspaceSessionEntry({
+        workspacePath,
+        workspaceIdentity: `remote:server:source-a:${workspacePath}`,
+        target: { kind: "ssh", host: "example.test", username: "dev" },
+        lastOpenedAt: now - 60_000,
+        lastConnectionStatus: "failed",
+      });
+    const project = make("/repo/a");
+    const conversation = {
+      ...make("/repo/conversation"),
+      workspacePurpose: "conversation" as const,
+    };
+    const closed = make("/repo/closed");
+    const input = {
+      sessions: [project, conversation, closed],
+      tabs: [project, conversation].map((entry, index) =>
+        createWorkspaceTab({
+          id: `tab-${index}`,
+          workspacePath: entry.workspacePath,
+          workspaceIdentity: entry.workspaceIdentity,
+        }),
+      ),
+      attemptedWorkspaceKeys: new Set<string>(),
+      onlineSourceServerIds: new Set(["source-a"]),
+    };
+    expect(collectStartupRemoteWorkspaceReconnectGroups(input)).toEqual([
+      { sourceServerId: "source-a", entries: [project] },
+    ]);
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        ...input,
+        pendingTerminallyDisconnectedSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([]);
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        ...input,
+        attemptedWorkspaceKeys: new Set([
+          project.workspaceIdentity!,
+          conversation.workspaceIdentity!,
+        ]),
+      }),
+    ).toEqual([]);
+  });
+
+  it("RPN-04 does not attach the project owned by the dialog while restoring its sibling", () => {
+    const a = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: 1,
+      lastConnectionStatus: "failed",
+    });
+    const b = {
+      ...a,
+      workspacePath: "/repo/b",
+      workspaceIdentity: "remote:server:source-a:/repo/b",
+    };
+    const input = {
+      sessions: [a, b],
+      tabs: [
+        createWorkspaceTab({
+          id: "manual-tab",
+          workspacePath: a.workspacePath,
+          workspaceIdentity: a.workspaceIdentity,
+        }),
+        createWorkspaceTab({
+          id: "sibling-tab",
+          workspacePath: b.workspacePath,
+          workspaceIdentity: b.workspaceIdentity,
+        }),
+      ],
+      attemptedWorkspaceKeys: new Set<string>(),
+      onlineSourceServerIds: new Set(["source-a"]),
+      manuallyOpeningWorkspaceTabId: "manual-tab",
+    };
+    expect(collectStartupRemoteWorkspaceReconnectGroups(input)).toEqual([
+      { sourceServerId: "source-a", entries: [b] },
+    ]);
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        ...input,
+        manuallyOpeningWorkspaceTabId: undefined,
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [a, b] }]);
+  });
+
+  it("keeps reconnect dedupe while another line still holds the Source online", () => {
+    const workspace = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/a",
+      workspaceIdentity: "remote:server:source-a:/repo/a",
+      lastConnectionStatus: "connected",
+    });
+    const workspaceKey = buildWorkspaceSessionKey(workspace);
+    const attemptedWorkspaceKeys = new Set([workspaceKey]);
+
+    updateStartupRemoteWorkspaceReconnectAttemptsForSourceState({
+      state: { state: "offline", sourceServerId: "source-a" },
+      onlineSourceServerIds: new Set(["source-a"]),
+      sessions: [workspace],
+      attemptedWorkspaceKeys,
+    });
+
+    expect(attemptedWorkspaceKeys).toContain(workspaceKey);
+  });
+
+  it("prunes legacy, live, offline Source and already-attempted histories but restores failed and stale history", () => {
+    const now = 10 * 24 * 60 * 60_000;
+    const make = (sourceServerId: string, overrides: Partial<RemoteWorkspaceSessionEntry> = {}) =>
+      createRemoteWorkspaceSessionEntry({
+        workspacePath: `/repo/${sourceServerId}`,
+        workspaceIdentity: `remote:server:${sourceServerId}:/repo/${sourceServerId}`,
+        target: {
+          kind: "ssh",
+          host: `${sourceServerId}.test`,
+          username: "dev",
+        },
+        lastOpenedAt: now - 60_000,
+        lastConnectionStatus: "connected",
+        ...overrides,
+      });
+    const live = make("live");
+    const eligible = make("eligible");
+    const sessions = [
+      eligible,
+      live,
+      make("offline"),
+      make("stale", { lastOpenedAt: now - 8 * 24 * 60 * 60_000 }),
+      make("failed", { lastConnectionStatus: "failed" }),
+      make("attempted"),
+      createRemoteWorkspaceSessionEntry({
+        workspacePath: "/repo/legacy",
+        workspaceIdentity: "remote:ssh:legacy.test:22:dev:/repo/legacy",
+        target: { kind: "ssh", host: "legacy.test", username: "dev" },
+        lastOpenedAt: now - 60_000,
+        lastConnectionStatus: "connected",
+      }),
+    ];
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions,
+        tabs: sessions.map((entry, index) =>
+          createWorkspaceTab({
+            id: `tab-${index}`,
+            workspacePath: entry.workspacePath,
+            workspaceIdentity: entry.workspaceIdentity,
+            ...(entry === live ? { remoteSessionId: "live-session" } : {}),
+          }),
+        ),
+        attemptedWorkspaceKeys: new Set([buildWorkspaceSessionKey(sessions[5]!)]),
+        onlineSourceServerIds: new Set(["eligible", "live", "stale", "failed", "attempted"]),
+      }),
+    ).toEqual([
+      { sourceServerId: "eligible", entries: [eligible] },
+      { sourceServerId: "stale", entries: [sessions[3]] },
+      { sourceServerId: "failed", entries: [sessions[4]] },
+    ]);
+  });
+
+  it("restores an open workspace whose lastOpenedAt is older than 7 days once its Source is online", () => {
+    // RDUX-14：设备级 7 天门禁由 Host 启动重连持有；Renderer 挂回不再按工作区年龄过滤，
+    // 否则同一设备下会出现部分 tab 上线、部分停留在未连接的割裂状态。
+    const now = 30 * 24 * 60 * 60_000;
+    const recent = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/recent",
+      workspaceIdentity: "remote:server:source-a:/repo/recent",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 60_000,
+      lastConnectionStatus: "connected",
+    });
+    const old = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/old",
+      workspaceIdentity: "remote:server:source-a:/repo/old",
+      target: { kind: "ssh", host: "example.test", username: "dev" },
+      lastOpenedAt: now - 20 * 24 * 60 * 60_000,
+      lastConnectionStatus: "failed",
+    });
+
+    expect(
+      collectStartupRemoteWorkspaceReconnectGroups({
+        sessions: [recent, old],
+        tabs: [
+          createWorkspaceTab({
+            workspacePath: recent.workspacePath,
+            workspaceIdentity: recent.workspaceIdentity,
+          }),
+          createWorkspaceTab({
+            id: "tab-old",
+            workspacePath: old.workspacePath,
+            workspaceIdentity: old.workspaceIdentity,
+          }),
+        ],
+        attemptedWorkspaceKeys: new Set(),
+        onlineSourceServerIds: new Set(["source-a"]),
+      }),
+    ).toEqual([{ sourceServerId: "source-a", entries: [recent, old] }]);
   });
 });
 
@@ -1525,6 +2561,92 @@ describe("reconnectRemoteWorkspaceGroup", () => {
   });
 });
 
+describe("restoreSourceRemoteWorkspaceGroup", () => {
+  it("continues restoring siblings when an earlier member is already live", async () => {
+    const live = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/live",
+      workspaceIdentity: "remote:server:source-a:/repo/live",
+      lastConnectionStatus: "connected",
+    });
+    const disconnected = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/repo/disconnected",
+      workspaceIdentity: "remote:server:source-a:/repo/disconnected",
+      lastConnectionStatus: "failed",
+    });
+    const reconnectEntry = vi.fn(
+      async (entry: RemoteWorkspaceSessionEntry) => entry === disconnected,
+    );
+
+    await restoreSourceRemoteWorkspaceGroup({
+      entries: [live, disconnected],
+      reconnectEntry,
+      options: {
+        activateWorkspaceAfterReconnect: false,
+        showErrorToast: false,
+        recoveryMode: "automatic",
+      },
+    });
+
+    expect(reconnectEntry).toHaveBeenCalledTimes(2);
+    expect(reconnectEntry).toHaveBeenNthCalledWith(1, live, {
+      activateWorkspaceAfterReconnect: false,
+      showErrorToast: false,
+      recoveryMode: "automatic",
+    });
+    expect(reconnectEntry).toHaveBeenNthCalledWith(2, disconnected, {
+      activateWorkspaceAfterReconnect: false,
+      showErrorToast: false,
+      recoveryMode: "automatic",
+    });
+  });
+});
+
+describe("resolveSourceRemoteConversationWorkspaceProjection", () => {
+  it("ensures a missing Source conversation path and self-heals an exact open entry", async () => {
+    const sourceServerId = "11111111-1111-4111-8111-111111111111";
+    const conversationPath = "/home/dev/.zcode/workspace/default";
+    const conversation = createRemoteWorkspaceSessionEntry({
+      workspacePath: conversationPath,
+      workspaceIdentity: `remote:server:${sourceServerId}:${conversationPath}`,
+      workspacePurpose: "project",
+    });
+    const project = createRemoteWorkspaceSessionEntry({
+      workspacePath: "/home/dev",
+      workspaceIdentity: `remote:server:${sourceServerId}:/home/dev`,
+      workspacePurpose: "project",
+    });
+    const ensureConversationWorkspace = vi.fn(async () => ({
+      path: conversationPath,
+      created: false,
+      workspacePurpose: "conversation" as const,
+    }));
+
+    await expect(
+      resolveSourceRemoteConversationWorkspaceProjection({
+        sourceServerId,
+        remoteSessions: [conversation, project],
+        conversationWorkspaceMap: undefined,
+        ensureConversationWorkspace,
+      }),
+    ).resolves.toEqual({
+      conversationWorkspaceMap: {
+        [sourceServerId]: {
+          workspacePath: conversationPath,
+          lastResolvedAt: expect.any(Number),
+        },
+      },
+      remoteSessions: [{ ...conversation, workspacePurpose: "conversation" }, project],
+      updatedEntries: [
+        {
+          workspacePath: conversationPath,
+          workspaceIdentity: conversation.workspaceIdentity,
+        },
+      ],
+    });
+    expect(ensureConversationWorkspace).toHaveBeenCalledOnce();
+  });
+});
+
 describe("cancelPendingRemoteReconnectsForWorkspaceKeys", () => {
   it("cancels and clears pending reconnect request ids for removed workspace keys", async () => {
     const pendingRequestIds = new Map([
@@ -1652,6 +2774,7 @@ describe("openRemoteWorkspaceFromHistoryEntry", () => {
     expect(onWorkspaceActivated).toHaveBeenCalledWith({
       workspacePath: sessionEntry.workspacePath,
       workspaceIdentity: sessionEntry.workspaceIdentity,
+      restoreSelection: true,
     });
     expect(addTab.mock.invocationCallOrder[0]).toBeLessThan(
       activateTabByPath.mock.invocationCallOrder[0]!,
@@ -1708,4 +2831,80 @@ describe("openRemoteWorkspaceFromHistoryEntry", () => {
 
     expect(context.params.reconnectImpl).toHaveBeenCalledTimes(1);
   });
+});
+
+describe("source management directory subscription", () => {
+  // 合同 §8.1.4 事件回调适配：目录写入（重命名/删线路/记录打开项目）不是重连信号。
+  // 订阅逻辑在 hook 的 useEffect 闭包内、无法注入单测，沿用本文件既有的源码结构断言先例。
+  it("refreshes without reconnecting on directory deltas while only online state deltas can reconnect", async () => {
+    const source = await readFile(
+      new URL("../src/root/useRemoteWorkspaceHistory.ts", import.meta.url),
+      "utf8",
+    );
+
+    const directoryCallback =
+      /sourceManagement\.onDidChangeDirectory\?\.\(\s*\(\) => \{([\s\S]*?)\}/u.exec(source)?.[1];
+    expect(directoryCallback, "directory subscription must exist").toBeTruthy();
+    // directory 事件：只走统一刷新队列（refreshSnapshot(false)），不得触发自动重连。
+    expect(directoryCallback).toContain("refreshSnapshot(false)");
+    expect(directoryCallback).not.toContain("attemptReconnect");
+    expect(directoryCallback).not.toContain("runReconnectRemoteWorkspace");
+
+    const stateCallback =
+      /sourceManagement\.onDidChangeState\(\s*\(delta\) => \{([\s\S]*?)\}/u.exec(source)?.[1];
+    expect(stateCallback, "state subscription must exist").toBeTruthy();
+    // state 事件：保留增量 patch，但只有 online 才是启动恢复信号。
+    expect(stateCallback).toContain("delta.state.profileId");
+    expect(stateCallback).toContain("shouldAttemptStartupReconnectForSourceState");
+    expect(stateCallback).toContain("attemptReconnect()");
+
+    // 两路回调共享同一个 generation 判序变量，refresh 结果按低版本丢弃。
+    expect(stateCallback).toContain("observedManagementGeneration");
+    expect(source).toMatch(
+      /refreshInFlight = sourceManagement\s*\.getSnapshot\(\)[\s\S]{0,400}?snapshot\.generation < observedManagementGeneration/u,
+    );
+  });
+});
+
+it("手动原地重连在密码缺失时交回凭据等待，不发起网络请求", async () => {
+  const entry = createRemoteWorkspaceSessionEntry({
+    target: { kind: "ssh", host: "dev", username: "dev", passwordCredentialKey: "missing" },
+  });
+  const connect = vi.fn(async () => "session");
+  await expect(
+    reconnectRemoteWorkspaceHistoryEntry({
+      sessionEntry: entry,
+      activateTabByPath: vi.fn(() => false),
+      setReconnectingRemoteWorkspaceKeys: vi.fn(),
+      loadCredential: vi.fn(async () => null),
+      connectRemoteWorkspaceTarget: connect,
+      resolveRemoteWorkspaceCanonicalPath: vi.fn(async () => entry.workspacePath),
+      bindRemoteWorkspaceScope: createBindRemoteWorkspaceScopeMock(),
+      disposeRemoteWorkspaceSession: vi.fn(async () => undefined),
+      bindRemoteWorkspacePath: vi.fn(),
+      bindRemoteWorkspaceIdentity: vi.fn(),
+      upsertWorkspaceTab: vi.fn(),
+      commitRemoteWorkspaceSessionMutation: vi.fn(async (mutation) => mutation.entry),
+      getRemoteSessions: () => [entry],
+      logger: { warn: vi.fn() },
+      toast: vi.fn(),
+      options: { requireStoredCredentials: true, throwOnFailure: true, showErrorToast: false },
+    }),
+  ).rejects.toMatchObject({ code: "credentials-required" });
+  expect(connect).not.toHaveBeenCalled();
+});
+
+it("主动断开没有失败事实，不把正常关闭持久化成连接失败原因", async () => {
+  const { isRemoteWorkspaceCloseFailure } = await import("@/root/useRemoteWorkspaceHistory.js");
+  expect(isRemoteWorkspaceCloseFailure({ exitCode: null, signal: null })).toBe(false);
+  expect(
+    isRemoteWorkspaceCloseFailure({ exitCode: null, signal: null, error: "connection lost" }),
+  ).toBe(true);
+  expect(
+    isRemoteWorkspaceCloseFailure({
+      exitCode: null,
+      signal: null,
+      reasonCode: "remote-recovery-budget-exhausted",
+    }),
+  ).toBe(true);
 });

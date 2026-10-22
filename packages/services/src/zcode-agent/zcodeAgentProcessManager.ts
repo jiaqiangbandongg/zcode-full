@@ -111,6 +111,7 @@ interface ManagedZCodeAgentProcess {
   client: ZCodeProtocolClient;
   child: ChildProcessWithoutNullStreams;
   cleanupPromise?: Promise<void>;
+  exitDiagnosticsCompleted: Promise<void>;
   exited: boolean;
   firstCleanupReason?: AgentProcessCleanupReason;
   idleTimer?: ReturnType<typeof setTimeout>;
@@ -752,7 +753,10 @@ export class ZCodeAgentProcessManager {
     let cleanupCompleted = false;
     const cleanupPromise = managed.client
       .disposeAndWait()
-      .then(() => {
+      .then(async () => {
+        // 进程树回收可能先于异步 exit 监听器返回；必须等 stderr/退出事件完成，
+        // 否则 Host 会提前释放所有权，关闭调用方看不到最后一条诊断。
+        await managed.exitDiagnosticsCompleted;
         cleanupCompleted = true;
         log("ZCode agent process cleanup completed", {
           workspaceKey: managed.runtimeIdentity.workspaceKey,
@@ -1114,10 +1118,12 @@ export class ZCodeAgentProcessManager {
       ...(this.lane ? { lane: this.lane } : {}),
       workspaceKey,
     };
+    const exitDiagnostics = Promise.withResolvers<void>();
     const managed: ManagedZCodeAgentProcess = {
       child,
       client,
       exited: false,
+      exitDiagnosticsCompleted: exitDiagnostics.promise,
       readyReported: false,
       runtimeIdentity,
       runtimeInstanceId,
@@ -1224,68 +1230,73 @@ export class ZCodeAgentProcessManager {
         }),
       );
       if (child.pid == null) {
+        exitDiagnostics.resolve();
         this.ownedProcesses.delete(managed);
       }
     });
     child.once("exit", async (code, signal) => {
-      managed.exited = true;
-      this.clearIdleTimer(managed);
-      const endedAt = Date.now();
-      const terminationKind = managed.terminationIntent?.kind ?? "unexpected";
-      // 协议解析/stream 故障会先触发 protocol-close，再由 Host 用 SIGTERM
-      // 回收仍存活的进程。若只透传主动 termination intent，desktop 只能看到最终信号，
-      // 无法区分协议故障与受控退出；保留首次 cleanup 原因作为结构化根因。
-      const terminationReason = managed.terminationIntent?.reason ?? managed.firstCleanupReason;
-      // 协议已立即失效，但 exit 先于 stderr EOF；保留旧 runtime 闭包身份收齐最后诊断。
-      await transport.waitForStderrDrain();
-      const stderr = stderrTail.snapshot();
-      const exitContext = {
-        workspaceKey,
-        pid: child.pid,
-        runtimeIdentity: runtimeIdentity.identity,
-        code,
-        signal,
-        terminationKind,
-        terminationReason,
-      };
-      // 之前日志只有新的 "process started"，缺少旧 pid 的退出轨迹。
-      // agent native crash 后 UI 只会看到 protocol close/Session is not active，无法判断是崩溃还是主动重启。
-      log("ZCode agent process exited", exitContext);
-      if (terminationKind === "unexpected") {
-        // Agent 顶层异常只写 stderr 并以非零 code 退出；stderr 过去仅走开发态
-        // debug，生产日志只剩 code=1，无法还原异常。不能只按非零 code 判断：signal crash
-        // 和长期运行的 Agent 自行 exit 0 同样是非预期退出。
-        // 已有独立生命周期事件，显式标记包装日志，避免 Electron 将其再计为 JS 异常。
-        errorLog(
-          `ZCode agent process exited unexpectedly${this.processLifecycleReporter ? ` ${ZCODE_AGENT_LIFECYCLE_LOG_MARKER}` : ""}`,
-          {
-            ...exitContext,
-            stderr,
-          },
-        );
-      }
-      if (typeof child.pid === "number") {
-        this.reportProcessLifecycle((reporter) =>
-          reporter.onExit({
-            pid: child.pid!,
-            provider: ZCODE_AGENT_PROVIDER,
-            ...(this.lane ? { lane: this.lane } : {}),
-            workspacePath: params.workspacePath,
-            exitCode: code,
-            signal,
-            endedAt,
-            terminationKind,
-            runtimeReady: managed.readyAt != null,
-            ...(terminationReason ? { terminationReason } : {}),
-            runtimeGeneration,
-            runtimeInstanceId,
-            uptimeMs: Math.max(0, endedAt - startedAt),
-            stderrLineCount: stderr.lineCount,
-            ...(terminationKind === "unexpected" && stderr.tail.length > 0
-              ? { stderrTail: stderr.tail }
-              : {}),
-          }),
-        );
+      try {
+        managed.exited = true;
+        this.clearIdleTimer(managed);
+        const endedAt = Date.now();
+        const terminationKind = managed.terminationIntent?.kind ?? "unexpected";
+        // 协议解析/stream 故障会先触发 protocol-close，再由 Host 用 SIGTERM
+        // 回收仍存活的进程。若只透传主动 termination intent，desktop 只能看到最终信号，
+        // 无法区分协议故障与受控退出；保留首次 cleanup 原因作为结构化根因。
+        const terminationReason = managed.terminationIntent?.reason ?? managed.firstCleanupReason;
+        // 协议已立即失效，但 exit 先于 stderr EOF；保留旧 runtime 闭包身份收齐最后诊断。
+        await transport.waitForStderrDrain();
+        const stderr = stderrTail.snapshot();
+        const exitContext = {
+          workspaceKey,
+          pid: child.pid,
+          runtimeIdentity: runtimeIdentity.identity,
+          code,
+          signal,
+          terminationKind,
+          terminationReason,
+        };
+        // 之前日志只有新的 "process started"，缺少旧 pid 的退出轨迹。
+        // agent native crash 后 UI 只会看到 protocol close/Session is not active，无法判断是崩溃还是主动重启。
+        log("ZCode agent process exited", exitContext);
+        if (terminationKind === "unexpected") {
+          // Agent 顶层异常只写 stderr 并以非零 code 退出；stderr 过去仅走开发态
+          // debug，生产日志只剩 code=1，无法还原异常。不能只按非零 code 判断：signal crash
+          // 和长期运行的 Agent 自行 exit 0 同样是非预期退出。
+          // 已有独立生命周期事件，显式标记包装日志，避免 Electron 将其再计为 JS 异常。
+          errorLog(
+            `ZCode agent process exited unexpectedly${this.processLifecycleReporter ? ` ${ZCODE_AGENT_LIFECYCLE_LOG_MARKER}` : ""}`,
+            {
+              ...exitContext,
+              stderr,
+            },
+          );
+        }
+        if (typeof child.pid === "number") {
+          this.reportProcessLifecycle((reporter) =>
+            reporter.onExit({
+              pid: child.pid!,
+              provider: ZCODE_AGENT_PROVIDER,
+              ...(this.lane ? { lane: this.lane } : {}),
+              workspacePath: params.workspacePath,
+              exitCode: code,
+              signal,
+              endedAt,
+              terminationKind,
+              runtimeReady: managed.readyAt != null,
+              ...(terminationReason ? { terminationReason } : {}),
+              runtimeGeneration,
+              runtimeInstanceId,
+              uptimeMs: Math.max(0, endedAt - startedAt),
+              stderrLineCount: stderr.lineCount,
+              ...(terminationKind === "unexpected" && stderr.tail.length > 0
+                ? { stderrTail: stderr.tail }
+                : {}),
+            }),
+          );
+        }
+      } finally {
+        exitDiagnostics.resolve();
       }
     });
     client.onRequestTimeout((event) => {

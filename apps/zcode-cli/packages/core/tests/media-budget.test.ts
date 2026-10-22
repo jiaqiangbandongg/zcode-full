@@ -533,7 +533,6 @@ describe("model request media budget", () => {
     const secondRequestImages = requestImageBlocks(requests[1] ?? []);
     const secondRequestText = requestTextBlocks(requests[1] ?? []).join("\n");
     expect(DEFAULT_MODEL_REQUEST_MEDIA_BUDGET_BYTES).toBe(40 * 1024 * 1024);
-    expect(secondRequestImages).toHaveLength(2);
     expect(secondRequestImages.map((image) => image.source?.placeholder)).toEqual([
       "[image #1]",
       "[image #2]",

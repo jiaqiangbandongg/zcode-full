@@ -91,6 +91,21 @@ export const workflowNotificationMetaSchema = z.discriminatedUnion("kind", [
 ]);
 export type WorkflowNotificationMeta = z.infer<typeof workflowNotificationMetaSchema>;
 
+// 主代理闲着、run 还欠着决定时的提醒（docs/dynamic-workflow/transcript-and-notifications.md
+// 「Reminding an idle main agent」）：每个 run 一条，只带发出那一刻的计数与最久的等待——每个决定的
+// 原文在它自己那条 escalation / hole 行上，这一行不重复，也不随后续状态翻转。
+//
+// ⚠ 它是 originMeta 上**独立的键**，不是上面那个 union 的成员（同一篇文档「The payload」）。它曾经是
+// `kind: "blocked"`：闭集多一个成员，不认识它的客户端（手机远控页单独部署，可能比 CLI 旧）解析整帧
+// 失败，强制快照里是同一行、再次失败，于是整个会话打不开。不认识的**键**
+// 则只是被剥掉，行退回裸标题。所以新的通知种类一律加新的可选键，这个 union 不再加成员。
+export const workflowBlockedMetaSchema = z.object({
+  questions: z.number().int().nonnegative(),
+  holes: z.number().int().nonnegative(),
+  sinceMs: z.number().int().nonnegative(),
+});
+export type WorkflowBlockedMeta = z.infer<typeof workflowBlockedMetaSchema>;
+
 export const backgroundResultOriginMetaSchema = z.object({
   // 三个取值与 contracts 的 BackgroundResultOriginMeta 保持同步。
   // "workflow" 是 dynamic-workflow run（workId ≡ runId），复用整条后台通知管线。
@@ -100,6 +115,9 @@ export const backgroundResultOriginMetaSchema = z.object({
   // 只在 backgroundSource === "workflow" 的单条通知轮上在场；zod 剥离未知键，
   // 这里不加即整条链路静默丢——本字段是 manifest 渲染的唯一数据源。
   workflowNotification: workflowNotificationMetaSchema.optional(),
+  // 提醒载荷，与 workflowNotification 至多在场一个。`.catch(undefined)`：将来它的形状变了，认识这个
+  // 键的客户端把它当作缺席（裸标题行），而不是丢掉整帧。
+  workflowBlocked: workflowBlockedMetaSchema.optional().catch(undefined),
 });
 export type BackgroundResultOriginMeta = z.infer<typeof backgroundResultOriginMetaSchema>;
 

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  permissionFullAccessReceiptSchema,
   createMessageId,
   createPartId,
   createProjectId,
@@ -159,9 +158,6 @@ describe("CR-02 授权辅助标记不阻断任务恢复", () => {
     } else expect(logger.warn).not.toHaveBeenCalled();
   });
   it("合法记录恢复标记，不以 receipt 内旧 mode 覆盖当前 execution state", async () => {
-    expect(permissionFullAccessReceiptSchema.safeParse(validReceipt())).toMatchObject({
-      success: true,
-    });
     const { runtime, entries, logger } = fixture(validReceipt());
     await runtime.resumeFromStore();
     expect(logger.warn).not.toHaveBeenCalled();

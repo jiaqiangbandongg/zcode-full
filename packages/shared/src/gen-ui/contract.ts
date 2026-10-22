@@ -8,6 +8,11 @@ export const GEN_UI_CONTEXT_MAX_BYTES = 64 * 1024;
 export const GEN_UI_GLOBALS_EVENT = "zcode:set_globals";
 export const GEN_UI_STATE_CONTEXT_KEY = "zcode/genUiState";
 export const GEN_UI_TWEAK_CONTEXT_KEY = "zcode/genUiTweaks";
+export const GEN_UI_STYLE_CONTEXT_KEY = "zcode/genUiStyles";
+export const genUiStyleVariablesSchema = z.record(
+  z.string().regex(/^--gen-ui-[a-z-]+$/),
+  z.string(),
+);
 export const GEN_UI_STATE_METHOD = "zcode/gen-ui/state";
 export const GEN_UI_FOLLOW_UP_METHOD = "zcode/gen-ui/follow-up";
 export const GEN_UI_TWEAK_METHOD = "zcode/gen-ui/tweak";

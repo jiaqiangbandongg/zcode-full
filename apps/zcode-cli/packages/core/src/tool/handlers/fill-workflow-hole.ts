@@ -300,6 +300,7 @@ export const fillWorkflowHoleToolEntry: ToolEntry = {
   capability:
     "Supply the body of a hole a running dynamic-workflow run is waiting at, so the parked branch resumes",
   metadata: {
+    shouldDefer: true,
     name: FILL_WORKFLOW_HOLE_TOOL_NAME,
     description: FILL_WORKFLOW_HOLE_TOOL_DESCRIPTION,
     readOnly: false,

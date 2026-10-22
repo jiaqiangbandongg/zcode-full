@@ -111,6 +111,8 @@ export async function refreshLatestModelProviderFamilySelectionAfterLogin(params
   const expectedAccountSettings = {
     providerFamilyDomain: currentSettings.providerFamilyDomain,
     providerFamilyConnectionSelections: currentSettings.providerFamilyConnectionSelections,
+    // 原因：相同身份重选不会改变映射，迟到操作仍须按锁内版本拒绝。
+    providerFamilyDomainUpdatedAt: currentSettings.providerFamilyDomainUpdatedAt ?? 0,
   };
   const codingPlanProviderId = familySpec.individualCodingPlanProviderId;
   const startPlanProviderId = familySpec.startPlanProviderId;

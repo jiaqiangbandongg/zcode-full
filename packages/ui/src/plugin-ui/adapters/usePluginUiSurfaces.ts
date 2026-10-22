@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useReducer } from "react";
 import type { PluginUiSurfaceEntry } from "@zcode/services";
 import { useOptionalServices } from "@/hooks/useServices.js";
 import { logger } from "@/logger.js";
-import { usePluginStore } from "@/store/pluginStore.js";
+import {
+  isPluginManagementChangeRelevant,
+  subscribePluginManagementChanges,
+} from "@/store/pluginManagementStoreLoading.js";
 
 export interface UsePluginUiSurfacesInput {
   workspacePath: string;
@@ -13,15 +16,29 @@ export interface UsePluginUiSurfacesInput {
 
 /**
  * 工作区级面板入口（）：经桥读 `plugins/listUiSurfaces`。
- * 刷新信号复用插件设置页的 store：`installedPlugins` 的 id+enabled 指纹变化（安装 / 卸载 / 启停）即重新拉取；
- * 不再另起事件通道，也不缓存跨 workspace。
+ * 只订阅当前插件管理命令的成功变更；旧 pluginStore 不接收真实安装和启停结果。
  */
 export function usePluginUiSurfaces(input: UsePluginUiSurfacesInput): PluginUiSurfaceEntry[] {
   const bridge = useOptionalServices()?.pluginUiBridgeService;
-  const pluginFingerprint = usePluginStore((state) =>
-    state.installedPlugins.map((plugin) => `${plugin.id}:${plugin.enabled ? 1 : 0}`).join("|"),
-  );
+  const [pluginRevision, refresh] = useReducer((value: number) => value + 1, 0);
   const enabled = input.enabled !== false && Boolean(bridge);
+  useEffect(() => {
+    if (!enabled) return;
+    return subscribePluginManagementChanges((change) => {
+      if (
+        isPluginManagementChangeRelevant(
+          {
+            workspacePath: input.workspacePath,
+            workspaceIdentity: input.workspaceIdentity?.trim() || null,
+            authorityKey: null,
+            configScope: null,
+          },
+          change,
+        )
+      )
+        refresh();
+    });
+  }, [enabled, input.workspacePath, input.workspaceIdentity]);
   const [surfaces, setSurfaces] = useState<PluginUiSurfaceEntry[]>([]);
 
   useEffect(() => {
@@ -48,8 +65,7 @@ export function usePluginUiSurfaces(input: UsePluginUiSurfacesInput): PluginUiSu
     return () => {
       cancelled = true;
     };
-    // pluginFingerprint 只作刷新信号。
-  }, [bridge, enabled, input.workspaceIdentity, input.workspacePath, pluginFingerprint]);
+  }, [bridge, enabled, input.workspaceIdentity, input.workspacePath, pluginRevision]);
 
   return surfaces;
 }

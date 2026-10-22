@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   WEB_REMOTE_CONTROL_RPC_TRANSPORT_LIMITS,
   encodeWebRemoteControlRpcTransportMessage,
   type WebRemoteControlAppPayload,
 } from "@zcode/shared";
+import { parseWebRemoteControlRelayV2OutgoingMessage } from "@zcode/shared/web-remote-relay";
 import { WebRemoteControlRelayPayloadSerializer } from "../src/webRemoteControlRelayPayloadSerializer.js";
 
 describe("WebRemoteControlRelayPayloadSerializer", () => {
@@ -22,6 +23,20 @@ describe("WebRemoteControlRelayPayloadSerializer", () => {
     expect(replay.json).toBe(first.json);
     expect(replay.message.client_ts).toBe(100);
     expect(replay.bytes).toBe(new TextEncoder().encode(replay.json).byteLength);
+  });
+
+  it("uses Unix seconds for the default V2 data timestamp", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_123);
+    try {
+      const prepared = new WebRemoteControlRelayPayloadSerializer().prepare({
+        zcode_type: "bootstrap-request",
+        requestId: "request-1",
+      });
+      expect(prepared.message.client_ts).toBe(1_800_000_000);
+      expect(parseWebRemoteControlRelayV2OutgoingMessage(JSON.parse(prepared.json))).not.toBeNull();
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("distinguishes a permanent oversize envelope from a bounded payload", () => {

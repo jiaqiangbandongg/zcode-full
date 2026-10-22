@@ -101,6 +101,55 @@ describe("NodeApiClient endpoint rewriting", () => {
     );
   });
 
+  it("X-Client-Language 跟随注入的界面语言，而不是进程 Intl locale", async () => {
+    // 从 Dock 启动时进程无 LANG，Intl 回退 en-US；界面语言才是唯一数据源。
+    const resolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
+    const intlSpy = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockImplementation(function (this: Intl.DateTimeFormat) {
+        return { ...resolvedOptions.call(this), locale: "en-US" };
+      });
+    let uiLocale = "zh-CN";
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createNodeApiClient({
+      fetchImpl: fetchImpl as typeof fetch,
+      resolveZCodeEndpointOrigin: async () => "https://zcode.z.ai",
+      resolveClientLanguage: () => uiLocale,
+    });
+
+    try {
+      await client.request(`${DEFAULT_ZCODE_ENDPOINT_ORIGIN}/api/v1/zcode-plan/billing/balance`);
+      uiLocale = "en-US";
+      await client.request(`${DEFAULT_ZCODE_ENDPOINT_ORIGIN}/api/v1/client/configs`);
+      uiLocale = "zh-CN";
+      await client.request(`${DEFAULT_ZCODE_ENDPOINT_ORIGIN}/api/v1/marketing/touch`, {
+        headers: { "X-Client-Language": "en-US" },
+      });
+    } finally {
+      intlSpy.mockRestore();
+    }
+
+    const languages = fetchImpl.mock.calls.map(([, init]) =>
+      new Headers(init?.headers).get("X-Client-Language"),
+    );
+    // 切换语言后下一次请求立即生效；调用方显式传入的值仍然优先。
+    expect(languages).toEqual(["zh-CN", "en-US", "en-US"]);
+  });
+
+  it("尚未收到界面语言时回退 Intl locale", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createNodeApiClient({
+      fetchImpl: fetchImpl as typeof fetch,
+      resolveZCodeEndpointOrigin: async () => "https://zcode.z.ai",
+      resolveClientLanguage: () => undefined,
+    });
+
+    await client.request(`${DEFAULT_ZCODE_ENDPOINT_ORIGIN}/api/v1/client/configs`);
+
+    const headers = new Headers(fetchImpl.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("X-Client-Language")).toBe(buildZCodeSourceHeaders()["X-Client-Language"]);
+  });
+
   it("给当前 zcode endpoint 请求补既有 deviceMid header", async () => {
     const dataBaseDir = mkdtempSync(join(tmpdir(), "zcode-device-mid-"));
     tempDirs.push(dataBaseDir);

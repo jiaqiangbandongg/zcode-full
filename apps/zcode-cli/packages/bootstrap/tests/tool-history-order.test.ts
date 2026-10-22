@@ -29,7 +29,8 @@ describe("tool order through runtime and SQLite", () => {
       const root = await mkdtemp(join(tmpdir(), "zcode-tool-order-"));
       const dbPath = join(root, "session.sqlite");
       const sessionId = createSessionId("tool-order");
-      let store = createSqliteSessionStore({ dbPath });
+      // 合并适配：SQLite store 已改为异步打开，必须等初始化完成后再注入持久化故障。
+      let store = await createSqliteSessionStore({ dbPath });
       const writes: ToolPart[] = [];
       const pendingStarted = Promise.withResolvers<void>();
       const pendingRelease = Promise.withResolvers<void>();
@@ -194,7 +195,7 @@ describe("tool order through runtime and SQLite", () => {
         // 冷恢复确实关闭并重开数据库，再观察新的 ModelFactory 请求。
         runtime.beginShutdown();
         store.close();
-        store = createSqliteSessionStore({ dbPath });
+        store = await createSqliteSessionStore({ dbPath });
         runtime = createRuntime();
         await runtime.resumeFromStore();
         await runtime.executeTurn("later user query");

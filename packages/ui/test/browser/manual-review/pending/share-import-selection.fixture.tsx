@@ -16,7 +16,9 @@ import { decodeCustomModelValue, encodeCustomModelValue } from "@/lib/zcodeCusto
 import { captureComposerRecentSubmission } from "@/lib/composerRecent.js";
 import { useDraftConfigControl } from "@/v4/composer/useDraftConfigControl.js";
 import { persistV4ComposerDraft, readV4ComposerDraft } from "@/v4/composer/composerDraftStore.js";
-import { seedImportedSessionDraft } from "@/v4/composer/newTaskDraft.js";
+import { resolveImportedComposerConfig } from "@/v4/composer/newTaskDraft.js";
+import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
+import type { SessionConfigState } from "@zcode/shared/zcode-protocol-v4";
 import { createComposerSubmissionConfig } from "@/v4/composer/composerSubmissionConfig.js";
 import type { V4ComposerConfigPicker } from "@/v4/composer/configPickerState.js";
 import "@/styles.css";
@@ -67,6 +69,13 @@ const services = {
 const platform = {} as IPlatformService;
 if (!sessionStorage.getItem("prepared")) {
   sessionStorage.setItem("prepared", "true");
+  if (source === "session-text")
+    persistV4ComposerDraft(workspacePath, undefined, "session", {
+      text: "UNSENT TEXT",
+      mode: "yolo",
+      planEnabled: true,
+      modelSelection: selection,
+    });
   if (source === "recent")
     captureComposerRecentSubmission(workspacePath, { modelSelection: selection, mode: "yolo" })();
   if (source === "root" || source === "empty")
@@ -81,7 +90,30 @@ document.documentElement.className =
 
 function Fixture() {
   const { intl } = useZCodeIntl();
-  const [sessionId, setSessionId] = useState<string | null>("unrelated-history");
+  const [sessionId, setSessionId] = useState<string | null>(
+    source.startsWith("session") ? "session" : "unrelated-history",
+  );
+  const [snapshot, setSnapshot] = useState<Partial<SessionConfigState>>({
+    mode: "build",
+    planEnabled: false,
+    modelSelection: selection,
+    permissionGrant: { interactionId: "historical-grant" },
+    planTransition: { toolCallId: "historical-plan", planEnabled: true },
+  });
+  const navigate = (id: string | null, imported = false) => {
+    const store = useZCodeSessionStore.getState();
+    if (id === null) store.startDraft(workspacePath);
+    else
+      store.setActiveTaskId(
+        workspacePath,
+        id,
+        undefined,
+        imported
+          ? resolveImportedComposerConfig({ workspacePath, sessionId: id, reused: false })
+          : undefined,
+      );
+    setSessionId(id);
+  };
   const [ready, setReady] = useState(source !== "delayed");
   const [picker, setPicker] = useState<V4ComposerConfigPicker | null>(null);
   const [submitted, setSubmitted] = useState("");
@@ -89,7 +121,7 @@ function Fixture() {
   const control = useDraftConfigControl({
     workspacePath,
     sessionId,
-    sessionConfig: { mode: "build" },
+    sessionConfig: snapshot,
     agentStartupAllowed: false,
     modelSelectionService: ready ? modelSelectionService : null,
   });
@@ -100,21 +132,43 @@ function Fixture() {
     <main className="bg-background text-foreground min-h-screen p-4 space-y-4">
       <button
         onClick={() => {
-          seedImportedSessionDraft({ workspacePath, sessionId: "imported", reused: false });
-          setSessionId("imported");
+          navigate("imported", true);
         }}
       >
         Import
       </button>
       <button
         onClick={() => {
-          seedImportedSessionDraft({ workspacePath, sessionId: "imported", reused: true });
-          setSessionId("imported");
+          navigate("imported");
         }}
       >
         Reopen
       </button>
-      <button onClick={() => setSessionId(null)}>Ordinary new task</button>
+      <button onClick={() => navigate(null)}>Ordinary new task</button>
+      <button onClick={() => navigate("session")}>Open session</button>
+      <button
+        onClick={() =>
+          setSnapshot({
+            ...snapshot,
+            mode: "yolo",
+            permissionGrant: { interactionId: "live-grant" },
+          })
+        }
+      >
+        New grant
+      </button>
+      <button
+        onClick={() =>
+          setSnapshot({
+            ...snapshot,
+            planEnabled: true,
+            planTransition: { toolCallId: "live-plan", planEnabled: true },
+          })
+        }
+      >
+        New plan
+      </button>
+      <button onClick={() => setSnapshot({ ...snapshot })}>Repeat snapshot</button>
       <button onClick={() => setReady(true)}>Registry ready</button>
       <p data-testid="content">{sessionId === "imported" ? "IMPORTED CONTENT" : "other"}</p>
       <div className="flex flex-wrap gap-2">

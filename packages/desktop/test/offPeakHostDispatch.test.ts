@@ -38,7 +38,8 @@ beforeAll(async () => {
 function setup() {
   const service = {
     listDeletedTaskIds: vi.fn(async (): Promise<string[]> => []),
-    listTasks: vi.fn(async () => [{ taskId: "bound", status: "completed" }]),
+    // tasks-index 行的 status 只镜像 CLI 终态，运行中只能来自 syncer 的活动集合。
+    listActiveTaskIds: vi.fn(async (): Promise<string[]> => []),
     resumeTask: vi.fn(async () => {}),
     setConfigOption: vi.fn(async () => {}),
     createTask: vi.fn(async (_params: Record<string, unknown>) => ({
@@ -48,17 +49,36 @@ function setup() {
     sendPrompt: vi.fn(async () => {}),
   };
   const runtime = {
+    service: {
+      residentExecutions: {
+        has: vi.fn(() => false),
+        retakeGuard: vi.fn(() => () => true),
+        isUserOwned: vi.fn(() => false),
+        discardTicket: vi.fn(async () => {}),
+        deliverTicket: vi.fn(async () => undefined as { sessionId: string } | undefined),
+      },
+    },
     validateSelection: vi.fn(async () => true),
     buildRequestAuth: vi.fn(async () => ({ apiKey: "test-ticket-auth" })),
   };
   const dispose = vi.fn();
-  const track = vi.fn();
+  const admitted = vi.fn();
+  const track = vi.fn(() => ({ admitted }));
+  const repo = {
+    get: vi.fn(async () => ({ status: "queued", conversationId: "bound" })),
+    markRunning: vi.fn(async () => ({})),
+    requeueForContinuation: vi.fn(async () => ({})),
+  };
   const report = vi.fn();
   const dispatch = createDispatch({
     activeServices: { getOptional: () => service },
     reportHostSessionCreate: report,
     parentPort: {},
     IZCodeTaskService: Symbol("task-service"),
+    IZCodeAgentService: Symbol("agent-service"),
+    offPeakTaskRepo: repo,
+    isOffPeakTerminalStatus: (status: string) =>
+      ["completed", "failed", "cancelled"].includes(status),
     ensureOffPeakRuntime: async () => runtime,
     OffPeakModelUnavailableError,
     resolveOffPeakDispatchKind,
@@ -84,10 +104,69 @@ function setup() {
     workspacePath: "/project",
     workspaceIdentity: "remote:ssh:test:/project",
   };
-  return { service, runtime, dispose, track, report, dispatch, request };
+  return { service, runtime, dispose, track, report, dispatch, request, admitted, repo };
 }
 
 describe("Host OffPeak dispatch current execution contract", () => {
+  it("会话准备期间任务取消，接纳前重新核对并释放票据", async () => {
+    const state = setup();
+    state.service.resumeTask.mockImplementation(async () => {
+      state.repo.get.mockResolvedValue({ status: "cancelled", conversationId: "bound" });
+    });
+    await expect(state.dispatch(state.request)).resolves.toMatchObject({ lifecycleManaged: true });
+    expect(state.service.sendPrompt).not.toHaveBeenCalled();
+    expect(state.track).not.toHaveBeenCalled();
+    expect(state.runtime.service.residentExecutions.discardTicket).toHaveBeenCalledWith("ticket-1");
+  });
+
+  it("续票交接报错期间已被用户接管，不将用户任务重新排队", async () => {
+    const state = setup();
+    state.runtime.service.residentExecutions.has.mockReturnValue(true);
+    state.runtime.service.residentExecutions.retakeGuard.mockReturnValue(() => false);
+    state.runtime.service.residentExecutions.deliverTicket.mockRejectedValue(
+      new Error("lost reply"),
+    );
+    await expect(state.dispatch(state.request)).rejects.toThrow("lost reply");
+    expect(state.repo.requeueForContinuation).not.toHaveBeenCalled();
+  });
+  it("任务已结束时迟到派发只释放票据，不重放原始任务", async () => {
+    const state = setup();
+    state.repo.get.mockResolvedValue({ status: "completed", conversationId: "bound" });
+    await expect(state.dispatch(state.request)).resolves.toMatchObject({ lifecycleManaged: true });
+    expect(state.service.sendPrompt).not.toHaveBeenCalled();
+    expect(state.repo.markRunning).not.toHaveBeenCalled();
+  });
+  it("未创建会话的任务已删除时，不返回虚构的空会话标识", async () => {
+    const state = setup();
+    state.repo.get.mockResolvedValue(undefined as never);
+    const result = await state.dispatch({ ...state.request, sessionId: undefined });
+    expect(result).toMatchObject({ lifecycleManaged: true });
+    expect((result as { sessionId?: string }).sessionId).toBeUndefined();
+    expect(state.runtime.service.residentExecutions.discardTicket).toHaveBeenCalledWith("ticket-1");
+    expect(state.service.createTask).not.toHaveBeenCalled();
+  });
+  it("构建续票凭据期间驻留执行结束，不落入初始派发", async () => {
+    const state = setup();
+    state.runtime.service.residentExecutions.has.mockReturnValue(true);
+    await expect(state.dispatch(state.request)).resolves.toMatchObject({ lifecycleManaged: true });
+    expect(state.service.sendPrompt).not.toHaveBeenCalled();
+    expect(state.service.resumeTask).not.toHaveBeenCalled();
+  });
+  it("驻留执行收到新票只交接票据，不重复恢复或提交原始任务", async () => {
+    const state = setup();
+    state.runtime.service.residentExecutions.has.mockReturnValue(true);
+    state.runtime.service.residentExecutions.deliverTicket.mockResolvedValue({
+      sessionId: "bound",
+    });
+    await expect(state.dispatch({ ...state.request, conversationId: "bound" })).resolves.toEqual({
+      conversationId: "bound",
+      sessionId: "bound",
+      lifecycleManaged: true,
+    });
+    expect(state.service.sendPrompt).not.toHaveBeenCalled();
+    expect(state.service.resumeTask).not.toHaveBeenCalled();
+    expect(state.track).not.toHaveBeenCalled();
+  });
   it.each(["bound-first-run", "resume"])(
     "%s keeps idle reasoning out of persisted Session config",
     async (kind) => {
@@ -99,6 +178,7 @@ describe("Host OffPeak dispatch current execution contract", () => {
       await expect(state.dispatch(request)).resolves.toEqual({
         conversationId: "bound",
         sessionId: "bound",
+        lifecycleManaged: true,
       });
       expect(state.service.setConfigOption.mock.calls).toHaveLength(1);
       expect(state.service.setConfigOption).toHaveBeenCalledWith(
@@ -114,11 +194,18 @@ describe("Host OffPeak dispatch current execution contract", () => {
             memoryExtraction: "skip",
             selectionScope: "execution",
             requestAuth: { apiKey: "test-ticket-auth" },
-            subagents: { foregroundModel: "submission", background: "deny" },
+            offPeak: {
+              executionId: expect.any(String),
+              ticketId: "ticket-1",
+              providerErrorCode: "3102",
+            },
+            subagents: { foregroundModel: "submission", background: "allow" },
           },
         }),
       );
       expect(state.service.createTask).not.toHaveBeenCalled();
+      expect(state.repo.markRunning).toHaveBeenCalled();
+      expect(state.admitted).toHaveBeenCalledTimes(1);
       expect(state.report).not.toHaveBeenCalled();
       expect(state.service.resumeTask).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -133,8 +220,7 @@ describe("Host OffPeak dispatch current execution contract", () => {
     "bound session %s fails before config writes or dispatch",
     async (kind) => {
       const state = setup();
-      if (kind === "busy")
-        state.service.listTasks.mockResolvedValue([{ taskId: "bound", status: "running" }]);
+      if (kind === "busy") state.service.listActiveTaskIds.mockResolvedValue(["bound"]);
       else state.service.listDeletedTaskIds.mockResolvedValue(["bound"]);
       await expect(state.dispatch(state.request)).rejects.toThrow(
         kind === "busy" ? "is busy" : "was deleted",
@@ -158,7 +244,7 @@ describe("Host OffPeak dispatch current execution contract", () => {
       {},
       {
         sessionId: "new",
-      messageId: "trace-new",
+        messageId: "trace-new",
         source: "automation_idle",
         workspaceIdentity: state.request.workspaceIdentity,
       },

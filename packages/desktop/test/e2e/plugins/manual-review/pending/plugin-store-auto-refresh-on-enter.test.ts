@@ -1,5 +1,8 @@
-import { clearAppData, clickTestIdByDom } from "../../../helpers/desktop-app.js";
-import { TID_SETTINGS_BACK_BUTTON } from "@zcode/shared";
+import {
+  clearAppData,
+  clickTestIdByDom,
+  waitForDefaultWorkspaceReady,
+} from "../../../helpers/desktop-app.js";
 import {
   PLUGIN_CDN_ZIP_MARKETPLACE_ID,
   PLUGIN_STORE_AUTO_REFRESH_STALE_LAST_UPDATED,
@@ -11,7 +14,6 @@ import {
   openPluginSettings,
   requirePluginManualReview,
   waitForPluginControl,
-  waitForPluginSettingsScope,
 } from "../../../helpers/plugin-management-lifecycle.js";
 
 // 真打公网 CDN：与 PLM-LC-007b 一致，刷新等待 180s。
@@ -41,6 +43,7 @@ describe("PLM-LC-019 Desktop plugin store auto refresh on enter (real official C
 
   it("官方市场刷新时间过期时，进入商店页不点刷新也会自动刷新，重进则命中节流", async function () {
     requirePluginManualReview();
+    await waitForDefaultWorkspaceReady();
 
     // wdio seed 把官方市场 lastUpdated 写成远古时间且 pluginCount>0，必然落在节流窗口外。
     expect(readOfficialLastUpdated(await getPluginOverview())).toBe(
@@ -88,11 +91,8 @@ describe("PLM-LC-019 Desktop plugin store auto refresh on enter (real official C
     await capturePluginManualReview("PLM-LC-019", "auto-refreshed-on-enter");
 
     // 刚刷新过：离开再重进商店页命中 10 分钟窗口，不再刷新。
-    // 重进路径与 conversation-session-plugin-marketplace-installed-roundtrip 一致：商店顶栏返回
-    // 到设置页 → 退出设置 → 侧栏「插件市场」重新进入，保证 PluginStorePage 真正重新挂载。
+    // 商店顶栏返回聊天，再从侧栏进入，保证 PluginStorePage 真正重新挂载。
     await clickTestIdByDom("desktop-top-nav-back");
-    await waitForPluginSettingsScope("user");
-    await clickTestIdByDom(TID_SETTINGS_BACK_BUTTON);
     await clickTestIdByDom("plugin-store-sidebar-open");
     await waitForPluginControl("plugin-store-root", {}, 30000);
     await browser.pause(NO_REFRESH_SETTLE_MS);

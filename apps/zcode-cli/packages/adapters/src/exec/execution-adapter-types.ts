@@ -1,4 +1,5 @@
 import type { SpawnOptions } from "node:child_process";
+import type { BashFileOutput } from "./bash-file-output.js";
 import type { ZCodeToolExecResource } from "@zcode/shared";
 import type { NetworkEgressEnvPolicy } from "../network/subprocess-env.js";
 import type { ResolvedSpawnCommand } from "./execution-command.js";
@@ -33,6 +34,7 @@ export interface ExecutionOutputPaths {
 }
 
 export interface InternalExecutionRunOptions extends ExecutionRunOptions {
+  preparedBashOutput?: PreparedBashOutput;
   onOutputEncodingResolved?: (encoding: string | null) => void;
   /** Bash 移交时停止前台预览并重启文件 watchdog；不复制进程或输出。 */
   bashLifecycle?: {
@@ -44,6 +46,13 @@ export interface InternalExecutionRunOptions extends ExecutionRunOptions {
   sharePersistedOutputLimitAcrossStreams?: boolean;
   shouldStopOnPersistedLimit?: () => boolean;
   shouldRetainExecutionAfterRootExit?: () => boolean;
+}
+
+export interface PreparedBashOutput {
+  file: BashFileOutput;
+  legacyOutputEncoding: string | null;
+  /** 准备与执行交接期间仍由 close() 等待，执行接管后释放准备记录。 */
+  releasePreparation: () => void;
 }
 
 export type BashBackgroundLifecycleMode = "explicit" | "auto_on_timeout";
@@ -74,6 +83,8 @@ export interface ActiveExecutionRecord {
 export interface NodeExecutionAdapterOptions {
   onToolExecResource?: (sample: ZCodeToolExecResource) => void;
   outputRootDir?: string;
+  /** 仅 Bash 输出优先使用的临时父目录；不可用时复用 outputRootDir。 */
+  bashOutputTempDir?: string;
   maxPersistedOutputBytes?: number;
   network?: NetworkEgressEnvPolicy;
   platform?: NodeJS.Platform;

@@ -21,32 +21,32 @@
       "description": "workspace A 首发模型回复。",
       "kind": "main",
       "source": "synthetic",
-      "timingPolicy": "slow-stream",
-      "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "首段输出后等待侧栏 active/running 断言，再显式释放结束帧；避免固定时长造成观测竞态。"
     },
     {
       "id": "ssh-remote-p0-b-first",
       "description": "workspace B 首发模型回复。",
       "kind": "main",
       "source": "synthetic",
-      "timingPolicy": "slow-stream",
-      "syntheticReason": "稳定验证远端首发请求、running 状态和回复。"
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "首段输出后等待侧栏 active/running 断言，再显式释放结束帧；避免固定时长造成观测竞态。"
     },
     {
       "id": "ssh-remote-p0-a-follow",
       "description": "切回 workspace A task 后的续发模型回复。",
       "kind": "main",
       "source": "synthetic",
-      "timingPolicy": "slow-stream",
-      "syntheticReason": "稳定验证 task A 续发历史隔离。"
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "首段输出后等待侧栏 active/running 断言，再显式释放结束帧；避免固定时长造成观测竞态。"
     },
     {
       "id": "ssh-remote-p0-b-follow",
       "description": "切回 workspace B task 后的续发模型回复。",
       "kind": "main",
       "source": "synthetic",
-      "timingPolicy": "slow-stream",
-      "syntheticReason": "稳定验证 task B 续发历史隔离。"
+      "timingPolicy": "controlled-stream",
+      "syntheticReason": "首段输出后等待侧栏 active/running 断言，再显式释放结束帧；避免固定时长造成观测竞态。"
     }
   ]
 }

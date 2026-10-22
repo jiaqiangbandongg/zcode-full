@@ -8,9 +8,6 @@ describe("compact persistence model selection", () => {
     const saved: MessageInfo[] = [];
     const runtime = {
       config: { agentName: "test-agent", systemPrompt: "test" },
-      getSessionModelSelection: () => {
-        throw new Error("compact persistence must read the session selection");
-      },
       getSessionModelSelection: () => ({
         providerId: "selection-provider",
         modelId: "selection-model",

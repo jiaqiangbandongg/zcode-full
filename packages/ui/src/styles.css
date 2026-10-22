@@ -74,6 +74,10 @@ body,
 
 :root {
   --ui-font-size: 14px;
+  --color-remote-continuity-panel: #202124;
+  --color-remote-continuity-panel-surface: #2c2d30;
+  --color-remote-continuity-panel-foreground: #f8f8f8;
+  --color-remote-continuity-panel-subtle: #a7a7ad;
 }
 
 body {
@@ -106,33 +110,6 @@ html[data-document-hidden] *::after {
   }
 }
 
-.side-pane-open-tab-shell {
-  container: side-pane-open-tab / inline-size;
-}
-
-@container side-pane-open-tab (min-width: 480px) {
-  .side-pane-open-tab-content {
-    max-width: 34rem;
-  }
-
-  .side-pane-open-tab-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  }
-
-  .side-pane-open-tab-button {
-    flex-direction: column;
-    gap: 0.375rem;
-    height: 5.5rem;
-    justify-content: center;
-  }
-
-  .side-pane-open-tab-button-label {
-    flex: 0 1 auto;
-    text-align: center;
-  }
-}
-
 #root {
   /* Bugfix: Windows 桌面窗口拉伸后，根节点如果只靠内容撑开，Chromium 偶发会把新尺寸区域留给宿主底层。
    * 这里把 React 挂载点固定成完整动态视口，让桌面/Web/手机端都从根节点开始明确铺满可视区。 */
@@ -144,6 +121,7 @@ html[data-document-hidden] *::after {
  * Bugfix: 部分浏览器 / Electron 运行环境会在 focus-visible 时叠加系统级高亮边框，
  * 表现为和产品主题无关的黄色描边，看起来像“随机冒出来的无障碍样式”。
  * 这里在全局层同时清掉 outline 和 focus ring 对应的 box-shadow，避免系统高亮和组件局部 ring 混用。
+ * 曾按对话框、远程控件和设置导航强制恢复 outline，导致组合输入出现双框；保留组件原有焦点样式，不再全局叠加。
  */
 *:focus,
 *:focus-visible {
@@ -168,6 +146,11 @@ html[data-document-hidden] *::after {
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", monospace;
+  /* 设置页直接恢复通用大字号会绕过 UI 字号体系；专用 token 保留默认 24px / 30px，并跟随界面字号缩放。 */
+  --text-ui-settings-title: calc(var(--ui-font-size) + 10px);
+  --text-ui-settings-title--line-height: calc(4 / 3);
+  --text-ui-settings-title-lg: calc(var(--ui-font-size) + 16px);
+  --text-ui-settings-title-lg--line-height: 1.2;
   --text-ui-xl: calc(var(--ui-font-size) + 4px);
   --text-ui-lg: calc(var(--ui-font-size) + 2px);
   --text-ui-base: var(--ui-font-size);
@@ -187,6 +170,7 @@ html[data-document-hidden] *::after {
   --color-background-alt: color-mix(in oklab, var(--color-neutral-100) 60%, transparent);
   --color-background-win-alt: var(--color-neutral-200);
   --color-brand: var(--color-sky-400);
+  --color-resize-handle: var(--color-sky-500);
   --color-icon-blue: var(--color-terminal-bright-blue);
   --color-icon-purple: var(--color-terminal-bright-magenta);
   --color-trajectory-user: #2563eb;
@@ -281,8 +265,13 @@ html[data-document-hidden] *::after {
   --color-interaction-ask-fill: color-mix(in oklab, var(--color-green-500) 20%, transparent);
   --color-interaction-confirmation-surface: var(--color-green-50);
   --color-interaction-confirmation-foreground: var(--color-green-700);
+  --color-success-surface: var(--color-green-50);
+  --color-success-surface-foreground: var(--color-green-700);
+  --color-progress-surface: var(--color-blue-50);
+  --color-progress-surface-foreground: var(--color-blue-700);
   --color-foreground: var(--color-neutral-700);
   --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-700) 60%, transparent);
+  --color-remote-foreground-muted: #595959;
   --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-700) 40%, transparent);
   --lucide-subtlest-opacity: 0.4;
   --color-foreground-inverse: var(--color-white);
@@ -295,6 +284,10 @@ html[data-document-hidden] *::after {
   --color-warning: var(--color-yellow-600);
   --color-feedback-privacy-hint: var(--color-yellow-600);
   --color-warning-foreground: var(--color-foreground-inverse);
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-warning-surface-foreground: var(--color-yellow-800);
+  --color-destructive-surface: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  --color-destructive-surface-foreground: var(--color-red-800);
   --color-diff-added: var(--color-green-600);
   --color-diff-added-foreground: var(--color-foreground-inverse);
   --color-diff-removed: var(--color-red-600);
@@ -313,6 +306,15 @@ html[data-document-hidden] *::after {
   --color-tooltip-tag: var(--color-neutral-200);
   --color-tooltip-tag-foreground: color-mix(in oklab, var(--color-neutral-950) 60%, transparent);
   --color-tag: var(--color-neutral-200);
+  --color-remote-ssh-surface: var(--color-sky-50);
+  --color-remote-ssh-foreground: var(--color-sky-700);
+  --color-remote-ssh-border: var(--color-sky-200);
+  --color-remote-wsl-surface: var(--color-green-50);
+  --color-remote-wsl-foreground: var(--color-green-700);
+  --color-remote-wsl-border: var(--color-green-200);
+  --color-remote-docker-surface: var(--color-violet-50);
+  --color-remote-docker-foreground: var(--color-violet-700);
+  --color-remote-docker-border: var(--color-violet-200);
   --color-file-node: color-mix(in oklab, var(--color-sky-600) 14%, transparent);
   --color-file-node-hover: color-mix(in oklab, var(--color-sky-600) 20%, transparent);
   --color-file-node-foreground: var(--color-sky-600);
@@ -342,6 +344,7 @@ html[data-document-hidden] *::after {
   --color-background-alt: color-mix(in oklab, var(--color-neutral-800) 60%, transparent);
   --color-background-win-alt: var(--color-neutral-800);
   --color-brand: var(--color-sky-500);
+  --color-resize-handle: var(--color-sky-400);
   --color-trajectory-user: #60a5fa;
   --color-trajectory-assistant: #2dd4bf;
   --color-trajectory-reasoning: #a78bfa;
@@ -435,8 +438,13 @@ html[data-document-hidden] *::after {
     transparent
   );
   --color-interaction-confirmation-foreground: var(--color-green-300);
+  --color-success-surface: color-mix(in oklab, var(--color-green-950) 45%, transparent);
+  --color-success-surface-foreground: var(--color-green-300);
+  --color-progress-surface: var(--color-blue-950);
+  --color-progress-surface-foreground: var(--color-blue-300);
   --color-foreground: var(--color-neutral-200);
   --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-200) 60%, transparent);
+  --color-remote-foreground-muted: #b3b3b3;
   --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-200) 30%, transparent);
   --lucide-subtlest-opacity: 0.3;
   --color-foreground-inverse: var(--color-white);
@@ -449,6 +457,10 @@ html[data-document-hidden] *::after {
   --color-warning: var(--color-yellow-500);
   --color-feedback-privacy-hint: var(--color-yellow-300);
   --color-warning-foreground: var(--color-foreground-inverse);
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  --color-warning-surface-foreground: var(--color-yellow-400);
+  --color-destructive-surface: color-mix(in srgb, var(--color-destructive) 16%, transparent);
+  --color-destructive-surface-foreground: var(--color-red-300);
   --color-diff-added: var(--color-green-500);
   --color-diff-added-foreground: var(--color-foreground-inverse);
   --color-diff-removed: var(--color-red-500);
@@ -467,6 +479,15 @@ html[data-document-hidden] *::after {
   --color-tooltip-tag: var(--color-neutral-800);
   --color-tooltip-tag-foreground: color-mix(in oklab, var(--color-neutral-50) 60%, transparent);
   --color-tag: var(--color-neutral-700);
+  --color-remote-ssh-surface: color-mix(in oklab, var(--color-sky-500) 18%, transparent);
+  --color-remote-ssh-foreground: var(--color-sky-300);
+  --color-remote-ssh-border: var(--color-sky-700);
+  --color-remote-wsl-surface: color-mix(in oklab, var(--color-green-500) 18%, transparent);
+  --color-remote-wsl-foreground: var(--color-green-300);
+  --color-remote-wsl-border: var(--color-green-700);
+  --color-remote-docker-surface: color-mix(in oklab, var(--color-violet-500) 18%, transparent);
+  --color-remote-docker-foreground: var(--color-violet-300);
+  --color-remote-docker-border: var(--color-violet-700);
   --color-file-node: color-mix(in oklab, var(--color-sky-400) 18%, transparent);
   --color-file-node-hover: color-mix(in oklab, var(--color-sky-400) 24%, transparent);
   --color-file-node-foreground: var(--color-sky-300);
@@ -581,8 +602,13 @@ html[data-document-hidden] *::after {
   --color-interaction-ask-fill: rgba(70, 191, 114, 0.2);
   --color-interaction-confirmation-surface: #eaf7ee;
   --color-interaction-confirmation-foreground: #166b32;
+  --color-success-surface: #eaf7ee;
+  --color-success-surface-foreground: #166b32;
+  --color-progress-surface: var(--color-blue-50);
+  --color-progress-surface-foreground: var(--color-blue-700);
   --color-foreground: var(--color-neutral-800);
   --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-800) 60%, transparent);
+  --color-remote-foreground-muted: #595959;
   --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-800) 40%, transparent);
   --lucide-subtlest-opacity: 0.4;
   --color-foreground-inverse: #ffffff;
@@ -595,6 +621,10 @@ html[data-document-hidden] *::after {
   --color-warning: #e07b00;
   --color-feedback-privacy-hint: var(--color-yellow-600);
   --color-warning-foreground: #ffffff;
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  --color-warning-surface-foreground: #914e00;
+  --color-destructive-surface: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  --color-destructive-surface-foreground: #b42020;
   --color-diff-added: #1e8a3e;
   --color-diff-added-foreground: #ffffff;
   --color-diff-removed: #e03131;
@@ -613,6 +643,15 @@ html[data-document-hidden] *::after {
   --color-tooltip-tag: #e6e6e6;
   --color-tooltip-tag-foreground: #5c5c5c;
   --color-tag: #e6e6e6;
+  --color-remote-ssh-surface: #ebf4ff;
+  --color-remote-ssh-foreground: #0867ce;
+  --color-remote-ssh-border: #bad9ff;
+  --color-remote-wsl-surface: #eaf7ee;
+  --color-remote-wsl-foreground: #166b32;
+  --color-remote-wsl-border: #b7e0c2;
+  --color-remote-docker-surface: #f2efff;
+  --color-remote-docker-foreground: #6047b4;
+  --color-remote-docker-border: #d4caff;
   --color-file-node: rgba(26, 112, 184, 0.1);
   --color-file-node-hover: rgba(26, 112, 184, 0.16);
   --color-file-node-foreground: #1a70b8;
@@ -727,8 +766,13 @@ html[data-document-hidden] *::after {
   --color-interaction-ask-fill: rgba(70, 191, 114, 0.24);
   --color-interaction-confirmation-surface: rgba(70, 191, 114, 0.16);
   --color-interaction-confirmation-foreground: #87d9a4;
+  --color-success-surface: rgba(70, 191, 114, 0.16);
+  --color-success-surface-foreground: #87d9a4;
+  --color-progress-surface: rgba(70, 130, 240, 0.16);
+  --color-progress-surface-foreground: var(--color-blue-300);
   --color-foreground: var(--color-neutral-300);
   --color-foreground-subtle: color-mix(in oklab, var(--color-neutral-300) 60%, transparent);
+  --color-remote-foreground-muted: #b3b3b3;
   --color-foreground-subtlest: color-mix(in oklab, var(--color-neutral-300) 30%, transparent);
   --lucide-subtlest-opacity: 0.3;
   --color-foreground-inverse: #000000;
@@ -742,6 +786,10 @@ html[data-document-hidden] *::after {
   --color-warning: #ff8a30;
   --color-feedback-privacy-hint: var(--color-yellow-300);
   --color-warning-foreground: #000000;
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  --color-warning-surface-foreground: #ffa159;
+  --color-destructive-surface: color-mix(in srgb, var(--color-destructive) 16%, transparent);
+  --color-destructive-surface-foreground: #ff8585;
   --color-diff-added: #46bf72;
   --color-diff-added-foreground: #000000;
   --color-diff-removed: #ff5c5c;
@@ -760,6 +808,15 @@ html[data-document-hidden] *::after {
   --color-tooltip-tag: #363636;
   --color-tooltip-tag-foreground: #adadad;
   --color-tag: #363636;
+  --color-remote-ssh-surface: rgba(64, 153, 255, 0.16);
+  --color-remote-ssh-foreground: #8fc0ff;
+  --color-remote-ssh-border: rgba(64, 153, 255, 0.42);
+  --color-remote-wsl-surface: rgba(70, 191, 114, 0.16);
+  --color-remote-wsl-foreground: #87d9a4;
+  --color-remote-wsl-border: rgba(70, 191, 114, 0.42);
+  --color-remote-docker-surface: rgba(159, 132, 255, 0.16);
+  --color-remote-docker-foreground: #bfaaff;
+  --color-remote-docker-border: rgba(159, 132, 255, 0.42);
   --color-file-node: rgba(112, 174, 224, 0.16);
   --color-file-node-hover: rgba(112, 174, 224, 0.22);
   --color-file-node-foreground: #8fc5ef;
@@ -881,11 +938,7 @@ html[data-document-hidden] *::after {
   .highspeed-animated-gradient-text .animated-gradient-text {
     /* Bug 根因：accelerated turn 只改了工时文案，内部思考和工具仍继承普通扫光色。 */
     --animated-gradient-text-strong: var(--color-icon-purple);
-    --animated-gradient-text-soft: color-mix(
-      in srgb,
-      var(--color-icon-purple) 22%,
-      transparent
-    );
+    --animated-gradient-text-soft: color-mix(in srgb, var(--color-icon-purple) 22%, transparent);
   }
 
   .cua-group-gradient-text {
@@ -2217,4 +2270,10 @@ html[data-document-hidden] *::after {
 
 .prompt-mention[data-mention-category="plugins"]::before {
   border-radius: var(--radius-sm);
+}
+
+/* 文件视图保留任务面板用于位移动效，延伸横线必须随原面板一起隐藏。 */
+[data-workspace-shell]:has([data-project-sidebar-panel="navigation"][aria-hidden="true"])
+  [data-sidebar-divider-extension] {
+  display: none;
 }

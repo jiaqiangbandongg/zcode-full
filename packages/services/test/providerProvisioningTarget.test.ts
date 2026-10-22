@@ -70,6 +70,7 @@ async function createTarget(
   const replacePersonalConfig = vi.spyOn(personal, "update");
   let currentSettings = {
     providerFamilyDomain: "bigmodel" as const,
+    providerFamilyDomainUpdatedAt: 0,
     providerFamilyConnectionSelections: {},
   };
   const credentialValues = new Map<string, string | null>([
@@ -119,6 +120,7 @@ async function createTarget(
     credentialValues,
     personalConfigFilePath,
     directory,
+    getSettings: () => currentSettings,
   };
 }
 
@@ -365,4 +367,30 @@ describe("Provider Provisioning Target", () => {
     ).rejects.toThrow("不允许同步");
     expect(settingUpdate).not.toHaveBeenCalled();
   });
+});
+
+it("Host Provisioning 提交和回滚均使用完整 CAS，不能回滚同身份的新操作", async () => {
+  let f: Awaited<ReturnType<typeof createTarget>>;
+  f = await createTarget({
+    refresh: async () => {
+      const current = f.getSettings();
+      await f.settingUpdate({
+        ...current,
+        providerFamilyDomainUpdatedAt: (current as any).providerFamilyDomainUpdatedAt + 1,
+      });
+      throw new Error("refresh failed");
+    },
+  });
+  await f.target.apply(createEnvelope() as never);
+  expect(f.settingUpdate).toHaveBeenNthCalledWith(
+    1,
+    expect.anything(),
+    expect.objectContaining({
+      providerFamilyDomainUpdatedAt: 0,
+      providerFamilyDomain: "bigmodel",
+      providerFamilyConnectionSelections: {},
+    }),
+  );
+  expect(f.getSettings().providerFamilyDomain).toBe("zai");
+  expect(f.settingUpdate).toHaveBeenCalledTimes(2);
 });

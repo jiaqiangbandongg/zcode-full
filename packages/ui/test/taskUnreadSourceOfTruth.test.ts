@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ZCodeTaskMeta } from "@zcode/shared";
-import { countWorkspaceUnreadTasks } from "@/lib/unreadTaskCount.js";
 import { getTaskMeta, getTaskUnreadIndicator } from "@/store/zcodeSessionStore.js";
 import { getDefaultWorkspaceState } from "@/store/zcodeSessionStoreTypes.js";
 
@@ -58,31 +57,5 @@ describe("task unread source of truth", () => {
 
     expect(getTaskMeta(workspaceState, "task-1")?.unreadAt).toBeUndefined();
     expect(getTaskUnreadIndicator(workspaceState, "task-1")).toBe(false);
-  });
-
-  it("dock badge 统计基于可见 task meta，而不是旧 unread map", () => {
-    const workspaceState = {
-      ...getDefaultWorkspaceState(),
-      taskListCache: [
-        createTaskMeta({
-          taskId: "task-1",
-          unreadAt: 100,
-        }),
-        createTaskMeta({
-          taskId: "task-2",
-        }),
-      ],
-      optimisticTaskListByTaskId: {
-        "task-2": createTaskMeta({
-          taskId: "task-2",
-          unreadAt: 200,
-        }),
-      },
-      taskUnreadByTaskId: {
-        stale: true,
-      },
-    };
-
-    expect(countWorkspaceUnreadTasks(workspaceState)).toBe(2);
   });
 });

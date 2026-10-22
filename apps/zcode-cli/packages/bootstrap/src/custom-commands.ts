@@ -18,6 +18,7 @@ export interface ListZCodeCustomCommandsOptions {
   skipUserConfig?: boolean;
   userConfigPath?: string;
   workingDirectory?: string;
+  additionalDirectories?: readonly string[];
 }
 
 export interface InspectZCodeCustomCommandOptions extends ListZCodeCustomCommandsOptions {
@@ -92,6 +93,7 @@ function createCustomCommandDiscovery(options: ListZCodeCustomCommandsOptions) {
       extraResolvedRoots: pluginOutcome.commandRoots,
       disabledPaths: collectDisabledPaths(configResult.config.commandOverrides),
       homeDirectory: options.homeDirectory,
+      additionalDirectories: options.additionalDirectories,
     }),
     workingDirectory,
   };

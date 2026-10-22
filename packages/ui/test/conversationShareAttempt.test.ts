@@ -2,10 +2,26 @@ import { describe, expect, it } from "vitest";
 
 import {
   ensureConversationShareAttempt,
+  retainConversationShareAttemptAfterFailure,
   type ConversationShareAttempt,
 } from "@/v4/conversationShareAttempt.js";
 
 describe("conversation share attempt identity", () => {
+  it.each([3211, 3212, 3210, 3215, 3217, undefined])(
+    "renews only a definitively unavailable preparation (%s)",
+    (code) => {
+      const first = ensureConversationShareAttempt(null, "same", "s", {
+        randomUUID: () => "first",
+      });
+      const retained = retainConversationShareAttemptAfterFailure(first, code);
+      const next = ensureConversationShareAttempt(retained, "same", "s", {
+        randomUUID: () => "next",
+      });
+      if (code === 3211 || code === 3212) expect(next.clientRequestId).toBe("share-next");
+      else expect(next).toBe(first);
+    },
+  );
+
   it("keeps the disclosure timestamp and request id stable for a retry", () => {
     const first = ensureConversationShareAttempt(null, "same-attempt", "session-1", {
       now: () => 1_000,

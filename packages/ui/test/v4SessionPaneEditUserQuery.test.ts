@@ -123,6 +123,7 @@ vi.mock("@/hooks/useSettingService.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useOptionalServices: () => null,
   useServices: () => servicesMock,
 }));
@@ -901,7 +902,7 @@ describe("SessionPane user query editing", () => {
     await act(async () => root.unmount());
   });
 
-  it("running 时 edit 可用，fork 回调交给 row.actions 裁决，retry 仍保持 completed gate", async () => {
+  it("running 时向 Timeline 提供 edit、fork 与 retry 回调，由 row.actions 裁决展示", async () => {
     const snapshot = makeSnapshot();
     snapshot.control = {
       ...snapshot.control,
@@ -1065,7 +1066,6 @@ describe("SessionPane user query editing", () => {
       );
       await flushMicrotasks();
     });
-    expect(timelineProps.at(-1)?.onEdit).toBeTypeOf("function");
     await act(async () => {
       await timelineProps
         .at(-1)
@@ -1089,6 +1089,9 @@ describe("SessionPane user query editing", () => {
         },
       },
     });
+    expect(
+      layerMock.acquire.mock.results.at(-1)?.value.store.expectAcceptedInputProjection,
+    ).toHaveBeenCalledWith(sendCommandMock.mock.calls[0]?.[0].commandId);
 
     await act(async () => root.unmount());
   });
@@ -1176,7 +1179,6 @@ describe("SessionPane user query editing", () => {
       );
       await flushMicrotasks();
     });
-    expect(queueProps.at(-1)?.onSendNow).toBeTypeOf("function");
     await act(async () => {
       queueProps.at(-1)?.onSendNow?.("queue-1");
       await flushMicrotasks();

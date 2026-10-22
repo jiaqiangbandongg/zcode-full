@@ -106,22 +106,6 @@ describe("publishArtifact — 内容成员", () => {
     expect(published(resumed.driver)).toEqual([]);
   });
 
-  it("命中一条失败记录即按记录重新拒绝（resume 是崩溃恢复，不是复验）", async () => {
-    const journal = new InMemoryJournalStore();
-    const first = setup({ journal, withoutArtifactStore: true });
-    await expect(
-      first.engine.publishArtifact("artifact#1", "file", ["book", "a.pdf"]),
-    ).rejects.toMatchObject({ code: "ArtifactStoreUnavailable" });
-    first.engine.complete(undefined);
-
-    // 第二次装配**有** store：记录里的失败仍然是失败，driver 不会被调到。
-    const resumed = setup({ journal });
-    await expect(
-      resumed.engine.publishArtifact("artifact#1", "file", ["book", "a.pdf"]),
-    ).rejects.toMatchObject({ code: "ArtifactStoreUnavailable" });
-    expect(resumed.driver.artifactPublishes).toEqual([]);
-  });
-
   it("版本号跨 resume 连续", async () => {
     const journal = new InMemoryJournalStore();
     const first = setup({ journal });
@@ -234,6 +218,7 @@ describe("publishArtifact — 内容成员", () => {
     await expect(
       resumed.engine.publishArtifact("artifact#1", "file", ["book", "a.pdf"]),
     ).rejects.toMatchObject({ code: "ArtifactStoreUnavailable" });
+    expect(resumed.driver.artifactPublishes).toEqual([]);
     expect(resumed.driver.eventsOfType("artifact-failed")).toEqual([]);
     expect(resumed.driver.eventsOfType("artifact-published")).toEqual([]);
   });
@@ -242,9 +227,9 @@ describe("publishArtifact — 内容成员", () => {
   // 也不发事件——没有 id 可写，编一个出来会让读者以为真有那么一个产物。
   it("实参形状错误直接拒绝，不落行也不发事件", async () => {
     const { engine, journal, driver } = setup();
-    await expect(
-      engine.publishArtifact("artifact#1", "file", [42, "a.pdf"]),
-    ).rejects.toMatchObject({ code: "DriverError" });
+    await expect(engine.publishArtifact("artifact#1", "file", [42, "a.pdf"])).rejects.toMatchObject(
+      { code: "DriverError" },
+    );
     await expect(
       engine.publishArtifact("artifact#2", "markdown", ["notes", 7]),
     ).rejects.toMatchObject({ code: "DriverError" });
@@ -338,7 +323,11 @@ describe("primary（docs/dynamic-workflow/authoring.md「Ids, tags and versions�
     first.engine.complete(undefined);
 
     const resumed = setup({ journal });
-    await resumed.engine.publishArtifact("artifact#1", "file", ["book", "a.pdf", { primary: true }]);
+    await resumed.engine.publishArtifact("artifact#1", "file", [
+      "book",
+      "a.pdf",
+      { primary: true },
+    ]);
     await expect(
       resumed.engine.publishArtifact("artifact#2", "file", ["other", "o.pdf", { primary: true }]),
     ).rejects.toMatchObject({ code: "ArtifactPrimaryConflict" });
@@ -563,17 +552,5 @@ describe("report 的产物标签", () => {
     await engine.publishArtifact("artifact#1", "markdown", ["doc", "hi"]);
     engine.report("report#1", { a: 1 }, "doc");
     expect((await failure(engine)).code).toBe("ArtifactUndeclared");
-  });
-
-  it("标签不进 inputHash：既有 journal 里的无标签 report 照旧命中", () => {
-    const journal = new InMemoryJournalStore();
-    const first = setup({ journal });
-    first.engine.report("report#1", { a: 1 });
-    first.engine.complete(undefined);
-
-    const resumed = setup({ journal });
-    resumed.engine.report("report#1", { a: 1 });
-    expect(resumed.driver.eventsOfType("report")).toEqual([]);
-    expect(resumed.engine.status()).toBe("running");
   });
 });

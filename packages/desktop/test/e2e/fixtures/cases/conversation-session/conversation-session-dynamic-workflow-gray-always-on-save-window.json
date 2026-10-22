@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-dynamic-workflow-gray-always-on-save-window",
+  "spec": "./test/e2e/conversation-session/conversation-session-dynamic-workflow-gray-always-on-save-window.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-dynamic-workflow-gray-always-on-save-window.json"
+  ],
+  "fileFixtures": [],
+  "requests": [
+    {
+      "id": "dwf-save-window-title",
+      "description": "E2E_DWF_SAVE_WINDOW_BOUNDS 首发的 case-local 标题生成响应。",
+      "kind": "common",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "E2E_DWF_SAVE_WINDOW_BOUNDS 首发会触发默认 title sidecar；固定 case-local 标题响应。"
+    },
+    {
+      "id": "dwf-save-window-save-call",
+      "description": "SaveWorkflow tool_use，超长说明/实参/脚本打开保存确认窗。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "保存确认窗只由模型调用 SaveWorkflow 打开；超长载荷是被测条件本身。"
+    },
+    {
+      "id": "dwf-save-window-final",
+      "description": "拒绝保存后的终态文本。",
+      "kind": "main",
+      "source": "synthetic",
+      "timingPolicy": "fast-text",
+      "syntheticReason": "拒绝后不写盘，终态文本确认 turn 收口。"
+    }
+  ]
+}

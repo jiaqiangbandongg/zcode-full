@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe("task workbench drag preview", () => {
-  it("keeps the task item content and only adds the grouped surface styles", () => {
+  it("clones task content at the measured drag image size and removes the preview on cleanup", () => {
     const source = document.createElement("li");
     source.className = "task-row rounded-md";
     source.innerHTML =
@@ -38,11 +38,6 @@ describe("task workbench drag preview", () => {
     );
     expect(preview?.innerHTML).toBe(source.innerHTML);
     expect(preview?.className).toContain("task-row");
-    expect(preview?.className).toContain("border");
-    expect(preview?.className).toContain("border-border");
-    expect(preview?.className).toContain("bg-background");
-    expect(preview?.className).toContain("shadow-lg");
-    expect(preview?.className).not.toContain("cursor-grabbing");
     expect(preview?.style.width).toBe("240px");
     expect(setDragImage).toHaveBeenCalledWith(preview, 60, 12);
 

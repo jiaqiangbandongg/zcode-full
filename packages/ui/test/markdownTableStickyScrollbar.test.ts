@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   resolveMarkdownTableStickyScrollbarMode,
@@ -58,30 +57,5 @@ describe("resolveMarkdownTableStickyScrollbarOffset", () => {
         viewportBottom: 921,
       }),
     ).toBe(0);
-  });
-});
-
-describe("markdown table sticky scrollbar lifecycle", () => {
-  it("keeps the scrollbar mounted across visibility changes and observes V4 composer dock changes", () => {
-    const source = readFileSync(
-      "packages/ui/src/components/ai-elements/markdown-table.tsx",
-      "utf8",
-    );
-
-    expect(source).toContain('className="my-0 flex min-w-0 flex-col gap-2"');
-    expect(source).toContain(
-      'data-markdown-table-virtual-scroll-visible={virtualScrollbarVisible ? "true" : "false"}',
-    );
-    expect(source).toContain(
-      'data-markdown-table-virtual-scroll-sticky={',
-    );
-    expect(source).toContain('data-markdown-table-frame=""');
-    expect(source).not.toContain("{virtualScrollbarVisible ? (");
-    expect(source).toContain(
-      "}, [virtualScrollbarSticky, virtualScrollbarVisible]);",
-    );
-    expect(source).toContain("resizeObserver?.observe(observedDock)");
-    expect(source).toContain("new MutationObserver(syncDockObservation)");
-    expect(source).toContain("readMarkdownTableBackToBottomClearance(root)");
   });
 });

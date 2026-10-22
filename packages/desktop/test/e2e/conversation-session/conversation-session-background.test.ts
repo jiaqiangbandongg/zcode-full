@@ -15,7 +15,7 @@ import {
   TID_V4_SESSION_PANE,
   TID_V4_TURN_NAVIGATOR_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { clearAppData, seedSettings } from "../helpers/desktop-app.js";
 import {
   waitForCompactMarkerStatus,
@@ -50,7 +50,6 @@ import {
   selectV4TaskById,
   sendV4Prompt,
   sendV4PromptAndWaitAccepted,
-  startNewV4Draft,
   waitForV4AssistantMessageContaining,
   waitForV4ComposerText,
   waitForV4ConversationState,
@@ -66,7 +65,6 @@ import {
   beginConversationTelemetryCapture,
   checkpointConversationTelemetryCase,
   waitForConversationReportDelta,
-  type ConversationTelemetryCaptureHandle,
   type ConversationTelemetryReport,
 } from "../helpers/conversation-telemetry-parity-capture.js";
 
@@ -200,8 +198,6 @@ async function waitForBackgroundResultPresentation(options: {
 }
 
 describe("会话区 Background Runtime Task E2E", () => {
-  let telemetryCapture: ConversationTelemetryCaptureHandle | null = null;
-
   before(async function () {
     this.timeout(BACKGROUND_E2E_TIMEOUT_MS);
     await mkdir(BACKGROUND_RUNTIME_ROOT, { recursive: true });
@@ -297,7 +293,7 @@ describe("会话区 Background Runtime Task E2E", () => {
     this.timeout(BACKGROUND_E2E_TIMEOUT_MS);
 
     await startNewBackgroundDraft();
-    const capture = (telemetryCapture ??= await beginConversationTelemetryCapture());
+    const capture = await beginBackgroundTelemetryCapture();
     const prompt =
       "E2E_BACKGROUND_BASH: Run a background Bash command and report after notification.";
     const requestCountBefore = await getUpstreamRequestRecordCount();
@@ -1217,7 +1213,7 @@ describe("会话区 Background Runtime Task E2E", () => {
     this.timeout(BACKGROUND_E2E_TIMEOUT_MS);
 
     await startNewBackgroundDraft();
-    const capture = (telemetryCapture ??= await beginConversationTelemetryCapture());
+    const capture = await beginBackgroundTelemetryCapture();
     const prompt =
       "E2E_FOREGROUND_AGENT_CHILD_TOOL_STREAMING_STATUS: Launch a foreground agent that runs a visible child Bash tool while the parent conversation is still running.";
     const requestCountBefore = await getUpstreamRequestRecordCount();
@@ -1253,11 +1249,8 @@ describe("会话区 Background Runtime Task E2E", () => {
       agent_step: 1,
       message_completion: 1,
     });
-    // 前面的非 telemetry case 也写入同一 capture；只验本 session，避免把旧 completion 当成本轮重复上报。
-    const sessionId = (await getV4PaneSnapshot()).sessionId;
-    const sessionReports = reports.filter((report) => report.talk_id === sessionId);
-    assertMainCompletionAgentCompositions(sessionReports, ["main_plus_fg"]);
-    assertMainCompletionMessageSources(sessionReports, ["chat"]);
+    assertMainCompletionAgentCompositions(reports, ["main_plus_fg"]);
+    assertMainCompletionMessageSources(reports, ["chat"]);
   });
 
   it("同一 main turn 同时消费 foreground 和 background subagent 结果", async function () {
@@ -1265,7 +1258,7 @@ describe("会话区 Background Runtime Task E2E", () => {
 
     await startNewBackgroundDraft();
     await rm(BACKGROUND_MIXED_FOREGROUND_RELEASE_FILE, { force: true });
-    const capture = (telemetryCapture ??= await beginConversationTelemetryCapture());
+    const capture = await beginBackgroundTelemetryCapture();
     const prompt =
       "E2E_AGENT_COMPOSITION_MIXED: Launch one foreground Agent and one background Agent, then summarize both results.";
     const requestCountBefore = await getUpstreamRequestRecordCount();
@@ -1354,7 +1347,7 @@ describe("会话区 Background Runtime Task E2E", () => {
     this.timeout(BACKGROUND_E2E_TIMEOUT_MS);
 
     await startNewBackgroundDraft();
-    const capture = (telemetryCapture ??= await beginConversationTelemetryCapture());
+    const capture = await beginBackgroundTelemetryCapture();
     await rm(BACKGROUND_CHILD_TOOL_IDLE_RELEASE_FILE, { force: true });
     const prompt =
       "E2E_BACKGROUND_AGENT_CHILD_TOOL_IDLE_STATUS: Launch a background agent that runs a visible child Bash tool while the parent conversation is idle.";
@@ -1421,7 +1414,7 @@ describe("会话区 Background Runtime Task E2E", () => {
     this.timeout(BACKGROUND_E2E_TIMEOUT_MS);
 
     await startNewBackgroundDraft();
-    const capture = (telemetryCapture ??= await beginConversationTelemetryCapture());
+    const capture = await beginBackgroundTelemetryCapture();
     const prompt =
       "E2E_BACKGROUND_CHILD_TOOL_PARENT_ANCHOR: Launch a background agent whose child tool update arrives after my next main prompt has completed.";
     const followUpPrompt =
@@ -2604,22 +2597,9 @@ async function waitForMainLoading(timeoutMsg: string) {
 
 async function getVisibleChatLoadingTexts(): Promise<string[]> {
   return browser.execute((chatLoadingTestId) => {
-    const isElementVisible = (element: HTMLElement) => {
-      let current: HTMLElement | null = element;
-      while (current) {
-        const style = window.getComputedStyle(current);
-        const rects = Array.from(current.getClientRects());
-        if (
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          rects.every((rect) => rect.width <= 0 || rect.height <= 0)
-        ) {
-          return false;
-        }
-        current = current.parentElement;
-      }
-      return true;
-    };
+    // display: contents 祖先没有布局盒但子元素仍可见，不能用祖先零尺寸判隐藏。
+    const isElementVisible = (element: HTMLElement) =>
+      element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
     return Array.from(
       document.querySelectorAll<HTMLElement>(`[data-testid="${chatLoadingTestId}"]`),
     )
@@ -2636,8 +2616,18 @@ async function assertNoMainToolCallById(toolCallId: string, failureMessage: stri
   }
 }
 
+async function beginBackgroundTelemetryCapture() {
+  // 跨 case 复用采集器会混入中间用例的 completion，失败后游标也可能只推进一半。
+  // 每条 case 从空 HTTP 调用记录和 ARMS 缓冲开始，保留精确数量断言。
+  const capture = await beginConversationTelemetryCapture();
+  await capture.telemetryFetch.mockClear();
+  return capture;
+}
+
 async function startNewBackgroundDraft() {
-  await startNewV4Draft();
+  // Bash fixture 的相对路径属于夹具项目；全局新建会切到另一个 cwd，读不到 PID/释放文件。
+  // 初始空草稿直接复用，避免准备步骤重复新建；已有任务仍走同一项目的新建入口。
+  await prepareV4ConversationE2E({ skipProvider: true });
   // Bug 根因：suite 只在 before 设置 yolo，新草稿恢复默认 build 后 child Bash 会停在审批。
   // 生命周期用例在每次 draft admission 前固定前置；权限代理仍由独立 interaction spec 验证。
   await ensureToolCrossProductFullAccessMode();
@@ -2778,22 +2768,9 @@ async function startBackgroundTaskControlPresenceProbe(
         startedAt: performance.now(),
         wasPresent: null,
       };
-      const isElementVisible = (element: HTMLElement) => {
-        let current: HTMLElement | null = element;
-        while (current) {
-          const style = window.getComputedStyle(current);
-          const rects = Array.from(current.getClientRects());
-          if (
-            style.display === "none" ||
-            style.visibility === "hidden" ||
-            rects.every((rect) => rect.width <= 0 || rect.height <= 0)
-          ) {
-            return false;
-          }
-          current = current.parentElement;
-        }
-        return true;
-      };
+      // display: contents 祖先没有布局盒但子元素仍可见，不能用祖先零尺寸判隐藏。
+      const isElementVisible = (element: HTMLElement) =>
+        element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
       const sample = () => {
         const legacyTaskId = document
           .querySelector<HTMLElement>('[data-testid="chat-view"]')
@@ -2913,22 +2890,9 @@ async function clickStopBackgroundTaskControlRow(
       await openV4ComposerRunningBackgroundWorks();
       latest = await browser.execute(
         (expectedKind, expectedText, cancelButtonPrefix) => {
-          const isElementVisible = (element: HTMLElement) => {
-            let current: HTMLElement | null = element;
-            while (current) {
-              const style = window.getComputedStyle(current);
-              const rects = Array.from(current.getClientRects());
-              if (
-                style.display === "none" ||
-                style.visibility === "hidden" ||
-                rects.every((rect) => rect.width <= 0 || rect.height <= 0)
-              ) {
-                return false;
-              }
-              current = current.parentElement;
-            }
-            return true;
-          };
+          // display: contents 祖先没有布局盒但子元素仍可见，不能用祖先零尺寸判隐藏。
+          const isElementVisible = (element: HTMLElement) =>
+            element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
           const rows = Array.from(
             document.querySelectorAll<HTMLElement>("[data-background-task-kind]"),
           );
@@ -2978,22 +2942,9 @@ async function getBackgroundTaskControlRows({
   visibleOnly: boolean;
 }): Promise<BackgroundTaskControlRowSnapshot[]> {
   return browser.execute((filterVisible) => {
-    const isElementVisible = (element: HTMLElement) => {
-      let current: HTMLElement | null = element;
-      while (current) {
-        const style = window.getComputedStyle(current);
-        const rects = Array.from(current.getClientRects());
-        if (
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          rects.every((rect) => rect.width <= 0 || rect.height <= 0)
-        ) {
-          return false;
-        }
-        current = current.parentElement;
-      }
-      return true;
-    };
+    // display: contents 祖先没有布局盒但子元素仍可见，不能用祖先零尺寸判隐藏。
+    const isElementVisible = (element: HTMLElement) =>
+      element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
     return Array.from(document.querySelectorAll<HTMLElement>("[data-background-task-kind]"))
       .map((row) => ({
         buttonDisabled: row.querySelector<HTMLButtonElement>("button")?.disabled ?? false,

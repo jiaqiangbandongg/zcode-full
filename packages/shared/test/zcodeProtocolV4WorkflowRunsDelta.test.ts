@@ -7,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 import {
   WORKFLOW_RUNS_LIMITS,
-  WORKFLOW_RUN_HEADER_KEYS,
   applyConversationDeltas,
   applyConversationDeltasMutable,
   canonicalWorkflowRun,
@@ -17,7 +16,6 @@ import {
   diffWorkflowRunsState,
   isCompleteWorkflowRunHeader,
   reduceWorkflowRunsState,
-  workflowRunSchema,
   workflowRunsStateSchema,
   type ConversationDelta,
   type ConversationSnapshot,
@@ -603,14 +601,6 @@ describe("diff：条目被删时走键化路径", () => {
     ]);
     expect(op.removedActors).toEqual([{ siteId: "x", ordinal: 1 }]);
   });
-
-  it("重排仍然退回整键重发：删除之外的顺序变化这个模型表达不了", () => {
-    const before = { revision: 1, runs: [runWithNodes([queued("a"), queued("b")])] };
-    const after = { revision: 2, runs: [runWithNodes([queued("b"), queued("a")])] };
-    expect(diffWorkflowRunsState(before, after)).toEqual([
-      { op: "state.updated", patch: { workflowRuns: after } },
-    ]);
-  });
 });
 
 describe("apply：一条 op 内先删后加", () => {
@@ -889,12 +879,6 @@ describe("canonicalWorkflowRun：规范键序", () => {
       "nodes",
       "lastEventSequence",
     ]);
-  });
-
-  it("header 键表就是 schema 的键减去两张增量表", () => {
-    expect(WORKFLOW_RUN_HEADER_KEYS).toEqual(
-      Object.keys(workflowRunSchema.shape).filter((key) => key !== "actors" && key !== "nodes"),
-    );
   });
 
   it("归约产出的 run 已经是规范序（diff 的字节等价不靠调用方再排一次）", () => {

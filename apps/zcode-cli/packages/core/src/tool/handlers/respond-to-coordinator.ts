@@ -52,6 +52,7 @@ const respondToCoordinatorHandler: ToolHandler = async (input, context) => {
 export const respondToCoordinatorToolEntry: ToolEntry = {
   capability: "Respond to the coordinator that owns this subagent",
   metadata: {
+    shouldDefer: true,
     name: RESPOND_TO_COORDINATOR_TOOL_NAME,
     description: "Respond to the coordinator that owns this subagent.",
     modelInstructions: [

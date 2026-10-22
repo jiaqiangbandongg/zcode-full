@@ -49,6 +49,7 @@ export type IRawResponse =
         details?: unknown;
         taskId?: unknown;
         traceId?: unknown;
+        retryable?: unknown;
       };
     }
   | { type: ResponseType.PromiseErrorObj; id: number; data: any }

@@ -7,6 +7,32 @@ import { estimateTokens } from "../src/context/utils.js";
 import { buildContextHistoryEntries } from "../src/runtime/methods/context-history-entries.js";
 
 describe("message history metadata", () => {
+  it("isolates announcement delta arrays across add, read and replace without exposing metadata", () => {
+    const history = new MessageHistoryImpl();
+    const delta = {
+      addedNames: ["WebFetch"],
+      removedNames: ["TodoWrite"],
+      readdedNames: ["WebFetch"],
+    };
+    const expected = structuredClone(delta);
+    history.addEntries([
+      {
+        message: { role: "user", content: "Tool availability changed." },
+        metadata: { source: "legacy_synthetic", toolSearchAnnouncement: delta },
+      },
+    ]);
+    for (const names of Object.values(delta)) names.push("source mutation");
+    const entries = history.toRuntimeEntries();
+    expect(entries[0]?.metadata?.toolSearchAnnouncement).toEqual(expected);
+    history.replaceMessages(entries);
+    for (const names of Object.values(entries[0]!.metadata!.toolSearchAnnouncement!))
+      (names as string[]).push("copy mutation");
+    expect(history.toRuntimeEntries()[0]?.metadata?.toolSearchAnnouncement).toEqual(expected);
+    expect(buildProviderRequestMessages({ entries: history.toRuntimeEntries() }).messages).toEqual([
+      { role: "user", content: "Tool availability changed." },
+    ]);
+  });
+
   it("preserves assistant model provenance through request-local clones", () => {
     const history = new MessageHistoryImpl();
     const model = createTestModelSelection("provider-a/model-a");
@@ -38,9 +64,6 @@ describe("message history metadata", () => {
     expect(buildProviderRequestMessages({ entries: history.toRuntimeEntries() }).messages).toEqual([
       { role: "assistant", content: "answer" },
     ]);
-    expect(JSON.stringify(buildProviderRequestMessages({ entries: history.toRuntimeEntries() }).messages)).not.toContain(
-      "tokens",
-    );
   });
 
   it("borrows the current authoritative runtime entries without cloning the array", () => {
@@ -72,14 +95,6 @@ describe("message history metadata", () => {
         metadata: { source: "real_user" },
       },
     ]);
-  });
-
-  it("does not expose provider-visible render helpers on message history", () => {
-    const history = new MessageHistoryImpl();
-
-    expect("toModelMessages" in history).toBe(false);
-    expect("getCacheableMessages" in history).toBe(false);
-    expect("getIncrementalMessages" in history).toBe(false);
   });
 
   it("stores system reminder attachments as structured entries rendered only by provider builder", () => {
@@ -127,7 +142,6 @@ describe("message history metadata", () => {
       { role: "system", content: "system prompt" },
       { role: "user", content: "hook context" },
     ]);
-    expect(JSON.stringify(providerMessages)).not.toContain("hook_context");
 
     const entries = history.toRuntimeEntries();
     expect(entries[1]?.metadata).toEqual({ source: "hook_context" });

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
-import { TID_V4_MODEL_CONFIG, TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER } from "@zcode/shared";
+import { TID_V4_MODEL_CONFIG, TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER } from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,

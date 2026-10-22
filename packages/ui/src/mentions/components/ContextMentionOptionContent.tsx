@@ -10,19 +10,31 @@ export function ContextMentionOptionContent({
   workspacePath: string;
 }) {
   return item.category === "files" ? (
-    <FileDisplayInline
-      path={item.data?.path ?? item.data?.relativePath ?? item.value}
-      options={{
-        basePath: workspacePath,
-        // 这里只给 file/directory 传 kind，让 fileDisplay 继续按文件和文件夹图标渲染；
-        // whiteboard 等非文件类候选不应该伪装成文件路径。
-        kind:
-          item.data?.kind === "file" || item.data?.kind === "directory"
-            ? item.data.kind
-            : undefined,
-        showFilePath: true,
-      }}
-    />
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="min-w-0 flex-1 truncate">
+        <FileDisplayInline
+          path={item.data?.path ?? item.data?.relativePath ?? item.value}
+          options={{
+            basePath: workspacePath,
+            // 这里只给 file/directory 传 kind，让 fileDisplay 继续按文件和文件夹图标渲染；
+            // whiteboard 等非文件类候选不应该伪装成文件路径。
+            kind:
+              item.data?.kind === "file" || item.data?.kind === "directory"
+                ? item.data.kind
+                : undefined,
+            showFilePath: true,
+          }}
+        />
+      </span>
+      {item.data?.rootName && (
+        <span
+          className="max-w-32 shrink-0 truncate text-ui-xs text-foreground-subtlest"
+          title={item.data.rootName}
+        >
+          {item.data.rootName}
+        </span>
+      )}
+    </span>
   ) : (
     <span className="min-w-0 flex flex-1 items-center gap-2">
       <MessagesSquare className="size-3.5 shrink-0 text-foreground" />

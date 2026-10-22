@@ -40,24 +40,14 @@ async function createTempHome(): Promise<string> {
   return homeDir;
 }
 
-async function createFakeSshExecutable(
-  homeDir: string,
-  lines: string[],
-): Promise<string> {
+async function createFakeSshExecutable(homeDir: string, lines: string[]): Promise<string> {
   const binDir = join(homeDir, "bin");
   await mkdir(binDir, { recursive: true });
   const sshPath = join(binDir, "ssh");
   const output = lines.join("\n");
   await writeFile(
     sshPath,
-    [
-      "#!/bin/sh",
-      "cat <<'EOF'",
-      output,
-      "EOF",
-      "exit 0",
-      "",
-    ].join("\n"),
+    ["#!/bin/sh", "cat <<'EOF'", output, "EOF", "exit 0", ""].join("\n"),
     "utf8",
   );
   await chmod(sshPath, 0o755);
@@ -119,56 +109,57 @@ describe("sshConfigAlias fallback parser", () => {
       process.env["HOME"] = homeDir;
       process.env["PATH"] = "";
 
-    const includeDir = join(homeDir, ".ssh", "includes");
-    await mkdir(includeDir, { recursive: true });
-    await writeFile(
-      join(includeDir, "aliases.conf"),
-      [
-        "Host dev",
-        "  HostName dev.example.com",
-        "  Port 2201",
-        "Host multi one",
-        "  HostName invalid.example.com",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+      const includeDir = join(homeDir, ".ssh", "includes");
+      await mkdir(includeDir, { recursive: true });
+      await writeFile(
+        join(includeDir, "aliases.conf"),
+        [
+          "Host dev",
+          "  HostName dev.example.com",
+          "  Port 2201",
+          "Host multi one",
+          "  HostName invalid.example.com",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
 
-    await writeFile(
-      join(homeDir, ".ssh", "config"),
-      [
-        "Include includes/*.conf",
-        "Host *",
-        "  User default-user",
-        "Host skip-*",
-        "  HostName wildcard.example.com",
-        "Host prod",
-        "  HostName prod.example.com",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+      await writeFile(
+        join(homeDir, ".ssh", "config"),
+        [
+          "Include includes/*.conf",
+          "Host *",
+          "  User default-user",
+          "Host skip-*",
+          "  HostName wildcard.example.com",
+          "Host prod",
+          "  HostName prod.example.com",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
 
-    const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
-    const aliases = await listSSHConfigAliasesFromLocalConfig();
-    const aliasNames = aliases.map((item) => item.alias);
+      const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
+      const aliases = await listSSHConfigAliasesFromLocalConfig();
+      const aliasNames = aliases.map((item) => item.alias);
 
-    expect(aliasNames).toEqual(["dev", "prod"]);
-    expect(aliases).toHaveLength(2);
-    expect(aliases[0]).toMatchObject({
-      alias: "dev",
-      host: "dev.example.com",
-      port: 2201,
-      username: "default-user",
-      source: join(includeDir, "aliases.conf"),
-    });
-    expect(aliases[1]).toMatchObject({
-      alias: "prod",
-      host: "prod.example.com",
-      username: "default-user",
-      source: join(homeDir, ".ssh", "config"),
-    });
-  }, testTimeout);
+      expect(aliasNames).toEqual(["dev", "prod"]);
+      expect(aliases[0]).toMatchObject({
+        alias: "dev",
+        host: "dev.example.com",
+        port: 2201,
+        username: "default-user",
+        source: join(includeDir, "aliases.conf"),
+      });
+      expect(aliases[1]).toMatchObject({
+        alias: "prod",
+        host: "prod.example.com",
+        username: "default-user",
+        source: join(homeDir, ".ssh", "config"),
+      });
+    },
+    testTimeout,
+  );
 
   it(
     "Teleport 通配符 Host 块不会阻断普通 alias 枚举",
@@ -260,78 +251,79 @@ describe("sshConfigAlias fallback parser", () => {
     expect(aliases[0]?.privateKeyPath).toBeUndefined();
   });
 
-  it("保留 Windows 风格私钥路径中的反斜杠", async () => {
-    const homeDir = await createTempHome();
-    process.env["HOME"] = homeDir;
-    process.env["PATH"] = "";
+  it(
+    "保留 Windows 风格私钥路径中的反斜杠",
+    async () => {
+      const homeDir = await createTempHome();
+      process.env["HOME"] = homeDir;
+      process.env["PATH"] = "";
 
-    const configPath = join(homeDir, ".ssh", "config");
-    const windowsPrivateKeyPath = "C:\\Users\\alice\\.ssh\\id_ed25519";
-    await writeFile(
-      configPath,
-      [
-        "Host windows-host",
-        "  HostName windows.example.com",
-        "  User root",
-        `  IdentityFile ${windowsPrivateKeyPath}`,
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+      const configPath = join(homeDir, ".ssh", "config");
+      const windowsPrivateKeyPath = "C:\\Users\\alice\\.ssh\\id_ed25519";
+      await writeFile(
+        configPath,
+        [
+          "Host windows-host",
+          "  HostName windows.example.com",
+          "  User root",
+          `  IdentityFile ${windowsPrivateKeyPath}`,
+          "",
+        ].join("\n"),
+        "utf8",
+      );
 
-    const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
-    const aliases = await listSSHConfigAliasesFromLocalConfig();
+      const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
+      const aliases = await listSSHConfigAliasesFromLocalConfig();
 
-    expect(aliases).toHaveLength(1);
-    expect(aliases[0]).toMatchObject({
-      alias: "windows-host",
-      host: "windows.example.com",
-      username: "root",
-      source: configPath,
-    });
-    expect(aliases[0]?.privateKeyPath).toBe(windowsPrivateKeyPath);
-  }, testTimeout);
+      expect(aliases).toHaveLength(1);
+      expect(aliases[0]).toMatchObject({
+        alias: "windows-host",
+        host: "windows.example.com",
+        username: "root",
+        source: configPath,
+      });
+      expect(aliases[0]?.privateKeyPath).toBe(windowsPrivateKeyPath);
+    },
+    testTimeout,
+  );
 
-  it("支持包含反斜杠的 Include 直路径", async () => {
-    const homeDir = await createTempHome();
-    process.env["HOME"] = homeDir;
-    process.env["PATH"] = "";
+  it(
+    "支持包含反斜杠的 Include 直路径",
+    async () => {
+      const homeDir = await createTempHome();
+      process.env["HOME"] = homeDir;
+      process.env["PATH"] = "";
 
-    const includeToken = "includes\\alias.conf";
-    const includeFilePath = join(homeDir, ".ssh", includeToken);
-    if (process.platform === "win32") {
-      await mkdir(join(homeDir, ".ssh", "includes"), { recursive: true });
-    }
-    await writeFile(
-      includeFilePath,
-      [
-        "Host backslash-include",
-        "  HostName include.example.com",
-        "  User include-user",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+      const includeToken = "includes\\alias.conf";
+      const includeFilePath = join(homeDir, ".ssh", includeToken);
+      if (process.platform === "win32") {
+        await mkdir(join(homeDir, ".ssh", "includes"), { recursive: true });
+      }
+      await writeFile(
+        includeFilePath,
+        [
+          "Host backslash-include",
+          "  HostName include.example.com",
+          "  User include-user",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
 
-    const rootConfigPath = join(homeDir, ".ssh", "config");
-    await writeFile(
-      rootConfigPath,
-      [
-        `Include ${includeToken}`,
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+      const rootConfigPath = join(homeDir, ".ssh", "config");
+      await writeFile(rootConfigPath, [`Include ${includeToken}`, ""].join("\n"), "utf8");
 
-    const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
-    const aliases = await listSSHConfigAliasesFromLocalConfig();
+      const listSSHConfigAliasesFromLocalConfig = await loadAliasParser();
+      const aliases = await listSSHConfigAliasesFromLocalConfig();
 
-    expect(aliases).toHaveLength(1);
-    expect(aliases[0]).toMatchObject({
-      alias: "backslash-include",
-      host: "include.example.com",
-      username: "include-user",
-      source: includeFilePath,
-    });
-  }, testTimeout);
+      expect(aliases).toHaveLength(1);
+      expect(aliases[0]).toMatchObject({
+        alias: "backslash-include",
+        host: "include.example.com",
+        username: "include-user",
+        source: includeFilePath,
+      });
+    },
+    testTimeout,
+  );
 });

@@ -1,6 +1,7 @@
 import { ServiceChannels, hostPluginSandboxRegisterResultMessageSchema } from "@zcode/shared";
 import type { PluginSandboxHandle } from "@zcode/shared/mcp-apps";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createPluginUiBridgeService } from "./pluginUiBridgeService.js";
 import { examplePrepareAndMount, exampleReadBlob } from "./contract.example.js";
 import { IPluginUiBridgeService } from "./contract.js";
 
@@ -78,4 +79,41 @@ describe("plugin-ui-bridge contract", () => {
     });
     await expect(exampleReadBlob(bridge)).resolves.toBe("AAAA");
   });
+});
+
+describe("plugin UI telemetry", () => {
+  it.each([false, true])(
+    "reports tool outcome without request or response content (failure=%s)",
+    async (isError) => {
+      const reportTelemetryEvent = vi.fn().mockRejectedValue(new Error("offline"));
+      const result = { content: [{ type: "text" as const, text: "private output" }], isError };
+      const service = createPluginUiBridgeService({
+        reportTelemetryEvent,
+        callMcpToolForUi: async () => result,
+      });
+      const params = {
+        workspacePath: "/private/path",
+        sessionId: "session",
+        pluginId: "demo@market",
+        serverName: "server",
+        toolName: "tool",
+        callId: "call",
+        arguments: { secret: "private input" },
+        instance: {
+          runtimeId: "agent",
+          generation: 1,
+          token: "private token",
+          appIdentity: "a".repeat(64),
+        },
+      };
+      expect(await service.callTool(params)).toBe(result);
+      expect(reportTelemetryEvent).toHaveBeenCalledTimes(1);
+      expect(reportTelemetryEvent.mock.calls[0]![0].eventExtraDetail).toMatchObject({
+        plugin_id: "demo@market",
+        action: "ui_tool_call",
+        result: isError ? "failure" : "success",
+      });
+      expect(JSON.stringify(reportTelemetryEvent.mock.calls)).not.toContain("private");
+    },
+  );
 });

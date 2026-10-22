@@ -15,7 +15,7 @@ journal, same notifications, same cancel and resume, same run pane.
 |---|---|---|---|
 | `CreateWorkflow` tool, inline `script` | the model | the confirmation window | the current session |
 | `CreateWorkflow` tool, `saved` source | the model | the confirmation window, with a saved-source badge | the current session |
-| `AmendWorkflow` tool | the model | none when the run being amended is this session's own; the confirmation window otherwise (see "Amending this session's runs") | the current session |
+| `AmendWorkflow` tool | the model | none when the run being amended is this session's own and the amendment brings in no new provider; the confirmation window otherwise (see "Amending this session's runs") | the current session |
 | 「运行」 (Run) on the hub page | the user | none: the click is the consent | a new, empty session in the workflow's project |
 | Configure on the run card or the run pane (a new run of the same script under new settings; one change starts none, see below) | the user | none: the click on Apply is the consent | the session that owns the run |
 | `/dwf resume`, the run pane's Resume, `ResumeWorkflowRun` | the user or the model | none | the session that owns the run |
@@ -93,6 +93,21 @@ force. The response names it: "Subagents run on {model} (the main agent stays on
 model)". The parenthesis is load-bearing. The main agent keeps the session model whatever
 this field says, and without that half-sentence it reads "runs on X" as its own switch and
 reports one to the user that never happened.
+
+The field is the user's choice, never the main agent's. The agent sets it only when the user
+asked for a model, passing the name they used, and it never moves the subagents to a model
+under another provider on its own: another provider is another bill, and a cheaper-looking
+model there is not a reason to act, only a reason to ask. When the agent sees that a lighter
+or faster model elsewhere would serve the run, it asks the user before the call, naming the
+model, the provider and what it would save, and takes their answer as the request. When the
+user did ask for a model that lives under another provider, by that question or on their
+own, that is fine; the agent then writes the full `providerId/modelId`, which is the
+only form the resolver accepts for a model the session's provider does not have (see the
+table below). The same rule binds the models a script names for its subagents
+(`docs/dynamic-workflow/authoring.md`, "Choosing a model per subagent"). The permission rule
+backs this up for the one path that has no window of its own: an `AmendWorkflow` of this
+session's run that would bring in a provider neither the session nor the run used asks the
+user like any other amend ("Amending this session's runs").
 
 Exactly one of `script`, `saved` and `path` must be given, and `args` only with `path`. The
 rule is enforced by the tool's `validateInput` on the model's arguments, not by the schema:
@@ -179,8 +194,14 @@ next `CreateWorkflow`. Against that listing, `subagent_model` resolves by specif
 | What the field says | What it resolves to |
 |---|---|
 | `providerId/modelId` | that entry |
-| a bare `modelId` configured under exactly one provider | that entry |
-| a bare `modelId` configured under several providers | the session's own model when it is one of them; otherwise a failure naming all of them |
+| a bare `modelId` the session's own provider has | that provider's entry, whatever other providers also have it |
+| a bare `modelId` only other providers have | a failure naming their full ids: a bare name never crosses the provider boundary, so moving the subagents to another provider is always written out as `providerId/modelId` |
+| a bare `modelId`, when the session's model is not in the catalog | the entry when exactly one provider has it; otherwise a failure naming all of them (there is no provider boundary to keep) |
+
+The provider boundary is the resolver's part of the rule above: a model id that happens to
+exist under one more provider than the user has in mind (the same model on a personal key
+and a team plan, say) is never picked up from the other one in silence, and the one form that
+does cross the boundary is the one the agent writes only when the user asked for it.
 
 Provider and model ids compare case-insensitively, since a registry publishes no display
 name distinct from the id, and the canonical string is written in the catalog's own spelling
@@ -624,7 +645,7 @@ model read first: the cache (unchanged asks of named subagents replay at zero co
 revision's first write to the workspace; after that only asks that read and ran nothing keep
 replaying), the fact that a named subagent whose unfinished ask the revision did not change
 picks that ask up where it left off, and the confirmation rule (this session's runs start
-without a window; another session's run asks). Its field list states one rule, omit a field
+without a window unless the amendment brings in a new provider; another session's run asks). Its field list states one rule, omit a field
 and the new run keeps the predecessor's value, in a fixed order: the script first (omit both
 `path` and `script` to keep the predecessor's and change only the settings), then
 `max_concurrency` (omit keeps, `null` removes, a number changes, and only when the user asks;
@@ -772,7 +793,7 @@ Inside the always-ask branch the order is fixed:
 | tool is in `disallowedTools` | deny |
 | a project deny rule matches | deny |
 | a session allow rule matches | allow, no event, no window (`rule.session.allow`) |
-| `AmendWorkflow` of a run this session started, not stopped by the user | allow, no event, no window (`rule.session.workflowOwner`) |
+| `AmendWorkflow` of a run this session started, not stopped by the user, bringing in no new provider | allow, no event, no window (`rule.session.workflowOwner`) |
 | otherwise | ask (`tool.alwaysAsk`) |
 
 Project allow rules and `allowedTools` are never consulted for an always-ask tool. A
@@ -974,9 +995,24 @@ The rule is read from the journal, through the `predecessor` block `resolveInput
 
 | Predecessor | Result |
 |---|---|
-| `parent_session_id` is this session and `stop_reason` is not `user` | allow, `rule.session.workflowOwner`, in every mode |
+| `parent_session_id` is this session, `stop_reason` is not `user`, and the amendment brings in no new provider | allow, `rule.session.workflowOwner`, in every mode |
+| `parent_session_id` is this session but the amendment brings in a new provider | ask: another provider is another bill, and only the user can choose it |
 | `parent_session_id` is this session but the user stopped it | ask: the user ended that run on purpose, and a revision of it is a new decision |
 | another session's run | ask |
+
+"A new provider" is `predecessor.introduces_providers`, which `resolveInput` computes as its last
+step, after the script's model bindings are settled. It lists, once each and in alphabetical
+order, the providers of the models the revision will use (the resolved `subagent_model` and the
+values of `model_bindings`) that are neither the session model's provider nor a provider of the
+models the predecessor ran on (its `subagentModel` and `modelBindings` from `run-launched`). The
+key is present only when that list is not empty. A model the predecessor already used was
+approved in that run's own window, so keeping it, or moving to another model under the same
+provider, stays free. The fact is computed, never read from the call: the model-facing schema
+has no `predecessor`, so a call that carries one is refused before `resolveInput`, and a full
+`providerId/modelId` written by the model proves only that the name is unambiguous, not that the
+user chose it. Without a model catalog there is no session provider to read, so the comparison
+is with the predecessor alone; a model name the call passes cannot be resolved then anyway, and
+an inherited one is the predecessor's own.
 
 A hub launch owns the session it created, so amending it from that session is free. A run
 that was itself an amendment is owned by the session that amended, so a chain of revisions
@@ -994,10 +1030,12 @@ The server-side gates (`run_not_found`, `missing_boundaries`) still run at submi
 only removes the window. A `max_concurrency` different from the predecessor's does not bring
 the window back either, in either direction: it changes how many of the approved script's
 subagents work at once, not what the script does or what any subagent may do, and a raise
-still answers to the governor's cap on each provider key. Nor does a different `subagent_model`.
-It moves the subagents onto another model this host already has configured and widens nothing
-about what the run may do, so an amend that changes only the model starts without a window
-like any other amend of this session's run. An amend that omits both `script` and `path` is judged the same
+still answers to the governor's cap on each provider key. Nor does a different `subagent_model`
+under a provider the session or the run already used. It moves the subagents onto another model
+this host already has configured and widens nothing about what the run may do, so such an amend
+starts without a window like any other amend of this session's run. A model under a provider
+neither has used is the exception in the table above: the window comes back, because that
+choice moves the cost to another bill. An amend that omits both `script` and `path` is judged the same
 way as one that passes it: free for this session's run, a window for another session's, where
 the lineage row says the script is unchanged.
 
@@ -1201,6 +1239,44 @@ The call follows the same lifecycle as `CreateWorkflow`:
    arguments table (name, type, required, default, description), and the script in a
    collapsible closed by default. Options: Allow once and Deny, plus the generic feedback
    row. No graph, no Refine, no session option.
+
+   The window sits above the composer, and the model writes the description, the
+   arguments and the script, so any of them can be long. The window is at most the smaller
+   of 72% of the viewport height and 42rem, the same cap as the question window in the
+   same place. It has exactly one vertical scrolling area: everything above the options.
+   The options, the feedback row and Confirm stay below it, behind a hairline, so the
+   decision is always on screen. The question and the name are the top of that area, not
+   pinned above it: pinning them left too little room on a short viewport and needed a
+   second scroller as a fallback.
+
+   Pinning holds only on a viewport at least 36rem tall. The pinned part alone can reach
+   about 320px (the options, a feedback box that grows to 5 lines, an error line and the
+   Confirm row), more than the cap on a short screen such as a phone held sideways, where
+   the window would clip it and Confirm with it. Below 36rem the whole window is the one
+   scrolling area instead, and the options scroll with the content; the cap, the hairline
+   and every disclosure stay the same. Either way there is exactly one vertical scroller.
+
+   No part scrolls on its own. A scroller inside a scroller sends a single wheel
+   gesture to whichever box happens to be under the pointer, then hands it on to the outer
+   one. Long parts are shortened by disclosure instead, and each disclosure makes the one
+   area longer:
+
+   | Part | Collapsed | Expanded by |
+   |---|---|---|
+   | `description`, `whenToUse` | the first 4 lines | 「展开」 / "Show more" under the text, shown only when the text is actually cut; 「收起」 / "Show less" folds it back |
+   | Arguments | the first 8 rows | 「显示全部 N 个参数」 / "Show all N arguments" under the table; 「收起参数」 / "Show fewer arguments" folds it back |
+   | Script | closed | the script toggle; it opens inline at full height (a long line still scrolls sideways inside the code block) |
+
+   The arguments table's column header sticks to the top of the scrolling area while
+   its rows pass under it, and long names and defaults wrap rather than widening the
+   table. A new request resets every disclosure to collapsed.
+
+   Every disclosure is reachable from the keyboard. The window opens with focus on the
+   first option, and Tab cycles through the options and the feedback row as in every
+   permission window. Shift+Tab on the first option leaves that cycle and lands on the
+   last control in the scrolling area (the script toggle); from there Tab and Shift+Tab
+   walk the disclosures in reading order, and Tab past the last one returns to the
+   selected option. The browser scrolls the area to the focused control.
 5. Allow writes the file (creating the directory), replacing any existing one. The
    `overwritten` flag in the output is re-derived at write time, not copied from the input.
 
@@ -1450,7 +1526,8 @@ section heading 「已保存的工作流」 with the total count, and, on the ri
 「工作流设置」 (Workflow settings) followed by the current mode's label in the tertiary text
 colour, then a refresh button 「刷新」 that makes every group reload past its cache. The
 settings button opens Settings › 常规, where the mode row lives (see "The user's choice"),
-and is present exactly when that row is: when the feature is offered.
+and is present exactly when that row is, which is whenever the hub is shown, except for a
+snapshot from an older Host.
 
 ### Groups
 
@@ -1503,13 +1580,15 @@ model launched under a different `name` belongs to no saved workflow.
 
 ### The detail page
 
-The detail page replaces the list. Its breadcrumb is 自动化 › project (or 「全局」) › name;
-the section crumb returns to the list. Every action on the page targets the workflow's own
-project, never the active one.
+The detail page replaces the list. Its breadcrumb is 自动化 › name, and the section crumb
+returns to the list. The breadcrumb has no project level: a project is a group in the list,
+not a page, so a crumb for it would have nowhere to lead. The page says which project the
+workflow belongs to in its header instead. Every action on the page targets the workflow's
+own project, never the active one.
 
 | Part | Content |
 |---|---|
-| Header | the name, the description, a primary 「运行」 button and a ⋯ menu (revise, copy path, the scope item, delete) |
+| Header | the name, beside it a small outlined label with the project's label (「全局」 for a global workflow), the description, a primary 「运行」 button and a ⋯ menu (revise, copy path, the scope item, delete). The label is plain text, not a control; a long project label is cut with an ellipsis. |
 | 「最近产物」 (latest artifacts) | the artifact chips of the newest completed run that published any, clickable into that run's session |
 | Tabs | 「定义」 (definition) and 「运行历史」 (run history, with the count); the file path with a copy button on the right |
 | Definition: 「基本信息」 | 「说明」 (description, required), 「使用时机」 (when to use, with the help 「给 ZCode 的路由提示：什么场景该选这个工作流。」), and a 「参数」 table (name, type, required, default, description) with add and remove. Row errors: 「参数需要名字」, 「参数名重复」, 「默认值与类型不符」. |
@@ -1654,6 +1733,23 @@ target project), opens the dialog:
 | Note | 「将立即在 {project} 的新会话中运行」 |
 | Footer | 「取消」 and 「运行」, the latter showing a spinner while pending |
 | Error area | appears when the launch is rejected: the reason text, then the agent's message in a monospace block (for `compile_failed`, the diagnostics) |
+
+The dialog is as tall as its content, up to the smaller of the viewport height less a 1rem
+margin on each side and 45rem. A declaration can carry any number of arguments, so the
+dialog is laid out in three zones and only the middle one scrolls:
+
+| Zone | Parts | Behaviour |
+|---|---|---|
+| Top | Header | fixed |
+| Middle | 「运行于」 and the argument fields | scrolls on its own once the content passes the height cap. With three or more rows (「运行于」 counts as one) it shrinks no further than 6rem; with fewer it does not shrink at all, since its content is already shorter than a useful scroll area. |
+| Bottom | Note, error area, footer | fixed, so the consequence of the click, the result of the last attempt and the buttons are always on screen. The agent's message block scrolls inside the error area past 10rem. |
+
+When the fixed zones alone leave less than the middle zone's minimum (a very short
+viewport), the dialog as a whole scrolls instead, so every part stays reachable.
+
+A submit that fails validation scrolls the first failing field into view and moves focus
+to it: with a long list the field and its error may be far from the visible part of the
+list, and a click that changes nothing on screen reads as a dead button.
 
 ### The launcher
 
@@ -2384,12 +2480,11 @@ follows: on a team plan it is a UUID.
 
 ## Gray release: the `dynamicWorkflow` feature key
 
-Status: implemented. The server decides, per client, whether dynamic workflows are offered
-at all, and which mode a user gets by default. The key is `data.configs.dynamicWorkflow.mode`
+Status: implemented. The server decides, per client, which mode a user gets by default. The key is `data.configs.dynamicWorkflow.mode`
 in the `/api/v1/client/configs` response, with the values `"disabled" | "onDemand" |
-"alwaysOn"`. Where the server offers the feature, the user can pick another of the three
-modes in Settings (see "The user's choice"). The server offers; the user picks among what is
-offered.
+"alwaysOn"`. The user can pick any of the three modes in Settings (see "The user's choice"),
+and an explicit choice always wins. The server only sets the default: the mode of a user who
+has not chosen.
 
 ### What each mode means
 
@@ -2402,9 +2497,10 @@ offered mode.
 | `onDemand` | Every door of `alwaysOn`, with the model-facing tool surface deferred. The `/workflow` command stays in the slash catalog (so the composer's plus-menu entry and `/` panel entry stay), the `dynamic-workflows` skill stays discoverable, the automations page keeps its 「工作流」 tab and every Resume affordance is offered; but the ten workflow tools are **not registered for the model, and the `Agent`/`Task` descriptions carry no CreateWorkflow line, until the session is activated** by its first `/workflow`, by a Resume or Configure of one of its runs, or by resuming a session whose records already hold a workflow. Once activated a session stays activated. See "On demand: activation". `enabled = mode !== "disabled"` (`isDynamicWorkflowModeEnabled` in `packages/shared/src/dynamic-workflow-feature.ts`) still answers every "is the feature offered at all" question; only the registration gate reads the mode itself. |
 | `alwaysOn` | Everything this document describes; the ten tools are registered from the session's first request. |
 
-The key absent, malformed, or the request failed: `disabled`. A server that stops sending
-the key has turned the feature off; a stale "on" snapshot is never carried forward past a
-successful response that lacks it. The terminal UI and headless `-p` runs never consult the
+The key absent, malformed, or the request failed: the offer is `disabled`. A server that
+stops sending the key has turned the default off; a stale "on" snapshot is never carried
+forward past a successful response that lacks it. A user's explicit choice still applies on
+top (see "The user's choice"). The terminal UI and headless `-p` runs never consult the
 key: the standalone CLI does not read `/client/configs`. Its mode comes from the
 `--workflow-mode` flag and is `disabled` when the flag is absent (see "The standalone CLI:
 `--workflow-mode`").
@@ -2447,11 +2543,14 @@ policy sync, session create and resume in that process reuses it. The user's cho
 latched: it is applied to the latched offer at every use. A server flip therefore
 takes effect at the next app start, the same rule as the desktop context prompt gray. The
 latch is what keeps a session create from waiting on a network timeout when the machine is
-offline; the cost is that a Host that started offline stays disabled until restart. The
+offline; the cost is that a Host that started offline offers `disabled` until restart, so
+a user who never chose a mode has the feature off until then (an explicit choice still
+applies, see "The user's choice"). The
 provider's own 1 h envelope cache and `forceRefresh` serve the renderer's refresh, not the
 CLI gate. Remote Hosts over SSH, WSL and Docker evaluate the key themselves through their own
-`/client/configs` request, so a remote machine that cannot reach the server is disabled
-unless the override reaches it (below). The CLI never reads the key or the override;
+`/client/configs` request, so a remote machine that cannot reach the server offers
+`disabled`: the feature is off there unless the user's choice (pushed by the desktop) or the
+override (below) turns it on. The CLI never reads the key or the override;
 it only consumes what the Host sends, the way `offPeakToolEnabled` works. Old CLIs that do
 not know the policy method answer method-not-found, which the Host logs and ignores, and
 their `z.object` schemas drop the unknown session flag, so the pairing degrades to disabled.
@@ -2553,17 +2652,21 @@ Status: implemented. One app-wide setting, `dynamicWorkflowMode` in the shared s
 file, holds the user's choice. Absent means "follow the offer". It holds one of the three
 modes otherwise.
 
-**Precedence.** The server (or the local override) decides the *offer*: whether the feature
-is available (`offeredMode` is a known mode other than `disabled`, `isDynamicWorkflowOffered`)
-and which mode is the default. A snapshot without a readable `offeredMode` counts as not
-offered: it comes from an older Host (a newer UI bundle, such as the phone remote, attached
-to an older desktop), which ignores the choice, so neither the row nor the hub's settings
-button appears. The user's choice
-applies only when the feature is available, and then replaces the offered mode. A choice
-never turns the feature on where the offer is `disabled`: the stored value stays in the file
-and applies again if a later offer makes the feature available. The shared helper
-`applyDynamicWorkflowUserMode(offer, choice)` is the only place this rule is written; the
-Host calls it, and the renderer only reads its result.
+**Precedence.** The user's choice always wins. The server (or the local override) decides
+only the *offer*, `offeredMode`: the default mode, which is the effective mode while the user
+has not chosen. An offer of `disabled` is a default like the others, so a user can turn the
+feature on where the server does not send the key, where the request failed, or on a remote
+machine that cannot reach the server. A Host without a resolver for the offer at all (one
+that does not wire the feature) stays `disabled` whatever the choice. The server therefore
+has no remote off switch for a user who chose a mode; the feature is generally available, and
+the key only moves the default. The shared helper `applyDynamicWorkflowUserMode(offer, choice)`
+is the only place this rule is written; the Host calls it, and the renderer only reads its
+result.
+
+A snapshot without a readable `offeredMode` (`readDynamicWorkflowOfferedMode` returns
+nothing) comes from an older Host (a newer UI bundle, such as the phone remote, attached to an
+older desktop), which ignores the choice, so neither the row nor the hub's settings button
+appears for it.
 
 **Clear on default.** Picking the option that equals the offered mode deletes the stored
 value (the patch carries the empty string, which the settings patch normalizer turns into a
@@ -2585,10 +2688,10 @@ description that wraps inside the list:
 | `alwaysOn` | 始终开启 / Always on | 除了 /workflow 命令，模型也会根据你的意图主动运行工作流。 |
 
 The option equal to the offered mode carries a 「默认」 (Default) tag; the trigger shows the
-effective mode's title only. The row is not rendered while the availability snapshot is
-loading, when it failed, or when the offer is `disabled`: the gray release stays invisible,
-and a user whose server never offered the feature sees nothing that mentions it. The row
-has no note about timing; open sessions keeping their tools is the rule below, not something
+effective mode's title only. The row is always rendered once the availability snapshot is
+ready, whatever the offer: under an offer of `disabled` the trigger shows 关闭 and the tag
+sits on 关闭. It is not rendered while the snapshot is loading, when reading it failed, or for
+a snapshot from an older Host (above). The row has no note about timing; open sessions keeping their tools is the rule below, not something
 the row explains.
 
 **When it takes effect.** The same rule as a server flip: sessions created or resumed after
@@ -2622,8 +2725,8 @@ once that resolves, reloads its availability snapshot.
 mode's label (see "The hub page"). It is shown only while the hub itself is shown, that is,
 while the effective mode is not `disabled`. Under `disabled` the page reverts to the plain
 「自动化」 title and nothing points at the setting; the way back is Settings › 常规, where the
-user turned it off. A user who chose Off and a user who was never offered the feature see
-the same automations page.
+row is always present. A user who chose Off and a user whose default is Off see the same
+automations page.
 
 ### The local override
 
@@ -2689,6 +2792,21 @@ What the terminal shows under `disabled`:
 
 ### Acceptance
 
+The saved-workflow hub E2E (`automations-workflows-hub.test.ts`) requires the
+case-local client-config gateway to offer `alwaysOn` before Electron starts.
+It must not depend on a live rollout or a developer's local mode override.
+The hub uses a local replay provider with no seeded OAuth account; account-specific
+authentication belongs to separate fixtures, not this file-management and launch case.
+Each case closes a launch dialog left by the previous case and leaves the automations
+page through the default project's new-task action before preparing the conversation. Deferred worker
+cleanup does not reset the page between cases in the same spec.
+Run-side-pane actions and assertions target the visible active tab because inactive
+tabs remain mounted. Hover assertions must establish pointer hover on the expanded
+run row before checking Stop opacity. Concurrency assertions read the numeric input's
+value, not its empty text content, and verify the decrement before applying it.
+The same gateway continues to omit the key for the disabled gray-release case;
+enabling the hub fixture must not change unrelated specs or the fail-closed product default.
+
 | ID | Setup → action → assertion |
 |---|---|
 | DWG-01 | `resolveDynamicWorkflowClientConfig`: remote `{mode:"alwaysOn"}` → enabled/remote; remote absent, `null`, or `{mode:"bogus"}` → disabled/default; env override set → override wins over remote; `onDemand` → enabled with `mode` preserved as `onDemand` |
@@ -2711,12 +2829,12 @@ What the terminal shows under `disabled`:
 | DWG-15 | Flag scope: `--workflow-mode` with `app-server`, `agent-server`, `login`, `skills` → exit 1 with the scope error; with `-p`, `--target`, `tui` or no command → accepted |
 | DWG-16 | TUI under `disabled`: the `/` suggestions and `/help` have no `workflow`; `/workflow x` answers the disabled notice without calling `submitPrompt`; `/dwf list` and `/dwf cancel` work; `/dwf resume <id>` answers the notice without calling `resumeWorkflowRun`. Under `onDemand` and `alwaysOn`: `/workflow` is suggested and submitted as before |
 | DWG-17 | Headless under `disabled`: `-p "/workflow x"` → the notice on stderr, exit 1, no app created; `-p "/help"` lists no `/workflow`. With `--workflow-mode alwaysOn` the command rides the plain-prompt path and the settle-wait as before |
-| DWG-18 | `applyDynamicWorkflowUserMode`: offer `onDemand` + choice `alwaysOn` → mode `alwaysOn`, `offeredMode` `onDemand`, `userMode` `alwaysOn`; offer `disabled` + any choice → `disabled`, no `userMode`; no choice → the offer unchanged; an invalid stored value is ignored |
+| DWG-18 | `applyDynamicWorkflowUserMode`: offer `onDemand` + choice `alwaysOn` → mode `alwaysOn`, `offeredMode` `onDemand`, `userMode` `alwaysOn`; offer `disabled` + choice `alwaysOn` → mode `alwaysOn`, enabled, `offeredMode` `disabled`; no choice → the offer unchanged; an invalid stored value is ignored. `readDynamicWorkflowOfferedMode` returns the offered mode, `disabled` included, and nothing for a snapshot without a readable `offeredMode` |
 | DWG-19 | Settings patch: `dynamicWorkflowMode: ""` deletes the stored value; a mode is stored as is; an unknown stored value does not break reading the file |
-| DWG-20 | Host: with a latched offer `alwaysOn`, a stored choice `onDemand` makes the next session create carry `dynamicWorkflowMode: "onDemand"` without a new server read; a choice `disabled` makes it carry no workflow fields; `syncDynamicWorkflowUserMode` re-sends the policy to every live workspace (`enabled: false` for `disabled`) only when the effective mode changed, in call order |
+| DWG-20 | Host: with a latched offer `alwaysOn`, a stored choice `onDemand` makes the next session create carry `dynamicWorkflowMode: "onDemand"` without a new server read; a choice `disabled` makes it carry no workflow fields; with a latched offer `disabled`, or an offer read that threw, a stored choice `alwaysOn` sends the policy `enabled: true` and makes session create carry the mode; without an offer resolver the choice is ignored; `syncDynamicWorkflowUserMode` re-sends the policy to every live workspace (`enabled: false` for `disabled`) only when the effective mode changed, in call order |
 | DWG-21 | Desktop-attached remote Host: without a local settings resolver it applies the last pushed value; the desktop pushes the settings value when it builds the remote workspace services and forwards later changes to live remote connections |
-| DWG-22 | UI Settings row: absent while loading, on failure, when the offer is `disabled`, and for a snapshot with no readable `offeredMode` (an older Host), where the hub's settings button is absent too; shows the effective mode; the 「默认」 tag sits on the offered mode; picking the offered mode writes `""`, picking another writes that mode; the store reloads after a change |
-| DWG-23 | Desktop E2E against a mock `/client/configs` sending `alwaysOn`: the row shows 始终开启 with the tag; choosing 关闭 removes the 「工作流」 title word and, in a new draft, the plus-menu entry; choosing 始终开启 again clears the stored value. Offer `disabled`: no row |
+| DWG-22 | UI Settings row: absent while loading, on failure, and for a snapshot with no readable `offeredMode` (an older Host), where the hub's settings button is absent too; present under an offer `disabled`, showing 关闭 with the tag; with an offer `disabled` and a choice `alwaysOn` the hub shows its settings button; shows the effective mode; the 「默认」 tag sits on the offered mode; picking the offered mode writes `""`, picking another writes that mode; the store reloads after a change |
+| DWG-23 | Desktop E2E against a mock `/client/configs` sending `alwaysOn`: the row shows 始终开启 with the tag; choosing 关闭 removes the 「工作流」 title word and, in a new draft, the plus-menu entry; choosing 始终开启 again clears the stored value. Offer `disabled`: the row shows 关闭 with the tag; choosing 始终开启 stores it and brings back the 「工作流」 tab and, in a new draft, the plus-menu entry |
 
 ## Alternatives not taken
 

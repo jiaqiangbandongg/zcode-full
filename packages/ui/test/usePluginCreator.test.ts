@@ -33,7 +33,7 @@ vi.mock("@/v4/workbenchGroupStore.js", () => ({
     getState: () => mocks.group,
   }),
 }));
-vi.mock("@/v4/workbenchNewTaskTarget.js", () => ({
+vi.mock("@/conversation-workspace-target/workbenchTarget.js", () => ({
   resolveWorkbenchNewTaskTarget: (s: {
     activeWorkspacePath: string;
     activeWorkspaceIdentity: string;
@@ -44,7 +44,7 @@ vi.mock("@/i18n/IntlProvider.js", () => ({
   useZCodeIntl: () => ({ intl: { formatMessage: ({ id }: { id: string }) => id } }),
 }));
 vi.mock("@/logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
-import { usePluginCreator } from "@/hooks/usePluginCreator.js";
+import { usePluginCreator } from "@/conversation-workspace-target/usePluginCreator.js";
 const skill = {
   id: "creator",
   name: "plugin-creator",

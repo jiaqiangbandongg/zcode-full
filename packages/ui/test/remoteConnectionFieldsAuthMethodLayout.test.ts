@@ -1,6 +1,7 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { createElement, type ComponentProps } from "react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { PlatformProvider } from "@/hooks/usePlatform.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
@@ -30,8 +31,27 @@ const platform: IPlatformService = {
   selectFile: vi.fn(),
 };
 
-function renderRemoteConnectionFields(locale: "zh-CN" | "en-US") {
-  return renderToStaticMarkup(
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
+
+function renderRemoteConnectionFields(
+  locale: "zh-CN" | "en-US",
+  overrides: Partial<ComponentProps<typeof RemoteConnectionFields>> = {},
+) {
+  return render(
     createElement(
       PlatformProvider,
       { platform },
@@ -80,20 +100,61 @@ function renderRemoteConnectionFields(locale: "zh-CN" | "en-US") {
           setServerName: vi.fn(),
           setServerToken: vi.fn(),
           setServerWorkspacePath: vi.fn(),
+          ...overrides,
         }),
       ),
     ),
   );
 }
 
-describe("RemoteConnectionFields authentication method layout", () => {
-  it("keeps SSH auth method options wide enough and non-wrapping for Chinese and English labels", () => {
-    const zhHtml = renderRemoteConnectionFields("zh-CN");
-    const enHtml = renderRemoteConnectionFields("en-US");
+it("认证与下载方式有组名和选中状态，密码可显示再隐藏", () => {
+  renderRemoteConnectionFields("zh-CN");
+  const auth = screen.getByRole("group", { name: "认证方式" });
+  expect(within(auth).getByRole("button", { pressed: true }).textContent).toBe("密码");
+  const password = screen.getByLabelText("密码");
+  expect(password.getAttribute("type")).toBe("password");
+  fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
+  expect(password.getAttribute("type")).toBe("text");
+  fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
+  expect(password.getAttribute("type")).toBe("password");
+  fireEvent.click(screen.getByRole("button", { name: /高级/ }));
+  const download = screen.getByRole("group", { name: "资源下载方式" });
+  expect(within(download).getByRole("button", { pressed: true })).toBeTruthy();
+  expect(within(download).getByRole("button", { pressed: false })).toBeTruthy();
+});
 
-    for (const html of [zhHtml, enHtml]) {
-      expect(html).toContain("sm:grid-cols-[minmax(0,1fr)_12rem]");
-      expect(html).toContain("whitespace-nowrap");
-    }
+it.each([
+  { kind: "ssh", sshAuthMethod: "privateKey", label: "私钥口令（可选）" },
+  { kind: "server", sshAuthMethod: "password", label: "Token（可选）" },
+] as const)("$kind 的口令字段可以显示和隐藏且标签关联", ({ kind, sshAuthMethod, label }) => {
+  renderRemoteConnectionFields("zh-CN", { kind, sshAuthMethod });
+  const input = screen.getByLabelText(label);
+  expect(input.getAttribute("type")).toBe("password");
+  fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
+  expect(input.getAttribute("type")).toBe("text");
+  fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
+  expect(input.getAttribute("type")).toBe("password");
+});
+
+it("Docker 容器列表可从搜索框使用方向键与回车选择", async () => {
+  const setDockerContainer = vi.fn();
+  renderRemoteConnectionFields("zh-CN", {
+    kind: "docker",
+    dockerContainer: "alpha",
+    dockerAvailable: true,
+    dockerContainers: ["alpha", "beta"].map((name) => ({
+      id: name,
+      name,
+      image: "ubuntu",
+      state: "running",
+      status: "Up",
+    })),
+    setDockerContainer,
   });
+  fireEvent.click(screen.getByTestId("docker-container-select"));
+  const search = await screen.findByRole("combobox");
+  await waitFor(() => expect(document.activeElement).toBe(search));
+  fireEvent.keyDown(search, { key: "ArrowDown" });
+  fireEvent.keyDown(search, { key: "Enter" });
+  expect(setDockerContainer).toHaveBeenCalledWith("beta");
 });

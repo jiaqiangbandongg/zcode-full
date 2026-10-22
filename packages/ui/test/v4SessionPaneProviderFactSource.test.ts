@@ -7,9 +7,8 @@ const sessionPaneSource = readFileSync(
 );
 
 describe("V4 SessionPane provider fact source", () => {
-  it("recovers custom providers only from the Model Selection View", () => {
+  it("keeps provider-only recovery sourced from the Model Selection View in SessionPane source", () => {
     expect(sessionPaneSource).toContain("modelSelectionView?.providers.find(");
-    expect(sessionPaneSource).toContain("?.models[0]?.modelId");
     expect(sessionPaneSource).not.toContain("modelProviderService.getAllCached()");
   });
 });

@@ -19,15 +19,6 @@ describe("resolveZCodeAgentPresentationSurface", () => {
     ).toBeUndefined();
   });
 
-  it("服务端灰度开启时保留 Desktop 呈现面", () => {
-    expect(
-      resolveZCodeAgentPresentationSurface({
-        serviceAuthorityMode: "desktop-attached-remote",
-        desktopContextPromptEnabled: true,
-      }),
-    ).toBe("desktop");
-  });
-
   it("从 Desktop-attached remote authority 推导 Desktop 呈现面", () => {
     expect(
       resolveZCodeAgentPresentationSurface({

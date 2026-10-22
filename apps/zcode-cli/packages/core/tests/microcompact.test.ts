@@ -239,9 +239,6 @@ describe("local microcompact", () => {
       trigger: MicrocompactTrigger.TokenPressure,
     });
     expect(String(result.messages[1]?.content)).toBe("[Old tool result content cleared]");
-    expect(String(result.messages[1]?.content)).not.toContain("by microcompact");
-    expect(String(result.messages[1]?.content)).not.toContain("tool=");
-    expect(String(result.messages[1]?.content)).not.toContain("call=");
     expect(String(result.messages[3]?.content)).toContain("latest-a-token");
     expect(String(result.messages[4]?.content)).toContain("latest-b-token");
   });
@@ -421,7 +418,6 @@ describe("local microcompact", () => {
       },
     });
     expect(String(result.entries[2]?.message.content)).toBe("[Old tool result content cleared]");
-    expect(String(result.entries[2]?.message.content)).not.toContain("old-read-token");
     expect(entries).toEqual(originalEntries);
     expect(result.entries[0]).toBe(entries[0]);
     expect(result.entries[1]).toBe(entries[1]);

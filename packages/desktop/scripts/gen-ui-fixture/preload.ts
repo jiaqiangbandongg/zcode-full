@@ -3,7 +3,8 @@ import { PlatformChannels } from "@zcode/shared";
 import { installPluginSandboxHostBridge } from "../../src/preload/pluginSandbox/hostBridge.js";
 installPluginSandboxHostBridge();
 contextBridge.exposeInMainWorld("harness", {
-  config: () => ipcRenderer.invoke("fixture-config"),
+  config: (remote = false) => ipcRenderer.invoke("fixture-config", remote),
+  remoteRead: (input: unknown) => ipcRenderer.invoke("fixture-remote-read", input),
   bridge: (method: string, input: unknown) => ipcRenderer.invoke("fixture-service", method, input),
   owner: () => ipcRenderer.invoke(PlatformChannels.PluginSandboxOwnerWebContentsId),
   dispose: (id: string, init: number) =>

@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { stageE2EAppOutput } from "./e2e/helpers/e2e-app-output-stage.js";
 
@@ -21,32 +21,25 @@ async function createTestDirs() {
 }
 
 describe("desktop E2E app output staging", () => {
-  it("creates a recursive hard-link snapshot", async () => {
+  it("共享构建被类型检查原地覆盖后，递归快照保持原产物", async () => {
     const { destination, source } = await createTestDirs();
-    await mkdir(resolve(source, "renderer"), { recursive: true });
-    await writeFile(resolve(source, "renderer", "main.js"), "main");
-
+    await mkdir(resolve(source, "host"), { recursive: true });
+    const sourceEntry = resolve(source, "host", "index.js");
+    await writeFile(sourceEntry, "bundled-host");
     await stageE2EAppOutput(source, destination);
-
-    expect(await readFile(resolve(destination, "renderer", "main.js"), "utf8")).toBe("main");
-    const [sourceStat, destinationStat] = await Promise.all([
-      stat(resolve(source, "renderer", "main.js")),
-      stat(resolve(destination, "renderer", "main.js")),
-    ]);
-    expect(destinationStat.ino).toBe(sourceStat.ino);
+    await writeFile(sourceEntry, "unbundled-tsc-output");
+    expect(await readFile(resolve(destination, "host", "index.js"), "utf8")).toBe("bundled-host");
   });
 
-  it("falls back to copying when the filesystem rejects links", async () => {
-    const { destination, source } = await createTestDirs();
+  it("用例修改隔离副本时，不污染共享构建或其他 shard", async () => {
+    const { destination, root, source } = await createTestDirs();
     await mkdir(source, { recursive: true });
-    await writeFile(resolve(source, "main.js"), "main");
-    const linkFile = vi.fn(async () => {
-      throw Object.assign(new Error("cross-device link"), { code: "EXDEV" });
-    });
-
-    await stageE2EAppOutput(source, destination, { linkFile });
-
-    expect(linkFile).toHaveBeenCalledOnce();
-    expect(await readFile(resolve(destination, "main.js"), "utf8")).toBe("main");
+    await writeFile(resolve(source, "main.js"), "original");
+    const another = resolve(root, "another-shard");
+    await stageE2EAppOutput(source, destination);
+    await stageE2EAppOutput(source, another);
+    await writeFile(resolve(destination, "main.js"), "case-specific");
+    expect(await readFile(resolve(source, "main.js"), "utf8")).toBe("original");
+    expect(await readFile(resolve(another, "main.js"), "utf8")).toBe("original");
   });
 });

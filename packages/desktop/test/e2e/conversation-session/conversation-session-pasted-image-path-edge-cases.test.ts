@@ -1,6 +1,12 @@
 import { readdir, readFile, stat, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { TID_CHAT_ERROR_BANNER } from "@zcode/shared";
+import { encodeCustomModelValue } from "@zcode/shared";
+import {
+  TID_CHAT_ERROR_BANNER,
+  TID_CHAT_MODEL_SELECT_TRIGGER,
+  TID_CHAT_MODEL_SELECT_ITEM,
+  testId,
+} from "@zcode/shared/test-ids";
 import { clearAppData, getE2EAppDataPaths, waitForTestIdByDom } from "../helpers/desktop-app.js";
 import {
   assertUpstreamRequestCapture,
@@ -28,7 +34,6 @@ const CASE_NAME = "conversation-session-pasted-image-path-edge-cases";
 const UNKNOWN_MODEL = "e2e-image-unknown-capability-model";
 const VISION_MODEL = "e2e-image-edge-vision-model";
 const TEXT_ONLY_MODEL = UPSTREAM_MODEL;
-const UNKNOWN_REPLY = "E2E_PASTED_IMAGE_EDGE_UNKNOWN_OK";
 const FAILURE_SEED_REPLY = "E2E_PASTED_IMAGE_EDGE_FAILURE_SEED_OK";
 const BMP_IMAGE_REPLY = "E2E_PASTED_IMAGE_EDGE_BMP_IMAGE_OK";
 const BMP_TEXT_REPLY = "E2E_PASTED_IMAGE_EDGE_BMP_TEXT_OK";
@@ -41,18 +46,8 @@ const VALID_PNG_BASE64 =
 // 1x1 24-bit BMP。Jimp/provider 链路可解码，但派生缓存故意不支持 image/bmp。
 const VALID_BMP_BASE64 =
   "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAATCwAAEwsAAAAAAAAAAAAAAAD/AA==";
-const artifactRoot = join(
-  getE2EAppDataPaths().homeDir,
-  ".zcode",
-  "cli",
-  "artifacts",
-);
-const imageCacheRoot = join(
-  getE2EAppDataPaths().homeDir,
-  ".zcode",
-  "cli",
-  "image-cache",
-);
+const artifactRoot = join(getE2EAppDataPaths().homeDir, ".zcode", "cli", "artifacts");
+const imageCacheRoot = join(getE2EAppDataPaths().homeDir, ".zcode", "cli", "image-cache");
 
 let modelProviderReplayServer: Awaited<
   ReturnType<typeof startConversationModelProviderReplayServer>
@@ -70,38 +65,39 @@ describe("粘贴图片 path 投影边界 E2E", () => {
     modelProviderReplayServer = null;
   });
 
-  it("T15: 未声明图片能力时仍向 provider 发送 image + path", async () => {
+  it("T15: 缺失输入能力的模型不可进入 App 可执行模型菜单", async () => {
     const runId = Date.now();
-    await seedProvider({
-      modelId: UNKNOWN_MODEL,
-      providerId: `e2e-image-edge-unknown-${runId}`,
-      providerName: `Image Edge Unknown E2E ${runId}`,
-    });
-
-    const marker = `E2E_PASTED_IMAGE_EDGE_UNKNOWN_${runId}`;
-    const prompt = `${marker}: preserve this pasted image when capability is unknown.`;
-    await setV4ComposerText(prompt);
-    await pasteV4ComposerImageAttachment(`unknown-capability-${runId}.png`, {
-      base64: VALID_PNG_BASE64,
-      mimeType: "image/png",
-    });
-    await clickV4Send();
-
-    const record = await waitForUpstreamNetworkCapture(marker);
-    assertUpstreamRequestCapture(record, {
-      expectedText: prompt,
-      model: UNKNOWN_MODEL,
-    });
-    const imagePath = assertImageAndOptionalPathProjection(record.requestJson, marker, {
-      expectedImageDataPrefix: "data:image/png;base64,",
-      expectPath: true,
-    });
-    if (!imagePath) throw new Error("T15 provider projection 缺少派生图片 path");
-    expect(isAbsolute(imagePath)).toBe(true);
-    expect((await stat(imagePath)).isFile()).toBe(true);
-
-    await waitForV4AssistantMessageContaining(UNKNOWN_REPLY, 60_000);
-    await waitForIdleWithText(UNKNOWN_REPLY, "T15 unknown capability 首轮没有完成");
+    await prepareV4ConversationE2E({ skipProvider: true });
+    const [unknown, vision] = await restartWithSeededOpenAIProviders([
+      {
+        inputModalities: null,
+        modelId: UNKNOWN_MODEL,
+        providerId: `e2e-image-edge-unknown-${runId}`,
+        providerName: `Image Edge Unknown E2E ${runId}`,
+      },
+      {
+        inputModalities: ["text", "image"],
+        modelId: VISION_MODEL,
+        providerId: `e2e-image-edge-known-${runId}`,
+        providerName: `Image Edge Known E2E ${runId}`,
+      },
+    ]);
+    if (!unknown || !vision) throw new Error("T15 provider fixture 缺失");
+    await prepareV4ConversationE2E({ skipProvider: true });
+    await selectProviderModel(vision.id, vision.name, VISION_MODEL);
+    await $(`[data-testid="${TID_CHAT_MODEL_SELECT_TRIGGER}"]`).click();
+    // Registry 要求完整能力；先确认同批有效配置已水合，再断言缺失配置没有可执行入口。
+    const knownItem = testId(
+      TID_CHAT_MODEL_SELECT_ITEM,
+      encodeCustomModelValue(vision.id, VISION_MODEL),
+    );
+    await $(`[data-testid="${knownItem}"]`).waitForExist({ timeout: 15000 });
+    const unknownItem = testId(
+      TID_CHAT_MODEL_SELECT_ITEM,
+      encodeCustomModelValue(unknown.id, UNKNOWN_MODEL),
+    );
+    expect(await $(`[data-testid="${unknownItem}"]`).isExisting()).toBe(false);
+    await browser.keys("Escape");
   }).timeout(180_000);
 
   it("T16: 派生文件与 durable artifact 都丢失时应在 provider 前明确失败", async () => {

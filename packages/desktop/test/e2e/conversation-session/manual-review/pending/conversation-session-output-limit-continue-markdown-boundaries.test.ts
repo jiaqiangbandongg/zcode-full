@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_V4_TIMELINE } from "@zcode/shared";
+import { TID_V4_TIMELINE } from "@zcode/shared/test-ids";
 import { clearAppData, DEFAULT_WORKSPACE } from "../../../helpers/desktop-app.js";
 import {
   countUpstreamRequests,

@@ -60,60 +60,23 @@ const artifacts = join(tmpdir(), "zcode-plugin-strip-clipping");
 for (const width of [390, 1200]) {
   for (const locale of ["en-US", "zh-CN"]) {
     for (const theme of ["light", "dark"]) {
-      test(`PLM-STRIP-CLIP ${width}/${locale}/${theme}`, async () => {
+      test(`PLM-CARD-ACTIONS ${width}/${locale}/${theme}`, async () => {
         const page = await browser.newPage({ viewport: { width, height: 700 } });
         const errors = [];
         page.on("pageerror", (error) => errors.push(error.message));
         try {
           await page.goto(`${origin}fixture?locale=${locale}&theme=${theme}`);
-          const badges = page.getByTestId("plugin-store-installed-item-update");
+          const badges = page.getByTestId("plugin-store-card-update");
           await badges.first().waitFor();
-          async function assertUnclipped(locator, inset = 0) {
-            const bounds = await locator.evaluate((element, margin) => {
-              const viewport = element.closest(
-                "[data-testid=plugin-store-installed-strip]",
-              ).lastElementChild;
-              const r = element.getBoundingClientRect();
-              const v = viewport.getBoundingClientRect();
-              const point = document.elementFromPoint(r.left + r.width / 2, r.top + 1);
-              return {
-                top: r.top - margin >= v.top,
-                bottom: r.bottom + margin <= v.top + viewport.clientHeight,
-                left: r.left - margin >= v.left,
-                right: r.right + margin <= v.left + viewport.clientWidth,
-                hit: element.contains(point),
-                verticalScroll: viewport.scrollHeight > viewport.clientHeight,
-              };
-            }, inset);
-            assert.deepEqual(bounds, {
-              top: true,
-              bottom: true,
-              left: true,
-              right: true,
-              hit: true,
-              verticalScroll: false,
-            });
-          }
-          // 回归：旧 overflow-x-auto 容器会裁去 -top-1 角标的顶部 4px。
-          await assertUnclipped(badges.first());
+          assert.equal(await page.getByTestId("plugin-store-installed-strip").count(), 0);
+          // 插件管理入口已移到页头操作组；列表首行只有来源分段与搜索。
+          assert.equal(await page.getByTestId("plugin-store-manage-open").count(), 0);
+          assert.equal(await page.getByTestId("plugin-store-search").count(), 1);
           for (const badge of [badges.first(), badges.last()]) {
             await badge.scrollIntoViewIfNeeded();
-            await badge.hover();
-            await page.waitForFunction(() =>
-              document.getAnimations().every((animation) => animation.playState !== "running"),
-            );
-            await assertUnclipped(badge, 2);
             await badge.focus();
-            await assertUnclipped(badge, 2);
-          }
-          const icons = page.getByTestId("plugin-store-installed-item");
-          for (const icon of [icons.first(), icons.last()]) {
-            await icon.scrollIntoViewIfNeeded();
-            await icon.hover();
-            await page.waitForFunction(() =>
-              document.getAnimations().every((animation) => animation.playState !== "running"),
-            );
-            await assertUnclipped(icon, 2);
+            const bounds = await badge.boundingBox();
+            assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
           }
           await badges.last().click();
           assert.equal(
@@ -134,4 +97,98 @@ for (const width of [390, 1200]) {
       });
     }
   }
+}
+
+for (const [width, locale, theme] of [
+  [1200, "en-US", "light"],
+  [390, "zh-CN", "dark"],
+]) {
+  test(`PLM-UI-PREVIEW ${width}/${locale}/${theme}`, async () => {
+    const page = await browser.newPage({ viewport: { width, height: 800 } });
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.route("https://example.com/panel.png", (route) =>
+      route.fulfill({
+        contentType: "image/png",
+        body: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jH+cAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      }),
+    );
+    try {
+      await page.goto(`${origin}fixture?detail=1&locale=${locale}&theme=${theme}`);
+      await page.getByTestId("plugin-store-ui-capability").waitFor();
+      const preview = page.getByTestId("plugin-store-preview-open");
+      await preview.click();
+      await page.getByRole("dialog").waitFor();
+      assert.equal(await page.getByRole("dialog").getByRole("img").getAttribute("alt"), "Panel");
+      await page.keyboard.press("Escape");
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      assert.equal(await preview.evaluate((element) => element === document.activeElement), true);
+      await page.getByTestId("plugin-store-open-ui").click();
+      assert.equal(await page.getByTestId("opened").textContent(), "plugin-00@personal");
+      assert.equal(await page.getByTestId("plugin-store-try-now").count(), 0);
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      assert.deepEqual(errors, []);
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const [width, locale, theme] of [
+  [1200, "en-US", "light"],
+  [390, "zh-CN", "dark"],
+]) {
+  test(`PLM-UI-DETAILS ${width}/${locale}/${theme}`, async () => {
+    const page = await browser.newPage({ viewport: { width, height: 800 } });
+    try {
+      await page.goto(`${origin}fixture?ui=1&paused=1&locale=${locale}&theme=${theme}`);
+      // 卡片整行进入详情，不再有独立「详情」按钮；进入详情不打开也不启用 UI。
+      assert.equal(await page.getByTestId("plugin-store-ui-details").count(), 0);
+      const card = page.getByTestId("plugin-store-card");
+      await card.focus();
+      await page.keyboard.press("Enter");
+      await page.getByTestId("plugin-store-detail").waitFor();
+      assert.equal(await page.getByTestId("ui-opened").textContent(), "");
+      await page.getByTestId("plugin-store-ui-capability").waitFor();
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const [width, locale, theme] of [
+  [1200, "en-US", "light"],
+  [390, "zh-CN", "dark"],
+]) {
+  test(`PLM-UI-MAIN-NAV ${width}/${locale}/${theme}`, async () => {
+    const page = await browser.newPage({ viewport: { width, height: 800 } });
+    try {
+      // 主导航市场：已安装 UI 插件只有更多菜单，整行进详情，详情恢复「立即试用」。
+      await page.goto(`${origin}fixture?ui=1&mainNav=1&locale=${locale}&theme=${theme}`);
+      await page.getByTestId("plugin-store-card").waitFor();
+      assert.equal(await page.getByTestId("plugin-store-open-ui").count(), 0);
+      assert.equal(await page.getByTestId("plugin-store-ui-details").count(), 0);
+      await page.getByTestId("plugin-store-card").click();
+      await page.getByTestId("plugin-store-detail").waitFor();
+      assert.equal(await page.getByTestId("ui-opened").textContent(), "");
+      assert.equal(await page.getByTestId("plugin-store-open-ui").count(), 0);
+      assert.equal(await page.getByTestId("plugin-store-try-now").count(), 1);
+      await mkdir(artifacts, { recursive: true });
+      await page.screenshot({
+        path: join(artifacts, `main-nav-detail-${width}-${locale}-${theme}.png`),
+      });
+    } finally {
+      await page.close();
+    }
+  });
 }

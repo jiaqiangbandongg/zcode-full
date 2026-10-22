@@ -253,8 +253,6 @@ describe("Edit tool contract", () => {
     expect(content).toBe(
       "The file /work/user-modified.txt has been updated successfully.  The user modified your proposed changes before accepting them. .",
     );
-    expect(content).not.toContain("file state is current in your context");
-    expect(content).not.toContain("no need to Read it back");
   });
 
   it("rejects no-op edits before filesystem access", async () => {

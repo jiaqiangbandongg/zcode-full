@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // DWG-22（docs/dynamic-workflow/launch.md「The user's choice」）：常规设置里的动态工作流行。
-// 只在服务端提供功能时出现；值与「默认」标签都读 Host 算好的快照；选回默认值写空串删除选择。
+// 快照就绪后总是出现（服务端只给默认值）；值与「默认」标签都读 Host 算好的快照；选回默认值写空串删除选择。
 import { createElement, type ReactNode } from "react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -111,7 +111,7 @@ describe("DynamicWorkflowModeSetting（DWG-22）", () => {
     resetDynamicWorkflowAvailabilityStoreForTests();
   });
 
-  it("快照加载中、读取失败、服务端未提供时整行不渲染", () => {
+  it("快照加载中、读取失败时整行不渲染", () => {
     const { container, rerender } = render(createElement(DynamicWorkflowModeSetting));
     expect(container.innerHTML).toBe("");
 
@@ -124,24 +124,28 @@ describe("DynamicWorkflowModeSetting（DWG-22）", () => {
     );
     rerender(createElement(DynamicWorkflowModeSetting));
     expect(container.innerHTML).toBe("");
-
-    act(() => publish("disabled", "alwaysOn"));
-    rerender(createElement(DynamicWorkflowModeSetting));
-    expect(container.innerHTML).toBe("");
   });
 
-  it("未选择时显示服务端提供的模式，「默认」标签只在它上面，列表在触发器下方展开", () => {
+  it("服务端默认 disabled 时行照样出现：显示「关闭」且「默认」在它上面，选开启写入该模式", async () => {
+    act(() => publish("disabled"));
+    render(createElement(DynamicWorkflowModeSetting));
+    expect(screen.getByTestId("select").getAttribute("data-value")).toBe("disabled");
+    expect(taggedOptions()).toEqual(["disabled"]);
+
+    await act(async () => mocks.onValueChange?.("alwaysOn"));
+    expect(mocks.update).toHaveBeenLastCalledWith({ dynamicWorkflowMode: "alwaysOn" });
+    // Host 套上选择后快照的生效值就是所选值，标签仍留在服务端默认的「关闭」上。
+    act(() => publish("disabled", "alwaysOn"));
+    expect(screen.getByTestId("select").getAttribute("data-value")).toBe("alwaysOn");
+    expect(taggedOptions()).toEqual(["disabled"]);
+  });
+
+  it("未选择时显示服务端提供的模式且默认标签只在它上面", () => {
     act(() => publish("alwaysOn"));
     render(createElement(DynamicWorkflowModeSetting));
     expect(screen.getByTestId("select").getAttribute("data-value")).toBe("alwaysOn");
     expect(taggedOptions()).toEqual(["alwaysOn"]);
     expect(screen.getByTestId(TID_SETTINGS_DYNAMIC_WORKFLOW_MODE_TRIGGER)).toBeTruthy();
-    // 列表宽度固定为触发器宽度，说明折行；否则最长的一行说明会把列表撑宽。
-    expect(document.querySelector('[data-position="popper"]')?.className).toContain(
-      "w-(--radix-select-trigger-width)",
-    );
-    // 行用 wide 控件列（280px）：默认 192px 列会把 260px 触发器与列表一起压窄。
-    expect(document.body.innerHTML).toContain("sm:grid-cols-[minmax(0,1fr)_280px]");
     expect(
       screen.getByTestId("option-onDemand").querySelector('[data-part="description"]')?.textContent,
     ).toBe("settings.dynamicWorkflow.option.onDemand.description");

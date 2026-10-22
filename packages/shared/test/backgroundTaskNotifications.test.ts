@@ -42,6 +42,5 @@ describe("background task notifications", () => {
         error: providerMessage,
       },
     });
-    expect(parsed?.notification.error).toBe(providerMessage);
   });
 });

@@ -6,7 +6,7 @@
     "#src/*": "./src/*"
   },
   "exports": {
-    "./storage-startup": "./src/storage-startup.ts",
+    "./storage-startup": "./src/project-storage/startup-entry.ts",
     ".": "./src/index.ts",
     "./cua-permission-broker": "./src/cua-permission-broker/index.ts",
     "./process/processTreeTerminator": "./src/process/processTreeTerminator.ts",

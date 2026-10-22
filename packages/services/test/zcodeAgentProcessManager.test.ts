@@ -477,10 +477,11 @@ describe("resolveDefaultZCodeAgentCommand", () => {
     manager.disposeAll();
   });
 
-  it("Host 在每次 Worker 启动时注入所属 Environment 的 Provider Config 路径", async () => {
+  it("Host 在每次 Worker 启动时注入所属 Environment 的 Provider Config 路径", async ({
+    signal,
+  }) => {
     const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-manager-provider-env-"));
     createdDirs.push(workspacePath);
-    const markerPath = join(workspacePath, "provider-env.json");
     const zcodeBuiltinFilePath = join(workspacePath, "zcode-builtin.json");
     const personalFilePath = join(workspacePath, "personal.json");
     const manager = new ZCodeAgentProcessManager({
@@ -488,7 +489,15 @@ describe("resolveDefaultZCodeAgentCommand", () => {
         command: process.execPath,
         args: [
           "-e",
-          `require("node:fs").writeFileSync(${JSON.stringify(markerPath)}, JSON.stringify({ official: process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE, personal: process.env.ZCODE_PERSONAL_PROVIDER_CONFIG_FILE })); setInterval(() => {}, 1000);`,
+          `
+require("node:readline").createInterface({ input: process.stdin }).on("line", line => {
+  const request = JSON.parse(line);
+  process.stdout.write(JSON.stringify({ id: request.id, result: {
+    official: process.env.ZCODE_BUILTIN_PROVIDER_CONFIG_FILE,
+    personal: process.env.ZCODE_PERSONAL_PROVIDER_CONFIG_FILE,
+  } }) + "\\n");
+});
+`,
         ],
         cwd: workspacePath,
       }),
@@ -499,14 +508,17 @@ describe("resolveDefaultZCodeAgentCommand", () => {
     });
 
     try {
-      await manager.getClient({ workspacePath });
-      await vi.waitFor(() => expect(existsSync(markerPath)).toBe(true));
-      expect(JSON.parse(readFileSync(markerPath, "utf8"))).toEqual({
+      const client = await manager.getClient({ workspacePath });
+      // 修复原因：getClient 仅完成进程创建，不保证 Worker 已执行；默认 1 秒文件轮询
+      // 会把慢启动误判为 env 丢失。通过真实 stdio 响应读取 Worker 看到的配置。
+      await expect(
+        client.request("workspace/readState", {}, undefined, { signal }),
+      ).resolves.toEqual({
         official: zcodeBuiltinFilePath,
         personal: personalFilePath,
       });
     } finally {
-      manager.disposeAll();
+      await manager.disposeAllAndWait();
     }
   });
 
@@ -724,7 +736,11 @@ setInterval(() => {}, 1000);
 
       // 修复原因：进程树回收按 OS 存活状态完成，Node exit 事件及 stderr
       // 收尾后的生命周期上报可能稍晚投递；断言应等待上报，不能假定同步发生。
+      // POSIX 上报前还可能查到僵尸 PID，等待上报后再核对进程确已退出。
       await vi.waitFor(() => expect(reporter.onExit).toHaveBeenCalledTimes(2));
+      for (const pid of spawnedPids) {
+        expect(() => process.kill(pid, 0)).toThrowError(expect.objectContaining({ code: "ESRCH" }));
+      }
       expect(reporter.onExit.mock.calls.map(([event]) => event.pid).sort((a, b) => a - b)).toEqual(
         [...spawnedPids].sort((a, b) => a - b),
       );
@@ -741,6 +757,60 @@ setInterval(() => {}, 1000);
           /* 测试兜底清理，进程已退出时忽略。 */
         }
       }
+    }
+  });
+
+  it("关闭等待进程退出后的 stderr 和生命周期诊断完成", async () => {
+    const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-manager-exit-drain-"));
+    createdDirs.push(workspacePath);
+    const stderrReleased = createDeferred<void>();
+    const processDisposed = createDeferred<void>();
+    const originalDrain = ZCodeStdioTransport.prototype.waitForStderrDrain;
+    const drainSpy = vi
+      .spyOn(ZCodeStdioTransport.prototype, "waitForStderrDrain")
+      .mockImplementation(async function (this: ZCodeStdioTransport) {
+        await originalDrain.call(this);
+        await stderrReleased.promise;
+      });
+    const originalDispose = ZCodeStdioTransport.prototype.disposeAndWait;
+    const disposeSpy = vi
+      .spyOn(ZCodeStdioTransport.prototype, "disposeAndWait")
+      .mockImplementation(async function (this: ZCodeStdioTransport) {
+        await originalDispose.call(this);
+        processDisposed.resolve();
+      });
+    const reporter = {
+      onSpawn: vi.fn(),
+      onExit: vi.fn(),
+    } satisfies RuntimeProcessLifecycleReporter;
+    const manager = new ZCodeAgentProcessManager({
+      commandResolver: () => ({
+        command: process.execPath,
+        args: ["-e", "process.stdin.resume();"],
+        cwd: workspacePath,
+      }),
+      processLifecycleReporter: reporter,
+    });
+    let closing: Promise<void> | undefined;
+    try {
+      await manager.getClient({ workspacePath });
+      let closed = false;
+      closing = manager.disposeAllAndWait().then(() => {
+        closed = true;
+      });
+      await processDisposed.promise;
+      // 进程确已回收，但诊断仍被显式阻塞；推进一个事件循环检查关闭是否提前返回。
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(reporter.onExit).not.toHaveBeenCalled();
+      expect(closed).toBe(false);
+      stderrReleased.resolve();
+      await closing;
+      expect(reporter.onExit).toHaveBeenCalledTimes(1);
+    } finally {
+      stderrReleased.resolve();
+      await (closing ?? manager.disposeAllAndWait());
+      drainSpy.mockRestore();
+      disposeSpy.mockRestore();
     }
   });
 
@@ -776,23 +846,37 @@ setInterval(() => {}, 1000);
     }
   });
 
-  it("未声明 ZCODE_RUNTIME_ENV 时默认以 production 启动 agent 子进程且不传 NODE_ENV", async () => {
-    const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-node-env-default-"));
+  it.for([
+    {
+      name: "未声明 ZCODE_RUNTIME_ENV 时默认以 production 启动 agent 子进程且不传 NODE_ENV",
+      nodeEnv: "development",
+      runtimeEnv: undefined,
+      expectedRuntimeEnv: "production",
+    },
+    {
+      name: "显式 ZCODE_RUNTIME_ENV=development 时保留 agent 子进程开发态",
+      nodeEnv: undefined,
+      runtimeEnv: "development",
+      expectedRuntimeEnv: "development",
+    },
+  ])("$name", async ({ nodeEnv, runtimeEnv, expectedRuntimeEnv }, { signal }) => {
+    const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-node-env-"));
     createdDirs.push(workspacePath);
-    const nodeEnvPath = join(workspacePath, "node-env.txt");
-    process.env.NODE_ENV = "development";
-    delete process.env[ZCODE_RUNTIME_ENV_KEY];
+    restoreEnv("NODE_ENV", nodeEnv);
+    restoreEnv(ZCODE_RUNTIME_ENV_KEY, runtimeEnv);
     const manager = new ZCodeAgentProcessManager({
       commandResolver: () => ({
         command: process.execPath,
         args: [
           "-e",
           `
-require("node:fs").writeFileSync(${JSON.stringify(nodeEnvPath)}, JSON.stringify({
-  nodeEnv: process.env.NODE_ENV || "<empty>",
-  runtimeEnv: process.env.ZCODE_RUNTIME_ENV || "<empty>",
-}));
-setInterval(() => {}, 1000);
+require("node:readline").createInterface({ input: process.stdin }).on("line", line => {
+  const request = JSON.parse(line);
+  process.stdout.write(JSON.stringify({ id: request.id, result: {
+    nodeEnv: process.env.NODE_ENV || "<empty>",
+    runtimeEnv: process.env.ZCODE_RUNTIME_ENV || "<empty>",
+  } }) + "\\n");
+});
 `,
         ],
         cwd: workspacePath,
@@ -800,55 +884,17 @@ setInterval(() => {}, 1000);
     });
 
     try {
-      await manager.getClient({ workspacePath });
-      // 修复原因：前序进程树回收会在低负载余量环境中短暂占用 spawn/ps；
-      // 这里验证的是子进程 env，不应使用 Vitest 默认 1 秒调度窗口制造时序失败。
-      await vi.waitFor(() => expect(existsSync(nodeEnvPath)).toBe(true), {
-        timeout: 5_000,
-      });
-      expect(JSON.parse(readFileSync(nodeEnvPath, "utf-8"))).toEqual({
+      const client = await manager.getClient({ workspacePath });
+      // 修复原因：文件轮询即使延长到 5 秒仍会在慢启动时失败；由 Worker 响应
+      // 确认真实环境已读取，测试整体截止通过 signal 取消请求，不按启动耗时断言。
+      await expect(
+        client.request("workspace/readState", {}, undefined, { signal }),
+      ).resolves.toEqual({
         nodeEnv: "<empty>",
-        runtimeEnv: "production",
+        runtimeEnv: expectedRuntimeEnv,
       });
     } finally {
-      manager.disposeAll();
-    }
-  });
-
-  it("显式 ZCODE_RUNTIME_ENV=development 时保留 agent 子进程开发态", async () => {
-    const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-node-env-dev-"));
-    createdDirs.push(workspacePath);
-    const nodeEnvPath = join(workspacePath, "node-env.txt");
-    delete process.env.NODE_ENV;
-    process.env[ZCODE_RUNTIME_ENV_KEY] = "development";
-    const manager = new ZCodeAgentProcessManager({
-      commandResolver: () => ({
-        command: process.execPath,
-        args: [
-          "-e",
-          `
-require("node:fs").writeFileSync(${JSON.stringify(nodeEnvPath)}, JSON.stringify({
-  nodeEnv: process.env.NODE_ENV || "<empty>",
-  runtimeEnv: process.env.ZCODE_RUNTIME_ENV || "<empty>",
-}));
-setInterval(() => {}, 1000);
-`,
-        ],
-        cwd: workspacePath,
-      }),
-    });
-
-    try {
-      await manager.getClient({ workspacePath });
-      await vi.waitFor(() => expect(existsSync(nodeEnvPath)).toBe(true), {
-        timeout: 5_000,
-      });
-      expect(JSON.parse(readFileSync(nodeEnvPath, "utf-8"))).toEqual({
-        nodeEnv: "<empty>",
-        runtimeEnv: "development",
-      });
-    } finally {
-      manager.disposeAll();
+      await manager.disposeAllAndWait();
     }
   });
 
@@ -1124,9 +1170,10 @@ setInterval(() => {}, 1000);
     const workspacePath = mkdtempSync(join(tmpdir(), "zcode-agent-stderr-tail-"));
     createdDirs.push(workspacePath);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const exited = createDeferred<void>();
     const reporter = {
       onSpawn: vi.fn(),
-      onExit: vi.fn(),
+      onExit: vi.fn<RuntimeProcessLifecycleReporter["onExit"]>(() => exited.resolve()),
       onError: vi.fn(),
     } satisfies RuntimeProcessLifecycleReporter;
     const manager = new ZCodeAgentProcessManager({
@@ -1143,33 +1190,34 @@ setInterval(() => {}, 1000);
 
     try {
       await manager.getClient({ workspacePath });
-      await vi.waitFor(() =>
-        expect(errorSpy).toHaveBeenCalledWith(
-          expect.any(String),
-          `ZCode agent process exited unexpectedly ${ZCODE_AGENT_LIFECYCLE_LOG_MARKER}`,
-          expect.objectContaining({
-            workspaceKey: workspacePath,
-            code: 1,
-            signal: null,
-            stderr: {
-              lineCount: 1,
-              tail: ["Error: simulated EPIPE token=<redacted> key=sk-<redacted>"],
-            },
-          }),
-        ),
+      // 修复原因：启动和 stderr 排空可能超过默认 1 秒轮询窗口；onExit 在诊断
+      // 日志写完后上报，以该事件作为断言屏障，避免提前清理仍未退出的夹具。
+      await exited.promise;
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        `ZCode agent process exited unexpectedly ${ZCODE_AGENT_LIFECYCLE_LOG_MARKER}`,
+        expect.objectContaining({
+          workspaceKey: workspacePath,
+          code: 1,
+          signal: null,
+          stderr: {
+            lineCount: 1,
+            tail: ["Error: simulated EPIPE token=<redacted> key=sk-<redacted>"],
+          },
+        }),
       );
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("super-secret");
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(
         "sk-1234567890abcdefghijklmnopqrstuv",
       );
-      await vi.waitFor(() => expect(reporter.onExit).toHaveBeenCalledTimes(1));
+      expect(reporter.onExit).toHaveBeenCalledTimes(1);
       expect(reporter.onExit.mock.calls[0]![0]).toMatchObject({
         terminationKind: "unexpected",
         stderrLineCount: 1,
         stderrTail: ["Error: simulated EPIPE token=<redacted> key=sk-<redacted>"],
       });
     } finally {
-      manager.disposeAll();
+      await manager.disposeAllAndWait();
       errorSpy.mockRestore();
     }
   });
@@ -1500,8 +1548,6 @@ setInterval(() => {}, 1000);
         workspacePath: "/repo/workspace",
         workspaceKey: "/repo/workspace",
       });
-      expect(command).not.toBeNull();
-
       const wrapped = wrapZCodeAgentCommandWithStdioTapDevProxy(command!, "/repo/workspace");
 
       expect(wrapped.args).toEqual([

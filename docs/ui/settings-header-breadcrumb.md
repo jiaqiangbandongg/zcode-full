@@ -33,6 +33,9 @@ Settings 内容面板顶部的窗口拖拽区展示当前层级，帮助用户�
   `Plugins` 大标题，确保进入插件管理后当前页面标题明确；进入插件、MCP 或 Skill 详情后仍保留
   `Plugins` 中间层级。
 - Command、Subagent、MCP、Hook 的新建/编辑当前内容标题使用 `text-ui-xl`。
+- Settings 外层 section 大标题使用 `text-ui-settings-title lg:text-ui-settings-title-lg`，
+  默认字号下保留窄屏 24px / 32px 行高、`lg` 起 30px / 36px 行高，并随界面字号设置缩放。
+  使用专用语义 token，避免直接使用通用字号类而违反设计系统检查。
 - Model Settings 和 Usage Stats 不使用面包屑；它们始终保留内容区的大标题。Model Settings
   的内部供应商导航和 Usage Stats 的 Tab 都属于同页切换，不提升为页面层级。
 - Desktop、普通 Web 和 Mobile 复用相同层级语义；非 Electron 环境忽略 app-region 样式即可。

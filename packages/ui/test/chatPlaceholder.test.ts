@@ -3,8 +3,6 @@ import {
   resolveChatPlaceholderKey,
   shouldDeferChatPlaceholder,
 } from "../src/lib/chatPlaceholder.js";
-import enUS from "../src/i18n/locales/en-US.js";
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 describe("resolveChatPlaceholderKey", () => {
   it("returns newTask for empty conversation", () => {
@@ -24,8 +22,6 @@ describe("resolveChatPlaceholderKey", () => {
         compactNewTask: true,
       }),
     ).toBe("chat.placeholder.newTaskMobile");
-    expect(enUS["chat.placeholder.newTaskMobile"]).toBe("Ask ZCode anything…");
-    expect(zhCN["chat.placeholder.newTaskMobile"]).toBe("向 ZCode 提问…");
   });
 
   it("returns newTask while first turn is processing", () => {

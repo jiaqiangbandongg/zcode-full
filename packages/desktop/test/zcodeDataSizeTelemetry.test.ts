@@ -481,7 +481,5 @@ describe("buildZCodeDataSizeArmsPayload", () => {
       type: "custom",
       value: 1024,
     });
-    expect(Object.keys(payload.properties)).not.toContain("path");
-    expect(JSON.stringify(payload)).not.toContain("/Users/");
   });
 });

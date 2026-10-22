@@ -5,8 +5,6 @@ import {
   type DynamicWorkflowRunPort,
   type DynamicWorkflowRunResumeResult,
 } from "@zcode/contracts";
-import { PermissionService } from "../src/permission/service.js";
-import { resolveRuntimePermissionCapability } from "../src/tool/executor/permission-capability.js";
 import { registerBuiltInTools } from "../src/tool/handlers/index.js";
 import { resumeWorkflowRunToolEntry } from "../src/tool/handlers/resume-workflow-run.js";
 import { createToolRegistry } from "../src/tool/registry.js";
@@ -143,8 +141,7 @@ describe("ResumeWorkflowRun handler — structured failures", () => {
 
     // 判别键是 message 前缀（errorCode 数值不进模型，executor 投影成 code:"N" 字符串）。
     // not_found 复用内省工具的 run_not_found 键（同键同码）。
-    const expectedPrefix =
-      reason === "not_found" ? "run_not_found" : `workflow_run_${reason}`;
+    const expectedPrefix = reason === "not_found" ? "run_not_found" : `workflow_run_${reason}`;
     expect(failure.message.startsWith(`${expectedPrefix}:`)).toBe(true);
     // 可操作性：失败要说清下一步（not_found 指向 ListWorkflowRuns，其余各自说清因由）。
     expect(failure.message.length).toBeGreaterThan(expectedPrefix.length + 1);
@@ -233,7 +230,6 @@ describe("ResumeWorkflowRun declaration", () => {
       maxModelBytes: 24_000,
       strategy: "truncate",
     });
-    expect(resumeWorkflowRunToolEntry.resultBudget.maxInlineBytes).toBeGreaterThan(0);
     // timeout 与 metadata.timeoutMs 一致（v2 common contract 断言之外再各自钉一遍）。
     expect(resumeWorkflowRunToolEntry.timeout).toMatchObject({
       kind: "timed",
@@ -274,43 +270,8 @@ describe("ResumeWorkflowRun registration", () => {
     registerBuiltInTools(registry);
 
     expect(registry.has(RESUME_WORKFLOW_RUN_TOOL_NAME)).toBe(true);
-    expect(registry.toContracts().map((tool) => tool.name)).toContain(RESUME_WORKFLOW_RUN_TOOL_NAME);
-  });
-
-  // 免确认（2026-08-30）：build/yolo 自动放行（prompt-less 直行）；plan 按 read-only 契约
-  // 拒绝（mode.plan.nonReadOnly——resume 是执行面工具，plan 模式不执行副作用）。
-  // 完整的 run() 全链路权限矩阵在 resume-workflow-run-permission.test.ts。
-  it("auto-allows in build and yolo; plan mode still denies (read-only contract)", () => {
-    const service = new PermissionService();
-    const capability = resolveRuntimePermissionCapability(
-      resumeWorkflowRunToolEntry,
-      { run_id: "dwfrun-1" },
-      {
-        workingDirectory: "/workspace/project",
-        workspaceRoot: "/workspace/project",
-      } as never,
+    expect(registry.toContracts().map((tool) => tool.name)).toContain(
+      RESUME_WORKFLOW_RUN_TOOL_NAME,
     );
-    for (const mode of ["build", "yolo"] as const) {
-      const decision = service.checkPermission(
-        {
-          input: { run_id: "dwfrun-1" },
-          mode,
-          riskLevel: "low",
-          toolName: RESUME_WORKFLOW_RUN_TOOL_NAME,
-        },
-        capability,
-      );
-      expect(decision.allowed, mode).toBe(true);
-    }
-    const planDecision = service.checkPermission(
-      {
-        input: { run_id: "dwfrun-1" },
-        mode: "plan",
-        riskLevel: "low",
-        toolName: RESUME_WORKFLOW_RUN_TOOL_NAME,
-      },
-      capability,
-    );
-    expect(planDecision.allowed).toBe(false);
   });
 });

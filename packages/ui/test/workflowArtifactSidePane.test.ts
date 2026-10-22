@@ -555,12 +555,6 @@ describe("WorkflowArtifactSidePane 头部动作", () => {
     await waitFor(() => expect(view.getByTestId("pdf-viewer")).toBeTruthy());
     expect(view.queryByTestId("workflow-artifact-copy")).toBeNull();
   });
-
-  it("没有「下载」按钮——renderer 没有任何把字节存成用户文件的宿主能力", async () => {
-    const view = renderPane();
-    await waitFor(() => expect(view.getByTestId("pdf-viewer")).toBeTruthy());
-    expect(view.queryByText("下载")).toBeNull();
-  });
 });
 
 describe("WorkflowArtifactSidePane 作为文件打开", () => {

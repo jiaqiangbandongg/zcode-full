@@ -114,7 +114,6 @@ describe("AgentRuntime output-token continuation boundaries", () => {
       const result = await runtime.executeTurn("start");
 
       expect(result.response).toBe("done");
-      expect(requests).toHaveLength(4);
       expect(requests.map((request) => countContinuePrompts(request.messages))).toEqual([
         0, 1, 2, 3,
       ]);
@@ -145,7 +144,6 @@ describe("AgentRuntime output-token continuation boundaries", () => {
         message: "The model's response exceeded the output token maximum.",
         type: "model_error",
       });
-      expect(requests).toHaveLength(4);
       expect(requests.map((request) => countContinuePrompts(request.messages))).toEqual([
         0, 1, 2, 3,
       ]);

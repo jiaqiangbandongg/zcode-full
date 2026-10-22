@@ -92,13 +92,6 @@ describe("Linux manifest 与真实 updater 文件选择契约", () => {
     expect(selected).toBe(resolved[0]);
   });
 
-  it.each(linuxUpdaters)("%s 支持只发布当前格式 %s", (Updater, extension) => {
-    const files = artifacts.filter((file) => file.url.endsWith(extension));
-    expect(createProvider(Updater).resolveFiles({ ...manifest, files })[0]?.url.href).toBe(
-      files[0]?.url,
-    );
-  });
-
   it.each(linuxUpdaters)("%s 缺少 %s 时不回退其他安装格式", (Updater, extension) => {
     expect(() =>
       createProvider(Updater).resolveFiles({
@@ -122,7 +115,6 @@ describe("Linux manifest 与真实 updater 文件选择契约", () => {
     const [file] = createProvider(PacmanUpdater).resolveFiles(manifest);
     expect(file?.info.url).toBe("ZCode-3.12.2-linux-x64.pkg.tar.zst");
     expect(file?.url.href).toBe(artifacts[3]?.url);
-    expect(artifacts[3]?.url).toMatch(/^https:/);
   });
 
   it("兼容旧 pacman 后缀", () => {

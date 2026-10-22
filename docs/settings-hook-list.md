@@ -9,6 +9,8 @@ Scope、搜索、分组标题、列表容器和空状态信息架构。
 - Scope 使用共享 `PluginScopeMenu`：User 展示 user 配置及 user 插件 Hook；Workspace 展示
   当前 workspace 配置、兼容来源及该 workspace 安装插件提供的 Hook。
 - `workspaceIdentity?.trim() || workspacePath` 用于工作区状态隔离，`workspacePath` 只用于读写路径。
+- 读写目标只由选中的 Scope 条目决定（`resolveHookScopeTarget`）：选中本机项目时 identity 为空、走本机服务，
+  不借用活动聊天工作区的远端 identity；User 未选项目时沿用当前 workspace 路由。
 - Workspace Hook 允许管理，但按 `docs/hooks-runtime-contract.md` 的安全契约不进入 Agent runtime。
 - 新建表单继承父层 Scope；编辑表单显示持久化 Scope 且不可迁移。Scope 位于表单卡片右上角，
   使用 `Scope + PluginScopeMenu` 的横向结构并向右对齐，与 MCP、Command 表单一致。

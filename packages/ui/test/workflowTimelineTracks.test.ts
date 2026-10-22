@@ -372,8 +372,6 @@ describe("WorkflowTimeline with bands", () => {
     expect(arc.querySelector("path")!.getAttribute("d")).toBe(
       "M413,51 V16 Q413,8 405,8 H12 Q4,8 4,16 V54",
     );
-    expect(arc.querySelector("path")!.getAttribute("d")).toContain(`M413,${rowY[0]! - 7}`);
-    expect(arc.querySelector("path")!.getAttribute("d")).toContain(`V${rowY[0]! - 4}`);
   });
 
   it("an arc inside one track stays in that track's air, lamp to lamp", () => {
@@ -402,10 +400,6 @@ describe("WorkflowTimeline without bands", () => {
     const view = renderTimeline(model);
     const rails = view.getAllByTestId("workflow-timeline-rail");
     expect(rails.map((rail) => rail.tagName)).toEqual(["SPAN", "SPAN"]);
-    expect(rails.map((rail) => rail.className)).toEqual([
-      expect.stringContaining("border-foreground-subtlest"),
-      expect.stringContaining("border-foreground-subtlest"),
-    ]);
     expect(view.queryAllByTestId("workflow-timeline-leader")).toHaveLength(0);
     const stations = view.getAllByTestId("workflow-timeline-station") as HTMLElement[];
     // 站头还排在轨道行里：没有绝对定位，也没有轨道号。

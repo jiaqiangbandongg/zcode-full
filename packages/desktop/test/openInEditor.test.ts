@@ -10,15 +10,14 @@ const {
   openPathMock,
   showItemInFolderMock,
   loggerWarnMock,
-} =
-  vi.hoisted(() => ({
-    accessMock: vi.fn(),
-    execFileMock: vi.fn(),
-    listWSLDistrosMock: vi.fn(),
-    openPathMock: vi.fn(),
-    showItemInFolderMock: vi.fn(),
-    loggerWarnMock: vi.fn(),
-  }));
+} = vi.hoisted(() => ({
+  accessMock: vi.fn(),
+  execFileMock: vi.fn(),
+  listWSLDistrosMock: vi.fn(),
+  openPathMock: vi.fn(),
+  showItemInFolderMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
+}));
 
 vi.mock("node:child_process", () => ({
   execFile: execFileMock,
@@ -249,10 +248,7 @@ describe("openInEditor", () => {
     expect(result).toEqual({ success: true });
     expect(execFileMock).toHaveBeenCalledWith(
       "code",
-      [
-        "--folder-uri",
-        "vscode-remote://wsl+Ubuntu%2022.04/home/demo/My%20Repo",
-      ],
+      ["--folder-uri", "vscode-remote://wsl+Ubuntu%2022.04/home/demo/My%20Repo"],
       expect.any(Function),
     );
   });
@@ -275,10 +271,7 @@ describe("openInEditor", () => {
     expect(result).toEqual({ success: true });
     expect(execFileMock).toHaveBeenCalledWith(
       "code",
-      [
-        "--file-uri",
-        "vscode-remote://wsl+Ubuntu%2022.04/home/demo/My%20Repo/src/index.ts",
-      ],
+      ["--file-uri", "vscode-remote://wsl+Ubuntu%2022.04/home/demo/My%20Repo/src/index.ts"],
       expect.any(Function),
     );
   });
@@ -322,10 +315,9 @@ describe("openInEditor", () => {
     expect(listWSLDistrosMock).toHaveBeenCalledTimes(1);
     expect(execFileMock).not.toHaveBeenCalled();
     expect(openPathMock).not.toHaveBeenCalled();
-    expect(loggerWarnMock).toHaveBeenCalledWith(
-      "[editors] 解析默认 WSL distro 失败",
-      { error: "wsl unavailable" },
-    );
+    expect(loggerWarnMock).toHaveBeenCalledWith("[editors] 解析默认 WSL distro 失败", {
+      error: "wsl unavailable",
+    });
   });
 
   it("WSL 远程工作区用资源管理器打开时应通过 explorer.exe 打开 wsl.localhost UNC", async () => {
@@ -380,11 +372,7 @@ describe("openInEditor", () => {
     const command =
       '"C:/Windows/explorer.exe" /select, "\\\\wsl.localhost\\Ubuntu\\home\\demo\\src\\index.ts"';
     execFileMock.mockImplementation(
-      (
-        _file: string,
-        _args: string[],
-        callback: (error: Error | null) => void,
-      ) => {
+      (_file: string, _args: string[], callback: (error: Error | null) => void) => {
         callback(
           Object.assign(new Error(`Command failed: ${command}`), {
             code: 1,
@@ -442,9 +430,7 @@ describe("openInEditor", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(accessMock).toHaveBeenCalledWith(
-      "\\\\wsl.localhost\\Ubuntu\\workspace\\demo",
-    );
+    expect(accessMock).toHaveBeenCalledWith("\\\\wsl.localhost\\Ubuntu\\workspace\\demo");
     expect(execFileMock).toHaveBeenCalledTimes(2);
     expect(execFileMock).toHaveBeenNthCalledWith(
       2,
@@ -458,9 +444,7 @@ describe("openInEditor", () => {
     execFileMock.mockImplementation(
       (_file: string, args: string[], callback: (error: Error | null) => void) => {
         callback(
-          args[0]?.startsWith("\\\\wsl.localhost")
-            ? new Error("cannot open wsl.localhost")
-            : null,
+          args[0]?.startsWith("\\\\wsl.localhost") ? new Error("cannot open wsl.localhost") : null,
         );
       },
     );
@@ -520,36 +504,14 @@ describe("openInEditor", () => {
       expect.any(Function),
     );
     expect(openPathMock).not.toHaveBeenCalled();
-    expect(loggerWarnMock).toHaveBeenCalledWith(
-      "[editors] 打开 WSL 工作区资源管理器失败",
-      {
-        path: "/workspace/demo",
-        candidates: [
-          "\\\\wsl.localhost\\Ubuntu\\workspace\\demo",
-          "\\\\wsl$\\Ubuntu\\workspace\\demo",
-        ],
-        error: "cannot open \\\\wsl$\\Ubuntu\\workspace\\demo",
-      },
-    );
-  });
-
-  it("macOS QSpace 应通过 app bundle 打开目录", async () => {
-    setProcessPlatform("darwin");
-    execFileMock.mockImplementation(
-      (_file: string, _args: string[], callback: (error: Error | null) => void) => {
-        callback(null);
-      },
-    );
-
-    const result = await openInEditor("qspace", tempDir);
-
-    expect(result).toEqual({ success: true });
-    expect(execFileMock).toHaveBeenCalledTimes(1);
-    expect(execFileMock).toHaveBeenCalledWith(
-      "open",
-      ["-a", "/Applications/QSpace.app", tempDir],
-      expect.any(Function),
-    );
+    expect(loggerWarnMock).toHaveBeenCalledWith("[editors] 打开 WSL 工作区资源管理器失败", {
+      path: "/workspace/demo",
+      candidates: [
+        "\\\\wsl.localhost\\Ubuntu\\workspace\\demo",
+        "\\\\wsl$\\Ubuntu\\workspace\\demo",
+      ],
+      error: "cannot open \\\\wsl$\\Ubuntu\\workspace\\demo",
+    });
   });
 
   it("macOS QSpace Pro 应通过 app bundle 打开目录", async () => {

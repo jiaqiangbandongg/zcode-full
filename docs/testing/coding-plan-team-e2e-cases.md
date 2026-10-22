@@ -17,17 +17,18 @@
 | CTP-02 | 设置页连接方式展示按量 API、个人 Coding Plan 与 Team Plan  | 已登录 BigModel，mock 同时返回个人与 Team Plan                                  | 打开模型设置并展开连接方式；选择 Team Plan                               | 菜单包含三类正式连接；设置保存结构化 `providerFamilyConnectionSelections.bigmodel`，不写旧 `mode/selectedKey`                                                  |
 | CTP-03 | 用户头像菜单进入 Team Plan 使用统计                        | mock 返回 Team A quota，当前连接方式为 Team A                                   | 点击用户头像菜单里的使用统计入口                                         | Usage 页切到 Team Plan 编程套餐，显示 Team A 名称和剩余额度百分比；mock 收到 `quota/limit?type=2`                                                              |
 | CTP-04 | 设置 → 使用统计 → 编程套餐显示 Team Plan 用量              | mock 返回 Team A quota、model usage、tool usage                                 | 打开设置页 → 使用统计 → 编程套餐                                         | 页面显示 Team A 额度、模型用量、工具用量；mock 收到 `quota/limit?type=2`、`model-usage?type=2`、`tool-usage?type=2`                                            |
-| CTP-05 | 个人/团队套餐组合跟随当前 Family 连接展示                  | mock 同时返回个人与 Team Plan                                                   | 在设置页切换个人 Coding Plan 与 Team Plan                                | 产品卡、quota 与模型成员跟随当前结构化 connection selection；不由旧 selectedKey 或 Personal Account Provider 决定                                              |
+| CTP-05 | 切换 Family 连接后分别查看个人/团队用量来源                | mock 同时返回个人与 Team Plan                                                   | 在设置页切换个人 Coding Plan 与 Team Plan                                | 产品卡与模型成员跟随当前结构化 connection selection；使用统计按账号展示全部来源 tab，仅选中来源的 quota 生效，不将未选中的 Team tab 当作数据泄漏               |
 | CTP-06 | OAuth 启动恢复保留已选择 Team Plan                         | 冷启动前保存结构化 Team Plan selection，账号凭据可恢复                          | 启动 App 并打开模型设置                                                  | Team Plan 仍为当前连接，organization/project identity 完整；OAuth 恢复不覆盖为个人 Coding Plan                                                                 |
 | CTP-11 | quota 致命失败后保留来源并可恢复                           | 已登录 BigModel，当前连接为个人 Coding Plan，mock 首次返回 quota fatal          | 打开使用统计 → Coding Plan；确认错误后切到 App Usage，再切回 Coding Plan | 错误态使用当前“无法读取用量统计”语义；subscription snapshot 存在时 Coding Plan 来源 tab 不消失；mock 恢复后重新进入来源并显示 quota、model usage 和 tool usage |
 
 ## Fixture Contract
 
-### CTP-12：供应商长团队名称与体验套餐切换（formal）
+### CTP-12：供应商长团队名称与独立 Start Plan 导航（formal）
 
 - Setup：真实 Electron 应用、隔离测试配置，业务 mock 提供长组织名称、个人/团队套餐与一份有效 Start Plan 权益。
-- Action：从设置进入模型供应商，选择团队；在宽、窄窗口检查名称与箭头，悬停体验套餐按钮，再点击切换；离开并重新进入设置。
-- Assertions：宽屏可显示全称且标题与操作区同行；窄屏不足时名称省略、控件不越界；不显示独立 Switch to；tooltip 使用当前语言的“切换至体验套餐”；实际 setting.json 保存 Start selectedKey，重新进入仍显示 Start Plan。
+- Action：从设置进入模型供应商，选择团队；在宽、窄窗口检查名称与箭头，再打开独立 Start Plan 导航；离开并重新进入设置，返回品牌入口。
+- Assertions：宽屏可显示全称且标题与操作区同行；窄屏不足时名称省略、控件不越界；Start 详情不显示付费连接下拉；浏览 Start 不改变已保存的团队连接，重新进入品牌页仍显示原团队。
+- 当前导航合同以 [Start 独立规格](../zai-start-plan-provider.md) 为准。已删除的体验套餐快捷按钮和 tooltip 不再作为操作前置条件，不恢复旧 `kind: start-plan` 写入。
 - 仅覆盖桌面真实应用路径；20 组组件浏览器测试继续承担尺寸/语言/主题组合，不声称覆盖手机 `/remote` 链路。
 - 自动化：`packages/desktop/test/e2e/provider-family-responsive.test.ts`。2026-09-04 本地真实 Electron 运行通过，用户确认通过即转正；正式入口不带 manual-review 开关已再次通过（1 passed）。
 - 本用例通过 scenario 控制端启用专属长名称和 billing/balance fixture；普通 Team mock 场景恢复默认数据，不发送模型请求。
@@ -42,7 +43,9 @@ pnpm --filter @zcode/desktop test:e2e -- --spec './test/e2e/provider-family-resp
 
 转正证据：`packages/desktop/.e2e-artifacts/desktop-e2e-20260904060754282-p39563-0c1b2374a55285ca/summary.json`（1 passed，默认正式入口）。重新进入设置只读取恢复状态，不再次点击供应商导航覆盖选中项。通用转正脚本仅支持 conversation 目录，本用例按设置领域路径迁移并同步引用；没有加入 Docker suite。
 
-窗口取 1800/480px（Electron 最小宽度 480px），tooltip 在 1200px 检查。每次运行保存宽屏、窄屏、tooltip 和重新进入后的 Start 选中截图，以及几何数值和业务请求断言。
+窗口取 1800/480px（Electron 最小宽度 480px），独立 Start 导航在 1200px 检查。每次运行保存宽屏、窄屏、Start 详情和重新进入后的团队选中截图，以及几何数值和业务请求断言。上方 2026-09-04 记录为旧交互的历史通过证据。
+
+当前导航回归：2026-10-14 macOS Electron，`desktop-e2e-tests-only-20261014b` 中 CTP-12 通过；截图保存在同名本地 artifact 目录。该 run 的两个 webview case 当时失败，不将此记录视为整批通过。
 
 ### 通用约束
 
@@ -81,7 +84,7 @@ Start Plan 的 balance 返回 429 时保留 Start 标题、单一失败提示和
 | Case   | Setup / Action                                                                         | 必须断言                                                                                                                                                          |
 | ------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CTP-14 | BigModel 未连接，打开编程套餐                                                          | 连接动作、个人和团队购买 banner；无体验购买 banner、无模型列表/添加模型                                                                                           |
-| CTP-15 | 个人无权益，团队商品仍 subscribed 但团队已过期                                         | 个人和团队购买 banner 同时出现；无模型列表；个人订阅请求使用 API key                                                                                              |
+| CTP-15 | 个人无权益，团队商品仍 subscribed 但团队已过期                                         | 个人和团队购买 banner 同时出现；无模型列表；个人订阅请求使用短期项目 Token（project_access），不再携带长期 Key                                                    |
 | CTP-16 | 选择团队，分别已过期、未分配、接口失败                                                 | 对应状态文案；确认过期/未分配时无模型列表（查询失败不等于无权益）；登录态不退化为连接按钮；失败点击重试后有效权益恢复模型列表；团队请求使用业务 token 和组织/项目 |
 | CTP-17 | Start 返回 status=active、旧 server_time、已过期 ends_at 和旧余额                      | 以 HTTP Date 判过期；显示过期状态，无今日余额/旧模型列表                                                                                                          |
 | CTP-18 | Start 同时返回已过期和有效计划                                                         | 仅有效计划与余额显示，模型列表可用                                                                                                                                |
@@ -123,3 +126,63 @@ Start Plan 的 balance 返回 429 时保留 Start 标题、单一失败提示和
 CTP-16 启动夹具保存旧商品 ID，订阅和 pricing 返回当前商品 ID；组织与项目保持一致。各状态及重试恢复后断言不显示“连接不可用”，覆盖团队商品变更的导航恢复回归。平台/组织/项目隔离由导航单测覆盖。
 
 2026-09-18 商品 ID 变化回归：原生 macOS Electron 回放 CTP-16 三种状态全部通过（3/3），包含失败后重试恢复。证据目录：`packages/desktop/.e2e-artifacts/desktop-e2e-20260918-042734-046/`。导航及可见性相关单测 243/243 通过；未回放真实手机 `/remote`，未使用 Docker。
+
+- CTP-20：Composer 供应商子菜单直接展示 BigModel Individual 与 BigModel 实际团队标签，无额外连接方式行；个人→团队→个人切换验证完整持久化身份、主行标签、模型与勾选。API 供应商保持原有入口。选择非默认思考档位后双向切换须保持该档位，并采样整个切换的 DOM，禁止档位中间清空或 Effort 消失。
+
+- CTP-20 同时注入可用团队与明确无有效授权的团队，验证后者不出现在供应商列表；DOM 时序须捕捉主行 loading/aria-busy 的出现与结束，且原思考档位和控件始终保持。
+
+### Composer 连接回归补充（2026-10-08）
+
+| Case   | 场景与断言                                                                                                         | 验证范围                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| CTP-21 | 调思考后挂起 Host 选择解析，再主动选模型；新模型档位非空，同连接操作不触发连接 loading。                           | macOS Electron、隔离 mock，已通过                             |
+| CTP-22 | 个人→普通 API→团队、团队→普通 API→个人；两段各显示 loading，目标思考完整；loading 期间模型列表与思考展示保持稳定。 | 双向 macOS Electron 已通过，共 41 次加载 DOM 采样，无不稳定帧 |
+| CTP-23 | 团队激活时补充的个人入口跟随语言：zh-CN 显示“个人”、en-US 显示 Individual；团队实际名称不变。                      | 中英文 macOS Electron 已通过                                  |
+
+以上用例不发送模型请求；手机 Web、Windows/Linux 真机尚未验证。与现有 CTP-20 的直接个人/团队切换、不可用团队隐藏形成互补。
+
+- CTP-24：当前选中团队订阅明确 EXPIRED 时，先调用真实 Provider 服务刷新并断言 unavailable，再验证 Composer Provider 子菜单不展示该团队，但同 Provider 下第二个有效团队仍可见，点击后完整身份更新并完成切换；未知状态由投影单测覆盖并保留。设置页不隐藏详情。macOS Electron 隔离 mock、1100px/390px、Zai Light/Zai Dark 已通过；手机真实远控和 Windows/Linux 真机未验证。
+
+- CTP-25：无 OAuth 登录、已有 API Provider 时，能选择 API 模型，不显示团队登录错误；覆盖宽/窄屏与深/浅主题。
+- CTP-26：无 OAuth 登录、无配置 Provider 时，点击模型按钮直接进入 Provider 设置，不展开空菜单；覆盖宽/窄屏与深/浅主题。
+
+### 连接边界回归（2026-10-12）
+
+- CTP-30：供应商列表宽/窄屏 × Zai Light/Zai Dark，个人→团队→个人期间连续采样，列表 `scrollWidth <= clientWidth`；列表溢出高度时仍可纵向滚动。测试以一行的实测高度约束列表，先确认至少两条候选，避免固定 96px 在精简目录下不产生溢出。macOS Electron 1100px/390px × 两主题通过，94 次列表尺寸采样最大横向溢出为 0；原代码红测复现 clientWidth=186px、scrollWidth=190px。证据目录 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-085803-464/`。窄屏属于 Electron 响应式验证，真实手机远控及 Windows/Linux 未验证。
+
+- CTP-27：已登录并显示团队目录，先缓存团队用量；同一已挂载 Composer 中设置 user=null，并暂停 Provider 刷新与旧凭据恢复回执；立即隐藏旧组织与额度，解除屏障后完成真实 Host 登出，仍不恢复旧身份；宽/窄屏、深/浅主题均不显示旧组织行，API 模型仍可用。
+- CTP-28：连接读取后、CAS 提交前执行另一真实设置写入；显示失败并解除锁，保留另一 family，重新选择成功。
+- CTP-31：注入测试服务端口并完成草稿重渲染后，通过真实菜单重新选择起点团队，确认 Provider 和档位均已就绪，再开启故障；同一团队 Provider 和模型的连接切换，旧 ready 已显示；目标事件触发的带输入读取失败，但独立同步读取成功，且失败后不再发事件；错误可见，操作解除锁，恢复服务只关闭故障开关，保持同一 service/input/Composer，不补发事件、不编辑草稿；重新选择当前连接成功。
+- CTP-29：连接同步后展示 owner 返回同 revision 的 ready，但指向另一有效 Provider/模型；显示失败并解除锁，恢复解析后重新选择成功。
+
+CTP-27：macOS Electron 隔离回放，1100px/390px × Zai Light/Zai Dark 全部通过；证据目录 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012072737490-p73602-81686d33d6b37893/`。实际执行登出并观察同一已挂载 Composer，不用重启替代鉴权边界验证。
+
+CTP-28/29、CTP-20 与 CTP-22 双向切换共 5 条全部通过；证据目录 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012075432860-p70907-5e99b6277afac91e/`。运行时记录确认 CAS 携带操作版本，冲突保留另一 family；ready 不匹配与同步目标处于同一 revision，失败后允许重选当前连接。真实手机远控、Windows/Linux 真机和生产账号未验证。
+
+CTP-25/26：macOS Electron 隔离回放，1100px/390px × Zai Light/Zai Dark 全部通过；证据目录 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012-053547-130/`。CTP-24 已同步回归通过。窄屏验证属于 Electron 响应式布局，真实手机远控及 Windows/Linux 未验证。
+
+MR 评审修复验证：增加设置 owner 强制版本 CAS、OAuth/设置页/Host provisioning 写入与回滚、同身份新版本回滚保护、团队用量鉴权隔离和迟到响应单测。受影响范围 1,017 个 Vitest 文件、10,238 条通过、1 条跳过；独立执行器 1 条及 Node 测试 34 条通过。额外筛选的 CTP-02B 中英文侧栏标签用例在原提交与修复版本均失败，未扩入侧栏需求；不将其报告为通过。
+
+本轮 MR 修复版本 Electron：CTP-02/27/28/29 共 4 条通过，证据目录 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012110143641-p43000-56076160c711037a/`。CTP-27 覆盖 1100px/390px × 两主题，在 Provider 刷新屏障内验证 user=null、团队用量来源为空；CTP-29 使用另一有效选择保证 mismatch，重开菜单可见失败并允许重试。窄屏不代表手机远控实机；Windows/Linux 与生产账号未验证。
+
+展示失败回执修复验证：真实 React hook 组合先红后绿；4 个相关文件 69 条通过，受影响 419 个 Vitest 文件 4,724 条通过，独立执行器 1 条及 Node 测试 34 条通过。CTP-27/28/29 回放通过（产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012112541998-p18419-47fd77bb465fa512/`）；CTP-31 先在未修复构建记录目标事件 → 展示失败 → 独立同步成功且无错误提示，修复后 1 条通过（产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012113004465-p28653-e3243aa5c1a3a4e4/`），正常菜单重试成功。两团队使用相同 Provider/模型；失败后不补发目录事件。case 目录整文件存在基线格式问题，只追加相关记录，不重排其它用例。
+
+无事件重试修复验证：真实 hook 与 Electron 均先复现同连接重试仍失败，再验证显式展示重读。最终受影响 410 个 Vitest 文件、4,664 条通过，独立执行器 1 条与 Node 34 条通过。CTP-27/28/29/31 共 4 条通过（产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012115220815-p78332-f37cd2f0c72393f8/`）；`connection-retry-no-event.json` 记录恢复后没有 target-event，presentation-recovered 的 revision 仍为 2。恢复期间保持同一 service/input/Composer，不编辑草稿；正常菜单重试当前连接成功。类型、架构、lint、修改文件格式与 diff 检查通过。
+
+CTP-31 的 revision 断言对齐本次 target-synchronized 的实际值，不固定为历史回放中的 2；冷启动目录刷新次数可以变化。
+
+CTP-31 补充旧展示 Promise 消费者回归：恢复后显式读取 A 挂起，同一 owner 的目录事件触发 B 成功，再拒绝 A；连接保持成功，无错误且解除 pending。当前读取失败分支仍按原步骤验证。OAuth 轮询/深链使用真实 SettingService CAS 联合回归验证成功收尾；Electron 继续验证真实认证失败提示。
+
+本轮 review 修复证据：联合 hook 回归先红后绿；真实 SettingService CAS 轮询/深链 4 条通过；受影响 414 个 Vitest 文件 4,698 条、独立执行器 1 条及 Node 测试 35 条通过。CTP-31 Electron 回放通过，记录 target-synchronized → presentation-failed → fault-recovered → obsolete-started → presentation-recovered(revision=2) → obsolete-failed，最后无错误且 pending 解除。产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012133022821-p39573-b5f6819a454bc7fb/`。真实生产账号、手机远控和 Windows/Linux 未在本轮验证。
+
+OAuth 失败反例的 Electron 前置：隔离 profile 若进入职业引导，先按产品 Escape 退出再寻找登录入口；仅调整测试初始化，不修改登录产品行为。
+
+AUTH-05 的启动记录确认假 JWT 触发过期确认层，阻挡登录入口；该匿名回调失败用例使用空账号凭据夹具，避免向真实控制面发送测试 JWT。
+
+AUTH-05 匿名夹具修复后 Electron 通过（产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012134331515-p59485-f6e61f7e604f8568/`）：真实 Host 拒绝无效回调，UI 展示错误，取消后恢复渠道列表。
+
+OAuth 初始化冲突回归加强：polling/deep-link 的真实 SettingService 测试不再故意失败 Provider 刷新；提供可用个人套餐及正常权益/团队目录响应，断言仅一次初始化提交尝试、团队身份与并发写入版本不变、设置快照/Provider 刷新与成功标记完成。AUTH-05 在失败取消反例后追加成功 session 的 CAS 冲突回放，认证结果为合成夹具，设置提交仍经真实 Electron RPC/SettingService 锁内 CAS。
+
+AUTH-05 加强回归 Electron 通过（产物 `packages/desktop/.e2e-artifacts/desktop-e2e-20261012144218138-p47669-8fbdc8dc0a4bea3e/`）：`oauth-cas-success.json` 记录一次初始化写入尝试、并发团队选择及版本保持、只读 Provider 刷新和登录成功。定向单测 18 条通过；旧实现对应 3 条失败，确认覆盖正常查询下的二次自动覆盖路径。
+
+2026-10-15 夹具维护：CTP-26 临时禁用普通 Provider 时保留并原样恢复 `personalConfig`。保存接口替换完整 Overlay，不能以 `{}` 切换 enabled，否则会清空 API 配置并污染后续 CTP-27/CTP-22。

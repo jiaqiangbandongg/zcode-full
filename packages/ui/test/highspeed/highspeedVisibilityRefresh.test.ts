@@ -102,6 +102,7 @@ vi.mock("@/v4/ConversationDraftSuggestedPromptsContainer.js", () => ({
 }));
 
 vi.mock("@/hooks/useServices.js", () => ({
+  useComposerClientNamespace: () => "desktop",
   useServices: () => ({
     botsService: mocks.botsService,
     broadcastService: mocks.broadcastService,

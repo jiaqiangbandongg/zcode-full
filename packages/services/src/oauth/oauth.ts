@@ -3,10 +3,12 @@ import type {
   OAuthCallbackResult,
   OAuthProviderId,
   OAuthProviderMeta,
+  OAuthSessionState,
   OAuthStartResponse,
   UserInfo,
 } from "@zcode/shared";
 import { ServiceChannels } from "@zcode/shared";
+import type { Event } from "@zcode/rpc";
 import { createServiceDescriptor } from "../descriptors.js";
 
 /**
@@ -16,6 +18,9 @@ import { createServiceDescriptor } from "../descriptors.js";
  * provider 管理、state 生命周期、token 交换、凭据存储。
  */
 export interface IOAuthService {
+  /** 凭据变更完成后发布，早于 provider 清理及调用方的 UI/设置后处理。 */
+  readonly onDidChangeSession: Event<OAuthSessionState>;
+
   /** 获取可用 provider 列表（仅返回 enabled=true） */
   getProviders(): Promise<OAuthProviderMeta[]>;
 

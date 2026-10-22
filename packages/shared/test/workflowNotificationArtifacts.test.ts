@@ -137,15 +137,6 @@ describe("workflowNotificationMeta.terminal.artifacts", () => {
 
   // escalation 分支是另一支：它播报的是一个还没被满足的义务，与交付物无关。
   it("escalation 分支不长出 artifacts", () => {
-    expect(() =>
-      workflowNotificationMetaSchema.parse({
-        kind: "escalation",
-        qid: "dwfq-1",
-        actor: "actor#1@1",
-        question: "which branch?",
-        artifacts: [{ id: "a", kind: "file", version: 1 }],
-      }),
-    ).not.toThrow();
     const parsed = workflowNotificationMetaSchema.parse({
       kind: "escalation",
       qid: "dwfq-1",

@@ -83,7 +83,7 @@ describe("App 从真实存储恢复未绑定选择", () => {
       });
       const oldSelection = stored as ModelSelection | undefined;
       if (oldSelection?.providerId?.startsWith("builtin:")) {
-        fixture.seedLegacy(sessionID, {
+        await fixture.seedLegacy(sessionID, {
           providerId: oldSelection.providerId,
           modelId: oldSelection.modelId,
           thoughtLevel: oldSelection.options?.reasoningLevel,

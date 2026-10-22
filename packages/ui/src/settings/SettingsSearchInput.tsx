@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
@@ -10,12 +10,14 @@ export function SettingsSearchInput({
   clearTestId,
   containerClassName,
   onClear,
+  trailingAction,
   ...props
 }: ComponentProps<typeof Input> & {
   clearLabel?: string;
   clearTestId?: string;
   containerClassName?: string;
   onClear?: () => void;
+  trailingAction?: ReactNode;
 }) {
   const canClear = Boolean(onClear && props.value && !props.disabled);
 
@@ -31,23 +33,27 @@ export function SettingsSearchInput({
         size="lg"
         className={cn(
           "h-9 rounded-xl pl-9 [&::-webkit-search-cancel-button]:appearance-none",
-          canClear && "pr-9",
+          (canClear || trailingAction) && "pr-9",
+          canClear && trailingAction && "pr-16",
           className,
         )}
       />
-      {canClear ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full text-foreground-subtle"
-          aria-label={clearLabel}
-          data-testid={clearTestId}
-          onClick={onClear}
-        >
-          <X className="size-3.5" aria-hidden="true" />
-        </Button>
-      ) : null}
+      <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center">
+        {canClear ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-full text-foreground-subtle"
+            aria-label={clearLabel}
+            data-testid={clearTestId}
+            onClick={onClear}
+          >
+            <X className="size-3.5" aria-hidden="true" />
+          </Button>
+        ) : null}
+        {trailingAction}
+      </div>
     </div>
   );
 }

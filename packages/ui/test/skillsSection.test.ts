@@ -268,6 +268,7 @@ vi.mock("@/store/zcodeSessionStore.js", () => ({
 }));
 
 vi.mock("@/hooks/usePlatform.js", () => ({
+  useOptionalPlatform: () => null,
   usePlatform: () => ({
     openInFileManager: openInFileManagerMock,
   }),
@@ -521,13 +522,10 @@ describe("SkillsSection", () => {
 
     const html = await renderSkillsSection();
 
-    expect(html).not.toContain(">Skill Details<");
-    expect(html).not.toContain(">Source<");
     expect(html).toContain("feishu-drive");
     expect(html).toContain(
       "飞书云空间文件管理 Skill。上传/下载/移动/搜索文件、创建文件夹、获取元数据等。当需要管理飞书云空间中的文件和文件夹时使用此 Skill。",
     );
-    expect(html).toContain(">Version<");
     expect(html).toContain(">1.0.0<");
     expect(html).toContain(">feishu-drive<");
     expect(html).toContain(">owner-1<");
@@ -535,8 +533,6 @@ describe("SkillsSection", () => {
     expect(html).toContain("/Users/dev/.agents/skills/feishu-drive-1.0.0/SKILL.md");
     expect(html).toContain(">Enabled<");
     expect(html).toContain('aria-label="Open"');
-    expect(html).not.toContain("Copy to Common");
-    expect(html).not.toContain("Remove from Common");
   });
 
   it("技能详情弹窗的文件路径可以打开", async () => {
@@ -628,14 +624,13 @@ describe("SkillsSection", () => {
     const html = await renderSkillsSection();
 
     expect(html).toContain("Skill diagnostics: 1 error(s), 1 warning(s)");
-    expect(html).not.toContain("skill(s) failed to load");
     expect(html).toContain("Missing YAML frontmatter");
     expect(html).toContain("Unknown frontmatter key");
     expect(html).toContain("缺少 frontmatter");
     expect(html).toContain("/tmp/workspace/.zcode/skills/bad/SKILL.md");
   });
 
-  it("Plugin 只展示当前 scope 且名称后不重复 scope 标签", async () => {
+  it("Plugin 只展示当前 scope 的技能", async () => {
     mockCapabilityState = { userScopeAvailable: true };
     mockSkillsState = [
       {
@@ -662,7 +657,6 @@ describe("SkillsSection", () => {
 
     expect(html).toContain("repo-review");
     expect(html).not.toContain("global-skill");
-    expect(html).not.toContain("data-skill-scope");
   });
 
   it("设置页切换技能开关后会刷新同一远程工作区的聊天补全技能缓存", async () => {
@@ -708,7 +702,7 @@ describe("SkillsSection", () => {
         skillId: "skill-1",
         enabled: false,
       });
-      // 修复原因：protocol-v4 草稿没有 legacy draftSessionId，切换技能仍必须失效预热运行态。
+      // 修复原因：切换技能必须通过失效版本重建 V4 pane 持有的预热运行态。
       expect(invalidateDraftRuntimeMock).toHaveBeenCalledWith(
         "/tmp/workspace",
         "remote:ssh:dev:/tmp/workspace",
@@ -767,4 +761,14 @@ describe("SkillsSection", () => {
     expect(useSkillStore.getState().workspacePath).toBe("/Users/alice/local-project");
     expect(useSkillStore.getState().skills).toEqual([localSkill]);
   });
+});
+
+// 能力列表/表单测试使用既有 workspace service double，配置 admission 单独验证。
+vi.mock("@/workspace-config-catalog/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/workspace-config-catalog/index.js")>();
+  const workspace = await import("@/hooks/useWorkspaceServices.js");
+  return {
+    ...actual,
+    useConfigWorkspaceServicesResolution: workspace.useWorkspaceServicesResolution,
+  };
 });

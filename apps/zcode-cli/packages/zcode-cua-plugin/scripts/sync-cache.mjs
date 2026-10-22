@@ -3,7 +3,7 @@
 // picks up skill / MCP / manifest changes without a manual copy.
 //
 // This closes the last hop of the sync chain:
-//   zcode-cua repo  --sync:skill/sync:mcp-->  dev plugin (here)  --sync:cache-->  CLI cache
+//   packages/zcode-cua/plugin  --sync:skill-->  dev plugin (here)  --sync:cache-->  CLI cache
 //
 // The cache dir name (e.g. 0.1.31) is just an install-time cache key; copying newer
 // content (plugin.json says 0.2.0) on top of it is tolerated by the CLI and is exactly

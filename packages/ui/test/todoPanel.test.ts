@@ -46,7 +46,7 @@ describe("TodoPanel", () => {
     expect(html).toContain("还要处理的事项");
   });
 
-  it("keeps collapsed todo layout bounded on narrow remote-control viewports", () => {
+  it("uses a collapsed content button without making the plan header a button", () => {
     const html = renderWithTooltipProvider(
       createElement(TodoPanel, {
         isStreaming: true,
@@ -66,13 +66,7 @@ describe("TodoPanel", () => {
       }),
     );
 
-    expect(html).toContain("min-w-0 flex-1");
-    expect(html).toContain("truncate");
-    expect(html).toContain("shrink-0");
-    expect(html).toMatch(
-      /<button[^>]*aria-expanded="false"[^>]*class="[^"]*\binline-flex\b[^"]*\bmax-w-full\b/,
-    );
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"/);
     expect(html).not.toContain('data-slot="plan-header" role="button"');
-    expect(html).not.toContain("cursor-pointer items-center gap-3 px-4");
   });
 });

@@ -629,7 +629,13 @@ describe("tool result display", () => {
       ],
       participants: [
         { id: "unphased:actor#1", phase: "unphased", lane: "actor#1", steps: ["ask#1"] },
-        { id: "unphased:actor#2", phase: "unphased", lane: "actor#2", steps: ["ask#2"], many: true },
+        {
+          id: "unphased:actor#2",
+          phase: "unphased",
+          lane: "actor#2",
+          steps: ["ask#2"],
+          many: true,
+        },
       ],
       handoffs: [{ from: "unphased:actor#1", to: "unphased:actor#2", types: ["string"] }],
       sink: ["ask#2"],
@@ -805,8 +811,23 @@ describe("workflow observation tool displays", () => {
       { sequence: 2, message: "fan-out complete", at: Date.UTC(2026, 7, 21, 9, 4, 0) },
     ],
     phases: [
-      { name: "collect", state: "done" as const, rounds: 1, nodesSettled: 2, nodesRunning: 0, enteredAt: 1_000, exitedAt: 1_400 },
-      { name: "judge", state: "current" as const, rounds: 1, nodesSettled: 2, nodesRunning: 2, enteredAt: 1_400 },
+      {
+        name: "collect",
+        state: "done" as const,
+        rounds: 1,
+        nodesSettled: 2,
+        nodesRunning: 0,
+        enteredAt: 1_000,
+        exitedAt: 1_400,
+      },
+      {
+        name: "judge",
+        state: "current" as const,
+        rounds: 1,
+        nodesSettled: 2,
+        nodesRunning: 2,
+        enteredAt: 1_400,
+      },
     ],
     subagents: [
       {
@@ -891,15 +912,6 @@ describe("workflow observation tool displays", () => {
     expect(parseToolResultDisplayPayload(display)).toEqual(display);
   });
 
-  // 卡上的年龄必须对快照时刻算，不能对渲染时刻算：一条三天前的 transcript 重新打开时，
-  // 卡上的「40 秒前」必须仍是当时那个 40 秒前。
-  it("carries the snapshot clock and the assembled summary onto the card", () => {
-    const display = createToolResultDisplay("GetWorkflowRun", getWorkflowRunRunningOutput);
-    if (display?.kind !== "get_workflow_run") throw new Error("Expected get_workflow_run display payload");
-    expect(display.generatedAt).toBe(2_400);
-    expect(display.summary).toBe(getWorkflowRunRunningOutput.summary);
-  });
-
   // 情势上线之前持久化的载荷没有这五件；display schema 是 strict 的，设成必填会让升级后
   // 打开的每一条历史会话里这张卡整块被剥、退化成纯文本。
   it("still parses a payload persisted before the situation report existed", () => {
@@ -922,7 +934,8 @@ describe("workflow observation tool displays", () => {
       phases: undefined,
       subagents: [],
     });
-    if (display?.kind !== "get_workflow_run") throw new Error("Expected get_workflow_run display payload");
+    if (display?.kind !== "get_workflow_run")
+      throw new Error("Expected get_workflow_run display payload");
     expect("phases" in display).toBe(false);
     expect(display.subagents).toEqual([]);
   });
@@ -936,7 +949,8 @@ describe("workflow observation tool displays", () => {
       subagents: Array.from({ length: 64 }, () => subagent),
       subagentsTruncated: true,
     });
-    if (display?.kind !== "get_workflow_run") throw new Error("Expected get_workflow_run display payload");
+    if (display?.kind !== "get_workflow_run")
+      throw new Error("Expected get_workflow_run display payload");
     expect(display.subagents).toHaveLength(64);
     expect(display.truncated).toBe(true);
     expect(parseToolResultDisplayPayload(display)).toEqual(display);
@@ -962,21 +976,6 @@ describe("workflow observation tool displays", () => {
     expect(parseToolResultDisplayPayload(display)).toEqual(display);
   });
 
-  it("carries each log entry's journal time onto the card and leaves it absent when unknown", () => {
-    const display = createToolResultDisplay("GetWorkflowRun", getWorkflowRunRunningOutput);
-    if (display?.kind !== "get_workflow_run") {
-      throw new Error("Expected get_workflow_run display payload");
-    }
-    // 没有时钟的行不合成一个：`at` 缺席就是缺席，卡上不给它年龄。
-    expect(display.logTail[0]).toEqual({ sequence: 1, message: "started" });
-    expect(display.logTail[1]).toEqual({
-      sequence: 2,
-      message: "fan-out complete",
-      at: Date.UTC(2026, 7, 21, 9, 4, 0),
-    });
-    expect(parseToolResultDisplayPayload(display)).toEqual(display);
-  });
-
   it("bounds the GetWorkflowRun result text independently of the model channel", () => {
     const display = createToolResultDisplay("GetWorkflowRun", {
       ...getWorkflowRunRunningOutput,
@@ -986,7 +985,6 @@ describe("workflow observation tool displays", () => {
     if (display?.kind !== "get_workflow_run") {
       throw new Error("Expected get_workflow_run display payload");
     }
-    expect(display.result).toBeDefined();
     expect(display.result!.length).toBeLessThanOrEqual(4_000);
     expect(display.truncated).toBe(true);
     expect(parseToolResultDisplayPayload(display)).toEqual(display);
@@ -1069,7 +1067,12 @@ describe("workflow observation tool displays", () => {
     const display = createToolResultDisplay("EvalWorkflowSnippet", {
       ok: false,
       diagnostics: [
-        { code: 2322, column: 10, line: 3, message: "Type 'string' is not assignable to 'number'." },
+        {
+          code: 2322,
+          column: 10,
+          line: 3,
+          message: "Type 'string' is not assignable to 'number'.",
+        },
       ],
       logs: longLogs,
       response: "y".repeat(9_000),

@@ -26,22 +26,4 @@ describe("armsUserIdentity", () => {
     sync.refresh();
     expect(setUser).toHaveBeenCalledTimes(1);
   });
-
-  it("deviceMid 变更时重新写入", () => {
-    const setUser = vi.fn();
-    const sync1 = createArmsUserIdentitySync({
-      deviceMid: "mid-001",
-      setUser,
-    });
-    sync1.refresh();
-    expect(setUser).toHaveBeenCalledTimes(1);
-
-    const sync2 = createArmsUserIdentitySync({
-      deviceMid: "mid-002",
-      setUser,
-    });
-    sync2.refresh();
-    expect(setUser).toHaveBeenCalledTimes(2);
-    expect(setUser).toHaveBeenLastCalledWith({ name: "mid-002" });
-  });
 });

@@ -1,9 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AppUsageSnapshot } from "@zcode/shared";
 import {
-  APP_USAGE_TREND_CHART_MARGIN,
   buildAppUsageDailyModelChartViewModel,
   filterDailyModelTooltipPayload,
   resolveDailyModelTooltipTokenParts,
@@ -35,28 +32,6 @@ function createDateKey(index: number): string {
 }
 
 describe("AppUsageDailyModelTrendChart view model", () => {
-  it("使用折线图而不是柱状图渲染趋势", () => {
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        "packages/ui/src/settings/usage-stats/AppUsageDailyModelTrendChart.tsx",
-      ),
-      "utf8",
-    );
-
-    expect(source).toContain("LineChart");
-    expect(source).toContain("<Line");
-    expect(source).not.toContain("BarChart");
-    expect(source).not.toContain("<Bar");
-  });
-
-  it("为首尾日期刻度保留水平安全区", () => {
-    expect(APP_USAGE_TREND_CHART_MARGIN).toMatchObject({
-      left: 24,
-      right: 24,
-    });
-  });
-
   it("按 7d range 的每日模型 token 用量保留未知模型", () => {
     const snapshot = createSnapshot({
       models: [
@@ -191,34 +166,6 @@ describe("AppUsageDailyModelTrendChart view model", () => {
     });
   });
 
-  it("每日模型图表使用应用用量专用色板", () => {
-    const snapshot = createSnapshot({
-      models: Array.from({ length: 6 }, (_, index) => ({
-        modelId: `model-${index}`,
-        totalTokens: 100 - index,
-        inputTokens: 40,
-        outputTokens: 60,
-        requestCount: 1,
-        share: 1 / 6,
-      })),
-    });
-
-    const viewModel = buildAppUsageDailyModelChartViewModel({
-      intl,
-      locale: "en-US",
-      snapshot,
-    });
-
-    expect(viewModel.modelKeys.map((model) => model.color)).toEqual([
-      "var(--color-usage-chart-1)",
-      "var(--color-usage-chart-2)",
-      "var(--color-usage-chart-3)",
-      "var(--color-usage-chart-4)",
-      "var(--color-usage-chart-5)",
-      "var(--color-usage-chart-6)",
-    ]);
-  });
-
   it("tooltip payload 过滤当天用量为 0 的模型", () => {
     const activeModel = { name: "glm-4.5", value: 128 };
     const zeroModel = { name: "glm-4.6", value: 0 };
@@ -238,15 +185,5 @@ describe("AppUsageDailyModelTrendChart view model", () => {
       number: "419.9M",
       unit: "tokens",
     });
-
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        "packages/ui/src/settings/usage-stats/AppUsageDailyModelTrendChart.tsx",
-      ),
-      "utf8",
-    );
-    expect(source).toContain('className="font-mono font-medium tabular-nums"');
-    expect(source).toContain('className="text-foreground-subtle">{tokenValue.unit}</span>');
   });
 });

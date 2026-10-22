@@ -1,11 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import {
-  DEFAULT_WORKSPACE,
-  clearAppData,
-  ensureWorkspaceItemExpanded,
-} from "../../../helpers/desktop-app.js";
+import { DEFAULT_WORKSPACE, clearAppData } from "../../../helpers/desktop-app.js";
 import { restartIntoWorkspacePreservingProfile } from "../../../helpers/model-provider-restart.js";
 import {
   getV4PaneSnapshot,
@@ -16,6 +12,7 @@ import {
   waitForV4QueueCount,
   waitForV4TimelineContaining,
 } from "../../../helpers/v4-conversation.js";
+import { ensureProjectExpanded } from "../../../helpers/project-sidebar.js";
 
 const CASE_TIMEOUT_MS = 180_000;
 const PENDING_COMMAND_STORAGE_KEY = "zcode-v4-pending-commands:v1";
@@ -61,7 +58,7 @@ describe("PV4-25Q：restart-discarded queue 静默清账", () => {
     expect(await readPendingCommandIds()).toContain(sourceCommandId);
 
     await restartIntoWorkspacePreservingProfile();
-    await ensureWorkspaceItemExpanded(DEFAULT_WORKSPACE);
+    await ensureProjectExpanded(DEFAULT_WORKSPACE);
     await selectV4TaskById(sessionId);
     await waitForV4Pane(
       (snapshot) => snapshot.sessionId === sessionId,

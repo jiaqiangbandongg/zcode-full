@@ -36,7 +36,6 @@ describe("submit_result contracts", () => {
     expect(SubmitResultInputJsonSchema.type).toBe("object");
     // result 是无约束的任意 JSON：其子 schema 不带类型约束。
     const resultSchema = (SubmitResultInputJsonSchema.properties as Record<string, unknown>).result;
-    expect(resultSchema).toBeDefined();
     expect((resultSchema as Record<string, unknown>).type).toBeUndefined();
     expect(SubmitResultInputJsonSchema.additionalProperties).toBe(false);
   });

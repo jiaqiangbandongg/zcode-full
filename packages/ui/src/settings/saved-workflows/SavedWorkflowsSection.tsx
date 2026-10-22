@@ -1,3 +1,4 @@
+import { useSavedWorkflowProjectOptions } from "@/project-sidebar/useSavedWorkflowProjectOptions.js";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Plus, Settings2 } from "lucide-react";
 import {
@@ -5,7 +6,7 @@ import {
   TID_WORKFLOWS_EMPTY,
   TID_WORKFLOWS_OPEN_SETTINGS,
   TID_WORKFLOWS_REFRESH,
-  isDynamicWorkflowOffered,
+  readDynamicWorkflowOfferedMode,
   resolveWorkspaceKey,
 } from "@zcode/shared";
 import { Button } from "@/components/ui/button.js";
@@ -16,10 +17,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useTabStore } from "@/store/TabStoreProvider.js";
 import { useDynamicWorkflowAvailability } from "@/hooks/useDynamicWorkflowAvailability.js";
 import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
-import {
-  buildAutomationWorkspaceOptions,
-  type AutomationWorkspaceOption,
-} from "@/settings/automationWorkspaceOptions.js";
+import { type AutomationWorkspaceOption } from "@/settings/automationWorkspaceOptions.js";
 import { AutomationRefreshIcon } from "@/settings/AutomationDesignPrimitives.js";
 import { SETTINGS_FRAME_CONTENT_CLASSNAME } from "@/settings/SettingsPageParts.js";
 import { buildSavedWorkflowCreatePrompt } from "@/settings/saved-workflows/savedWorkflowLaunchPrompt.js";
@@ -95,24 +93,24 @@ export function SavedWorkflowsSection({
   onOpenWorkflowConsumed,
 }: SavedWorkflowsSectionProps) {
   const { intl, locale } = useZCodeIntl();
-  const tabs = useTabStore((store) => store.tabs);
   const openSettingsTab = useTabStore((store) => store.openSettingsTab);
   // launch.md「The hub page」「The user's choice」：标题行的「工作流设置」直达设置 › 常规的模式行，
   // 旁边写当前生效模式。中枢只在生效模式不是关闭时出现，所以这里不处理关闭态。
-  // 链接与它要打开的设置行同进同退：行只在功能被提供时出现（isDynamicWorkflowOffered），旧 Host 的
-  // 快照没有 offeredMode，行不出，链接也不出——否则点过去是一个找不到的设置。
+  // 链接与它要打开的设置行同进同退：行在快照就绪后总是出现，唯一例外是旧 Host 的快照没有
+  // offeredMode（readDynamicWorkflowOfferedMode 读不到），行不出，链接也不出——否则点过去是一个找不到的设置。
   const dynamicWorkflowConfig = useDynamicWorkflowAvailability().config;
   const dynamicWorkflowMode = dynamicWorkflowConfig?.mode;
   const showWorkflowSettings =
-    dynamicWorkflowConfig !== null && isDynamicWorkflowOffered(dynamicWorkflowConfig);
+    dynamicWorkflowConfig !== null &&
+    readDynamicWorkflowOfferedMode(dynamicWorkflowConfig) !== undefined;
   const handleOpenWorkflowSettings = useCallback(() => {
     setPendingSettingsSectionIntent("general");
     openSettingsTab();
   }, [openSettingsTab]);
-  const projects = useMemo(() => buildAutomationWorkspaceOptions(tabs), [tabs]);
+  const projects = useSavedWorkflowProjectOptions();
   // 全局组的运行 / 移动落点只能是本机项目：过滤掉远程 workspace。
   const localProjects = useMemo(
-    () => projects.filter((project) => !project.remoteSessionId),
+    () => projects.filter((project) => !project.workspaceIdentity),
     [projects],
   );
 
@@ -192,6 +190,8 @@ export function SavedWorkflowsSection({
     const target = active ?? projects[0];
     if (!target) return null;
     return {
+      projectId: target.projectId,
+      hostId: target.hostId,
       workspacePath: target.workspacePath,
       ...(target.workspaceIdentity ? { workspaceIdentity: target.workspaceIdentity } : {}),
     };

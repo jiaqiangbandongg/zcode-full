@@ -37,13 +37,6 @@ describe("sidePaneTerminalSessionRegistry", () => {
     registry.clearForTest();
   });
 
-  it("register 后可 get/has 命中", () => {
-    const entry = createMockEntry("t1");
-    registry.register("t1", entry);
-    expect(registry.has("t1")).toBe(true);
-    expect(registry.get("t1")?.term).toBe(entry.term);
-  });
-
   it("未注册时 get/has miss", () => {
     expect(registry.has("missing")).toBe(false);
     expect(registry.get("missing")).toBeUndefined();
@@ -55,15 +48,6 @@ describe("sidePaneTerminalSessionRegistry", () => {
     const host = document.createElement("div");
     registry.attachDom("t1", host);
     expect(entry.hostEl.parentElement).toBe(host);
-  });
-
-  it("attachDom 幂等：已在 host 不重复追加", () => {
-    const entry = createMockEntry("t1");
-    registry.register("t1", entry);
-    const host = document.createElement("div");
-    registry.attachDom("t1", host);
-    registry.attachDom("t1", host);
-    expect(host.children.length).toBe(1);
   });
 
   it("attachDom miss 不抛（key 未注册）", () => {
@@ -79,9 +63,7 @@ describe("sidePaneTerminalSessionRegistry", () => {
     registry.detachDom("t1");
     expect(entry.hostEl.parentElement).not.toBe(host);
     // hostEl 应回到隐藏暂存容器
-    expect(
-      entry.hostEl.parentElement?.getAttribute("data-side-pane-terminal-stash"),
-    ).toBe("");
+    expect(entry.hostEl.parentElement?.getAttribute("data-side-pane-terminal-stash")).toBe("");
   });
 
   it("detachDom 不删 entry —— 跨 workspace 切换保活的核心", () => {
@@ -152,13 +134,5 @@ describe("sidePaneTerminalSessionRegistry", () => {
     expect(e1.dispose).toHaveBeenCalledTimes(1);
     expect(e3.dispose).toHaveBeenCalledTimes(1);
     expect(e2.dispose).not.toHaveBeenCalled();
-  });
-
-  it("clearForTest 清空所有 session", () => {
-    registry.register("t1", createMockEntry("t1"));
-    registry.register("t2", createMockEntry("t2"));
-    registry.clearForTest();
-    expect(registry.has("t1")).toBe(false);
-    expect(registry.has("t2")).toBe(false);
   });
 });

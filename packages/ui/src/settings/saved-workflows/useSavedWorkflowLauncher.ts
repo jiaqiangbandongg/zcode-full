@@ -19,6 +19,8 @@ import { logger } from "@/logger.js";
 
 /** 目标项目坐标（工作流所属项目，绝不取活动项目；不变式 7）；remoteSessionId 决定连接 endpoint。 */
 export interface SavedWorkflowLaunchTarget {
+  projectId?: string | null;
+  hostId?: string;
   workspacePath: string;
   workspaceIdentity?: string;
   remoteSessionId?: string;
@@ -161,6 +163,7 @@ export function useSavedWorkflowLauncher(params: {
             payload: { workspaceId },
             sessionId: null,
           }),
+          { projectId: target.projectId },
         );
         if (createAck.status !== "accepted" || createAck.result?.type !== "createSession") {
           // 会话没建成：不发 start、不留会话，通用错误。

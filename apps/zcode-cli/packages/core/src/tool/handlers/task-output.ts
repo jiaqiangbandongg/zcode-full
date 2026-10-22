@@ -88,7 +88,9 @@ export const taskOutputToolEntry: ToolEntry = {
   capability: "read output/logs from a background task",
   maxModelChars: TASK_OUTPUT_PERSIST_THRESHOLD_CHARS,
   metadata: {
+    shouldDefer: true,
     name: TASK_OUTPUT_TOOL_NAME,
+    searchHint: "read output/logs from a background task",
     description: TASK_OUTPUT_PROVIDER_DESCRIPTION,
     readOnly: true,
     destructive: false,

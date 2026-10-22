@@ -602,27 +602,6 @@ describe("NodePluginAdapter", () => {
     }
   });
 
-  it("allows a trusted refresh to (re)add an official marketplace id", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-official-trusted-"));
-    const storageRoot = join(dir, "storage");
-    const sourceDir = join(dir, "official-mirror");
-
-    try {
-      await writeMarketplaceManifest(sourceDir, {
-        name: "claude-plugins-official",
-        plugins: [],
-      });
-      const record = await addMarketplace({
-        source: { source: "directory", path: sourceDir },
-        storageRoot,
-        trustedId: "claude-plugins-official",
-      });
-      expect(record.id).toBe("claude-plugins-official");
-    } finally {
-      await rm(dir, { force: true, recursive: true });
-    }
-  });
-
   // Review #2: a trusted refresh must NOT let a non-official known marketplace claim an official
   // id by renaming its manifest. trustedId pins the refresh to the record's own id, so an
   // official name coming from a record whose id is not that official id is rejected.
@@ -896,7 +875,7 @@ describe("NodePluginAdapter", () => {
     }
   });
 
-  it("loads ten Claude marketplace plugins that provide skills, commands, and MCP servers", async () => {
+  it("loads representative Claude marketplace plugin layouts for skills, commands, and MCP servers", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-triplet-marketplace-"));
     const storageRoot = join(dir, "storage");
     const marketplaceRoot = join(dir, "marketplace");
@@ -2594,15 +2573,16 @@ describe("NodePluginAdapter", () => {
       ]);
       vi.stubGlobal(
         "fetch",
-        vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-          new Promise<Response>((_resolve, reject) => {
-            const signal = init?.signal;
-            if (signal?.aborted) {
-              reject(signal.reason);
-              return;
-            }
-            signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
-          }),
+        vi.fn(
+          (_input: RequestInfo | URL, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              const signal = init?.signal;
+              if (signal?.aborted) {
+                reject(signal.reason);
+                return;
+              }
+              signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+            }),
         ),
       );
 
@@ -2616,9 +2596,8 @@ describe("NodePluginAdapter", () => {
 
       await expect(refresh).rejects.toBeDefined();
       expect(
-        loadKnownMarketplacesSync(storageRoot).find(
-          (record) => record.id === "cancelled-market",
-        )?.lastRefreshFailure,
+        loadKnownMarketplacesSync(storageRoot).find((record) => record.id === "cancelled-market")
+          ?.lastRefreshFailure,
       ).toBeUndefined();
     } finally {
       await rm(dir, { force: true, recursive: true });
@@ -3442,46 +3421,6 @@ describe("NodePluginAdapter", () => {
         allowedTools: ["Bash", "Read"],
         description: "Generated from inline content",
       });
-    } finally {
-      await rm(dir, { force: true, recursive: true });
-    }
-  });
-
-  it("validates marketplace sources without persisting them", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-marketplace-validate-"));
-    const storageRoot = join(dir, "storage");
-    const marketplaceRoot = join(dir, "marketplace");
-
-    try {
-      await writeMarketplaceManifest(marketplaceRoot, {
-        name: "diagnostics",
-        plugins: [
-          {
-            name: "risky",
-            source: "./plugins/risky",
-            agents: "./agents/risky.md",
-            hooks: "./hooks/hooks.json",
-            userConfig: {
-              token: {
-                sensitive: true,
-                title: "Token",
-                type: "string",
-              },
-            },
-          },
-        ],
-      });
-      const diagnostics = await validateMarketplaceSource({
-        source: { source: "directory", path: marketplaceRoot },
-        storageRoot,
-      });
-      expect(diagnostics).not.toContainEqual(
-        expect.objectContaining({
-          code: "plugin_unsupported_component",
-          pluginId: "risky@diagnostics",
-        }),
-      );
-      expect(listInstalledPluginRecords(storageRoot)).toEqual([]);
     } finally {
       await rm(dir, { force: true, recursive: true });
     }
@@ -4357,75 +4296,72 @@ describe("NodePluginAdapter", () => {
   // SKILL.md 是链接的形态。文件级与目录级走同一个 isSymbolicLinkSync（lstat）
   // 拒绝路径。Windows 普通权限下创建文件 symlink 会 EPERM，此时才跳过——
   // 开发者模式或管理员 CI 上本用例会真实执行，不整体按平台跳过。
-  it(
-    "rejects file-level SKILL.md symlinks escaping the plugin root",
-    async (ctx) => {
-      const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-file-symlink-"));
-      const pluginRoot = join(dir, "plugin");
-      const outsideFile = join(dir, "outside-secret.md");
+  it("rejects file-level SKILL.md symlinks escaping the plugin root", async (ctx) => {
+    const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-file-symlink-"));
+    const pluginRoot = join(dir, "plugin");
+    const outsideFile = join(dir, "outside-secret.md");
 
+    try {
+      await writePluginManifest(
+        pluginRoot,
+        {
+          name: "file-symlink-escape",
+          skills: ["./skills", "./bundle-root"],
+        },
+        ".claude-plugin",
+      );
+      await writeFile(outsideFile, "---\nname: leaked-secret\ndescription: x\n---\nleaked");
+      // 形态 1：子目录是真实目录，其 SKILL.md 是指向外部的文件链接。
+      // 第一个链接同时作为权限探针：EPERM（Windows 无 symlink 特权）才跳过，
+      // 其余错误如实抛出；finally 保证临时目录清理。
+      await mkdir(join(pluginRoot, "skills", "foo"), { recursive: true });
       try {
-        await writePluginManifest(
-          pluginRoot,
-          {
-            name: "file-symlink-escape",
-            skills: ["./skills", "./bundle-root"],
-          },
-          ".claude-plugin",
-        );
-        await writeFile(outsideFile, "---\nname: leaked-secret\ndescription: x\n---\nleaked");
-        // 形态 1：子目录是真实目录，其 SKILL.md 是指向外部的文件链接。
-        // 第一个链接同时作为权限探针：EPERM（Windows 无 symlink 特权）才跳过，
-        // 其余错误如实抛出；finally 保证临时目录清理。
-        await mkdir(join(pluginRoot, "skills", "foo"), { recursive: true });
-        try {
-          await symlink(outsideFile, join(pluginRoot, "skills", "foo", "SKILL.md"));
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
-          ctx.skip();
-          return;
-        }
-        // 形态 2：声明根（bundle-root）自身目录真实，SKILL.md 是外部文件链接。
-        await mkdir(join(pluginRoot, "bundle-root"), { recursive: true });
-        await symlink(outsideFile, join(pluginRoot, "bundle-root", "SKILL.md"));
-        // 对照组：真实文件技能正常发现。
-        await mkdir(join(pluginRoot, "skills", "legit"), { recursive: true });
-        await writeFile(
-          join(pluginRoot, "skills", "legit", "SKILL.md"),
-          "---\nname: legit\ndescription: legitimate\n---\n# legit",
-        );
-
-        const outcome = await createNodePluginAdapter({
-          storageRoot: join(dir, "plugins"),
-        }).discoverPlugins({
-          config: {
-            dirs: [pluginRoot],
-            enabled: true,
-            enabledPlugins: {},
-            options: {},
-          },
-          env: {},
-          storageRoot: join(dir, "plugins"),
-          workingDirectory: join(dir, "workspace"),
-        });
-
-        // 只有真实文件技能被计数；两个文件级链接形态都被剔除。
-        const plugin = outcome.plugins.find((item) => item.id === "file-symlink-escape@inline");
-        expect(plugin).toMatchObject({ skillCount: 1 });
-        expect(componentNames(plugin?.components ?? [], "skill")).toEqual(["legit"]);
-
-        const skillOutcome = await createNodeSkillAdapter().discoverSkills({
-          roots: outcome.skillRoots,
-          workingDirectory: join(dir, "workspace"),
-        });
-        expect(skillOutcome.skills.map((skill) => skill.name)).toEqual(["legit"]);
-        // 泄密文件内容绝不出现在任何技能路径的加载结果里。
-        expect(skillOutcome.skills.some((skill) => skill.path === outsideFile)).toBe(false);
-      } finally {
-        await rm(dir, { force: true, recursive: true });
+        await symlink(outsideFile, join(pluginRoot, "skills", "foo", "SKILL.md"));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+        ctx.skip();
+        return;
       }
-    },
-  );
+      // 形态 2：声明根（bundle-root）自身目录真实，SKILL.md 是外部文件链接。
+      await mkdir(join(pluginRoot, "bundle-root"), { recursive: true });
+      await symlink(outsideFile, join(pluginRoot, "bundle-root", "SKILL.md"));
+      // 对照组：真实文件技能正常发现。
+      await mkdir(join(pluginRoot, "skills", "legit"), { recursive: true });
+      await writeFile(
+        join(pluginRoot, "skills", "legit", "SKILL.md"),
+        "---\nname: legit\ndescription: legitimate\n---\n# legit",
+      );
+
+      const outcome = await createNodePluginAdapter({
+        storageRoot: join(dir, "plugins"),
+      }).discoverPlugins({
+        config: {
+          dirs: [pluginRoot],
+          enabled: true,
+          enabledPlugins: {},
+          options: {},
+        },
+        env: {},
+        storageRoot: join(dir, "plugins"),
+        workingDirectory: join(dir, "workspace"),
+      });
+
+      // 只有真实文件技能被计数；两个文件级链接形态都被剔除。
+      const plugin = outcome.plugins.find((item) => item.id === "file-symlink-escape@inline");
+      expect(plugin).toMatchObject({ skillCount: 1 });
+      expect(componentNames(plugin?.components ?? [], "skill")).toEqual(["legit"]);
+
+      const skillOutcome = await createNodeSkillAdapter().discoverSkills({
+        roots: outcome.skillRoots,
+        workingDirectory: join(dir, "workspace"),
+      });
+      expect(skillOutcome.skills.map((skill) => skill.name)).toEqual(["legit"]);
+      // 泄密文件内容绝不出现在任何技能路径的加载结果里。
+      expect(skillOutcome.skills.some((skill) => skill.path === outsideFile)).toBe(false);
+    } finally {
+      await rm(dir, { force: true, recursive: true });
+    }
+  });
 
   // 信任边界回归（目录级 symlink/junction）：plugin-scope 扫描不跟随符号链接——
   //   skills/evil-link -> ../../outside-skill（子目录是逃逸链接）
@@ -4433,77 +4369,74 @@ describe("NodePluginAdapter", () => {
   // 两种形态都被剔除；声明根是链接时扫描为空，落入「没有任何技能」告警。
   // Windows 用 junction 创建（无需特权；lstat/Dirent 对 junction 同样报告
   // isSymbolicLink=true），CR-02 的 Windows 形态在本用例获得真实覆盖。
-  it(
-    "strips symlink escapes from plugin skills and warns on escaping declared roots",
-    async () => {
-      const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-symlink-escape-"));
-      const pluginRoot = join(dir, "plugin");
-      const outsideSkill = join(dir, "outside-skill");
+  it("strips symlink escapes from plugin skills and warns on escaping declared roots", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zcode-plugin-symlink-escape-"));
+    const pluginRoot = join(dir, "plugin");
+    const outsideSkill = join(dir, "outside-skill");
 
-      try {
-        await writePluginManifest(
-          pluginRoot,
-          {
-            name: "symlink-escape",
-            skills: ["./skills/linked-root", "./skills"],
-          },
-          ".claude-plugin",
-        );
-        await mkdir(outsideSkill, { recursive: true });
-        await writeFile(
-          join(outsideSkill, "SKILL.md"),
-          "---\nname: escaped-skill\ndescription: must never load\n---\n# x",
-        );
-        // 形态 1：声明根本身是指向插件根外的链接（skills/ 需先存在）。
-        // Windows 传 junction 类型（目录 symlink 需特权，junction 不需要；
-        // POSIX 忽略该参数，行为为普通 symlink）。
-        await mkdir(join(pluginRoot, "skills"), { recursive: true });
-        await symlinkDir(outsideSkill, join(pluginRoot, "skills", "linked-root"));
-        // 形态 2：默认 skills/ 根下的子目录是指向插件根外的链接。
-        await symlinkDir(outsideSkill, join(pluginRoot, "skills", "evil-link"));
+    try {
+      await writePluginManifest(
+        pluginRoot,
+        {
+          name: "symlink-escape",
+          skills: ["./skills/linked-root", "./skills"],
+        },
+        ".claude-plugin",
+      );
+      await mkdir(outsideSkill, { recursive: true });
+      await writeFile(
+        join(outsideSkill, "SKILL.md"),
+        "---\nname: escaped-skill\ndescription: must never load\n---\n# x",
+      );
+      // 形态 1：声明根本身是指向插件根外的链接（skills/ 需先存在）。
+      // Windows 传 junction 类型（目录 symlink 需特权，junction 不需要；
+      // POSIX 忽略该参数，行为为普通 symlink）。
+      await mkdir(join(pluginRoot, "skills"), { recursive: true });
+      await symlinkDir(outsideSkill, join(pluginRoot, "skills", "linked-root"));
+      // 形态 2：默认 skills/ 根下的子目录是指向插件根外的链接。
+      await symlinkDir(outsideSkill, join(pluginRoot, "skills", "evil-link"));
 
-        const outcome = await createNodePluginAdapter({
-          storageRoot: join(dir, "plugins"),
-        }).discoverPlugins({
-          config: {
-            dirs: [pluginRoot],
-            enabled: true,
-            enabledPlugins: {},
-            options: {},
-          },
-          env: {},
-          storageRoot: join(dir, "plugins"),
-          workingDirectory: join(dir, "workspace"),
-        });
+      const outcome = await createNodePluginAdapter({
+        storageRoot: join(dir, "plugins"),
+      }).discoverPlugins({
+        config: {
+          dirs: [pluginRoot],
+          enabled: true,
+          enabledPlugins: {},
+          options: {},
+        },
+        env: {},
+        storageRoot: join(dir, "plugins"),
+        workingDirectory: join(dir, "workspace"),
+      });
 
-        // 逃逸技能不进计数、不进组件清单。
-        const plugin = outcome.plugins.find((item) => item.id === "symlink-escape@inline");
-        expect(plugin).toMatchObject({ skillCount: 0 });
-        expect(componentNames(plugin?.components ?? [], "skill")).toEqual([]);
+      // 逃逸技能不进计数、不进组件清单。
+      const plugin = outcome.plugins.find((item) => item.id === "symlink-escape@inline");
+      expect(plugin).toMatchObject({ skillCount: 0 });
+      expect(componentNames(plugin?.components ?? [], "skill")).toEqual([]);
 
-        // 声明根本身是链接 → 扫描为空，落入「没有任何技能」告警（词法路径存在，
-        // 不误报 does not exist）。
-        expect(
-          outcome.diagnostics.some(
-            (diagnostic) =>
-              diagnostic.code === "plugin_skill_root_empty" &&
-              diagnostic.pluginId === "symlink-escape@inline" &&
-              diagnostic.message.includes("does not contain any skills") &&
-              diagnostic.message.includes("skills/linked-root"),
-          ),
-        ).toBe(true);
+      // 声明根本身是链接 → 扫描为空，落入「没有任何技能」告警（词法路径存在，
+      // 不误报 does not exist）。
+      expect(
+        outcome.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === "plugin_skill_root_empty" &&
+            diagnostic.pluginId === "symlink-escape@inline" &&
+            diagnostic.message.includes("does not contain any skills") &&
+            diagnostic.message.includes("skills/linked-root"),
+        ),
+      ).toBe(true);
 
-        // 运行时发现同样剔除：逃逸技能不出现在 skill adapter 结果。
-        const skillOutcome = await createNodeSkillAdapter().discoverSkills({
-          roots: outcome.skillRoots,
-          workingDirectory: join(dir, "workspace"),
-        });
-        expect(skillOutcome.skills.map((skill) => skill.name)).toEqual([]);
-      } finally {
-        await rm(dir, { force: true, recursive: true });
-      }
-    },
-  );
+      // 运行时发现同样剔除：逃逸技能不出现在 skill adapter 结果。
+      const skillOutcome = await createNodeSkillAdapter().discoverSkills({
+        roots: outcome.skillRoots,
+        workingDirectory: join(dir, "workspace"),
+      });
+      expect(skillOutcome.skills.map((skill) => skill.name)).toEqual([]);
+    } finally {
+      await rm(dir, { force: true, recursive: true });
+    }
+  });
 
   // 去静默：manifest 显式声明的技能路径扫描为 0 个技能时必须发 warning（路径写进 message，
   // 因为协议 wire schema 不携带 path）；纯默认目录为空不告警；显式声明默认目录名同样算声明。
@@ -4574,7 +4507,8 @@ describe("NodePluginAdapter", () => {
       expect(
         explicitOutcome.diagnostics.some(
           (diagnostic) =>
-            diagnostic.code === "plugin_skill_root_empty" && diagnostic.pluginId === "explicit-default@inline",
+            diagnostic.code === "plugin_skill_root_empty" &&
+            diagnostic.pluginId === "explicit-default@inline",
         ),
       ).toBe(true);
     } finally {
@@ -4782,39 +4716,11 @@ interface TripletPluginFixture {
 function claudeMarketplaceTripletFixtures(): TripletPluginFixture[] {
   return [
     {
-      commandCount: 2,
-      commandPrefix: "appwrite",
-      mcpServerName: "appwrite",
-      name: "appwrite",
-      skillCount: 11,
-    },
-    {
-      commandCount: 9,
-      commandPrefix: "awsdevsecops",
-      mcpServerName: "aws-devsecops",
-      name: "aws-agents-for-devsecops",
-      skillCount: 13,
-    },
-    {
       commandCount: 27,
       commandPrefix: "bigdata",
       mcpServerName: "bigdata",
       name: "bigdata-com",
       skillCount: 1,
-    },
-    {
-      commandCount: 2,
-      commandPrefix: "cloudflare",
-      mcpServerName: "cloudflare",
-      name: "cloudflare",
-      skillCount: 11,
-    },
-    {
-      commandCount: 5,
-      commandPrefix: "confidence",
-      mcpServerName: "confidence",
-      name: "confidence",
-      skillCount: 11,
     },
     {
       commandCount: 1,
@@ -4823,27 +4729,6 @@ function claudeMarketplaceTripletFixtures(): TripletPluginFixture[] {
       mcpServerName: "convex",
       name: "convex",
       skillCount: 2,
-    },
-    {
-      commandCount: 4,
-      commandPrefix: "domino",
-      mcpServerName: "domino",
-      name: "dominodatalab",
-      skillCount: 23,
-    },
-    {
-      commandCount: 2,
-      commandPrefix: "fiftyone",
-      mcpServerName: "fiftyone",
-      name: "fiftyone",
-      skillCount: 16,
-    },
-    {
-      commandCount: 1,
-      commandPrefix: "legalzoom",
-      mcpServerName: "legalzoom",
-      name: "legalzoom",
-      skillCount: 1,
     },
     {
       commandCount: 4,

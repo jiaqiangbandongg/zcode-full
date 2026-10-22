@@ -760,7 +760,6 @@ describe("file tool handlers", () => {
     );
 
     expect(fs.files.get(filePath)).toBe("one\r\ntwo\r\ninserted\r\nthree\r\n");
-    expect(fs.files.get(filePath)).not.toContain("\r\r\n");
   });
 
   it("passes legacy text encoding metadata through Edit writes", async () => {

@@ -4,11 +4,14 @@
 //   2. reducer 把 `hole-reached` / `hole-filled` 归约成 run 的 `holes[]`、并同步 `phaseNames` 与对齐的 `phaseHoles`；
 //   3. sessions-index 的侧栏摘要把留白站标成 open / waiting，并交出「等待补全」的那个名字。
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   WORKFLOW_RUNS_LIMITS,
+  backgroundResultOriginMetaSchema,
   deriveSessionWorkflowPhases,
   reduceWorkflowRunsState,
   toolCallCreateWorkflowDisplaySchema,
+  workflowBlockedMetaSchema,
   workflowNotificationMetaSchema,
   workflowRunsStateSchema,
   type WorkflowRunProgressEnvelope,
@@ -16,7 +19,6 @@ import {
   type WorkflowRunsState,
 } from "../src/zcode-protocol-v4/index.js";
 import { deriveSessionWorkflowActivity } from "../src/zcode-protocol-v4/index.js";
-import { getZCodeToolFamilyForName, normalizeZCodeToolName } from "../src/tool-identity.js";
 
 const RUN_ID = "dwfrun-holes";
 
@@ -172,6 +174,61 @@ describe("display 载荷：holes 与 fill", () => {
   });
 });
 
+describe("提醒载荷：originMeta.workflowBlocked", () => {
+  // docs/dynamic-workflow/transcript-and-notifications.md「The payload」：主代理闲着、run 还欠着问题或
+  // 留白时的提醒走 `workflowBlocked` 这个独立的键，不是 `workflowNotification` 的新成员。
+  const base = { backgroundSource: "workflow", workId: "dwfrun-blocked", title: "review the diff" };
+  const blocked = { questions: 2, holes: 1, sinceMs: 17 * 60_000 };
+
+  it("计数与等待时长都是非负整数", () => {
+    expect(workflowBlockedMetaSchema.parse(blocked)).toEqual(blocked);
+    expect(
+      workflowBlockedMetaSchema.safeParse({ questions: 0, holes: 0, sinceMs: 0 }).success,
+    ).toBe(true);
+    expect(workflowBlockedMetaSchema.safeParse({ questions: 1, sinceMs: 0 }).success).toBe(false);
+    expect(workflowBlockedMetaSchema.safeParse({ ...blocked, holes: -1 }).success).toBe(false);
+    expect(workflowBlockedMetaSchema.safeParse({ ...blocked, sinceMs: 1.5 }).success).toBe(false);
+  });
+
+  it("随 turnHeader 的 originMeta 过线，原样保留", () => {
+    expect(backgroundResultOriginMetaSchema.parse({ ...base, workflowBlocked: blocked })).toEqual({
+      ...base,
+      workflowBlocked: blocked,
+    });
+  });
+
+  // 闭集 union 上多一个 kind，不认识它的客户端会拒掉整帧——快照里是同一行，于是整个会话打不开
+  // 。所以 `blocked` 不得回到 union 里。
+  it("`workflowNotification` 的闭集里没有 blocked", () => {
+    expect(workflowNotificationMetaSchema.safeParse({ kind: "blocked", ...blocked }).success).toBe(
+      false,
+    );
+  });
+
+  // 老客户端的 schema 就是「没有这个键的同一个对象」：它把不认识的键剥掉，读成一条不带载荷的
+  // workflow 通知（裸标题行），整帧照常解析。这条性质靠容器不是 strict 成立。
+  it("不认识这个键的客户端剥掉它，其余照读", () => {
+    const olderClient = z.object({
+      backgroundSource: z.enum(["bash", "subagent", "workflow"]),
+      workId: z.string().min(1),
+      title: z.string().min(1),
+      workflowNotification: workflowNotificationMetaSchema.optional(),
+    });
+    expect(olderClient.parse({ ...base, workflowBlocked: blocked })).toEqual(base);
+    // 现在这份 schema 对将来的键同样如此。
+    expect(backgroundResultOriginMetaSchema.parse({ ...base, someLaterKey: { any: 1 } })).toEqual(
+      base,
+    );
+  });
+
+  // 认识这个键的客户端宽容地读它：形状对不上就当它缺席，行退回裸标题，而不是丢掉整帧。
+  it("形状对不上的 workflowBlocked 只丢载荷", () => {
+    expect(
+      backgroundResultOriginMetaSchema.parse({ ...base, workflowBlocked: { questions: "two" } }),
+    ).toEqual(base);
+  });
+});
+
 describe("通知载荷：kind = hole", () => {
   it("最小与完整两形都通过；prompt 超 4000 被拒", () => {
     expect(
@@ -208,13 +265,6 @@ describe("通知载荷：kind = hole", () => {
         prompt: "x".repeat(4001),
       }).success,
     ).toBe(false);
-  });
-});
-
-describe("tool identity：FillWorkflowHole 属于 workflow family", () => {
-  it("按名归一并落到 workflow family（确认窗按 family 选运行确认块）", () => {
-    expect(normalizeZCodeToolName("fillworkflowhole")).toBe("FillWorkflowHole");
-    expect(getZCodeToolFamilyForName("FillWorkflowHole")).toBe("workflow");
   });
 });
 
@@ -393,7 +443,7 @@ describe("workflowRuns reducer · hole-reached / hole-filled", () => {
     });
   });
 
-  it("新的一世（run-started）剥掉 waiting 记录、保留 filled；终态同样清掉 waiting", () => {
+  it("终态清掉 waiting，新的一世保留 filled，并可重新到达", () => {
     const progress = progressLog();
     const state = reduceAll([
       progress("run-started", { runId: RUN_ID, caps: {} }),

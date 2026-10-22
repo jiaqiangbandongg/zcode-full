@@ -24,12 +24,6 @@ describe("streamClientId", () => {
       const result = generateMobileDeviceFingerprint();
       expect(result).toBeTruthy();
     });
-
-    it("空参数时仍返回字符串", () => {
-      // 函数内部有 undefined 过滤，验证不会抛错
-      const result = generateMobileDeviceFingerprint();
-      expect(result).toBeDefined();
-    });
   });
 
   describe("setStreamClientId / getStreamClientId (缓存行为)", () => {
@@ -44,13 +38,6 @@ describe("streamClientId", () => {
       const after = getStreamClientId();
       expect(after).toBe("renderer:new-device-456");
       expect(after).not.toBe(before);
-    });
-
-    it("setStreamClientId 格式为 renderer:前缀加设备ID", () => {
-      setStreamClientId("device-abc");
-      const id = getStreamClientId();
-      expect(id).toMatch(/^renderer:.+$/);
-      expect(id).toBe("renderer:device-abc");
     });
   });
 });

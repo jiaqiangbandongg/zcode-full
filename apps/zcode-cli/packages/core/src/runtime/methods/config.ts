@@ -1,3 +1,4 @@
+import { resolveToolSearchMode } from "../../tool/search/exposure.js";
 import type {
   CollaborationMode,
   ExecutionShellSelection,
@@ -139,6 +140,12 @@ export function getTools(this: AgentRuntimeInternal, model?: Model): ModelToolCo
     this.cachedTools = filterRuntimeVisibleTools.call(this, this.registry.toContracts());
   }
   return this.cachedTools
+    .filter(
+      (tool) =>
+        (tool.name !== "ToolSearch" && tool.name !== "DeferredToolCall") ||
+        !model ||
+        resolveToolSearchMode(model, this.config.toolSearch?.mode) !== "off",
+    )
     .filter((tool) => tool.name !== "WebSearch" || shouldExposeWebSearch.call(this, model))
     .map((tool) =>
       projectToolModelContract(tool, this.registry.get(tool.name), {

@@ -4,6 +4,8 @@ import {
   type ModelSelection,
   encodeCustomModelValue,
   BUILTIN_MODEL_PROVIDER_IDS,
+} from "@zcode/shared";
+import {
   TID_MODEL_PROVIDER_CONNECTION_MODE_ITEM,
   TID_MODEL_PROVIDER_CONNECTION_MODE_TRIGGER,
   TID_MODEL_PROVIDER_NAV_ITEM,
@@ -26,7 +28,7 @@ import {
   TID_CHAT_THOUGHT_LEVEL_SELECT_TRIGGER,
   TID_CHAT_THOUGHT_LEVEL_SELECT_ITEM,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByDom,

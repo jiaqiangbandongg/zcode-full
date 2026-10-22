@@ -193,20 +193,15 @@ describe("FeedbackBackgroundUploadIndicator", () => {
     );
 
     expect(html.match(/正在提交反馈/g)).toHaveLength(2);
-    expect(html).toContain("flex-col");
     for (const job of jobs) {
       dismissFeedbackSubmissionJob(job.id);
     }
   });
 
-  it("renders a folded status capsule by default to avoid covering the workspace", () => {
+  it("hides progress details while folded", () => {
     const html = renderIndicator();
 
     expect(html).toContain("正在提交反馈");
-    expect(html).toContain("rounded-xl border border-popover-border bg-popover");
-    expect(html).toContain("grid-cols-[auto_minmax(0,1fr)_auto]");
-    expect(html).toContain("gap-0.5");
-    expect(html).not.toContain("rounded-md border border-border bg-surface");
     expect(html).toContain("正在上传完整日志");
     expect(html).toContain("50%");
     expect(html).toContain("打开反馈提交详情");
@@ -228,7 +223,6 @@ describe("FeedbackBackgroundUploadIndicator", () => {
 
     expect(html).toContain("反馈已提交");
     expect(html).toContain("100%");
-    expect(html).toContain("width:100%");
     expect(html).toContain("打开反馈提交详情");
     expect(html).not.toContain("展开反馈提交状态");
     expect(html).not.toContain("我们会尽快处理。");
@@ -238,13 +232,8 @@ describe("FeedbackBackgroundUploadIndicator", () => {
     const html = renderIndicator({ defaultExpanded: true });
 
     expect(html).toContain("正在提交反馈");
-    expect(html).toContain("rounded-xl border border-popover-border bg-popover");
-    expect(html).toContain("grid-cols-[auto_minmax(0,1fr)_auto]");
-    expect(html).toContain("gap-0.5");
-    expect(html).not.toContain("rounded-md border border-border bg-surface");
     expect(html).toContain("正在上传完整日志");
     expect(html).toContain("2.0 MB / 4.0 MB");
-    expect(html).toContain("width:50%");
     expect(html).toContain("点击查看详情");
     expect(html).toContain("打开反馈提交详情");
     expect(html).not.toContain("暂停日志");

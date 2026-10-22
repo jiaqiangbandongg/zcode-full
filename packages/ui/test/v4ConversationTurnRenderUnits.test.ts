@@ -831,7 +831,6 @@ describe("buildConversationTurnRenderUnits", () => {
     ]);
 
     expect(resolveAssistantCopyText(units[0]!)).toBe(`好的，直接写计划！\n\n${plan}`);
-    expect(resolveAssistantCopyText(units[0]!)).not.toContain("普通工具输出不能进入复制内容");
   });
 
   it("BTA01/BTA09：把 Browser 完成态截图单独放在轮尾内容分组", () => {

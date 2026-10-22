@@ -3,7 +3,7 @@ import type { ZCodePluginReferenceCatalogEntry } from "@zcode/shared";
 import {
   buildWorkspacePluginMention,
   isWorkspacePluginReferenceable,
-} from "../src/WorkspacePluginPreview.js";
+} from "../src/workspace-plugin-preview/index.js";
 
 function entry(
   overrides: Partial<ZCodePluginReferenceCatalogEntry> = {},

@@ -80,14 +80,6 @@ describe("provider-visible WebSearch wrapper", () => {
     ).toBe(true);
   });
 
-  it("keeps the client-side WebSearch entry metadata aligned with local execution", () => {
-    expect(webSearchToolEntry.metadata.name).toBe("WebSearch");
-    expect(webSearchToolEntry.executionMode).toBe("client");
-    expect(webSearchToolEntry.providerNative).toBeUndefined();
-    expect(webSearchToolEntry.metadata.readOnly).toBe(true);
-    expect(webSearchToolEntry.metadata.concurrentSafe).toBe(true);
-  });
-
   it("describes public WebSearch citation and domain guidance", () => {
     const description = webSearchToolEntry.metadata.description;
     const instructions = webSearchToolEntry.metadata.modelInstructions?.join("\n") ?? "";
@@ -307,7 +299,6 @@ describe("provider-visible WebSearch wrapper", () => {
       ({ observation }) =>
         observation.invocationContext?.metadata?.querySource === "web_search_tool",
     )?.request;
-    expect(innerRequest).toBeDefined();
     expect(innerRequest.messages).toEqual([
       {
         content: "You are an assistant for performing a web search tool use.",

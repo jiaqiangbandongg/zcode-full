@@ -158,18 +158,6 @@ describe("providerRuntimeResolver workspace config dir identity", () => {
       join(home, ".zcode", "cli"),
     );
   });
-
-  it("本地 GLM 配置目录同样使用 ZCode Agent home", () => {
-    const home = mkdtempSync(join(tmpdir(), "zcode-agent-resolver-home-"));
-    createdDirs.push(home);
-    process.env.HOME = home;
-    // Bugfix: paths.ts 会在模块加载时固定默认 dataBaseDir，测试不能只改 HOME。
-    setDataBaseDir(home);
-
-    const workspacePath = "/Users/demo/project";
-
-    expect(resolveProviderConfigDir("glm", workspacePath)).toBe(join(home, ".zcode", "cli"));
-  });
 });
 
 describe("providerRuntimeResolver clean env", () => {

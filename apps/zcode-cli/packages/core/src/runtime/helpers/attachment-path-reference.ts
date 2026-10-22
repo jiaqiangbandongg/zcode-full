@@ -64,6 +64,8 @@ export function resolvedPathReferenceAttachment(
       recoverability: "metadata_only",
       sizeBytes: options.sizeBytes,
       storageKind: "local_ref",
+      // 原说明只存在于 contentBlock 时，冷恢复会丢失降级原因和读取提示，改变模型历史前缀。
+      pathReferenceText: content,
     },
     mime,
     source: options.source,

@@ -2,20 +2,19 @@ import { getUpstreamRequestEvidence } from "../helpers/conversation-session-netw
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
-  TID_WORKSPACE_FILE_TREE_BUTTON,
-  TID_WORKSPACE_ITEM,
   TID_WORKSPACE_FILE_TREE_ROW,
   TID_V4_COMPOSER_INPUT,
   TID_V4_SESSION_PANE,
   testId,
-} from "@zcode/shared";
-import { clearAppData, clickTestIdByDom, DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
+} from "@zcode/shared/test-ids";
+import { clearAppData, DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
 import { resolveE2ERuntimePath } from "../helpers/e2e-runtime-paths.js";
 import {
   prepareV4ConversationE2E,
   sendV4Prompt,
   waitForV4TimelineContaining,
 } from "../helpers/v4-conversation.js";
+import { openProjectFileTree } from "../helpers/project-sidebar.js";
 
 const filePath = resolveE2ERuntimePath("markdown-preview-selection", "selection.md");
 const marker = "E2E_MARKDOWN_PREVIEW_SELECTED_PARAGRAPH";
@@ -29,45 +28,10 @@ describe("Markdown preview selection", () => {
     await prepareV4ConversationE2E();
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `# Preview\n\n${marker}\n`, "utf8");
-    // 工作区行的操作按真实 hover 挂载；外层容器不保证可 focus，不能用 DOM focus 代替手势。
-    const workspaceRow = await $(
-      `[data-testid="${testId(TID_WORKSPACE_ITEM, DEFAULT_WORKSPACE)}"]`,
-    );
-    await workspaceRow.waitForDisplayed({ timeout: 15000 });
-    await workspaceRow.moveTo();
-    await browser
-      .waitUntil(
-        async () =>
-          browser.execute(
-            (actionId) => {
-              return Boolean(document.querySelector(`[data-testid="${actionId}"]`));
-            },
-            testId(TID_WORKSPACE_FILE_TREE_BUTTON, DEFAULT_WORKSPACE),
-          ),
-        { timeout: 5000, timeoutMsg: "Workspace file tree action did not mount after hover" },
-      )
-      .catch(async (error) => {
-        if (process.env.ZCODE_E2E_ARTIFACT_DIR) {
-          await browser.saveScreenshot(
-            join(process.env.ZCODE_E2E_ARTIFACT_DIR, "markdown-file-tree-unavailable.png"),
-          );
-        }
-        console.log(
-          "[MPS workspace entry]",
-          await browser.execute(() =>
-            Array.from(document.querySelectorAll<HTMLElement>("[data-testid]"))
-              .filter((element) =>
-                /workspace|file-tree|sidebar|project/.test(element.dataset.testid ?? ""),
-              )
-              .map((element) => ({
-                id: element.dataset.testid,
-                text: element.innerText.slice(0, 100),
-              })),
-          ),
-        );
-        throw error;
-      });
-    await clickTestIdByDom(testId(TID_WORKSPACE_FILE_TREE_BUTTON, DEFAULT_WORKSPACE));
+    // 项目行的操作按真实 hover 挂载；helper 内部先 hover 项目行再点击文件树按钮。
+    await openProjectFileTree(DEFAULT_WORKSPACE, {
+      timeoutMsg: "Workspace file tree action did not mount after hover",
+    });
     // 文件树会将单子目录链压缩为一行，入口使用压缩后的最深目录。
     for (const path of [dirname(filePath), filePath]) {
       const row = await $(`[data-testid="${testId(TID_WORKSPACE_FILE_TREE_ROW, path)}"]`);
@@ -174,10 +138,10 @@ describe("Markdown preview selection", () => {
     await sendV4Prompt("E2E_MARKDOWN_SIDE_PARENT Reply with a short acknowledgment.");
     await waitForV4TimelineContaining("E2E_MARKDOWN_SIDE_READY", 30000);
     const evidence = await getUpstreamRequestEvidence({
-      lastUserMessageIncludes: ["E2E_MARKDOWN_SIDE_PARENT", "# userselect:"],
+      lastUserMessageIncludes: ["E2E_MARKDOWN_SIDE_PARENT", "<conversation_quote>"],
       excludes: ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"],
     });
-    // 仅搜索文件名会被其他上下文误满足；精确检查实际 userselect 发送合同。
+    // 选区已改为结构化引用；检查模型边界的引用正文，避免旧 userselect 包装导致误报。
     expect(evidence.length).toBeGreaterThan(0);
     for (const record of evidence) {
       const { messages } = record.requestJson as {
@@ -195,7 +159,7 @@ describe("Markdown preview selection", () => {
         .filter((text) => text.includes("E2E_MARKDOWN_SIDE_PARENT"))
         .flatMap((text) =>
           Array.from(
-            text.matchAll(/# userselect:\n```userselect\n([^]*?)\n```/g),
+            text.matchAll(/<conversation_quote>\n([^]*?)\n<\/conversation_quote>/g),
             (match) => JSON.parse(match[1]!) as unknown,
           ),
         );

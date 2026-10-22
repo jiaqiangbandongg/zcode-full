@@ -268,9 +268,8 @@ describe("connectRemote", () => {
     }
   });
 
-  it("启动远端 server 时不再注入退役 proxy runtime 环境变量", async () => {
+  it("启动远端 server 时设置 runtime root", async () => {
     const backend = new FakeConnectBackend();
-    const retiredProxyEnvName = ["ZCODE", `${"A"}${"CP"}`, "PROXY", "RUNTIME", "PATH"].join("_");
 
     const connection = await connectRemote(backend, {
       clientId: "test-client",
@@ -279,7 +278,6 @@ describe("connectRemote", () => {
     connection.dispose();
 
     expect(backend.commands[0]).toContain('ZCODE_SERVER_RUNTIME_ROOT="$HOME/.zcode/server"');
-    expect(backend.commands[0]).not.toContain(retiredProxyEnvName);
   });
 
   it("启动 desktop attached 远端 server 时注入服务权威模式", async () => {
@@ -352,25 +350,6 @@ describe("connectRemote", () => {
     expect(backend.commands[0]).toContain("ZCODE_REMOTE_RUNTIME_NETWORK_AUTHORITY='1'");
     expect(backend.commands[0]).toContain("ZCODE_REMOTE_HTTP_PROXY='http://172.21.240.1:7890/'");
     expect(backend.commands[0]).toContain("ZCODE_REMOTE_NO_PROXY='localhost,127.0.0.1'");
-  });
-
-  it("backend 断连时即使 stdio 未关闭也应上报远端关闭", async () => {
-    const backend = new FakeConnectBackend();
-    const closeEvents: Array<{ code: number }> = [];
-
-    const connection = await connectRemote(backend, {
-      clientId: "test-client",
-      skipDeploy: true,
-      onDidRemoteClose: (event) => {
-        closeEvents.push(event);
-      },
-    });
-
-    backend.fireDisconnect({ reason: "close" });
-
-    expect(closeEvents).toEqual([{ code: -1 }]);
-
-    connection.dispose();
   });
 
   it("backend 断连和 stdio close 同时到达时只上报一次", async () => {

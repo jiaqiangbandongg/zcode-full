@@ -2,12 +2,6 @@ import { describe, it, expect } from "vitest";
 import { VSBuffer } from "../src/buffer.js";
 
 describe("VSBuffer", () => {
-  it("alloc should create a zero-filled buffer", () => {
-    const buf = VSBuffer.alloc(4);
-    expect(buf.byteLength).toBe(4);
-    expect(buf.buffer.every((b) => b === 0)).toBe(true);
-  });
-
   it("wrap should wrap existing Uint8Array", () => {
     const raw = new Uint8Array([1, 2, 3]);
     const buf = VSBuffer.wrap(raw);

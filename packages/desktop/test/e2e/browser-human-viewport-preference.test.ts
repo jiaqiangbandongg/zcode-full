@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import {
   TID_BROWSER_ADDRESS_INPUT,
@@ -8,10 +9,11 @@ import {
   TID_BROWSER_RESPONSIVE_WIDTH_INPUT,
   TID_BROWSER_RESPONSIVE_ZOOM_OPTION,
   TID_BROWSER_RESPONSIVE_ZOOM_SELECT,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   clearAppData,
   clickTestIdByWebDriver,
+  getE2EAppDataPaths,
   readSettings,
   setInputValueByTestIdDom,
 } from "./helpers/desktop-app.js";
@@ -37,6 +39,13 @@ describe("BCP-231：human Browser 显示偏好跨重启恢复", () => {
 
   it("只恢复 human 模式、尺寸和预览比例，不恢复旧 tab、URL 或 history", async function () {
     this.timeout(180_000);
+    // 普通 Browser 用例无需账号；启动假 OAuth 会触发登录过期弹窗并遮挡真实点击。
+    const credentials = JSON.parse(await readFile(getE2EAppDataPaths().credentialsFile, "utf8"));
+    expect(
+      Object.keys(credentials).filter(
+        (key) => key.startsWith("oauth:") || key === "auth_token" || key === "zcodejwttoken",
+      ),
+    ).toEqual([]);
     await prepareConversationE2E({ skipProvider: true });
     await openFirstBrowserTab();
 

@@ -11,9 +11,9 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
-  type ReactNode,
 } from "react";
 import { ChevronRightIcon, EyeIcon } from "lucide-react";
+import { type HighspeedMessageMeta, type ZCodeApiRetryStatus } from "@zcode/shared";
 import {
   TID_CHAT_ASSISTANT_HISTORY_CONTENT,
   TID_CHAT_ASSISTANT_HISTORY_TRIGGER,
@@ -21,21 +21,17 @@ import {
   TID_CHAT_LOADING,
   TID_V4_ROW,
   testId,
-  type HighspeedMessageMeta,
-  type ZCodeApiRetryStatus,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import type {
   ApiRetryState,
   AttachmentRef,
   CommandAck,
   ConversationRowTarget,
-  WorkflowNotificationMeta,
 } from "@zcode/shared/zcode-protocol-v4";
 import { ChatLoading } from "@/components/ai-elements/chat-loading.js";
 import { ChatApiRetryStatus } from "@/chat-input-toolbar/display.js";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
-import { Checkbox } from "@/components/ui/checkbox.js";
 import { MessageActions } from "@/components/ai-elements/message.js";
 import {
   Collapsible,
@@ -85,7 +81,11 @@ import {
 import type { ConversationCuaGroupEvent } from "@/v4/conversationCuaGroups.js";
 import { ConversationAgentToolCallRow } from "@/v4/ConversationAgentToolCallRow.js";
 import { ConversationFileSummaryPanel } from "@/v4/ConversationFileSummaryPanel.js";
-import { WorkflowNotificationToolRow } from "@/v4/WorkflowNotificationToolRow.js";
+import {
+  WorkflowNotificationToolRow,
+  workflowRowNotification,
+  type WorkflowRowNotification,
+} from "@/v4/WorkflowNotificationToolRow.js";
 import { ConversationWorkflowDigests } from "@/v4/ConversationWorkflowDigests.js";
 import { ConversationWorkflowCompletion } from "@/v4/ConversationWorkflowCompletion.js";
 import { resolveWorkflowTurnDigests } from "@/v4/workflowTurnDigests.js";
@@ -127,12 +127,6 @@ interface ConversationTurnGroupProps {
     attachments?: readonly AttachmentRef[],
     workspaceMode?: "preserve" | "rewind",
   ) => Promise<CommandAck | boolean | void> | CommandAck | boolean | void;
-  /** 分享选择阶段在正文左侧显示本轮勾选入口。 */
-  shareSelection?: {
-    eligibleRowIds: ReadonlySet<number>;
-    selectedRowIds: ReadonlySet<number>;
-    onToggle: (rowId: number) => void;
-  };
 }
 
 interface CronAutomationTurnCard {
@@ -744,8 +738,6 @@ function ConversationWorkSegmentFlow({
   canRetryLatestAssistant,
   highspeed,
   highspeedMeta,
-  shareSelectionToggle,
-  shareSelectionRowId,
 }: {
   segment: ConversationTurnWorkSegment;
   sourceCommandIds: readonly string[];
@@ -763,8 +755,6 @@ function ConversationWorkSegmentFlow({
   canRetryLatestAssistant: boolean;
   highspeed: boolean;
   highspeedMeta?: HighspeedMessageMeta;
-  shareSelectionToggle?: ReactNode;
-  shareSelectionRowId?: number;
 }) {
   const [historyOpen, setHistoryOpen] = useState(segment.assistantHistoryDefaultOpen);
   useEffect(() => {
@@ -808,15 +798,7 @@ function ConversationWorkSegmentFlow({
               editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
             />
           );
-          content =
-            shareSelectionToggle && item.row.rowId === shareSelectionRowId ? (
-              <div className="relative">
-                {shareSelectionToggle}
-                {userRow}
-              </div>
-            ) : (
-              userRow
-            );
+          content = userRow;
         } else if (item.kind === "cuaGroup") {
           const group = <ConversationCuaGroupRow item={item} context={context} />;
           if (item.flowKind === "assistantHistory") {
@@ -918,8 +900,6 @@ function ConversationTurnFlow({
   assistantPreviewCardsAutoOpenKey,
   highspeed,
   highspeedMeta,
-  shareSelectionToggle,
-  shareSelectionRowId,
 }: {
   unit: ConversationTurnRenderUnit;
   apiRetry: ApiRetryState | null;
@@ -934,8 +914,6 @@ function ConversationTurnFlow({
   assistantPreviewCardsAutoOpenKey?: string;
   highspeed: boolean;
   highspeedMeta?: HighspeedMessageMeta;
-  shareSelectionToggle?: ReactNode;
-  shareSelectionRowId?: number;
 }) {
   // 产品语义：可见正文或工具不代表主轮已经结束；ChatLoading 跟随最后一轮
   // running 生命周期，但等待用户回答/授权时由交互 UI 独占进度反馈。
@@ -1042,8 +1020,6 @@ function ConversationTurnFlow({
           canRetryLatestAssistant={canRetryLatestAssistant}
           highspeed={highspeed}
           highspeedMeta={highspeedMeta}
-          shareSelectionToggle={shareSelectionToggle}
-          shareSelectionRowId={shareSelectionRowId}
         />
       ))}
       <TurnChatLoadingSlot apiRetry={apiRetry} eligible={showLoading} />
@@ -1089,10 +1065,9 @@ function resolveBackgroundResultTitle(unit: ConversationTurnRenderUnit): string 
  */
 function resolveWorkflowNotification(
   unit: ConversationTurnRenderUnit,
-): WorkflowNotificationMeta | undefined {
+): WorkflowRowNotification | undefined {
   if (unit.header?.origin !== "backgroundResult") return undefined;
-  const originMeta = unit.header.originMeta;
-  return originMeta?.backgroundSource === "workflow" ? originMeta.workflowNotification : undefined;
+  return workflowRowNotification(unit.header.originMeta);
 }
 
 function ConversationBackgroundResultWork({
@@ -1268,7 +1243,6 @@ function ConversationTurnGroupImpl({
   onRetry,
   onFeedbackChange,
   onEdit,
-  shareSelection,
 }: ConversationTurnGroupProps) {
   const isOfficeMode = useIsOfficeMode();
   const { intl } = useZCodeIntl();
@@ -1488,67 +1462,6 @@ function ConversationTurnGroupImpl({
   const startsWithoutUserBubble =
     startsWithWorkflowNotificationCard || unit.workflowLaunch !== undefined;
 
-  const shareSelectionRows = shareSelection
-    ? unit.visibleUserInputs.filter(
-        (row) => row.origin === "realUser" && shareSelection.eligibleRowIds.has(row.rowId),
-      )
-    : [];
-  // 一个 turn 可以有多条 realUser 输入（steer/排队消息），而这里只渲染一个
-  // turn 级 checkbox。用 every() 折叠成布尔值会让部分选中显示为"未选中"，
-  // 用户看到未选中却点一下让计数跳 2。半选必须显式呈现为 indeterminate。
-  const shareSelectionSelectedCount = shareSelection
-    ? shareSelectionRows.filter((row) => shareSelection.selectedRowIds.has(row.rowId)).length
-    : 0;
-  const shareSelectionChecked: boolean | "indeterminate" =
-    shareSelection === undefined || shareSelectionRows.length === 0
-      ? false
-      : shareSelectionSelectedCount === shareSelectionRows.length
-        ? true
-        : shareSelectionSelectedCount === 0
-          ? false
-          : "indeterminate";
-  const shareSelectionToggle =
-    shareSelectionRows.length > 0 ? (
-      <div
-        data-conversation-share-turn-toggle="true"
-        data-conversation-share-turn-toggle-state={
-          shareSelectionChecked === true
-            ? "selected"
-            : shareSelectionChecked === "indeterminate"
-              ? "partial"
-              : "unselected"
-        }
-        className="absolute left-0 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center"
-      >
-        <label className="flex size-8 cursor-pointer items-center justify-center">
-          <Checkbox
-            checked={shareSelectionChecked}
-            aria-label={
-              shareSelectionRows[0]?.text ||
-              intl.formatMessage({ id: "conversationShare.partial.panelLabel" })
-            }
-            onCheckedChange={(checked) => {
-              if (!shareSelection) return;
-              // Radix 从 indeterminate 点击后给出 true，半选状态因此会补齐整个 turn。
-              if (checked === true) {
-                for (const row of shareSelectionRows) {
-                  if (!shareSelection.selectedRowIds.has(row.rowId))
-                    shareSelection.onToggle(row.rowId);
-                }
-              } else if (checked === false) {
-                for (const row of shareSelectionRows) {
-                  if (shareSelection.selectedRowIds.has(row.rowId))
-                    shareSelection.onToggle(row.rowId);
-                }
-              }
-            }}
-            checkIconStrokeWidth={1.33}
-            className="size-4 rounded-sm border-foreground bg-transparent data-[state=checked]:border-foreground data-[state=checked]:bg-foreground data-[state=checked]:text-background data-[state=indeterminate]:border-foreground data-[state=indeterminate]:bg-foreground data-[state=indeterminate]:text-background"
-          />
-        </label>
-      </div>
-    ) : null;
-
   return (
     <section
       data-turn-id={unit.turnId}
@@ -1574,27 +1487,15 @@ function ConversationTurnGroupImpl({
         <div className="group/assistant-turn flex w-full flex-col gap-5">
           {backgroundResultTitle ? (
             <>
-              {visibleUserRows.map((row) =>
-                shareSelectionToggle && row.rowId === shareSelectionRows[0]?.rowId ? (
-                  <div className="relative" key={`${row.rowId}:${row.entityId ?? ""}`}>
-                    {shareSelectionToggle}
-                    <ConversationTurnRow
-                      row={row}
-                      context={context}
-                      onEdit={row.actions?.canEdit === true ? onEdit : undefined}
-                      editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
-                    />
-                  </div>
-                ) : (
-                  <ConversationTurnRow
-                    key={`${row.rowId}:${row.entityId ?? ""}`}
-                    row={row}
-                    context={context}
-                    onEdit={row.actions?.canEdit === true ? onEdit : undefined}
-                    editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
-                  />
-                ),
-              )}
+              {visibleUserRows.map((row) => (
+                <ConversationTurnRow
+                  key={`${row.rowId}:${row.entityId ?? ""}`}
+                  row={row}
+                  context={context}
+                  onEdit={row.actions?.canEdit === true ? onEdit : undefined}
+                  editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
+                />
+              ))}
               <ConversationBackgroundResultWork
                 unit={unit}
                 apiRetry={apiRetry}
@@ -1621,8 +1522,6 @@ function ConversationTurnGroupImpl({
               onRetry={onRetry}
               onEdit={onEdit}
               editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
-              shareSelectionToggle={shareSelectionToggle}
-              shareSelectionRowId={shareSelectionRows[0]?.rowId}
               assistantCopyText={assistantCopyText}
               assistantCodeCommentCards={assistantCodeCommentCards}
               assistantCodeCommentProjectionEnabled={assistantCodeCommentProjectionEnabled}
@@ -1747,8 +1646,6 @@ function ConversationTurnGroupImpl({
           context={assistantRowContext}
           onEdit={onEdit}
           editWorkspaceRewindAvailability={editWorkspaceRewindAvailability}
-          shareSelectionToggle={shareSelectionToggle}
-          shareSelectionRowId={shareSelectionRows[0]?.rowId}
           assistantCopyText={assistantCopyText}
           assistantCodeCommentCards={assistantCodeCommentCards}
           assistantCodeCommentProjectionEnabled={assistantCodeCommentProjectionEnabled}

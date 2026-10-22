@@ -15,7 +15,7 @@ describe("resolveWorkspaceShellWindowChromeClass", () => {
         isWindowsMaximized: false,
         supportsNativeRoundedCorners: false,
       }),
-    ).toBe("rounded-[6px] border border-border");
+    ).toBe("rounded-md border border-border");
   });
 
   it("uses 12px corners on macOS Tahoe and later", () => {
@@ -30,24 +30,14 @@ describe("resolveWorkspaceShellWindowChromeClass", () => {
     ).toBe("rounded-xl border border-border");
   });
 
-  it("uses 5px corners in Windows 11 normal windows", () => {
+  it("uses 6px corners in Windows 11 normal windows", () => {
     expect(
       resolveWorkspaceShellWindowChromeClass({
         isWindowsDesktop: true,
         isWindowsMaximized: false,
         supportsNativeRoundedCorners: true,
       }),
-    ).toBe("rounded-[5px] border border-border");
-  });
-
-  it("keeps the inset panel rounded and fully bordered when Windows 11 is maximized", () => {
-    expect(
-      resolveWorkspaceShellWindowChromeClass({
-        isWindowsDesktop: true,
-        isWindowsMaximized: true,
-        supportsNativeRoundedCorners: true,
-      }),
-    ).toBe("rounded-[5px] border border-border");
+    ).toBe("rounded-md border border-border");
   });
 
   it("squares only the outer corners and preserves the full border on Windows 10", () => {
@@ -57,14 +47,7 @@ describe("resolveWorkspaceShellWindowChromeClass", () => {
         isWindowsMaximized: false,
         supportsNativeRoundedCorners: false,
       }),
-    ).toBe("rounded-l-[5px] border border-border");
-    expect(
-      resolveWorkspaceShellWindowChromeClass({
-        isWindowsDesktop: true,
-        isWindowsMaximized: true,
-        supportsNativeRoundedCorners: false,
-      }),
-    ).toBe("rounded-l-[5px] border border-border");
+    ).toBe("rounded-l-md border border-border");
   });
 
   it("preserves the existing appearance while Windows capability is unknown", () => {
@@ -74,23 +57,20 @@ describe("resolveWorkspaceShellWindowChromeClass", () => {
         isWindowsMaximized: false,
         supportsNativeRoundedCorners: null,
       }),
-    ).toBe("rounded-[5px] border border-border");
+    ).toBe("rounded-md border border-border");
   });
 });
 
-it.each([false, true])(
-  "matches the settings xl Linux corners when maximized=%s",
-  (isWindowsMaximized) => {
-    expect(
-      resolveWorkspaceShellWindowChromeClass({
-        isLinuxDesktop: true,
-        isWindowsDesktop: false,
-        isWindowsMaximized,
-        supportsNativeRoundedCorners: false,
-      }),
-    ).toBe("rounded-xl border border-border");
-  },
-);
+it("uses the settings xl corners on Linux", () => {
+  expect(
+    resolveWorkspaceShellWindowChromeClass({
+      isLinuxDesktop: true,
+      isWindowsDesktop: false,
+      isWindowsMaximized: false,
+      supportsNativeRoundedCorners: false,
+    }),
+  ).toBe("rounded-xl border border-border");
+});
 
 describe("workspace shell resize handle inset", () => {
   it.each([
@@ -99,7 +79,7 @@ describe("workspace shell resize handle inset", () => {
     ["macOS Sonoma", { isMacDesktop: true, macOSMajorVersion: 14 }, 6, 10],
     ["Web", {}, 12, 16],
     ["macOS Tahoe", { isMacDesktop: true, macOSMajorVersion: 26 }, 12, 16],
-    ["Windows", { isWindowsDesktop: true }, 5, 9],
+    ["Windows", { isWindowsDesktop: true }, 6, 12],
     ["Linux", { isLinuxDesktop: true }, 12, 16],
   ] as const)(
     "aligns %s handle with the start of the straight edge",

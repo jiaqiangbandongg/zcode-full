@@ -2,8 +2,12 @@
 
 ## 规则
 
-Computer Use 的真实实现来自私有仓的 `@zcode/zcode-cua`（producer）。开源导出用 `packages/zcode-cua`
+Computer Use 的真实实现来自 workspace 包 `@zcode/zcode-cua`（producer）。开源导出用 `packages/zcode-cua`
 占位包替换它，占位包在 `package.json` 声明 `zcodeCuaPlaceholder: true`，所有能力 fail-closed。
+
+占位包保留公共 `build` 和 `tsconfig.json` 入口，构建只检查随包类型声明。
+日志回调的 traceId 与参数类型和真实 producer 一致，使公共调用方无需按发行版本分支。
+根单测引用的 `vitest.config.ts` 也必须存在，运行占位执行入口和 broker 的不可用契约测试。
 
 开发、构建与打包中只服务于真实 Computer Use 的步骤，必须先检测到真实 producer 才执行；
 检测不到时跳过，不能让开源树的入口因为缺少私有产物而失败：

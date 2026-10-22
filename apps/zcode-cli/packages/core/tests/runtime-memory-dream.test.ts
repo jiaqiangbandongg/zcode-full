@@ -365,6 +365,16 @@ function createMemorySessionStore(seedSessions: SessionInfo[]): SessionStorePort
       };
       return currentSession;
     },
+    // 终态结果由 CLI 存储维护；夹具也须更新同一条会话记录。
+    async updateSession(input) {
+      if (!currentSession || currentSession.id !== input.id) throw new Error("Session not found");
+      currentSession = {
+        ...currentSession,
+        ...input,
+        time: { ...currentSession.time, ...input.time },
+      };
+      return currentSession;
+    },
     async getProjectPermission() {
       return null;
     },

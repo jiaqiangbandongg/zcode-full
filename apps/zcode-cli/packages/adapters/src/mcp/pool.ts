@@ -346,6 +346,24 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
     };
 
     return {
+      async waitForAppConnection(serverName) {
+        const key = leased.get(serverName);
+        if (!key) return null;
+        const entry = entries.get(key);
+        if (!entry) return null;
+        const connecting = entry.connecting;
+        await connecting;
+        const source = entry.adapter.waitForAppConnection
+          ? await entry.adapter.waitForAppConnection(serverName)
+          : (entry.adapter.appConnectionSnapshot?.(serverName) ?? null);
+        // 共享连接可能仍被其它会话持有；等待结束不能复活已释放或换源的本会话 lease。
+        return !leaseClosed &&
+          leased.get(serverName) === key &&
+          entries.get(key) === entry &&
+          entry.connecting === connecting
+          ? source
+          : null;
+      },
       appConnectionSnapshot(serverName) {
         const key = leased.get(serverName);
         return key ? (entries.get(key)?.adapter.appConnectionSnapshot?.(serverName) ?? null) : null;

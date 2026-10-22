@@ -170,7 +170,7 @@ export function WorkflowCardHeader({
     });
   return (
     <div
-      className="flex min-w-0 items-center gap-2 text-ui-base"
+      className="flex min-w-0 flex-wrap items-center gap-2 text-ui-base"
       data-testid="workflow-card-header"
     >
       {WORKFLOW_CARD_ICON}
@@ -184,7 +184,8 @@ export function WorkflowCardHeader({
       </span>
       <span
         // 名称是 UI 文本；工具摘要与取消等状态共用的卡片表头都要经过同一修正。
-        className="min-w-0 flex-1 truncate text-foreground-subtle"
+        // 手机分享页的状态簇曾把名称挤到 0 宽；名称保留最小宽度，空间不足时状态整组换行。
+        className="min-w-20 flex-1 truncate text-foreground-subtle"
         data-testid="workflow-card-name"
         title={name}
       >
@@ -197,8 +198,9 @@ export function WorkflowCardHeader({
           ——`overflow:hidden` 与子元素的 min-w-0 都不会把它算小。不写簇的 min-w-0，簇的地板
           就是「整串细节 + 按钮」，它一个像素都不会缩，按钮照样被顶出卡外（本次修复的起因）。
           浏览器实测（卡宽逐档收窄）：修复前 520px 起按钮就出界；修复后 290px 以上零溢出，
-          带待答问题芯片时 380px——芯片也是 shrink-0，它把地板整体抬高。 */}
-      <span className="flex min-w-0 items-center gap-2">
+          带待答问题芯片时 380px——芯片也是 shrink-0，它把地板整体抬高。
+          ml-auto 只在右簇换行到独立行时生效（分享页窄屏）：名称是 flex-1，同行时它没有作用。 */}
+      <span className="ml-auto flex min-w-0 items-center gap-2">
         {leading}
         {status}
         {detail === undefined || detail.length === 0 ? null : (

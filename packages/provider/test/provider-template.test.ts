@@ -13,7 +13,6 @@ import {
   ProviderTemplateMap,
   parseProviderTemplateMap,
   parseZCodeBuiltinModelConfigRules,
-  resolveProviderTemplateName,
 } from "../src/index.js";
 
 describe("Provider Template", () => {
@@ -58,28 +57,6 @@ describe("Provider Template", () => {
     ]) {
       expect(() => parseProviderTemplateMap([{ templateId: "deepseek", ...forbidden }])).toThrow();
     }
-  });
-
-  it("按当前语言、英文和 Template ID 依次解析名称", () => {
-    const localized = new ProviderTemplate({
-      templateId: "deepseek",
-      templateNameMap: { "zh-CN": "深度求索", "en-US": "DeepSeek" },
-      config: new ProviderConfig(),
-    });
-    const englishOnly = new ProviderTemplate({
-      templateId: "deepseek",
-      templateNameMap: { "en-US": "DeepSeek" },
-      config: new ProviderConfig(),
-    });
-    const unnamed = new ProviderTemplate({
-      templateId: "deepseek",
-      templateNameMap: {},
-      config: new ProviderConfig(),
-    });
-
-    expect(resolveProviderTemplateName("deepseek", localized, "zh-CN")).toBe("深度求索");
-    expect(resolveProviderTemplateName("deepseek", englishOnly, "zh-CN")).toBe("DeepSeek");
-    expect(resolveProviderTemplateName("deepseek", unnamed, "zh-CN")).toBe("deepseek");
   });
 
   it("同一 Template 可实例化为多个独立 Provider，Template 不进入 Registry", () => {

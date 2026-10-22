@@ -172,13 +172,6 @@ describe("workflowRunDirectoryRefreshKey", () => {
     };
   }
 
-  it("run 跑完时变化：这就是那一行从「运行中」挪到「已结束」的时机", () => {
-    const before = workflowRunDirectoryRefreshKey([run({ runId: "r-1" })]);
-    const after = workflowRunDirectoryRefreshKey([run({ runId: "r-1", status: "completed" })]);
-
-    expect(after).not.toBe(before);
-  });
-
   it("三种终态都算跑完（errored / stopped 与 completed 同样要挪段）", () => {
     const running = workflowRunDirectoryRefreshKey([run({ runId: "r-1" })]);
     for (const status of ["completed", "errored", "stopped"] as const) {

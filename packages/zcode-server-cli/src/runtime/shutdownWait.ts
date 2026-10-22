@@ -1,3 +1,4 @@
+import { SERVER_STOP_WAIT_TIMEOUT_MS } from "../contracts.js";
 import { DataRootLock } from "./lock.js";
 import type { ServerLayout } from "./paths.js";
 import { readPersistedStatusDetailed } from "./statusSnapshot.js";
@@ -8,7 +9,9 @@ export async function waitForServerStopped(
   minUpdatedAt = 0,
   requireFreshSnapshot = false,
 ): Promise<void> {
-  const deadline = Date.now() + 6_000;
+  // Bug 原因：旧的 6 秒上限短于 Supervisor 的 5 秒宽限 + 强杀等待；Core 走 SIGKILL 路径时
+  // Supervisor 仍会正常 stopped，等待方却先超时，update handoff 因此误报失败。
+  const deadline = Date.now() + SERVER_STOP_WAIT_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const persisted = await readPersistedStatusDetailed(layout);
     if (persisted.state === "invalid" || persisted.state === "unreadable") {

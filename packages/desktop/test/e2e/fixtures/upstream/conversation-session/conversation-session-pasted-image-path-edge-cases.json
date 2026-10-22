@@ -5,14 +5,14 @@
   "fixtures": [
     {
       "id": "pasted-image-edge-title",
-      "description": "T15-T17 三个首轮的固定标题响应。",
+      "description": "T16-T17 首轮的固定标题响应。",
       "metadata": {
         "kind": "common",
         "timingPolicy": "fast-text",
         "source": "synthetic",
-        "syntheticReason": "标题内容不属于 T15-T17 语义；只需把三个首轮 title sidecar 与 provider-visible 功能请求隔离。"
+        "syntheticReason": "标题内容不属于 T16-T17 语义；只需隔离 title sidecar 与 provider-visible 功能请求。"
       },
-      "maxMatches": 3,
+      "maxMatches": 2,
       "match": {
         "method": "POST",
         "pathIncludes": "/chat/completions",
@@ -21,36 +21,10 @@
       "response": {
         "statusCode": 200,
         "statusMessage": "OK",
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
         "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"{\\\"title\\\":\\\"Image Edge\\\"}\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-title\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
-      }
-    },
-    {
-      "id": "pasted-image-edge-unknown",
-      "description": "T15 unknown capability 的 image + path 响应。",
-      "metadata": {
-        "kind": "main",
-        "timingPolicy": "fast-text",
-        "source": "synthetic",
-        "syntheticReason": "响应只负责稳定收口；E2E 通过真实 PNG paste 和 requestJson 结构化断言 unknown capability 保留 image + path。"
-      },
-      "maxMatches": 1,
-      "match": {
-        "method": "POST",
-        "pathIncludes": "/chat/completions",
-        "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_UNKNOWN_"],
-        "bodyIncludes": [
-          "e2e-image-unknown-capability-model",
-          "data:image/png;base64,",
-          "[Image: source:"
-        ],
-        "bodyExcludes": ["Generate a concise title"]
-      },
-      "response": {
-        "statusCode": 200,
-        "statusMessage": "OK",
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
-        "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_UNKNOWN_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-unknown\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-unknown-capability-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
       }
     },
     {
@@ -77,7 +51,9 @@
       "response": {
         "statusCode": 200,
         "statusMessage": "OK",
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
         "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_FAILURE_SEED_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-failure-seed\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
       }
     },
@@ -95,16 +71,15 @@
         "method": "POST",
         "pathIncludes": "/chat/completions",
         "lastUserMessageIncludes": ["E2E_PASTED_IMAGE_EDGE_BMP_IMAGE_"],
-        "bodyIncludes": [
-          "e2e-image-edge-vision-model",
-          "data:image/bmp;base64,"
-        ],
+        "bodyIncludes": ["e2e-image-edge-vision-model", "data:image/bmp;base64,"],
         "bodyExcludes": ["[Image: source:", "Generate a concise title"]
       },
       "response": {
         "statusCode": 200,
         "statusMessage": "OK",
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
         "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_BMP_IMAGE_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-image\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"e2e-image-edge-vision-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
       }
     },
@@ -126,16 +101,14 @@
           "deepseek-v4-flash",
           "Media omitted from provider request because the selected model does not support image input."
         ],
-        "bodyExcludes": [
-          "data:image",
-          "[Image: source:",
-          "Generate a concise title"
-        ]
+        "bodyExcludes": ["data:image", "[Image: source:", "Generate a concise title"]
       },
       "response": {
         "statusCode": 200,
         "statusMessage": "OK",
-        "headers": { "content-type": "text/event-stream; charset=utf-8" },
+        "headers": {
+          "content-type": "text/event-stream; charset=utf-8"
+        },
         "body": "data: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"E2E_PASTED_IMAGE_EDGE_BMP_TEXT_OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-pasted-image-edge-bmp-text\",\"object\":\"chat.completion.chunk\",\"created\":0,\"model\":\"deepseek-v4-flash\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
       }
     }

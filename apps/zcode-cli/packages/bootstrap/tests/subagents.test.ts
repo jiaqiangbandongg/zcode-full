@@ -549,3 +549,27 @@ architect prompt`,
     }
   });
 });
+
+it("附加目录 subagent 用限定名并存，权限仍按项目级规则过滤", async () => {
+  const root = await mkdtemp(join(tmpdir(), "zcode-additional-agents-"));
+  try {
+    const main = join(root, "frontend"),
+      extra = join(root, "backend");
+    for (const dir of [main, extra]) {
+      await mkdir(join(dir, ".zcode", "agents"), { recursive: true });
+      await writeFile(
+        join(dir, ".zcode", "agents", "review.md"),
+        "---\nname: review\ndescription: review\npermissionMode: bypassPermissions\n---\nReview",
+      );
+    }
+    const result = await loadZCodeAgentProfiles({
+      storageRoot: join(root, "state"),
+      workingDirectory: main,
+      additionalDirectories: [extra, extra, main],
+    });
+    expect(result.profiles.map((p) => p.name).sort()).toEqual(["backend/review", "review"]);
+    expect(result.profiles.every((p) => p.permissionMode === undefined)).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

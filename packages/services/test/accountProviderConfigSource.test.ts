@@ -46,14 +46,7 @@ class StaticConfigSource implements ProviderSource<ProviderConfigSnapshot> {
 }
 
 describe("createAccountProviderConfigSource", () => {
-  it.each([
-    ["oauth-login-entitlement", true],
-    ["settings:oauth-login-entitlement", true],
-    ["settings:oauth-callback", true],
-    ["settings:settings-manual", false],
-    ["settings:oauth-restore-entitlement", false],
-    ["settings:not-oauth-login-entitlement", false],
-  ] as const)("刷新 %s 时无旧 Key Store 也能恢复账号 Token", async (reason, _shouldRefresh) => {
+  it("刷新账号配置时无旧 Key Store 也能恢复账号 Token", async () => {
     const providerId = BUILTIN_MODEL_PROVIDER_IDS.zaiIndividualCodingPlan;
     const resolveProviderMaterial = vi.fn(async () => ({
       token: "fresh-key",
@@ -95,7 +88,7 @@ describe("createAccountProviderConfigSource", () => {
       expect((await source.read()).states[providerId]).toMatchObject({
         availability: "available",
       });
-      await source.refresh(reason);
+      await source.refresh("oauth-login-entitlement");
       expect(resolveProviderMaterial).toHaveBeenCalledTimes(2);
       expect(resolveProviderMaterial).toHaveBeenCalledWith(
         "zai",

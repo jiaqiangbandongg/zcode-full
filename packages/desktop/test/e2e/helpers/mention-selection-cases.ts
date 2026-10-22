@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { TID_V4_COMPOSER_INPUT } from "@zcode/shared";
+import { TID_V4_COMPOSER_INPUT } from "@zcode/shared/test-ids";
 import { waitForDefaultWorkspaceReady } from "./desktop-app.js";
 
 const LABEL = "selection-demo.ts";

@@ -23,6 +23,8 @@ export type CustomCommandDiagnosticCode =
   | "custom_command_unsupported_dynamic_syntax";
 
 export interface CustomCommandRoot {
+  /** 附加目录能力的目录限定名；不是项目身份。 */
+  namespace?: string;
   path: string;
   plugin?: HookPluginContext;
   scope: CustomCommandScope;

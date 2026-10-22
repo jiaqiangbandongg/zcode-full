@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-remote-sidebar-menus",
+  "spec": "./test/e2e/conversation-session/conversation-session-remote-sidebar-menus.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-remote-sidebar-menus.json"
+  ],
+  "fileFixtures": [],
+  "providerRequestPolicy": "none",
+  "noProviderRequests": true,
+  "providerRequestReason": "RDUX-SIDEBAR 验证真实 SSH 在线设备菜单、项目详情、设置定位和原目录重连，不发模型请求。",
+  "requests": []
+}

@@ -36,6 +36,7 @@ export interface ConversationShareMockRouteError {
 }
 
 export interface ConversationShareMockApiClientOptions {
+  contentBlockVersions?: Record<string, number>;
   now?: () => number;
   ttlMs?: number;
   authenticatedToken?: string;
@@ -120,7 +121,10 @@ export class ConversationShareMockApiClient implements ApiClient {
   private readonly grants = new Map<string, string>();
   private sequence = 0;
 
+  private readonly contentBlockVersions: Record<string, number>;
+
   constructor(options: ConversationShareMockApiClientOptions = {}) {
+    this.contentBlockVersions = options.contentBlockVersions ?? { workflow: 1 };
     const pendingAttempts = options.confirmSafetyCheckPendingAttempts ?? 0;
     if (!Number.isSafeInteger(pendingAttempts) || pendingAttempts < 0) {
       throw new TypeError("confirmSafetyCheckPendingAttempts must be a non-negative integer");
@@ -188,6 +192,7 @@ export class ConversationShareMockApiClient implements ApiClient {
     if (token instanceof Response) return token;
     return success({
       schema_version: 1,
+      content_block_versions: this.contentBlockVersions,
       ttl_ms: this.ttlMs,
       access_modes: ["private", "public_readonly", "public_importable"],
       max_rows: 10_000,
@@ -362,6 +367,7 @@ export class ConversationShareMockApiClient implements ApiClient {
       disclosure_confirmation: parsed.data.disclosure_confirmation,
     });
     if (
+      rebuilt.integrity.content_blocks_sha256 !== parsed.data.integrity.content_blocks_sha256 ||
       rebuilt.integrity.projection_sha256 !== parsed.data.integrity.projection_sha256 ||
       rebuilt.integrity.artifact_set_sha256 !== parsed.data.integrity.artifact_set_sha256
     ) {
@@ -415,6 +421,9 @@ export class ConversationShareMockApiClient implements ApiClient {
         schema_version: 1,
         share: this.publicMetadata(share),
         rows: share.request.projection.rows,
+        ...(share.request.projection.content_blocks
+          ? { content_blocks: share.request.projection.content_blocks }
+          : {}),
         artifacts: share.artifacts.map((artifact) => ({
           ...artifact,
           url: `${this.shareBaseUrl}/${encodeURIComponent(shareCode)}/artifacts/${encodeURIComponent(artifact.artifact_id)}`,
@@ -452,6 +461,9 @@ export class ConversationShareMockApiClient implements ApiClient {
         import_grant_expires_at: share.expiresAt,
         share: { ...this.publicMetadata(share), share_id: share.shareId },
         rows: share.request.projection.rows,
+        ...(share.request.projection.content_blocks
+          ? { content_blocks: share.request.projection.content_blocks }
+          : {}),
         artifacts: share.artifacts.map((artifact) => ({
           ...artifact,
           download_url: `${this.shareBaseUrl}/${encodeURIComponent(shareCode)}/downloads/${encodeURIComponent(artifact.artifact_id)}`,

@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import type { HighspeedDrawRequest, HighspeedDrawResponse } from "@zcode/shared";
 import {
@@ -90,6 +89,37 @@ describe("HighspeedCardService", () => {
       model: "glm-5",
     });
     expect(manualResult.kind).toBe("accelerated");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("only invalidates the matching current card and preserves the draw cooldown", async () => {
+    const now = 9_500;
+    const { calls, transport } = createTransport(async (request) =>
+      cardResponse(request.task_id, now),
+    );
+    const service = new HighspeedCardService({ transport, now: () => now });
+    await service.prepareTurn({
+      taskId: "task-1",
+      providerId: "account:zai-individual-coding-plan",
+      model: "glm-5",
+    });
+    const before = await service.getSnapshot();
+
+    await expect(service.invalidateCard("older-card")).resolves.toBe(false);
+    expect((await service.getSnapshot()).card?.cardId).toBe("hsc-1");
+    await expect(service.invalidateCard("hsc-1")).resolves.toBe(true);
+    expect(await service.getSnapshot()).toEqual({
+      card: null,
+      nextDrawAt: before.nextDrawAt,
+      drawing: false,
+    });
+
+    const next = await service.prepareTurn({
+      taskId: "task-1",
+      providerId: "account:zai-individual-coding-plan",
+      model: "glm-5",
+    });
+    expect(next).toMatchObject({ kind: "fallback", reason: "cooldown" });
     expect(calls).toHaveLength(1);
   });
 
@@ -543,25 +573,6 @@ describe("HighspeedCardService", () => {
     });
   });
 
-  it("omits selection options when the session has no reasoning level", async () => {
-    const now = 10_000;
-    const { transport } = createTransport(async (request) => cardResponse(request.task_id, now));
-    const service = new HighspeedCardService({ transport, now: () => now });
-
-    const result = await service.prepareTurn({
-      taskId: "task-1",
-      providerId: "account:zai-team-coding-plan",
-      model: "glm-5",
-    });
-
-    // 无档位模型不写 options，避免给 CLI 传空档位或非法值。
-    expect(result.kind).toBe("accelerated");
-    expect(result.execution?.modelSelection).toEqual({
-      providerId: "account:zai-highspeed-card",
-      modelId: "glm-5",
-    });
-  });
-
   it("falls back after one second but keeps the late hit for the next turn", async () => {
     let now = 20_000;
     const pending = deferred<HighspeedDrawResponse>();
@@ -685,9 +696,19 @@ describe("Highspeed mock transport", () => {
       now: () => now,
       delay: async () => undefined,
     });
+    const invalidModel = createHighspeedMockTransport({
+      scenario: "hit-invalid-model",
+      now: () => now,
+      delay: async () => undefined,
+    });
 
     const hitResponse = await hit.draw({ task_id: "task-1", provider: "zai", model: "glm-5" });
     const missResponse = await miss.draw({
+      task_id: "task-1",
+      provider: "zai",
+      model: "glm-5",
+    });
+    const invalidModelResponse = await invalidModel.draw({
       task_id: "task-1",
       provider: "zai",
       model: "glm-5",
@@ -696,19 +717,11 @@ describe("Highspeed mock transport", () => {
     expect(hitResponse.data.card?.expires_at).toBe(now + 5 * 60_000);
     expect(hitResponse.data.next_draw_at).toBe(now + 2 * 60_000);
     expect(missResponse.data.next_draw_at).toBe(now + 2 * 60_000);
+    expect(invalidModelResponse.data.card?.model).toBe("E2E-HIGHSPEED-MODEL-NOT-IN-REGISTRY");
   });
 });
 
 describe("Highspeed HTTP contract", () => {
-  it("keeps the renderer-shared Highspeed entry free of Node logger initialization", async () => {
-    const source = await readFile(
-      new URL("../src/highspeed/highspeedHttpTransport.ts", import.meta.url),
-      "utf8",
-    );
-
-    expect(source).not.toContain("createServiceLogger");
-  });
-
   it("builds the shared Coding Plan headers for personal and team plans", () => {
     expect(
       buildHighspeedCodingPlanAuthHeaders({
@@ -866,44 +879,6 @@ describe("Highspeed HTTP contract", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain("must-not-be-logged");
   });
 
-  /* share endpoint removed: sharing is now generated entirely in the UI. */
-  /*
-    const warn = vi.fn();
-    const transport = createHighspeedHttpTransport({
-      drawUrl: "https://example.test/api/v1/highspeed/draw",
-      healthyBaseUrl: "https://example.test/api/v1/highspeed/",
-      shareUrl: "https://example.test/api/v1/highspeed/share",
-      drawHeaders: async () => ({ Authorization: "Bearer draw-secret" }),
-      healthyHeaders: async () => ({ Authorization: "Bearer healthy-secret" }),
-      shareHeaders: async () => ({ Authorization: "Bearer share-secret" }),
-      logger: { warn },
-      fetchImpl: async () => {
-        throw new TypeError("fetch failed");
-      },
-    });
-
-    await expect(
-      transport.share({
-        card_id: "hsc-1",
-        token_usage: 100,
-        highspeed_tps: 90,
-        regular_tps: 45,
-      }),
-    ).rejects.toThrow("fetch failed");
-
-    expect(warn).toHaveBeenCalledWith(
-      undefined,
-      "Highspeed 接口网络请求失败",
-      expect.objectContaining({
-        operation: "share",
-        method: "POST",
-        url: "https://example.test/api/v1/highspeed/share",
-        error: "fetch failed",
-      }),
-    );
-    expect(JSON.stringify(warn.mock.calls)).not.toContain("share-secret");
-  }); */
-
   it("logs healthy HTTP failures without logging authorization", async () => {
     const warn = vi.fn();
     const transport = createHighspeedHttpTransport({
@@ -936,45 +911,6 @@ describe("Highspeed HTTP contract", () => {
     );
     expect(JSON.stringify(warn.mock.calls)).not.toContain("healthy-secret");
   });
-
-  /*
-  it("logs invalid share response schemas", async () => {
-    const warn = vi.fn();
-    const transport = createHighspeedHttpTransport({
-      drawUrl: "https://example.test/api/v1/highspeed/draw",
-      healthyBaseUrl: "https://example.test/api/v1/highspeed/",
-      shareUrl: "https://example.test/api/v1/highspeed/share",
-      drawHeaders: async () => ({}),
-      healthyHeaders: async () => ({}),
-      shareHeaders: async () => ({}),
-      logger: { warn },
-      fetchImpl: async () =>
-        Response.json(
-          { code: 0, msg: "success", data: { share_id: "hss-1" } },
-          { headers: { "x-request-id": "req-highspeed-share" } },
-        ),
-    });
-
-    await expect(
-      transport.share({
-        card_id: "hsc-1",
-        token_usage: 100,
-        highspeed_tps: 90,
-        regular_tps: 45,
-      }),
-    ).rejects.toThrow();
-
-    expect(warn).toHaveBeenCalledWith(
-      undefined,
-      "Highspeed 接口响应结构校验失败",
-      expect.objectContaining({
-        operation: "share",
-        status: 200,
-        responseHeaders: { "x-request-id": "req-highspeed-share" },
-        response: { code: 0, message: "success", fields: ["code", "data", "msg"] },
-      }),
-    );
-  }); */
 
   it("rejects and logs Highspeed business envelope failures with response request id", async () => {
     const warn = vi.fn();

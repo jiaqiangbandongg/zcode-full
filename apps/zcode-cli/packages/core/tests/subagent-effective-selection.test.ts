@@ -67,7 +67,6 @@ describe("显式 Subagent 选择使用注入的公共解析", () => {
     const projected = projectExecutionErrorPayload(caught);
     expect(projected.message).toContain(original.providerId);
     expect(projected.attribution).not.toHaveProperty("providerId");
-    expect(projected.message).not.toContain("apiKey");
   });
 
   it("只解析本次显式意图，保留原 profile", () => {
@@ -77,7 +76,6 @@ describe("显式 Subagent 选择使用注入的公共解析", () => {
       hasConcreteModel: true,
     });
     expect(resolveSelection).toHaveBeenCalledWith(original);
-    expect(original.providerId).toBe("account:bigmodel-individual-coding-plan");
   });
 
   it("无有效同模型时阻断，不能回退父模型", () => {

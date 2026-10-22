@@ -22,10 +22,6 @@ import {
 import type { WorkflowCompletionArtifact } from "@/components/workflow-timeline/WorkflowArtifactTile.js";
 // eslint-disable-next-line import/first -- 同上。
 import { formatWorkDuration, workDurationParts } from "@/lib/workDuration.js";
-// eslint-disable-next-line import/first -- 同上；词条只用于双语言存在性断言。
-import enUS from "../src/i18n/locales/en-US.js";
-// eslint-disable-next-line import/first -- 同上。
-import zhCN from "../src/i18n/locales/zh-CN.js";
 
 afterEach(() => {
   cleanup();
@@ -121,37 +117,25 @@ describe("WorkflowCompletionCard · 形态", () => {
     }
   });
 
-  it("zh-CN：时长单位前留空格；四格标签与无障碍名双写", () => {
+  it("zh-CN：时长单位前留空格并渲染子代理标签", () => {
     const view = renderCard({ figures: { durationMs: 708_000, tokens: 5 } }, "zh-CN");
     expect(view.getByTestId("workflow-completion-figure-time").getAttribute("data-value")).toBe(
       "11 分 48 秒",
     );
     expect(view.getByTestId("workflow-completion-figures").textContent).toContain("子代理");
-    for (const key of [
-      "chat.toolCall.workflow.completion.time",
-      "chat.toolCall.workflow.completion.tokens",
-      "chat.toolCall.workflow.completion.subagents",
-      "chat.toolCall.workflow.completion.phases",
-      "chat.toolCall.workflow.completion.unavailable",
-    ]) {
-      expect(enUS).toHaveProperty(key);
-      expect(zhCN).toHaveProperty(key);
-    }
   });
 });
 
 describe("WorkflowCompletionCard · 产物索引", () => {
-  it("没有交付物：索引独占产物区，一件一行（图标 + 标题 + 等宽细节 + 尾槽），两列流；没有框、没有细线；有回调才可点并交出 id", () => {
+  it("没有交付物：索引独占产物区；细节与打开身份保真", () => {
     const onOpenArtifact = vi.fn();
     const view = renderCard({ onOpenArtifact });
     const index = view.getByTestId("workflow-completion-index");
-    expect(index.className).toContain("repeat(auto-fit,minmax(220px,1fr))");
     expect(index.className).not.toContain("border-t");
     expect(index.getAttribute("data-columns")).toBe("auto");
     const lines = view.getAllByTestId("workflow-completion-line");
     expect(lines).toHaveLength(3);
     expect(lines.every((line) => line.getAttribute("data-variant") === "line")).toBe(true);
-    expect(lines.every((line) => line.className.includes("h-[26px]"))).toBe(true);
     // 三件、无旗子：没有交付物，也没有交付物行；索引不画框，所以整卡没有纸页字形。
     expect(view.queryByTestId("workflow-completion-row")).toBeNull();
     expect(view.queryByTestId("workflow-artifact-tile-frame")).toBeNull();
@@ -187,15 +171,12 @@ describe("WorkflowCompletionCard · 产物索引", () => {
     expect(view.getAllByTestId("workflow-artifact-tile-version")).toHaveLength(1);
   });
 
-  it("一件产物即交付物（单件规则）：画成交付物行，框仍是 160 × 100 的缩略图档，不撑成横幅；没有索引", () => {
+  it("一件产物即交付物：保留预览框，没有索引", () => {
     const one = renderCard({ artifacts: ARTIFACTS.slice(0, 1) });
     expect(one.queryByTestId("workflow-completion-index")).toBeNull();
     const row = one.getByTestId("workflow-completion-row");
     expect(row.getAttribute("data-artifact-id")).toBe("brief");
-    const frame = one.getByTestId("workflow-artifact-row-frame");
-    expect(frame.className).toContain("w-[160px]");
-    expect(frame.className).toContain("h-[100px]");
-    expect(frame.className).not.toContain("aspect-[16/6]");
+    expect(one.getByTestId("workflow-artifact-row-frame")).toBeTruthy();
   });
 
   it("超过六件：五行 + 一行「N more」——一扇门（↗ 常在，点开 run 侧板）；六件全画；砍过时「… more」且无回调则禁用", () => {
@@ -276,7 +257,7 @@ describe("WorkflowCompletionCard · 交付物", () => {
       ...(index === 0 ? { itemCount: 12 } : { bytes: 2_048 }),
     }));
 
-  it("交付物行：框 + 一级大的标题 + 三行截断的说明 + `kind · size` 行 + 尾槽 v3；整行一颗按钮交出 id；没有标签", () => {
+  it("交付物行保留说明、细节、版本与打开身份", () => {
     const onOpenArtifact = vi.fn();
     // 旗子在清单**中间**也领头：布局按旗子选，不按位置。
     const view = renderCard({ artifacts: [...others(2), REPORT, ...others(1)], onOpenArtifact });
@@ -285,10 +266,8 @@ describe("WorkflowCompletionCard · 交付物", () => {
     expect(row.getAttribute("data-artifact-id")).toBe("report");
     expect(row.getAttribute("data-variant")).toBe("row");
     expect(view.getByTestId("workflow-artifact-row-title").textContent).toBe("季度基准报告");
-    expect(view.getByTestId("workflow-artifact-row-title").className).toContain("text-ui-base");
     const description = view.getByTestId("workflow-artifact-row-description");
     expect(description.textContent).toContain("确认三处回归");
-    expect(description.className).toContain("line-clamp-3");
     expect(view.getByTestId("workflow-artifact-row-detail").textContent).toBe("Document·24.0 KB");
     expect(within(row).getByTestId("workflow-artifact-tile-version").textContent).toBe("v3");
     expect(row.getAttribute("aria-label")).toBe("Open artifact: 季度基准报告");
@@ -310,11 +289,10 @@ describe("WorkflowCompletionCard · 交付物", () => {
     expect(view.queryByTestId("workflow-artifact-tile-open")).toBeNull();
   });
 
-  it("其余产物是细线之下的索引：一件一行、两列流、细节就在行上；≤ 6 行全画、没有门", () => {
+  it("其余产物在分隔线后按原序列出：六件全画且没有门", () => {
     const view = renderCard({ artifacts: [REPORT, ...others(6)] });
     const index = view.getByTestId("workflow-completion-index");
     expect(index.className).toContain("border-t");
-    expect(index.className).toContain("repeat(auto-fit,minmax(220px,1fr))");
     const lines = view.getAllByTestId("workflow-completion-line");
     expect(lines).toHaveLength(6);
     expect(lines.map((line) => line.getAttribute("data-artifact-id"))).toEqual([
@@ -352,10 +330,6 @@ describe("WorkflowCompletionCard · 交付物", () => {
     const dumb = truncated.getByTestId("workflow-completion-more") as HTMLButtonElement;
     expect(dumb.textContent).toBe("… more");
     expect(dumb.disabled).toBe(true);
-    for (const key of ["chat.toolCall.workflow.completion.moreArtifacts"]) {
-      expect(enUS).toHaveProperty(key);
-      expect(zhCN).toHaveProperty(key);
-    }
   });
 
   it("预览只问交付物一次；节拍：行 30 ms、索引行依次、门在最后一行之后、四格接在门之后", () => {

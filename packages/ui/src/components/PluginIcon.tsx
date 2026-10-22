@@ -24,7 +24,7 @@ export function PluginIcon({
     <span
       aria-hidden="true"
       className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-xl bg-surface",
+        "flex shrink-0 select-none items-center justify-center overflow-hidden rounded-xl bg-surface",
         !showImage && "text-foreground-subtle",
         className,
       )}
@@ -34,7 +34,7 @@ export function PluginIcon({
           src={resolvedSrc}
           alt=""
           draggable={false}
-          className="h-2/3 w-2/3 object-contain"
+          className="size-full object-contain"
           onError={() => setImageFailed(true)}
         />
       ) : fallbackIcon ? (

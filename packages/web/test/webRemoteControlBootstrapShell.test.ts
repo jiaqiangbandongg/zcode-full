@@ -15,12 +15,6 @@ function readWorkspaceFileDataUrl(path: string, mimeType: string): string {
   return `data:${mimeType};base64,${readWorkspaceFile(path).toString("base64")}`;
 }
 
-function readCssRule(source: string, selector: string): string {
-  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = source.match(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`));
-  return match?.groups?.body ?? "";
-}
-
 function createBootstrapDocument(theme: "zai-dark" | "zai-light"): JSDOM {
   return new JSDOM(readWebIndexHtml(), {
     beforeParse(window) {
@@ -51,14 +45,6 @@ describe("web remote control bootstrap shell", () => {
     );
   });
 
-  it("预渲染 loading 容器自身兜底主题背景，避免全局透明 body 露出白底", () => {
-    const html = readWebIndexHtml();
-    const loadingRule = readCssRule(html, ".zcode-boot-loading");
-
-    expect(loadingRule).toContain("background: var(--zcode-bootstrap-bg");
-    expect(loadingRule).toContain("#0f172a");
-  });
-
   it.each([
     ["zai-dark", "dark", "#161616"],
     ["zai-light", "light", "#f8f8f8"],
@@ -81,13 +67,4 @@ describe("web remote control bootstrap shell", () => {
       dom.window.close();
     },
   );
-
-  it("Web 根表面以语义背景覆盖 Electron 透明根背景", () => {
-    const html = readWebIndexHtml();
-    const browserSurfaceRule = readCssRule(html, "html[data-zcode-browser-theme-surface] #root");
-
-    expect(html).toContain("html[data-zcode-browser-theme-surface] body");
-    expect(browserSurfaceRule).toContain("background: var(--color-background");
-    expect(browserSurfaceRule).toContain("!important");
-  });
 });

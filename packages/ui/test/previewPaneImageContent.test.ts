@@ -1,32 +1,7 @@
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import {
-  getImagePreviewPixelRatio,
-  ImagePreviewContent,
-  SvgPreviewContent,
-} from "@/previewPaneImageContent.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { copyPreviewImage, getImagePreviewPixelRatio } from "@/previewPaneImageContent.js";
 
 describe("ImagePreviewContent", () => {
-  it("centers the image and preserves natural size until it reaches the pane bounds", () => {
-    const html = renderToStaticMarkup(
-      createElement(ImagePreviewContent, {
-        title: "logo.png",
-        imageSource: "data:image/png;base64,",
-      }),
-    );
-
-    expect(html).toContain("flex h-full min-h-0 items-center justify-center");
-    expect(html).toContain("p-10");
-    expect(html).toContain("[background-color:var(--color-background)]");
-    expect(html).toContain("[background-image:linear-gradient(45deg,var(--color-surface)_25%,transparent_25%)");
-    expect(html).toContain("[background-position:0_0,0_4px,4px_-4px,-4px_0]");
-    expect(html).toContain("[background-size:8px_8px]");
-    expect(html).toContain("h-auto max-h-full w-auto max-w-full");
-    expect(html).not.toContain("rounded");
-    expect(html).not.toMatch(/\sw-full(\s|")/);
-  });
-
   it("detects retina pixel ratios from image file names", () => {
     expect(getImagePreviewPixelRatio("/tmp/logo@2x.png")).toBe(2);
     expect(getImagePreviewPixelRatio("icon@3x.webp")).toBe(3);
@@ -35,17 +10,69 @@ describe("ImagePreviewContent", () => {
     expect(getImagePreviewPixelRatio("logo@0x.png")).toBe(1);
     expect(getImagePreviewPixelRatio("logo@2x.backup.png")).toBe(1);
   });
+});
 
-  it("fits svg previews to the container instead of using bitmap natural sizing", () => {
-    const html = renderToStaticMarkup(
-      createElement(SvgPreviewContent, {
-        title: "logo@2x.svg",
-        svgContent:
-          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0z"/></svg>',
-      }),
+describe("copyPreviewImage", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function setup() {
+    const blob = new Blob(["png"], { type: "image/png" });
+    const drawImage = vi.fn();
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({ drawImage }),
+      toBlob: (callback: (value: Blob | null) => void) => callback(blob),
+    };
+    const write = vi.fn(async (items: { data: Record<string, Promise<Blob>> }[]) => {
+      await items[0]!.data["image/png"];
+    });
+    vi.stubGlobal("document", { createElement: () => canvas });
+    vi.stubGlobal("navigator", { clipboard: { write } });
+    vi.stubGlobal(
+      "ClipboardItem",
+      class {
+        constructor(public data: Record<string, Promise<Blob>>) {}
+      },
     );
+    const image = { complete: true, naturalWidth: 640, naturalHeight: 480 } as HTMLImageElement;
+    return { blob, canvas, drawImage, image, write };
+  }
 
-    expect(html).toContain("h-full max-h-full w-full max-w-full");
-    expect(html).not.toContain("h-auto max-h-full w-auto max-w-full");
+  it("writes PNG at natural resolution and submits before asynchronous conversion finishes", async () => {
+    const { canvas, drawImage, image, write, blob } = setup();
+    let finish!: (value: Blob) => void;
+    canvas.toBlob = (callback) => {
+      finish = callback;
+    };
+    const result = copyPreviewImage(image);
+    expect(write).toHaveBeenCalledOnce();
+    expect(canvas.width).toBe(640);
+    expect(canvas.height).toBe(480);
+    expect(drawImage).toHaveBeenCalledWith(image, 0, 0);
+    finish(blob);
+    await result;
+  });
+
+  it("rejects images that have not loaded without writing to the clipboard", async () => {
+    const { image, write } = setup();
+    await expect(
+      copyPreviewImage({ ...image, complete: false } as HTMLImageElement),
+    ).rejects.toThrow();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("reports conversion failure instead of pretending the image was copied", async () => {
+    const { canvas, image } = setup();
+    canvas.toBlob = (callback) => callback(null);
+    await expect(copyPreviewImage(image)).rejects.toThrow();
+  });
+
+  it("propagates clipboard denial and unsupported environments", async () => {
+    const { image, write } = setup();
+    write.mockRejectedValueOnce(new Error("NotAllowedError"));
+    await expect(copyPreviewImage(image)).rejects.toThrow("NotAllowedError");
+    vi.stubGlobal("navigator", {});
+    await expect(copyPreviewImage(image)).rejects.toThrow();
   });
 });

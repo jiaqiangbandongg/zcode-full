@@ -30,7 +30,7 @@ describe("DB109 会话库正式数据迁移", () => {
   let root: string;
   let path: string;
   let db: DatabaseSync;
-  let store: ReturnType<typeof createSqliteSessionStore> | undefined;
+  let store: Awaited<ReturnType<typeof createSqliteSessionStore>> | undefined;
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "zcode-db109-"));
     path = join(root, "session.sqlite");
@@ -73,7 +73,7 @@ describe("DB109 会话库正式数据迁移", () => {
       .run("selection", sessionID, "runtime/model_selection", 11, 12, JSON.stringify(value));
   const oldModel = { providerID: legacyProvider, modelID: "GLM-5.3", variant: "high" };
 
-  it("DB109-01/11：22 张业务表全部有覆盖，无关表、账本旧记录与外键关系不变", () => {
+  it("DB109-01/11：22 张业务表全部有覆盖，无关表、账本旧记录与外键关系不变", async () => {
     const unrelated = seedUnrelatedProviderTables(db, sessionID);
     const allTables = db
       .prepare(
@@ -87,7 +87,7 @@ describe("DB109 会话库正式数据迁移", () => {
     const before = unrelated.map((table) => db.prepare(`SELECT * FROM ${table}`).all());
     const ledger = db.prepare("SELECT * FROM schema_migration ORDER BY id").all();
     entry({ providerId: legacyProvider, modelId: "GLM-5.3" });
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(unrelated.map((table) => db.prepare(`SELECT * FROM ${table}`).all())).toEqual(before);
     expect(
       db.prepare("SELECT * FROM schema_migration WHERE id<? ORDER BY id").all(migrationId),
@@ -95,9 +95,9 @@ describe("DB109 会话库正式数据迁移", () => {
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
-  it("DB109-04：当前选择保留旧 parser 的 trim 语义，原值本身不修改", () => {
+  it("DB109-04：当前选择保留旧 parser 的 trim 语义，原值本身不修改", async () => {
     entry({ providerId: ` ${legacyProvider} `, modelId: " GLM-5.3 ", thoughtLevel: " high " });
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(raw("session_entry", "selection").modelSelection).toEqual(currentSelection);
     expect(raw("session_entry", "selection").providerId).toBe(` ${legacyProvider} `);
   });
@@ -154,9 +154,14 @@ describe("DB109 会话库正式数据迁移", () => {
       ).run(part.id, "assistant", sessionID, 11, 12, JSON.stringify(part.value), index);
     }
     const sessionBefore = db.prepare("SELECT * FROM session").get();
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(store.debugMigrationIds()).toContain(migrationId);
-    expect(store.debugMigrationIds().at(-1)).toBe("0022_backfilled_session_reasoning");
+    expect(store.debugMigrationIds()).toEqual(
+      expect.arrayContaining([
+        "0023_session_soft_delete_outcome",
+        "0024_session_database_identity",
+      ]),
+    );
     expect(raw("session_entry", "selection")).toEqual({
       ...oldEntry,
       modelSelection: currentSelection,
@@ -178,7 +183,11 @@ describe("DB109 会话库正式数据迁移", () => {
       modelSelection: historicalSelection,
     });
     expect(raw("part", "body")).toEqual(parts[0]!.value);
-    expect(db.prepare("SELECT * FROM session").get()).toEqual(sessionBefore);
+    expect(db.prepare("SELECT * FROM session").get()).toEqual({
+      ...sessionBefore,
+      time_deleted: null,
+      last_outcome: null,
+    });
     const history = await store.messages({ sessionID });
     expect(history[0]?.info).not.toHaveProperty("model");
     expect(history[1]?.info).not.toHaveProperty("providerID");
@@ -189,7 +198,7 @@ describe("DB109 会话库正式数据迁移", () => {
 
   it("DB109-03/10：再升级缺新字段不补迁，历史正文仍然可读", async () => {
     message("user", { role: "user", time: { created: 11 }, agent: "main", model: oldModel });
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(store.debugMigrationIds()).toContain(migrationId);
     store.close();
     db.prepare("UPDATE message SET data=json_remove(data,'$.modelSelection')").run();
@@ -199,7 +208,7 @@ describe("DB109 会话库正式数据迁移", () => {
       { role: "user", time: { created: 13 }, agent: "main", model: oldModel },
       3,
     );
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const history = await store.messages({ sessionID });
     expect(history).toHaveLength(2);
     expect(history.every((item) => !("modelSelection" in item.info))).toBe(true);
@@ -207,30 +216,30 @@ describe("DB109 会话库正式数据迁移", () => {
     expect(raw("message", "user")).not.toHaveProperty("modelSelection");
   });
 
-  it("DB109-04：有明确旧来源时重建目标新字段，未知身份留空而不丢来源", () => {
+  it("DB109-04：有明确旧来源时重建目标新字段，未知身份留空而不丢来源", async () => {
     entry({
       providerId: legacyProvider,
       modelId: "GLM-5.3",
       thoughtLevel: "high",
       modelSelection: null,
     });
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(raw("session_entry", "selection").modelSelection).toEqual(currentSelection);
   });
 
-  it("DB109-05：数据写入失败回滚整个 migration，移除故障后可重试", () => {
+  it("DB109-05：数据写入失败回滚整个 migration，移除故障后可重试", async () => {
     entry({ providerId: legacyProvider, modelId: "GLM-5.3", thoughtLevel: "high" });
     const before = db.prepare("SELECT * FROM session_entry").all();
     db.exec(
       "CREATE TRIGGER reject_entry BEFORE UPDATE ON session_entry BEGIN SELECT RAISE(ABORT,'db109 write failure'); END",
     );
-    expect(() => createSqliteSessionStore({ dbPath: path })).toThrow();
+    await expect(createSqliteSessionStore({ dbPath: path })).rejects.toThrow();
     expect(db.prepare("SELECT * FROM session_entry").all()).toEqual(before);
     expect(
       db.prepare("SELECT id FROM schema_migration WHERE id=?").get(migrationId),
     ).toBeUndefined();
     db.exec("DROP TRIGGER reject_entry");
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     expect(raw("session_entry", "selection").modelSelection).toEqual(currentSelection);
   });
 
@@ -242,7 +251,7 @@ describe("DB109 会话库正式数据迁移", () => {
       model: oldModel,
       metadata: { removable: true },
     });
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const first = (await store.messages({ sessionID }))[0]!.info;
     await store.saveMessage({ ...first, metadata: {}, modelSelection: undefined } as typeof first);
     expect(raw("message", "user").model).toEqual(oldModel);
@@ -285,7 +294,7 @@ describe("DB109 会话库正式数据迁移", () => {
   });
 
   it("DB109-09：新版新增/无模型的用户消息经冻结旧协议 Reader 仍可打开正文", async () => {
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     for (const selection of [undefined, currentSelection]) {
       const id = (selection ? "new-selected" : "new-empty") as Parameters<
         typeof store.saveMessage
@@ -335,7 +344,7 @@ describe("DB109 会话库正式数据迁移", () => {
         model: oldModel,
       }),
     );
-    store = createSqliteSessionStore({ dbPath: path });
+    store = await createSqliteSessionStore({ dbPath: path });
     const source = (await store.messages({ sessionID }))[0]!;
     const childId = createSessionId("copy-child"),
       messageId = createMessageId("copy-message"),

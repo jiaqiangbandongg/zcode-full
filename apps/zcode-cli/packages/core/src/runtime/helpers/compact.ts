@@ -109,15 +109,22 @@ export function maybeLocalMicrocompactRuntimeEntries(input: {
   nowMs?: number;
   useMidConversationSystem?: boolean;
 }): RuntimeMicrocompactResult {
-  const providerMessages = buildProviderRequestMessages({
+  const projection = buildProviderRequestMessages({
     entries: input.entries,
     applyCacheControl: false,
     useMidConversationSystem: input.useMidConversationSystem,
-  }).messages;
+  });
   const result = maybeLocalMicrocompactMessages({
     config: input.config,
     lastAssistantCompletedAtMs: input.lastAssistantCompletedAtMs,
-    messages: providerMessages,
+    messages: projection.messages,
+    // 候选分类读取权威目标身份，token 估算继续使用真实 provider 包装。
+    resolveToolResultName: (message, index) => {
+      const source = projection.sourceEntries[index];
+      return source && !isRuntimeAttachmentEntry(source)
+        ? source.message.toolName
+        : message.toolName;
+    },
     nowMs: input.nowMs,
   });
 

@@ -1,26 +1,18 @@
-import {
-  TID_CONFIRM_DIALOG_CONFIRM,
-  TID_SSH_DIALOG,
-  buildRemoteWorkspaceIdentity,
-  type RemoteTarget,
-} from "@zcode/shared";
-import {
-  clearAppData,
-  clickTestIdByDom,
-  waitForWorkspaceApp,
-} from "../../../helpers/desktop-app.js";
+import { parseRemoteWorkspaceIdentity } from "@zcode/shared";
+import { clearAppData, waitForWorkspaceApp } from "../../../helpers/desktop-app.js";
 import { prepareV4ConversationE2E } from "../../../helpers/v4-conversation.js";
 import {
   clickLastEnabledSSHDialogButton,
   createFirstConnectionStallingSSHProxy,
   fillSSHPasswordSettings,
   openSSHRemoteDialog,
+  openSSHSourceDirectory,
   readHostProcesses,
   readSSHRuntimeConfig,
+  prepareSSHConnectionPage,
   selectSSHRemoteDirectory,
   waitForRemoteTab,
   waitForSSHDirectoryStep,
-  waitForSSHError,
   type FirstConnectionStallingSSHProxy,
   SSH_WORKSPACE_READY_TIMEOUT_MS,
 } from "../../../helpers/ssh-remote-p0.js";
@@ -51,14 +43,7 @@ describe(`${CASE_MARKER}: SSH pending cancel 后立即重试`, () => {
       host: "127.0.0.1",
       port: proxy.port,
     };
-    const target: RemoteTarget = {
-      kind: "ssh",
-      host: proxiedConfig.host,
-      port: proxiedConfig.port,
-      username: proxiedConfig.username,
-    };
-    const identity = buildRemoteWorkspaceIdentity(workspacePath, target);
-
+    await prepareSSHConnectionPage(CASE_MARKER);
     await prepareV4ConversationE2E({ skipProvider: true });
     const initialHosts = await readHostProcesses();
     expect(initialHosts).toHaveLength(1);
@@ -71,65 +56,81 @@ describe(`${CASE_MARKER}: SSH pending cancel 后立即重试`, () => {
     await clickLastEnabledSSHDialogButton(CASE_MARKER);
     await proxy.firstConnectionAccepted;
 
-    await browser.keys("Escape");
-    await clickTestIdByDom(TID_CONFIRM_DIALOG_CONFIRM, {
-      timeout: 15_000,
-      timeoutMsg: `${CASE_MARKER}: pending SSH 连接没有显示停止确认`,
-    });
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          const buttons = Array.from(
+            document.querySelectorAll<HTMLButtonElement>('[data-testid="ssh-dialog"] button'),
+          );
+          const button = buttons.find((item) =>
+            ["取消连接", "Cancel connection"].includes(item.textContent?.trim() ?? ""),
+          );
+          if (!button || button.disabled) return false;
+          button.click();
+          return true;
+        }),
+      { timeout: 15_000, timeoutMsg: `${CASE_MARKER}: 连接中主按钮不可取消` },
+    );
     await waitForPromise(
       proxy.waitForFirstConnectionClosed(),
       CONNECTION_CLOSE_TIMEOUT_MS,
       `${CASE_MARKER}: 取消后首个 SSH socket 没有关闭`,
     );
-    await waitForSSHError(CASE_MARKER, CONNECTION_CLOSE_TIMEOUT_MS);
-    await clickSSHDialogBackButton();
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          const dialog = document.querySelector('[data-testid="ssh-dialog"]');
+          return (
+            /已取消|Cancelled/u.test(dialog?.textContent ?? "") &&
+            !dialog?.querySelector('[data-testid="ssh-error"]')
+          );
+        }),
+      { timeout: 15_000, timeoutMsg: `${CASE_MARKER}: 主动取消仍显示错误` },
+    );
+    await closeCancelledSSHDialog();
+    await openSSHRemoteDialog(CASE_MARKER);
 
     await fillSSHPasswordSettings(proxiedConfig);
     await clickLastEnabledSSHDialogButton(CASE_MARKER);
-    await waitForSSHDirectoryStep(CASE_MARKER);
+    const retryFlow = await waitForSSHDirectoryStep(CASE_MARKER);
+    if (retryFlow === "closed") {
+      // 重试连接成功后向导按新合同自动收起（openConversation），从设备行进目录选择。
+      await openSSHSourceDirectory(proxiedConfig, CASE_MARKER);
+    }
     await selectSSHRemoteDirectory(workspacePath, CASE_MARKER);
     await waitForWorkspaceApp(workspacePath, SSH_WORKSPACE_READY_TIMEOUT_MS);
 
     const tab = await waitForRemoteTab({
       caseMarker: CASE_MARKER,
-      expectedIdentity: identity,
       expectedPath: workspacePath,
     });
     expect(tab.remoteSessionId).toBeTruthy();
+    const parsedIdentity = tab.workspaceIdentity
+      ? parseRemoteWorkspaceIdentity(tab.workspaceIdentity)
+      : null;
+    expect(parsedIdentity).toMatchObject({
+      kind: "server",
+      workspacePath,
+    });
     expect(tab.secretPersistedInTab).toBe(false);
     expect(await readHostProcesses()).toEqual(initialHosts);
   });
 });
 
-async function clickSSHDialogBackButton(): Promise<void> {
-  let visibleLabels: string[] = [];
+async function closeCancelledSSHDialog(): Promise<void> {
+  // 当前取消页没有“返回配置”；关闭会清空未完成草稿，再从真实新建入口以新凭据重试同一 target。
   await browser.waitUntil(
-    async () => {
-      const result = await browser.execute((dialogTestId) => {
-        const dialog = document.querySelector<HTMLElement>(
-          `[data-testid="${dialogTestId}"]`,
-        );
-        if (!dialog?.getClientRects().length) {
-          return { clicked: false, labels: [] as string[] };
-        }
-        const buttons = Array.from(
-          dialog.querySelectorAll<HTMLButtonElement>("button"),
-        ).filter((button) => button.getClientRects().length > 0 && !button.disabled);
-        const labels = buttons.map((button) => button.innerText.trim());
-        const back = buttons.find((button) =>
-          ["Back", "返回"].includes(button.innerText.trim()),
-        );
-        back?.click();
-        return { clicked: Boolean(back), labels };
-      }, TID_SSH_DIALOG);
-      visibleLabels = result.labels;
-      return result.clicked;
-    },
-    {
-      timeout: 15_000,
-      timeoutMsg: `${CASE_MARKER}: 取消后 SSH 向导没有可用的返回按钮 (${visibleLabels.join(",")})`,
-    },
+    () =>
+      browser.execute(() => {
+        const button = Array.from(
+          document.querySelectorAll<HTMLButtonElement>('[data-testid="ssh-dialog"] button'),
+        ).find((item) => ["关闭", "Close"].includes(item.innerText.trim()) && !item.disabled);
+        button?.click();
+        return Boolean(button);
+      }),
+    { timeout: 15_000, timeoutMsg: `${CASE_MARKER}: 取消页没有关闭入口` },
   );
+  await $('[data-testid="ssh-dialog"]').waitForExist({ reverse: true });
 }
 
 async function waitForPromise<T>(

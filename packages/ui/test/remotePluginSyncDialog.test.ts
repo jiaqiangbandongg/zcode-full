@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   PluginSyncCandidate,
   PluginSyncRemoteStatus,
@@ -13,7 +13,6 @@ import {
   filterRemotePluginSyncRows,
   resolveDefaultRemotePluginSyncSelection,
   shouldAllowRemotePluginSyncDialogOpenChange,
-  shouldFinishRemotePluginSyncRun,
   syncSelectedRemotePlugins,
 } from "../src/settings/RemotePluginSyncDialog.js";
 
@@ -23,9 +22,7 @@ type RemoteInstallResult = Awaited<
   ReturnType<NonNullable<RemotePluginSyncParams["remoteZCodeAgentService"]>["installPlugin"]>
 >;
 
-function makeCandidate(
-  overrides: Partial<PluginSyncCandidate>,
-): PluginSyncCandidate {
+function makeCandidate(overrides: Partial<PluginSyncCandidate>): PluginSyncCandidate {
   return {
     id: "remote-tools-id",
     name: "remote-tools",
@@ -94,9 +91,7 @@ function makeMarketplaceRow(name: string): RemotePluginSyncRow {
   };
 }
 
-function makePluginInfo(
-  overrides: Partial<ZCodePluginInfo>,
-): ZCodePluginInfo {
+function makePluginInfo(overrides: Partial<ZCodePluginInfo>): ZCodePluginInfo {
   return {
     id: "formatter@team-market",
     name: "formatter",
@@ -118,19 +113,15 @@ function delay(ms: number): Promise<"timeout"> {
 }
 
 describe("RemotePluginSyncDialog helpers", () => {
-  it("only finishes the currently active remote plugin sync run", () => {
-    const currentRun = new AbortController();
-    const staleRun = new AbortController();
-
-    expect(shouldFinishRemotePluginSyncRun(currentRun, currentRun)).toBe(true);
-    expect(shouldFinishRemotePluginSyncRun(currentRun, staleRun)).toBe(false);
-  });
-
   it("joins local plugin candidates with remote status by plugin id and directory", () => {
     const rows = buildRemotePluginSyncRows(
       [
         makeCandidate({ id: "missing-id", pluginId: "missing@inline", directoryName: "missing" }),
-        makeCandidate({ id: "existing-id", pluginId: "existing@inline", directoryName: "existing" }),
+        makeCandidate({
+          id: "existing-id",
+          pluginId: "existing@inline",
+          directoryName: "existing",
+        }),
       ],
       [
         {
@@ -152,7 +143,11 @@ describe("RemotePluginSyncDialog helpers", () => {
     const rows = buildRemotePluginSyncRows(
       [
         makeCandidate({ id: "missing-id", pluginId: "missing@inline", directoryName: "missing" }),
-        makeCandidate({ id: "existing-id", pluginId: "existing@inline", directoryName: "existing" }),
+        makeCandidate({
+          id: "existing-id",
+          pluginId: "existing@inline",
+          directoryName: "existing",
+        }),
       ],
       [
         {
@@ -172,7 +167,11 @@ describe("RemotePluginSyncDialog helpers", () => {
     const rows = buildRemotePluginSyncRows(
       [
         makeCandidate({ id: "missing-id", pluginId: "missing@inline", directoryName: "missing" }),
-        makeCandidate({ id: "existing-id", pluginId: "existing@inline", directoryName: "existing" }),
+        makeCandidate({
+          id: "existing-id",
+          pluginId: "existing@inline",
+          directoryName: "existing",
+        }),
       ],
       [
         {
@@ -201,7 +200,7 @@ describe("RemotePluginSyncDialog helpers", () => {
     expect(shouldAllowRemotePluginSyncDialogOpenChange("complete", false)).toBe(true);
   });
 
-  it("does not carry legacy install scope into marketplace candidates", () => {
+  it("builds marketplace candidate source metadata and disabled state", () => {
     const candidates = buildMarketplaceRemotePluginSyncCandidates(
       makeOverview([
         {
@@ -637,9 +636,7 @@ describe("RemotePluginSyncDialog helpers", () => {
       ],
     });
 
-    expect(result.results).toMatchObject([
-      { pluginId: "formatter@team-market", status: "synced" },
-    ]);
+    expect(result.results).toMatchObject([{ pluginId: "formatter@team-market", status: "synced" }]);
     expect(calls).toEqual([
       { operation: "install", scope: "user" },
       { operation: "setEnabled", scope: "user" },
@@ -723,14 +720,12 @@ describe("RemotePluginSyncDialog helpers", () => {
             stopWaiters.set(candidateId, resolve);
           }),
         cancelOperation: async (operationId) => {
-          await (
-            {
-              cancelPluginOperation: async (params: { operationId: string }) => {
-                cancelCalls.push(params.operationId);
-                return { cancelled: true, operationId: params.operationId };
-              },
-            }
-          ).cancelPluginOperation({ operationId });
+          await {
+            cancelPluginOperation: async (params: { operationId: string }) => {
+              cancelCalls.push(params.operationId);
+              return { cancelled: true, operationId: params.operationId };
+            },
+          }.cancelPluginOperation({ operationId });
         },
       },
     });
@@ -870,5 +865,44 @@ describe("RemotePluginSyncDialog helpers", () => {
         status: "stopped",
       },
     ]);
+  });
+});
+
+describe("remote plugin sync telemetry", () => {
+  it("reports each final target outcome once without paths or source content", async () => {
+    const reportTelemetryEvent = vi.fn();
+    const candidate = makeCandidate({});
+    const result = await syncSelectedRemotePlugins({
+      rows: [
+        { candidate: { ...candidate, kind: "inline", inlineCandidate: candidate }, exists: false },
+      ],
+      localPluginSyncService: {
+        exportPluginsArchive: async () => ({ archive: new Uint8Array() }),
+      } as never,
+      remotePluginSyncService: {
+        importPluginsArchive: async () => ({
+          results: [
+            {
+              pluginId: candidate.pluginId,
+              name: candidate.name,
+              directoryName: candidate.directoryName,
+              status: "synced",
+              path: "/secret/remote",
+            },
+          ],
+        }),
+      } as never,
+      remoteWorkspacePath: "/secret/remote",
+      reportTelemetryEvent,
+    });
+    expect(result.results[0].status).toBe("synced");
+    expect(reportTelemetryEvent).toHaveBeenCalledTimes(1);
+    expect(reportTelemetryEvent.mock.calls[0][0].eventExtraDetail).toMatchObject({
+      action: "sync",
+      result: "success",
+      plugin_id: candidate.pluginId,
+      trigger: "sync",
+    });
+    expect(JSON.stringify(reportTelemetryEvent.mock.calls)).not.toContain("/secret");
   });
 });

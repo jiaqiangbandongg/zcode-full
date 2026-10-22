@@ -34,6 +34,7 @@ export interface TokenUsageLike {
 }
 
 export interface BuildManualCompactBoundaryInput {
+  preCompactDiscoveredTools?: string[];
   autoCompactThreshold?: number;
   boundaryId: string;
   compactReason?: CompactReason;
@@ -79,6 +80,9 @@ export function buildManualCompactBoundary(
 ): CompactBoundaryPayload {
   return {
     boundaryId: input.boundaryId,
+    ...(input.preCompactDiscoveredTools
+      ? { preCompactDiscoveredTools: input.preCompactDiscoveredTools }
+      : {}),
     trigger: input.trigger ?? CompactTrigger.Manual,
     phase: input.phase,
     compactReason: input.compactReason,

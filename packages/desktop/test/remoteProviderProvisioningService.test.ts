@@ -98,23 +98,4 @@ describe("Remote Provider Provisioning Host facade", () => {
     expect(source.read).toHaveBeenCalledOnce();
     expect(target.apply).toHaveBeenCalledWith(envelope);
   });
-
-  it("always applies the complete local snapshot without a remote existence preflight", async () => {
-    const envelope = { syncId: "source-sync" };
-    const source = { read: vi.fn(async () => envelope) };
-    const target = {
-      apply: vi.fn(async () => ({
-        syncId: envelope.syncId,
-        status: "applied" as const,
-        personalProviderCount: 0,
-        credentialCount: 0,
-        rolledBack: false,
-      })),
-    };
-    const service = createRemoteProviderProvisioningExecutor({ source, target });
-
-    await service.syncLocalToRemote();
-
-    expect(target.apply).toHaveBeenCalledWith(envelope);
-  });
 });

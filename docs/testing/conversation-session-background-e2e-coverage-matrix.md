@@ -1,5 +1,7 @@
 # Conversation Session Background E2E Coverage Matrix
 
+> **闲时后台修订：** 设计、Core/协议证据及 OP10 三种桌面变体结果见 [实施计划](../off-peak-task/background-lifecycle-plan.md#最终验证记录2026-10-08)。用例仍为 manual-review/pending；手机整机交互未验证，不改变本矩阵原有准入与交付范围。
+
 本文记录会话区 background runtime task 的 E2E 枚举边界。它补充主矩阵里的 `BG` 分组，只覆盖当前已经实现并确认的桌面端主链路。
 
 > **覆盖状态说明**：历史综合 spec `conversation-session-background.test.ts` 当前位于

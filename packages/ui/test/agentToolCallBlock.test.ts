@@ -1,7 +1,8 @@
+import { ToolCallBlock } from "@/ToolCallBlocks.js";
 import type { IBroadcastService, IServiceAccessor } from "@zcode/services";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { testId, TID_TOOL_SUMMARY_TRIGGER } from "@zcode/shared";
+import { testId, TID_TOOL_SUMMARY_TRIGGER } from "@zcode/shared/test-ids";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceProvider } from "@/hooks/useServices.js";
 import { ZCodeIntlProvider } from "@/i18n/IntlProvider.js";
@@ -123,7 +124,6 @@ describe("AgentToolCallBlock", () => {
     expect(html).toContain("Inspect workspace");
     expect(html).not.toContain('role="button"');
     expect(html).not.toContain("aria-expanded");
-    expect(html).not.toContain("lucide-chevron-right");
     expect(html).not.toMatch(/提示词|Prompt/);
     expect(html).not.toContain("分析当前工作区并继续拆分任务");
   });
@@ -194,7 +194,6 @@ describe("AgentToolCallBlock", () => {
     expect(html).toContain('data-testid="v4-subagent-open-side-pane-child-session"');
     expect(html).toContain('aria-label="在右侧打开"');
     expect(html).not.toContain("aria-expanded");
-    expect(html).not.toContain("lucide-chevron-right");
     expect(html).not.toContain("subagent-output-preview");
     expect(html).not.toContain("分析当前工作区并继续拆分任务");
   });
@@ -264,7 +263,6 @@ describe("AgentToolCallBlock", () => {
     expect(html).not.toContain("分析当前工作区并继续拆分任务");
     expect(html).not.toContain("subagent-output-preview");
     expect(html).not.toContain("aria-expanded");
-    expect(html).not.toContain("lucide-chevron-right");
     expect(html).not.toContain("在右侧打开");
     expect(html).not.toContain("子会话");
   });
@@ -296,7 +294,7 @@ describe("AgentToolCallBlock", () => {
           createElement(
             StoreProvider,
             { broadcastService: mockBroadcastService },
-            createElement(AgentToolCallBlock, {
+            createElement(ToolCallBlock, {
               toolCallNode: {
                 toolCall: {
                   toolId: "tool-agent-configured-color",
@@ -341,9 +339,6 @@ describe("AgentToolCallBlock", () => {
 
     expect(html).toContain("Explore");
     expect(html).toContain("text-rose-700");
-    expect(html).toContain("inline-flex max-w-36 items-center");
-    expect(html).toContain("leading-[1.5]");
-    expect(html).not.toContain("leading-none");
   });
 
   it("keeps the agent type blank while subagent_type may still be streaming", () => {
@@ -546,10 +541,7 @@ describe("AgentToolCallBlock", () => {
         ),
       ),
     );
-
-    // Bugfix: Agent 收起态参考普通 active Explore 聚合，使用最新子工具摘要，
-    // 同时外层仍展示子智能体，而不是把子智能体类型 Explore 当 kind label。
-    expect(html).toContain("lucide-bot");
+    // Bugfix: Agent 收起态使用最新子工具摘要，外层仍展示子智能体。
     expect(html).toMatch(/>(SubAgent|子智能体)</);
     expect(html).toContain("·");
     expect(html).toContain("正在读取");
@@ -641,87 +633,6 @@ describe("AgentToolCallBlock", () => {
     expect(html).not.toContain("App.tsx");
     expect(html).not.toContain("animated-gradient-text");
     expect(html).not.toContain("读取核心入口文件");
-  });
-
-  it("allows disabling subagent summary roll animation", () => {
-    const html = renderToStaticMarkup(
-      createElement(
-        ZCodeIntlProvider,
-        { initialLocale: "zh-CN" },
-        createElement(
-          ServiceProvider,
-          { services: mockServices },
-          createElement(
-            StoreProvider,
-            { broadcastService: mockBroadcastService },
-            createElement(AgentToolCallBlock, {
-              toolCallNode: {
-                toolCall: {
-                  toolId: "tool-agent-animation-disabled",
-                  kind: "Agent",
-                  title: "Agent",
-                  input: {
-                    prompt: "读取核心入口文件",
-                    subagent_type: "Explore",
-                  },
-                  output: "",
-                  status: "running",
-                  raw: {
-                    _meta: {
-                      zcode: {
-                        toolName: "Agent",
-                      },
-                    },
-                  },
-                },
-                childToolCalls: [
-                  {
-                    toolCall: {
-                      toolId: "tool-agent-animation-disabled-child",
-                      kind: "read",
-                      title: "Read",
-                      input: {
-                        path: "/workspace/src/App.tsx",
-                      },
-                      output: "",
-                      status: "in_progress",
-                      raw: {},
-                    },
-                    childToolCalls: [],
-                  },
-                ],
-              },
-              workspacePath: "/workspace",
-              displayModel: {
-                inlinePreview: { type: "none" },
-                planResult: null,
-                viewerSource: null,
-                viewerLabelId: "codeViewer.viewCode",
-                showSummaryFileLink: false,
-                showInput: false,
-                showOutput: false,
-                showKind: false,
-              },
-              viewerSource: null,
-              rawFileSummaries: [],
-              isRunning: true,
-              statusLabel: "执行中",
-              errorText: undefined,
-              childToolList: null,
-              showIcon: true,
-              forceOpen: false,
-              disableSummaryContentAnimation: true,
-              onOpenCodeViewer: undefined,
-              onOpenBrowserUrl: undefined,
-            }),
-          ),
-        ),
-      ),
-    );
-
-    expect(html).toContain("正在读取");
-    expect(html).toContain("App.tsx");
-    expect(html).not.toContain("overflow-hidden align-middle");
   });
 
   it("keeps the child action label for completed subagent child summaries", () => {

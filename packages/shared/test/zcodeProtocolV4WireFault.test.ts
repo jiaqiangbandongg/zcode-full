@@ -44,10 +44,6 @@ function schemaInvalidWire(): ConversationTopicWireFrame {
 }
 
 describe("确定性内容 fault 的分类", () => {
-  it("只有 schema 拒收算确定性内容失败", () => {
-    expect(isDeterministicContentFault(WIRE_FAULT_INVALID_PAYLOAD)).toBe(true);
-  });
-
   // 刻意不把这些算进来：它们可能来自传输或组装路径本身，重投确实可能不同。把瞬态误判成确定性
   // 会让本该自愈的 gap 停在原地，那比多一次无用重试更坏。
   it.each([

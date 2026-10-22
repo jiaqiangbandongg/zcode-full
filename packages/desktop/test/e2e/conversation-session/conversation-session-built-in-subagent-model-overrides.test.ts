@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { decodeCustomModelValue, encodeCustomModelValue } from "@zcode/shared";
 import {
   TID_CHAT_MODEL_SELECT_ITEM,
   TID_CHAT_MODEL_SELECT_GROUP,
@@ -14,10 +15,8 @@ import {
   TID_SUBAGENT_ROW,
   TID_TASK_SETTINGS_BUTTON,
   TID_V4_SUBAGENT_OPEN_SIDE_PANE,
-  decodeCustomModelValue,
-  encodeCustomModelValue,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import {
   DEFAULT_WORKSPACE,
   clearAppData,
@@ -371,7 +370,8 @@ async function openCustomAgentForm() {
     async () =>
       browser.execute((currentRowTestId) => {
         const row = document.querySelector<HTMLElement>(`[data-testid="${currentRowTestId}"]`);
-        if (!row) return false;
+        // 保存后的刷新会保留行，但暂时移除 role 和编辑事件；存在不代表已经可编辑。
+        if (!row || row.getAttribute("role") !== "button") return false;
         // 编辑入口由整行承载；行内带 title 的按钮是删除，不能按 button[title] 定位。
         row.click();
         return true;

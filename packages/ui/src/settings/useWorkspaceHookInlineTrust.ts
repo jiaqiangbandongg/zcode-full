@@ -21,6 +21,7 @@ import {
 export function useWorkspaceHookInlineTrust(input: {
   workspacePath?: string | null;
   workspaceIdentity?: string;
+  authorityKey?: string;
   hooksService?: IHooksService;
   rpcReady?: boolean;
 }) {
@@ -76,12 +77,14 @@ export function useWorkspaceHookInlineTrust(input: {
     const target = {
       workspacePath: input.workspacePath,
       workspaceIdentity: input.workspaceIdentity,
+      authorityKey: input.authorityKey,
     };
     void refreshHooks(service, target);
   }, [
     activeReviewInteractionId,
     canUseHooksService,
     hooksService,
+    input.authorityKey,
     input.workspaceIdentity,
     input.workspacePath,
     refreshHooks,
@@ -128,6 +131,7 @@ export function useWorkspaceHookInlineTrust(input: {
         await refreshHooks(service, {
           workspacePath: input.workspacePath,
           workspaceIdentity: input.workspaceIdentity,
+          authorityKey: input.authorityKey,
         });
       } catch (cause) {
         logger.error("[workspace-hook-trust] 行内信任命令失败", { cause });
@@ -139,6 +143,7 @@ export function useWorkspaceHookInlineTrust(input: {
     [
       canUseHooksService,
       hooksService,
+      input.authorityKey,
       input.workspaceIdentity,
       input.workspacePath,
       intl,

@@ -47,9 +47,7 @@ const PHASED_SCRIPT = [
 ].join("\n");
 const BAD_SCRIPT = 'const x: number = "nope";\nreturn x;';
 const MODEL_CATALOG: ModelCatalogPort = {
-  listModels: () => [
-    { providerId: "acme", modelId: "gpt-5", reasoningLevels: [], current: true },
-  ],
+  listModels: () => [{ providerId: "acme", modelId: "gpt-5", reasoningLevels: [], current: true }],
 };
 
 const dirs: string[] = [];
@@ -406,10 +404,9 @@ describe("startSavedWorkflowRun — 成功路径", () => {
     );
   });
 
-  it("submit 带上脚本点名的模型，已解析成结构化选择；没点名时整个键缺席", async () => {
+  it("submit 带上脚本点名的模型，已解析成结构化选择", async () => {
     const cwd = makeDir("dwf-launch-cwd-");
     seed(cwd, "judged", 'await agent("评审员", { model: "GPT-5" }).ask("x");\nreturn 1;');
-    seed(cwd, "plain", OK_SCRIPT);
     const { runtime, submitCalls } = makeRuntime({
       name: "ok-models",
       cwd,
@@ -434,7 +431,6 @@ describe("startSavedWorkflowRun — 成功路径", () => {
 
     const result = await runtime.startSavedWorkflowRun({ name: "reporter" });
 
-    expect(result.ok).toBe(true);
     const toolCallId = (result as { toolCallId: string }).toolCallId;
     expect(result).toMatchObject({ ok: true, runId: "dwfrun-ok" });
     expect(toolCallId).toMatch(/^launch-/);
@@ -565,4 +561,3 @@ describe("startSavedWorkflowRun — 成功路径", () => {
     });
   });
 });
-

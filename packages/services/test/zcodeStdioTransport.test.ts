@@ -1,7 +1,6 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { terminateProcessTree } from "@zcode/services/process/processTreeTerminator";
 import { ZCodeStdioTransport } from "@zcode/services/node";
@@ -110,6 +109,7 @@ describe("ZCodeStdioTransport", () => {
 process.stdin.resume();
 process.stdin.once("end", () => process.exit(0));
 process.stdin.once("close", () => process.exit(0));
+process.stdout.write(JSON.stringify({ id: "ready", result: {} }) + "\\n");
 setInterval(() => {}, 1000);
 `,
       ],
@@ -120,7 +120,9 @@ setInterval(() => {}, 1000);
     );
     activeChildren.add(child);
     const transport = new ZCodeStdioTransport(child);
-    await delay(50);
+    // 子进程启动可能超过 50ms；先收到已注册 EOF 处理器的 ready 帧，
+    // 再计时关闭，避免把启动排队误判为优雅退出失败并触发强杀。
+    await new Promise<void>((resolve) => transport.onMessage(() => resolve()));
 
     const startedAt = Date.now();
     // Bugfix: app-server --stdio 的自然关闭边界是 stdin EOF，不能每次关闭都直接

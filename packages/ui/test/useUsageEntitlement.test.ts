@@ -24,6 +24,16 @@ import {
   useRemoteWorkspaceSessionStore,
 } from "@/store/remoteWorkspaceSessionStore.js";
 
+const auth = vi.hoisted(() => ({
+  state: undefined as undefined | { user: { id: string } | null; authSessionSeq: number },
+}));
+vi.mock("@/store/StoreProvider.js", () => ({
+  useZCodeStoreWithDefault: (
+    selector: (state: NonNullable<typeof auth.state>) => unknown,
+    fallback: unknown,
+  ) => (auth.state ? selector(auth.state) : fallback),
+}));
+
 function createMinimalElement(ownerDocument?: Document, tagName = "div"): Element {
   const element = {
     appendChild: (child: { parentNode?: unknown }) => {
@@ -141,6 +151,7 @@ function flushPromises() {
 }
 
 afterEach(() => {
+  auth.state = undefined;
   vi.restoreAllMocks();
 });
 
@@ -561,3 +572,97 @@ describe("跨组件购买刷新代次", () => {
     }
   });
 });
+
+it("禁用权益查询后旧响应不再发布共享快照或本地缓存", async () => {
+  let finish!: (value: UsageEntitlementSnapshot) => void;
+  const service = {
+    getEntitlementSnapshot: vi.fn(
+      () =>
+        new Promise<UsageEntitlementSnapshot>((resolve) => {
+          finish = resolve;
+        }),
+    ),
+  } as unknown as IUsageStatsService;
+  const cacheKey = "logout-late-entitlement";
+  const options = {
+    cacheKey,
+    preferredProviderId: "account:bigmodel-team-coding-plan",
+    refreshOnMount: true,
+  };
+  let state: ReturnType<typeof useUsageEntitlementWithService>;
+  function Probe({ enabled }: { enabled: boolean }) {
+    state = useUsageEntitlementWithService(service, { ...options, enabled });
+    return null;
+  }
+  const root = createRoot(installMinimalDom());
+  try {
+    await act(async () => root.render(createElement(Probe, { enabled: true })));
+    await act(async () => root.render(createElement(Probe, { enabled: false })));
+    await act(async () =>
+      finish(createSnapshot({ organizationId: "old-org", projectId: "old-project" })),
+    );
+    expect(state!.snapshot).toBeNull();
+    expect(readCachedUsageEntitlementSnapshot({ cacheKey })).toBeNull();
+    expect(
+      readSharedEntitlementSnapshot({
+        usageStatsService: service,
+        freshnessKey: buildEntitlementFreshnessKey({
+          cacheKey,
+          options: {
+            preferredProviderId: options.preferredProviderId,
+            includeSubscription: false,
+            allowDisabledPreferredProvider: false,
+            requirePreferredProvider: false,
+          },
+        }),
+      }),
+    ).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it.each(["logout", "account", "session"])(
+  "%s：同服务的鉴权变化隔离旧权益及迟到响应",
+  async (boundary) => {
+    auth.state = { user: { id: "account-a" }, authSessionSeq: 1 };
+    let finish!: (value: UsageEntitlementSnapshot) => void;
+    const service = {
+      getEntitlementSnapshot: vi.fn(
+        () =>
+          new Promise<UsageEntitlementSnapshot>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    } as unknown as IUsageStatsService;
+    let state: ReturnType<typeof useUsageEntitlementWithService>;
+    function Probe({ revision }: { revision: number }) {
+      void revision;
+      state = useUsageEntitlementWithService(service, {
+        cacheKey: "auth-boundary",
+        enabled: true,
+        refreshOnMount: true,
+      });
+      return null;
+    }
+    const root = createRoot(installMinimalDom());
+    try {
+      await act(async () => root.render(createElement(Probe, { revision: 1 })));
+      const completeOld = finish;
+      if (boundary === "logout") auth.state.user = null;
+      if (boundary === "account") auth.state.user = { id: "account-b" };
+      if (boundary === "session") auth.state.authSessionSeq++;
+      await act(async () => root.render(createElement(Probe, { revision: 2 })));
+      await act(async () =>
+        completeOld(createSnapshot({ organizationId: "old-org", projectId: "old-project" })),
+      );
+      expect(state!.snapshot).toBeNull();
+      expect(
+        readCachedUsageEntitlementSnapshot({ cacheKey: "auth-boundary:auth:account-a:1" }),
+      ).toBeNull();
+      if (boundary === "logout") expect(service.getEntitlementSnapshot).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  },
+);

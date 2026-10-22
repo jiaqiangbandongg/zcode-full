@@ -1,5 +1,7 @@
 # Marketing Touch E2E 补齐实施规范
 
+正式回放维护（2026-10-15）：隔离 fixture 从已完成职业引导的账号启动；全局触达只等待应用壳，不要求固定项目已激活。MTA-05 按主 action 的稳定 test id 点击；Start Plan 导航会将按钮文案改为本地化的 View plan，不再硬编码 fixture 的 Run action；目标应选中独立的 Start Plan 节点。营销升级 fixture 在领取前保留可查询的个人项目和短期 Token，订阅列表仍为空；否则全局套餐入口检查会把凭据未知当成未就绪，四条升级路径都无法开始。其它领取 fixture 的前置状态保持原合同。
+
 ### 任务完成触发刷新（2026-09-18）
 
 MTC-TASK-COMPLETE 对应 [客户端约定](../marketing-touch-client.md#任务完成后刷新2026-09-18)。
@@ -91,7 +93,7 @@ MTE-06 新增真实 Popup 关闭与在途 Banner ZIP 的竞态用例：HTTP 资�
 
 ### 第十六批：自定义 provider 导航
 
-MTE-02 经真实 Custom 模板创建空 provider，读取节点的 providerId，先导航外观再通过营销动作定位回该自定义 provider；确认目标选中、HTTP confirm、持久连接快照和工作区当前模型均不改变。finally 导航回该配置，点击删除并确认，节点消失；不写真实 key、不调用模型服务、不直接修改配置文件。
+MTE-02 经真实 Custom 模板创建空 provider，读取节点的 providerId，先导航外观再通过营销动作定位回该自定义 provider；确认目标选中、HTTP confirm、持久连接快照和工作区当前模型均不改变。finally 导航回该配置，打开详情「更多」菜单并选择删除、确认，节点消失；不写真实 key、不调用模型服务、不直接修改配置文件。
 
 `desktop-e2e-20260912-033816-286` **1/1 通过**（11.2 秒），runner 退出 0；日志 `/tmp/marketing-custom-provider-e2e.log`。初次类型检查发现 DOM 属性可能为空，补明确异常检查后 typecheck、desktop typecheck:e2e 通过，lint（45 既有警告/0 错误）、architecture、diff check 通过。仅新增测试及文档，没有新增产品修复。累计 57 个独立用例有通过记录，本轮只跑新增一项，不代表全量同轮或 95% 达标；全部 pending，未 push。
 
@@ -100,6 +102,8 @@ MTE-02 经真实 Custom 模板创建空 provider，读取节点的 providerId，
 扩展已有 MTC-RICH：使用当前 Renderer 的 Puppeteer Chromium 媒体模拟，验证 reduce 时 video.paused=true/autoplay=false，no-preference 时恢复播放；两次切换前后 WebDriver 元素 ID 相同，HTTP events 不变。finally 清空模拟，继续原复制动作上报验证。没有替换 matchMedia/播放方法，也没有修改系统偏好。
 
 `desktop-e2e-20260912-034307-178` **1/1 通过**（12.7 秒），runner 退出 0；日志 `/tmp/marketing-motion-e2e.log`。typecheck、desktop typecheck:e2e、lint（45 既有警告/0 错误）、architecture、diff check 通过。只扩展既有用例，独立用例总数仍为 57，不声称覆盖 Hero bundle 动态 reduced-motion 或手机实机；95% Goal 与 Lottie 范围决定仍未完成。保持 pending，未 push。
+
+Webview 回放必须使用本轮 mock 地址构建：邀请页与升级页的 origin 是 Vite 编译期配置。跨 run 复用 `out` 会继续请求旧 mock 地址，不能将这类超时计为产品失败；这些场景回放不使用 `ZCODE_E2E_SKIP_BUILD=1`。
 
 ## 60 项同轮复验（2026-09-12）
 
@@ -117,13 +121,13 @@ MTE-02 经真实 Custom 模板创建空 provider，读取节点的 providerId，
 
 ## Clarification Log / Boundary Decisions
 
-| 决定                     | 状态                 | 范围                                                                                              |
-| ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------- |
-| 修复现有失败、补齐 P0/P1 | accepted             | 用户明确要求 Goal 继续完成；包括必要产品缺陷，不只改断言                                          |
-| 覆盖率                   | accepted             | 用户调整为 90%，排除 Lottie；当前 Renderer 90.07%，不冒充跨域整体结果；函数/分支单列，不以单测补数 |
-| 动作能力                 | accepted             | 保留 close/open_url/claim/navigate/copy_text；不创建任务、不切模型、不自动安装/支付               |
-| 旧 API 迁移              | bug-candidate → 修复 | 使用 providerSettingsService.refresh 与当前 providerId/连接结构；不恢复退役服务                   |
-| 测试生命周期             | accepted             | case-local 场景与清理；用户授权达到目标且全部通过后转正，只用本机 Electron 验证，不用 Docker、不 push |
+| 决定                     | 状态                 | 范围                                                                                                   |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------ |
+| 修复现有失败、补齐 P0/P1 | accepted             | 用户明确要求 Goal 继续完成；包括必要产品缺陷，不只改断言                                               |
+| 覆盖率                   | accepted             | 用户调整为 90%，排除 Lottie；当前 Renderer 90.07%，不冒充跨域整体结果；函数/分支单列，不以单测补数     |
+| 动作能力                 | accepted             | 保留 close/open_url/claim/navigate/copy_text；不创建任务、不切模型、不自动安装/支付                    |
+| 旧 API 迁移              | bug-candidate → 修复 | 使用 providerSettingsService.refresh 与当前 providerId/连接结构；不恢复退役服务                        |
+| 测试生命周期             | accepted             | case-local 场景与清理；用户授权达到目标且全部通过后转正，只用本机 Electron 验证，不用 Docker、不 push  |
 | 第三方/平台              | pruned combinations  | 官方版本安全校验使用确定性回调替身；真实购买/生产资格不执行。macOS 运行不能替代 Windows/Linux/手机实机 |
 
 ## Domain Scope / Concept Map / State Owners
@@ -193,7 +197,7 @@ MTE-15 补升级 webview HTML 的网络断连、挂起时关闭、30 秒导航�
 
 MTE-17 在原 MTC-RICH 视频 Banner 用例内补减少动效往返：Chromium Emulation 设置 prefers-reduced-motion=reduce 后真实 video 暂停且 autoplay=false；no-preference 后恢复播放，媒体节点不替换，不产生营销事件。finally 清空媒体模拟，不改系统设置或 mock matchMedia；仍使用 Electron 编码的 MP4 经服务下载/准备后展示。
 
-MTE-02 自定义 provider：通过真实设置页 Custom 模板创建空 provider，从导航节点读取真实 providerId；离开模型分区后由营销 navigate 定位该 ID，选中目标并确认上报，持久连接快照和工作区当前模型保持不变。finally 通过删除按钮/确认框清理该 provider，不直接写配置，不配置真实 API key 或发模型请求。
+MTE-02 自定义 provider：通过真实设置页 Custom 模板创建空 provider，从导航节点读取真实 providerId；离开模型分区后由营销 navigate 定位该 ID，选中目标并确认上报，持久连接快照和工作区当前模型保持不变。finally 通过详情「更多」菜单中的删除项及确认框清理该 provider，不直接写配置，不配置真实 API key 或发模型请求。
 
 MTE-06 资源阶段失效：已显示的无 Hero Popup 保持打开，新 Banner ZIP 下载在 HTTP fixture 挂起；用户关闭 Popup 使旧准备快照失效，释放 ZIP 后不显示 Banner、不额外上报。排队的下一次 GET 到达作为上一轮资源处理完毕的同步边界，再释放该 GET，服务端新下发相同 Banner 可以显示。资源 gate 只控制 fixture 响应时机，reset/stop 均释放，包内容/哈希不变。
 
@@ -343,6 +347,9 @@ App 退出登录确认 -> OAuth 清理真实测试凭据 -> 原 Host 释放
 
 两例均断言真实 HTTP ledger 的 Authorization 缺省；关闭行为不因匿名状态被跳过。领取只打开登录 UI，不模拟完成第三方登录。原登录重启语义不改，测试结束只清理隔离 E2E HOME。
 
+匿名 Banner fixture 使用空按钮文案，由 App 的 `common.close` / `common.open` 提供可访问名称。
+E2E 同时匹配中文和英文名称，不能用英文专用定位阻断取消上报与领取登录拦截断言。
+
 测试准备先以空投放进入匿名工作区，再 reset 场景并发出 online 事件拉取，避免营销 Popup 遮挡 WelcomeScreen 的公开跳过入口。退出登录重启 mock 必须 `update()` 同步跨进程调用记录后再断言，直接轮询本地记录会超时。
 
 验证：`desktop-e2e-20260912-015734-173` 新构建真实 Electron E2E **2/2 通过**（51.7 秒；日志 `/tmp/marketing-anonymous-e2e-3.log`）。前两轮分别在准备阶段的 mock 记录同步、WelcomeScreen 被提前投放遮挡处失败，均不计为通过证据。测试保持 pending，不扩展协议、不转正、不 push。加第一批 31 项为 33 个已有通过记录的用例，但本轮只跑匿名两项，不声称 33 项同轮全量通过；未重新计算覆盖率，95% Goal 仍未达成。
@@ -362,7 +369,7 @@ App 退出登录确认 -> OAuth 清理真实测试凭据 -> 原 Host 释放
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | 现有用例   | 逐例重启/HTTP reset；迁接 providerId、当前账户 ID、Selection View 分组；真实非空连接快照断言                                         | 自定义 provider 导航的独立 E2E                                           |
 | 关闭与上报 | 新增普通/领取结果 Popup × X/Esc/遮罩 6 例；修复 iframe 默认焦点吞 Esc                                                                | 主动进入 iframe 后的键盘边界未扩展协议                                   |
-| 请求/故障  | 新增 seq 首次 0/连续递增/POST 不计数、必要请求头、report 500 不阻塞、query 503 恢复 3 例                                             | 匿名/凭据切换、安全校验失败/取消、慢响应竞态、完整退避/隐藏恢复            |
+| 请求/故障  | 新增 seq 首次 0/连续递增/POST 不计数、必要请求头、report 500 不阻塞、query 503 恢复 3 例                                             | 匿名/凭据切换、安全校验失败/取消、慢响应竞态、完整退避/隐藏恢复          |
 | 媒体/缓存  | 新增主题资源、坏 dark/default 图片、坏 ZIP 有/无 fallback 5 例；原 Bundle 用例追加解包文件不重写和 lease 404；修复 Host 异步清理漏调 | 解码/超时/大小/重定向边界、伪造握手、视频与 reduced-motion、Web fallback |
 | 产品修复   | Root 错误态图标、领取后的 ProviderSettingsService 刷新、自定义 providerId 匹配、Popup 初始焦点、异步-only 服务回收                   | 更广 P0/P1 仍按 MTE 矩阵推进，不能宣称全部完成                           |
 | 采集设施   | 每例复用 Node 覆盖归一化，避免重启累积 source map 撑满磁盘                                                                           | Node V8/source-map 跨域可执行行口径仍需统一，不能 OR 合并为全分支百分比  |
@@ -380,3 +387,5 @@ App 退出登录确认 -> OAuth 清理真实测试凭据 -> 原 Host 释放
 `CloudDialogMediaHero` 中 Lottie 两个函数占 48 个已映射可执行行，`cloudLottieRuntime` 占 36 行。当前营销协议没有 Lottie 投放入口，仅此 84 行就使上述 Renderer 900 行分母的理论上限不超过 90.67%。这不是跨运行域整体覆盖率的上限：整体统一分母尚未建立，不能据此断言整体 95% 不可能。Lottie 是否扩展协议/真实入口仍待用户决定；不能自行删代码、缩分母或扩展协议。
 
 仅在 macOS Electron 实测；窄宽度和明暗 UI 断言不等价于手机 Web、Windows/Linux 实机。共享服务释放已回归 Windows Helper 单测，但没有 Windows 实机证据。关系图的 4 条既有悬空边与 HEAD 相同，本批没有新增；代码图工具不可用的限制不变。
+
+2026-10-15 回放前置：delivery 用例固定使用英文界面与 `en-US` 请求头。每例退出旧 Electron 后写入 `locale` 和 `localePreference`，再启动新窗口，避免跟随宿主系统语言或被退出写回覆盖。

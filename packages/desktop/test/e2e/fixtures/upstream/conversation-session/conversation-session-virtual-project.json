@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-virtual-project",
+  "spec": "./test/e2e/conversation-session/conversation-session-virtual-project.test.ts",
+  "fixtures": [
+    {
+      "id": "vp17-remote",
+      "description": "Actual remote project Agent execution",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed reply drives a real remote SourceServer Agent; assertions inspect remote execution, fixed-root capability, persistence ownership and reopening, not model output quality."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP17_REMOTE"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp17-remote",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP17_READY"
+        }
+      }
+    },
+    {
+      "id": "vp18-cold",
+      "description": "Remote Agent cold restore with refreshed skills in its fixed root",
+      "metadata": {
+        "kind": "main",
+        "source": "synthetic",
+        "timingPolicy": "fast-text",
+        "syntheticReason": "Fixed reply drives the real restarted remote Agent; assertions inspect refreshed fixed-root skills and actual runtime identity, not model output quality."
+      },
+      "maxMatches": 1,
+      "match": {
+        "method": "POST",
+        "lastUserMessageIncludes": ["E2E_VP18_COLD"],
+        "bodyExcludes": ["Generate a concise title", "CRITICAL: Respond with TEXT ONLY"]
+      },
+      "response": {
+        "statusCode": 200,
+        "text": {
+          "id": "vp18-cold",
+          "inputTokens": 80,
+          "outputTokens": 12,
+          "text": "E2E_VP18_READY"
+        }
+      }
+    }
+  ]
+}

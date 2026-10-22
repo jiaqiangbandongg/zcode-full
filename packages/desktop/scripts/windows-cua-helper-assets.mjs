@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- staging 与 afterPack verifier 共用同一发布契约，保持同模块避免 schema/PE 规则漂移。 */
 import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { cp, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import {
   basename,
@@ -159,6 +160,10 @@ function resolveModuleLookupRoots(sourceRoot) {
   while (currentDir !== volumeRoot) {
     if (basename(currentDir) === "node_modules") {
       lookupRoots.push(dirname(currentDir));
+      break;
+    }
+    if (existsSync(resolve(currentDir, "pnpm-workspace.yaml"))) {
+      lookupRoots.push(currentDir);
       break;
     }
     currentDir = dirname(currentDir);
@@ -732,8 +737,8 @@ export async function resolveWindowsCuaHelperSourceRoot({
   if (!isAbsolute(servicesPackageRoot)) {
     throw new Error("[windows-cua-helper-assets] servicesPackageRoot must be absolute");
   }
-  // servicesPackageRoot 固定对应当前仓库的 packages/services；禁止向上扫描到用户目录
-  // 或另一个仓库，否则当前 workspace 缺包时可能误用上级同名 alias。
+  // servicesPackageRoot 固定对应当前仓库的 packages/services；CUA producer 是同一 workspace 的
+  // packages/zcode-cua，禁止向上扫描到用户目录或另一个仓库。
   const workspaceRoot = resolve(servicesPackageRoot, "..", "..");
   const workspaceMarkerPath = resolve(workspaceRoot, "pnpm-workspace.yaml");
   let markerStats;
@@ -751,26 +756,15 @@ export async function resolveWindowsCuaHelperSourceRoot({
     );
   }
 
-  const packagePathSegments = ["node_modules", "@zcode", "zcode-cua"];
-  const packageCandidates = [
-    resolve(servicesPackageRoot, ...packagePathSegments),
-    resolve(workspaceRoot, ...packagePathSegments),
-  ];
-  for (const installedPackageRoot of new Set(packageCandidates)) {
-    try {
-      return await realpath(installedPackageRoot);
-    } catch (error) {
-      if (error?.code !== "ENOENT") {
-        throw new Error(
-          `[windows-cua-helper-assets] packaged helper runtime is unavailable: ${installedPackageRoot}`,
-          { cause: error },
-        );
-      }
-    }
+  const packageRoot = resolve(workspaceRoot, "packages", "zcode-cua");
+  try {
+    return await realpath(packageRoot);
+  } catch (error) {
+    throw new Error(
+      `[windows-cua-helper-assets] packaged helper runtime is unavailable: ${packageRoot}`,
+      { cause: error },
+    );
   }
-  throw new Error(
-    `[windows-cua-helper-assets] packaged helper runtime is unavailable: ${packageCandidates.join(", ")}`,
-  );
 }
 
 export async function prepareWindowsCuaHelperAssets({

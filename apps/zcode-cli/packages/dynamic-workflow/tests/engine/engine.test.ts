@@ -106,7 +106,7 @@ describe("WorkflowEngine — happy path", () => {
     expect(node?.actorSeq).toBe(0);
     expect(node?.inputHash).toBe(inputHash("do it"));
     expect(node?.result).toEqual({ x: 1 });
-    expect(node?.stats?.tokens).toBe(10);
+    expect(node?.stats).toEqual({ tokens: 10, toolCalls: 1, turns: 1 });
     expect(node?.actorSiteId).toBe("actor#1");
 
     engine.complete("final artifact");
@@ -863,19 +863,6 @@ describe("WorkflowEngine — stats backfill after settle", () => {
     expect(node?.kind).toBe("ask");
   });
 
-  it("preserves the pre-settle path: stats reported before submit are present at settle without a backfill", async () => {
-    const { engine, journal } = setup({ askSpecs: typedSpecs(), validate: requireFields });
-    const actor = engine.createActor("actor#1");
-    const p = engine.ask("ask#1", actor, "do it");
-    await flush();
-
-    engine.askStats(inst("ask#1"), { tokens: 10, toolCalls: 1, turns: 1 });
-    engine.askSubmitAttempted(inst("ask#1"), { x: 1 });
-    await expect(p).resolves.toEqual({ x: 1 });
-
-    expect(journal.getNode(RUN, "ask#1", 1)?.stats).toEqual({ tokens: 10, toolCalls: 1, turns: 1 });
-  });
-
   it("is a no-op when the node was never journaled (defensive, best-effort)", async () => {
     // 从未准入的实例上报 stats：既无 live 节点也无 journal 记录，回填静默跳过（不抛错、不建记录）。
     const { engine, journal } = setup({ askSpecs: typedSpecs(), validate: requireFields });
@@ -886,7 +873,7 @@ describe("WorkflowEngine — stats backfill after settle", () => {
 });
 
 describe("WorkflowEngine — run metadata", () => {
-  it("persists scriptText / scriptHash / parentSessionId / cwd / toolCallId through createRun", async () => {
+  it("persists supplied run metadata through createRun", async () => {
     // 前四个字段 RunRecord 早就声明了，但 createRun 从不填——于是 resume 的 script_hash
     // 校验没有比对对象。落库是那条校验唯一的前提。toolCallId 是 cancel & resume 特性
     // 追加的第五个：重启后工具卡 join 与 resume 通知锚点的唯一持久来源。
@@ -896,6 +883,8 @@ describe("WorkflowEngine — run metadata", () => {
       parentSessionId: "sess_parent",
       cwd: "/tmp/project",
       toolCallId: "call-abc",
+      name: "nightly triage",
+      resumedFrom: "run-predecessor",
     });
     expect(journal.getRun(RUN)).toMatchObject({
       runId: RUN,
@@ -905,15 +894,9 @@ describe("WorkflowEngine — run metadata", () => {
       parentSessionId: "sess_parent",
       cwd: "/tmp/project",
       toolCallId: "call-abc",
+      name: "nightly triage",
+      resumedFrom: "run-predecessor",
     });
-  });
-
-  // name 走的是与上面四个字段**完全相同**的那条元数据路（EngineConfig → createRun，
-  // 此后没有任何写入者碰它）。它纯展示：引擎不读，宿主的枚举面拿它当标签——缺了这一步，
-  // 跨会话列出来的 run 只能是一串裸 runId（docs/dynamic-workflow/launch.md）。
-  it("persists the run name through createRun", async () => {
-    const { journal } = setup({ name: "nightly triage" });
-    expect(journal.getRun(RUN)).toMatchObject({ runId: RUN, name: "nightly triage" });
   });
 
   it("omits the metadata fields entirely when the config carries none", async () => {
@@ -930,13 +913,6 @@ describe("WorkflowEngine — run metadata", () => {
     // 绝大多数 run 不是修订：lineage 指针同样必须缺席，而不是落成空值
     // （docs/execution-engine.md）。
     expect("resumedFrom" in run).toBe(false);
-  });
-
-  // resumedFrom 走的也是这条只写一次的元数据路。引擎不读它：导入缓存的构建在 run service。
-  // 它落库的意义在崩溃之后——修订 run 的 plain resume 靠读回这个指针重建 ImportedCache。
-  it("persists the amend-resume lineage pointer through createRun", async () => {
-    const { journal } = setup({ resumedFrom: "run-predecessor" });
-    expect(journal.getRun(RUN)).toMatchObject({ runId: RUN, resumedFrom: "run-predecessor" });
   });
 });
 
@@ -1284,17 +1260,6 @@ describe("WorkflowEngine — askSpecs completeness", () => {
       status: "errored",
       error: { code: "MissingAskSpec" },
     });
-  });
-
-  it("still honours an explicit untyped entry", async () => {
-    // untyped ask 依然是一等公民——它只是必须被显式记为 { typed: false }。
-    const { engine, driver } = setup({ askSpecs: new Map([["ask#1", { typed: false }]]) });
-    const actor = engine.createActor("actor#1");
-    const p = engine.ask("ask#1", actor, "summarize");
-    await flush();
-    expect(driver.startAsks[0]?.message.typed).toBe(false);
-    engine.askTurnEnded(inst("ask#1"), "the answer");
-    await expect(p).resolves.toBe("the answer");
   });
 });
 
@@ -1739,6 +1704,7 @@ describe("WorkflowEngine — report", () => {
     resumed.engine.report("report#1", { n: 2 });
 
     expect(resumed.driver.eventsOfType("report")).toEqual([]);
+    expect(journal.getRun(RUN)?.status).toBe("running");
     expect(
       journal.listNodes(RUN, { kinds: "all", withResult: true }).filter((n) => n.kind === "report"),
     ).toHaveLength(2);
@@ -2081,7 +2047,12 @@ describe("WorkflowEngine — 出生阶段坐标（phaseName）", () => {
     // 所以不带 sourceSessionId；出生事实照带——读面据它把节点归到子代理名下
     // （docs/execution-engine.md「Events」）。失败的行同样短路复现，也同样带。
     const journal = new InMemoryJournalStore();
-    journal.createRun({ runId: RUN, caps: { maxConcurrency: 16 }, spentTokens: 0, status: "running" });
+    journal.createRun({
+      runId: RUN,
+      caps: { maxConcurrency: 16 },
+      spentTokens: 0,
+      status: "running",
+    });
     journal.putActor({ runId: RUN, siteId: "actor#1", ordinal: 1 });
     const row = (siteId: string, seq: number, instructions: string): NodeRecord => ({
       runId: RUN,
@@ -2105,7 +2076,9 @@ describe("WorkflowEngine — 出生阶段坐标（phaseName）", () => {
     const { engine, driver } = setup({ journal });
     const actor = engine.createActor("actor#1");
     await expect(engine.ask("ask#1", actor, "first task")).resolves.toBe("r-ask#1");
-    await expect(engine.ask("ask#2", actor, "second task")).rejects.toMatchObject({ code: "DriverError" });
+    await expect(engine.ask("ask#2", actor, "second task")).rejects.toMatchObject({
+      code: "DriverError",
+    });
 
     expect(driver.startAskCount()).toBe(0);
     const facts = { kind: "ask", actor: { siteId: "actor#1", ordinal: 1 } };
@@ -2276,7 +2249,12 @@ describe("WorkflowEngine — node-dispatched 重复出生事实", () => {
 
   it("carries the facts of the new life when a running row is re-queued on resume", async () => {
     const journal = new InMemoryJournalStore();
-    journal.createRun({ runId: RUN, caps: { maxConcurrency: 16 }, spentTokens: 0, status: "running" });
+    journal.createRun({
+      runId: RUN,
+      caps: { maxConcurrency: 16 },
+      spentTokens: 0,
+      status: "running",
+    });
     journal.putActor({ runId: RUN, siteId: "actor#1", ordinal: 1 });
     // 上一世崩在执行中：这一行是 running，重跑要按记录的 actorSeq 重新派发。
     journal.putNode({

@@ -11,6 +11,14 @@ import {
 } from "../src/slashCommandHelpers.js";
 
 describe("slashCommandHelpers", () => {
+  it("计划模式使用本地化操作名称，旧 CLI Plan 命令不能覆盖它", () => {
+    const [action] = buildAppSlashCommandSuggestions([
+      { value: "plan", label: "计划模式", description: "开启计划模式", run: () => {} },
+    ]);
+    expect(action).toMatchObject({ id: "app-slash:plan", value: "plan", label: "计划模式" });
+    expect(buildSlashSuggestions([{ name: "/PLAN", description: "legacy plan" }])).toEqual([]);
+  });
+
   it("buildSlashSuggestions 逐项展示 CLI catalog，不在 UI 维护内建白名单", () => {
     const commands: ZCodeSlashCommand[] = [
       {
@@ -265,8 +273,8 @@ describe("slashCommandHelpers", () => {
     expect(isAppSlashCommandSuggestion(cli[0]!)).toBe(false);
   });
 
-  // SSC28：/btw 是 /side 的等价别名，面板中各自独立展示。
-  it("buildAppSlashCommandSuggestions 支持 /btw 等价别名独立展示", () => {
+  // 多个 App 命令逐项保留，避免建议列表被截断。
+  it("buildAppSlashCommandSuggestions 逐项保留多个 App 命令建议", () => {
     const run = () => {};
     const shared = { description: "新建并打开一个辅助对话", keywords: ["side", "btw"], run };
     const result = buildAppSlashCommandSuggestions([

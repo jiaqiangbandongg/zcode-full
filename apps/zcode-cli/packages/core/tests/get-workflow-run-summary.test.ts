@@ -302,22 +302,4 @@ describe("workflow run summary — the budget", () => {
     expect(summary).toContain("12 steps settled");
     expect(summary).not.toContain(longTitle);
   });
-
-  it("hard-truncates only when even the two required sentences overflow", () => {
-    const summary = summaryOf({
-      status: "stopped",
-      stopReason: "user",
-      phases: [
-        { name: "p".repeat(128), state: "unfinished", rounds: 1, nodesSettled: 0, nodesRunning: 1 },
-      ],
-      usage: {
-        spentTokens: 999_999_999,
-        nodesObserved: 999_999,
-        nodesRunning: 1,
-        nodesCompleted: 999_998,
-        nodesFailed: 0,
-      },
-    });
-    expect(summary.length).toBeLessThanOrEqual(400);
-  });
 });

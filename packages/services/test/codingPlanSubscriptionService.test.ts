@@ -2,8 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_MODEL_PROVIDER_IDS, CODING_PLAN_SYSTEM_BUSY, type ApiClient } from "@zcode/shared";
 import {
   BigModelCodingPlanSubscriptionProvider,
-  createBigModelLoginAuthHeaders,
-  createZaiLoginAuthHeaders,
   resolveCodingPlanClientConfigUrl,
 } from "../src/coding-plan-subscription/bigmodelCodingPlanSubscriptionProvider.js";
 import { ZaiCodingPlanSubscriptionProvider } from "../src/coding-plan-subscription/zaiCodingPlanSubscriptionProvider.js";
@@ -322,18 +320,6 @@ describe("BigModelCodingPlanSubscriptionProvider", () => {
     expect(value).toBe("preflight-v1");
     expect(request).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it("预算读取不触发配置失败请求", async () => {
-    const request = vi.fn(async () => {
-      throw new Error("offline");
-    });
-    const provider = new BigModelCodingPlanSubscriptionProvider({
-      apiClient: { request },
-      credentialService: { load: vi.fn() },
-    });
-    await expect(provider.getModelContextBudgetStrategy()).resolves.toBe("preflight-v1");
-    expect(request).not.toHaveBeenCalled();
   });
 
   it("batchPreview 使用 BigModel OAuth token 且不添加 Bearer", async () => {
@@ -2356,20 +2342,6 @@ describe("BigModelCodingPlanSubscriptionProvider", () => {
         },
       }),
     );
-  });
-
-  it("鉴权 header helper 只返回裸 token", () => {
-    expect(createBigModelLoginAuthHeaders("token-1")).toEqual({
-      Authorization: "token-1",
-      "Content-Type": "application/json",
-    });
-  });
-
-  it("Z.ai 鉴权 header helper 只返回裸登录 token", () => {
-    expect(createZaiLoginAuthHeaders("zai-token")).toEqual({
-      Authorization: "zai-token",
-      "Content-Type": "application/json",
-    });
   });
 });
 

@@ -6,6 +6,7 @@ import {
 import {
   buildOAuthState,
   buildReturnToCallbackUrl,
+  buildWebRemoteOAuthRedirectUri,
   isTrustedDevReturnTo,
   parseOAuthState,
   parseOptionalUrl,
@@ -86,20 +87,34 @@ export class WebAuthService {
   startLogin(options: WebAuthLoginOptions = {}): void {
     const nonce = this.runtime.createNonce();
     const provider = options.provider ?? ZAI_PROVIDER_ID;
-    this.repo.savePendingNonce(nonce);
-    this.repo.savePendingProvider(provider);
+    const appReturnTo = options.appReturnTo ?? this.runtime.getCurrentHref();
+    const returnToOptions = { currentOrigin: this.runtime.getCurrentOrigin() };
+    const redirectUri = buildWebRemoteOAuthRedirectUri(
+      options.redirectUri ?? this.config.redirectUri,
+      appReturnTo,
+      returnToOptions,
+    );
+    this.repo.savePendingLogin({ nonce, provider, redirectUri });
 
     const state = buildOAuthState({
       nonce,
-      app_return_to: options.appReturnTo ?? this.runtime.getCurrentHref(),
-      ...(options.devReturnTo ? { return_to: options.devReturnTo } : {}),
+      app_return_to: appReturnTo,
+      ...(options.devReturnTo
+        ? {
+            return_to: buildWebRemoteOAuthRedirectUri(
+              options.devReturnTo,
+              appReturnTo,
+              returnToOptions,
+            ),
+          }
+        : {}),
     });
 
     this.runtime.assign(
       this.provider.buildAuthorizeUrl({
         state,
         provider,
-        redirectUri: options.redirectUri ?? this.config.redirectUri,
+        redirectUri,
       }),
     );
   }
@@ -134,26 +149,18 @@ export class WebAuthService {
       throw new Error("OAuth callback missing code");
     }
 
-    const pendingNonce = this.repo.loadPendingNonce();
-    if (statePayload.nonce !== pendingNonce) {
+    // provider 与回调地址必须取跳转前记下的那条：authorize 参数名和 token 响应里 access_token
+    // 的位置都是 provider 特定的，token 请求也要用授权时的完整回调地址。
+    const pendingLogin = this.repo.takePendingLogin(statePayload.nonce);
+    if (!pendingLogin) {
       throw new Error("OAuth CSRF 检测失败");
     }
-    // provider 必须取跳转前记下的那个：authorize 参数名和 token 响应里 access_token 的位置
-    // 都是 provider 特定的。缺失时按 zai 兜底，保持旧回调链接可用。
-    const provider = this.repo.loadPendingProvider() ?? ZAI_PROVIDER_ID;
-    this.repo.clearPendingNonce();
-    this.repo.clearPendingProvider();
-
-    const callbackRedirectUri = ["/cn/share/callback", "/share/callback"].includes(
-      new URL(url).pathname,
-    )
-      ? this.config.shareRedirectUri
-      : this.config.redirectUri;
+    const { provider, redirectUri } = pendingLogin;
     const exchange = await this.provider.exchangeToken({
       code: callback.code,
       state: callback.state,
       provider,
-      redirectUri: callbackRedirectUri,
+      redirectUri,
     });
 
     this.repo.saveTokenSet(exchange.tokenSet, provider);
@@ -178,6 +185,22 @@ export class WebAuthService {
 
   getZCodeJwtToken(): string | null {
     return this.repo.loadZCodeJwtToken();
+  }
+
+  /** 设备页账号行的展示资料；只读，不参与登录判断。 */
+  getActiveAccount(): {
+    displayName: string;
+    avatarUrl?: string;
+    provider: WebOAuthProviderId;
+  } | null {
+    const account = this.repo.loadActiveAccount();
+    if (!account) return null;
+    const { userInfo, provider } = account;
+    return {
+      displayName: userInfo.displayName.trim() || userInfo.username,
+      ...(userInfo.avatarUrl ? { avatarUrl: userInfo.avatarUrl } : {}),
+      provider,
+    };
   }
 
   async logout(): Promise<void> {

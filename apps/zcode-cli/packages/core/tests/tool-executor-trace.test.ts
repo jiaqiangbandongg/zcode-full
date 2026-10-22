@@ -50,6 +50,7 @@ describe("ToolExecutor trace propagation", () => {
       },
       handler: async (_input, context) => {
         context.recordSkillTelemetryMetadata?.({
+          name: "pptx",
           qualifiedName: "document-skills:pptx",
           pluginId: "document-skills@zcode-plugins-official",
           source: "plugin",
@@ -74,6 +75,7 @@ describe("ToolExecutor trace propagation", () => {
     expect(errorEvent?.payload).toMatchObject({
       toolCallId,
       skillMetadata: {
+        name: "pptx",
         qualifiedName: "document-skills:pptx",
         pluginId: "document-skills@zcode-plugins-official",
         source: "plugin",
@@ -399,7 +401,10 @@ describe("ToolExecutor trace propagation", () => {
         optionSpecs: model.optionSpecs,
         properties: model.properties,
       };
-    expect(capturedModels.map(identityOf)).toEqual([identityOf(activeModel), identityOf(activeModel)]);
+    expect(capturedModels.map(identityOf)).toEqual([
+      identityOf(activeModel),
+      identityOf(activeModel),
+    ]);
     for (const captured of capturedModels) {
       await expect(captured!.generateText({ messages: [] })).resolves.toEqual({
         finishReason: "stop",
@@ -805,13 +810,12 @@ describe("ToolExecutor trace propagation", () => {
     expect((events[1]?.payload as any).decision).toBe("deny");
   });
 
-  it("waits for the permission broker and executes when approved", async () => {
+  it("executes the tool after the permission broker approves", async () => {
     const sessionId = createSessionId("tool-permission-allow");
     const turnId = createTurnId("tool-turn");
     const traceContext = createRootTraceContext({ sessionId, turnId });
     const events: SessionEvent[] = [];
     const registry = createToolRegistry();
-    let handlerRan = false;
     let brokerSawRequest = false;
     const permissionBroker: PermissionBrokerPort = {
       async requestPermission(request) {
@@ -840,7 +844,6 @@ describe("ToolExecutor trace propagation", () => {
         sideEffectScope: "workspace",
       },
       handler: async () => {
-        handlerRan = true;
         return "write-ok";
       },
     });
@@ -869,7 +872,6 @@ describe("ToolExecutor trace propagation", () => {
 
     expect(result.success).toBe(true);
     expect(result.output).toBe("write-ok");
-    expect(handlerRan).toBe(true);
     expect(brokerSawRequest).toBe(true);
     expect((events[0]?.payload as any).suggestedPermissionUpdates).toEqual([
       {
@@ -2513,7 +2515,6 @@ describe("ToolExecutor trace propagation", () => {
 
     expect(result.success).toBe(true);
     expect(result.modelContent).toContain("Tool output truncated by resultBudget");
-    expect(result.modelContent).not.toContain(rawStructuredText);
     expect(result.serialization?.content).toBe(result.modelContent);
     expect(result.serialization?.modelContent).toBe(result.modelContent);
     expect(result.serialization?.truncated).toBe(true);
@@ -2908,7 +2909,6 @@ describe("ToolExecutor trace propagation", () => {
     expect(artifactStore.requests).toHaveLength(1);
     expect(artifactStore.requests[0]?.content).toBe(JSON.stringify(rawOutput));
     expect(result.serialization?.artifactPath).toBe("/artifacts/artifact-1.json");
-    expect(Buffer.byteLength(result.modelContent ?? "", "utf8")).toBeGreaterThan(160);
     expect(result.modelContent).toBe(
       '<persisted-output>\nOutput too large (311 B). Full output saved to: /artifacts/artifact-1.json\n\nPreview (first 2 KB):\n{"text":"artifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-outputartifact-output"}\n</persisted-output>',
     );
@@ -3131,7 +3131,6 @@ describe("ToolExecutor trace propagation", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(Array.isArray(result.modelContent)).toBe(true);
     expect(result.modelContent).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "image", dataUrl: imageBlock.dataUrl }),
@@ -3229,7 +3228,6 @@ describe("ToolExecutor trace propagation", () => {
 
     expect(result.success).toBe(true);
     expect(result.modelContent).toContain("Tool output truncated by resultBudget");
-    expect(result.modelContent).not.toBe(rawOutput);
     expect(result.serialization?.content).toBe(result.modelContent);
     expect(result.serialization?.truncated).toBe(true);
     expect(Buffer.byteLength(result.modelContent ?? "", "utf8")).toBeLessThanOrEqual(64);
@@ -3281,7 +3279,6 @@ describe("ToolExecutor trace propagation", () => {
 
     expect(result.success).toBe(true);
     expect(result.modelContent).toContain("Tool output truncated by resultBudget");
-    expect(result.modelContent).not.toBe(rawOutput);
     expect(result.serialization?.content).toBe(result.modelContent);
     expect(result.serialization?.truncated).toBe(true);
     expect(Buffer.byteLength(result.modelContent ?? "", "utf8")).toBeLessThanOrEqual(64);

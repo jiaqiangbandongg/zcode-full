@@ -315,6 +315,7 @@ export function OnboardingDialog(props: {
   const handleBeginMigration = useCallback(async () => {
     if (agentsFileMigration.selected) {
       const confirmed = await confirmDialog({
+        confirmVariant: "destructive",
         title: intl.formatMessage({ id: "onboarding.agentsFile.confirmTitle" }),
         description: intl.formatMessage(
           { id: "onboarding.agentsFile.confirmDescription" },

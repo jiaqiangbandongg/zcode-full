@@ -4,6 +4,8 @@ import {
   persistSidebarPurposeSectionPreferences,
   readSidebarPurposeSectionPreferences,
   reorderSidebarPurposeSections,
+  resolveSidebarPurposeSectionExpanded,
+  updateSidebarPurposeSectionExpanded,
 } from "@/lib/sidebarPurposeSectionPreferences.js";
 
 function createStorageMock(initial: Record<string, string> = {}) {
@@ -51,6 +53,57 @@ describe("sidebarPurposeSectionPreferences", () => {
       conversationsExpanded: true,
       sectionOrder: ["conversations", "projects"],
     });
+  });
+
+  it("isolates purpose section expansion by source group", () => {
+    const initial = readSidebarPurposeSectionPreferences(createStorageMock());
+    const next = updateSidebarPurposeSectionExpanded(initial, {
+      sectionId: "projects",
+      expanded: false,
+      sourceGroupKey: "server:source-a",
+    });
+
+    expect(
+      resolveSidebarPurposeSectionExpanded(next, "projects", "server:source-a"),
+    ).toBe(false);
+    expect(
+      resolveSidebarPurposeSectionExpanded(next, "projects", "server:source-b"),
+    ).toBe(true);
+    expect(
+      resolveSidebarPurposeSectionExpanded(
+        next,
+        "conversations",
+        "server:source-a",
+      ),
+    ).toBe(true);
+  });
+
+  it("persists source-group expansion without changing the legacy fallback", () => {
+    const storage = createStorageMock();
+    const next = updateSidebarPurposeSectionExpanded(
+      readSidebarPurposeSectionPreferences(storage),
+      {
+        sectionId: "conversations",
+        expanded: false,
+        sourceGroupKey: "local",
+      },
+    );
+
+    persistSidebarPurposeSectionPreferences(next, storage);
+    const restored = readSidebarPurposeSectionPreferences(storage);
+
+    expect(restored.projectsExpanded).toBe(true);
+    expect(restored.conversationsExpanded).toBe(true);
+    expect(
+      resolveSidebarPurposeSectionExpanded(restored, "conversations", "local"),
+    ).toBe(false);
+    expect(
+      resolveSidebarPurposeSectionExpanded(
+        restored,
+        "conversations",
+        "server:source-a",
+      ),
+    ).toBe(true);
   });
 
   it("falls back missing or invalid fields independently", () => {

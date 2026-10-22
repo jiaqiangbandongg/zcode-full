@@ -1,11 +1,11 @@
 import { ChevronRight, Loader2 } from "lucide-react";
+import { type StorageCategoryId } from "@zcode/shared";
 import {
-  type StorageCategoryId,
   TID_RESOURCE_MANAGER_STORAGE_CATEGORY_CLEAN,
   TID_RESOURCE_MANAGER_STORAGE_CATEGORY_ROW,
   TID_RESOURCE_MANAGER_STORAGE_CATEGORY_SIZE,
   testId,
-} from "@zcode/shared";
+} from "@zcode/shared/test-ids";
 import { Button } from "@/components/ui/button.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { formatBytes } from "@/resource-manager/resourceUsageView.js";

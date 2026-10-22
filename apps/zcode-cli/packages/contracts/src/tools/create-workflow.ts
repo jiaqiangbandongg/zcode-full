@@ -149,7 +149,7 @@ const CreateWorkflowModelInputSchema = z
       .min(1)
       .optional()
       .describe(
-        "Model for the subagents (`providerId/modelId` or a model id). Only when the user asks; you stay on the session model.",
+        "Model for the subagents (`providerId/modelId` or a model id). Only when the user asks, and never a model under another provider the user did not name — ask them first if one would help; you stay on the session model.",
       ),
     // 修订续跑不在这里：它是 `AmendWorkflow` 的工作（amend-workflow.ts）。`.strict()` 让旧写法 `resume_from` 成为可见的 schema 错误，
     // 而不是被静默忽略后变成一次全价重跑。

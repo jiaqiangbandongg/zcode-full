@@ -219,8 +219,16 @@ export async function openMcpUiInstance(
 ) {
   const params = parseParams(zcodeMcpUiOpenInstanceParamsSchema, rawParams);
   const record = requireSession(context, params.sessionId, { operation: "mcp/uiOpenInstance" });
-  const source = record.app.getMcpAppConnectionSnapshot(params.serverName);
-  if (!source) throw new ProtocolRequestError(-32001, "MCP App connection is unavailable");
+  // session ready 不代表目标 MCP ready；首次签发等待连接，已有凭证校验仍保持同步拒绝失效来源。
+  const source = await record.app.waitForMcpAppConnection(params.serverName);
+  const current = record.app.getMcpAppConnectionSnapshot(params.serverName);
+  if (
+    context.sessions.get(params.sessionId) !== record ||
+    !source ||
+    current?.identity !== source.identity ||
+    current.generation !== source.generation
+  )
+    throw new ProtocolRequestError(-32001, "MCP App connection is unavailable");
   const lease = mcpUiInstances.open(
     {
       workspace: params.workspace.workspaceIdentity?.trim() || params.workspace.workspacePath,

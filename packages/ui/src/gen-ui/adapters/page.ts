@@ -1,8 +1,4 @@
-import {
-  AppBridge,
-  type McpUiStyles,
-  type McpUiHostContext,
-} from "@modelcontextprotocol/ext-apps/app-bridge";
+import { AppBridge, type McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { z } from "zod";
 import type { IGenUiService } from "@zcode/services";
 import type { PluginSandboxPlatformPort, PluginSandboxHandle } from "@zcode/shared/mcp-apps";
@@ -27,7 +23,7 @@ import {
 } from "@/plugin-ui/hostPrimitives.js";
 import type { GenUiCardTarget, GenUiPage, GenUiPageSnapshot } from "../contract.js";
 import { EMPTY_GEN_UI_SNAPSHOT } from "../contract.js";
-import { readGenUiStyleVariables } from "./theme.js";
+import { readGenUiStyleContext } from "./theme.js";
 import { createGenUiTweakRegistry } from "../app/tweaks.js";
 
 export interface GenUiPageInput {
@@ -79,7 +75,7 @@ export function createGenUiPage(input: GenUiPageInput): GenUiPage {
   const context: McpUiHostContext = {
     displayMode: "inline",
     theme: document.documentElement.classList.contains("dark") ? "dark" : "light",
-    styles: { variables: readGenUiStyleVariables() as McpUiStyles },
+    ...readGenUiStyleContext(),
   };
   const pushContext = () => {
     bridge?.setHostContext({ ...context });
@@ -233,7 +229,7 @@ export function createGenUiPage(input: GenUiPageInput): GenUiPage {
   });
   const themes = new MutationObserver(() => {
     context.theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
-    context.styles = { variables: readGenUiStyleVariables() as McpUiStyles };
+    Object.assign(context, readGenUiStyleContext());
     pushContext();
   });
   themes.observe(document.documentElement, {
